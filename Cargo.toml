@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
   "contracts/utils/*",
+  "examples/*",
 ]
 
 [workspace.package]
