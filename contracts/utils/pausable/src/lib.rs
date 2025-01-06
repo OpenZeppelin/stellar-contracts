@@ -1,11 +1,13 @@
 #![no_std]
-#![allow(dead_code)]
 
-mod clients;
-mod errors;
-mod events;
+pub mod clients;
+pub mod errors;
+pub mod events;
 mod storage;
 
-pub use crate::clients::{Pausable, PausableClient};
+pub use crate::{
+    clients::{Pausable, PausableClient},
+    storage::{paused, pause, unpause, when_not_paused, when_paused},
+};
 
 mod test;

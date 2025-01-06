@@ -15,7 +15,7 @@ version = "0.0.0"
 soroban-sdk = "22.0.1"
 
 # members
-openzeppelin-pausable = { path = "contracts/pausable" }
+openzeppelin-pausable = { path = "contracts/utils/pausable" }
 
 [profile.release]
 opt-level = "z"
