@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+  "contracts/utils/*",
+]
+
+[workspace.package]
+authors = ["OpenZeppelin"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/OpenZeppelin/soroban-contracts"
+version = "0.0.0"
+
+[workspace.dependencies]
+soroban-sdk = "22.0.1"
+
+# members
+openzeppelin-pausable = { path = "contracts/pausable" }
+
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true
+
+# For more information about this profile see https://soroban.stellar.org/docs/basic-tutorials/logging#cargotoml-profile
+[profile.release-with-logs]
+inherits = "release"
+debug-assertions = true
