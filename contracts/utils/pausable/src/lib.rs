@@ -7,7 +7,7 @@ mod storage;
 
 pub use crate::{
     clients::{Pausable, PausableClient},
-    storage::{paused, pause, unpause, when_not_paused, when_paused},
+    storage::{pause, paused, unpause, when_not_paused, when_paused},
 };
 
 mod test;

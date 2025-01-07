@@ -13,7 +13,7 @@ use crate::storage::{pause, paused, unpause, when_not_paused, when_paused, PAUSE
 struct MockContract;
 
 #[test]
-fn test_initial_state() {
+fn initial_state() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
@@ -23,7 +23,7 @@ fn test_initial_state() {
 }
 
 #[test]
-fn test_pause() {
+fn pause_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -35,18 +35,18 @@ fn test_pause() {
         assert_eq!(paused(&e), true);
 
         //assert_eq!(
-            //e.auths(),
-            //[(
-                //caller.clone(),
-                //AuthorizedInvocation {
-                    //function: AuthorizedFunction::Contract((
-                        //address.clone(),
-                        //symbol_short!("pause"),
-                        //vec![&e, caller.clone().into_val(&e)]
-                    //)),
-                    //sub_invocations: [].to_vec()
-                //}
-            //)]
+        //e.auths(),
+        //[(
+        //caller.clone(),
+        //AuthorizedInvocation {
+        //function: AuthorizedFunction::Contract((
+        //address.clone(),
+        //symbol_short!("pause"),
+        //vec![&e, caller.clone().into_val(&e)]
+        //)),
+        //sub_invocations: [].to_vec()
+        //}
+        //)]
         //);
 
         let events = e.events().all();
@@ -66,7 +66,7 @@ fn test_pause() {
 }
 
 #[test]
-fn test_unpause() {
+fn unpause_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -97,7 +97,7 @@ fn test_unpause() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #1)")]
-fn test_pause_when_paused() {
+fn errors_pause_when_paused() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -113,7 +113,7 @@ fn test_pause_when_paused() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #2)")]
-fn test_unpause_when_not_paused() {
+fn errors_unpause_when_not_paused() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -126,7 +126,7 @@ fn test_unpause_when_not_paused() {
 }
 
 #[test]
-fn test_when_not_paused() {
+fn when_not_paused_works() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
@@ -137,7 +137,7 @@ fn test_when_not_paused() {
 }
 
 #[test]
-fn test_when_paused() {
+fn when_paused_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());

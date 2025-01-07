@@ -8,4 +8,3 @@ pub enum PausableError {
     /// The operation failed because the contract is not paused.
     ExpectedPause = 2,
 }
-

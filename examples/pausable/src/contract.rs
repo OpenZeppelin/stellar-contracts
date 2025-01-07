@@ -5,11 +5,10 @@
 //!
 //! Counter can be incremented only when `unpaused` and reset only when `paused`.
 
+use openzeppelin_pausable::{self as pausable, Pausable};
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env,
 };
-
-use openzeppelin_pausable::{self as pausable, Pausable};
 
 #[contracttype]
 pub enum DataKey {

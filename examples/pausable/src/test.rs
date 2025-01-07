@@ -7,7 +7,7 @@ use crate::contract::{ExampleContract, ExampleContractClient};
 
 fn create_client<'a>(e: &Env, owner: &Address) -> ExampleContractClient<'a> {
     let address = e.register(ExampleContract, (owner,));
-    ExampleContractClient::new(&e, &address)
+    ExampleContractClient::new(e, &address)
 }
 
 #[test]
