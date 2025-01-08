@@ -1,8 +1,8 @@
 use soroban_sdk::{panic_with_error, symbol_short, Address, Env, Symbol};
 
 use crate::{
-    pausable::PausableError,
     events::{self},
+    pausable::PausableError,
 };
 
 /// Indicates whether the contract is in `Paused` state.
