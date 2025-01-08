@@ -18,7 +18,7 @@ fn initial_state() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        assert_eq!(paused(&e), false);
+        assert!(!paused(&e));
     });
 }
 
@@ -32,7 +32,7 @@ fn pause_works() {
     e.as_contract(&address, || {
         // Test pause
         pause(&e, &caller);
-        assert_eq!(paused(&e), true);
+        assert!(paused(&e));
 
         //assert_eq!(
         //e.auths(),
@@ -78,7 +78,7 @@ fn unpause_works() {
 
         // Test unpause
         unpause(&e, &caller);
-        assert_eq!(paused(&e), false);
+        assert!(!paused(&e));
         let events = e.events().all();
         assert_eq!(events.len(), 1);
         assert_eq!(

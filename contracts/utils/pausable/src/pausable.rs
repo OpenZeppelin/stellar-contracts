@@ -10,7 +10,16 @@
 //! Note that your contract will NOT be pausable by simply including this
 //! module only once and where you use [`pausable::when_not_paused`].
 
-use soroban_sdk::{contractclient, Address, Env};
+use soroban_sdk::{contractclient, contracterror, Address, Env};
+
+#[contracterror]
+#[repr(u32)]
+pub enum PausableError {
+    /// The operation failed because the contract is paused.
+    EnforcedPause = 1,
+    /// The operation failed because the contract is not paused.
+    ExpectedPause = 2,
+}
 
 #[contractclient(name = "PausableClient")]
 pub trait Pausable {

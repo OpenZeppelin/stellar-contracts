@@ -1,7 +1,7 @@
 use soroban_sdk::{panic_with_error, symbol_short, Address, Env, Symbol};
 
 use crate::{
-    errors::PausableError,
+    pausable::PausableError,
     events::{self},
 };
 

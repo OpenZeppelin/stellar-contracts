@@ -1,12 +1,11 @@
 #![no_std]
 
-pub mod clients;
-pub mod errors;
 pub mod events;
+mod pausable;
 mod storage;
 
 pub use crate::{
-    clients::{Pausable, PausableClient},
+    pausable::{Pausable, PausableClient},
     storage::{pause, paused, unpause, when_not_paused, when_paused},
 };
 
