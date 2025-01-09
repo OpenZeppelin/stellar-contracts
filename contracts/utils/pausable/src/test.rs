@@ -34,21 +34,6 @@ fn pause_works() {
         pause(&e, &caller);
         assert!(paused(&e));
 
-        //assert_eq!(
-        //e.auths(),
-        //[(
-        //caller.clone(),
-        //AuthorizedInvocation {
-        //function: AuthorizedFunction::Contract((
-        //address.clone(),
-        //symbol_short!("pause"),
-        //vec![&e, caller.clone().into_val(&e)]
-        //)),
-        //sub_invocations: [].to_vec()
-        //}
-        //)]
-        //);
-
         let events = e.events().all();
         assert_eq!(events.len(), 1);
         assert_eq!(

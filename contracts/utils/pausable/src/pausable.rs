@@ -10,16 +10,7 @@
 //! Note that your contract will NOT be pausable by simply including this
 //! module only once and where you use [`pausable::when_not_paused`].
 
-use soroban_sdk::{contractclient, contracterror, Address, Env};
-
-#[contracterror]
-#[repr(u32)]
-pub enum PausableError {
-    /// The operation failed because the contract is paused.
-    EnforcedPause = 1,
-    /// The operation failed because the contract is not paused.
-    ExpectedPause = 2,
-}
+use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env};
 
 #[contractclient(name = "PausableClient")]
 pub trait Pausable {
@@ -65,4 +56,49 @@ pub trait Pausable {
     /// * topics - `["unpaused"]`
     /// * data - `[caller: Address]`
     fn unpause(e: Env, caller: Address);
+}
+
+// ################## ERRORS ##################
+
+#[contracterror]
+#[repr(u32)]
+pub enum PausableError {
+    /// The operation failed because the contract is paused.
+    EnforcedPause = 1,
+    /// The operation failed because the contract is not paused.
+    ExpectedPause = 2,
+}
+
+// ################## EVENTS ##################
+
+/// Emits an event when `Paused` state is triggered.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller.
+///
+/// # Events
+///
+/// * topics - `["paused"]`
+/// * data - `[caller: Address]`
+pub fn emit_paused(e: &Env, caller: &Address) {
+    let topics = (symbol_short!("paused"),);
+    e.events().publish(topics, caller)
+}
+
+/// Emits an event when `Unpaused` state is triggered.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller.
+///
+/// # Events
+///
+/// * topics - `["unpaused"]`
+/// * data - `[caller: Address]`
+pub fn emit_unpaused(e: &Env, caller: &Address) {
+    let topics = (symbol_short!("unpaused"),);
+    e.events().publish(topics, caller)
 }

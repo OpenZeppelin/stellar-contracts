@@ -1,8 +1,7 @@
 use soroban_sdk::{panic_with_error, symbol_short, Address, Env, Symbol};
 
 use crate::{
-    events::{self},
-    pausable::PausableError,
+    emit_paused, emit_unpaused, pausable::PausableError
 };
 
 /// Indicates whether the contract is in `Paused` state.
@@ -38,7 +37,7 @@ pub fn pause(e: &Env, caller: &Address) {
     caller.require_auth();
     when_not_paused(e);
     e.storage().instance().set(&PAUSED, &true);
-    events::emit_paused(e, caller);
+    emit_paused(e, caller);
 }
 
 /// Triggers `Unpaused` state.
@@ -61,7 +60,7 @@ pub fn unpause(e: &Env, caller: &Address) {
     caller.require_auth();
     when_paused(e);
     e.storage().instance().set(&PAUSED, &false);
-    events::emit_unpaused(e, caller);
+    emit_unpaused(e, caller);
 }
 
 /// Helper to make a function callable only when the contract is NOT
