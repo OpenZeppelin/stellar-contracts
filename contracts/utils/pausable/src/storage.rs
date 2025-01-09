@@ -1,8 +1,6 @@
 use soroban_sdk::{panic_with_error, symbol_short, Address, Env, Symbol};
 
-use crate::{
-    emit_paused, emit_unpaused, pausable::PausableError
-};
+use crate::{emit_paused, emit_unpaused, pausable::PausableError};
 
 /// Indicates whether the contract is in `Paused` state.
 pub(crate) const PAUSED: Symbol = symbol_short!("PAUSED");
