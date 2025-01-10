@@ -11,7 +11,7 @@ pub(crate) const PAUSED: Symbol = symbol_short!("PAUSED");
 ///
 /// * `e` - Access to Soroban environment.
 ///
-/// no authorization is required for this function.
+/// no authentication is required for this function.
 pub fn paused(e: &Env) -> bool {
     // if not paused, consider default false (unpaused)
     e.storage().instance().get(&PAUSED).unwrap_or(false)
@@ -34,7 +34,9 @@ pub fn paused(e: &Env) -> bool {
 /// * topics - `["paused"]`
 /// * data - `[caller: Address]`
 ///
-/// authorization is required for this function.
+/// # Notes
+///
+/// authentication is required for this function.
 pub fn pause(e: &Env, caller: &Address) {
     caller.require_auth();
     when_not_paused(e);
@@ -59,7 +61,9 @@ pub fn pause(e: &Env, caller: &Address) {
 /// * topics - `["unpaused"]`
 /// * data - `[caller: Address]`
 ///
-/// authorization is required for this function.
+/// # Notes
+///
+/// authentication is required for this function.
 pub fn unpause(e: &Env, caller: &Address) {
     caller.require_auth();
     when_paused(e);
@@ -79,7 +83,9 @@ pub fn unpause(e: &Env, caller: &Address) {
 /// If the contract is in the `Paused` state, then the error
 /// [`PausableError::EnforcedPause`] is thrown.
 ///
-/// no authorization is required for this function.
+/// # Notes
+///
+/// no authentication is required for this function.
 pub fn when_not_paused(e: &Env) {
     if paused(e) {
         panic_with_error!(e, PausableError::EnforcedPause)
@@ -98,7 +104,9 @@ pub fn when_not_paused(e: &Env) {
 /// If the contract is in `Unpaused` state, then the error
 /// [`PausableError::ExpectedPause`] is thrown.
 ///
-/// no authorization is required for this function.
+/// # Notes
+///
+/// no authentication is required for this function.
 pub fn when_paused(e: &Env) {
     if !paused(e) {
         panic_with_error!(e, PausableError::ExpectedPause)

@@ -1,9 +1,11 @@
 //! Pausable Example Contract.
 //!
-//! Demonstrates an example usage of `openzeppelin_pausable` moddule by implementing
-//! an emergency stop mechanism that can be triggered only by the owner account.
+//! Demonstrates an example usage of `openzeppelin_pausable` moddule by
+//! implementing an emergency stop mechanism that can be triggered only by the
+//! owner account.
 //!
-//! Counter can be incremented only when `unpaused` and reset only when `paused`.
+//! Counter can be incremented only when `unpaused` and reset only when
+//! `paused`.
 
 use openzeppelin_pausable::{self as pausable, Pausable};
 use soroban_sdk::{
