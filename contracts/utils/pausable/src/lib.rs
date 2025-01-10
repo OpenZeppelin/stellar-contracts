@@ -41,7 +41,6 @@
 //! TL;DR
 //! to see it all in action, check out the `examples/pausable/src/contract.rs` file.
 
-
 #![no_std]
 
 mod pausable;

@@ -1,5 +1,3 @@
-
-
 use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env};
 
 #[contractclient(name = "PausableClient")]
