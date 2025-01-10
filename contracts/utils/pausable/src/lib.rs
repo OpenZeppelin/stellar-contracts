@@ -1,6 +1,6 @@
 //! Pausable Contract Module.
 //!
-//! Contract module which allows implementing a configurable stop mechanism.
+//! This contract module allows implementing a configurable stop mechanism for your contract.
 //!
 //! By implementing the trait [`Pausable`] for your contract,
 //! you can safely integrate the Pausable functionality.
@@ -32,7 +32,7 @@
 //!
 //! For god knows why, if you want to opt-out of [`Pausable`] trait, and use
 //! `storage::*` functions directly in your contract, well... you can!
-//! But we encourage the use of `Pausable` trait instead, due to:
+//! But we encourage the use of [`Pausable`] trait instead, due to:
 //! - there is no additional cost
 //! - standardization
 //! - you cannot mistakenly forget one of the methods
