@@ -1,0 +1,21 @@
+:source-highlighter: highlight.js
+:highlightjs-languages: bash
+
+= Stellar Smart Contracts Suite
+
+A comprehensive collection of secure, scalable smart contracts and utilities for the Stellar network, supporting Fungible, Non-Fungible, and Multi-Token standards.
+
+== Token Standards
+Explore our implementations for token standards on Stellar Soroban:
+
+- **xref:tokens/fungible.adoc[Fungible Tokens]**: Digital assets representing a fixed or dynamic supply of identical units.
+- **Non-Fungible Tokens**: Unique digital assets with verifiable ownership (work in progress).
+- **Multi-Token**: Hybrid tokens enabling both fungible and non-fungible token functionalities (work in progress).
+
+== Audits
+// TODO: You can find our audit reports here.
+
+== Get Started
+// TODO: link to the Wizard
+
+

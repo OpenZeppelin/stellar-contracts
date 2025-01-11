@@ -1,0 +1,4 @@
+* Token Standards
+** xref:tokens/fungible.adoc[Fungible Tokens]
+
+

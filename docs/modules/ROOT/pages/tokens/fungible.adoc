@@ -1,0 +1,15 @@
+:source-highlighter: highlight.js
+:highlightjs-languages: rust
+:github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
+= Fungible Token Standard
+
+== Source Code link: // TODO
+
+== Purpose
+
+The Fungible Token Standard is a contract template designed to facilitate the creation and management of fungible tokens on the Stellar network.
+It provides a flexible and secure framework for defining and managing token standards, enabling developers to create and manage tokens with ease.
+
+== Extensions
+* Mintable: // TODO
+* Burnable: // TODO
