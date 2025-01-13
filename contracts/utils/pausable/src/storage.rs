@@ -11,6 +11,8 @@ pub(crate) const PAUSED: Symbol = symbol_short!("PAUSED");
 ///
 /// * `e` - Access to Soroban environment.
 ///
+/// # Notes
+///
 /// no authentication is required for this function.
 pub fn paused(e: &Env) -> bool {
     // if not paused, consider default false (unpaused)
@@ -36,7 +38,7 @@ pub fn paused(e: &Env) -> bool {
 ///
 /// # Notes
 ///
-/// authentication is required for this function.
+/// Authentication is required for this function.
 pub fn pause(e: &Env, caller: &Address) {
     caller.require_auth();
     when_not_paused(e);
@@ -63,7 +65,7 @@ pub fn pause(e: &Env, caller: &Address) {
 ///
 /// # Notes
 ///
-/// authentication is required for this function.
+/// Authentication is required for this function.
 pub fn unpause(e: &Env, caller: &Address) {
     caller.require_auth();
     when_paused(e);
@@ -85,7 +87,7 @@ pub fn unpause(e: &Env, caller: &Address) {
 ///
 /// # Notes
 ///
-/// no authentication is required for this function.
+/// No authentication is required for this function.
 pub fn when_not_paused(e: &Env) {
     if paused(e) {
         panic_with_error!(e, PausableError::EnforcedPause)
@@ -106,7 +108,7 @@ pub fn when_not_paused(e: &Env) {
 ///
 /// # Notes
 ///
-/// no authentication is required for this function.
+/// No authentication is required for this function.
 pub fn when_paused(e: &Env) {
     if !paused(e) {
         panic_with_error!(e, PausableError::ExpectedPause)

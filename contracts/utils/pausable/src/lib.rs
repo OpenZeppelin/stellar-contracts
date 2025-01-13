@@ -6,9 +6,9 @@
 //! By implementing the trait [`Pausable`] for your contract,
 //! you can safely integrate the Pausable functionality.
 //! The trait [`Pausable`] has the following methods:
-//! - [`storage::paused()`]
-//! - [`storage::pause()`]
-//! - [`storage::unpause()`]
+//! - [`paused()`]
+//! - [`pause()`]
+//! - [`unpause()`]
 //!
 //! The trait ensures all the required methods are implemented for your
 //! contract, and nothing is forgotten. Additionally, if you are to implement
