@@ -814,6 +814,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "openzeppelin-pausable-macros"
+version = "0.1.0"
+dependencies = [
+ "openzeppelin-pausable",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.95",
+]
+
+[[package]]
 name = "p256"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -836,6 +846,7 @@ name = "pausable-example"
 version = "0.0.0"
 dependencies = [
  "openzeppelin-pausable",
+ "openzeppelin-pausable-macros",
  "soroban-sdk",
 ]
 

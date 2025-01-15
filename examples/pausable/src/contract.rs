@@ -8,6 +8,7 @@
 //! `paused`.
 
 use openzeppelin_pausable::{self as pausable, Pausable};
+use openzeppelin_pausable_macros::{when_not_paused, when_paused};
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env,
 };
@@ -34,9 +35,8 @@ impl ExampleContract {
         e.storage().instance().set(&DataKey::Counter, &0);
     }
 
-    pub fn increment(e: &Env) -> i32 {
-        pausable::when_not_paused(e);
-
+    #[when_not_paused]
+    pub fn increment(e: Env) -> i32 {
         let mut counter: i32 =
             e.storage().instance().get(&DataKey::Counter).expect("counter should be set");
 
@@ -47,9 +47,8 @@ impl ExampleContract {
         counter
     }
 
-    pub fn emergency_reset(e: &Env) {
-        pausable::when_paused(e);
-
+    #[when_paused]
+    pub fn emergency_reset(e: Env) {
         e.storage().instance().set(&DataKey::Counter, &0);
     }
 }
