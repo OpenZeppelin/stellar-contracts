@@ -83,15 +83,15 @@ fn approve_and_transfer_from() {
         mint(&e, &owner, 100);
         approve(&e, &owner, &spender, 50, 1000);
 
-        let allowance_data = allowance(&e, &owner, &spender);
-        assert_eq!(allowance_data.value, 50);
+        let allowance_val = allowance(&e, &owner, &spender);
+        assert_eq!(allowance_val, 50);
 
         transfer_from(&e, &spender, &owner, &recipient, 30);
         assert_eq!(balance(&e, &owner), 70);
         assert_eq!(balance(&e, &recipient), 30);
 
         let updated_allowance = allowance(&e, &owner, &spender);
-        assert_eq!(updated_allowance.value, 20);
+        assert_eq!(updated_allowance, 20);
     });
 }
 
