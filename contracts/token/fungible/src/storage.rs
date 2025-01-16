@@ -382,7 +382,6 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, value: i128
         from_balance -= value;
         e.storage().persistent().set(&StorageKey::Balance(account.clone()), &from_balance);
     } else {
-        // TODO: check for total_supply for compatibilty with Token Interface
         let mut total_supply = total_supply(e);
         total_supply = total_supply.checked_add(value).expect("total_supply overflow");
         e.storage().instance().set(&StorageKey::TotalSupply, &total_supply);
@@ -393,7 +392,6 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, value: i128
         to_balance = to_balance.checked_add(value).expect("to_balance overflow");
         e.storage().persistent().set(&StorageKey::Balance(account.clone()), &to_balance);
     } else {
-        // TODO: check for total_supply for compatibilty with Token Interface
         let mut total_supply = total_supply(e);
         total_supply = total_supply.checked_sub(value).expect("total_supply underflow");
         e.storage().instance().set(&StorageKey::TotalSupply, &total_supply);
