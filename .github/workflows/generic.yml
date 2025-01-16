@@ -10,12 +10,6 @@ on:
     paths-ignore:
       - "**.md"
   workflow_dispatch:
-    inputs:
-      test-macos:
-        description: "run tests on macOS"
-        required: true
-        default: false
-        type: boolean
 
 # If new code is pushed to a PR branch, then cancel in progress workflows for
 # that PR. Ensures that we don't waste CI time, and returns results quicker.
@@ -42,13 +36,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-22.04
-          - macos-12
-        run-all:
-          - ${{ inputs.test-macos == true || github.ref == 'refs/heads/main' }}
-        exclude: # exclude macos-12 when the condition is false
-          - run-all: false
-            os: macos-12
+          - ubuntu-latest
 
     runs-on: ${{ matrix.os }}
     steps:
