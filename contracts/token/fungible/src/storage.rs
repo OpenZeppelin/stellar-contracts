@@ -29,6 +29,7 @@ enum StorageKey {
 /// it defaults to `0`.
 ///
 /// # Arguments
+///
 /// * `e` - Access to the Soroban environment.
 pub fn total_supply(e: &Env) -> i128 {
     e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0)
@@ -38,6 +39,7 @@ pub fn total_supply(e: &Env) -> i128 {
 /// balance is stored.
 ///
 /// # Arguments
+///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address for which the balance is being queried.
 pub fn balance(e: &Env, account: &Address) -> i128 {
@@ -227,6 +229,7 @@ pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, value: i128)
 /// the total supply accordingly.
 ///
 /// # Arguments
+///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address receiving the new tokens.
 /// * `value` - The amount of tokens to mint.
@@ -246,6 +249,7 @@ pub fn mint(e: &Env, account: &Address, value: i128) {
 /// supply accordingly.
 ///
 /// # Arguments
+///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address whose tokens are destroyed.
 /// * `value` - The amount of tokens to burn.

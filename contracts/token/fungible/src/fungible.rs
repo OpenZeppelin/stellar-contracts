@@ -1,16 +1,34 @@
-use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env};
+use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, String};
 
+/// Vanilla Fungible Token Trait
+///
+/// The `FungibleToken` trait defines the core functionality for fungible
+/// tokens, adhering to SEP-41. It provides a standard interface for managing
+/// balances, allowances, and metadata associated with fungible tokens.
+/// Additionally, this trait includes the `total_supply()` function, which is
+/// not part of SEP-41 but is commonly used in token contracts.
+///
+/// To fully comply with the SEP-41 specification one have to implement the
+/// `Burnable` trait in addition to this one. SEP-41 mandates support for token
+/// burning to be considered compliant.
 #[contractclient(name = "FungibleTokenClient")]
 pub trait FungibleToken {
     /// Returns the total amount of tokens in circulation.
     ///
     /// # Arguments
+    ///
     /// * `e` - Access to the Soroban environment.
-    fn total_supply(e: &Env) -> i128;
+    ///
+    /// # Notes
+    ///
+    /// We recommend using the [`crate::storage::total_supply()`] function from
+    /// the `storage` module when implementing this function.
+    fn total_supply(e: Env) -> i128;
 
     /// Returns the amount of tokens held by `account`.
     ///
     /// # Arguments
+    ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address for which the balance is being queried.
     ///
@@ -19,6 +37,21 @@ pub trait FungibleToken {
     /// We recommend using the [`crate::storage::balance()`] function from
     /// the `storage` module when implementing this function.
     fn balance(e: Env, account: Address) -> i128;
+
+    /// Returns the amount of tokens a `spender` is allowed to spend on behalf
+    /// of an `owner`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `owner` - The address holding the tokens.
+    /// * `spender` - The address authorized to spend the tokens.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using the [`crate::storage::allowance()`] function from
+    /// the `storage` module when implementing this function.
+    fn allowance(e: Env, owner: Address, spender: Address) -> i128;
 
     /// Transfers a `value` amount of tokens from `from` to `to`.
     ///
@@ -76,24 +109,11 @@ pub trait FungibleToken {
     /// the `storage` module when implementing this function.
     fn transfer_from(e: Env, spender: Address, from: Address, to: Address, value: i128);
 
-    /// Returns the amount of tokens a `spender` is allowed to spend on behalf
-    /// of an `owner`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
-    /// * `owner` - The address holding the tokens.
-    /// * `spender` - The address authorized to spend the tokens.
-    ///
-    /// # Notes
-    ///
-    /// We recommend using the [`crate::storage::allowance()`] function from
-    /// the `storage` module when implementing this function.
-    fn allowance(e: Env, owner: Address, spender: Address) -> i128;
-
     /// Sets the amount of tokens a `spender` is allowed to spend on behalf of
     /// an `owner`. Overrides any existing allowance set between `spender` and
-    /// `owner`. # Arguments
+    /// `owner`.
+    ///
+    /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
     /// * `owner` - The address holding the tokens.
@@ -118,6 +138,42 @@ pub trait FungibleToken {
     /// We recommend using the [`crate::storage::approve()`] function from
     /// the `storage` module when implementing this function.
     fn approve(e: Env, owner: Address, spender: Address, value: i128, live_until_ledger: u32);
+
+    /// Returns the number of decimals used to represent amounts of this token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using the [`crate::metadata::decimals()`] function from
+    /// the `metadata` module when implementing this function.
+    fn decimals(e: Env) -> u32;
+
+    /// Returns the name for this token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using the [`crate::metadata::name()`] function from
+    /// the `metadata` module when implementing this function.
+    fn name(e: Env) -> String;
+
+    /// Returns the symbol for this token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using the [`crate::metadata::symbol()`] function from
+    /// the `metadata` module when implementing this function.
+    fn symbol(e: Env) -> String;
 }
 
 // ################## ERRORS ##################
