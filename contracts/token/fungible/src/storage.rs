@@ -260,19 +260,19 @@ pub fn burn(e: &Env, account: &Address, value: i128) {
     // TODO: emit_burn
 }
 
-/// Transfers a `value` amount of tokens from `owner` to `to`.
+/// Transfers a `value` amount of tokens from `from` to `to`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `owner` - The address holding the tokens.
+/// * `from` - The address holding the tokens.
 /// * `to` - The address receiving the transferred tokens.
 /// * `value` - The value of tokens to be transferred.
 ///
 /// # Errors
 ///
 /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
-///   more tokens than `owner` current balance.
+///   more tokens than `from` current balance.
 ///
 /// # Events
 ///
@@ -281,13 +281,13 @@ pub fn burn(e: &Env, account: &Address, value: i128) {
 ///
 /// # Notes
 ///
-/// Authorization for `owner` is required.
-pub fn transfer(e: &Env, owner: &Address, to: &Address, value: i128) {
-    owner.require_auth();
-    do_transfer(e, owner, to, value);
+/// Authorization for `from` is required.
+pub fn transfer(e: &Env, from: &Address, to: &Address, value: i128) {
+    from.require_auth();
+    do_transfer(e, from, to, value);
 }
 
-/// Transfers a `value` amount of tokens from `owner` to `to` using the
+/// Transfers a `value` amount of tokens from `from` to `to` using the
 /// allowance mechanism. `value` is then deducted from `spender` allowance.
 ///
 /// # Arguments
@@ -295,14 +295,14 @@ pub fn transfer(e: &Env, owner: &Address, to: &Address, value: i128) {
 /// * `e` - Access to Soroban environment.
 /// * `spender` - The address authorizing the transfer, and having its allowance
 ///   consumed during the transfer.
-/// * `owner` - The address holding the tokens which will be transferred.
+/// * `from` - The address holding the tokens which will be transferred.
 /// * `to` - The address receiving the transferred tokens.
 /// * `value` - The amount of tokens to be transferred.
 ///
 /// # Errors
 ///
 /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
-///   more tokens than `owner` current balance.
+///   more tokens than `from` current balance.
 /// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to
 ///   transfer more tokens than `spender` current allowance.
 ///
@@ -315,10 +315,10 @@ pub fn transfer(e: &Env, owner: &Address, to: &Address, value: i128) {
 /// # Notes
 ///
 /// Authorization for `spender` is required.
-pub fn transfer_from(e: &Env, spender: &Address, owner: &Address, to: &Address, value: i128) {
+pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, value: i128) {
     spender.require_auth();
-    spend_allowance(e, owner, spender, value);
-    do_transfer(e, owner, to, value);
+    spend_allowance(e, from, spender, value);
+    do_transfer(e, from, to, value);
 }
 
 /// Equivalent to [`transfer()`] but doesn't handle authorization.
@@ -326,14 +326,14 @@ pub fn transfer_from(e: &Env, spender: &Address, owner: &Address, to: &Address, 
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `owner` - The address holding the tokens.
+/// * `from` - The address holding the tokens.
 /// * `to` - The address receiving the transferred tokens.
 /// * `value` - The value of tokens to be transferred.
 ///
 /// # Errors
 ///
 /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
-///   more tokens than `owner` current balance.
+///   more tokens than `from` current balance.
 ///
 /// # Events
 ///
@@ -343,10 +343,10 @@ pub fn transfer_from(e: &Env, spender: &Address, owner: &Address, to: &Address, 
 /// # Notes
 ///
 /// No authorization is required.
-pub fn do_transfer(e: &Env, owner: &Address, to: &Address, value: i128) {
-    update(e, Some(owner), Some(to), value);
+pub fn do_transfer(e: &Env, from: &Address, to: &Address, value: i128) {
+    update(e, Some(from), Some(to), value);
 
-    emit_transfer(e, owner, to, value);
+    emit_transfer(e, from, to, value);
 }
 
 /// Transfers a `value` amount of tokens from `from` to `to` or alternatively

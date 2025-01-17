@@ -43,10 +43,10 @@
 //!
 //! ## Compatibility and Compliance
 //!
-//! The module is designed to ensure full compatibility with SEP-0041 standards,
-//! making it easy to integrate into Soroban-based applications that follow
-//! these guidelines. It also closely mirrors the Ethereum ERC-20 standard,
-//! facilitating cross-ecosystem familiarity and ease of use.
+//! The module is designed to ensure full compatibility with SEP-0041, making it
+//! easy to integrate into Soroban-based applications. It also closely mirrors
+//! the Ethereum ERC-20 standard, facilitating cross-ecosystem familiarity and
+//! ease of use.
 //!
 //! ## Notes for Developers
 //!

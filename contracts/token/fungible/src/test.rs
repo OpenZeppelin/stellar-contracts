@@ -56,13 +56,13 @@ fn transfer_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let owner = Address::generate(&e);
+    let from = Address::generate(&e);
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        mint(&e, &owner, 100);
-        transfer(&e, &owner, &recipient, 50);
-        assert_eq!(balance(&e, &owner), 50);
+        mint(&e, &from, 100);
+        transfer(&e, &from, &recipient, 50);
+        assert_eq!(balance(&e, &from), 50);
         assert_eq!(balance(&e, &recipient), 50);
 
         let events = e.events().all();
@@ -101,12 +101,12 @@ fn errors_transfer_insufficient_balance() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let owner = Address::generate(&e);
+    let from = Address::generate(&e);
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        mint(&e, &owner, 50);
-        transfer(&e, &owner, &recipient, 100);
+        mint(&e, &from, 50);
+        transfer(&e, &from, &recipient, 100);
     });
 }
 
