@@ -12,7 +12,7 @@ pub trait Pausable {
     ///
     /// We expect you to use the [`crate::storage::paused()`] function from
     /// the `storage` module when implementing this function.
-    fn paused(e: Env) -> bool;
+    fn paused(e: &Env) -> bool;
 
     /// Triggers `Paused` state.
     ///
@@ -35,7 +35,7 @@ pub trait Pausable {
     ///
     /// We expect you to use the [`crate::storage::pause()`] function from
     /// the `storage` module.
-    fn pause(e: Env, caller: Address);
+    fn pause(e: &Env, caller: Address);
 
     /// Triggers `Unpaused` state.
     ///
@@ -58,7 +58,7 @@ pub trait Pausable {
     ///
     /// We expect you to use the [`crate::storage::unpause()`] function
     /// from the `storage` module.
-    fn unpause(e: Env, caller: Address);
+    fn unpause(e: &Env, caller: Address);
 }
 
 // ################## ERRORS ##################

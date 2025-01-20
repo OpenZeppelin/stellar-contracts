@@ -262,26 +262,6 @@ pub fn mint(e: &Env, account: &Address, value: i128) {
     // TODO: emit_mint
 }
 
-/// TODO: move to burnable
-/// Destroys a `value` amount of tokens from `account`. Updates the total
-/// supply accordingly.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The address whose tokens are destroyed.
-/// * `value` - The amount of tokens to burn.
-///
-/// # Errors
-/// TODO
-///
-/// # Events
-/// TODO
-pub fn burn(e: &Env, account: &Address, value: i128) {
-    update(e, Some(account), None, value)
-    // TODO: emit_burn
-}
-
 /// Transfers a `value` amount of tokens from `from` to `to`.
 ///
 /// # Arguments

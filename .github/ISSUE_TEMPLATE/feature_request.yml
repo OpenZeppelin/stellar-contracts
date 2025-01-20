@@ -14,11 +14,3 @@ body:
       description: Is your feature request related to a specific problem? Is it just a crazy idea? Tell us about it!
     validations:
       required: true
-  - type: checkboxes
-    id: terms
-    attributes:
-      label: Contribution Guidelines
-      description: By submitting this issue, you agree to follow our [Contribution Guidelines](https://github.com/OpenZeppelin/soroban-contracts/blob/main/CONTRIBUTING.md)
-      options:
-        - label: I agree to follow this project's Contribution Guidelines
-          required: true
