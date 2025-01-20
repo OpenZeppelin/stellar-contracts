@@ -213,7 +213,7 @@ pub fn set_allowance(
 /// * `e` - Access to Soroban environment.
 /// * `owner` - The address holding the tokens.
 /// * `spender` - The address authorized to spend the tokens.
-/// * `value` - The amount of tokens to be deducted from `spender` allowance.
+/// * `value` - The amount of tokens to be deducted from `spender`s allowance.
 ///
 /// # Errors
 ///
@@ -290,7 +290,7 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, value: i128) {
 }
 
 /// Transfers a `value` amount of tokens from `from` to `to` using the
-/// allowance mechanism. `value` is then deducted from `spender` allowance.
+/// allowance mechanism. `value` is then deducted from `spender`s allowance.
 ///
 /// # Arguments
 ///
