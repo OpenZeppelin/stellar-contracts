@@ -35,7 +35,7 @@ impl ExampleContract {
     }
 
     pub fn increment(e: &Env) -> i32 {
-        pausable::when_not_paused(&e);
+        pausable::when_not_paused(e);
 
         let mut counter: i32 =
             e.storage().instance().get(&DataKey::Counter).expect("counter should be set");
@@ -48,7 +48,7 @@ impl ExampleContract {
     }
 
     pub fn emergency_reset(e: &Env) {
-        pausable::when_paused(&e);
+        pausable::when_paused(e);
 
         e.storage().instance().set(&DataKey::Counter, &0);
     }
@@ -57,7 +57,7 @@ impl ExampleContract {
 #[contractimpl]
 impl Pausable for ExampleContract {
     fn paused(e: &Env) -> bool {
-        pausable::paused(&e)
+        pausable::paused(e)
     }
 
     fn pause(e: &Env, caller: Address) {
@@ -70,7 +70,7 @@ impl Pausable for ExampleContract {
             panic_with_error!(e, ExampleContractError::Unauthorized)
         }
 
-        pausable::pause(&e, &caller);
+        pausable::pause(e, &caller);
     }
 
     fn unpause(e: &Env, caller: Address) {
@@ -83,6 +83,6 @@ impl Pausable for ExampleContract {
             panic_with_error!(e, ExampleContractError::Unauthorized)
         }
 
-        pausable::unpause(&e, &caller);
+        pausable::unpause(e, &caller);
     }
 }
