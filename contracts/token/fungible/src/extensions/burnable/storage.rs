@@ -16,8 +16,8 @@ use crate::{
 ///
 /// # Errors
 ///
-/// * [`crate::fungible::FungibleTokenError::InsufficientBalance`] -
-/// When attempting to burn more tokens than `from` current balance.
+/// * [`crate::fungible::FungibleTokenError::InsufficientBalance`] - When
+///   attempting to burn more tokens than `from` current balance.
 ///
 /// # Events
 ///
@@ -42,10 +42,10 @@ pub fn burn(e: &Env, from: &Address, amount: i128) {
 ///
 /// # Errors
 ///
-/// * [`crate::fungible::FungibleTokenError::InsufficientBalance`] -
-/// When attempting to burn more tokens than `from` current balance.
-/// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to
-/// burn more tokens than `spender`s current allowance.
+/// * [`crate::fungible::FungibleTokenError::InsufficientBalance`] - When
+///   attempting to burn more tokens than `from` current balance.
+/// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to burn
+///   more tokens than `spender`s current allowance.
 ///
 /// # Events
 ///
