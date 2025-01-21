@@ -53,7 +53,7 @@ pub trait FungibleToken {
     /// the `storage` module when implementing this function.
     fn allowance(e: &Env, owner: Address, spender: Address) -> i128;
 
-    /// Transfers a `amount` of tokens from `from` to `to`.
+    /// Transfers `amount` of tokens from `from` to `to`.
     ///
     /// # Arguments
     ///
@@ -78,7 +78,7 @@ pub trait FungibleToken {
     /// the `storage` module when implementing this function.
     fn transfer(e: &Env, from: Address, to: Address, amount: i128);
 
-    /// Transfers a `amount` of tokens from `from` to `to` using the
+    /// Transfers `amount` of tokens from `from` to `to` using the
     /// allowance mechanism. `amount` is then deducted from `spender`
     /// allowance.
     ///
