@@ -23,7 +23,7 @@ pub struct AllowanceKey {
 /// and the ledger number at which this allowance expires.
 #[contracttype]
 pub struct AllowanceData {
-    pub value: i128,
+    pub amount: i128,
     pub live_until_ledger: u32,
 }
 
@@ -82,7 +82,7 @@ pub fn balance(e: &Env, account: &Address) -> i128 {
 /// allowance should be treated as `0`.
 pub fn allowance_data(e: &Env, owner: &Address, spender: &Address) -> AllowanceData {
     let key = AllowanceKey { owner: owner.clone(), spender: spender.clone() };
-    let default = AllowanceData { value: 0, live_until_ledger: 0 };
+    let default = AllowanceData { amount: 0, live_until_ledger: 0 };
     e.storage().temporary().get(&StorageKey::Allowance(key)).unwrap_or(default)
 }
 
@@ -98,15 +98,15 @@ pub fn allowance_data(e: &Env, owner: &Address, spender: &Address) -> AllowanceD
 /// # Notes
 ///
 /// An allowance entry where `live_until_ledger` is less than the current
-/// ledger number is treated as an allowance with value `0`.
+/// ledger number is treated as an allowance with amount `0`.
 pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
     let allowance = allowance_data(e, owner, spender);
 
-    if allowance.value > 0 && allowance.live_until_ledger < e.ledger().sequence() {
+    if allowance.amount > 0 && allowance.live_until_ledger < e.ledger().sequence() {
         return 0;
     }
 
-    allowance.value
+    allowance.amount
 }
 
 // ################## CHANGE STATE ##################
@@ -119,7 +119,7 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 /// * `e` - Access to Soroban environment.
 /// * `owner` - The address holding the tokens.
 /// * `spender` - The address authorized to spend the tokens.
-/// * `value` - The amount of tokens made available to `spender`.
+/// * `amount` - The amount of tokens made available to `spender`.
 /// * `live_until_ledger` - The ledger number at which the allowance expires.
 ///
 /// # Errors
@@ -131,20 +131,20 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 /// # Events
 ///
 /// * topics - `["approve", from: Address, spender: Address]`
-/// * data - `[value: i128, live_until_ledger: u32]`
+/// * data - `[amount: i128, live_until_ledger: u32]`
 ///
 /// # Notes
 ///
 /// Authorization for `owner` is required.
-pub fn approve(e: &Env, owner: &Address, spender: &Address, value: i128, live_until_ledger: u32) {
+pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
     owner.require_auth();
-    set_allowance(e, owner, spender, value, live_until_ledger, true);
+    set_allowance(e, owner, spender, amount, live_until_ledger, true);
 }
 
 /// Sets the amount of tokens a `spender` is allowed to spend on behalf of an
 /// `owner`. Overrides any existing allowance set between `spender` and `owner`.
 /// Variant of [`approve()`] that doesn't handle authorization, but controls
-/// event emission. That can be useful in operatioins like spending allowance
+/// event emission. That can be useful in operations like spending allowance
 /// during [`transfer_from()`].
 ///
 /// # Arguments
@@ -152,7 +152,7 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, value: i128, live_un
 /// * `e` - Access to Soroban environment.
 /// * `owner` - The address holding the tokens.
 /// * `spender` - The address authorized to spend the tokens.
-/// * `value` - The amount of tokens made available to `spender`.
+/// * `amount` - The amount of tokens made available to `spender`.
 /// * `live_until_ledger` - The ledger number at which the allowance expires.
 /// * `emit` - A flag to enable or disable event emission.
 ///
@@ -166,7 +166,7 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, value: i128, live_un
 ///
 /// Emits an event if `emit` is `true`.
 /// * topics - `["approve", from: Address, spender: Address]`
-/// * data - `[value: i128, live_until_ledger: u32]`
+/// * data - `[amount: i128, live_until_ledger: u32]`
 ///
 /// # Notes
 ///
@@ -175,17 +175,17 @@ pub fn set_allowance(
     e: &Env,
     owner: &Address,
     spender: &Address,
-    value: i128,
+    amount: i128,
     live_until_ledger: u32,
     emit: bool,
 ) {
-    if value < 0 {
-        panic!("value cannot be negative")
+    if amount < 0 {
+        panic!("amount cannot be negative")
     }
 
-    let allowance = AllowanceData { value, live_until_ledger };
+    let allowance = AllowanceData { amount, live_until_ledger };
 
-    if value > 0 && live_until_ledger < e.ledger().sequence() {
+    if amount > 0 && live_until_ledger < e.ledger().sequence() {
         panic_with_error!(e, FungibleTokenError::InvalidLiveUntilLedger);
     }
 
@@ -193,7 +193,7 @@ pub fn set_allowance(
         StorageKey::Allowance(AllowanceKey { owner: owner.clone(), spender: spender.clone() });
     e.storage().temporary().set(&key, &allowance);
 
-    if value > 0 {
+    if amount > 0 {
         // NOTE: can't underflow because of the check above.
         let live_for = live_until_ledger - e.ledger().sequence();
 
@@ -201,7 +201,7 @@ pub fn set_allowance(
     }
 
     if emit {
-        emit_approve(e, owner, spender, value, live_until_ledger);
+        emit_approve(e, owner, spender, amount, live_until_ledger);
     }
 }
 
@@ -213,7 +213,7 @@ pub fn set_allowance(
 /// * `e` - Access to Soroban environment.
 /// * `owner` - The address holding the tokens.
 /// * `spender` - The address authorized to spend the tokens.
-/// * `value` - The amount of tokens to be deducted from `spender`s allowance.
+/// * `amount` - The amount of tokens to be deducted from `spender`s allowance.
 ///
 /// # Errors
 ///
@@ -223,19 +223,19 @@ pub fn set_allowance(
 /// # Notes
 ///
 /// No authorization is required.
-pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, value: i128) {
+pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128) {
     let allowance = allowance_data(e, owner, spender);
 
-    if allowance.value < value {
+    if allowance.amount < amount {
         panic_with_error!(e, FungibleTokenError::InsufficientAllowance);
     }
 
-    if value > 0 {
+    if amount > 0 {
         set_allowance(
             e,
             owner,
             spender,
-            allowance.value - value,
+            allowance.amount - amount,
             allowance.live_until_ledger,
             false,
         );
@@ -243,33 +243,33 @@ pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, value: i128)
 }
 
 /// TODO: move to mintable
-/// Creates a `value` amount of tokens and assigns them to `account`. Updates
+/// Creates `amount` of tokens and assigns them to `account`. Updates
 /// the total supply accordingly.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address receiving the new tokens.
-/// * `value` - The amount of tokens to mint.
+/// * `amount` - The amount of tokens to mint.
 ///
 /// # Errors
 /// TODO
 ///
 /// # Events
 /// TODO
-pub fn mint(e: &Env, account: &Address, value: i128) {
-    update(e, None, Some(account), value)
+pub fn mint(e: &Env, account: &Address, amount: i128) {
+    update(e, None, Some(account), amount)
     // TODO: emit_mint
 }
 
-/// Transfers a `value` amount of tokens from `from` to `to`.
+/// Transfers `amount` of tokens from `from` to `to`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `from` - The address holding the tokens.
 /// * `to` - The address receiving the transferred tokens.
-/// * `value` - The value of tokens to be transferred.
+/// * `amount` - The amount of tokens to be transferred.
 ///
 /// # Errors
 ///
@@ -279,18 +279,18 @@ pub fn mint(e: &Env, account: &Address, value: i128) {
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[value: i128]`
+/// * data - `[amount: i128]`
 ///
 /// # Notes
 ///
 /// Authorization for `from` is required.
-pub fn transfer(e: &Env, from: &Address, to: &Address, value: i128) {
+pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
     from.require_auth();
-    do_transfer(e, from, to, value);
+    do_transfer(e, from, to, amount);
 }
 
-/// Transfers a `value` amount of tokens from `from` to `to` using the
-/// allowance mechanism. `value` is then deducted from `spender`s allowance.
+/// Transfers `amount` of tokens from `from` to `to` using the
+/// allowance mechanism. `amount` is then deducted from `spender`s allowance.
 ///
 /// # Arguments
 ///
@@ -299,7 +299,7 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, value: i128) {
 ///   consumed during the transfer.
 /// * `from` - The address holding the tokens which will be transferred.
 /// * `to` - The address receiving the transferred tokens.
-/// * `value` - The amount of tokens to be transferred.
+/// * `amount` - The amount of tokens to be transferred.
 ///
 /// # Errors
 ///
@@ -312,15 +312,15 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, value: i128) {
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[value: i128]`
+/// * data - `[amount: i128]`
 ///
 /// # Notes
 ///
 /// Authorization for `spender` is required.
-pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, value: i128) {
+pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
     spender.require_auth();
-    spend_allowance(e, from, spender, value);
-    do_transfer(e, from, to, value);
+    spend_allowance(e, from, spender, amount);
+    do_transfer(e, from, to, amount);
 }
 
 /// Equivalent to [`transfer()`] but doesn't handle authorization.
@@ -330,7 +330,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, v
 /// * `e` - Access to Soroban environment.
 /// * `from` - The address holding the tokens.
 /// * `to` - The address receiving the transferred tokens.
-/// * `value` - The value of tokens to be transferred.
+/// * `amount` - The amount of tokens to be transferred.
 ///
 /// # Errors
 ///
@@ -340,18 +340,18 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, v
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[value: i128]`
+/// * data - `[amount: i128]`
 ///
 /// # Notes
 ///
 /// No authorization is required.
-pub fn do_transfer(e: &Env, from: &Address, to: &Address, value: i128) {
-    update(e, Some(from), Some(to), value);
+pub fn do_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+    update(e, Some(from), Some(to), amount);
 
-    emit_transfer(e, from, to, value);
+    emit_transfer(e, from, to, amount);
 }
 
-/// Transfers a `value` amount of tokens from `from` to `to` or alternatively
+/// Transfers `amount` of tokens from `from` to `to` or alternatively
 /// mints (or burns) tokens if `from` (or `to`) is `None`. Updates the total
 /// supply accordingly.
 ///
@@ -360,7 +360,7 @@ pub fn do_transfer(e: &Env, from: &Address, to: &Address, value: i128) {
 /// * `e` - Access to Soroban environment.
 /// * `from` - The address holding the tokens.
 /// * `to` - The address receiving the transferred tokens.
-/// * `value` - The value of tokens to be transferred.
+/// * `amount` - The amount of tokens to be transferred.
 ///
 /// # Errors
 ///
@@ -370,32 +370,32 @@ pub fn do_transfer(e: &Env, from: &Address, to: &Address, value: i128) {
 /// # Notes
 ///
 /// No authorization is required.
-pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, value: i128) {
-    if value <= 0 {
-        panic!("value must be > 0")
+pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i128) {
+    if amount <= 0 {
+        panic!("amount must be > 0")
     }
 
     if let Some(account) = from {
         let mut from_balance = balance(e, account);
-        if from_balance < value {
+        if from_balance < amount {
             panic_with_error!(e, FungibleTokenError::InsufficientBalance);
         }
         // NOTE: can't underflow because of the check above.
-        from_balance -= value;
+        from_balance -= amount;
         e.storage().persistent().set(&StorageKey::Balance(account.clone()), &from_balance);
     } else {
         let mut total_supply = total_supply(e);
-        total_supply = total_supply.checked_add(value).expect("total_supply overflow");
+        total_supply = total_supply.checked_add(amount).expect("total_supply overflow");
         e.storage().instance().set(&StorageKey::TotalSupply, &total_supply);
     }
 
     if let Some(account) = to {
         let mut to_balance = balance(e, account);
-        to_balance = to_balance.checked_add(value).expect("to_balance overflow");
+        to_balance = to_balance.checked_add(amount).expect("to_balance overflow");
         e.storage().persistent().set(&StorageKey::Balance(account.clone()), &to_balance);
     } else {
         let mut total_supply = total_supply(e);
-        total_supply = total_supply.checked_sub(value).expect("total_supply underflow");
+        total_supply = total_supply.checked_sub(amount).expect("total_supply underflow");
         e.storage().instance().set(&StorageKey::TotalSupply, &total_supply);
     }
 }

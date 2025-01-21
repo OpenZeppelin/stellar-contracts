@@ -4,7 +4,22 @@
     "nonce": 0
   },
   "auth": [
-    []
+    [],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "function_name": "",
+              "args": []
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ]
   ],
   "ledger": {
     "protocol_version": 22,
@@ -94,7 +109,7 @@
                       "val": {
                         "i128": {
                           "hi": 0,
-                          "lo": 10
+                          "lo": 30
                         }
                       }
                     },
@@ -227,7 +242,7 @@
                 {
                   "i128": {
                     "hi": 0,
-                    "lo": 10
+                    "lo": 50
                   }
                 },
                 {

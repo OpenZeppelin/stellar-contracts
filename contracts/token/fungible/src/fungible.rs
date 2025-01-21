@@ -53,14 +53,14 @@ pub trait FungibleToken {
     /// the `storage` module when implementing this function.
     fn allowance(e: &Env, owner: Address, spender: Address) -> i128;
 
-    /// Transfers a `value` amount of tokens from `from` to `to`.
+    /// Transfers a `amount` of tokens from `from` to `to`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
     /// * `from` - The address holding the tokens.
     /// * `to` - The address receiving the transferred tokens.
-    /// * `value` - The value of tokens to be transferred.
+    /// * `amount` - The amount of tokens to be transferred.
     ///
     /// # Errors
     ///
@@ -70,16 +70,16 @@ pub trait FungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[value: i128]`
+    /// * data - `[amount: i128]`
     ///
     /// # Notes
     ///
     /// We recommend using the [`crate::storage::transfer()`] function from
     /// the `storage` module when implementing this function.
-    fn transfer(e: &Env, from: Address, to: Address, value: i128);
+    fn transfer(e: &Env, from: Address, to: Address, amount: i128);
 
-    /// Transfers a `value` amount of tokens from `from` to `to` using the
-    /// allowance mechanism. `value` is then deducted from `spender`
+    /// Transfers a `amount` of tokens from `from` to `to` using the
+    /// allowance mechanism. `amount` is then deducted from `spender`
     /// allowance.
     ///
     /// # Arguments
@@ -89,7 +89,7 @@ pub trait FungibleToken {
     ///   allowance consumed during the transfer.
     /// * `from` - The address holding the tokens which will be transferred.
     /// * `to` - The address receiving the transferred tokens.
-    /// * `value` - The amount of tokens to be transferred.
+    /// * `amount` - The amount of tokens to be transferred.
     ///
     /// # Errors
     ///
@@ -102,13 +102,13 @@ pub trait FungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[value: i128]`
+    /// * data - `[amount: i128]`
     ///
     /// # Notes
     ///
     /// We recommend using the [`crate::storage::transfer_from()`] function from
     /// the `storage` module when implementing this function.
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, value: i128);
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128);
 
     /// Sets the amount of tokens a `spender` is allowed to spend on behalf of
     /// an `owner`. Overrides any existing allowance set between `spender` and
@@ -119,7 +119,7 @@ pub trait FungibleToken {
     /// * `e` - Access to Soroban environment.
     /// * `owner` - The address holding the tokens.
     /// * `spender` - The address authorized to spend the tokens.
-    /// * `value` - The amount of tokens made available to `spender`.
+    /// * `amount` - The amount of tokens made available to `spender`.
     /// * `live_until_ledger` - The ledger number at which the allowance
     ///   expires.
     ///
@@ -132,13 +132,13 @@ pub trait FungibleToken {
     /// # Events
     ///
     /// * topics - `["approve", from: Address, spender: Address]`
-    /// * data - `[value: i128, live_until_ledger: u32]`
+    /// * data - `[amount: i128, live_until_ledger: u32]`
     ///
     /// # Notes
     ///
     /// We recommend using the [`crate::storage::approve()`] function from
     /// the `storage` module when implementing this function.
-    fn approve(e: &Env, owner: Address, spender: Address, value: i128, live_until_ledger: u32);
+    fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32);
 
     /// Returns the number of decimals used to represent amounts of this token.
     ///
@@ -202,15 +202,15 @@ pub enum FungibleTokenError {
 /// * `e` - Access to Soroban environment.
 /// * `from` - The address holding the tokens.
 /// * `to` - The address receiving the transferred tokens.
-/// * `value` - The value of tokens to be transferred.
+/// * `amount` - The amount of tokens to be transferred.
 ///
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[value: i128]`
-pub fn emit_transfer(e: &Env, from: &Address, to: &Address, value: i128) {
+/// * data - `[amount: i128]`
+pub fn emit_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
     let topics = (symbol_short!("transfer"), from, to);
-    e.events().publish(topics, value)
+    e.events().publish(topics, amount)
 }
 
 /// Emits an event indicating an allowance was set.
@@ -220,20 +220,20 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, value: i128) {
 /// * `e` - Access to Soroban environment.
 /// * `owner` - The address holding the tokens.
 /// * `spender` - The address authorized to spend the tokens.
-/// * `value` - The amount of tokens made available to `spender`.
+/// * `amount` - The amount of tokens made available to `spender`.
 /// * `live_until_ledger` - The ledger number at which the allowance expires.
 ///
 /// # Events
 ///
 /// * topics - `["approve", owner: Address, spender: Address]`
-/// * data - `[value: i128, live_until_ledger: u32]`
+/// * data - `[amount: i128, live_until_ledger: u32]`
 pub fn emit_approve(
     e: &Env,
     owner: &Address,
     spender: &Address,
-    value: i128,
+    amount: i128,
     live_until_ledger: u32,
 ) {
     let topics = (symbol_short!("approve"), owner, spender);
-    e.events().publish(topics, (value, live_until_ledger))
+    e.events().publish(topics, (amount, live_until_ledger))
 }

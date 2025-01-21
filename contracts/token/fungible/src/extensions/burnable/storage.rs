@@ -1,6 +1,11 @@
-use crate::extensions::burnable::emit_burn;
+use soroban_sdk::{Address, Env};
 
-/// Destroys a `value` amount of tokens from `account`. Updates the total
+use crate::{
+    extensions::burnable::emit_burn,
+    storage::{spend_allowance, update},
+};
+
+/// Destroys `amount` of tokens from `account`. Updates the total
 /// supply accordingly.
 ///
 /// # Arguments
@@ -17,10 +22,10 @@ use crate::extensions::burnable::emit_burn;
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[value: i128]`
+/// * data - `[amount: i128]`
 pub fn burn(e: &Env, from: &Address, amount: i128) {
-    update(e, Some(account), None, value);
-    emit_burn(e, from, value);
+    update(e, Some(from), None, amount);
+    emit_burn(e, from, amount);
 }
 
 /// Destroys `amount` of tokens from `account` using the allowance mechanism.
@@ -45,14 +50,14 @@ pub fn burn(e: &Env, from: &Address, amount: i128) {
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[value: i128]`
+/// * data - `[amount: i128]`
 ///
 /// # Notes
 ///
 /// Authorization for `spender` is required.
 pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
     spender.require_auth();
-    spend_allowance(e, from, spender, value);
-    update(e, Some(account), None, value);
-    emit_burn(e, from, value);
+    spend_allowance(e, from, spender, amount);
+    update(e, Some(from), None, amount);
+    emit_burn(e, from, amount);
 }

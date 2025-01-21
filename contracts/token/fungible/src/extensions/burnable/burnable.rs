@@ -1,4 +1,4 @@
-use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, String};
+use soroban_sdk::{contractclient, symbol_short, Address, Env};
 
 /// Burnable Trait for Fungible Token
 ///
@@ -15,7 +15,7 @@ use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, Str
 /// for various smart contract use cases.
 #[contractclient(name = "FungibleBurnableTokenClient")]
 pub trait FungibleBurnable {
-    /// Destroys a `value` amount of tokens from `account`. Updates the total
+    /// Destroys `amount` of tokens from `account`. Updates the total
     /// supply accordingly.
     ///
     /// # Arguments
@@ -32,15 +32,15 @@ pub trait FungibleBurnable {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[value: i128]`
+    /// * data - `[amount: i128]`
     ///
     /// # Notes
     ///
     /// We recommend using the [`crate::extensions::burnable::storage::burn()`]
     /// function the `storage` module when implementing this function.
-    pub fn burn(e: &Env, from: &Address, amount: i128);
+    fn burn(e: &Env, from: &Address, amount: i128);
 
-    /// Destroys a `value` amount of tokens from `account`. Updates the total
+    /// Destroys `amount` of tokens from `account`. Updates the total
     /// supply accordingly.
     ///
     /// # Arguments
@@ -60,13 +60,13 @@ pub trait FungibleBurnable {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[value: i128]`
+    /// * data - `[amount: i128]`
     ///
     /// # Notes
     ///
     /// We recommend using the [`crate::extensions::burnable::storage::burn()`]
     /// function the `storage` module when implementing this function.
-    pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128);
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128);
 }
 
 // ################## EVENTS ##################
@@ -77,13 +77,13 @@ pub trait FungibleBurnable {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `from` - The address holding the tokens.
-/// * `value` - The value of tokens to be burned.
+/// * `amount` - The amount of tokens to be burned.
 ///
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[value: i128]`
-pub fn emit_burn(e: &Env, from: &Address, value: i128) {
+/// * data - `[amount: i128]`
+pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
     let topics = (symbol_short!("burn"), from);
-    e.events().publish(topics, value)
+    e.events().publish(topics, amount)
 }

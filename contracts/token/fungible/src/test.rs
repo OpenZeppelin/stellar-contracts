@@ -12,8 +12,8 @@ use soroban_sdk::{
 };
 
 use crate::storage::{
-    allowance, approve, balance, burn, mint, set_allowance, spend_allowance, total_supply,
-    transfer, transfer_from, update, StorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT,
+    allowance, approve, balance, mint, set_allowance, spend_allowance, total_supply, transfer,
+    transfer_from, update, StorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT,
 };
 
 #[contract]
@@ -71,19 +71,6 @@ fn mint_works() {
 }
 
 #[test]
-fn burn_works() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-    let account = Address::generate(&e);
-    e.as_contract(&address, || {
-        mint(&e, &account, 100);
-        burn(&e, &account, 50);
-        assert_eq!(balance(&e, &account), 50);
-        assert_eq!(total_supply(&e), 50);
-    });
-}
-
-#[test]
 fn approve_with_event() {
     let e = Env::default();
     e.mock_all_auths();
@@ -136,7 +123,7 @@ fn approve_handles_expiry() {
 }
 
 #[test]
-fn spend_allowance_reduces_value() {
+fn spend_allowance_reduces_amount() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -183,7 +170,7 @@ fn set_allowance_with_expired_ledger_fails() {
 }
 
 #[test]
-fn set_allowance_with_zero_value() {
+fn set_allowance_with_zero_amount() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let owner = Address::generate(&e);
@@ -345,8 +332,8 @@ fn update_burns_tokens() {
 }
 
 #[test]
-#[should_panic(expected = "value must be > 0")]
-fn update_with_invalid_value_panics() {
+#[should_panic(expected = "amount must be > 0")]
+fn update_with_invalid_amount_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let from = Address::generate(&e);

@@ -117,21 +117,21 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "live_until_ledger"
-                      },
-                      "val": {
-                        "u32": 1000
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "value"
+                        "symbol": "amount"
                       },
                       "val": {
                         "i128": {
                           "hi": 0,
                           "lo": 20
                         }
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "live_until_ledger"
+                      },
+                      "val": {
+                        "u32": 1000
                       }
                     }
                   ]
