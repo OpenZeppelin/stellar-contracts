@@ -242,26 +242,6 @@ pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128
     }
 }
 
-/// TODO: move to mintable
-/// Creates `amount` of tokens and assigns them to `account`. Updates
-/// the total supply accordingly.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The address receiving the new tokens.
-/// * `amount` - The amount of tokens to mint.
-///
-/// # Errors
-/// TODO
-///
-/// # Events
-/// TODO
-pub fn mint(e: &Env, account: &Address, amount: i128) {
-    update(e, None, Some(account), amount)
-    // TODO: emit_mint
-}
-
 /// Transfers `amount` of tokens from `from` to `to`.
 ///
 /// # Arguments

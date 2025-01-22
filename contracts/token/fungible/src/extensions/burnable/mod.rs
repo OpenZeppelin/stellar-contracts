@@ -1,5 +1,5 @@
 pub mod storage;
-mod tests;
+mod test;
 
 use soroban_sdk::{contractclient, symbol_short, Address, Env};
 
@@ -16,7 +16,7 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// Excluding the `burn` functionality from the `[FungibleToken]` trait
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
-#[contractclient(name = "FungibleBurnableTokenClient")]
+#[contractclient(name = "FungibleBurnableClient")]
 pub trait FungibleBurnable {
     /// Destroys `amount` of tokens from `account`. Updates the total
     /// supply accordingly.
@@ -40,7 +40,7 @@ pub trait FungibleBurnable {
     /// # Notes
     ///
     /// We recommend using the [`crate::extensions::burnable::storage::burn()`]
-    /// function the `storage` module when implementing this function.
+    /// function from the `storage` module when implementing this function.
     fn burn(e: &Env, from: &Address, amount: i128);
 
     /// Destroys `amount` of tokens from `account`. Updates the total
