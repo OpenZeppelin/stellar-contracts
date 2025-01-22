@@ -35,17 +35,6 @@ pub enum StorageKey {
     Allowance(AllowanceKey),
 }
 
-/// Extends the Time-to-Live (TTL) value of the instance storage entry.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `ttl_threshold` - The TTL threshold below which the entry can be extended.
-/// * `extend_amount` - The new TTL value.
-pub fn bump_instance(e: &Env, ttl_threshold: u32, extend_amount: u32) {
-    e.storage().instance().extend_ttl(ttl_threshold, extend_amount);
-}
-
 // ################## QUERY STATE ##################
 
 /// Returns the total amount of tokens in circulation. If no supply is recorded,
@@ -55,7 +44,7 @@ pub fn bump_instance(e: &Env, ttl_threshold: u32, extend_amount: u32) {
 ///
 /// * `e` - Access to the Soroban environment.
 pub fn total_supply(e: &Env) -> i128 {
-    bump_instance(e, INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
+    e.storage().instance().extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
     e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0)
 }
 
