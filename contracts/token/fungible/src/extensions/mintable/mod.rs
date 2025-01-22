@@ -32,6 +32,19 @@ pub trait FungibleMintable {
     ///
     /// We recommend using the [`crate::extensions::mintable::storage::mint()`]
     /// function from the `storage` module when implementing this function.
+    ///
+    /// IMPORTANT: This function lacks authorization controls. It is the
+    /// responsibility of the implementer to establish appropriate access
+    /// controls to ensure that only authorized accounts can execute minting
+    /// operations. Failure to implement proper authorization could lead to
+    /// security vulnerabilities and unauthorized token creation.
+    ///
+    /// You probably want to do something like this (pseudo-code):
+    ///
+    /// ```ignore
+    /// let admin = read_administrator(e)?;
+    /// admin.require_auth()?;
+    /// ```
     fn mint(e: &Env, account: &Address, amount: i128);
 }
 // ################## EVENTS ##################
