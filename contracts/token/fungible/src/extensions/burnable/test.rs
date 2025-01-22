@@ -5,8 +5,11 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::{
-    extensions::burnable::storage::{burn, burn_from},
-    storage::{allowance, approve, balance, mint, total_supply},
+    extensions::{
+        burnable::storage::{burn, burn_from},
+        mintable::storage::mint,
+    },
+    storage::{allowance, approve, balance, total_supply},
 };
 
 #[contract]

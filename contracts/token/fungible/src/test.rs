@@ -196,7 +196,7 @@ fn transfer_works() {
         assert_eq!(balance(&e, &recipient), 50);
 
         let events = e.events().all();
-        assert_eq!(events.len(), 1);
+        assert_eq!(events.len(), 2);
     });
 }
 
