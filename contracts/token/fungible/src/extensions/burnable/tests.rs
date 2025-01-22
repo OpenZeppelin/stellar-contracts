@@ -15,6 +15,7 @@ struct MockContract;
 #[test]
 fn burn_works() {
     let e = Env::default();
+    e.mock_all_auths();
     let address = e.register(MockContract, ());
     let account = Address::generate(&e);
     e.as_contract(&address, || {
@@ -46,6 +47,7 @@ fn burn_with_allowance_works() {
 #[should_panic(expected = "Error(Contract, #1)")]
 fn burn_with_insufficient_balance_panics() {
     let e = Env::default();
+    e.mock_all_auths();
     let address = e.register(MockContract, ());
     let account = Address::generate(&e);
     e.as_contract(&address, || {
