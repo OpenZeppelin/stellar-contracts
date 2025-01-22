@@ -2,25 +2,48 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::fungible::{emit_approve, emit_transfer, FungibleTokenError};
 
+// Same values as in Stellar Asset Contract (SAC) implementation:
+// https://github.com/stellar/rs-soroban-env/blob/main/soroban-env-host/src/builtin_contracts/stellar_asset_contract/storage_types.rs
+pub(crate) const DAY_IN_LEDGERS: u32 = 17280;
+
+pub(crate) const INSTANCE_EXTEND_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
+pub(crate) const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
+pub(crate) const BALANCE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub(crate) const BALANCE_TTL_THRESHOLD: u32 = BALANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
+/// Storage key that maps to [`AllowanceData`]
 #[contracttype]
-struct AllowanceKey {
-    owner: Address,
-    spender: Address,
+pub struct AllowanceKey {
+    pub owner: Address,
+    pub spender: Address,
 }
 
-/// Contains the amount of tokens for which an allowance is granted and the
-/// ledger number at which this allowance expires.
+/// Storage container for the amount of tokens for which an allowance is granted
+/// and the ledger number at which this allowance expires.
 #[contracttype]
 pub struct AllowanceData {
     pub value: i128,
     pub live_until_ledger: u32,
 }
 
+/// Storage keys for the data associated with `FungibleToken`
 #[contracttype]
-enum StorageKey {
+pub enum StorageKey {
     TotalSupply,
     Balance(Address),
     Allowance(AllowanceKey),
+}
+
+/// Extends the Time-to-Live (TTL) value of the instance storage entry.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `ttl_threshold` - The TTL threshold below which the entry can be extended.
+/// * `extend_amount` - The new TTL value.
+pub fn bump_instance(e: &Env, ttl_threshold: u32, extend_amount: u32) {
+    e.storage().instance().extend_ttl(ttl_threshold, extend_amount);
 }
 
 // ################## QUERY STATE ##################
@@ -32,6 +55,7 @@ enum StorageKey {
 ///
 /// * `e` - Access to the Soroban environment.
 pub fn total_supply(e: &Env) -> i128 {
+    bump_instance(e, INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
     e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0)
 }
 
@@ -43,8 +67,13 @@ pub fn total_supply(e: &Env) -> i128 {
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address for which the balance is being queried.
 pub fn balance(e: &Env, account: &Address) -> i128 {
-    // TODO: extend persistent?
-    e.storage().persistent().get(&StorageKey::Balance(account.clone())).unwrap_or(0)
+    let key = StorageKey::Balance(account.clone());
+    if let Some(balance) = e.storage().persistent().get::<_, i128>(&key) {
+        e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
+        balance
+    } else {
+        0
+    }
 }
 
 /// Returns the amount of tokens a `spender` is allowed to spend on behalf of an

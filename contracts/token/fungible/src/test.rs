@@ -4,13 +4,16 @@ extern crate std;
 
 use soroban_sdk::{
     contract, symbol_short,
-    testutils::{Address as _, Events, Ledger},
+    testutils::{
+        storage::{Instance, Persistent},
+        Address as _, Events, Ledger,
+    },
     vec, Address, Env, IntoVal,
 };
 
 use crate::storage::{
-    allowance, approve, balance, burn, mint, set_allowance, spend_allowance, total_supply,
-    transfer, transfer_from, update,
+    allowance, approve, balance, bump_instance, burn, mint, set_allowance, spend_allowance,
+    total_supply, transfer, transfer_from, update, StorageKey, BALANCE_EXTEND_AMOUNT,
 };
 
 #[contract]
@@ -24,6 +27,34 @@ fn initial_state() {
     e.as_contract(&address, || {
         assert_eq!(total_supply(&e), 0);
         assert_eq!(balance(&e, &account), 0);
+    });
+}
+
+#[test]
+fn bump_instance_works() {
+    let e = Env::default();
+
+    e.ledger().with_mut(|l| {
+        // Minimum TTL for persistent entries - new persistent (and instance)
+        // entries will have this TTL when created.
+        l.min_persistent_entry_ttl = 500;
+    });
+
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let ttl = e.storage().instance().get_ttl();
+        // Note, that TTL doesn't include the current ledger, but when entry
+        // is created the current ledger is counted towards the number of
+        // ledgers specified by `min_persistent_entry_ttl`, thus
+        // the TTL is 1 ledger less than the respective setting.
+        assert_eq!(ttl, 499);
+
+        let current = e.ledger().sequence();
+        e.ledger().set_sequence_number(current + ttl);
+
+        bump_instance(&e, 400, 500);
+        assert_eq!(e.storage().instance().get_ttl(), 500);
     });
 }
 
@@ -188,6 +219,29 @@ fn transfer_works() {
 
         let events = e.events().all();
         assert_eq!(events.len(), 1);
+    });
+}
+
+#[test]
+fn extend_balance_ttl_thru_transfer() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let from = Address::generate(&e);
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        mint(&e, &from, 100);
+
+        let key = StorageKey::Balance(from.clone());
+
+        let ttl = e.storage().persistent().get_ttl(&key);
+        e.ledger().with_mut(|l| {
+            l.sequence_number += ttl;
+        });
+        transfer(&e, &from, &recipient, 50);
+        let ttl = e.storage().persistent().get_ttl(&key);
+        assert_eq!(ttl, BALANCE_EXTEND_AMOUNT);
     });
 }
 
