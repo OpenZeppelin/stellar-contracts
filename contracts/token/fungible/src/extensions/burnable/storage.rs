@@ -24,6 +24,7 @@ use crate::{
 /// * topics - `["burn", from: Address]`
 /// * data - `[amount: i128]`
 pub fn burn(e: &Env, from: &Address, amount: i128) {
+    from.require_auth();
     update(e, Some(from), None, amount);
     emit_burn(e, from, amount);
 }
