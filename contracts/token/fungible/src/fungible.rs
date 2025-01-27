@@ -148,8 +148,8 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::metadata::decimals()`] function from
-    /// the `metadata` module when implementing this function.
+    /// We recommend using the [`crate::metadata::decimals()`]
+    /// function from the `metadata` module when implementing this function.
     fn decimals(e: &Env) -> u32;
 
     /// Returns the name for this token.
@@ -160,8 +160,8 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::metadata::name()`] function from
-    /// the `metadata` module when implementing this function.
+    /// We recommend using the [`crate::metadata::name()`] function
+    /// from the `metadata` module when implementing this function.
     fn name(e: &Env) -> String;
 
     /// Returns the symbol for this token.
@@ -172,8 +172,8 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::metadata::symbol()`] function from
-    /// the `metadata` module when implementing this function.
+    /// We recommend using the [`crate::metadata::symbol()`]
+    /// function from the `metadata` module when implementing this function.
     fn symbol(e: &Env) -> String;
 }
 

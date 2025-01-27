@@ -62,4 +62,6 @@ pub mod extensions;
 pub mod fungible;
 pub mod storage;
 
+pub use extensions::metadata;
+
 mod test;
