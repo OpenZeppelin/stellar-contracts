@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use soroban_sdk::{contract, Env, String};
 
 use crate::extensions::metadata::{decimals, name, set_metadata, symbol};
@@ -15,10 +17,8 @@ fn set_and_get_metadata() {
         let test_name = String::from_str(&e, "Test Token");
         let test_symbol = String::from_str(&e, "TEST");
 
-        // Set metadata
         set_metadata(&e, test_decimals, test_name.clone(), test_symbol.clone());
 
-        // Verify all metadata fields
         assert_eq!(decimals(&e), test_decimals);
         assert_eq!(name(&e), test_name);
         assert_eq!(symbol(&e), test_symbol);
@@ -32,7 +32,6 @@ fn get_unset_metadata() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        // Attempting to get metadata before setting should panic
         decimals(&e);
     });
 }
@@ -43,13 +42,10 @@ fn metadata_update() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        // Initial metadata
         set_metadata(&e, 6, String::from_str(&e, "Initial Name"), String::from_str(&e, "INI"));
 
-        // Updated metadata
         set_metadata(&e, 8, String::from_str(&e, "Updated Name"), String::from_str(&e, "UPD"));
 
-        // Verify updates
         assert_eq!(decimals(&e), 8);
         assert_eq!(name(&e), String::from_str(&e, "Updated Name"));
         assert_eq!(symbol(&e), String::from_str(&e, "UPD"));
