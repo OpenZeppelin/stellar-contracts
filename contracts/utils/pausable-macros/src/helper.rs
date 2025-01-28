@@ -2,11 +2,9 @@ use syn::{FnArg, ItemFn, PatType, Type};
 
 pub fn check_env_arg(input_fn: &ItemFn) -> (syn::Ident, bool) {
     // Get the first argument
-    let first_arg = input_fn
-        .sig
-        .inputs
-        .first()
-        .expect(&format!("function '{}' must have at least one argument", input_fn.sig.ident));
+    let first_arg = input_fn.sig.inputs.first().unwrap_or_else(|| {
+        panic!("function '{}' must have at least one argument", input_fn.sig.ident)
+    });
 
     // Extract the pattern and type from the argument
     let (pat, ty) = match first_arg {
