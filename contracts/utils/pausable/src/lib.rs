@@ -55,7 +55,10 @@ mod storage;
 
 pub use crate::{
     pausable::{emit_paused, emit_unpaused, Pausable, PausableClient, PausableError},
-    storage::{pause, paused, unpause, when_not_paused, when_paused},
+    storage::{
+        pause, paused, unpause, when_not_paused, when_paused, INSTANCE_EXTEND_AMOUNT,
+        INSTANCE_TTL_THRESHOLD,
+    },
 };
 
 mod test;

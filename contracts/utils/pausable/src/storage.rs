@@ -2,20 +2,24 @@ use soroban_sdk::{panic_with_error, symbol_short, Address, Env, Symbol};
 
 use crate::{emit_paused, emit_unpaused, pausable::PausableError};
 
+// Same values as in Stellar Asset Contract (SAC) implementation:
+// https://github.com/stellar/rs-soroban-env/blob/main/soroban-env-host/src/builtin_contracts/stellar_asset_contract/storage_types.rs
+pub const DAY_IN_LEDGERS: u32 = 17280;
+
+pub const INSTANCE_EXTEND_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
+pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
 /// Indicates whether the contract is in `Paused` state.
-pub(crate) const PAUSED: Symbol = symbol_short!("PAUSED");
+pub const PAUSED: Symbol = symbol_short!("PAUSED");
 
 /// Returns true if the contract is paused, and false otherwise.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-///
-/// # Notes
-///
-/// no authentication is required for this function.
 pub fn paused(e: &Env) -> bool {
     // if not paused, consider default false (unpaused)
+    e.storage().instance().extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
     e.storage().instance().get(&PAUSED).unwrap_or(false)
 }
 
@@ -28,8 +32,8 @@ pub fn paused(e: &Env) -> bool {
 ///
 /// # Errors
 ///
-/// If the contract is in `Paused` state, then the error
-/// [`PausableError::EnforcedPause`] is thrown.
+/// * [`PausableError::EnforcedPause`] - Occurs when the contract is already in
+///   `Paused` state.
 ///
 /// # Events
 ///
@@ -38,7 +42,7 @@ pub fn paused(e: &Env) -> bool {
 ///
 /// # Notes
 ///
-/// Authentication is required for this function.
+/// Authorization for `caller` is required.
 pub fn pause(e: &Env, caller: &Address) {
     caller.require_auth();
     when_not_paused(e);
@@ -55,8 +59,8 @@ pub fn pause(e: &Env, caller: &Address) {
 ///
 /// # Errors
 ///
-/// If the contract is in `Unpaused` state, then the error
-/// [`PausableError::ExpectedPause`] is thrown.
+/// * [`PausableError::ExpectedPause`] - Occurs when the contract is already in
+///   `Unpaused` state.
 ///
 /// # Events
 ///
@@ -65,7 +69,7 @@ pub fn pause(e: &Env, caller: &Address) {
 ///
 /// # Notes
 ///
-/// Authentication is required for this function.
+/// Authorization for `caller` is required.
 pub fn unpause(e: &Env, caller: &Address) {
     caller.require_auth();
     when_paused(e);
@@ -73,8 +77,7 @@ pub fn unpause(e: &Env, caller: &Address) {
     emit_unpaused(e, caller);
 }
 
-/// Helper to make a function callable only when the contract is NOT
-/// paused.
+/// Helper to make a function callable only when the contract is NOT paused.
 ///
 /// # Arguments
 ///
@@ -82,20 +85,19 @@ pub fn unpause(e: &Env, caller: &Address) {
 ///
 /// # Errors
 ///
-/// If the contract is in the `Paused` state, then the error
-/// [`PausableError::EnforcedPause`] is thrown.
+/// * [`PausableError::EnforcedPause`] - Occurs when the contract is already in
+///   `Paused` state.
 ///
 /// # Notes
 ///
-/// No authentication is required for this function.
+/// No authorization is required.
 pub fn when_not_paused(e: &Env) {
     if paused(e) {
         panic_with_error!(e, PausableError::EnforcedPause)
     }
 }
 
-/// Helper to make a function callable
-/// only when the contract is paused.
+/// Helper to make a function callable only when the contract is paused.
 ///
 /// # Arguments
 ///
@@ -103,12 +105,12 @@ pub fn when_not_paused(e: &Env) {
 ///
 /// # Errors
 ///
-/// If the contract is in `Unpaused` state, then the error
-/// [`PausableError::ExpectedPause`] is thrown.
+/// * [`PausableError::ExpectedPause`] - Occurs when the contract is already in
+///   `Unpaused` state.
 ///
 /// # Notes
 ///
-/// No authentication is required for this function.
+/// No authorization is required.
 pub fn when_paused(e: &Env) {
     if !paused(e) {
         panic_with_error!(e, PausableError::ExpectedPause)

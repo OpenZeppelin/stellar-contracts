@@ -10,8 +10,7 @@ pub trait Pausable {
     ///
     /// # Notes
     ///
-    /// We expect you to use the [`crate::storage::paused()`] function from
-    /// the `storage` module when implementing this function.
+    /// We recommend using [`crate::paused()`] when implementing this function.
     fn paused(e: &Env) -> bool;
 
     /// Triggers `Paused` state.
@@ -23,8 +22,8 @@ pub trait Pausable {
     ///
     /// # Errors
     ///
-    /// If the contract is in `Paused` state, then the error
-    /// [`PausableError::EnforcedPause`] is thrown.
+    /// * [`PausableError::EnforcedPause`] - Occurs when the contract is already
+    ///   in `Paused` state.
     ///
     /// # Events
     ///
@@ -33,8 +32,7 @@ pub trait Pausable {
     ///
     /// # Notes
     ///
-    /// We expect you to use the [`crate::storage::pause()`] function from
-    /// the `storage` module.
+    /// We recommend using [`crate::pause()`] when implementing this function.
     fn pause(e: &Env, caller: Address);
 
     /// Triggers `Unpaused` state.
@@ -46,8 +44,8 @@ pub trait Pausable {
     ///
     /// # Errors
     ///
-    /// If the contract is in `Unpaused` state, then the error
-    /// [`PausableError::ExpectedPause`] is thrown.
+    /// * [`PausableError::ExpectedPause`] - Occurs when the contract is already
+    ///   in `Unpaused` state.
     ///
     /// # Events
     ///
@@ -56,8 +54,7 @@ pub trait Pausable {
     ///
     /// # Notes
     ///
-    /// We expect you to use the [`crate::storage::unpause()`] function
-    /// from the `storage` module.
+    /// We recommend using [`crate::unpause()`] when implementing this function.
     fn unpause(e: &Env, caller: Address);
 }
 
