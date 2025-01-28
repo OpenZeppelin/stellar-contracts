@@ -36,7 +36,7 @@ impl ExampleContract {
     }
 
     #[when_not_paused]
-    pub fn increment(e: Env) -> i32 {
+    pub fn increment(e: &Env) -> i32 {
         let mut counter: i32 =
             e.storage().instance().get(&DataKey::Counter).expect("counter should be set");
 
@@ -48,7 +48,7 @@ impl ExampleContract {
     }
 
     #[when_paused]
-    pub fn emergency_reset(e: Env) {
+    pub fn emergency_reset(e: &Env) {
         e.storage().instance().set(&DataKey::Counter, &0);
     }
 }
