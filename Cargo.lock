@@ -817,7 +817,6 @@ dependencies = [
 name = "openzeppelin-pausable-macros"
 version = "0.1.0"
 dependencies = [
- "openzeppelin-pausable",
  "proc-macro2",
  "quote",
  "syn 2.0.96",
