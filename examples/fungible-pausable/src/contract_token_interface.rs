@@ -6,8 +6,10 @@
 //! [`openzeppelin_fungible_token::fungible::FungibleToken`] and
 //! [`openzeppelin_fungible_token::burnable::FungibleBurnable`], whereas this
 //! version directly implements [`soroban_sdk::token::TokenInterface`].
+//!
 //! Ultimately, it is up to the user to choose their preferred approach to
-//! creating a SEP-41 token.
+//! creating a SEP-41 token. We suggest the approach in "contract.rs" for better
+//! organization of the code, consistancy and ease of inspection/debugging.
 
 use openzeppelin_fungible_token::{self as fungible, mintable::FungibleMintable};
 use openzeppelin_pausable::{self as pausable, Pausable};
@@ -41,7 +43,7 @@ impl ExampleContract {
     }
 
     /// `TokenInterface` doesn't require implementing `total_supply()` because
-    /// of the backwards compatibility with Stellar classic assets.
+    /// of the need for backwards compatibility with Stellar classic assets.
     pub fn total_supply(e: &Env) -> i128 {
         fungible::total_supply(e)
     }
