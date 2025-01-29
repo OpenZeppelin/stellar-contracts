@@ -15,7 +15,7 @@ Explore our implementations for token standards on Stellar Soroban:
 == Utilities
 Discover our utility contracts for Stellar Soroban, applicable to all token standards mentioned above:
 
-- **xref:utils/pausable.adoc[Pausable]**:
+- **xref:utils/pausable.adoc[Pausable]**
 
 // == Audits
 // TODO: You can find our audit reports here.

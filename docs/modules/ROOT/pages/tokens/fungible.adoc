@@ -3,7 +3,7 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Fungible Token Standard
 
-== Source Code https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible[Fungible]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible[Source Code]
 
 == Purpose
 
@@ -14,17 +14,19 @@ It provides a flexible and secure framework for defining and managing token stan
 
 We provide the below extensions to enhance the capabilities of the Fungible Token Standard.
 
-=== Mintable
-==== Source Code https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/mintable[Mintable]
+=== - Mintable
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/mintable[Source Code]
 
+==== Summary
 The `Mintable` trait extends the `FungibleToken` trait to provide the capability to mint tokens.
 
 ==== Events
 * `mint_event` :  broadcasted to the network when the `mint()` function is invoked.
 
-=== Burnable
-==== Source Code https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/burnable[Burnable]
+=== - Burnable
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/burnable[Source Code]
 
+==== Summary
 The `Burnable` trait extends the `FungibleToken` trait to provide the
 capability to burn tokens.
 
@@ -39,9 +41,10 @@ for various smart contract use cases.
 ==== Events
 * `burn_event`: broadcasted to the network when the `burn()` or `burn_from()` function is invoked.
 
-=== Metadata
-==== Source Code https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/metadata[Metadata]
+=== - Metadata
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/metadata[Source Code]
 
+==== Summary
 Provides `setter` and `getter` methods for `symbol`, `name`, and `decimal` metadata information for your token.
 
 ==== Events
