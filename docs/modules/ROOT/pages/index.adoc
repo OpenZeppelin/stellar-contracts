@@ -12,10 +12,15 @@ Explore our implementations for token standards on Stellar Soroban:
 - **Non-Fungible Tokens**: Unique digital assets with verifiable ownership (work in progress).
 - **Multi-Token**: Hybrid tokens enabling both fungible and non-fungible token functionalities (work in progress).
 
-== Audits
+== Utilities
+Discover our utility contracts for Stellar Soroban, applicable to all token standards mentioned above:
+
+- **xref:utils/pausable.adoc[Pausable]**:
+
+// == Audits
 // TODO: You can find our audit reports here.
 
-== Get Started
+// == Get Started
 // TODO: link to the Wizard
 
 

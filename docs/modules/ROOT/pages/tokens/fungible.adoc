@@ -3,7 +3,7 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Fungible Token Standard
 
-== Source Code link: // TODO
+== Source Code https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible[Fungible]
 
 == Purpose
 
@@ -11,5 +11,38 @@ The Fungible Token Standard is a contract template designed to facilitate the cr
 It provides a flexible and secure framework for defining and managing token standards, enabling developers to create and manage tokens with ease.
 
 == Extensions
-* Mintable: // TODO
-* Burnable: // TODO
+
+We provide the below extensions to enhance the capabilities of the Fungible Token Standard.
+
+=== Mintable
+==== Source Code https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/mintable[Mintable]
+
+The `Mintable` trait extends the `FungibleToken` trait to provide the capability to mint tokens.
+
+==== Events
+* `mint_event` :  broadcasted to the network when the `mint()` function is invoked.
+
+=== Burnable
+==== Source Code https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/burnable[Burnable]
+
+The `Burnable` trait extends the `FungibleToken` trait to provide the
+capability to burn tokens.
+
+To fully comply with the SEP-41 specification one have to implement the
+this `Burnable` trait along with the `[FungibleToken]` trait.
+SEP-41 mandates support for token burning to be considered compliant.
+
+Excluding the `burn` functionality from the `[FungibleToken]` trait
+is a deliberate design choice to accommodate flexibility and customization
+for various smart contract use cases.
+
+==== Events
+* `burn_event`: broadcasted to the network when the `burn()` or `burn_from()` function is invoked.
+
+=== Metadata
+==== Source Code https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/metadata[Metadata]
+
+Provides `setter` and `getter` methods for `symbol`, `name`, and `decimal` metadata information for your token.
+
+==== Events
+There are no custom events associated with the `Metadata` trait.
