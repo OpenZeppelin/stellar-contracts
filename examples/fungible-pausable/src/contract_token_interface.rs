@@ -9,7 +9,7 @@
 //!
 //! Ultimately, it is up to the user to choose their preferred approach to
 //! creating a SEP-41 token. We suggest the approach in "contract.rs" for better
-//! organization of the code, consistancy and ease of inspection/debugging.
+//! organization of the code, consistency and ease of inspection/debugging.
 
 use openzeppelin_fungible_token::{self as fungible, mintable::FungibleMintable};
 use openzeppelin_pausable::{self as pausable, Pausable};
