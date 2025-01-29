@@ -47,7 +47,7 @@ fn burn_with_allowance_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #200)")]
 fn burn_with_insufficient_balance_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -62,7 +62,7 @@ fn burn_with_insufficient_balance_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")]
+#[should_panic(expected = "Error(Contract, #201)")]
 fn burn_with_no_allowance_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -78,7 +78,7 @@ fn burn_with_no_allowance_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")]
+#[should_panic(expected = "Error(Contract, #201)")]
 fn burn_with_insufficient_allowance_panics() {
     let e = Env::default();
     e.mock_all_auths();
