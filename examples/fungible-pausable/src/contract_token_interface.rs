@@ -40,8 +40,8 @@ impl ExampleContract {
         e.storage().instance().set(&OWNER, &owner);
     }
 
-    /// `TokenInterface` doesn't require implmenting `total_supply()` because of
-    /// the backwards compatibility with Stellar classic assets.
+    /// `TokenInterface` doesn't require implementing `total_supply()` because
+    /// of the backwards compatibility with Stellar classic assets.
     pub fn total_supply(e: &Env) -> i128 {
         fungible::total_supply(e)
     }
