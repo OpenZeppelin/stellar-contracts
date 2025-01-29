@@ -21,8 +21,8 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::storage::total_supply()`] function from
-    /// the `storage` module when implementing this function.
+    /// We recommend using [`crate::total_supply()`] when implementing this
+    /// function.
     fn total_supply(e: &Env) -> i128;
 
     /// Returns the amount of tokens held by `account`.
@@ -34,8 +34,7 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::storage::balance()`] function from
-    /// the `storage` module when implementing this function.
+    /// We recommend using [`crate::balance()`] when implementing this function.
     fn balance(e: &Env, account: Address) -> i128;
 
     /// Returns the amount of tokens a `spender` is allowed to spend on behalf
@@ -49,8 +48,8 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::storage::allowance()`] function from
-    /// the `storage` module when implementing this function.
+    /// We recommend using [`crate::allowance()`] when implementing this
+    /// function.
     fn allowance(e: &Env, owner: Address, spender: Address) -> i128;
 
     /// Transfers `amount` of tokens from `from` to `to`.
@@ -74,8 +73,8 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::storage::transfer()`] function from
-    /// the `storage` module when implementing this function.
+    /// We recommend using [`crate::transfer()`] when implementing this
+    /// function.
     fn transfer(e: &Env, from: Address, to: Address, amount: i128);
 
     /// Transfers `amount` of tokens from `from` to `to` using the
@@ -106,8 +105,8 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::storage::transfer_from()`] function from
-    /// the `storage` module when implementing this function.
+    /// We recommend using [`crate::transfer_from()`] when implementing this
+    /// function.
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128);
 
     /// Sets the amount of tokens a `spender` is allowed to spend on behalf of
@@ -136,8 +135,7 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::storage::approve()`] function from
-    /// the `storage` module when implementing this function.
+    /// We recommend using [`crate::approve()`] when implementing this function.
     fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32);
 
     /// Returns the number of decimals used to represent amounts of this token.
@@ -148,8 +146,8 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::metadata::decimals()`]
-    /// function from the `metadata` module when implementing this function.
+    /// We recommend using [`crate::metadata::decimals()`] when implementing
+    /// this function.
     fn decimals(e: &Env) -> u32;
 
     /// Returns the name for this token.
@@ -160,8 +158,8 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::metadata::name()`] function
-    /// from the `metadata` module when implementing this function.
+    /// We recommend using [`crate::metadata::name()`] when implementing this
+    /// function.
     fn name(e: &Env) -> String;
 
     /// Returns the symbol for this token.
@@ -172,8 +170,8 @@ pub trait FungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::metadata::symbol()`]
-    /// function from the `metadata` module when implementing this function.
+    /// We recommend using [`crate::metadata::symbol()`] when implementing this
+    /// function.
     fn symbol(e: &Env) -> String;
 }
 

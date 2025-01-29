@@ -24,15 +24,14 @@
 //! By offering this dual-layered approach, developers can choose between
 //! convenience and customization, depending on their project requirements.
 //!
-//! ## Base Module and Extensions
+//! ## Structure
 //!
-//! The base module implements:
+//! The base module includes:
 //!
 //! - Total supply management
 //! - Transfers and allowances
 //!
-//! To extend functionality, the module supports the following optional
-//! features:
+//! The following optional extensions are available:
 //!
 //! - Metadata: Provides additional information about the token, such as name,
 //!   symbol, and decimals.
@@ -43,10 +42,17 @@
 //!
 //! ## Compatibility and Compliance
 //!
-//! The module is designed to ensure full compatibility with SEP-0041, making it
-//! easy to integrate into Soroban-based applications. It also closely mirrors
-//! the Ethereum ERC-20 standard, facilitating cross-ecosystem familiarity and
-//! ease of use.
+//! The module is designed to ensure full compatibility with SEP-0041. It also
+//! closely mirrors the Ethereum ERC-20 standard, facilitating cross-ecosystem
+//! familiarity and ease of use.
+//!
+//! Developers aiming to create SEP-41-compliant tokens can leverage the
+//! `soroban_sdk::token::TokenInterface` trait available in the "soroban-sdk"
+//! crate. By implementing `TokenInterface` using the helper functions provided
+//! in this library, they can ensure a secure and standardized implementation.
+//! Alternatively, developers can combine the implementation of both the
+//! [`FungibleToken`] and [`burnable::FungibleBurnable`] traits to create tokens
+//! that adhere to SEP-41 while providing greater control and extensibility.
 //!
 //! ## Notes for Developers
 //!
@@ -58,10 +64,18 @@
 //!   extensions.
 #![no_std]
 
-pub mod extensions;
-pub mod fungible;
-pub mod storage;
+mod extensions;
+mod fungible;
+mod storage;
 
-pub use extensions::metadata;
+pub use extensions::{burnable, metadata, mintable};
+pub use fungible::{
+    emit_approve, emit_transfer, FungibleToken, FungibleTokenClient, FungibleTokenError,
+};
+pub use storage::{
+    allowance, allowance_data, approve, balance, do_transfer, set_allowance, spend_allowance,
+    total_supply, transfer, transfer_from, update, AllowanceData, AllowanceKey, StorageKey,
+    BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
+};
 
 mod test;

@@ -1,4 +1,6 @@
-pub mod storage;
+mod storage;
+pub use self::storage::{burn, burn_from};
+
 mod test;
 
 use soroban_sdk::{contractclient, symbol_short, Address, Env};
@@ -29,8 +31,8 @@ pub trait FungibleBurnable {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::InsufficientBalance`] - When
-    ///   attempting to burn more tokens than `from` current balance.
+    /// * [`crate::FungibleTokenError::InsufficientBalance`] - When attempting
+    ///   to burn more tokens than `from` current balance.
     ///
     /// # Events
     ///
@@ -39,8 +41,8 @@ pub trait FungibleBurnable {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::extensions::burnable::storage::burn()`]
-    /// function from the `storage` module when implementing this function.
+    /// We recommend using [`crate::burnable::burn()`] when implementing this
+    /// function.
     fn burn(e: &Env, from: &Address, amount: i128);
 
     /// Destroys `amount` of tokens from `account`. Updates the total
@@ -55,10 +57,10 @@ pub trait FungibleBurnable {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::InsufficientBalance`] - When
-    ///   attempting to burn more tokens than `from` current balance.A
-    /// * [`crate::fungible::FungibleTokenError::InsufficientAllowance`] - When
-    ///   attempting to burn more tokens than `from` allowance.
+    /// * [`crate::FungibleTokenError::InsufficientBalance`] - When attempting
+    ///   to burn more tokens than `from` current balance.A
+    /// * [`crate::FungibleTokenError::InsufficientAllowance`] - When attempting
+    ///   to burn more tokens than `from` allowance.
     ///
     /// # Events
     ///
@@ -67,8 +69,8 @@ pub trait FungibleBurnable {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::extensions::burnable::storage::burn()`]
-    /// function the `storage` module when implementing this function.
+    /// We recommend using [`crate::burnable::burn_from()`] when implementing
+    /// this function.
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128);
 }
 

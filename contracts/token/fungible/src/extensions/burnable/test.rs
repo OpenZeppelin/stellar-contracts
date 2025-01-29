@@ -7,7 +7,7 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use crate::{
     extensions::{
         burnable::storage::{burn, burn_from},
-        mintable::storage::mint,
+        mintable::mint,
     },
     storage::{allowance, approve, balance, total_supply},
 };

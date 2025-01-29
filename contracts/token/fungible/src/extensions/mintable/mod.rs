@@ -1,4 +1,6 @@
-pub mod storage;
+mod storage;
+pub use self::storage::mint;
+
 mod test;
 
 use soroban_sdk::{contractclient, symbol_short, Address, Env};
@@ -30,8 +32,8 @@ pub trait FungibleMintable {
     ///
     /// # Notes
     ///
-    /// We recommend using the [`crate::extensions::mintable::storage::mint()`]
-    /// function from the `storage` module when implementing this function.
+    /// We recommend using [`crate::mintable::mint()`] when implementing this
+    /// function.
     ///
     /// IMPORTANT: Please do not forget that, you probably will want to have
     /// some authorization controls for minting tokens.
