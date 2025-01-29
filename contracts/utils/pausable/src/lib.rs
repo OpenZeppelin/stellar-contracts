@@ -15,9 +15,8 @@
 //! multiple extensions or utilities for your contract, the code will be better
 //! organized.
 //!
-//! We also provide two macros `when_paused` and `when_not_paused` (will be
-//! implemented later). These macros act as guards for your functions. For
-//! example:
+//! We also provide two macros `when_paused` and `when_not_paused`.
+//! These macros act as guards for your functions. For example:
 //!
 //! ```ignore
 //! #[when_not_paused]
