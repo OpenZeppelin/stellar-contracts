@@ -195,8 +195,6 @@ pub enum FungibleTokenError {
     LessThanOrEqualToZero = 204,
     /// Indicates overflow when adding two values
     MathOverflow = 205,
-    /// Indicates underflow when subtracting two values
-    MathUnderflow = 206,
 }
 
 // ################## EVENTS ##################

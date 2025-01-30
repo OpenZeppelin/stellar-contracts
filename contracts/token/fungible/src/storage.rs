@@ -348,8 +348,7 @@ pub fn do_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
 /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
 ///   more tokens than `from` current balance.
 /// * [`FungibleTokenError::LessThanOrEqualToZero`] - When `amount <= 0`.
-/// * [`FungibleTokenError::MathOverflow`] - When `total_supply` or `balance`
-/// * [`FungibleTokenError::MathUnderflow`] - When `total_supply` underflows.
+/// * [`FungibleTokenError::MathOverflow`] - When `total_supply` overflows.
 ///
 /// # Notes
 ///
@@ -377,18 +376,13 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i12
     }
 
     if let Some(account) = to {
-        let mut to_balance = balance(e, account);
-        to_balance = match to_balance.checked_add(amount) {
-            Some(num) => num,
-            _ => panic_with_error!(e, FungibleTokenError::MathOverflow),
-        };
+        // NOTE: can't overflow because balance + amoount is at most total_supply.
+        let to_balance = balance(e, account) + amount;
         e.storage().persistent().set(&StorageKey::Balance(account.clone()), &to_balance);
     } else {
-        let mut total_supply = total_supply(e);
-        total_supply = match total_supply.checked_sub(amount) {
-            Some(num) => num,
-            _ => panic_with_error!(e, FungibleTokenError::MathUnderflow),
-        };
+        // NOTE: can't overflow because amount <= total_supply or amount <= from_balance
+        // <= total_supply.
+        let total_supply = total_supply(e) - amount;
         e.storage().instance().set(&StorageKey::TotalSupply, &total_supply);
     }
 }
