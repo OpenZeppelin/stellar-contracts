@@ -6,8 +6,8 @@ members = ["contracts/utils/*", "contracts/token/*", "examples/*"]
 authors = ["OpenZeppelin"]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/OpenZeppelin/soroban-contracts"
-version = "0.0.0"
+repository = "https://github.com/OpenZeppelin/stellar-contracts"
+version = "0.1.0"
 
 [workspace.dependencies]
 soroban-sdk = "22.0.6"
