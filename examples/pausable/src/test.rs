@@ -72,7 +72,7 @@ fn errors_unpause_unauthorized() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #100)")]
 fn errors_increment_when_paused() {
     let e = Env::default();
     let owner = Address::generate(&e);
@@ -84,7 +84,7 @@ fn errors_increment_when_paused() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")]
+#[should_panic(expected = "Error(Contract, #101)")]
 fn errors_emergency_reset_when_not_paused() {
     let e = Env::default();
     let owner = Address::generate(&e);

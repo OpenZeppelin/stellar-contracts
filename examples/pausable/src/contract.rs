@@ -21,7 +21,6 @@ pub enum DataKey {
 
 #[contracterror]
 pub enum ExampleContractError {
-    // ATTENTION !!! - overwrites PausableError
     Unauthorized = 1,
 }
 

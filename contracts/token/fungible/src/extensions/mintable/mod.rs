@@ -37,7 +37,7 @@ pub trait FungibleMintable {
     ///
     /// IMPORTANT: Please do not forget that, you probably will want to have
     /// some authorization controls for minting tokens.
-    fn mint(e: &Env, account: &Address, amount: i128);
+    fn mint(e: &Env, account: Address, amount: i128);
 }
 // ################## EVENTS ##################
 

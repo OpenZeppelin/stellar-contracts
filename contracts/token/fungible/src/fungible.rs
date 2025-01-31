@@ -182,13 +182,19 @@ pub trait FungibleToken {
 pub enum FungibleTokenError {
     /// Indicates an error related to the current balance of account from which
     /// tokens are expected to be transferred.
-    InsufficientBalance = 1,
+    InsufficientBalance = 200,
     /// Indicates a failure with the allowance mechanism when a given spender
     /// doesn't have enough allowance.
-    InsufficientAllowance = 2,
+    InsufficientAllowance = 201,
     /// Indicates an invalid value for `live_until_ledger` when setting an
     /// allowance.
-    InvalidLiveUntilLedger = 3,
+    InvalidLiveUntilLedger = 202,
+    /// Indicates an error when an input that must be >= 0
+    LessThanZero = 203,
+    /// Indicates an error when an input that must be > 0
+    LessThanOrEqualToZero = 204,
+    /// Indicates overflow when adding two values
+    MathOverflow = 205,
 }
 
 // ################## EVENTS ##################

@@ -82,7 +82,7 @@ fn unpause_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #100)")]
 fn errors_pause_when_paused() {
     let e = Env::default();
     e.mock_all_auths();
@@ -98,7 +98,7 @@ fn errors_pause_when_paused() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")]
+#[should_panic(expected = "Error(Contract, #101)")]
 fn errors_unpause_when_not_paused() {
     let e = Env::default();
     e.mock_all_auths();

@@ -161,6 +161,7 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 /// * [`FungibleTokenError::InvalidLiveUntilLedger`] - Occurs when attempting to
 ///   set `live_until_ledger` that is less than the current ledger number and
 ///   greater than `0`.
+/// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
 ///
 /// # Events
 ///
@@ -180,7 +181,7 @@ pub fn set_allowance(
     emit: bool,
 ) {
     if amount < 0 {
-        panic!("amount cannot be negative")
+        panic_with_error!(e, FungibleTokenError::LessThanZero)
     }
 
     let allowance = AllowanceData { amount, live_until_ledger };
@@ -346,13 +347,15 @@ pub fn do_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
 ///
 /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
 ///   more tokens than `from` current balance.
+/// * [`FungibleTokenError::LessThanOrEqualToZero`] - When `amount <= 0`.
+/// * [`FungibleTokenError::MathOverflow`] - When `total_supply` overflows.
 ///
 /// # Notes
 ///
 /// No authorization is required.
 pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i128) {
     if amount <= 0 {
-        panic!("amount must be > 0")
+        panic_with_error!(e, FungibleTokenError::LessThanOrEqualToZero)
     }
 
     if let Some(account) = from {
@@ -365,17 +368,21 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i12
         e.storage().persistent().set(&StorageKey::Balance(account.clone()), &from_balance);
     } else {
         let mut total_supply = total_supply(e);
-        total_supply = total_supply.checked_add(amount).expect("total_supply overflow");
+        total_supply = match total_supply.checked_add(amount) {
+            Some(num) => num,
+            _ => panic_with_error!(e, FungibleTokenError::MathOverflow),
+        };
         e.storage().instance().set(&StorageKey::TotalSupply, &total_supply);
     }
 
     if let Some(account) = to {
-        let mut to_balance = balance(e, account);
-        to_balance = to_balance.checked_add(amount).expect("to_balance overflow");
+        // NOTE: can't overflow because balance + amoount is at most total_supply.
+        let to_balance = balance(e, account) + amount;
         e.storage().persistent().set(&StorageKey::Balance(account.clone()), &to_balance);
     } else {
-        let mut total_supply = total_supply(e);
-        total_supply = total_supply.checked_sub(amount).expect("total_supply underflow");
+        // NOTE: can't overflow because amount <= total_supply or amount <= from_balance
+        // <= total_supply.
+        let total_supply = total_supply(e) - amount;
         e.storage().instance().set(&StorageKey::TotalSupply, &total_supply);
     }
 }
