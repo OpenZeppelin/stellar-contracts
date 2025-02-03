@@ -195,6 +195,11 @@ pub enum FungibleTokenError {
     LessThanOrEqualToZero = 204,
     /// Indicates overflow when adding two values
     MathOverflow = 205,
+    /// Indicates that the operation would have caused `total_supply` to exceed
+    /// the `cap`.
+    ExceededCap = 206,
+    /// Indicates the supplied `cap` is not a valid cap value.
+    InvalidCap = 207,
 }
 
 // ################## EVENTS ##################
