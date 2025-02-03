@@ -34,6 +34,7 @@ pub fn when_not_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_vis = &input_fn.vis;
     let fn_sig = &input_fn.sig;
     let fn_block = &input_fn.block;
+    let fn_attrs = &input_fn.attrs; // get the other macros
 
     let env_arg = if is_ref {
         quote! { #env_ident }
@@ -42,6 +43,7 @@ pub fn when_not_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let output = quote! {
+        #(#fn_attrs)* // retain other macros
         #fn_vis #fn_sig {
             openzeppelin_pausable::when_not_paused(#env_arg);
 
@@ -80,6 +82,7 @@ pub fn when_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_vis = &input_fn.vis;
     let fn_sig = &input_fn.sig;
     let fn_block = &input_fn.block;
+    let fn_attrs = &input_fn.attrs; // get the other macros
 
     let env_arg = if is_ref {
         quote! { #env_ident }
@@ -88,6 +91,7 @@ pub fn when_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let output = quote! {
+        #(#fn_attrs)* // retain other macros
         #fn_vis #fn_sig {
             openzeppelin_pausable::when_paused(#env_arg);
 
