@@ -1,9 +1,9 @@
 :source-highlighter: highlight.js
 :highlightjs-languages: rust
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
-= Fungible Token Standard
+= Utilities
 
-== Source Code link: https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/utils/pausable[pausable]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/utils/pausable[Source Code]
 
 == Purpose
 
