@@ -34,7 +34,9 @@ pub fn when_not_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_vis = &input_fn.vis;
     let fn_sig = &input_fn.sig;
     let fn_block = &input_fn.block;
-    let fn_attrs = &input_fn.attrs; // get the other macros
+    // Filter out the current macro from attributes
+    let fn_attrs: Vec<_> =
+        input_fn.attrs.iter().filter(|attr| !attr.path().is_ident("when_not_paused")).collect();
 
     let env_arg = if is_ref {
         quote! { #env_ident }
@@ -82,7 +84,9 @@ pub fn when_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let fn_vis = &input_fn.vis;
     let fn_sig = &input_fn.sig;
     let fn_block = &input_fn.block;
-    let fn_attrs = &input_fn.attrs; // get the other macros
+    // Filter out the current macro from attributes
+    let fn_attrs: Vec<_> =
+        input_fn.attrs.iter().filter(|attr| !attr.path().is_ident("when_paused")).collect();
 
     let env_arg = if is_ref {
         quote! { #env_ident }
