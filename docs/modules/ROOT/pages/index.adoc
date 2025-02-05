@@ -17,6 +17,15 @@ Discover our utility contracts for Stellar Soroban, applicable to all token stan
 
 - **xref:utils/pausable.adoc[Pausable]**
 
+== Error Codes
+In Stellar Soroban, each error variant is assigned an integer. To prevent duplication of error codes, we use the following convention:
+. Utilities: `1XX`
+.. Pausable: `10X`
+.. any future utilities will continue from `11X`, `12X`, and so on.
+. Fungible: `2XX`
+. Non-Fungible: `3XX`
+. Multi-Token: `4XX`
+
 // == Audits
 // TODO: You can find our audit reports here.
 
