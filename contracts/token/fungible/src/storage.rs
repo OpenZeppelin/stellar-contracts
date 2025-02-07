@@ -220,11 +220,16 @@ pub fn set_allowance(
 ///
 /// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to
 ///   transfer more tokens than `spender` current allowance.
+/// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
 ///
 /// # Notes
 ///
 /// No authorization is required.
 pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128) {
+    if amount < 0 {
+        panic_with_error!(e, FungibleTokenError::LessThanZero)
+    }
+
     let allowance = allowance_data(e, owner, spender);
 
     if allowance.amount < amount {
