@@ -191,10 +191,8 @@ pub enum FungibleTokenError {
     InvalidLiveUntilLedger = 202,
     /// Indicates an error when an input that must be >= 0
     LessThanZero = 203,
-    /// Indicates an error when an input that must be > 0
-    LessThanOrEqualToZero = 204,
     /// Indicates overflow when adding two values
-    MathOverflow = 205,
+    MathOverflow = 204,
 }
 
 // ################## EVENTS ##################

@@ -214,6 +214,24 @@ fn transfer_works() {
 }
 
 #[test]
+fn transfer_zero_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let from = Address::generate(&e);
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        transfer(&e, &from, &recipient, 0);
+        assert_eq!(balance(&e, &from), 0);
+        assert_eq!(balance(&e, &recipient), 0);
+
+        let events = e.events().all();
+        assert_eq!(events.len(), 1);
+    });
+}
+
+#[test]
 fn extend_balance_ttl_thru_transfer() {
     let e = Env::default();
     e.mock_all_auths();
@@ -336,7 +354,7 @@ fn update_burns_tokens() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #204)")]
+#[should_panic(expected = "Error(Contract, #203)")]
 fn update_with_invalid_amount_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -344,12 +362,12 @@ fn update_with_invalid_amount_panics() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        update(&e, Some(&from), Some(&to), 0);
+        update(&e, Some(&from), Some(&to), -1);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #205)")]
+#[should_panic(expected = "Error(Contract, #204)")]
 fn update_overflow_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());
