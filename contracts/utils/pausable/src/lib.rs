@@ -34,9 +34,10 @@
 //! the methods of the `Pausable` trait, along with your custom business logic
 //! (authentication, etc.)
 //!
-//! For god knows why, if you want to opt-out of [`Pausable`] trait, and use
-//! `storage::*` functions directly in your contract, well... you can!
-//! But we encourage the use of [`Pausable`] trait instead, due to:
+//! You can opt-out of [`Pausable`] trait, and use
+//! `storage::*` functions directly in your contract if you want more
+//! customizability. But we encourage the use of [`Pausable`] trait instead, due
+//! to the following reasons:
 //! - there is no additional cost
 //! - standardization
 //! - you cannot mistakenly forget one of the methods
