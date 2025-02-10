@@ -127,6 +127,7 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 /// * [`FungibleTokenError::InvalidLiveUntilLedger`] - Occurs when attempting to
 ///   set `live_until_ledger` that is less than the current ledger number and
 ///   greater than `0`.
+/// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
 ///
 /// # Events
 ///
