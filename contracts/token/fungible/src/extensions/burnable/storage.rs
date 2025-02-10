@@ -34,7 +34,7 @@ pub fn burn(e: &Env, from: &Address, amount: i128) {
 }
 
 /// Destroys `amount` of tokens from `account` using the allowance mechanism.
-/// `amount`is then deducted from `spender` allowance.
+/// `amount` is then deducted from `spender` allowance.
 /// Updates the total supply accordingly.
 ///
 /// # Arguments
