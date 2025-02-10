@@ -178,6 +178,7 @@ pub trait FungibleToken {
 // ################## ERRORS ##################
 
 #[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum FungibleTokenError {
     /// Indicates an error related to the current balance of account from which
