@@ -347,15 +347,15 @@ pub fn do_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
 ///
 /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
 ///   more tokens than `from` current balance.
-/// * [`FungibleTokenError::LessThanOrEqualToZero`] - When `amount <= 0`.
+/// * [`FungibleTokenError::LessThanZero`] - When `amount < 0`.
 /// * [`FungibleTokenError::MathOverflow`] - When `total_supply` overflows.
 ///
 /// # Notes
 ///
 /// No authorization is required.
 pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i128) {
-    if amount <= 0 {
-        panic_with_error!(e, FungibleTokenError::LessThanOrEqualToZero)
+    if amount < 0 {
+        panic_with_error!(e, FungibleTokenError::LessThanZero)
     }
     if let Some(account) = from {
         let mut from_balance = balance(e, account);
