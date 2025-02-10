@@ -147,6 +147,19 @@ fn spend_allowance_insufficient_allowance_fails() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #203)")]
+fn spend_allowance_invalid_amount_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        spend_allowance(&e, &owner, &spender, -1);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #202)")]
 fn set_allowance_with_expired_ledger_fails() {
     let e = Env::default();
