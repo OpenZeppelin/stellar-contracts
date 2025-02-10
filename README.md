@@ -1,4 +1,4 @@
-# OpenZeppelin Soroban Contracts
+# OpenZeppelin Stellar Soroban Contracts
 
 
 ## Security
@@ -9,4 +9,4 @@
 
 ## License
 
-OpenZeppelin Soroban Contracts are released under the [MIT LICENSE](LICENSE).
+OpenZeppelin Stellar Soroban Contracts are released under the [MIT LICENSE](LICENSE).
