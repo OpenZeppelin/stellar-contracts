@@ -27,11 +27,10 @@ pub struct Metadata {
 /// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
 ///   uninitialized metadata.
 pub fn get_metadata(e: &Env) -> Metadata {
-    if let Some(metadata) = e.storage().instance().get(&METADATA_KEY) {
-        metadata
-    } else {
-        panic_with_error!(e, FungibleTokenError::UnsetMetadata)
-    }
+   e.storage()
+    .instance()
+    .get(&METADATA_KEY)
+    .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::UnsetMetadata))
 }
 
 /// Returns the token decimals.
