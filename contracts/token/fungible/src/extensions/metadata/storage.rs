@@ -24,8 +24,8 @@ pub struct Metadata {
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access uninitalized
-///   metadata.
+/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
+///   uninitialized metadata.
 pub fn get_metadata(e: &Env) -> Metadata {
     if let Some(metadata) = e.storage().instance().get(&METADATA_KEY) {
         metadata
@@ -42,8 +42,8 @@ pub fn get_metadata(e: &Env) -> Metadata {
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access uninitalized
-///   metadata.
+/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
+///   uninitialized metadata.
 pub fn decimals(e: &Env) -> u32 {
     get_metadata(e).decimals
 }
@@ -56,8 +56,8 @@ pub fn decimals(e: &Env) -> u32 {
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access uninitalized
-///   metadata.
+/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
+///   uninitialized metadata.
 pub fn name(e: &Env) -> String {
     get_metadata(e).name
 }
@@ -70,8 +70,8 @@ pub fn name(e: &Env) -> String {
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access uninitalized
-///   metadata.
+/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
+///   uninitialized metadata.
 pub fn symbol(e: &Env) -> String {
     get_metadata(e).symbol
 }
