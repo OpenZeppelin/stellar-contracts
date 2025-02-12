@@ -2,13 +2,6 @@ use soroban_sdk::{panic_with_error, symbol_short, Address, Env, Symbol};
 
 use crate::{emit_paused, emit_unpaused, pausable::PausableError};
 
-// Same values as in Stellar Asset Contract (SAC) implementation:
-// https://github.com/stellar/rs-soroban-env/blob/main/soroban-env-host/src/builtin_contracts/stellar_asset_contract/storage_types.rs
-pub const DAY_IN_LEDGERS: u32 = 17280;
-
-pub const INSTANCE_EXTEND_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
-pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
-
 /// Indicates whether the contract is in `Paused` state.
 pub const PAUSED: Symbol = symbol_short!("PAUSED");
 
@@ -19,8 +12,11 @@ pub const PAUSED: Symbol = symbol_short!("PAUSED");
 /// * `e` - Access to Soroban environment.
 pub fn paused(e: &Env) -> bool {
     // if not paused, consider default false (unpaused)
-    e.storage().instance().extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
     e.storage().instance().get(&PAUSED).unwrap_or(false)
+
+    // NOTE: We don't extend the TTL here. We don’t think utilities should
+    // have any opinion on the TTLs, contracts usually manage TTL's themselves.
+    // Extending the TTL in the utilities would be redundant in the most cases.
 }
 
 /// Triggers `Paused` state.
