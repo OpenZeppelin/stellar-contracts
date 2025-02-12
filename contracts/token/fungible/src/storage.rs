@@ -82,8 +82,10 @@ pub fn balance(e: &Env, account: &Address) -> i128 {
 /// allowance should be treated as `0`.
 pub fn allowance_data(e: &Env, owner: &Address, spender: &Address) -> AllowanceData {
     let key = AllowanceKey { owner: owner.clone(), spender: spender.clone() };
-    let default = AllowanceData { amount: 0, live_until_ledger: 0 };
-    e.storage().temporary().get(&StorageKey::Allowance(key)).unwrap_or(default)
+    e.storage()
+        .temporary()
+        .get(&StorageKey::Allowance(key))
+        .unwrap_or(AllowanceData { amount: 0, live_until_ledger: 0 })
 }
 
 /// Returns the amount of tokens a `spender` is allowed to spend on behalf of an
