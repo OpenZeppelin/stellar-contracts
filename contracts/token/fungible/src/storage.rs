@@ -102,7 +102,7 @@ pub fn allowance_data(e: &Env, owner: &Address, spender: &Address) -> AllowanceD
 pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
     let allowance = allowance_data(e, owner, spender);
 
-    if allowance.amount > 0 && allowance.live_until_ledger < e.ledger().sequence() {
+    if allowance.live_until_ledger < e.ledger().sequence() {
         return 0;
     }
 
