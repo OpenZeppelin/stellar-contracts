@@ -10,7 +10,8 @@
 //! [`openzeppelin_fungible_token::burnable::FungibleBurnable`].
 
 use openzeppelin_fungible_token::{
-    self as fungible, burnable::FungibleBurnable, mintable::FungibleMintable, FungibleToken,
+    self as fungible, burnable::FungibleBurnable, impl_token_interface, mintable::FungibleMintable,
+    FungibleToken,
 };
 use openzeppelin_pausable::{self as pausable, Pausable};
 use openzeppelin_pausable_macros::when_not_paused;
@@ -141,3 +142,5 @@ impl FungibleMintable for ExampleContract {
         fungible::mintable::mint(e, &account, amount);
     }
 }
+
+impl_token_interface!(ExampleContract);
