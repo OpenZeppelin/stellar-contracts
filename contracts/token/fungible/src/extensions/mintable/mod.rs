@@ -39,7 +39,7 @@ pub trait FungibleMintable {
     /// some authorization controls for minting tokens.
     ///
     /// NOTE: if you want to add `capped` functionality to this function,
-    /// we recomment using [`crate::capped::check_cap()`] when implementing this
+    /// we recommend using [`crate::capped::check_cap()`] when implementing this
     /// function. For more details on the `capped` functionality, check
     /// [`crate::extensions::capped`], and check the `fungible-capped`
     /// example.
