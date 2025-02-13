@@ -143,4 +143,8 @@ impl FungibleMintable for ExampleContract {
     }
 }
 
+// NOTE: if your contract implements `FungibleToken` and `FungibleBurnable`,
+// and you also want your contract to implement
+// `soroban_sdk::token::TokenInterface`, you can use the `impl_token_interface!`
+// macro to generate the boilerplate implementation.
 impl_token_interface!(ExampleContract);

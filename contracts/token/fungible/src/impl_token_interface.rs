@@ -1,3 +1,7 @@
+/// For contracts that implement `FungibleToken` and `FungibleBurnable`,
+/// the implementation of `TokenInterface` can be generated using the
+/// `impl_token_interface!` macro.
+
 #[macro_export]
 macro_rules! impl_token_interface {
     ($contract:ty) => {
