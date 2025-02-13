@@ -68,7 +68,7 @@ mod extensions;
 mod fungible;
 mod storage;
 
-pub use extensions::{burnable, metadata, mintable};
+pub use extensions::{burnable, capped, metadata, mintable};
 pub use fungible::{
     emit_approve, emit_transfer, FungibleToken, FungibleTokenClient, FungibleTokenError,
 };
