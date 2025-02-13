@@ -11,7 +11,7 @@ macro_rules! impl_token_interface {
                 + openzeppelin_fungible_token::burnable::FungibleBurnable,
         {
             fn balance(env: soroban_sdk::Env, id: soroban_sdk::Address) -> i128 {
-                <$contract as openzeppelin_fungible_token::FungibleToken>::balance(&env, &id)
+                <$contract as openzeppelin_fungible_token::FungibleToken>::balance(&env, id)
             }
 
             fn transfer(
@@ -21,7 +21,7 @@ macro_rules! impl_token_interface {
                 amount: i128,
             ) {
                 <$contract as openzeppelin_fungible_token::FungibleToken>::transfer(
-                    &env, &from, &to, &amount,
+                    &env, from, to, amount,
                 )
             }
 
@@ -33,13 +33,13 @@ macro_rules! impl_token_interface {
                 amount: i128,
             ) {
                 <$contract as openzeppelin_fungible_token::FungibleToken>::transfer_from(
-                    &env, &spender, &from, &to, &amount,
+                    &env, spender, from, to, amount,
                 )
             }
 
             fn burn(env: soroban_sdk::Env, from: soroban_sdk::Address, amount: i128) {
                 <$contract as openzeppelin_fungible_token::burnable::FungibleBurnable>::burn(
-                    &env, &from, &amount,
+                    &env, from, amount,
                 )
             }
 
@@ -50,7 +50,7 @@ macro_rules! impl_token_interface {
                 amount: i128,
             ) {
                 <$contract as openzeppelin_fungible_token::burnable::FungibleBurnable>::burn_from(
-                    &env, &spender, &from, &amount,
+                    &env, spender, from, amount,
                 )
             }
 
@@ -60,7 +60,7 @@ macro_rules! impl_token_interface {
                 spender: soroban_sdk::Address,
             ) -> i128 {
                 <$contract as openzeppelin_fungible_token::FungibleToken>::allowance(
-                    &env, &owner, &spender,
+                    &env, owner, spender,
                 )
             }
 
@@ -73,10 +73,10 @@ macro_rules! impl_token_interface {
             ) {
                 <$contract as openzeppelin_fungible_token::FungibleToken>::approve(
                     &env,
-                    &owner,
-                    &spender,
-                    &amount,
-                    &live_until_ledger,
+                    owner,
+                    spender,
+                    amount,
+                    live_until_ledger,
                 )
             }
 
