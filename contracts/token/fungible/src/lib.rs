@@ -61,6 +61,11 @@
 //! - **Composable Design**: The modular structure encourages developers to
 //!   extend functionality by combining provided primitives or creating custom
 //!   extensions.
+//! - **TTL management**: This library handles the TTL of only `temporary` and
+//!   `persistent` storage entries declared by the library. The `instance` TTL
+//!   management is left to the implementor due to flexibility. Our library
+//!   exposes the sane default values for extending the TTL:
+//!   `INSTANCE_TTL_THRESHOLD` and `INSTANCE_EXTEND_AMOUNT`.
 #![no_std]
 
 mod extensions;
