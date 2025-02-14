@@ -162,7 +162,6 @@ fn set_allowance_with_expired_ledger_fails() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #202)")]
-//#[should_panic]
 fn set_allowance_with_greater_than_max_ledger_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
