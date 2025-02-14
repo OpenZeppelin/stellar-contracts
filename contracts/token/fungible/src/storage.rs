@@ -56,6 +56,8 @@ pub fn total_supply(e: &Env) -> i128 {
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address for which the balance is being queried.
 pub fn balance(e: &Env, account: &Address) -> i128 {
+    e.storage().instance().extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
+
     let key = StorageKey::Balance(account.clone());
     if let Some(balance) = e.storage().persistent().get::<_, i128>(&key) {
         e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
@@ -102,6 +104,8 @@ pub fn allowance_data(e: &Env, owner: &Address, spender: &Address) -> AllowanceD
 /// An allowance entry where `live_until_ledger` is less than the current
 /// ledger number is treated as an allowance with amount `0`.
 pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
+    e.storage().instance().extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
+
     let allowance = allowance_data(e, owner, spender);
 
     if allowance.live_until_ledger < e.ledger().sequence() {
@@ -144,6 +148,8 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 ///   longer period. This behavior closely mirrors the functioning of the
 ///   "Stellar Asset Contract" implementation for consistency reasons.
 pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+    e.storage().instance().extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
+
     owner.require_auth();
     set_allowance(e, owner, spender, amount, live_until_ledger, true);
 }
@@ -288,6 +294,8 @@ pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128
 ///
 /// Authorization for `from` is required.
 pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+    e.storage().instance().extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
+
     from.require_auth();
     do_transfer(e, from, to, amount);
 }
