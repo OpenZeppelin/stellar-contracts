@@ -1,6 +1,9 @@
 use soroban_sdk::{Address, Env};
 
-use crate::{extensions::mintable::emit_mint, storage::update};
+use crate::{
+    extensions::mintable::emit_mint,
+    storage::{update, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD},
+};
 
 /// Creates `amount` of tokens and assigns them to `account`. Updates
 /// the total supply accordingly.
