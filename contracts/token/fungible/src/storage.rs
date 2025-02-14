@@ -138,7 +138,8 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 /// * Authorization for `owner` is required.
 /// * Allowance is implicitly timebound by the maximum allowed storage TTL value
 ///   which is a network parameter, i.e. one cannot set an allowance for a
-///   longer period.
+///   longer period. This behavior mirrors the functioning of the "Stellar Asset
+///   Contract" implementation for consistency reasons.
 pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
     owner.require_auth();
     set_allowance(e, owner, spender, amount, live_until_ledger, true);
@@ -177,7 +178,8 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 /// * No authorization is required.
 /// * Allowance is implicitly timebound by the maximum allowed storage TTL value
 ///   which is a network parameter, i.e. one cannot set an allowance for a
-///   longer period.
+///   longer period. This behavior mirrors the functioning of the "Stellar Asset
+///   Contract" implementation for consistency reasons.
 pub fn set_allowance(
     e: &Env,
     owner: &Address,
@@ -190,8 +192,6 @@ pub fn set_allowance(
         panic_with_error!(e, FungibleTokenError::LessThanZero)
     }
 
-    let allowance = AllowanceData { amount, live_until_ledger };
-
     if live_until_ledger > e.storage().max_ttl()
         || (amount > 0 && live_until_ledger < e.ledger().sequence())
     {
@@ -200,11 +200,11 @@ pub fn set_allowance(
 
     let key =
         StorageKey::Allowance(AllowanceKey { owner: owner.clone(), spender: spender.clone() });
+    let allowance = AllowanceData { amount, live_until_ledger };
     e.storage().temporary().set(&key, &allowance);
 
     if amount > 0 {
-        // NOTE: can't underflow because of the check above.
-        let live_for = live_until_ledger - e.ledger().sequence();
+        let live_for = live_until_ledger.saturating_sub(e.ledger().sequence()).saturating_add(1);
 
         e.storage().temporary().extend_ttl(&key, live_for, live_for)
     }
