@@ -125,8 +125,8 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 /// # Errors
 ///
 /// * [`FungibleTokenError::InvalidLiveUntilLedger`] - Occurs when attempting to
-///   set `live_until_ledger` that is less than the current ledger number and
-///   greater than `0`.
+///   set `live_until_ledger` that is 1) greater than the maximum allowed or 2)
+///   less than the current ledger number and `amount` is greater than `0`.
 ///
 /// # Events
 ///
@@ -163,8 +163,8 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 /// # Errors
 ///
 /// * [`FungibleTokenError::InvalidLiveUntilLedger`] - Occurs when attempting to
-///   set `live_until_ledger` that is 1) greater than the maximum allowed TTL or
-///   2) less than the current ledger number and `amount` is greater than `0`.
+///   set `live_until_ledger` that is 1) greater than the maximum allowed or 2)
+///   less than the current ledger number and `amount` is greater than `0`.
 /// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
 ///
 /// # Events
@@ -192,19 +192,21 @@ pub fn set_allowance(
         panic_with_error!(e, FungibleTokenError::LessThanZero)
     }
 
-    if live_until_ledger > e.storage().max_ttl()
-        || (amount > 0 && live_until_ledger < e.ledger().sequence())
-    {
+    let current_ledger = e.ledger().sequence();
+    let max_live_until = current_ledger + e.storage().max_ttl();
+
+    if live_until_ledger > max_live_until || (amount > 0 && live_until_ledger < current_ledger) {
         panic_with_error!(e, FungibleTokenError::InvalidLiveUntilLedger);
     }
 
     let key =
         StorageKey::Allowance(AllowanceKey { owner: owner.clone(), spender: spender.clone() });
     let allowance = AllowanceData { amount, live_until_ledger };
+
     e.storage().temporary().set(&key, &allowance);
 
     if amount > 0 {
-        let live_for = live_until_ledger.saturating_sub(e.ledger().sequence()).saturating_add(1);
+        let live_for = live_until_ledger.saturating_sub(current_ledger).saturating_add(1);
 
         e.storage().temporary().extend_ttl(&key, live_for, live_for)
     }
