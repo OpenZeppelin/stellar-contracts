@@ -49,7 +49,8 @@ jobs:
       - name: install rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          components: clippy, rustfmt
+          toolchain: stable, nightly
+          components: clippy, rustfmt,
 
       - name: "Install nextest"
         uses: taiki-e/install-action@v2
