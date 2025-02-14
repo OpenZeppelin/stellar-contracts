@@ -1,15 +1,17 @@
 //! Fungible Pausable Example Contract.
 //!
-//! This contract replicates the functionality of the one in "contract.rs",
-//! offering the same features. The key difference lies in how SEP-41 compliance
-//! is achieved. The contract in "contract.rs" accomplishes this by implementing
+//! This contract replicates the functionality of the contract in
+//! "examples/fungible-pausable", offering the same features. The key difference
+//! lies in how SEP-41 compliance is achieved. The contract in "contract.rs"
+//! accomplishes this by implementing
 //! [`openzeppelin_fungible_token::fungible::FungibleToken`] and
 //! [`openzeppelin_fungible_token::burnable::FungibleBurnable`], whereas this
 //! version directly implements [`soroban_sdk::token::TokenInterface`].
 //!
 //! Ultimately, it is up to the user to choose their preferred approach to
-//! creating a SEP-41 token. We suggest the approach in "contract.rs" for better
-//! organization of the code, consistency and ease of inspection/debugging.
+//! creating a SEP-41 token. We suggest the approach in
+//! "examples/fungible-pausable" for better organization of the code,
+//! consistency and ease of inspection/debugging.
 
 use openzeppelin_fungible_token::{self as fungible, mintable::FungibleMintable};
 use openzeppelin_pausable::{self as pausable, Pausable};
