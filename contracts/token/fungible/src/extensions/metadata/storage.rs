@@ -1,10 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, symbol_short, Env, String, Symbol};
 
-use crate::{
-    storage::{INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD},
-    FungibleTokenError,
-};
-
 /// Storage key that maps to [`Metadata`]
 pub const METADATA_KEY: Symbol = symbol_short!("METADATA");
 
@@ -91,6 +86,5 @@ pub fn symbol(e: &Env) -> String {
 /// admin-only authorization.
 pub fn set_metadata(e: &Env, decimals: u32, name: String, symbol: String) {
     let metadata = Metadata { decimals, name, symbol };
-    e.storage().instance().extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
     e.storage().instance().set(&METADATA_KEY, &metadata);
 }

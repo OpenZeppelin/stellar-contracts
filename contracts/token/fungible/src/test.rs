@@ -16,6 +16,7 @@ use crate::{
     storage::{
         allowance, approve, balance, set_allowance, spend_allowance, total_supply, transfer,
         transfer_from, update, StorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT,
+        INSTANCE_TTL_THRESHOLD,
     },
 };
 
@@ -56,7 +57,7 @@ fn bump_instance_works() {
         let current = e.ledger().sequence();
         e.ledger().set_sequence_number(current + ttl);
 
-        total_supply(&e);
+        e.storage().instance().extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
         assert_eq!(e.storage().instance().get_ttl(), INSTANCE_EXTEND_AMOUNT);
     });
 }

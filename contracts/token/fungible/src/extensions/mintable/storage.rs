@@ -1,9 +1,6 @@
 use soroban_sdk::{Address, Env};
 
-use crate::{
-    extensions::mintable::emit_mint,
-    storage::{update, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD},
-};
+use crate::{extensions::mintable::emit_mint, storage::update};
 
 /// Creates `amount` of tokens and assigns them to `account`. Updates
 /// the total supply accordingly.
@@ -34,8 +31,6 @@ use crate::{
 /// admin.require_auth();
 /// ```
 pub fn mint(e: &Env, account: &Address, amount: i128) {
-    e.storage().instance().extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
-
     update(e, None, Some(account), amount);
     emit_mint(e, account, amount);
 }
