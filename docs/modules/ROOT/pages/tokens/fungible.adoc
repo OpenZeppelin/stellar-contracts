@@ -18,7 +18,7 @@ We provide the below extensions to enhance the capabilities of the Fungible Toke
 https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/mintable[Source Code]
 
 ==== Summary
-The `Mintable` trait extends the `FungibleToken` trait to provide the capability to mint tokens.
+The `FungibleMintable` trait extends the `FungibleToken` trait to provide the capability to mint tokens.
 
 ==== Events
 * `mint_event` :  broadcasted to the network when the `mint()` function is invoked.
@@ -27,11 +27,11 @@ The `Mintable` trait extends the `FungibleToken` trait to provide the capability
 https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/burnable[Source Code]
 
 ==== Summary
-The `Burnable` trait extends the `FungibleToken` trait to provide the
+The `FungibleBurnable` trait extends the `FungibleToken` trait to provide the
 capability to burn tokens.
 
 To fully comply with the SEP-41 specification one have to implement the
-this `Burnable` trait along with the `[FungibleToken]` trait.
+this `FungibleBurnable` trait along with the `[FungibleToken]` trait.
 SEP-41 mandates support for token burning to be considered compliant.
 
 Excluding the `burn` functionality from the `[FungibleToken]` trait

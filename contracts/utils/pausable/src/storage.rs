@@ -93,7 +93,7 @@ pub fn unpause(e: &Env, caller: &Address) {
 /// No authorization is required.
 pub fn when_not_paused(e: &Env) {
     if paused(e) {
-        panic_with_error!(e, PausableError::EnforcedPause)
+        panic_with_error!(e, PausableError::EnforcedPause);
     }
 }
 
@@ -113,6 +113,6 @@ pub fn when_not_paused(e: &Env) {
 /// No authorization is required.
 pub fn when_paused(e: &Env) {
     if !paused(e) {
-        panic_with_error!(e, PausableError::ExpectedPause)
+        panic_with_error!(e, PausableError::ExpectedPause);
     }
 }

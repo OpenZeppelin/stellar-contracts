@@ -181,7 +181,7 @@ pub fn set_allowance(
     emit: bool,
 ) {
     if amount < 0 {
-        panic_with_error!(e, FungibleTokenError::LessThanZero)
+        panic_with_error!(e, FungibleTokenError::LessThanZero);
     }
 
     let allowance = AllowanceData { amount, live_until_ledger };
@@ -355,7 +355,7 @@ pub fn do_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
 /// No authorization is required.
 pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i128) {
     if amount <= 0 {
-        panic_with_error!(e, FungibleTokenError::LessThanOrEqualToZero)
+        panic_with_error!(e, FungibleTokenError::LessThanOrEqualToZero);
     }
     if let Some(account) = from {
         let mut from_balance = balance(e, account);
