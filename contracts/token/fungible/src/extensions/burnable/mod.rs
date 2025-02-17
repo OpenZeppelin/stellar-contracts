@@ -7,12 +7,12 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 
 /// Burnable Trait for Fungible Token
 ///
-/// The `Burnable` trait extends the `FungibleToken` trait to provide the
-/// capability to burn tokens. This trait is designed to be used in conjunction
-/// with the `FungibleToken` trait.
+/// The `FungibleBurnable` trait extends the `FungibleToken` trait to provide
+/// the capability to burn tokens. This trait is designed to be used in
+/// conjunction with the `FungibleToken` trait.
 ///
 /// To fully comply with the SEP-41 specification one have to implement the
-/// this `Burnable` trait along with the `[FungibleToken]` trait.
+/// this `FungibleBurnable` trait along with the `[FungibleToken]` trait.
 /// SEP-41 mandates support for token burning to be considered compliant.
 ///
 /// Excluding the `burn` functionality from the `[FungibleToken]` trait
