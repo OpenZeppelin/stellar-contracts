@@ -9,8 +9,8 @@ use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, Str
 /// not part of SEP-41 but is commonly used in token contracts.
 ///
 /// To fully comply with the SEP-41 specification one have to implement the
-/// `Burnable` trait in addition to this one. SEP-41 mandates support for token
-/// burning to be considered compliant.
+/// `FungibleBurnable` trait in addition to this one. SEP-41 mandates support
+/// for token burning to be considered compliant.
 #[contractclient(name = "FungibleTokenClient")]
 pub trait FungibleToken {
     /// Returns the total amount of tokens in circulation.
