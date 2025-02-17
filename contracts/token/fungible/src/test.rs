@@ -13,14 +13,13 @@ use soroban_sdk::{
 
 use crate::{
     extensions::mintable::mint,
-    extensions::burnable::burn,
     storage::{
         allowance, approve, balance, set_allowance, spend_allowance, total_supply, transfer,
         transfer_from, update, StorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT,
     },
 };
 
-mod event_utils;
+pub mod event_utils;
 use event_utils::EventAssertion;
 
 #[contract]
@@ -264,6 +263,12 @@ fn approve_and_transfer_from() {
 
         let updated_allowance = allowance(&e, &owner, &spender);
         assert_eq!(updated_allowance, 20);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(3);
+        event_assert.assert_mint(&owner, 100);
+        event_assert.assert_approve(&owner, &spender, 50, 1000);
+        event_assert.assert_transfer(&owner, &recipient, 30);
     });
 }
 
@@ -378,43 +383,5 @@ fn update_with_insufficient_balance_panics() {
     e.as_contract(&address, || {
         mint(&e, &from, 50);
         update(&e, Some(&from), Some(&to), 100);
-    });
-}
-
-#[test]
-fn mint_works() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let to = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        mint(&e, &to, 100);
-        assert_eq!(balance(&e, &to), 100);
-        assert_eq!(total_supply(&e), 100);
-
-        let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
-        event_assert.assert_mint(&to, 100);
-    });
-}
-
-#[test]
-fn burn_works() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let account = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        mint(&e, &account, 100);
-        burn(&e, &account, 50);
-        assert_eq!(balance(&e, &account), 50);
-        assert_eq!(total_supply(&e), 50);
-
-        let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
-        event_assert.assert_mint(&account, 100);
-        event_assert.assert_burn(&account, 50);
     });
 }

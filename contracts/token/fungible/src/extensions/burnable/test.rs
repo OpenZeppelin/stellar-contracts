@@ -10,6 +10,7 @@ use crate::{
         mintable::mint,
     },
     storage::{allowance, approve, balance, total_supply},
+    test::event_utils::EventAssertion,
 };
 
 #[contract]
@@ -26,6 +27,11 @@ fn burn_works() {
         burn(&e, &account, 50);
         assert_eq!(balance(&e, &account), 50);
         assert_eq!(total_supply(&e), 50);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        event_assert.assert_mint(&account, 100);
+        event_assert.assert_burn(&account, 50);
     });
 }
 
@@ -43,6 +49,12 @@ fn burn_with_allowance_works() {
         assert_eq!(balance(&e, &owner), 70);
         assert_eq!(balance(&e, &spender), 0);
         assert_eq!(total_supply(&e), 70);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(3);
+        event_assert.assert_mint(&owner, 100);
+        event_assert.assert_approve(&owner, &spender, 30, 1000);
+        event_assert.assert_burn(&owner, 30);
     });
 }
 
