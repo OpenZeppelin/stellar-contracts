@@ -26,7 +26,7 @@ mod helper;
 /// ```
 #[proc_macro_attribute]
 pub fn when_not_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    generate_pause_check(item, "when_not_paused", "when_not_paused")
+    generate_pause_check(item, "when_not_paused")
 }
 
 /// Adds a pause check at the beginning of the function that ensures the
@@ -51,5 +51,5 @@ pub fn when_not_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn when_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    generate_pause_check(item, "when_paused", "when_paused")
+    generate_pause_check(item, "when_paused")
 }

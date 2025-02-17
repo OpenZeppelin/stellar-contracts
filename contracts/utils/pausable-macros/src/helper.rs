@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, FnArg, ItemFn, PatType, Type};
 
-pub fn generate_pause_check(item: TokenStream, check_fn: &str, macro_name: &str) -> TokenStream {
+pub fn generate_pause_check(item: TokenStream, check_fn: &str) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);
     let (env_ident, is_ref) = check_env_arg(&input_fn);
 
