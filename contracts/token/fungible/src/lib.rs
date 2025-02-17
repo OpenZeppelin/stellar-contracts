@@ -63,7 +63,7 @@
 //!   extensions.
 //! - **TTL management**: This library handles the TTL of only `temporary` and
 //!   `persistent` storage entries declared by the library. The `instance` TTL
-//!   management is left to the implementor due to flexibility. Our library
+//!   management is left to the implementor due to flexibility. The library
 //!   exposes the sane default values for extending the TTL:
 //!   `INSTANCE_TTL_THRESHOLD` and `INSTANCE_EXTEND_AMOUNT`.
 #![no_std]
