@@ -9,9 +9,7 @@ pub fn generate_pause_check(item: TokenStream, check_fn: &str, macro_name: &str)
     let fn_vis = &input_fn.vis;
     let fn_sig = &input_fn.sig;
     let fn_block = &input_fn.block;
-    // Filter out the current macro from attributes
-    let fn_attrs: Vec<_> =
-        input_fn.attrs.iter().filter(|attr| !attr.path().is_ident(macro_name)).collect();
+    let fn_attrs = &input_fn.attrs;
 
     let env_arg = if is_ref {
         quote! { #env_ident }
