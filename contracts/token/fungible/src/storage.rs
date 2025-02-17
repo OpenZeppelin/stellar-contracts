@@ -193,9 +193,10 @@ pub fn set_allowance(
     }
 
     let current_ledger = e.ledger().sequence();
-    let max_live_until = current_ledger + e.storage().max_ttl();
 
-    if live_until_ledger > max_live_until || (amount > 0 && live_until_ledger < current_ledger) {
+    if live_until_ledger > e.ledger().max_live_until_ledger()
+        || (amount > 0 && live_until_ledger < current_ledger)
+    {
         panic_with_error!(e, FungibleTokenError::InvalidLiveUntilLedger);
     }
 
@@ -206,7 +207,9 @@ pub fn set_allowance(
     e.storage().temporary().set(&key, &allowance);
 
     if amount > 0 {
-        let live_for = live_until_ledger.saturating_sub(current_ledger).saturating_add(1);
+        // NOTE: cannot revert bcause of the check above;
+        // adding 1 for consistency with the SAC implementation.
+        let live_for = live_until_ledger - current_ledger + 1;
 
         e.storage().temporary().extend_ttl(&key, live_for, live_for)
     }
