@@ -7,31 +7,6 @@ use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, Str
 /// transfers and approvals associated with non-fungible tokens.
 #[contractclient(name = "NonFungibleTokenClient")]
 pub trait NonFungibleToken {
-    /// Transfers `amount` of tokens from `from` to `to`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
-    /// * `from` - The address holding the tokens.
-    /// * `to` - The address receiving the transferred tokens.
-    /// * `amount` - The amount of tokens to be transferred.
-    ///
-    /// # Errors
-    ///
-    /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to
-    ///   transfer more tokens than `from` current balance.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[amount: i128]`
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::transfer()`] when implementing this
-    /// function.
-    fn transfer(e: &Env, from: Address, to: Address, amount: i128);
-
     /// Returns the number of tokens in `owner`'s account.
     ///
     /// # Arguments
@@ -62,6 +37,8 @@ pub trait NonFungibleToken {
     ///
     /// # Arguments
     ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `spender` - The address authorizing the transfer.
     /// * `from` - Account of the sender.
     /// * `to` - Account of the recipient.
     /// * `token_id` - Token id as a number.
@@ -82,12 +59,14 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[token_id: i128]`
-    fn safe_transfer_from(e: &Env, from: Address, to: Address, token_id: U256);
+    fn safe_transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: U256);
 
     /// Safely transfers `token_id` token from `from` to `to`.
     ///
     /// # Arguments
     ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `spender` - The address authorizing the transfer.
     /// * `from` - Account of the sender.
     /// * `to` - Account of the recipient.
     /// * `token_id` - Token id as a number.
@@ -129,6 +108,8 @@ pub trait NonFungibleToken {
     ///
     /// # Arguments
     ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `spender` - The address authorizing the transfer.
     /// * `from` - Account of the sender.
     /// * `to` - Account of the recipient.
     /// * `token_id` - Token id as a number.
@@ -158,6 +139,8 @@ pub trait NonFungibleToken {
     ///
     /// # Arguments
     ///
+    /// * `e` - Access to Soroban environment.
+    /// * `owner` - The address holding the tokens.
     /// * `to` - Account of the recipient.
     /// * `token_id` - Token id as a number.
     ///
@@ -172,7 +155,7 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["approval", from: Address, to: Address]`
     /// * data - `[token_id: i128]`
-    fn approve(e: &Env, to: Address, token_id: U256);
+    fn approve(e: &Env, owner: Address, to: Address, token_id: U256);
 
     /// Approve or remove `operator` as an operator for the caller.
     ///
@@ -181,6 +164,8 @@ pub trait NonFungibleToken {
     ///
     /// # Arguments
     ///
+    /// * `e` - Access to Soroban environment.
+    /// * `owner` - The address holding the tokens.
     /// * `operator` - Account to add to the set of authorized operators.
     /// * `approved` - Flag that determines whether or not permission will be
     ///   granted to `operator`. If true, this means `operator` will be allowed
@@ -195,7 +180,7 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["approval_for_all", from: Address, operator: Address]`
     /// * data - `[approved: bool]`
-    fn set_approval_for_all(e: &Env, operator: Address, approved: bool);
+    fn set_approval_for_all(e: &Env, owner: Address, operator: Address, approved: bool);
 
     /// Returns the account approved for `token_id` token.
     ///
