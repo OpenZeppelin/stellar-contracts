@@ -12,7 +12,7 @@ pub trait NonFungibleToken {
     /// # Arguments
     ///
     /// * `owner` - Account of the token's owner.
-    fn balance_of(e: &Env, owner: Address) -> i128;
+    fn balance(e: &Env, owner: Address) -> i128;
 
     /// Returns the owner of the `token_id` token.
     ///
@@ -24,7 +24,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
-    fn owner_of(e: &Env, token_id: u128) -> Address;
+    fn owner(e: &Env, token_id: u128) -> Address;
 
     /// Safely transfers `token_id` token from `from` to `to`, checking first
     /// that contract recipients are aware of the [`Erc721`] protocol to
@@ -40,15 +40,12 @@ pub trait NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::IncorrectOwner`]  - If the previous owner is
-    ///   not `from`.
+    /// * [`NonFungibleTokenError::IncorrectOwner`]  - If the owner is not
+    ///   `from`.
     /// * [`NonFungibleTokenError::InsufficientApproval`] - If the caller does
     ///   not have the right to approve.
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
-    /// * [`NonFungibleTokenError::InvalidReceiver`] - If
-    ///   [`IERC721Receiver::on_erc_721_received`] hasn't returned its
-    /// interface id or returned with error, `to` is `Address::ZERO`.
     ///
     /// # Events
     ///
@@ -76,9 +73,6 @@ pub trait NonFungibleToken {
     ///    not have the right to approve.
     ///  * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///    exist.
-    ///  * [`NonFungibleTokenError::InvalidReceiver`] - If
-    ///    [`IERC721Receiver::on_erc_721_received`] hasn't returned its
-    ///    interface id or returned with error, or `to` is `Address::ZERO`.
     ///
     /// # Events
     ///
@@ -86,6 +80,7 @@ pub trait NonFungibleToken {
     /// * data - `[token_id: u128]`
     fn safe_transfer_from_with_data(
         e: &Env,
+        spender: Address,
         from: Address,
         to: Address,
         token_id: u128,
@@ -110,8 +105,6 @@ pub trait NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::InvalidReceiver`] - If `to` is
-    ///   `Address::ZERO`.
     /// * [`NonFungibleTokenError::IncorrectOwner`] - If the previous owner is
     ///   not `from`.
     /// * [`NonFungibleTokenError::InsufficientApproval`] - If the caller does
@@ -123,13 +116,14 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[token_id: u128]`
-    fn transfer_from(e: &Env, from: Address, to: Address, token_id: u128);
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u128);
 
     /// Gives permission to `to` to transfer `token_id` token to another
     /// account. The approval is cleared when the token is transferred.
     ///
-    /// Only a single account can be approved at a time,
-    /// so approving the `Address::ZERO` clears previous approvals.
+    /// Only a single account can be approved at a time.
+    /// To remove an approval, the owner can approve their own address,
+    /// effectively removing the previous approved address.
     ///
     /// # Arguments
     ///
@@ -186,7 +180,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
-    fn get_approved(e: &Env, token_id: u128) -> Address;
+    fn get_approved(e: &Env, token_id: u128) -> Option<Address>;
 
     /// Returns whether the `operator` is allowed to manage all the assets of
     /// `owner`.
@@ -204,7 +198,7 @@ pub trait NonFungibleToken {
 #[repr(u32)]
 pub enum NonFungibleTokenError {
     /// Indicates a non-existent `token_id`.
-    NonexistentToken = 300,
+    NonExistentToken = 300,
     /// Indicates an error related to the ownership over a particular token.
     /// Used in transfers.
     IncorrectOwner = 301,
@@ -254,8 +248,8 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 ///
 /// # Events
 ///
-/// * topics - `["approval", owner: Address, approver: Address]`
-/// * data - `[token_id: u128, live_until_ledger: u32]`
+/// * topics - `["approval", owner: Address, token_id: u128]`
+/// * data - `[approver: Address, live_until_ledger: u32]`
 pub fn emit_approval(
     e: &Env,
     owner: &Address,
@@ -263,8 +257,8 @@ pub fn emit_approval(
     token_id: u128,
     live_until_ledger: u32,
 ) {
-    let topics = (symbol_short!("approval"), owner, approver);
-    e.events().publish(topics, (token_id, live_until_ledger))
+    let topics = (symbol_short!("approval"), owner, token_id);
+    e.events().publish(topics, (approver, live_until_ledger))
 }
 
 /// Emits an event when `owner` enables `approved` to manage the `token_id`
@@ -281,8 +275,8 @@ pub fn emit_approval(
 ///
 /// # Events
 ///
-/// * topics - `["approval", owner: Address, operator: Address]`
-/// * data - `[approved: bool, live_until_ledger: u32]`
+/// * topics - `["approval", owner: Address]`
+/// * data - `[operator: Address, approved: bool, live_until_ledger: u32]`
 pub fn emit_approval_for_all(
     e: &Env,
     owner: &Address,
@@ -290,6 +284,6 @@ pub fn emit_approval_for_all(
     approved: bool,
     live_until_ledger: u32,
 ) {
-    let topics = (symbol_short!("approval"), owner, operator);
-    e.events().publish(topics, (approved, live_until_ledger))
+    let topics = (symbol_short!("approval"), owner);
+    e.events().publish(topics, (operator, approved, live_until_ledger))
 }
