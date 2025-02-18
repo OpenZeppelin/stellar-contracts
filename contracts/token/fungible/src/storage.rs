@@ -207,7 +207,7 @@ pub fn set_allowance(
     e.storage().temporary().set(&key, &allowance);
 
     if amount > 0 {
-        // NOTE: cannot revert bcause of the check above;
+        // NOTE: cannot revert because of the check above;
         // adding 1 for consistency with the SAC implementation.
         let live_for = live_until_ledger - current_ledger + 1;
 
