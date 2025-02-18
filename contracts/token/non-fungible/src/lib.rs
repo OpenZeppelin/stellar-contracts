@@ -63,5 +63,11 @@ pub use non_fungible::{
     emit_approval, emit_approval_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenClient,
     NonFungibleTokenError,
 };
+pub use storage::{
+    approve, balance, get_approved, is_approved_for_all, owner_of, safe_transfer_from,
+    safe_transfer_from_with_data, set_approval_for_all, transfer_from, ApprovalData,
+    ApprovalForAllData, ApprovalForAllKey, ApprovalKey, StorageKey, BALANCE_EXTEND_AMOUNT,
+    BALANCE_TTL_THRESHOLD, DAY_IN_LEDGERS, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
+};
 
 mod test;
