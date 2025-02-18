@@ -92,7 +92,18 @@ pub fn owner_of(e: &Env, token_id: u128) -> Address {
     }
 }
 
-/// Returns the address approved for `token_id` token.
+/// Returns the address approved for the specified token.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token_id` - The identifier of the token to check approval for.
+///
+/// # Returns
+///
+/// * `Some(Address)` - The approved address if there is a valid, non-expired
+///   approval
+/// * `None` - If there is no approval or if the approval has expired
 pub fn get_approved(e: &Env, token_id: u128) -> Option<Address> {
     let key = StorageKey::Approval(ApprovalKey { token_id });
 
@@ -107,7 +118,18 @@ pub fn get_approved(e: &Env, token_id: u128) -> Option<Address> {
     }
 }
 
-/// Returns whether the `operator` is allowed to manage all assets of `owner`.
+/// Returns whether the operator is allowed to manage all assets of the owner.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `owner` - The address that owns the tokens.
+/// * `operator` - The address to check for approval status.
+///
+/// # Returns
+///
+/// * `true` - If the operator has a valid, non-expired approval for all tokens
+/// * `false` - If there is no approval or if the approval has expired
 pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool {
     let key = StorageKey::ApprovalForAll(ApprovalForAllKey { owner: owner.clone() });
 
@@ -247,7 +269,19 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
     do_transfer(e, from, to, token_id);
 }
 
-/// Approves an address to transfer a specific token
+/// Approves an address to transfer a specific token.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `owner` - The address that owns the token.
+/// * `approver` - The address being granted approval.
+/// * `token_id` - The identifier of the token being approved for transfer.
+///
+/// # Errors
+///
+/// * [`NonFungibleTokenError::InvalidApprover`] - If the owner address is not
+///   the actual owner of the token.
 pub fn approve(e: &Env, owner: &Address, approver: &Address, token_id: u128) {
     owner.require_auth();
 
@@ -269,7 +303,15 @@ pub fn approve(e: &Env, owner: &Address, approver: &Address, token_id: u128) {
     emit_approval(e, owner, approver, token_id, live_until_ledger);
 }
 
-/// Sets or removes operator approval for all tokens
+/// Sets or removes operator approval for managing all tokens owned by the
+/// owner.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `owner` - The address granting approval for all their tokens.
+/// * `operator` - The address being granted or revoked approval.
+/// * `approved` - If true, grants approval; if false, revokes approval.
 pub fn set_approval_for_all(e: &Env, owner: &Address, operator: &Address, approved: bool) {
     owner.require_auth();
 
@@ -286,8 +328,23 @@ pub fn set_approval_for_all(e: &Env, owner: &Address, operator: &Address, approv
     emit_approval_for_all(e, owner, operator, approved, live_until_ledger);
 }
 
-/// Helper function to perform the actual transfer
-fn do_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
+/// Helper function to perform the actual transfer of a non-fungible token
+/// (NFT). Updates ownership records, adjusts balances, and clears existing
+/// approvals.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The address of the current token owner.
+/// * `to` - The address of the token recipient.
+/// * `token_id` - The identifier of the token being transferred.
+///
+/// # Notes
+///
+/// This is an internal function used by `transfer_from`, `safe_transfer_from`
+/// and `safe_transfer_from_with_data`. It assumes all necessary checks
+/// (ownership, approval, etc.) have already been performed.
+pub fn do_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
     // Update ownership
     e.storage().persistent().set(&StorageKey::Owner(token_id), to);
 

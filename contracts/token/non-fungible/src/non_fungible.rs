@@ -12,6 +12,10 @@ pub trait NonFungibleToken {
     /// # Arguments
     ///
     /// * `owner` - Account of the token's owner.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::balance()`] when implementing this function.
     fn balance(e: &Env, owner: Address) -> i128;
 
     /// Returns the owner of the `token_id` token.
@@ -24,7 +28,12 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
-    fn owner(e: &Env, token_id: u128) -> Address;
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::owner_of()`] when implementing this
+    /// function.
+    fn owner_of(e: &Env, token_id: u128) -> Address;
 
     /// Safely transfers `token_id` token from `from` to `to`, checking first
     /// that contract recipients are aware of the [`Erc721`] protocol to
@@ -51,6 +60,11 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[token_id: u128]`
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::safe_transfer_from()`] when implementing
+    /// this function.
     fn safe_transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u128);
 
     /// Safely transfers `token_id` token from `from` to `to`.
@@ -78,6 +92,11 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[token_id: u128]`
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::safe_transfer_from_with_data()`] when
+    /// implementing this function.
     fn safe_transfer_from_with_data(
         e: &Env,
         spender: Address,
@@ -116,6 +135,11 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[token_id: u128]`
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::transfer_from()`] when implementing this
+    /// function.
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u128);
 
     /// Gives permission to `to` to transfer `token_id` token to another
@@ -143,6 +167,11 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["approval", from: Address, to: Address]`
     /// * data - `[token_id: u128]`
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::approve()`] when implementing this
+    /// function.
     fn approve(e: &Env, owner: Address, to: Address, token_id: u128);
 
     /// Approve or remove `operator` as an operator for the caller.
@@ -168,6 +197,11 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["approval_for_all", from: Address, operator: Address]`
     /// * data - `[approved: bool]`
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::set_approval_for_all()`] when implementing
+    /// this function.
     fn set_approval_for_all(e: &Env, owner: Address, operator: Address, approved: bool);
 
     /// Returns the account approved for `token_id` token.
@@ -180,6 +214,11 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::get_approved()`] when implementing this
+    /// function.
     fn get_approved(e: &Env, token_id: u128) -> Option<Address>;
 
     /// Returns whether the `operator` is allowed to manage all the assets of
@@ -189,6 +228,11 @@ pub trait NonFungibleToken {
     ///
     /// * `owner` - Account of the token's owner.
     /// * `operator` - Account to be checked.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::is_approved_for_all()`] when implementing
+    /// this function.
     fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool;
 }
 
