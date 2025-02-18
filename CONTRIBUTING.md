@@ -41,7 +41,7 @@ As a contributor, you are expected to fork this repository, work on your own for
     git push origin fix/some-bug-short-description-#123
     ```
 
-4. Run tests and linter. This can be done by running local continuous integration and make sure it passes.
+4. Run tests and linter. This can be done by running local continuous integration and make sure it passes (the tests on GitHub will be run once they are approved by us for the external PRs).
 
     ```bash
     # run tests
