@@ -1,4 +1,4 @@
-use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, String};
+use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Bytes, Env};
 
 /// Vanilla NonFungible Token Trait
 ///
@@ -12,12 +12,7 @@ pub trait NonFungibleToken {
     /// # Arguments
     ///
     /// * `owner` - Account of the token's owner.
-    ///
-    /// # Errors
-    ///
-    /// * [`NonFungibleTokenError::InvalidOwner`] - If owner address is
-    ///   `Address::ZERO`.
-    fn balance_of(e: &Env, owner: Address) -> U256;
+    fn balance_of(e: &Env, owner: Address) -> i128;
 
     /// Returns the owner of the `token_id` token.
     ///
@@ -29,7 +24,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
-    fn owner_of(e: &Env, token_id: U256) -> Address;
+    fn owner_of(e: &Env, token_id: u128) -> Address;
 
     /// Safely transfers `token_id` token from `from` to `to`, checking first
     /// that contract recipients are aware of the [`Erc721`] protocol to
@@ -58,8 +53,8 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: i128]`
-    fn safe_transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: U256);
+    /// * data - `[token_id: u128]`
+    fn safe_transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u128);
 
     /// Safely transfers `token_id` token from `from` to `to`.
     ///
@@ -88,13 +83,12 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: i128]`
-    #[selector(name = "safeTransferFrom")]
+    /// * data - `[token_id: u128]`
     fn safe_transfer_from_with_data(
         e: &Env,
         from: Address,
         to: Address,
-        token_id: U256,
+        token_id: u128,
         data: Bytes,
     );
 
@@ -128,8 +122,8 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: i128]`
-    fn transfer_from(e: &Env, from: Address, to: Address, token_id: U256);
+    /// * data - `[token_id: u128]`
+    fn transfer_from(e: &Env, from: Address, to: Address, token_id: u128);
 
     /// Gives permission to `to` to transfer `token_id` token to another
     /// account. The approval is cleared when the token is transferred.
@@ -154,8 +148,8 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["approval", from: Address, to: Address]`
-    /// * data - `[token_id: i128]`
-    fn approve(e: &Env, owner: Address, to: Address, token_id: U256);
+    /// * data - `[token_id: u128]`
+    fn approve(e: &Env, owner: Address, to: Address, token_id: u128);
 
     /// Approve or remove `operator` as an operator for the caller.
     ///
@@ -192,7 +186,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
-    fn get_approved(e: &Env, token_id: U256) -> Address;
+    fn get_approved(e: &Env, token_id: u128) -> Address;
 
     /// Returns whether the `operator` is allowed to manage all the assets of
     /// `owner`.
@@ -208,65 +202,94 @@ pub trait NonFungibleToken {
 
 #[contracterror]
 #[repr(u32)]
-pub enum FungibleTokenError {
-    /// Indicates an error related to the current balance of account from which
-    /// tokens are expected to be transferred.
-    InsufficientBalance = 200,
-    /// Indicates a failure with the allowance mechanism when a given spender
-    /// doesn't have enough allowance.
-    InsufficientAllowance = 201,
-    /// Indicates an invalid value for `live_until_ledger` when setting an
-    /// allowance.
-    InvalidLiveUntilLedger = 202,
-    /// Indicates an error when an input that must be >= 0
-    LessThanZero = 203,
-    /// Indicates an error when an input that must be > 0
-    LessThanOrEqualToZero = 204,
-    /// Indicates overflow when adding two values
-    MathOverflow = 205,
+pub enum NonFungibleTokenError {
+    /// Indicates a non-existent `token_id`.
+    NonexistentToken = 300,
+    /// Indicates an error related to the ownership over a particular token.
+    /// Used in transfers.
+    IncorrectOwner = 301,
+    /// Indicates a failure with the token `sender`. Used in transfers.
+    InvalidSender = 302,
+    /// Indicates a failure with the token `receiver`. Used in transfers.
+    InvalidReceiver = 303,
+    /// Indicates a failure with the `operator`’s approval. Used in transfers.
+    InsufficientApproval = 304,
+    /// Indicates a failure with the `approver` of a token to be approved. Used
+    /// in approvals.
+    InvalidApprover = 305,
+    /// Indicates a failure with the `operator` to be approved. Used in
+    /// approvals.
+    InvalidOperator = 306,
 }
 
 // ################## EVENTS ##################
 
-/// Emits an event indicating a transfer of tokens.
+/// Emits an event indicating a transfer of token.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `from` - The address holding the tokens.
-/// * `to` - The address receiving the transferred tokens.
-/// * `amount` - The amount of tokens to be transferred.
+/// * `from` - The address holding the token.
+/// * `to` - The address receiving the transferred token.
+/// * `token_id` - The identifier of the transferred token.
 ///
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[amount: i128]`
-pub fn emit_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+/// * data - `[token_id: u128]`
+pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
     let topics = (symbol_short!("transfer"), from, to);
-    e.events().publish(topics, amount)
+    e.events().publish(topics, token_id)
 }
 
-/// Emits an event indicating an allowance was set.
+/// Emits an event when `owner` enables `approved` to manage the `token_id`
+/// token.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `owner` - The address holding the tokens.
-/// * `spender` - The address authorized to spend the tokens.
-/// * `amount` - The amount of tokens made available to `spender`.
-/// * `live_until_ledger` - The ledger number at which the allowance expires.
+/// * `owner` - Address of the owner of the token.
+/// * `approver` - Address of the approver.
+/// * `token_id` - The identifier of the transferred token.
 ///
 /// # Events
 ///
-/// * topics - `["approve", owner: Address, spender: Address]`
-/// * data - `[amount: i128, live_until_ledger: u32]`
-pub fn emit_approve(
+/// * topics - `["approval", owner: Address, approver: Address]`
+/// * data - `[token_id: u128, live_until_ledger: u32]`
+pub fn emit_approval(
     e: &Env,
     owner: &Address,
-    spender: &Address,
-    amount: i128,
+    approver: &Address,
+    token_id: u128,
     live_until_ledger: u32,
 ) {
-    let topics = (symbol_short!("approve"), owner, spender);
-    e.events().publish(topics, (amount, live_until_ledger))
+    let topics = (symbol_short!("approval"), owner, approver);
+    e.events().publish(topics, (token_id, live_until_ledger))
+}
+
+/// Emits an event when `owner` enables `approved` to manage the `token_id`
+/// token.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `owner` - Address of the owner of the token.
+/// * `operator` - Address of an operator that will manage operations on the
+///   token.
+/// * `approved` - Whether or not permission has been granted. If true, this
+///   means `operator` will be allowed to manage `owner`'s assets.
+///
+/// # Events
+///
+/// * topics - `["approval", owner: Address, operator: Address]`
+/// * data - `[approved: bool, live_until_ledger: u32]`
+pub fn emit_approval_for_all(
+    e: &Env,
+    owner: &Address,
+    operator: &Address,
+    approved: bool,
+    live_until_ledger: u32,
+) {
+    let topics = (symbol_short!("approval"), owner, operator);
+    e.events().publish(topics, (approved, live_until_ledger))
 }
