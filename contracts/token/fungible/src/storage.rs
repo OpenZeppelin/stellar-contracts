@@ -208,6 +208,8 @@ pub fn set_allowance(
 
     if amount > 0 {
         // NOTE: cannot revert because of the check above;
+        // NOTE: 1 is not added to `live_for` as in the SAC implementation which
+        // is a bug tracked in https://github.com/stellar/rs-soroban-env/issues/1519
         let live_for = live_until_ledger - current_ledger;
 
         e.storage().temporary().extend_ttl(&key, live_for, live_for)
