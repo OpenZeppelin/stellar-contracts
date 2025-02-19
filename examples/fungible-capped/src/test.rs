@@ -11,14 +11,6 @@ fn create_client<'a>(e: &Env, cap: &i128) -> ExampleContractClient<'a> {
     ExampleContractClient::new(e, &address)
 }
 
-// #[test]
-// fn query_cap_works() {
-//     let e = Env::default();
-//     e.register(ExampleContract, (&1000,));
-
-//     assert_eq!(query_cap(&e), 1000);
-// }
-
 #[test]
 fn mint_under_cap() {
     let e = Env::default();

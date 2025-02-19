@@ -35,14 +35,14 @@ pub trait FungibleMintable {
     /// We recommend using [`crate::mintable::mint()`] when implementing this
     /// function.
     ///
-    /// IMPORTANT: Please do not forget that, you probably will want to have
-    /// some authorization controls for minting tokens.
-    ///
-    /// NOTE: if you want to add `capped` functionality to this function,
+    /// If you want to add `capped` functionality to this function,
     /// we recommend using [`crate::capped::check_cap()`] when implementing this
     /// function. For more details on the `capped` functionality, check
     /// [`crate::extensions::capped`], and check the `fungible-capped`
     /// example.
+    ///
+    /// IMPORTANT: Please do not forget that, you probably will want to have
+    /// some authorization controls for minting tokens.
     fn mint(e: &Env, account: Address, amount: i128);
 }
 // ################## EVENTS ##################

@@ -200,6 +200,8 @@ pub enum FungibleTokenError {
     ExceededCap = 206,
     /// Indicates the supplied `cap` is not a valid cap value.
     InvalidCap = 207,
+    /// Indicates the Cap was not set.
+    CapNotSet = 208,
 }
 
 // ################## EVENTS ##################
