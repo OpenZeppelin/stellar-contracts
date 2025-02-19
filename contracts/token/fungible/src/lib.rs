@@ -39,6 +39,7 @@
 //!   total supply.
 //! - Burnable: Enables token holders to destroy their tokens, reducing the
 //!   total supply.
+//! - Capped: Enables the contract to set a maximum limit on the total supply.
 //!
 //! ## Compatibility and Compliance
 //!

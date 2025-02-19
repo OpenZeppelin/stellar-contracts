@@ -23,6 +23,17 @@ The `Mintable` trait extends the `FungibleToken` trait to provide the capability
 ==== Events
 * `mint_event` :  broadcasted to the network when the `mint()` function is invoked.
 
+=== - Capped
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/capped[Source Code]
+
+==== Summary
+The `Capped` trait extends the `FungibleToken` trait to provide the capability to set a maximum supply for the token.
+
+Note that the `Capped` trait is designed to be used in conjunction with the `Mintable` trait.
+
+==== Events
+There are no custom events associated with the `Capped` trait.
+
 === - Burnable
 https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/token/fungible/src/extensions/burnable[Source Code]
 
