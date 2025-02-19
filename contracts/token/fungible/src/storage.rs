@@ -138,8 +138,8 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 /// * Authorization for `owner` is required.
 /// * Allowance is implicitly timebound by the maximum allowed storage TTL value
 ///   which is a network parameter, i.e. one cannot set an allowance for a
-///   longer period. This behavior mirrors the functioning of the "Stellar Asset
-///   Contract" implementation for consistency reasons.
+///   longer period. This behavior closely mirrors the functioning of the
+///   "Stellar Asset Contract" implementation for consistency reasons.
 pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
     owner.require_auth();
     set_allowance(e, owner, spender, amount, live_until_ledger, true);
@@ -178,8 +178,8 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 /// * No authorization is required.
 /// * Allowance is implicitly timebound by the maximum allowed storage TTL value
 ///   which is a network parameter, i.e. one cannot set an allowance for a
-///   longer period. This behavior mirrors the functioning of the "Stellar Asset
-///   Contract" implementation for consistency reasons.
+///   longer period. This behavior closely mirrors the functioning of the
+///   "Stellar Asset Contract" implementation for consistency reasons.
 pub fn set_allowance(
     e: &Env,
     owner: &Address,
@@ -208,8 +208,7 @@ pub fn set_allowance(
 
     if amount > 0 {
         // NOTE: cannot revert because of the check above;
-        // adding 1 for consistency with the SAC implementation.
-        let live_for = live_until_ledger - current_ledger + 1;
+        let live_for = live_until_ledger - current_ledger;
 
         e.storage().temporary().extend_ttl(&key, live_for, live_for)
     }
