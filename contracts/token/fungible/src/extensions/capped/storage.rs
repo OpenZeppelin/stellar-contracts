@@ -1,9 +1,6 @@
-use soroban_sdk::{panic_with_error, symbol_short, unwrap::UnwrapOptimized, Env, Symbol};
+use soroban_sdk::{panic_with_error, symbol_short, Env, Symbol};
 
-use crate::{
-    storage::{INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD},
-    FungibleTokenError, StorageKey,
-};
+use crate::{FungibleTokenError, StorageKey};
 
 /// Storage key that maps to [`Cap`]
 pub const CAP_KEY: Symbol = symbol_short!("CAP");
