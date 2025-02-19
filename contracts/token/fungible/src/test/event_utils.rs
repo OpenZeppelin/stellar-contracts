@@ -1,6 +1,4 @@
-use soroban_sdk::{
-    symbol_short, testutils::Events, Address, Env, IntoVal, Symbol, Val, Vec,
-};
+use soroban_sdk::{symbol_short, testutils::Events, Address, Env, IntoVal, Symbol, Val, Vec};
 
 pub struct EventAssertion<'a> {
     env: &'a Env,
@@ -20,17 +18,14 @@ impl<'a> EventAssertion<'a> {
             topic_symbol == symbol_short!("transfer")
         });
 
-        assert!(
-            transfer_event.is_some(),
-            "Transfer event not found in event log"
-        );
+        assert!(transfer_event.is_some(), "Transfer event not found in event log");
 
         let (contract, topics, data) = transfer_event.unwrap();
         assert_eq!(contract, self.contract, "Event from wrong contract");
 
         let topics: Vec<Val> = topics.clone();
         assert_eq!(topics.len(), 3, "Transfer event should have 3 topics");
-        
+
         let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
         assert_eq!(topic_symbol, symbol_short!("transfer"));
 
@@ -58,7 +53,7 @@ impl<'a> EventAssertion<'a> {
 
         let topics: Vec<Val> = topics.clone();
         assert_eq!(topics.len(), 2, "Mint event should have 2 topics");
-        
+
         let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
         assert_eq!(topic_symbol, symbol_short!("mint"));
 
@@ -84,7 +79,7 @@ impl<'a> EventAssertion<'a> {
 
         let topics: Vec<Val> = topics.clone();
         assert_eq!(topics.len(), 2, "Burn event should have 2 topics");
-        
+
         let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
         assert_eq!(topic_symbol, symbol_short!("burn"));
 
@@ -106,7 +101,13 @@ impl<'a> EventAssertion<'a> {
         );
     }
 
-    pub fn assert_approve(&self, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+    pub fn assert_approve(
+        &self,
+        owner: &Address,
+        spender: &Address,
+        amount: i128,
+        live_until_ledger: u32,
+    ) {
         let events = self.env.events().all();
         let approve_event = events.iter().find(|e| {
             let topics: Vec<Val> = e.1.clone();
@@ -121,7 +122,7 @@ impl<'a> EventAssertion<'a> {
 
         let topics: Vec<Val> = topics.clone();
         assert_eq!(topics.len(), 3, "Approve event should have 3 topics");
-        
+
         let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
         assert_eq!(topic_symbol, symbol_short!("approve"));
 
@@ -134,4 +135,4 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(event_data.0, amount, "Approve event has wrong amount");
         assert_eq!(event_data.1, live_until_ledger, "Approve event has wrong live_until_ledger");
     }
-} 
+}

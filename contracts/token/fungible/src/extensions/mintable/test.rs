@@ -13,9 +13,6 @@ use crate::{
 #[contract]
 struct MockContract;
 
-// Note: Basic mint_works test is covered in the main fungible token tests
-// This file is reserved for mintable extension-specific tests
-
 #[test]
 fn mint_works() {
     let e = Env::default();
