@@ -66,6 +66,7 @@
 
 mod extensions;
 mod fungible;
+mod impl_token_interface;
 mod storage;
 
 pub use extensions::{burnable, metadata, mintable};
