@@ -111,7 +111,7 @@ pub fn get_approved(e: &Env, token_id: u128) -> Option<Address> {
         if approval_data.live_until_ledger < e.ledger().sequence() {
             return None; // Return None if approval expired
         }
-        return Some(approval_data.approver);
+        Some(approval_data.approver)
     } else {
         // if there is no ApprovalData Entry for this `token_id`
         None
@@ -137,7 +137,7 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
         if approval_data.live_until_ledger < e.ledger().sequence() {
             return false;
         }
-        return approval_data.operator == *operator && approval_data.approved;
+        approval_data.operator == *operator && approval_data.approved
     } else {
         // if there is no ApprovalForAllData Entry for this `owner`
         false
@@ -220,7 +220,7 @@ pub fn safe_transfer_from_with_data(
     }
 
     // TODO: implement the SAFE part when Receiver is implemented
-    // TODO: also use the `data` field on this `Recevier`
+    // TODO: also use the `data` field on this `Receiver`
     do_transfer(e, from, to, token_id);
 }
 
