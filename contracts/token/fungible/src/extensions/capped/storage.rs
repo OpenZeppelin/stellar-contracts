@@ -19,7 +19,7 @@ pub const CAP_KEY: Symbol = symbol_short!("CAP");
 /// # Notes
 ///
 /// We recommend using this function in the constructor of your smart contract.
-/// Cap functionality is designed to be used in junction with the `mintable`
+/// Cap functionality is designed to be used in conjunction with the `mintable`
 /// extension.
 pub fn set_cap(e: &Env, cap: i128) {
     if cap < 0 {
@@ -58,6 +58,8 @@ pub fn query_cap(e: &Env) -> i128 {
 /// # Errors
 ///
 /// * [`FungibleTokenError::CapNotSet`] - Occurs when the cap has not been set.
+/// * [`FungibleTokenError::ExceededCap`] - Occurs when the new amount of tokens
+///   will exceed the cap.
 pub fn check_cap(e: &Env, amount: i128) {
     let cap: i128 = e
         .storage()
