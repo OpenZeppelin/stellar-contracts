@@ -1,10 +1,9 @@
 {
   "generators": {
-    "address": 1,
+    "address": 3,
     "nonce": 0
   },
   "auth": [
-    [],
     []
   ],
   "ledger": {
@@ -39,41 +38,7 @@
                     "executable": {
                       "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                     },
-                    "storage": [
-                      {
-                        "key": {
-                          "symbol": "METADATA"
-                        },
-                        "val": {
-                          "map": [
-                            {
-                              "key": {
-                                "symbol": "decimals"
-                              },
-                              "val": {
-                                "u32": 8
-                              }
-                            },
-                            {
-                              "key": {
-                                "symbol": "name"
-                              },
-                              "val": {
-                                "string": "Updated Name"
-                              }
-                            },
-                            {
-                              "key": {
-                                "symbol": "symbol"
-                              },
-                              "val": {
-                                "string": "UPD"
-                              }
-                            }
-                          ]
-                        }
-                      }
-                    ]
+                    "storage": null
                   }
                 }
               }

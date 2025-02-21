@@ -58,7 +58,7 @@ pub trait FungibleBurnable {
     /// # Errors
     ///
     /// * [`crate::FungibleTokenError::InsufficientBalance`] - When attempting
-    ///   to burn more tokens than `from` current balance.A
+    ///   to burn more tokens than `from` current balance.
     /// * [`crate::FungibleTokenError::InsufficientAllowance`] - When attempting
     ///   to burn more tokens than `from` allowance.
     ///

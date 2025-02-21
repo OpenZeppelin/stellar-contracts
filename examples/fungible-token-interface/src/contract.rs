@@ -27,6 +27,8 @@ pub const OWNER: Symbol = symbol_short!("OWNER");
 pub struct ExampleContract;
 
 #[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
 pub enum ExampleContractError {
     Unauthorized = 1,
 }

@@ -35,8 +35,7 @@
 //!
 //! - Metadata: Provides additional information about the token, such as name,
 //!   symbol, and decimals.
-//! - Mintable: Allows authorized entities to mint new tokens and increase the
-//!   total supply.
+//! - Mintable: Allows creation of new tokens that increases the total supply.
 //! - Burnable: Enables token holders to destroy their tokens, reducing the
 //!   total supply.
 //!
@@ -62,6 +61,11 @@
 //! - **Composable Design**: The modular structure encourages developers to
 //!   extend functionality by combining provided primitives or creating custom
 //!   extensions.
+//! - **TTL management**: This library handles the TTL of only `temporary` and
+//!   `persistent` storage entries declared by the library. The `instance` TTL
+//!   management is left to the implementor due to flexibility. The library
+//!   exposes the sane default values for extending the TTL:
+//!   `INSTANCE_TTL_THRESHOLD` and `INSTANCE_EXTEND_AMOUNT`.
 #![no_std]
 
 mod extensions;

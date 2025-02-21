@@ -8,7 +8,7 @@ use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, Str
 /// Additionally, this trait includes the `total_supply()` function, which is
 /// not part of SEP-41 but is commonly used in token contracts.
 ///
-/// To fully comply with the SEP-41 specification one have to implement the
+/// To fully comply with the SEP-41 specification one has to implement the
 /// `FungibleBurnable` trait in addition to this one. SEP-41 mandates support
 /// for token burning to be considered compliant.
 #[contractclient(name = "FungibleTokenClient")]
@@ -178,6 +178,7 @@ pub trait FungibleToken {
 // ################## ERRORS ##################
 
 #[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum FungibleTokenError {
     /// Indicates an error related to the current balance of account from which
@@ -191,10 +192,10 @@ pub enum FungibleTokenError {
     InvalidLiveUntilLedger = 202,
     /// Indicates an error when an input that must be >= 0
     LessThanZero = 203,
-    /// Indicates an error when an input that must be > 0
-    LessThanOrEqualToZero = 204,
     /// Indicates overflow when adding two values
-    MathOverflow = 205,
+    MathOverflow = 204,
+    /// Indicates access to uninitialized metadata
+    UnsetMetadata = 205,
 }
 
 // ################## EVENTS ##################
