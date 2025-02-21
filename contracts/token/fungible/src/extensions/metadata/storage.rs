@@ -1,5 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, symbol_short, Env, String, Symbol};
 
+use crate::FungibleTokenError;
+
 /// Storage key that maps to [`Metadata`]
 pub const METADATA_KEY: Symbol = symbol_short!("METADATA");
 
