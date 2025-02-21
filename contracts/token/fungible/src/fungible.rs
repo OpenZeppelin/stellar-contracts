@@ -193,7 +193,9 @@ pub enum FungibleTokenError {
     /// Indicates an error when an input that must be >= 0
     LessThanZero = 203,
     /// Indicates overflow when adding two values
-    MathOverflow = 205,
+    MathOverflow = 204,
+    /// Indicates access to uninitialized metadata
+    UnsetMetadata = 205,
     /// Indicates that the operation would have caused `total_supply` to exceed
     /// the `cap`.
     ExceededCap = 206,
@@ -201,8 +203,6 @@ pub enum FungibleTokenError {
     InvalidCap = 207,
     /// Indicates the Cap was not set.
     CapNotSet = 208,
-    /// Indicates access to uninitialized metadata
-    UnsetMetadata = 209,
 }
 
 // ################## EVENTS ##################
