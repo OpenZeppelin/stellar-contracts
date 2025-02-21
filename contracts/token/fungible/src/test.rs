@@ -16,8 +16,12 @@ use crate::{
     storage::{
         allowance, approve, balance, set_allowance, spend_allowance, total_supply, transfer,
         transfer_from, update, StorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT,
+        INSTANCE_TTL_THRESHOLD,
     },
 };
+
+pub mod event_utils;
+use event_utils::EventAssertion;
 
 #[contract]
 struct MockContract;
@@ -56,7 +60,7 @@ fn bump_instance_works() {
         let current = e.ledger().sequence();
         e.ledger().set_sequence_number(current + ttl);
 
-        total_supply(&e);
+        e.storage().instance().extend_ttl(INSTANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT);
         assert_eq!(e.storage().instance().get_ttl(), INSTANCE_EXTEND_AMOUNT);
     });
 }
@@ -147,6 +151,19 @@ fn spend_allowance_insufficient_allowance_fails() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #203)")]
+fn spend_allowance_invalid_amount_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        spend_allowance(&e, &owner, &spender, -1);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #202)")]
 fn set_allowance_with_expired_ledger_fails() {
     let e = Env::default();
@@ -157,6 +174,20 @@ fn set_allowance_with_expired_ledger_fails() {
     e.as_contract(&address, || {
         e.ledger().set_sequence_number(10);
         set_allowance(&e, &owner, &spender, 50, 5, true);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #202)")]
+fn set_allowance_with_greater_than_max_ledger_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let ttl = e.storage().max_ttl() + 1;
+        set_allowance(&e, &owner, &spender, 50, ttl, true);
     });
 }
 
@@ -208,8 +239,28 @@ fn transfer_works() {
         assert_eq!(balance(&e, &from), 50);
         assert_eq!(balance(&e, &recipient), 50);
 
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        event_assert.assert_mint(&from, 100);
+        event_assert.assert_transfer(&from, &recipient, 50);
+    });
+}
+
+#[test]
+fn transfer_zero_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let from = Address::generate(&e);
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        transfer(&e, &from, &recipient, 0);
+        assert_eq!(balance(&e, &from), 0);
+        assert_eq!(balance(&e, &recipient), 0);
+
         let events = e.events().all();
-        assert_eq!(events.len(), 2);
+        assert_eq!(events.len(), 1);
     });
 }
 
@@ -258,6 +309,12 @@ fn approve_and_transfer_from() {
 
         let updated_allowance = allowance(&e, &owner, &spender);
         assert_eq!(updated_allowance, 20);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(3);
+        event_assert.assert_mint(&owner, 100);
+        event_assert.assert_approve(&owner, &spender, 50, 1000);
+        event_assert.assert_transfer(&owner, &recipient, 30);
     });
 }
 
@@ -336,7 +393,7 @@ fn update_burns_tokens() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #204)")]
+#[should_panic(expected = "Error(Contract, #203)")]
 fn update_with_invalid_amount_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -344,12 +401,12 @@ fn update_with_invalid_amount_panics() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        update(&e, Some(&from), Some(&to), 0);
+        update(&e, Some(&from), Some(&to), -1);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #205)")]
+#[should_panic(expected = "Error(Contract, #204)")]
 fn update_overflow_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());

@@ -7,9 +7,9 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 
 /// Mintable Trait for Fungible Token
 ///
-/// The `Mintable` trait extends the `FungibleToken` trait to provide the
-/// capability to mint tokens. This trait is designed to be used in conjunction
-/// with the `FungibleToken` trait.
+/// The `FungibleMintable` trait extends the `FungibleToken` trait to provide
+/// the capability to mint tokens. This trait is designed to be used in
+/// conjunction with the `FungibleToken` trait.
 ///
 /// Excluding the `mint` functionality from the `[FungibleToken]` trait
 /// is a deliberate design choice to accommodate flexibility and customization

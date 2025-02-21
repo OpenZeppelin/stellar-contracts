@@ -25,6 +25,8 @@ pub const OWNER: Symbol = symbol_short!("OWNER");
 pub struct ExampleContract;
 
 #[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
 pub enum ExampleContractError {
     Unauthorized = 1,
 }
@@ -55,7 +57,7 @@ impl Pausable for ExampleContract {
         // `ownable::only_owner(&e);`
         let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
         if owner != caller {
-            panic_with_error!(e, ExampleContractError::Unauthorized)
+            panic_with_error!(e, ExampleContractError::Unauthorized);
         }
 
         pausable::pause(e, &caller);
@@ -67,7 +69,7 @@ impl Pausable for ExampleContract {
         // `ownable::only_owner(&e);`
         let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
         if owner != caller {
-            panic_with_error!(e, ExampleContractError::Unauthorized)
+            panic_with_error!(e, ExampleContractError::Unauthorized);
         }
 
         pausable::unpause(e, &caller);
