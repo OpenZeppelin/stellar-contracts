@@ -406,7 +406,7 @@ fn update_with_invalid_amount_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #204)")]
+#[should_panic(expected = "Error(Contract, #205)")]
 fn update_overflow_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());

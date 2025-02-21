@@ -202,7 +202,7 @@ pub enum FungibleTokenError {
     /// Indicates the Cap was not set.
     CapNotSet = 208,
     /// Indicates access to uninitialized metadata
-    UnsetMetadata = 205,
+    UnsetMetadata = 209,
 }
 
 // ################## EVENTS ##################
