@@ -26,7 +26,7 @@ fn set_and_get_metadata() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Error(Contract, #205)")]
 fn get_unset_metadata() {
     let e = Env::default();
     let address = e.register(MockContract, ());

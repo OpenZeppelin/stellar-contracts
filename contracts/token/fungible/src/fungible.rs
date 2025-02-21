@@ -178,6 +178,7 @@ pub trait FungibleToken {
 // ################## ERRORS ##################
 
 #[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum FungibleTokenError {
     /// Indicates an error related to the current balance of account from which
@@ -191,10 +192,10 @@ pub enum FungibleTokenError {
     InvalidLiveUntilLedger = 202,
     /// Indicates an error when an input that must be >= 0
     LessThanZero = 203,
-    /// Indicates an error when an input that must be > 0
-    LessThanOrEqualToZero = 204,
     /// Indicates overflow when adding two values
-    MathOverflow = 205,
+    MathOverflow = 204,
+    /// Indicates access to uninitialized metadata
+    UnsetMetadata = 205,
 }
 
 // ################## EVENTS ##################

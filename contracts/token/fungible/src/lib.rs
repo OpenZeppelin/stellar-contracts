@@ -35,8 +35,7 @@
 //!
 //! - Metadata: Provides additional information about the token, such as name,
 //!   symbol, and decimals.
-//! - Mintable: Allows authorized entities to mint new tokens and increase the
-//!   total supply.
+//! - Mintable: Allows creation of new tokens that increases the total supply.
 //! - Burnable: Enables token holders to destroy their tokens, reducing the
 //!   total supply.
 //!
