@@ -68,6 +68,6 @@ pub fn check_cap(e: &Env, amount: i128) {
         .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::CapNotSet));
     let total_supply = e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0);
     if cap < amount + total_supply {
-        panic_with_error!(e, FungibleTokenError::ExceededCap)
+        panic_with_error!(e, FungibleTokenError::ExceededCap);
     }
 }
