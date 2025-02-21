@@ -10,10 +10,10 @@ Fixes #??? <!-- Fill in with issue number -->
 
 #### PR Checklist
 
-<!-- Before merging the pull request all of the following must be complete. -->
+<!-- For the PRs that introduce new features, all of the following must be complete. -->
 <!-- Feel free to submit a PR or Draft PR even if some items are pending. -->
 <!-- Some of the items below may not apply to your case (for example: fixing a typo). -->
 
 - [ ] Tests
 - [ ] Documentation
-- [ ] Pallets, that require benchmarks, are added to `scripts/assets/pallets.txt` (Pallet require benchmark if it has WeightInfo config type)
+

@@ -82,8 +82,10 @@ pub fn balance(e: &Env, account: &Address) -> i128 {
 /// allowance should be treated as `0`.
 pub fn allowance_data(e: &Env, owner: &Address, spender: &Address) -> AllowanceData {
     let key = AllowanceKey { owner: owner.clone(), spender: spender.clone() };
-    let default = AllowanceData { amount: 0, live_until_ledger: 0 };
-    e.storage().temporary().get(&StorageKey::Allowance(key)).unwrap_or(default)
+    e.storage()
+        .temporary()
+        .get(&StorageKey::Allowance(key))
+        .unwrap_or(AllowanceData { amount: 0, live_until_ledger: 0 })
 }
 
 /// Returns the amount of tokens a `spender` is allowed to spend on behalf of an
@@ -102,7 +104,7 @@ pub fn allowance_data(e: &Env, owner: &Address, spender: &Address) -> AllowanceD
 pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
     let allowance = allowance_data(e, owner, spender);
 
-    if allowance.amount > 0 && allowance.live_until_ledger < e.ledger().sequence() {
+    if allowance.live_until_ledger < e.ledger().sequence() {
         return 0;
     }
 
@@ -125,8 +127,9 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 /// # Errors
 ///
 /// * [`FungibleTokenError::InvalidLiveUntilLedger`] - Occurs when attempting to
-///   set `live_until_ledger` that is less than the current ledger number and
-///   greater than `0`.
+///   set `live_until_ledger` that is 1) greater than the maximum allowed or 2)
+///   less than the current ledger number and `amount` is greater than `0`.
+/// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
 ///
 /// # Events
 ///
@@ -135,7 +138,11 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 ///
 /// # Notes
 ///
-/// Authorization for `owner` is required.
+/// * Authorization for `owner` is required.
+/// * Allowance is implicitly timebound by the maximum allowed storage TTL value
+///   which is a network parameter, i.e. one cannot set an allowance for a
+///   longer period. This behavior closely mirrors the functioning of the
+///   "Stellar Asset Contract" implementation for consistency reasons.
 pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
     owner.require_auth();
     set_allowance(e, owner, spender, amount, live_until_ledger, true);
@@ -159,8 +166,8 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 /// # Errors
 ///
 /// * [`FungibleTokenError::InvalidLiveUntilLedger`] - Occurs when attempting to
-///   set `live_until_ledger` that is less than the current ledger number and
-///   greater than `0`.
+///   set `live_until_ledger` that is 1) greater than the maximum allowed or 2)
+///   less than the current ledger number and `amount` is greater than `0`.
 /// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
 ///
 /// # Events
@@ -171,7 +178,11 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 ///
 /// # Notes
 ///
-/// No authorization is required.
+/// * No authorization is required.
+/// * Allowance is implicitly timebound by the maximum allowed storage TTL value
+///   which is a network parameter, i.e. one cannot set an allowance for a
+///   longer period. This behavior closely mirrors the functioning of the
+///   "Stellar Asset Contract" implementation for consistency reasons.
 pub fn set_allowance(
     e: &Env,
     owner: &Address,
@@ -184,19 +195,25 @@ pub fn set_allowance(
         panic_with_error!(e, FungibleTokenError::LessThanZero)
     }
 
-    let allowance = AllowanceData { amount, live_until_ledger };
+    let current_ledger = e.ledger().sequence();
 
-    if amount > 0 && live_until_ledger < e.ledger().sequence() {
+    if live_until_ledger > e.ledger().max_live_until_ledger()
+        || (amount > 0 && live_until_ledger < current_ledger)
+    {
         panic_with_error!(e, FungibleTokenError::InvalidLiveUntilLedger);
     }
 
     let key =
         StorageKey::Allowance(AllowanceKey { owner: owner.clone(), spender: spender.clone() });
+    let allowance = AllowanceData { amount, live_until_ledger };
+
     e.storage().temporary().set(&key, &allowance);
 
     if amount > 0 {
-        // NOTE: can't underflow because of the check above.
-        let live_for = live_until_ledger - e.ledger().sequence();
+        // NOTE: cannot revert because of the check above;
+        // NOTE: 1 is not added to `live_for` as in the SAC implementation which
+        // is a bug tracked in https://github.com/stellar/rs-soroban-env/issues/1519
+        let live_for = live_until_ledger - current_ledger;
 
         e.storage().temporary().extend_ttl(&key, live_for, live_for)
     }
@@ -220,11 +237,16 @@ pub fn set_allowance(
 ///
 /// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to
 ///   transfer more tokens than `spender` current allowance.
+/// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
 ///
 /// # Notes
 ///
 /// No authorization is required.
 pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128) {
+    if amount < 0 {
+        panic_with_error!(e, FungibleTokenError::LessThanZero)
+    }
+
     let allowance = allowance_data(e, owner, spender);
 
     if allowance.amount < amount {
@@ -347,15 +369,15 @@ pub fn do_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
 ///
 /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
 ///   more tokens than `from` current balance.
-/// * [`FungibleTokenError::LessThanOrEqualToZero`] - When `amount <= 0`.
+/// * [`FungibleTokenError::LessThanZero`] - When `amount < 0`.
 /// * [`FungibleTokenError::MathOverflow`] - When `total_supply` overflows.
 ///
 /// # Notes
 ///
 /// No authorization is required.
 pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i128) {
-    if amount <= 0 {
-        panic_with_error!(e, FungibleTokenError::LessThanOrEqualToZero)
+    if amount < 0 {
+        panic_with_error!(e, FungibleTokenError::LessThanZero)
     }
     if let Some(account) = from {
         let mut from_balance = balance(e, account);

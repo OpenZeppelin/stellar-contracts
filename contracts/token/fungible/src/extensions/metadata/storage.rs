@@ -1,6 +1,9 @@
-use soroban_sdk::{contracttype, symbol_short, unwrap::UnwrapOptimized, Env, String, Symbol};
+use soroban_sdk::{contracttype, panic_with_error, symbol_short, Env, String, Symbol};
 
-use crate::storage::{INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD};
+use crate::{
+    storage::{INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD},
+    FungibleTokenError,
+};
 
 /// Storage key that maps to [`Metadata`]
 pub const METADATA_KEY: Symbol = symbol_short!("METADATA");
@@ -18,8 +21,16 @@ pub struct Metadata {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
+///   uninitialized metadata.
 pub fn get_metadata(e: &Env) -> Metadata {
-    e.storage().instance().get(&METADATA_KEY).unwrap_optimized()
+    e.storage()
+        .instance()
+        .get(&METADATA_KEY)
+        .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::UnsetMetadata))
 }
 
 /// Returns the token decimals.
@@ -27,6 +38,11 @@ pub fn get_metadata(e: &Env) -> Metadata {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
+///   uninitialized metadata.
 pub fn decimals(e: &Env) -> u32 {
     get_metadata(e).decimals
 }
@@ -36,6 +52,11 @@ pub fn decimals(e: &Env) -> u32 {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
+///   uninitialized metadata.
 pub fn name(e: &Env) -> String {
     get_metadata(e).name
 }
@@ -45,6 +66,11 @@ pub fn name(e: &Env) -> String {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
+///   uninitialized metadata.
 pub fn symbol(e: &Env) -> String {
     get_metadata(e).symbol
 }
