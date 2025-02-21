@@ -27,8 +27,8 @@ use crate::{extensions::mintable::emit_mint, storage::update};
 /// You probably want to do something like this (pseudo-code):
 ///
 /// ```ignore
-/// let admin = read_administrator(e)?;
-/// admin.require_auth()?;
+/// let admin = read_administrator(e);
+/// admin.require_auth();
 /// ```
 pub fn mint(e: &Env, account: &Address, amount: i128) {
     update(e, None, Some(account), amount);

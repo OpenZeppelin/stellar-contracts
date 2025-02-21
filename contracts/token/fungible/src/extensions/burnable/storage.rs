@@ -5,7 +5,7 @@ use crate::{
     storage::{spend_allowance, update},
 };
 
-/// Destroys `amount` of tokens from `account`. Updates the total
+/// Destroys `amount` of tokens from `from`. Updates the total
 /// supply accordingly.
 ///
 /// # Arguments
@@ -18,6 +18,7 @@ use crate::{
 ///
 /// * [`crate::FungibleTokenError::InsufficientBalance`] - When attempting to
 ///   burn more tokens than `from` current balance.
+/// * [`crate::FungibleTokenError::LessThanZero`] - When `amount < 0`.
 ///
 /// # Events
 ///
@@ -33,7 +34,7 @@ pub fn burn(e: &Env, from: &Address, amount: i128) {
     emit_burn(e, from, amount);
 }
 
-/// Destroys `amount` of tokens from `account` using the allowance mechanism.
+/// Destroys `amount` of tokens from `from` using the allowance mechanism.
 /// `amount`is then deducted from `spender` allowance.
 /// Updates the total supply accordingly.
 ///
@@ -51,6 +52,7 @@ pub fn burn(e: &Env, from: &Address, amount: i128) {
 ///   burn more tokens than `from` current balance.
 /// * [`crate::FungibleTokenError::InsufficientAllowance`] - When attempting to
 ///   burn more tokens than `spender`s current allowance.
+/// * [`crate::FungibleTokenError::LessThanZero`] - When `amount < 0`.
 ///
 /// # Events
 ///

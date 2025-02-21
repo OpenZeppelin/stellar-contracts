@@ -552,6 +552,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fungible-token-interface-example"
+version = "0.1.0"
+dependencies = [
+ "openzeppelin-fungible-token",
+ "openzeppelin-pausable",
+ "openzeppelin-pausable-macros",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

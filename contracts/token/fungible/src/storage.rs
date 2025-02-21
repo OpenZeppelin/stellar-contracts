@@ -127,6 +127,7 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 /// * [`FungibleTokenError::InvalidLiveUntilLedger`] - Occurs when attempting to
 ///   set `live_until_ledger` that is less than the current ledger number and
 ///   greater than `0`.
+/// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
 ///
 /// # Events
 ///
@@ -220,11 +221,16 @@ pub fn set_allowance(
 ///
 /// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to
 ///   transfer more tokens than `spender` current allowance.
+/// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
 ///
 /// # Notes
 ///
 /// No authorization is required.
 pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128) {
+    if amount < 0 {
+        panic_with_error!(e, FungibleTokenError::LessThanZero)
+    }
+
     let allowance = allowance_data(e, owner, spender);
 
     if allowance.amount < amount {
@@ -357,7 +363,6 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i12
     if amount < 0 {
         panic_with_error!(e, FungibleTokenError::LessThanZero)
     }
-
     if let Some(account) = from {
         let mut from_balance = balance(e, account);
         if from_balance < amount {
@@ -367,6 +372,7 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i12
         from_balance -= amount;
         e.storage().persistent().set(&StorageKey::Balance(account.clone()), &from_balance);
     } else {
+        // `from` is None, so we're minting tokens.
         let mut total_supply = total_supply(e);
         total_supply = match total_supply.checked_add(amount) {
             Some(num) => num,
@@ -376,10 +382,12 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i12
     }
 
     if let Some(account) = to {
-        // NOTE: can't overflow because balance + amoount is at most total_supply.
+        // NOTE: can't overflow because balance + amount is at most total_supply.
         let to_balance = balance(e, account) + amount;
         e.storage().persistent().set(&StorageKey::Balance(account.clone()), &to_balance);
     } else {
+        // `to` is None, so we're burning tokens.
+
         // NOTE: can't overflow because amount <= total_supply or amount <= from_balance
         // <= total_supply.
         let total_supply = total_supply(e) - amount;
