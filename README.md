@@ -1,7 +1,7 @@
 # OpenZeppelin Stellar Soroban Contracts
 
 > [!Warning]
-> This project is still in a very early and experimental phase. It has never been audited nor thoroughly reviewed for security vulnerabilities. Use in production environments at your own risk.
+> This is experimental software and is provided on an "as is" and "as available" basis. We do not give any warranties and will not be liable for any losses incurred through any use of this code base.
 
 
 OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stellar network. Our goal is to bring Web3 standards under the OpenZeppelin quality by providing a set of high-quality, battle-tested contracts that can be used to build decentralized applications on the Stellar network.
@@ -14,6 +14,26 @@ OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stel
   - `utils/`: Utilities for token types (pausable, etc.)
 - `examples/`: Example contracts
 - `docs/`: Documentation
+- `audits/`: Audit reports
+
+
+## Setup
+
+Stellar smart contracts are programs written in Rust leveraging the [Soroban SDK](https://crates.io/crates/soroban-sdk). Please, follow the setup process as outlined in the [Stellar documentation](https://developers.stellar.org/docs/build/smart-contracts/getting-started/setup).
+
+
+## Usage
+
+The library has not been published yet to `crates.io`, and this will be the case until we reach a stable version. However, one can [specify a git dependency](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#specifying-dependencies-from-git-repositories) in a `Cargo.toml`, like so:
+
+```toml
+[dependencies]
+openzeppelin-pausable = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+openzeppelin-fungible-token = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+```
+
+We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
+
 
 ## Security
 
