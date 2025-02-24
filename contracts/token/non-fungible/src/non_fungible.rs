@@ -305,7 +305,7 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 pub fn emit_approval(
     e: &Env,
     owner: &Address,
-    approver: &Address,
+    approved: &Address,
     token_id: u128,
     live_until_ledger: u32,
 ) {
