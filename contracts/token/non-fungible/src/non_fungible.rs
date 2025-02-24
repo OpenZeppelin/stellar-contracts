@@ -16,7 +16,7 @@ pub trait NonFungibleToken {
     /// # Notes
     ///
     /// We recommend using [`crate::balance()`] when implementing this function.
-    fn balance(e: &Env, owner: Address) -> i128;
+    fn balance(e: &Env, owner: Address) -> u128;
 
     /// Returns the owner of the `token_id` token.
     ///
@@ -336,6 +336,6 @@ pub fn emit_approval_for_all(
     approved: bool,
     live_until_ledger: u32,
 ) {
-    let topics = (symbol_short!("apprv_all"), owner);
+    let topics = (Symbol::new(e, "approval_for_all"), owner);
     e.events().publish(topics, (operator, approved, live_until_ledger))
 }
