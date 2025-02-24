@@ -110,9 +110,7 @@ pub trait NonFungibleToken {
     ///
     /// WARNING: Note that the caller is responsible to confirm that the
     /// recipient is capable of receiving [`Erc721`] or else they may be
-    /// permanently lost. Usage of [`Self::safe_transfer_from`] prevents loss,
-    /// though the caller must understand this adds an external call which
-    /// potentially creates a reentrancy vulnerability, unless it is disabled.
+    /// permanently lost. Usage of [`Self::safe_transfer_from`] prevents loss.
     ///
     /// # Arguments
     ///
@@ -155,6 +153,8 @@ pub trait NonFungibleToken {
     /// * `owner` - The address holding the tokens.
     /// * `to` - Account of the recipient.
     /// * `token_id` - Token id as a number.
+    /// * `live_until_ledger` - The ledger number at which the allowance
+    ///   expires.
     ///
     /// # Errors
     ///
@@ -172,7 +172,7 @@ pub trait NonFungibleToken {
     ///
     /// We recommend using [`crate::approve()`] when implementing this
     /// function.
-    fn approve(e: &Env, owner: Address, to: Address, token_id: u128);
+    fn approve(e: &Env, owner: Address, to: Address, token_id: u128, live_until_ledger: u32);
 
     /// Approve or remove `operator` as an operator for the caller.
     ///
@@ -186,7 +186,9 @@ pub trait NonFungibleToken {
     /// * `operator` - Account to add to the set of authorized operators.
     /// * `approved` - Flag that determines whether or not permission will be
     ///   granted to `operator`. If true, this means `operator` will be allowed
-    ///   to manage `msg::sender`'s assets.
+    ///   to manage `owner`'s assets.
+    /// * `live_until_ledger` - The ledger number at which the allowance
+    ///   expires.
     ///
     /// # Errors
     ///
@@ -202,7 +204,13 @@ pub trait NonFungibleToken {
     ///
     /// We recommend using [`crate::set_approval_for_all()`] when implementing
     /// this function.
-    fn set_approval_for_all(e: &Env, owner: Address, operator: Address, approved: bool);
+    fn set_approval_for_all(
+        e: &Env,
+        owner: Address,
+        operator: Address,
+        approved: bool,
+        live_until_ledger: u32,
+    );
 
     /// Returns the account approved for `token_id` token.
     ///
@@ -328,6 +336,6 @@ pub fn emit_approval_for_all(
     approved: bool,
     live_until_ledger: u32,
 ) {
-    let topics = (symbol_short!("approval"), owner);
+    let topics = (symbol_short!("apprv_all"), owner);
     e.events().publish(topics, (operator, approved, live_until_ledger))
 }

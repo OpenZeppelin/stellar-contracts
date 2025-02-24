@@ -13,24 +13,12 @@ pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 pub const BALANCE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const BALANCE_TTL_THRESHOLD: u32 = BALANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
-/// Storage key that maps to [`ApprovalData`]
-#[contracttype]
-pub struct ApprovalKey {
-    pub token_id: u128,
-}
-
 /// Storage container for the token for which an approval is granted
 /// and the ledger number at which this approval expires.
 #[contracttype]
 pub struct ApprovalData {
     pub approver: Address,
     pub live_until_ledger: u32,
-}
-
-/// Storage key that maps to [`ApprovalData`]
-#[contracttype]
-pub struct ApprovalForAllKey {
-    pub owner: Address,
 }
 
 /// Storage container for the address for which an operator is granted
@@ -47,8 +35,8 @@ pub struct ApprovalForAllData {
 pub enum StorageKey {
     Owner(u128),
     Balance(Address),
-    Approval(ApprovalKey),
-    ApprovalForAll(ApprovalForAllKey),
+    Approval(u128),
+    ApprovalForAll(Address),
 }
 
 // ################## QUERY STATE ##################
@@ -60,9 +48,9 @@ pub enum StorageKey {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address for which the balance is being queried.
-pub fn balance(e: &Env, account: &Address) -> i128 {
+pub fn balance(e: &Env, account: &Address) -> u128 {
     let key = StorageKey::Balance(account.clone());
-    if let Some(balance) = e.storage().persistent().get::<_, i128>(&key) {
+    if let Some(balance) = e.storage().persistent().get::<_, u128>(&key) {
         e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
         balance
     } else {
@@ -105,7 +93,7 @@ pub fn owner_of(e: &Env, token_id: u128) -> Address {
 ///   approval
 /// * `None` - If there is no approval or if the approval has expired
 pub fn get_approved(e: &Env, token_id: u128) -> Option<Address> {
-    let key = StorageKey::Approval(ApprovalKey { token_id });
+    let key = StorageKey::Approval(token_id);
 
     if let Some(approval_data) = e.storage().temporary().get::<_, ApprovalData>(&key) {
         if approval_data.live_until_ledger < e.ledger().sequence() {
@@ -131,7 +119,7 @@ pub fn get_approved(e: &Env, token_id: u128) -> Option<Address> {
 /// * `true` - If the operator has a valid, non-expired approval for all tokens
 /// * `false` - If there is no approval or if the approval has expired
 pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool {
-    let key = StorageKey::ApprovalForAll(ApprovalForAllKey { owner: owner.clone() });
+    let key = StorageKey::ApprovalForAll(owner.clone());
 
     if let Some(approval_data) = e.storage().temporary().get::<_, ApprovalForAllData>(&key) {
         if approval_data.live_until_ledger < e.ledger().sequence() {
@@ -291,7 +279,7 @@ pub fn approve(e: &Env, owner: &Address, approver: &Address, token_id: u128) {
         panic_with_error!(e, NonFungibleTokenError::InvalidApprover);
     }
 
-    let key = StorageKey::Approval(ApprovalKey { token_id });
+    let key = StorageKey::Approval(token_id);
 
     let live_until_ledger = e.ledger().sequence() + INSTANCE_EXTEND_AMOUNT;
 
@@ -315,7 +303,7 @@ pub fn approve(e: &Env, owner: &Address, approver: &Address, token_id: u128) {
 pub fn set_approval_for_all(e: &Env, owner: &Address, operator: &Address, approved: bool) {
     owner.require_auth();
 
-    let key = StorageKey::ApprovalForAll(ApprovalForAllKey { owner: owner.clone() });
+    let key = StorageKey::ApprovalForAll(owner.clone());
 
     let live_until_ledger = e.ledger().sequence() + INSTANCE_EXTEND_AMOUNT;
 
@@ -356,7 +344,7 @@ pub fn do_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
     e.storage().persistent().set(&StorageKey::Balance(to.clone()), &to_balance);
 
     // Clear any existing approval
-    let approval_key = StorageKey::Approval(ApprovalKey { token_id });
+    let approval_key = StorageKey::Approval(token_id);
     e.storage().temporary().remove(&approval_key);
 
     emit_transfer(e, from, to, token_id);
