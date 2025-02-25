@@ -46,8 +46,27 @@ pub trait FungibleMintable {
     /// [`crate::extensions::capped`], and check the `fungible-capped`
     /// example.
     ///
-    /// IMPORTANT: Please do not forget that, you probably will want to have
-    /// some authorization controls for minting tokens.
+    /// # Security Warning
+    ///
+    /// IMPORTANT: The base implementation of mint() intentionally lacks
+    /// authorization controls. You MUST implement proper authorization in
+    /// your contract. For example:
+    ///
+    /// ```rust
+    /// fn mint(&self, e: &Env, admin: Address, to: Address, amount: i128) {
+    ///     // 1. Require authorization from the admin
+    ///     admin.require_auth();
+    ///
+    ///     // 2. Verify admin has minting privileges (optional)
+    ///     let stored_admin = e.storage().instance().get(&ADMIN_KEY).unwrap();
+    ///     assert_eq!(admin, stored_admin, "unauthorized: not the admin");
+    ///
+    ///     // 3. Only then call the actual mint function
+    ///     crate::mintable::mint(e, &to, amount);
+    /// }
+    /// ```
+    ///
+    /// Failing to add proper authorization could allow anyone to mint tokens!
     fn mint(e: &Env, account: Address, amount: i128);
 }
 
