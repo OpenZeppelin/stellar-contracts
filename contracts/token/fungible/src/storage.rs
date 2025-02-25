@@ -203,7 +203,7 @@ pub fn set_allowance(
         // is a bug tracked in https://github.com/stellar/rs-soroban-env/issues/1519
         let live_for = live_until_ledger - current_ledger;
 
-        e.storage().temporary().extend_ttl(&key, live_for, live_for)
+        e.storage().temporary().extend_ttl(&key, live_for, live_for);
     }
 }
 
