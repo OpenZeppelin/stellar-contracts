@@ -198,7 +198,7 @@ pub fn set_allowance(
         // NOTE: can't underflow because of the check above.
         let live_for = live_until_ledger - e.ledger().sequence();
 
-        e.storage().temporary().extend_ttl(&key, live_for, live_for)
+        e.storage().temporary().extend_ttl(&key, live_for, live_for);
     }
 
     if emit {

@@ -51,7 +51,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::IncorrectOwner`]  - If the owner is not
     ///   `from`.
-    /// * [`NonFungibleTokenError::InsufficientApproval`] - If the caller does
+    /// * [`NonFungibleTokenError::UnauthorizedTransfer`] - If the caller does
     ///   not have the right to approve.
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
@@ -83,7 +83,7 @@ pub trait NonFungibleToken {
     ///
     ///  * [`NonFungibleTokenError::IncorrectOwner`] - If the previous owner is
     ///    not `from`.
-    ///  * [`NonFungibleTokenError::InsufficientApproval`] - If the caller does
+    ///  * [`NonFungibleTokenError::UnauthorizedTransfer`] - If the caller does
     ///    not have the right to approve.
     ///  * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///    exist.
@@ -124,7 +124,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::IncorrectOwner`] - If the previous owner is
     ///   not `from`.
-    /// * [`NonFungibleTokenError::InsufficientApproval`] - If the caller does
+    /// * [`NonFungibleTokenError::UnauthorizedTransfer`] - If the caller does
     ///   not have the right to approve.
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
@@ -259,13 +259,18 @@ pub enum NonFungibleTokenError {
     /// Indicates a failure with the token `receiver`. Used in transfers.
     InvalidReceiver = 303,
     /// Indicates a failure with the `operator`’s approval. Used in transfers.
-    InsufficientApproval = 304,
+    UnauthorizedTransfer = 304,
     /// Indicates a failure with the `approver` of a token to be approved. Used
     /// in approvals.
     InvalidApprover = 305,
     /// Indicates a failure with the `operator` to be approved. Used in
     /// approvals.
     InvalidOperator = 306,
+    /// Indicates an invalid value for `live_until_ledger` when setting
+    /// approvals.
+    InvalidLiveUntilLedger = 307,
+    /// Indicates overflow when adding two values
+    MathOverflow = 308,
 }
 
 // ################## EVENTS ##################
