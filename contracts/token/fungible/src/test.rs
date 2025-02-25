@@ -431,3 +431,106 @@ fn update_with_insufficient_balance_panics() {
         update(&e, Some(&from), Some(&to), 100);
     });
 }
+
+// Authorization Tests
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn approve_requires_auth() {
+    let e = Env::default();
+    // Note: we're not mocking the auth here
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let amount = 100;
+    let expiration_ledger = 1000;
+
+    e.as_contract(&address, || {
+        // This should panic because owner authorization is required
+        approve(&e, &owner, &spender, amount, expiration_ledger);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn transfer_requires_auth() {
+    let e = Env::default();
+    // Note: we're not mocking the auth here
+    let address = e.register(MockContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+    let amount = 100;
+
+    e.as_contract(&address, || {
+        mint(&e, &from, amount);
+        // This should panic because from authorization is required
+        transfer(&e, &from, &to, amount);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InternalError)")]
+fn transfer_from_requires_auth() {
+    let e = Env::default();
+    // We'll mock auth for the approve call but not for transfer_from
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let amount = 50;
+
+    e.as_contract(&address, || {
+        mint(&e, &owner, 100);
+        approve(&e, &owner, &spender, amount, 1000);
+
+        // Clear all mocked auths
+        e.set_auths(&[]);
+
+        // This should panic because spender authorization is required
+        transfer_from(&e, &spender, &owner, &recipient, amount);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InternalError)")]
+fn burn_requires_auth() {
+    let e = Env::default();
+    // Note: we'll mock auth for mint but not for burn
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let from = Address::generate(&e);
+    let amount = 50;
+
+    e.as_contract(&address, || {
+        mint(&e, &from, 100);
+
+        // Clear all mocked auths
+        e.set_auths(&[]);
+
+        // This should panic because from authorization is required
+        crate::extensions::burnable::burn(&e, &from, amount);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InternalError)")]
+fn burn_from_requires_auth() {
+    let e = Env::default();
+    // We'll mock auth for the approve call but not for burn_from
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let amount = 50;
+
+    e.as_contract(&address, || {
+        mint(&e, &owner, 100);
+        approve(&e, &owner, &spender, amount, 1000);
+
+        // Clear all mocked auths
+        e.set_auths(&[]);
+
+        // This should panic because spender authorization is required
+        crate::extensions::burnable::burn_from(&e, &spender, &owner, amount);
+    });
+}
