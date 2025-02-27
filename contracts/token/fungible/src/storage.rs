@@ -125,10 +125,7 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::InvalidLiveUntilLedger`] - Occurs when attempting to
-///   set `live_until_ledger` that is 1) greater than the maximum allowed or 2)
-///   less than the current ledger number and `amount` is greater than `0`.
-/// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
+/// * refer to [`set_allowance`] errors.
 ///
 /// # Events
 ///
@@ -144,14 +141,13 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 ///   "Stellar Asset Contract" implementation for consistency reasons.
 pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
     owner.require_auth();
-    set_allowance(e, owner, spender, amount, live_until_ledger, true);
+    set_allowance(e, owner, spender, amount, live_until_ledger);
+    emit_approve(e, owner, spender, amount, live_until_ledger);
 }
 
 /// Sets the amount of tokens a `spender` is allowed to spend on behalf of an
 /// `owner`. Overrides any existing allowance set between `spender` and `owner`.
-/// Variant of [`approve()`] that doesn't handle authorization, but controls
-/// event emission. That can be useful in operations like spending allowance
-/// during [`transfer_from()`].
+/// Doesn't handle authorization, nor event emission.
 ///
 /// # Arguments
 ///
@@ -160,7 +156,6 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 /// * `spender` - The address authorized to spend the tokens.
 /// * `amount` - The amount of tokens made available to `spender`.
 /// * `live_until_ledger` - The ledger number at which the allowance expires.
-/// * `emit` - A flag to enable or disable event emission.
 ///
 /// # Errors
 ///
@@ -169,15 +164,9 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 ///   less than the current ledger number and `amount` is greater than `0`.
 /// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
 ///
-/// # Events
-///
-/// Emits an event if `emit` is `true`.
-/// * topics - `["approve", from: Address, spender: Address]`
-/// * data - `[amount: i128, live_until_ledger: u32]`
-///
 /// # Notes
 ///
-/// * No authorization is required.
+/// * It is expected that the caller of this function handles the authorization.
 /// * Allowance is implicitly timebound by the maximum allowed storage TTL value
 ///   which is a network parameter, i.e. one cannot set an allowance for a
 ///   longer period. This behavior closely mirrors the functioning of the
@@ -188,7 +177,6 @@ pub fn set_allowance(
     spender: &Address,
     amount: i128,
     live_until_ledger: u32,
-    emit: bool,
 ) {
     if amount < 0 {
         panic_with_error!(e, FungibleTokenError::LessThanZero);
@@ -216,10 +204,6 @@ pub fn set_allowance(
 
         e.storage().temporary().extend_ttl(&key, live_for, live_for)
     }
-
-    if emit {
-        emit_approve(e, owner, spender, amount, live_until_ledger);
-    }
 }
 
 /// Deducts the amount of tokens a `spender` is allowed to spend on behalf of an
@@ -237,10 +221,11 @@ pub fn set_allowance(
 /// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to
 ///   transfer more tokens than `spender` current allowance.
 /// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
+/// * also refer to [`set_allowance`] errors.
 ///
 /// # Notes
 ///
-/// No authorization is required.
+/// * It is expected that the caller of this function handles the authorization.
 pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128) {
     if amount < 0 {
         panic_with_error!(e, FungibleTokenError::LessThanZero)
@@ -253,14 +238,7 @@ pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128
     }
 
     if amount > 0 {
-        set_allowance(
-            e,
-            owner,
-            spender,
-            allowance.amount - amount,
-            allowance.live_until_ledger,
-            false,
-        );
+        set_allowance(e, owner, spender, allowance.amount - amount, allowance.live_until_ledger);
     }
 }
 
@@ -275,13 +253,11 @@ pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
-///   more tokens than `from` current balance.
+/// * refer to [`do_transfer`] errors.
 ///
 /// # Events
 ///
-/// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[amount: i128]`
+/// * refer to [`do_transfer`] events.
 ///
 /// # Notes
 ///
@@ -305,16 +281,12 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
-///   more tokens than `from` current balance.
-/// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to
-///   transfer more tokens than `spender` current allowance.
-///
+/// * refer to [`spend_allowance`] errors.
+/// * refer to [`do_transfer`] errors.
 ///
 /// # Events
 ///
-/// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[amount: i128]`
+/// * refer to [`do_transfer`] events.
 ///
 /// # Notes
 ///
@@ -325,7 +297,9 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, a
     do_transfer(e, from, to, amount);
 }
 
-/// Equivalent to [`transfer()`] but doesn't handle authorization.
+/// Equivalent to [`transfer()`] but:
+/// - does NOT handle authorization.
+/// - does handles event emission
 ///
 /// # Arguments
 ///
@@ -336,8 +310,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, a
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
-///   more tokens than `from` current balance.
+/// * refer to [`update`] errors.
 ///
 /// # Events
 ///
@@ -346,10 +319,9 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, a
 ///
 /// # Notes
 ///
-/// No authorization is required.
+/// * It is expected that the caller of this function handles the authorization.
 pub fn do_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
     update(e, Some(from), Some(to), amount);
-
     emit_transfer(e, from, to, amount);
 }
 
@@ -373,7 +345,7 @@ pub fn do_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
 ///
 /// # Notes
 ///
-/// No authorization is required.
+/// * It is expected that the caller of this function handles the authorization.
 pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i128) {
     if amount < 0 {
         panic_with_error!(e, FungibleTokenError::LessThanZero);

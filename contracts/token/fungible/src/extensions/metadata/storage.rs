@@ -38,8 +38,7 @@ pub fn get_metadata(e: &Env) -> Metadata {
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
-///   uninitialized metadata.
+/// * refer to [`get_metadata`] errors.
 pub fn decimals(e: &Env) -> u32 {
     get_metadata(e).decimals
 }
@@ -52,8 +51,7 @@ pub fn decimals(e: &Env) -> u32 {
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
-///   uninitialized metadata.
+/// * refer to [`get_metadata`] errors.
 pub fn name(e: &Env) -> String {
     get_metadata(e).name
 }
@@ -66,8 +64,7 @@ pub fn name(e: &Env) -> String {
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
-///   uninitialized metadata.
+/// * refer to [`get_metadata`] errors.
 pub fn symbol(e: &Env) -> String {
     get_metadata(e).symbol
 }

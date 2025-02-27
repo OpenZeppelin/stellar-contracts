@@ -173,7 +173,7 @@ fn set_allowance_with_expired_ledger_fails() {
 
     e.as_contract(&address, || {
         e.ledger().set_sequence_number(10);
-        set_allowance(&e, &owner, &spender, 50, 5, true);
+        set_allowance(&e, &owner, &spender, 50, 5);
     });
 }
 
@@ -187,7 +187,7 @@ fn set_allowance_with_greater_than_max_ledger_fails() {
 
     e.as_contract(&address, || {
         let ttl = e.storage().max_ttl() + 1;
-        set_allowance(&e, &owner, &spender, 50, ttl, true);
+        set_allowance(&e, &owner, &spender, 50, ttl);
     });
 }
 
@@ -200,7 +200,7 @@ fn set_allowance_with_neg_amount_fails() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        set_allowance(&e, &owner, &spender, -1, 5, true);
+        set_allowance(&e, &owner, &spender, -1, 5);
     });
 }
 
@@ -213,13 +213,13 @@ fn set_allowance_with_zero_amount() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        set_allowance(&e, &owner, &spender, 0, 5, false);
+        set_allowance(&e, &owner, &spender, 0, 5);
         let allowance_val = allowance(&e, &owner, &spender);
         assert_eq!(allowance_val, 0);
 
         // should pass for a past ledger
         e.ledger().set_sequence_number(10);
-        set_allowance(&e, &owner2, &spender, 0, 5, false);
+        set_allowance(&e, &owner2, &spender, 0, 5);
         let allowance_val = allowance(&e, &owner2, &spender);
         assert_eq!(allowance_val, 0);
     });
