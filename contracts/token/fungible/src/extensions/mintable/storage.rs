@@ -11,6 +11,10 @@ use crate::{extensions::mintable::emit_mint, storage::update};
 /// * `account` - The address receiving the new tokens.
 /// * `amount` - The amount of tokens to mint.
 ///
+/// # Errors
+///
+/// refer to [`update`] errors.
+///
 /// # Events
 ///
 /// * topics - `["mint", account: Address]`

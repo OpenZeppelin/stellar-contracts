@@ -28,7 +28,7 @@ pub fn set_cap(e: &Env, cap: i128) {
     e.storage().instance().set(&CAP_KEY, &cap);
 }
 
-/// Query the maximum supply of tokens.
+/// Returns the maximum supply of tokens.
 ///
 /// # Arguments
 ///
@@ -37,10 +37,6 @@ pub fn set_cap(e: &Env, cap: i128) {
 /// # Errors
 ///
 /// * [`FungibleTokenError::CapNotSet`] - Occurs when the cap has not been set.
-///
-/// # Returns
-///
-/// the maximum supply of tokens.
 pub fn query_cap(e: &Env) -> i128 {
     e.storage()
         .instance()

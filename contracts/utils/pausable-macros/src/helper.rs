@@ -39,8 +39,9 @@ fn check_env_arg(input_fn: &ItemFn) -> (syn::Ident, bool) {
     // Extract the pattern and type from the argument
     let (pat, ty) = match first_arg {
         FnArg::Typed(PatType { pat, ty, .. }) => (pat, ty),
-        _ =>
-            panic!("first argument of function '{}' must be a typed parameter", input_fn.sig.ident),
+        _ => {
+            panic!("first argument of function '{}' must be a typed parameter", input_fn.sig.ident)
+        }
     };
 
     // Get the identifier from the pattern
