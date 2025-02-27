@@ -16,6 +16,9 @@ OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stel
 - `docs/`: Documentation
 - `audits/`: Audit reports
 
+## Docs
+We have a [documentation website](https://docs.openzeppelin.com/stellar-contracts/) explaining the high-level concepts of the library. You can find code-specific inline documentation in the source code, or alternatively you can locally generate the documentation using the `cargo doc --no-deps --lib --open` command, which will generate the documentation and open it using your default browser.
+
 
 ## Setup
 
