@@ -166,8 +166,8 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 ///
 /// # Notes
 ///
-/// * This function does not enforce authorization. Ensure that authorization
-///   is handled at a higher level.
+/// * This function does not enforce authorization. Ensure that authorization is
+///   handled at a higher level.
 /// * Allowance is implicitly timebound by the maximum allowed storage TTL value
 ///   which is a network parameter, i.e. one cannot set an allowance for a
 ///   longer period. This behavior closely mirrors the functioning of the

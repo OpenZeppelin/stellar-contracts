@@ -63,8 +63,8 @@ pub trait FungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
-    ///   more tokens than `from` current balance.
+    /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to
+    ///   transfer more tokens than `from` current balance.
     /// * [`FungibleTokenError::LessThanZero`] - When `amount < 0`.
     ///
     /// # Events
@@ -93,8 +93,8 @@ pub trait FungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
-    ///   more tokens than `from` current balance.
+    /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to
+    ///   transfer more tokens than `from` current balance.
     /// * [`FungibleTokenError::LessThanZero`] - When `amount < 0`.
     /// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to
     ///   transfer more tokens than `spender` current allowance.
