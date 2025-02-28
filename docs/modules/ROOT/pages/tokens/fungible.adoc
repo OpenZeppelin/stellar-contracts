@@ -60,3 +60,13 @@ Provides `setter` and `getter` methods for `symbol`, `name`, and `decimal` metad
 
 ==== Events
 There are no custom events associated with the `Metadata` trait.
+
+== Misc
+
+To comply with the SEP-41 specification, a contract must implement both the `FungibleToken` and `FungibleBurnable`
+traits. These traits together provide all the necessary methods to conform to `soroban_sdk::token::TokenInterface`,
+offering another way to meet the SEP-41 requirements.
+
+For contracts that implement both `FungibleToken` and `FungibleBurnable`,
+and also need to implement `TokenInterface`, we provide the `impl_token_interface!` macro.
+This macro automatically generates the required boilerplate, simplifying the implementation process.

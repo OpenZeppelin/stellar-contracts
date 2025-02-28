@@ -10,7 +10,8 @@
 //! [`openzeppelin_fungible_token::burnable::FungibleBurnable`].
 
 use openzeppelin_fungible_token::{
-    self as fungible, burnable::FungibleBurnable, mintable::FungibleMintable, FungibleToken,
+    self as fungible, burnable::FungibleBurnable, impl_token_interface, mintable::FungibleMintable,
+    FungibleToken,
 };
 use openzeppelin_pausable::{self as pausable, Pausable};
 use openzeppelin_pausable_macros::when_not_paused;
@@ -143,3 +144,9 @@ impl FungibleMintable for ExampleContract {
         fungible::mintable::mint(e, &account, amount);
     }
 }
+
+// NOTE: if your contract implements `FungibleToken` and `FungibleBurnable`,
+// and you also want your contract to implement
+// `soroban_sdk::token::TokenInterface`, you can use the `impl_token_interface!`
+// macro to generate the boilerplate implementation.
+impl_token_interface!(ExampleContract);
