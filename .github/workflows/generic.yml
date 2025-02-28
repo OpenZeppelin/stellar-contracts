@@ -68,4 +68,4 @@ jobs:
         run: cargo clippy --release --locked --all-targets -- -D warnings
 
       - name: Check build
-        run: cargo build --release --locked
+        run: cargo build --target wasm32-unknown-unknown --release
