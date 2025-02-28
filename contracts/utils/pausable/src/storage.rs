@@ -28,8 +28,7 @@ pub fn paused(e: &Env) -> bool {
 ///
 /// # Errors
 ///
-/// * [`PausableError::EnforcedPause`] - Occurs when the contract is already in
-///   `Paused` state.
+/// * refer to [`when_not_paused`] errors.
 ///
 /// # Events
 ///
@@ -55,8 +54,7 @@ pub fn pause(e: &Env, caller: &Address) {
 ///
 /// # Errors
 ///
-/// * [`PausableError::ExpectedPause`] - Occurs when the contract is already in
-///   `Unpaused` state.
+/// * refer to [`when_paused`] errors.
 ///
 /// # Events
 ///
@@ -83,10 +81,6 @@ pub fn unpause(e: &Env, caller: &Address) {
 ///
 /// * [`PausableError::EnforcedPause`] - Occurs when the contract is already in
 ///   `Paused` state.
-///
-/// # Notes
-///
-/// No authorization is required.
 pub fn when_not_paused(e: &Env) {
     if paused(e) {
         panic_with_error!(e, PausableError::EnforcedPause);
@@ -103,10 +97,6 @@ pub fn when_not_paused(e: &Env) {
 ///
 /// * [`PausableError::ExpectedPause`] - Occurs when the contract is already in
 ///   `Unpaused` state.
-///
-/// # Notes
-///
-/// No authorization is required.
 pub fn when_paused(e: &Env) {
     if !paused(e) {
         panic_with_error!(e, PausableError::ExpectedPause);

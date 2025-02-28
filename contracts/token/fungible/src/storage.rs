@@ -166,7 +166,8 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 ///
 /// # Notes
 ///
-/// * It is expected that the caller of this function handles the authorization.
+/// * This function does not enforce authorization. Ensure that authorization
+///   is handled at a higher level.
 /// * Allowance is implicitly timebound by the maximum allowed storage TTL value
 ///   which is a network parameter, i.e. one cannot set an allowance for a
 ///   longer period. This behavior closely mirrors the functioning of the
@@ -225,7 +226,8 @@ pub fn set_allowance(
 ///
 /// # Notes
 ///
-/// * It is expected that the caller of this function handles the authorization.
+/// This function does not enforce authorization. Ensure that authorization
+/// is handled at a higher level.
 pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128) {
     if amount < 0 {
         panic_with_error!(e, FungibleTokenError::LessThanZero)
@@ -319,7 +321,8 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, a
 ///
 /// # Notes
 ///
-/// * It is expected that the caller of this function handles the authorization.
+/// This function does not enforce authorization. Ensure that authorization
+/// is handled at a higher level.
 pub fn do_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
     update(e, Some(from), Some(to), amount);
     emit_transfer(e, from, to, amount);
@@ -345,7 +348,8 @@ pub fn do_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
 ///
 /// # Notes
 ///
-/// * It is expected that the caller of this function handles the authorization.
+/// This function does not enforce authorization. Ensure that authorization
+/// is handled at a higher level.
 pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i128) {
     if amount < 0 {
         panic_with_error!(e, FungibleTokenError::LessThanZero);

@@ -18,9 +18,9 @@ pub const CAP_KEY: Symbol = symbol_short!("CAP");
 ///
 /// # Notes
 ///
-/// We recommend using this function in the constructor of your smart contract.
-/// Cap functionality is designed to be used in conjunction with the `mintable`
-/// extension.
+/// * We recommend using this function in the constructor of your smart contract.
+/// * Cap functionality is designed to be used in conjunction with the `mintable`
+///   extension.
 pub fn set_cap(e: &Env, cap: i128) {
     if cap < 0 {
         panic_with_error!(e, FungibleTokenError::InvalidCap);

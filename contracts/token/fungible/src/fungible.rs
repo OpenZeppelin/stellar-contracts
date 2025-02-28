@@ -63,8 +63,9 @@ pub trait FungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to
-    ///   transfer more tokens than `from` current balance.
+    /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
+    ///   more tokens than `from` current balance.
+    /// * [`FungibleTokenError::LessThanZero`] - When `amount < 0`.
     ///
     /// # Events
     ///
@@ -92,11 +93,11 @@ pub trait FungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to
-    ///   transfer more tokens than `from` current balance.
+    /// * [`FungibleTokenError::InsufficientBalance`] - When attempting to transfer
+    ///   more tokens than `from` current balance.
+    /// * [`FungibleTokenError::LessThanZero`] - When `amount < 0`.
     /// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to
     ///   transfer more tokens than `spender` current allowance.
-    ///
     ///
     /// # Events
     ///
@@ -127,6 +128,7 @@ pub trait FungibleToken {
     /// * [`FungibleTokenError::InvalidLiveUntilLedger`] - Occurs when
     ///   attempting to set `live_until_ledger` that is less than the current
     ///   ledger number and greater than `0`.
+    /// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
     ///
     /// # Events
     ///

@@ -25,6 +25,11 @@ pub trait FungibleMintable {
     /// * `account` - The address receiving the new tokens.
     /// * `amount` - The amount of tokens to mint.
     ///
+    /// # Errors
+    ///
+    /// * [`FungibleTokenError::LessThanZero`] - When `amount < 0`.
+    /// * [`FungibleTokenError::MathOverflow`] - When `total_supply` overflows.
+    ///
     /// # Events
     ///
     /// * topics - `["mint", account: Address]`
@@ -45,6 +50,7 @@ pub trait FungibleMintable {
     /// some authorization controls for minting tokens.
     fn mint(e: &Env, account: Address, amount: i128);
 }
+
 // ################## EVENTS ##################
 
 /// Emits an event indicating a mint of tokens.
