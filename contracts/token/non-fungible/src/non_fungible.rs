@@ -1,4 +1,4 @@
-use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Bytes, Env};
+use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, Symbol};
 
 /// Vanilla NonFungible Token Trait
 ///
@@ -229,13 +229,13 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `owner` - Address of the owner of the token.
-/// * `approver` - Address of the approver.
+/// * `approved` - Address of the approved.
 /// * `token_id` - The identifier of the transferred token.
 ///
 /// # Events
 ///
 /// * topics - `["approval", owner: Address, token_id: u128]`
-/// * data - `[approver: Address, live_until_ledger: u32]`
+/// * data - `[approved: Address, live_until_ledger: u32]`
 pub fn emit_approval(
     e: &Env,
     owner: &Address,
@@ -244,7 +244,7 @@ pub fn emit_approval(
     live_until_ledger: u32,
 ) {
     let topics = (symbol_short!("approval"), owner, token_id);
-    e.events().publish(topics, (approver, live_until_ledger))
+    e.events().publish(topics, (approved, live_until_ledger))
 }
 
 /// Emits an event when `owner` enables `approved` to manage the `token_id`

@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Bytes, Env};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::non_fungible::{
     emit_approval, emit_approval_for_all, emit_transfer, NonFungibleTokenError,
@@ -191,7 +191,7 @@ pub fn approve(
     }
 
     if live_until_ledger < e.ledger().sequence() {
-        panic_with_error!(e, FungibleTokenError::InvalidLiveUntilLedger);
+        panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
     }
 
     let key = StorageKey::Approval(token_id);
@@ -232,7 +232,7 @@ pub fn set_approval_for_all(
     owner.require_auth();
 
     if live_until_ledger < e.ledger().sequence() {
-        panic_with_error!(e, FungibleTokenError::InvalidLiveUntilLedger);
+        panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
     }
 
     let key = StorageKey::ApprovalForAll(owner.clone());
@@ -300,7 +300,7 @@ pub fn update(e: &Env, spender: &Address, from: &Address, to: &Address, token_id
         panic_with_error!(e, NonFungibleTokenError::IncorrectOwner);
     }
 
-    check_spender_auth(e, spender, &owner);
+    check_spender_auth(e, spender, &owner, token_id);
 
     e.storage().persistent().set(&StorageKey::Owner(token_id), to);
 
@@ -323,7 +323,7 @@ pub fn update(e: &Env, spender: &Address, from: &Address, to: &Address, token_id
 }
 
 /// Low-level function for checking if the `spender` has enough authorization
-/// from the owner.
+/// from the owner. Panics if the authorization check fails.
 ///
 /// # Arguments
 ///
@@ -334,12 +334,7 @@ pub fn update(e: &Env, spender: &Address, from: &Address, to: &Address, token_id
 /// # Errors
 /// * [`NonFungibleTokenError::UnauthorizedTransfer`] - If the `spender` is not
 ///   authorized to transfer the token.
-///
-/// # Notes
-///
-/// This is an internal function used by `transfer_from`. It assumes all
-/// necessary checks (ownership, approval, etc.) have already been performed.
-pub fn check_spender_auth(e: &Env, spender: &Address, owner: &Address) {
+pub fn check_spender_auth(e: &Env, spender: &Address, owner: &Address, token_id: u128) {
     // If `spender` is not the owner, they must have explicit approval.
     let is_spender_owner = spender == owner;
     let is_spender_approved = get_approved(e, token_id) == Some(spender.clone());
