@@ -174,7 +174,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 /// * [`NonFungibleTokenError::InvalidApprover`] - If the owner address is not
 ///   the actual owner of the token.
 /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger number
-/// is less than the current ledger number.
+///   is less than the current ledger number.
 pub fn approve(
     e: &Env,
     owner: &Address,
@@ -221,7 +221,7 @@ pub fn approve(
 /// # Errors
 ///
 /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger number
-/// is less than the current ledger number.
+///   is less than the current ledger number.
 pub fn set_approval_for_all(
     e: &Env,
     owner: &Address,
