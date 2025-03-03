@@ -35,82 +35,11 @@ pub trait NonFungibleToken {
     /// function.
     fn owner_of(e: &Env, token_id: u128) -> Address;
 
-    /// Safely transfers `token_id` token from `from` to `to`, checking first
-    /// that contract recipients are aware of the [`Erc721`] protocol to
-    /// prevent tokens from being forever locked.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `spender` - The address authorizing the transfer.
-    /// * `from` - Account of the sender.
-    /// * `to` - Account of the recipient.
-    /// * `token_id` - Token id as a number.
-    ///
-    /// # Errors
-    ///
-    /// * [`NonFungibleTokenError::IncorrectOwner`]  - If the owner is not
-    ///   `from`.
-    /// * [`NonFungibleTokenError::UnauthorizedTransfer`] - If the caller does
-    ///   not have the right to approve.
-    /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
-    ///   exist.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: u128]`
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::safe_transfer_from()`] when implementing
-    /// this function.
-    fn safe_transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u128);
-
-    /// Safely transfers `token_id` token from `from` to `to`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `spender` - The address authorizing the transfer.
-    /// * `from` - Account of the sender.
-    /// * `to` - Account of the recipient.
-    /// * `token_id` - Token id as a number.
-    /// * `data` - Additional data with no specified format, sent in the call to
-    ///   [`Erc721::_check_on_erc721_received`].
-    ///
-    /// # Errors
-    ///
-    ///  * [`NonFungibleTokenError::IncorrectOwner`] - If the previous owner is
-    ///    not `from`.
-    ///  * [`NonFungibleTokenError::UnauthorizedTransfer`] - If the caller does
-    ///    not have the right to approve.
-    ///  * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
-    ///    exist.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: u128]`
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::safe_transfer_from_with_data()`] when
-    /// implementing this function.
-    fn safe_transfer_from_with_data(
-        e: &Env,
-        spender: Address,
-        from: Address,
-        to: Address,
-        token_id: u128,
-        data: Bytes,
-    );
-
     /// Transfers `token_id` token from `from` to `to`.
     ///
     /// WARNING: Note that the caller is responsible to confirm that the
-    /// recipient is capable of receiving [`Erc721`] or else they may be
-    /// permanently lost. Usage of [`Self::safe_transfer_from`] prevents loss.
+    /// recipient is capable of receiving the `Non-Fungible` or else the NFT
+    /// may be permanently lost.
     ///
     /// # Arguments
     ///
@@ -176,8 +105,8 @@ pub trait NonFungibleToken {
 
     /// Approve or remove `operator` as an operator for the caller.
     ///
-    /// Operators can call [`Self::transfer_from`] or
-    /// [`Self::safe_transfer_from`] for any token owned by the caller.
+    /// Operators can call [`Self::transfer_from`] for any token owned by the
+    /// caller.
     ///
     /// # Arguments
     ///
