@@ -64,10 +64,10 @@ pub use non_fungible::{
     NonFungibleTokenError,
 };
 pub use storage::{
-    approve, balance, do_transfer, get_approved, is_approved_for_all, owner_of, safe_transfer_from,
-    safe_transfer_from_with_data, set_approval_for_all, transfer_from, ApprovalData,
-    ApprovalForAllData, StorageKey, BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, DAY_IN_LEDGERS,
-    INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
+    approve, balance, do_transfer, get_approved, is_approved_for_all, owner_of,
+    set_approval_for_all, transfer_from, ApprovalData, ApprovalForAllData, StorageKey,
+    BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, DAY_IN_LEDGERS, INSTANCE_EXTEND_AMOUNT,
+    INSTANCE_TTL_THRESHOLD,
 };
 
 mod test;

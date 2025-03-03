@@ -131,70 +131,6 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 
 // ################## CHANGE STATE ##################
 
-/// Transfers a non-fungible token (NFT) safely (reverts if the recipient cannot
-/// receive the token), ensuring ownership and approval checks.
-///
-/// # Arguments
-///
-/// * `e`: The environment reference.
-/// * `spender`: The address attempting to transfer the token.
-/// * `from`: The current owner's address.
-/// * `to`: The recipient's address.
-/// * `token_id`: The identifier of the token being transferred.
-///
-/// # Errors
-///
-/// * refer to [`safe_transfer_from_with_data`] errors.
-///
-/// # Events
-///
-/// * refer to [`safe_transfer_from_with_data`] events.
-pub fn safe_transfer_from(
-    e: &Env,
-    spender: &Address,
-    from: &Address,
-    to: &Address,
-    token_id: u128,
-) {
-    safe_transfer_from_with_data(e, spender, from, to, token_id, Bytes::new(e));
-}
-
-// Transfers a non-fungible token (NFT) safely (reverts if the recipient cannot
-// receive the token), ensuring ownership and approval
-/// checks. Same as `[safe_transfer_from]`, but with additional data field.
-///
-/// # Arguments
-///
-/// * `e`: The environment reference.
-/// * `spender`: The address attempting to transfer the token.
-/// * `from`: The current owner's address.
-/// * `to`: The recipient's address.
-/// * `token_id`: The identifier of the token being transferred.
-/// * `data`: Additional data with no specified format, sent in the call to
-///   [`NonFungible::check_on_non_fungible_received`].
-///
-/// # Errors
-///
-/// * refer to [`do_transfer`] errors.
-///
-/// # Events
-///
-/// * refer to [`do_transfer`] events.
-pub fn safe_transfer_from_with_data(
-    e: &Env,
-    spender: &Address,
-    from: &Address,
-    to: &Address,
-    token_id: u128,
-    _data: Bytes,
-) {
-    spender.require_auth();
-
-    // TODO: implement the SAFE part when Receiver is implemented
-    // TODO: also use the `data` field on this `Receiver`
-    do_transfer(e, spender, from, to, token_id);
-}
-
 /// Transfers a non-fungible token (NFT), ensuring ownership and approval
 /// checks.
 ///
@@ -217,8 +153,6 @@ pub fn safe_transfer_from_with_data(
 /// # Notes
 ///
 /// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
-/// Use the `safe_transfer_from` variant if you also want to check things on the
-/// receiver end.
 pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u128) {
     spender.require_auth();
 
@@ -334,9 +268,6 @@ pub fn set_approval_for_all(
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
 /// * data - `[token_id: u128]`
-///
-/// This function is used by [`transfer_from`], [`safe_transfer_from`],
-/// and `[safe_transfer_from_with_data]`.
 pub fn do_transfer(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u128) {
     update(e, spender, from, to, token_id);
     emit_transfer(e, from, to, token_id);
@@ -406,9 +337,8 @@ pub fn update(e: &Env, spender: &Address, from: &Address, to: &Address, token_id
 ///
 /// # Notes
 ///
-/// This is an internal function used by `transfer_from`, `safe_transfer_from`
-/// and `safe_transfer_from_with_data`. It assumes all necessary checks
-/// (ownership, approval, etc.) have already been performed.
+/// This is an internal function used by `transfer_from`. It assumes all
+/// necessary checks (ownership, approval, etc.) have already been performed.
 pub fn check_spender_auth(e: &Env, spender: &Address, owner: &Address) {
     // If `spender` is not the owner, they must have explicit approval.
     let is_spender_owner = spender == owner;
