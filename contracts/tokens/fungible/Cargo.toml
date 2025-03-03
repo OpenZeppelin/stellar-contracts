@@ -1,5 +1,5 @@
 [package]
-name = "pausable-example"
+name = "openzeppelin-stellar-fungible"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -7,13 +7,12 @@ publish = false
 version.workspace = true
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["lib", "cdylib"]
 doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-openzeppelin-stellar-pausable = { workspace = true }
-openzeppelin-stellar-pausable-macros = { workspace = true }
+openzeppelin-stellar-constants = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

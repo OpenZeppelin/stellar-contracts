@@ -12,9 +12,9 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-openzeppelin-pausable = { workspace = true }
-openzeppelin-pausable-macros = { workspace = true }
-openzeppelin-fungible-token = { workspace = true }
+openzeppelin-stellar-pausable = { workspace = true }
+openzeppelin-stellar-pausable-macros = { workspace = true }
+openzeppelin-stellar-fungible = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

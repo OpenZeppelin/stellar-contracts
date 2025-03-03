@@ -1,6 +1,5 @@
+use openzeppelin_stellar_constants::{INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD};
 use soroban_sdk::{contracttype, symbol_short, unwrap::UnwrapOptimized, Env, String, Symbol};
-
-use crate::storage::{INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD};
 
 /// Storage key that maps to [`Metadata`]
 pub const METADATA_KEY: Symbol = symbol_short!("METADATA");

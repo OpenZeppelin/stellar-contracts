@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["contracts/utils/*", "contracts/token/*", "examples/*"]
+members = [
+    "contracts/utils/*",
+    "contracts/tokens/*",
+    "contracts/constants",
+    "examples/*",
+]
 
 [workspace.package]
 authors = ["OpenZeppelin"]
@@ -16,9 +21,11 @@ quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 
 # members
-openzeppelin-pausable = { path = "contracts/utils/pausable" }
-openzeppelin-pausable-macros = { path = "contracts/utils/pausable-macros" }
-openzeppelin-fungible-token = { path = "contracts/token/fungible" }
+openzeppelin-stellar-pausable = { path = "contracts/utils/pausable" }
+openzeppelin-stellar-pausable-macros = { path = "contracts/utils/pausable-macros" }
+openzeppelin-stellar-fungible = { path = "contracts/tokens/fungible" }
+openzeppelin-stellar-non-fungible = { path = "contracts/tokens/non-fungible" }
+openzeppelin-stellar-constants = { path = "contracts/constants" }
 
 [profile.release]
 opt-level = "z"

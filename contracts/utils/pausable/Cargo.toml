@@ -1,5 +1,5 @@
 [package]
-name = "openzeppelin-pausable"
+name = "openzeppelin-stellar-pausable"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -12,6 +12,7 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+openzeppelin-stellar-constants = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

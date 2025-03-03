@@ -13,9 +13,9 @@
 //! "examples/fungible-pausable" for better organization of the code,
 //! consistency and ease of inspection/debugging.
 
-use openzeppelin_fungible_token::{self as fungible, mintable::FungibleMintable};
-use openzeppelin_pausable::{self as pausable, Pausable};
-use openzeppelin_pausable_macros::when_not_paused;
+use openzeppelin_stellar_fungible::{self as fungible, mintable::FungibleMintable};
+use openzeppelin_stellar_pausable::{self as pausable, Pausable};
+use openzeppelin_stellar_pausable_macros::when_not_paused;
 use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, token::TokenInterface,
     Address, Env, String, Symbol,

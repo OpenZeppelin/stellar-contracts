@@ -545,9 +545,9 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 name = "fungible-pausable-example"
 version = "0.1.0"
 dependencies = [
- "openzeppelin-fungible-token",
- "openzeppelin-pausable",
- "openzeppelin-pausable-macros",
+ "openzeppelin-stellar-fungible",
+ "openzeppelin-stellar-pausable",
+ "openzeppelin-stellar-pausable-macros",
  "soroban-sdk",
 ]
 
@@ -555,9 +555,9 @@ dependencies = [
 name = "fungible-token-interface-example"
 version = "0.1.0"
 dependencies = [
- "openzeppelin-fungible-token",
- "openzeppelin-pausable",
- "openzeppelin-pausable-macros",
+ "openzeppelin-stellar-fungible",
+ "openzeppelin-stellar-pausable",
+ "openzeppelin-stellar-pausable-macros",
  "soroban-sdk",
 ]
 
@@ -820,28 +820,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
-name = "openzeppelin-fungible-token"
+name = "openzeppelin-stellar-constants"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
 ]
 
 [[package]]
-name = "openzeppelin-non-fungible-token"
+name = "openzeppelin-stellar-fungible"
 version = "0.1.0"
 dependencies = [
+ "openzeppelin-stellar-constants",
  "soroban-sdk",
 ]
 
 [[package]]
-name = "openzeppelin-pausable"
+name = "openzeppelin-stellar-non-fungible"
 version = "0.1.0"
 dependencies = [
+ "openzeppelin-stellar-constants",
  "soroban-sdk",
 ]
 
 [[package]]
-name = "openzeppelin-pausable-macros"
+name = "openzeppelin-stellar-pausable"
+version = "0.1.0"
+dependencies = [
+ "openzeppelin-stellar-constants",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "openzeppelin-stellar-pausable-macros"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
@@ -871,8 +881,8 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 name = "pausable-example"
 version = "0.1.0"
 dependencies = [
- "openzeppelin-pausable",
- "openzeppelin-pausable-macros",
+ "openzeppelin-stellar-pausable",
+ "openzeppelin-stellar-pausable-macros",
  "soroban-sdk",
 ]
 

@@ -9,11 +9,11 @@
 //! [`openzeppelin_fungible_token::fungible::FungibleToken`] and
 //! [`openzeppelin_fungible_token::burnable::FungibleBurnable`].
 
-use openzeppelin_fungible_token::{
+use openzeppelin_stellar_fungible::{
     self as fungible, burnable::FungibleBurnable, mintable::FungibleMintable, FungibleToken,
 };
-use openzeppelin_pausable::{self as pausable, Pausable};
-use openzeppelin_pausable_macros::when_not_paused;
+use openzeppelin_stellar_pausable::{self as pausable, Pausable};
+use openzeppelin_stellar_pausable_macros::when_not_paused;
 use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env, String,
     Symbol,

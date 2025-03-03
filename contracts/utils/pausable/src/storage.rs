@@ -1,13 +1,7 @@
+use openzeppelin_stellar_constants::{INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD};
 use soroban_sdk::{panic_with_error, symbol_short, Address, Env, Symbol};
 
 use crate::{emit_paused, emit_unpaused, pausable::PausableError};
-
-// Same values as in Stellar Asset Contract (SAC) implementation:
-// https://github.com/stellar/rs-soroban-env/blob/main/soroban-env-host/src/builtin_contracts/stellar_asset_contract/storage_types.rs
-pub const DAY_IN_LEDGERS: u32 = 17280;
-
-pub const INSTANCE_EXTEND_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
-pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 /// Indicates whether the contract is in `Paused` state.
 pub const PAUSED: Symbol = symbol_short!("PAUSED");

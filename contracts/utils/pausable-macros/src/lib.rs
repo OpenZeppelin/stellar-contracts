@@ -43,7 +43,7 @@ pub fn when_not_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let output = quote! {
         #fn_vis #fn_sig {
-            openzeppelin_pausable::when_not_paused(#env_arg);
+            openzeppelin_stellar_pausable::when_not_paused(#env_arg);
 
             #fn_block
         }
@@ -89,7 +89,7 @@ pub fn when_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let output = quote! {
         #fn_vis #fn_sig {
-            openzeppelin_pausable::when_paused(#env_arg);
+            openzeppelin_stellar_pausable::when_paused(#env_arg);
 
             #fn_block
         }
