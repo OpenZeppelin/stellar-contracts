@@ -20,10 +20,11 @@ use crate::{extensions::mintable::emit_mint, storage::update};
 /// * topics - `["mint", account: Address]`
 /// * data - `[amount: i128]`
 ///
-/// # Notes
+/// # Security Warning
 ///
-/// IMPORTANT: This function lacks authorization controls. It is the
-/// responsibility of the implementer to establish appropriate access
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is the responsibility of the implementer to establish appropriate access
 /// controls to ensure that only authorized accounts can execute minting
 /// operations. Failure to implement proper authorization could lead to
 /// security vulnerabilities and unauthorized token creation.
