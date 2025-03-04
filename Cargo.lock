@@ -835,6 +835,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "openzeppelin-non-fungible-token"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "openzeppelin-pausable"
 version = "0.1.0"
 dependencies = [
