@@ -144,7 +144,8 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 ///
 /// # Errors
 ///
-/// * refer to [`check_spender_auth`] and [`update`] errors.
+/// * refer to [`check_spender_auth`] errors.
+/// * refer to [`update`] errors.
 ///
 /// # Events
 ///
@@ -157,7 +158,7 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u128) {
     spender.require_auth();
     check_spender_auth(e, spender, &owner, token_id);
-    update(e, spender, from, to, token_id);
+    update(e, spender, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 }
 
@@ -270,32 +271,46 @@ pub fn set_approval_for_all(
 /// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `to` would
 ///   overflow.
 /// * refer to [`check_spender_auth`] errors.
-pub fn update(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u128) {
-    let owner = owner_of(e, token_id);
+pub fn update(
+    e: &Env,
+    spender: &Address,
+    from: Option<&Address>,
+    to: Option<&Address>,
+    token_id: u128,
+) {
+    if let Some(from_address) = from {
+        let owner = owner_of(e, token_id);
 
-    // Ensure the `from` address is indeed the owner.
-    if owner != *from {
-        panic_with_error!(e, NonFungibleTokenError::IncorrectOwner);
+        // Ensure the `from` address is indeed the owner.
+        if owner != *from_address {
+            panic_with_error!(e, NonFungibleTokenError::IncorrectOwner);
+        }
+
+        // Update the balance of the `from` address
+        let from_balance = balance(e, from_address) - 1;
+        e.storage().persistent().set(&StorageKey::Balance(from_address.clone()), &from_balance);
+
+        // Clear any existing approval
+        let approval_key = StorageKey::Approval(token_id);
+        e.storage().temporary().remove(&approval_key);
+    } else {
+        // nothing to do for the `None` case, since we don't track `total_supply`
     }
 
-    e.storage().persistent().set(&StorageKey::Owner(token_id), to);
+    if let Some(to_address) = to {
+        // Update the balance of the `to` address
+        let to_balance = match balance(e, to_address).checked_add(1) {
+            Some(num) => num,
+            _ => panic_with_error!(e, NonFungibleTokenError::MathOverflow),
+        };
+        e.storage().persistent().set(&StorageKey::Balance(to_address.clone()), &to_balance);
 
-    /* Update balances */
-    // We checked for the owner, no need to check for underflow (balance
-    // should be greater than 0 for the owner)
-    let from_balance = balance(e, from) - 1;
-    // However, we have to check for overflow
-    let to_balance = match balance(e, to).checked_add(1) {
-        Some(num) => num,
-        _ => panic_with_error!(e, NonFungibleTokenError::MathOverflow),
-    };
-
-    e.storage().persistent().set(&StorageKey::Balance(from.clone()), &from_balance);
-    e.storage().persistent().set(&StorageKey::Balance(to.clone()), &to_balance);
-
-    // Clear any existing approval
-    let approval_key = StorageKey::Approval(token_id);
-    e.storage().temporary().remove(&approval_key);
+        // Set the new owner
+        e.storage().persistent().set(&StorageKey::Owner(token_id), to_address);
+    } else {
+        // Burning: `to` is None
+        e.storage().persistent().remove(&StorageKey::Owner(token_id));
+    }
 }
 
 /// Low-level function for checking if the `spender` has enough authorization
