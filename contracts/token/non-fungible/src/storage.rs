@@ -144,19 +144,21 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 ///
 /// # Errors
 ///
-/// * refer to [`do_transfer`] errors.
+/// * refer to [`check_spender_auth`] and [`update`] errors.
 ///
 /// # Events
 ///
-/// * refer to [`do_transfer`] events.
+/// * topics - `["transfer", from: Address, to: Address]`
+/// * data - `[token_id: u128]`
 ///
 /// # Notes
 ///
 /// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
 pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u128) {
     spender.require_auth();
-
-    do_transfer(e, spender, from, to, token_id);
+    check_spender_auth(e, spender, &owner, token_id);
+    update(e, spender, from, to, token_id);
+    emit_transfer(e, from, to, token_id);
 }
 
 /// Approves an address to transfer a specific token.
@@ -250,30 +252,6 @@ pub fn set_approval_for_all(
 }
 
 /// Low-level function for handling transfers for NFTs, but doesn't
-/// handle authorization. Emits a transfer event.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `spender`: The address attempting to transfer the token.
-/// * `from` - The address of the current token owner.
-/// * `to` - The address of the token recipient.
-/// * `token_id` - The identifier of the token being transferred.
-///
-/// # Errors
-///
-/// * refer to [`update`] errors.
-///
-/// # Events
-///
-/// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u128]`
-pub fn do_transfer(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u128) {
-    update(e, spender, from, to, token_id);
-    emit_transfer(e, from, to, token_id);
-}
-
-/// Low-level function for handling transfers for NFTs, but doesn't
 /// handle authorization. Updates ownership records, adjusts balances,
 /// and clears existing approvals.
 ///
@@ -299,8 +277,6 @@ pub fn update(e: &Env, spender: &Address, from: &Address, to: &Address, token_id
     if owner != *from {
         panic_with_error!(e, NonFungibleTokenError::IncorrectOwner);
     }
-
-    check_spender_auth(e, spender, &owner, token_id);
 
     e.storage().persistent().set(&StorageKey::Owner(token_id), to);
 
