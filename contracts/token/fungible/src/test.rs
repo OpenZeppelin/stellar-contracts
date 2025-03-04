@@ -8,7 +8,7 @@ use soroban_sdk::{
         storage::{Instance, Persistent},
         Address as _, AuthorizedFunction, Events, Ledger,
     },
-    vec, Address, Env, IntoVal, Symbol, Val,
+    vec, Address, Env, IntoVal,
 };
 
 use crate::{
