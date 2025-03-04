@@ -53,15 +53,12 @@ pub trait FungibleMintable {
     /// your contract. For example:
     ///
     /// ```rust
-    /// fn mint(&self, e: &Env, admin: Address, to: Address, amount: i128) {
-    ///     // 1. Require authorization from the admin
+    /// fn mint(&self, e: &Env, to: Address, amount: i128) {
+    ///     // 1. Verify admin has minting privileges (optional)
+    ///     let admin = e.storage().instance().get(&ADMIN_KEY).unwrap();
     ///     admin.require_auth();
     ///
-    ///     // 2. Verify admin has minting privileges (optional)
-    ///     let stored_admin = e.storage().instance().get(&ADMIN_KEY).unwrap();
-    ///     assert_eq!(admin, stored_admin, "unauthorized: not the admin");
-    ///
-    ///     // 3. Only then call the actual mint function
+    ///     // 2. Only then call the actual mint function
     ///     crate::mintable::mint(e, &to, amount);
     /// }
     /// ```
