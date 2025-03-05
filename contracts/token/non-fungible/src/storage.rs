@@ -66,7 +66,7 @@ pub fn balance(e: &Env, account: &Address) -> u128 {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `token_id` - The identifier of the token
+/// * `owner` - Account of the token's owner.
 ///
 /// # Errors
 ///
@@ -78,7 +78,7 @@ pub fn owner_of(e: &Env, token_id: u128) -> Address {
         e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
         owner
     } else {
-        // tokens always have an owner
+        // existing tokens always have an owner
         panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
     }
 }

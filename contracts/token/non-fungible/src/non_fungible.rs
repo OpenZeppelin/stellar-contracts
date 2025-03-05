@@ -11,6 +11,7 @@ pub trait NonFungibleToken {
     ///
     /// # Arguments
     ///
+    /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     ///
     /// # Notes
@@ -22,7 +23,8 @@ pub trait NonFungibleToken {
     ///
     /// # Arguments
     ///
-    /// * `token_id` - Token id as a number.
+    /// * `e` - Access to the Soroban environment.
+    /// * `owner` - Account of the token's owner.
     ///
     /// # Errors
     ///
@@ -145,6 +147,7 @@ pub trait NonFungibleToken {
     ///
     /// # Arguments
     ///
+    /// * `e` - Access to the Soroban environment.
     /// * `token_id` - Token id as a number.
     ///
     /// # Errors
@@ -163,6 +166,7 @@ pub trait NonFungibleToken {
     ///
     /// # Arguments
     ///
+    /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `operator` - Account to be checked.
     ///
