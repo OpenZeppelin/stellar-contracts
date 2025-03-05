@@ -131,8 +131,7 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 
 // ################## CHANGE STATE ##################
 
-/// Transfers a non-fungible token (NFT), ensuring ownership and approval
-/// checks.
+/// Transfers a non-fungible token (NFT), ensuring ownership checks.
 ///
 /// # Arguments
 ///
