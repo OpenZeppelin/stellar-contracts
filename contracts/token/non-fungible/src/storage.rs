@@ -313,7 +313,8 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u
         let approval_key = StorageKey::Approval(token_id);
         e.storage().temporary().remove(&approval_key);
     } else {
-        // nothing to do for the `None` case, since we don't track `total_supply`
+        // nothing to do for the `None` case, since we don't track
+        // `total_supply`
     }
 
     if let Some(to_address) = to {
