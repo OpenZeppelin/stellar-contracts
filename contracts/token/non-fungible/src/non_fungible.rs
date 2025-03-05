@@ -141,7 +141,7 @@ pub trait NonFungibleToken {
     /// function.
     fn approve(e: &Env, owner: Address, to: Address, token_id: u128, live_until_ledger: u32);
 
-    /// Approve or remove `operator` as an operator for the caller.
+    /// Approve or remove `operator` as an operator for the owner.
     ///
     /// Operators can call [`Self::transfer_from`] for any token owned by the
     /// caller.
