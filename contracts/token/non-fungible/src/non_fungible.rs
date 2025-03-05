@@ -46,6 +46,37 @@ pub trait NonFungibleToken {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    /// * `from` - Account of the sender.
+    /// * `to` - Account of the recipient.
+    /// * `token_id` - Token id as a number.
+    ///
+    /// # Errors
+    ///
+    /// * [`NonFungibleTokenError::IncorrectOwner`] - If the previous owner is
+    ///   not `from`.
+    /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
+    ///   exist.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `[token_id: u128]`
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::transfer()`] when implementing this
+    /// function.
+    fn transfer(e: &Env, from: Address, to: Address, token_id: u128);
+
+    /// Transfers `token_id` token from `from` to `to`.
+    ///
+    /// WARNING: Note that the caller is responsible to confirm that the
+    /// recipient is capable of receiving the `Non-Fungible` or else the NFT
+    /// may be permanently lost.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
     /// * `spender` - The address authorizing the transfer.
     /// * `from` - Account of the sender.
     /// * `to` - Account of the recipient.

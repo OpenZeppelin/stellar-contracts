@@ -137,6 +137,34 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 /// # Arguments
 ///
 /// * `e`: The environment reference.
+/// * `from`: The current owner's address.
+/// * `to`: The recipient's address.
+/// * `token_id`: The identifier of the token being transferred.
+///
+/// # Errors
+///
+/// * refer to [`update`] errors.
+///
+/// # Events
+///
+/// * topics - `["transfer", from: Address, to: Address]`
+/// * data - `[token_id: u128]`
+///
+/// # Notes
+///
+/// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
+pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
+    spender.require_auth();
+    update(e, Some(from), Some(to), token_id);
+    emit_transfer(e, from, to, token_id);
+}
+
+/// Transfers a non-fungible token (NFT), ensuring ownership and approval
+/// checks.
+///
+/// # Arguments
+///
+/// * `e`: The environment reference.
 /// * `spender`: The address attempting to transfer the token.
 /// * `from`: The current owner's address.
 /// * `to`: The recipient's address.
@@ -158,7 +186,7 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u128) {
     spender.require_auth();
     check_spender_auth(e, spender, &owner, token_id);
-    update(e, spender, Some(from), Some(to), token_id);
+    update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 }
 
@@ -259,7 +287,6 @@ pub fn set_approval_for_all(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `spender`: The address attempting to transfer the token.
 /// * `from` - The address of the current token owner.
 /// * `to` - The address of the token recipient.
 /// * `token_id` - The identifier of the token being transferred.
@@ -270,14 +297,7 @@ pub fn set_approval_for_all(
 ///   the owner of the token.
 /// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `to` would
 ///   overflow.
-/// * refer to [`check_spender_auth`] errors.
-pub fn update(
-    e: &Env,
-    spender: &Address,
-    from: Option<&Address>,
-    to: Option<&Address>,
-    token_id: u128,
-) {
+pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u128) {
     if let Some(from_address) = from {
         let owner = owner_of(e, token_id);
 
