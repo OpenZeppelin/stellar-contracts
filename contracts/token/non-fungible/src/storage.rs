@@ -184,7 +184,7 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 /// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
 pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u128) {
     spender.require_auth();
-    check_spender_auth(e, spender, &from, token_id);
+    check_spender_auth(e, spender, from, token_id);
     update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 }
