@@ -213,6 +213,32 @@ pub trait NonFungibleToken {
     /// We recommend using [`crate::is_approved_for_all()`] when implementing
     /// this function.
     fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool;
+
+    /// Returns the token collection name.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn name(e: &Env) -> String;
+
+    /// Returns the token collection symbol.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn symbol(e: &Env) -> String;
+
+    /// Returns the Uniform Resource Identifier (URI) for `token_id` token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `token_id` - Token id as a number.
+    ///
+    /// # Notes
+    ///
+    /// If the token does not exist, this function is expected to panic.
+    fn token_uri(e: &Env, token_id: u128) -> String;
 }
 
 // ################## ERRORS ##################
