@@ -1,4 +1,4 @@
-use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, String, Symbol};
 
 /// Vanilla NonFungible Token Trait
 ///
