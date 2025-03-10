@@ -71,6 +71,7 @@
 
 mod extensions;
 mod fungible;
+mod impl_token_interface_macro;
 mod storage;
 
 pub use extensions::{burnable, capped, metadata, mintable};
@@ -78,8 +79,8 @@ pub use fungible::{
     emit_approve, emit_transfer, FungibleToken, FungibleTokenClient, FungibleTokenError,
 };
 pub use storage::{
-    allowance, allowance_data, approve, balance, do_transfer, set_allowance, spend_allowance,
-    total_supply, transfer, transfer_from, update, AllowanceData, AllowanceKey, StorageKey,
+    allowance, allowance_data, approve, balance, set_allowance, spend_allowance, total_supply,
+    transfer, transfer_from, update, AllowanceData, AllowanceKey, StorageKey,
     BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
 };
 

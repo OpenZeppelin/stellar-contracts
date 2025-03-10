@@ -255,18 +255,20 @@ pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128
 ///
 /// # Errors
 ///
-/// * refer to [`do_transfer`] errors.
+/// * refer to [`update`] errors.
 ///
 /// # Events
 ///
-/// * refer to [`do_transfer`] events.
+/// * topics - `["transfer", from: Address, to: Address]`
+/// * data - `[amount: i128]`
 ///
 /// # Notes
 ///
 /// Authorization for `from` is required.
 pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
     from.require_auth();
-    do_transfer(e, from, to, amount);
+    update(e, Some(from), Some(to), amount);
+    emit_transfer(e, from, to, amount);
 }
 
 /// Transfers `amount` of tokens from `from` to `to` using the
@@ -284,34 +286,6 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
 /// # Errors
 ///
 /// * refer to [`spend_allowance`] errors.
-/// * refer to [`do_transfer`] errors.
-///
-/// # Events
-///
-/// * refer to [`do_transfer`] events.
-///
-/// # Notes
-///
-/// Authorization for `spender` is required.
-pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-    spender.require_auth();
-    spend_allowance(e, from, spender, amount);
-    do_transfer(e, from, to, amount);
-}
-
-/// Equivalent to [`transfer()`] but:
-/// - does NOT handle authorization.
-/// - does handles event emission
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `from` - The address holding the tokens.
-/// * `to` - The address receiving the transferred tokens.
-/// * `amount` - The amount of tokens to be transferred.
-///
-/// # Errors
-///
 /// * refer to [`update`] errors.
 ///
 /// # Events
@@ -321,9 +295,10 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, a
 ///
 /// # Notes
 ///
-/// This function does not enforce authorization. Ensure that authorization
-/// is handled at a higher level.
-pub fn do_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+/// Authorization for `spender` is required.
+pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+    spender.require_auth();
+    spend_allowance(e, from, spender, amount);
     update(e, Some(from), Some(to), amount);
     emit_transfer(e, from, to, amount);
 }
