@@ -20,6 +20,65 @@ use crate::{
 struct MockContract;
 
 #[test]
+fn set_approval_for_all_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let operator = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        set_approval_for_all(&e, &owner, &operator, true, 1000);
+
+        let is_approved = is_approved_for_all(&e, &owner, &operator);
+        assert!(is_approved);
+    });
+}
+
+#[test]
+fn approve_nft_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let approved = Address::generate(&e);
+    let token_id = 1;
+
+    e.as_contract(&address, || {
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+
+        approve(&e, &owner, &approved, token_id, 1000);
+
+        let approved_address = get_approved(&e, token_id);
+        assert_eq!(approved_address, Some(approved.clone()));
+    });
+}
+
+#[test]
+// TODO:
+fn approve_with_operator_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let operator = Address::generate(&e);
+    let approved = Address::generate(&e);
+    let token_id = 1;
+
+    e.as_contract(&address, || {
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+
+        set_approval_for_all(&e, &owner, &operator, true, 1000);
+
+        // approver is the operator on behalf of the owner
+        approve(&e, &operator, &approved, token_id, 1000);
+
+        let approved_address = get_approved(&e, token_id);
+        assert_eq!(approved_address, Some(approved.clone()));
+    });
+}
+
+#[test]
 fn transfer_nft_works() {
     let e = Env::default();
     e.mock_all_auths();
@@ -42,42 +101,7 @@ fn transfer_nft_works() {
 }
 
 #[test]
-fn approve_nft_works() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let owner = Address::generate(&e);
-    let approver = Address::generate(&e);
-    let token_id = 1;
-
-    e.as_contract(&address, || {
-        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-
-        approve(&e, &owner, &approver, token_id, 1000);
-
-        let approved_address = get_approved(&e, token_id);
-        assert_eq!(approved_address, Some(approver.clone()));
-    });
-}
-
-#[test]
-fn set_approval_for_all_works() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let owner = Address::generate(&e);
-    let operator = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        set_approval_for_all(&e, &owner, &operator, true, 1000);
-
-        let is_approved = is_approved_for_all(&e, &owner, &operator);
-        assert!(is_approved);
-    });
-}
-
-#[test]
-fn transfer_from_nft_works() {
+fn transfer_from_nft_approved_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -96,6 +120,56 @@ fn transfer_from_nft_works() {
 
         // Transfer from the owner using the spender's approval
         transfer_from(&e, &spender, &owner, &recipient, token_id);
+
+        assert_eq!(balance(&e, &owner), 0);
+        assert_eq!(balance(&e, &recipient), 1);
+        assert_eq!(owner_of(&e, token_id), recipient);
+    });
+}
+
+#[test]
+fn transfer_from_nft_operator_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let token_id = 1;
+
+    e.as_contract(&address, || {
+        // Mint the NFT by setting the owner
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+
+        // Approve the spender
+        set_approval_for_all(&e, &owner, &spender, true, 1000);
+
+        // Transfer from the owner using the spender's approval
+        transfer_from(&e, &spender, &owner, &recipient, token_id);
+
+        assert_eq!(balance(&e, &owner), 0);
+        assert_eq!(balance(&e, &recipient), 1);
+        assert_eq!(owner_of(&e, token_id), recipient);
+    });
+}
+
+#[test]
+fn transfer_from_nft_owner_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let token_id = 1;
+
+    e.as_contract(&address, || {
+        // Mint the NFT by setting the owner
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+
+        // Attempt to transfer from the owner without approval
+        transfer_from(&e, &owner, &owner, &recipient, token_id);
 
         assert_eq!(balance(&e, &owner), 0);
         assert_eq!(balance(&e, &recipient), 1);
@@ -166,7 +240,7 @@ fn approve_with_invalid_live_until_ledger_fails() {
     e.mock_all_auths();
     let address = e.register(MockContract, ());
     let owner = Address::generate(&e);
-    let approver = Address::generate(&e);
+    let approved = Address::generate(&e);
     let token_id = 1;
 
     e.as_contract(&address, || {
@@ -177,7 +251,7 @@ fn approve_with_invalid_live_until_ledger_fails() {
         e.ledger().set_sequence_number(10);
 
         // Attempt to approve with an invalid live_until_ledger
-        approve(&e, &owner, &approver, token_id, 1);
+        approve(&e, &owner, &approved, token_id, 1);
     });
 }
 

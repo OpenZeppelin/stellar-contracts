@@ -66,7 +66,7 @@ pub fn balance(e: &Env, account: &Address) -> u128 {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `owner` - Account of the token's owner.
+/// * `token_id` - Token id as a number.
 ///
 /// # Errors
 ///
@@ -194,9 +194,9 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `owner` - The address that owns the token.
-/// * `approved` - The address being granted approval.
-/// * `token_id` - The identifier of the token being approved for transfer.
+/// * `approver` - The address of the approver (should be `owner` or `operator`).
+/// * `approved` - The address receiving the approval.
+/// * `token_id` - The identifier of the token to be approved.
 /// * `live_until_ledger` - The ledger number at which the approval expires.
 ///
 /// # Errors
@@ -208,16 +208,15 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 /// * refer to [`owner_of`] errors.
 pub fn approve(
     e: &Env,
-    owner: &Address,
+    approver: &Address,
     approved: &Address,
     token_id: u128,
     live_until_ledger: u32,
 ) {
-    owner.require_auth();
+    approver.require_auth();
 
-    // Check ownership
-    let token_owner = owner_of(e, token_id);
-    if token_owner != *owner {
+    let owner = owner_of(e, token_id);
+    if *approver != owner && !is_approved_for_all(e, &owner, approver) {
         panic_with_error!(e, NonFungibleTokenError::InvalidApprover);
     }
 
@@ -235,7 +234,7 @@ pub fn approve(
 
     e.storage().temporary().extend_ttl(&key, live_for, live_for);
 
-    emit_approval(e, owner, approved, token_id, live_until_ledger);
+    emit_approval(e, approver, approved, token_id, live_until_ledger);
 }
 
 /// Sets or removes operator approval for managing all tokens owned by the
@@ -289,7 +288,7 @@ pub fn set_approval_for_all(
 /// * `e` - Access to the Soroban environment.
 /// * `from` - The address of the current token owner.
 /// * `to` - The address of the token recipient.
-/// * `token_id` - The identifier of the token being transferred.
+/// * `token_id` - The identifier of the token to be transferred.
 ///
 /// # Errors
 ///
@@ -342,7 +341,7 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `spender`: The address attempting to transfer the token.
+/// * `spender` - The address attempting to transfer the token.
 /// * `owner` - The address of the current token owner.
 ///
 /// # Errors

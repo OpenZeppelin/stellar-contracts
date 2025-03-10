@@ -109,17 +109,17 @@ pub trait NonFungibleToken {
     /// function.
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u128);
 
-    /// Gives permission to `to` to transfer `token_id` token to another
+    /// Gives permission to `approved` to transfer `token_id` token to another
     /// account. The approval is cleared when the token is transferred.
     ///
-    /// Only a single account can be approved at a time.
-    /// To remove an approval, the owner can approve their own address,
+    /// Only a single account can be approved at a time for a `token_id`.
+    /// To remove an approval, the approver can approve their own address,
     /// effectively removing the previous approved address.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `owner` - The address holding the tokens.
+    /// * `approver` - The address of the approver (should be `owner` or `operator`).
     /// * `approved` - The address receiving the approval.
     /// * `token_id` - Token id as a number.
     /// * `live_until_ledger` - The ledger number at which the allowance
@@ -143,11 +143,18 @@ pub trait NonFungibleToken {
     ///
     /// We recommend using [`crate::approve()`] when implementing this
     /// function.
-    fn approve(e: &Env, owner: Address, approved: Address, token_id: u128, live_until_ledger: u32);
+    fn approve(
+        e: &Env,
+        approver: Address,
+        approved: Address,
+        token_id: u128,
+        live_until_ledger: u32,
+    );
 
     /// Approve or remove `operator` as an operator for the owner.
     ///
-    /// Operators can call `transfer_from()` for any token held by `owner`.
+    /// Operators can call `transfer_from()` for any token held by `owner`,
+    /// and call `approve()` on behalf of `owner`.
     ///
     /// # Arguments
     ///
@@ -284,13 +291,13 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
     e.events().publish(topics, token_id)
 }
 
-/// Emits an event when `owner` enables `approved` to manage the `token_id`
+/// Emits an event when `approver` enables `approved` to manage the `token_id`
 /// token.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `owner` - Address of the owner of the token.
+/// * `approver` - The address of the approver (should be `owner` or `operator`).
 /// * `approved` - Address of the approved.
 /// * `token_id` - The identifier of the transferred token.
 ///
@@ -300,12 +307,12 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 /// * data - `[approved: Address, live_until_ledger: u32]`
 pub fn emit_approval(
     e: &Env,
-    owner: &Address,
+    approver: &Address,
     approved: &Address,
     token_id: u128,
     live_until_ledger: u32,
 ) {
-    let topics = (symbol_short!("approval"), owner, token_id);
+    let topics = (symbol_short!("approval"), approver, token_id);
     e.events().publish(topics, (approved, live_until_ledger))
 }
 

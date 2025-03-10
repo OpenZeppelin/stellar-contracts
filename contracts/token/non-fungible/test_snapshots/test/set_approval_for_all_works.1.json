@@ -70,7 +70,7 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "approved"
+                        "symbol": "is_approved"
                       },
                       "val": {
                         "bool": true
