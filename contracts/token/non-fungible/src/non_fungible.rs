@@ -120,7 +120,7 @@ pub trait NonFungibleToken {
     ///
     /// * `e` - Access to Soroban environment.
     /// * `owner` - The address holding the tokens.
-    /// * `to` - Account of the recipient.
+    /// * `to` - The address receiving the approval.
     /// * `token_id` - Token id as a number.
     /// * `live_until_ledger` - The ledger number at which the allowance
     ///   expires.
