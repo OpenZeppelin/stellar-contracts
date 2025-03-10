@@ -131,6 +131,8 @@ pub trait NonFungibleToken {
     ///   exist.
     /// * [`NonFungibleTokenError::InvalidApprover`] - If the owner address is
     ///   not the actual owner of the token.
+    /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger number
+    ///   is less than the current ledger number.
     ///
     /// # Events
     ///
