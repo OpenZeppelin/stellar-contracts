@@ -194,7 +194,8 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `approver` - The address of the approver (should be `owner` or `operator`).
+/// * `approver` - The address of the approver (should be `owner` or
+///   `operator`).
 /// * `approved` - The address receiving the approval.
 /// * `token_id` - The identifier of the token to be approved.
 /// * `live_until_ledger` - The ledger number at which the approval expires.

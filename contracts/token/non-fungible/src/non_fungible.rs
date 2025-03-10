@@ -119,7 +119,8 @@ pub trait NonFungibleToken {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `approver` - The address of the approver (should be `owner` or `operator`).
+    /// * `approver` - The address of the approver (should be `owner` or
+    ///   `operator`).
     /// * `approved` - The address receiving the approval.
     /// * `token_id` - Token id as a number.
     /// * `live_until_ledger` - The ledger number at which the allowance
@@ -297,7 +298,8 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `approver` - The address of the approver (should be `owner` or `operator`).
+/// * `approver` - The address of the approver (should be `owner` or
+///   `operator`).
 /// * `approved` - Address of the approved.
 /// * `token_id` - The identifier of the transferred token.
 ///
