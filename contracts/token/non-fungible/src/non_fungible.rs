@@ -129,8 +129,8 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
-    /// * [`NonFungibleTokenError::InvalidApprover`] - If `auth` (param of
-    ///   [`Erc721::_approve`]) does not have a right to approve this token.
+    /// * [`NonFungibleTokenError::InvalidApprover`] - If the owner address is not
+    ///   the actual owner of the token.
     ///
     /// # Events
     ///
@@ -161,8 +161,8 @@ pub trait NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::InvalidOperator`] - If `operator` is
-    ///   `Address::ZERO`.
+    /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger number
+    ///   is less than the current ledger number.
     ///
     /// # Events
     ///
@@ -251,23 +251,16 @@ pub enum NonFungibleTokenError {
     /// Indicates an error related to the ownership over a particular token.
     /// Used in transfers.
     IncorrectOwner = 301,
-    /// Indicates a failure with the token `sender`. Used in transfers.
-    InvalidSender = 302,
-    /// Indicates a failure with the token `receiver`. Used in transfers.
-    InvalidReceiver = 303,
     /// Indicates a failure with the `operator`’s approval. Used in transfers.
-    UnauthorizedTransfer = 304,
+    UnauthorizedTransfer = 302,
     /// Indicates a failure with the `approver` of a token to be approved. Used
     /// in approvals.
-    InvalidApprover = 305,
-    /// Indicates a failure with the `operator` to be approved. Used in
-    /// approvals.
-    InvalidOperator = 306,
+    InvalidApprover = 303,
     /// Indicates an invalid value for `live_until_ledger` when setting
     /// approvals.
-    InvalidLiveUntilLedger = 307,
+    InvalidLiveUntilLedger = 304,
     /// Indicates overflow when adding two values
-    MathOverflow = 308,
+    MathOverflow = 305,
 }
 
 // ################## EVENTS ##################

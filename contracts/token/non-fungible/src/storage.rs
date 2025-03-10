@@ -171,7 +171,7 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 ///
 /// # Errors
 ///
-/// * refer to [`check_spender_auth`] errors.
+/// * refer to [`check_spender_approval`] errors.
 /// * refer to [`update`] errors.
 ///
 /// # Events
@@ -184,7 +184,7 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 /// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
 pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u128) {
     spender.require_auth();
-    check_spender_auth(e, spender, from, token_id);
+    check_spender_approval(e, spender, from, token_id);
     update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 }
@@ -205,6 +205,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 ///   the actual owner of the token.
 /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger number
 ///   is less than the current ledger number.
+/// * refer to [`owner_of`] errors.
 pub fn approve(
     e: &Env,
     owner: &Address,
@@ -333,8 +334,8 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u
     }
 }
 
-/// Low-level function for checking if the `spender` has enough authorization
-/// from the owner. Panics if the authorization check fails.
+/// Low-level function for checking if the `spender` has enough approval.
+/// Panics if the approval check fails.
 ///
 /// # Arguments
 ///
@@ -345,7 +346,7 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u
 /// # Errors
 /// * [`NonFungibleTokenError::UnauthorizedTransfer`] - If the `spender` is not
 ///   authorized to transfer the token.
-pub fn check_spender_auth(e: &Env, spender: &Address, owner: &Address, token_id: u128) {
+pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: u128) {
     // If `spender` is not the owner, they must have explicit approval.
     let is_spender_owner = spender == owner;
     let is_spender_approved = get_approved(e, token_id) == Some(spender.clone());

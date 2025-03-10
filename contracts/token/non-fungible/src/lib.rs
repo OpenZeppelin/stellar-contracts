@@ -3,7 +3,7 @@
 //! Implements utilities for handling non-fungible tokens in a Soroban contract.
 //!
 //! This module provides essential storage functionalities required for managing
-//! balances, allowances, and total supply of fungible tokens.
+//! balances, approvals, and transfers of non-fungible tokens.
 //!
 //! ## Design Overview
 //!
@@ -28,22 +28,30 @@
 //!
 //! The base module includes:
 //!
-//! - All ERC721 trait functionalities adapted to Stellar Ecosystem
+//! - Transfers
+//! - Owner and Approval management
+//! - Basic metadata management (`name`, `symbol`, and `token_uri`)
 //!
 //! The following optional extensions are available:
 //!
 //! - Metadata: Provides additional information about the token, such as name,
 //!   symbol, and tokenURI.
-//! - Mintable: Allows authorized entities to mint new tokens and increase the
-//!   total supply.
-//! - Burnable: Enables token holders to destroy their tokens, reducing the
-//!   total supply.
+//! - Mintable: Allows authorized entities to mint new non-fungible tokens.
+//! - Burnable: Enables token holders to destroy their non-fungible tokens.
 //!
 //! ## Compatibility and Compliance
 //!
-//! The module is designed to be compatible with SEP-0039. It also
-//! closely mirrors the Ethereum ERC-721 standard, facilitating cross-ecosystem
-//! familiarity and ease of use.
+//! ERC721 trait functionalities are adapted to Stellar Ecosystem,
+//! facilitating cross-ecosystem familiarity and ease of use,
+//! with the following differences:
+//!
+//! - `transfer` function is available for cheaper and faster transactions,
+//!   where the initiator is the owner.
+//! - `safeTransfer` mechanism is not present in the base module,
+//!   (will be provided as an extension)
+//! - `name`, `symbol` and `token_uri` functionality to be consistent
+//!   with fungible tokens as well.
+//!
 //!
 //! ## Notes for Developers
 //!

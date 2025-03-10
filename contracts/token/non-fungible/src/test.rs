@@ -105,7 +105,7 @@ fn transfer_from_nft_works() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #301)")]
-fn transfer_nft_unauthorized_fails() {
+fn transfer_nft_invalid_owner_fails() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -125,8 +125,8 @@ fn transfer_nft_unauthorized_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #304)")]
-fn transfer_from_nft_unauthorized_fails() {
+#[should_panic(expected = "Error(Contract, #302)")]
+fn transfer_from_nft_insufficient_approval_fails() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -160,7 +160,7 @@ fn owner_of_non_existent_token_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #307)")]
+#[should_panic(expected = "Error(Contract, #304)")]
 fn approve_with_invalid_live_until_ledger_fails() {
     let e = Env::default();
     e.mock_all_auths();
@@ -182,7 +182,7 @@ fn approve_with_invalid_live_until_ledger_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #305)")]
+#[should_panic(expected = "Error(Contract, #303)")]
 fn approve_with_invalid_approver_fails() {
     let e = Env::default();
     e.mock_all_auths();
@@ -202,7 +202,7 @@ fn approve_with_invalid_approver_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #308)")]
+#[should_panic(expected = "Error(Contract, #305)")]
 fn update_with_math_overflow_fails() {
     let e = Env::default();
     e.mock_all_auths();
@@ -262,7 +262,7 @@ fn transfer_from_incorrect_owner_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #304)")]
+#[should_panic(expected = "Error(Contract, #302)")]
 fn transfer_from_unauthorized_spender_fails() {
     let e = Env::default();
     e.mock_all_auths();
