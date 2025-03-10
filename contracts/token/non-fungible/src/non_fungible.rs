@@ -24,7 +24,7 @@ pub trait NonFungibleToken {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `owner` - Account of the token's owner.
+    /// * `token_id` - Token id as a number.
     ///
     /// # Errors
     ///
