@@ -93,8 +93,8 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::IncorrectOwner`] - If the previous owner is
     ///   not `from`.
-    /// * [`NonFungibleTokenError::UnauthorizedTransfer`] - If the caller does
-    ///   not have the right to approve.
+    /// * [`NonFungibleTokenError::UnauthorizedTransfer`] - If the spender does
+    ///   not have a valid approval.
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
     ///
