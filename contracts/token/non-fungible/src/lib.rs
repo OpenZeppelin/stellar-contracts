@@ -47,10 +47,10 @@
 //!
 //! - `transfer` function is available for cheaper and faster transactions,
 //!   where the initiator is the owner.
-//! - `safeTransfer` mechanism is not present in the base module,
-//!   (will be provided as an extension)
-//! - `name`, `symbol` and `token_uri` functionality to be consistent
-//!   with fungible tokens as well.
+//! - `safeTransfer` mechanism is not present in the base module, (will be
+//!   provided as an extension)
+//! - `name`, `symbol` and `token_uri` functionality to be consistent with
+//!   fungible tokens as well.
 //!
 //!
 //! ## Notes for Developers

@@ -129,8 +129,8 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
-    /// * [`NonFungibleTokenError::InvalidApprover`] - If the owner address is not
-    ///   the actual owner of the token.
+    /// * [`NonFungibleTokenError::InvalidApprover`] - If the owner address is
+    ///   not the actual owner of the token.
     ///
     /// # Events
     ///
@@ -161,8 +161,8 @@ pub trait NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger number
-    ///   is less than the current ledger number.
+    /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger
+    ///   number is less than the current ledger number.
     ///
     /// # Events
     ///
