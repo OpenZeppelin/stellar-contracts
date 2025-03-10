@@ -147,8 +147,7 @@ pub trait NonFungibleToken {
 
     /// Approve or remove `operator` as an operator for the owner.
     ///
-    /// Operators can call [`Self::transfer_from`] for any token owned by the
-    /// caller.
+    /// Operators can call `transfer_from()` for any token held by `owner`.
     ///
     /// # Arguments
     ///
