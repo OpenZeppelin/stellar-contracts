@@ -3,17 +3,16 @@ use soroban_sdk::{Address, Env};
 
 use crate::{
     extensions::burnable::emit_burn,
-    storage::{spend_allowance, update},
+    storage::{check_spender_approval, update},
 };
 
-/// Destroys `amount` of tokens from `from`. Updates the total
-/// supply accordingly.
+/// Destroys the `token_id` from `account`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `from` - The account whose tokens are destroyed.
-/// * `amount` - The amount of tokens to burn.
+/// * `from` - The account whose token is destroyed.
+/// * `token_id` - The token to burn.
 ///
 /// # Errors
 ///
@@ -22,45 +21,42 @@ use crate::{
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[amount: i128]`
+/// * data - `[token_id: u128]`
 ///
 /// # Notes
 ///
 /// Authorization for `from` is required.
-pub fn burn(e: &Env, from: &Address, amount: i128) {
+pub fn burn(e: &Env, from: &Address, token_id: u128) {
     from.require_auth();
-    update(e, Some(from), None, amount);
-    emit_burn(e, from, amount);
+    update(e, Some(from), None, token_id);
+    emit_burn(e, from, token_id);
 }
 
-/// Destroys `amount` of tokens from `from` using the allowance mechanism.
-/// `amount` is then deducted from `spender` allowance.
-/// Updates the total supply accordingly.
+/// Destroys the `token_id` from `account`, by using `spender`s approval.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `spender` - The address authorizing the transfer, and having its
-///   allowance.
-/// * `from` - The account whose tokens are destroyed.
-/// * `amount` - The amount of tokens to burn.
+/// * `spender` - The account that is allowed to
+///    burn the token on behalf of the owner.
+/// * `from` - The account whose token is destroyed.
+/// * `token_id` - The token to burn.
 ///
 /// # Errors
 ///
-/// * refer to [`spend_allowance`] errors.
 /// * refer to [`update`] errors.
 ///
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[amount: i128]`
+/// * data - `[token_id: u128]`
 ///
 /// # Notes
 ///
 /// Authorization for `spender` is required.
-pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u128) {
     spender.require_auth();
-    spend_allowance(e, from, spender, amount);
-    update(e, Some(from), None, amount);
-    emit_burn(e, from, amount);
+    check_spender_approval(e, spender, from, token_id);
+    update(e, Some(from), None, token_id);
+    emit_burn(e, from, token_id);
 }

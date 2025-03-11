@@ -21,19 +21,19 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// for various smart contract use cases.
 #[contractclient(name = "NonFungibleBurnableClient")]
 pub trait NonFungibleBurnable {
-    /// Destroys `amount` of tokens from `account`.
+    /// Destroys the `token_id` from `account`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `from` - The account whose tokens are destroyed.
-    /// * `token_id` - The amount of tokens to burn.
+    /// * `from` - The account whose token is destroyed.
+    /// * `token_id` - The token to burn.
     ///
     /// # Errors
     ///
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - When attempting
     ///   to burn a token that does not exist.
-    /// * [`NonFungibleTokenError::IncorrectOwner`] - When trying to burn
+    /// * [`crate::NonFungibleTokenError::IncorrectOwner`] - When trying to burn
     ///   a token that is not owned by the caller.
     ///
     /// # Events
@@ -47,22 +47,24 @@ pub trait NonFungibleBurnable {
     /// function.
     fn burn(e: &Env, from: Address, token_id: u128);
 
-    /// Destroys `amount` of tokens from `account`.
+    /// Destroys the `token_id` from `account`, by using `spender`s approval.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `spender` - The account that is allowed to
-    ///    burn tokens on behalf of the owner.
-    /// * `from` - The account whose tokens are destroyed.
-    /// * `token_id` - The amount of tokens to burn.
+    ///    burn the token on behalf of the owner.
+    /// * `from` - The account whose token is destroyed.
+    /// * `token_id` - The token to burn.
     ///
     /// # Errors
     ///
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - When attempting
     ///   to burn a token that does not exist.
-    /// * [`NonFungibleTokenError::IncorrectOwner`] - When trying to burn
+    /// * [`crate::NonFungibleTokenError::IncorrectOwner`] - When trying to burn
     ///   a token that is not owned by the caller.
+    /// * [`crate::NonFungibleTokenError::InsufficientApproval`] - When the spender
+    ///   does not have sufficient approvals to burn the token.
     ///
     /// # Events
     ///
@@ -73,7 +75,7 @@ pub trait NonFungibleBurnable {
     ///
     /// We recommend using [`crate::burnable::burn_from()`] when implementing this
     /// function.
-    fn burn_from(e: &Env, spender: Address, from: Address, amount: i128);
+    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u128);
 }
 
 // ################## EVENTS ##################
@@ -84,13 +86,13 @@ pub trait NonFungibleBurnable {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `from` - The address holding the tokens.
-/// * `amount` - The amount of tokens to be burned.
+/// * `token_id` - The burned token.
 ///
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[amount: i128]`
-pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
+/// * data - `[token_id: u128]`
+pub fn emit_burn(e: &Env, from: &Address, token_id: u128) {
     let topics = (symbol_short!("burn"), from);
-    e.events().publish(topics, amount)
+    e.events().publish(topics, token_id)
 }
