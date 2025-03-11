@@ -1,4 +1,5 @@
 use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, String, Symbol};
+use crate::extensions::enumerable::{NonFungibleEnumerable, EnumerableStorage};
 
 /// Vanilla NonFungible Token Trait
 ///
@@ -6,7 +7,7 @@ use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, Str
 /// tokens. It provides a standard interface for managing
 /// transfers and approvals associated with non-fungible tokens.
 #[contractclient(name = "NonFungibleTokenClient")]
-pub trait NonFungibleToken {
+pub trait NonFungibleToken: NonFungibleEnumerable {
     /// Returns the number of tokens in `owner`'s account.
     ///
     /// # Arguments
@@ -247,6 +248,25 @@ pub trait NonFungibleToken {
     ///
     /// If the token does not exist, this function is expected to panic.
     fn token_uri(e: &Env, token_id: u128) -> String;
+
+    /// Returns the total amount of tokens stored by the contract
+    fn total_supply(e: &Env) -> u128 {
+        EnumerableStorage::get_all_tokens(e).len()
+    }
+
+    /// Returns a token ID at a given index of all the tokens stored by the contract
+    fn token_by_index(e: &Env, index: u128) -> u128 {
+        let all_tokens = EnumerableStorage::get_all_tokens(e);
+        require!(index < all_tokens.len(), NonFungibleTokenError::NonExistentToken);
+        all_tokens.get_unchecked(index)
+    }
+
+    /// Returns a token ID owned by `owner` at a given index of its token list
+    fn token_of_owner_by_index(e: &Env, owner: Address, index: u128) -> u128 {
+        let owner_tokens = EnumerableStorage::get_owner_tokens(e, &owner);
+        require!(index < owner_tokens.len(), NonFungibleTokenError::NonExistentToken);
+        owner_tokens.get_unchecked(index)
+    }
 }
 
 // ################## ERRORS ##################
@@ -259,7 +279,7 @@ pub enum NonFungibleTokenError {
     /// Indicates an error related to the ownership over a particular token.
     /// Used in transfers.
     IncorrectOwner = 301,
-    /// Indicates a failure with the `operator`’s approval. Used in transfers.
+    /// Indicates a failure with the `operator`'s approval. Used in transfers.
     InsufficientApproval = 302,
     /// Indicates a failure with the `approver` of a token to be approved. Used
     /// in approvals.
