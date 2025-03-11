@@ -163,11 +163,11 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 ///
 /// # Arguments
 ///
-/// * `e`: The environment reference.
-/// * `spender`: The address attempting to transfer the token.
-/// * `from`: The current owner's address.
-/// * `to`: The recipient's address.
-/// * `token_id`: The identifier of the token being transferred.
+/// * `e` - The environment reference.
+/// * `spender` - The address attempting to transfer the token.
+/// * `from` - The current owner's address.
+/// * `to` - The recipient's address.
+/// * `token_id` - The identifier of the token being transferred.
 ///
 /// # Errors
 ///
