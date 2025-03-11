@@ -16,6 +16,9 @@ use crate::{
     transfer_from,
 };
 
+pub mod event_utils;
+use event_utils::EventAssertion;
+
 #[contract]
 struct MockContract;
 

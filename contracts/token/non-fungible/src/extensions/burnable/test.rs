@@ -7,6 +7,7 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::{
     extensions::burnable::storage::{burn, burn_from},
+    set_approval_for_all,
     storage::{approve, balance},
     test::event_utils::EventAssertion,
 };
@@ -19,83 +20,157 @@ fn burn_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let account = Address::generate(&e);
+    let owner = Address::generate(&e);
+    let token_id = 1;
+
     e.as_contract(&address, || {
-        // mint(&e, &account, 100);
-        burn(&e, &account, 50);
-        assert_eq!(balance(&e, &account), 50);
+        // Mint the NFT by setting the owner
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+
+        // Attempt to transfer from the owner without approval
+        burn(&e, &owner, token_id);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
-        // event_assert.assert_mint(&account, 100);
-        event_assert.assert_burn(&account, 50);
+        // event_assert.assert_mint(&owner, 100);
+        event_assert.assert_burn(&owner, 1);
     });
 }
 
 #[test]
-fn burn_with_allowance_works() {
+fn burn_from_with_approve_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
     let owner = Address::generate(&e);
     let spender = Address::generate(&e);
+    let token_id = 1;
+
     e.as_contract(&address, || {
-        // mint(&e, &owner, 100);
-        approve(&e, &owner, &spender, 30, 1000);
-        burn_from(&e, &spender, &owner, 30);
-        assert_eq!(balance(&e, &owner), 70);
-        assert_eq!(balance(&e, &spender), 0);
+        // Mint the NFT by setting the owner
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+
+        approve(&e, &owner, &spender, true, 1000);
+
+        // Attempt to transfer from the owner without approval
+        burn_from(&e, &spender, &owner, token_id);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         // event_assert.assert_mint(&owner, 100);
-        event_assert.assert_approve(&owner, &spender, 30, 1000);
-        event_assert.assert_burn(&owner, 30);
+        event_assert.assert_approve(&owner, &spender, 1, 1000);
+        event_assert.assert_burn(&owner, 1);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #200)")]
-fn burn_with_insufficient_balance_panics() {
+fn burn_from_with_operator_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let account = Address::generate(&e);
+    let owner = Address::generate(&e);
+    let operator = Address::generate(&e);
+    let token_id = 1;
+
     e.as_contract(&address, || {
-        // mint(&e, &account, 100);
-        assert_eq!(balance(&e, &account), 100);
-        burn(&e, &account, 101);
+        // Mint the NFT by setting the owner
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+
+        set_approval_for_all(&e, &owner, &operator, true, 1000);
+
+        // Attempt to transfer from the owner without approval
+        burn_from(&e, &operator, &owner, token_id);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        // event_assert.assert_mint(&owner, 100);
+        event_assert.assert_approve_for_all(&owner, &operator, true, 1000);
+        event_assert.assert_burn(&owner, 1);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #201)")]
-fn burn_with_no_allowance_panics() {
+fn burn_from_with_owner_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let token_id = 1;
+
+    e.as_contract(&address, || {
+        // Mint the NFT by setting the owner
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+
+        // Attempt to transfer from the owner without approval
+        burn_from(&e, &owner, &owner, token_id);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        // event_assert.assert_mint(&owner, 100);
+        event_assert.assert_burn(&owner, 1);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #301)")]
+fn burn_with_not_owner_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
     let owner = Address::generate(&e);
     let spender = Address::generate(&e);
+    let token_id = 1;
+
     e.as_contract(&address, || {
-        // mint(&e, &owner, 100);
-        assert_eq!(balance(&e, &owner), 100);
-        burn_from(&e, &spender, &owner, 50);
+        // Mint the NFT by setting the owner
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+
+        // Attempt to transfer from the owner without approval
+        burn(&e, &spender, token_id);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #201)")]
-fn burn_with_insufficient_allowance_panics() {
+#[should_panic(expected = "Error(Contract, #302)")]
+fn burn_from_with_insufficient_approval_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
     let owner = Address::generate(&e);
     let spender = Address::generate(&e);
+    let token_id = 1;
+
     e.as_contract(&address, || {
-        // mint(&e, &owner, 100);
-        approve(&e, &owner, &spender, 50, 100);
-        assert_eq!(allowance(&e, &owner, &spender), 50);
-        assert_eq!(balance(&e, &owner), 100);
-        burn_from(&e, &spender, &owner, 60);
+        // Mint the NFT by setting the owner
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+
+        // Attempt to transfer from the owner without approval
+        burn_from(&e, &spender, &owner, token_id);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #300)")]
+fn burn_with_non_existent_token_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let token_id = 1;
+    let non_existent_token_id = 2;
+
+    e.as_contract(&address, || {
+        // Mint the NFT by setting the owner
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+
+        // Attempt to transfer from the owner without approval
+        burn_from(&e, &spender, &owner, non_existent_token_id);
     });
 }
