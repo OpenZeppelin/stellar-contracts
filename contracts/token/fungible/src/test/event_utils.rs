@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use soroban_sdk::{symbol_short, testutils::Events, Address, Env, IntoVal, Symbol, Val, Vec};
 
 pub struct EventAssertion<'a> {
