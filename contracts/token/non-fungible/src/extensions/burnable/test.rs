@@ -10,6 +10,7 @@ use crate::{
     set_approval_for_all,
     storage::{approve, balance},
     test::event_utils::EventAssertion,
+    StorageKey,
 };
 
 #[contract]
@@ -30,6 +31,8 @@ fn burn_works() {
 
         // Attempt to transfer from the owner without approval
         burn(&e, &owner, token_id);
+
+        assert!(balance(&e, &owner) == 0);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
@@ -52,10 +55,12 @@ fn burn_from_with_approve_works() {
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
         e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
 
-        approve(&e, &owner, &spender, true, 1000);
+        approve(&e, &owner, &spender, token_id, 1000);
 
         // Attempt to transfer from the owner without approval
         burn_from(&e, &spender, &owner, token_id);
+
+        assert!(balance(&e, &owner) == 0);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -84,6 +89,8 @@ fn burn_from_with_operator_works() {
         // Attempt to transfer from the owner without approval
         burn_from(&e, &operator, &owner, token_id);
 
+        assert!(balance(&e, &owner) == 0);
+
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         // event_assert.assert_mint(&owner, 100);
@@ -107,6 +114,8 @@ fn burn_from_with_owner_works() {
 
         // Attempt to transfer from the owner without approval
         burn_from(&e, &owner, &owner, token_id);
+
+        assert!(balance(&e, &owner) == 0);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
@@ -171,6 +180,6 @@ fn burn_with_non_existent_token_panics() {
         e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
 
         // Attempt to transfer from the owner without approval
-        burn_from(&e, &spender, &owner, non_existent_token_id);
+        burn(&e, &owner, non_existent_token_id);
     });
 }

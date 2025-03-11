@@ -17,7 +17,6 @@ use crate::{
 };
 
 pub mod event_utils;
-use event_utils::EventAssertion;
 
 #[contract]
 struct MockContract;
