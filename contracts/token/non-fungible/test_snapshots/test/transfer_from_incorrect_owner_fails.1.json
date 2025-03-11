@@ -61,7 +61,7 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "approver"
+                        "symbol": "approved"
                       },
                       "val": {
                         "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"

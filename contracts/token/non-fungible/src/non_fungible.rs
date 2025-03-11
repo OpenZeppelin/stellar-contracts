@@ -24,7 +24,7 @@ pub trait NonFungibleToken {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `owner` - Account of the token's owner.
+    /// * `token_id` - Token id as a number.
     ///
     /// # Errors
     ///
@@ -52,8 +52,8 @@ pub trait NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::IncorrectOwner`] - If the previous owner is
-    ///   not `from`.
+    /// * [`NonFungibleTokenError::IncorrectOwner`] - If the current owner
+    ///   (before calling this function) is not `from`.
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
     ///
@@ -68,14 +68,13 @@ pub trait NonFungibleToken {
     /// function.
     fn transfer(e: &Env, from: Address, to: Address, token_id: u128);
 
-    /// Transfers `token_id` token from `from` to `to` with authorization from
-    /// `spender`.
+    /// Transfers `token_id` token from `from` to `to` by using `spender`s
+    /// approval.
     ///
     /// Unlike `transfer()`, which is used when the token owner initiates the
     /// transfer, `transfer_from()` allows an approved third party
     /// (`spender`) to transfer the token on behalf of the owner. This
-    /// function includes an on-chain check to verify that `spender` has the
-    /// necessary approval.
+    /// function verifies that `spender` has the necessary approval.
     ///
     /// WARNING: Note that the caller is responsible to confirm that the
     /// recipient is capable of receiving the `Non-Fungible` or else the NFT
@@ -91,10 +90,10 @@ pub trait NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::IncorrectOwner`] - If the previous owner is
-    ///   not `from`.
-    /// * [`NonFungibleTokenError::UnauthorizedTransfer`] - If the caller does
-    ///   not have the right to approve.
+    /// * [`NonFungibleTokenError::IncorrectOwner`] - If the current owner
+    ///   (before calling this function) is not `from`.
+    /// * [`NonFungibleTokenError::InsufficientApproval`] - If the spender does
+    ///   not have a valid approval.
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
     ///
@@ -109,18 +108,19 @@ pub trait NonFungibleToken {
     /// function.
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u128);
 
-    /// Gives permission to `to` to transfer `token_id` token to another
+    /// Gives permission to `approved` to transfer `token_id` token to another
     /// account. The approval is cleared when the token is transferred.
     ///
-    /// Only a single account can be approved at a time.
-    /// To remove an approval, the owner can approve their own address,
+    /// Only a single account can be approved at a time for a `token_id`.
+    /// To remove an approval, the approver can approve their own address,
     /// effectively removing the previous approved address.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `owner` - The address holding the tokens.
-    /// * `to` - Account of the recipient.
+    /// * `approver` - The address of the approver (should be `owner` or
+    ///   `operator`).
+    /// * `approved` - The address receiving the approval.
     /// * `token_id` - Token id as a number.
     /// * `live_until_ledger` - The ledger number at which the allowance
     ///   expires.
@@ -131,6 +131,8 @@ pub trait NonFungibleToken {
     ///   exist.
     /// * [`NonFungibleTokenError::InvalidApprover`] - If the owner address is
     ///   not the actual owner of the token.
+    /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger
+    ///   number is less than the current ledger number.
     ///
     /// # Events
     ///
@@ -141,19 +143,25 @@ pub trait NonFungibleToken {
     ///
     /// We recommend using [`crate::approve()`] when implementing this
     /// function.
-    fn approve(e: &Env, owner: Address, to: Address, token_id: u128, live_until_ledger: u32);
+    fn approve(
+        e: &Env,
+        approver: Address,
+        approved: Address,
+        token_id: u128,
+        live_until_ledger: u32,
+    );
 
     /// Approve or remove `operator` as an operator for the owner.
     ///
-    /// Operators can call [`Self::transfer_from`] for any token owned by the
-    /// caller.
+    /// Operators can call `transfer_from()` for any token held by `owner`,
+    /// and call `approve()` on behalf of `owner`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
     /// * `owner` - The address holding the tokens.
     /// * `operator` - Account to add to the set of authorized operators.
-    /// * `approved` - Flag that determines whether or not permission will be
+    /// * `is_approved` - Flag that determines whether or not permission will be
     ///   granted to `operator`. If true, this means `operator` will be allowed
     ///   to manage `owner`'s assets.
     /// * `live_until_ledger` - The ledger number at which the allowance
@@ -167,7 +175,7 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["approval_for_all", from: Address, operator: Address]`
-    /// * data - `[approved: bool]`
+    /// * data - `[is_approved: bool]`
     ///
     /// # Notes
     ///
@@ -177,7 +185,7 @@ pub trait NonFungibleToken {
         e: &Env,
         owner: Address,
         operator: Address,
-        approved: bool,
+        is_approved: bool,
         live_until_ledger: u32,
     );
 
@@ -252,7 +260,7 @@ pub enum NonFungibleTokenError {
     /// Used in transfers.
     IncorrectOwner = 301,
     /// Indicates a failure with the `operator`’s approval. Used in transfers.
-    UnauthorizedTransfer = 302,
+    InsufficientApproval = 302,
     /// Indicates a failure with the `approver` of a token to be approved. Used
     /// in approvals.
     InvalidApprover = 303,
@@ -283,13 +291,14 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
     e.events().publish(topics, token_id)
 }
 
-/// Emits an event when `owner` enables `approved` to manage the `token_id`
+/// Emits an event when `approver` enables `approved` to manage the `token_id`
 /// token.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `owner` - Address of the owner of the token.
+/// * `approver` - The address of the approver (should be `owner` or
+///   `operator`).
 /// * `approved` - Address of the approved.
 /// * `token_id` - The identifier of the transferred token.
 ///
@@ -299,16 +308,16 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 /// * data - `[approved: Address, live_until_ledger: u32]`
 pub fn emit_approval(
     e: &Env,
-    owner: &Address,
+    approver: &Address,
     approved: &Address,
     token_id: u128,
     live_until_ledger: u32,
 ) {
-    let topics = (symbol_short!("approval"), owner, token_id);
+    let topics = (symbol_short!("approval"), approver, token_id);
     e.events().publish(topics, (approved, live_until_ledger))
 }
 
-/// Emits an event when `owner` enables `approved` to manage the `token_id`
+/// Emits an event when `owner` enables `operator` to manage the `token_id`
 /// token.
 ///
 /// # Arguments
@@ -317,20 +326,20 @@ pub fn emit_approval(
 /// * `owner` - Address of the owner of the token.
 /// * `operator` - Address of an operator that will manage operations on the
 ///   token.
-/// * `approved` - Whether or not permission has been granted. If true, this
+/// * `is_approved` - Whether or not permission has been granted. If true, this
 ///   means `operator` will be allowed to manage `owner`'s assets.
 ///
 /// # Events
 ///
 /// * topics - `["approval", owner: Address]`
-/// * data - `[operator: Address, approved: bool, live_until_ledger: u32]`
+/// * data - `[operator: Address, is_approved: bool, live_until_ledger: u32]`
 pub fn emit_approval_for_all(
     e: &Env,
     owner: &Address,
     operator: &Address,
-    approved: bool,
+    is_approved: bool,
     live_until_ledger: u32,
 ) {
     let topics = (Symbol::new(e, "approval_for_all"), owner);
-    e.events().publish(topics, (operator, approved, live_until_ledger))
+    e.events().publish(topics, (operator, is_approved, live_until_ledger))
 }
