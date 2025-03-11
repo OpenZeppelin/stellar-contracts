@@ -135,10 +135,10 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 ///
 /// # Arguments
 ///
-/// * `e`: The environment reference.
-/// * `from`: The current owner's address.
-/// * `to`: The recipient's address.
-/// * `token_id`: The identifier of the token being transferred.
+/// * `e` - The environment reference.
+/// * `from` - The current owner's address.
+/// * `to` - The recipient's address.
+/// * `token_id` - The identifier of the token being transferred.
 ///
 /// # Errors
 ///
