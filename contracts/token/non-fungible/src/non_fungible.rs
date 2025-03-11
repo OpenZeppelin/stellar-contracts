@@ -74,8 +74,7 @@ pub trait NonFungibleToken {
     /// Unlike `transfer()`, which is used when the token owner initiates the
     /// transfer, `transfer_from()` allows an approved third party
     /// (`spender`) to transfer the token on behalf of the owner. This
-    /// function includes an on-chain check to verify that `spender` has the
-    /// necessary approval.
+    /// function verifies that `spender` has the necessary approval.
     ///
     /// WARNING: Note that the caller is responsible to confirm that the
     /// recipient is capable of receiving the `Non-Fungible` or else the NFT
