@@ -41,16 +41,18 @@
 //!
 //! ## Compatibility and Compliance
 //!
-//! ERC721 trait functionalities are adapted to Stellar Ecosystem,
+//! The ERC-721 interface is adapted to Stellar Ecosystem,
 //! facilitating cross-ecosystem familiarity and ease of use,
 //! with the following differences:
 //!
-//! - `transfer` function is available for cheaper and faster transactions,
-//!   where the initiator is the owner.
+//! - `transfer()` function is made available due to consistency with Fungible
+//!   Token interface, and also it is a simpler (thus, cheaper and faster)
+//!   version of `transferFrom()`, which may become handy depending on the
+//!   context.
 //! - `safeTransfer` mechanism is not present in the base module, (will be
 //!   provided as an extension)
-//! - `name`, `symbol` and `token_uri` functionality to be consistent with
-//!   fungible tokens as well.
+//! - `name()`, `symbol()` and `token_uri()` functionalities are made available
+//!   to be consistent with fungible tokens as well.
 //!
 //!
 //! ## Notes for Developers

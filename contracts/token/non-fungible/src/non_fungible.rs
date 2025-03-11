@@ -52,8 +52,8 @@ pub trait NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::IncorrectOwner`] - If the previous owner is
-    ///   not `from`.
+    /// * [`NonFungibleTokenError::IncorrectOwner`] - If the current owner
+    ///   (before calling this function) is not `from`.
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
     ///
@@ -90,8 +90,8 @@ pub trait NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::IncorrectOwner`] - If the previous owner is
-    ///   not `from`.
+    /// * [`NonFungibleTokenError::IncorrectOwner`] - If the current owner
+    ///   (before calling this function) is not `from`.
     /// * [`NonFungibleTokenError::InsufficientApproval`] - If the spender does
     ///   not have a valid approval.
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
