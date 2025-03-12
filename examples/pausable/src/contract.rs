@@ -1,17 +1,17 @@
 //! Pausable Example Contract.
 //!
-//! Demonstrates an example usage of `openzeppelin_pausable` moddule by
+//! Demonstrates an example usage of `stellar_pausable` moddule by
 //! implementing an emergency stop mechanism that can be triggered only by the
 //! owner account.
 //!
 //! Counter can be incremented only when `unpaused` and reset only when
 //! `paused`.
 
-use openzeppelin_pausable::{self as pausable, Pausable};
-use openzeppelin_pausable_macros::{when_not_paused, when_paused};
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env,
 };
+use stellar_pausable::{self as pausable, Pausable};
+use stellar_pausable_macros::{when_not_paused, when_paused};
 
 #[contracttype]
 pub enum DataKey {

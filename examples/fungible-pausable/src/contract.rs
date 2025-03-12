@@ -6,19 +6,19 @@
 //! the owner.
 //!
 //! To meet SEP-41 compliance, the contract must implement both
-//! [`openzeppelin_fungible_token::fungible::FungibleToken`] and
-//! [`openzeppelin_fungible_token::burnable::FungibleBurnable`].
+//! [`stellar_fungible::fungible::FungibleToken`] and
+//! [`stellar_fungible::burnable::FungibleBurnable`].
 
-use openzeppelin_fungible_token::{
-    self as fungible, burnable::FungibleBurnable, impl_token_interface, mintable::FungibleMintable,
-    FungibleToken,
-};
-use openzeppelin_pausable::{self as pausable, Pausable};
-use openzeppelin_pausable_macros::when_not_paused;
 use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env, String,
     Symbol,
 };
+use stellar_fungible::{
+    self as fungible, burnable::FungibleBurnable, impl_token_interface, mintable::FungibleMintable,
+    FungibleToken,
+};
+use stellar_pausable::{self as pausable, Pausable};
+use stellar_pausable_macros::when_not_paused;
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
 

@@ -1,5 +1,5 @@
 [package]
-name = "openzeppelin-pausable"
+name = "stellar-fungible"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

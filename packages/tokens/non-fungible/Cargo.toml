@@ -1,5 +1,5 @@
 [package]
-name = "openzeppelin-fungible-token"
+name = "stellar-non-fungible-token"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

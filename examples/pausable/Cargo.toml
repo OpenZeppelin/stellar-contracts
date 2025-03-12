@@ -12,8 +12,8 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-openzeppelin-pausable = { workspace = true }
-openzeppelin-pausable-macros = { workspace = true }
+stellar-pausable = { workspace = true }
+stellar-pausable-macros = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

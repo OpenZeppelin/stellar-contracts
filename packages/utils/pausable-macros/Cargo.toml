@@ -1,5 +1,5 @@
 [package]
-name = "openzeppelin-pausable-macros"
+name = "stellar-pausable-macros"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

@@ -3,7 +3,7 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Utilities
 
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/contracts/utils/pausable[Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/utils/pausable[Source Code]
 
 == Purpose
 

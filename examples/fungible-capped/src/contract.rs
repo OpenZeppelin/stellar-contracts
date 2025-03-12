@@ -7,13 +7,13 @@
 //! IMPORTANT: this example is for demonstration purposes, and authorization is
 //! not taken into consideration
 
-use openzeppelin_fungible_token::{
+use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use stellar_fungible::{
     self as fungible,
     capped::{check_cap, set_cap},
     mintable::{mint, FungibleMintable},
     FungibleToken,
 };
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
 
 #[contract]
 pub struct ExampleContract;

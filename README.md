@@ -31,8 +31,8 @@ The library has not been published yet to `crates.io`, and this will be the case
 
 ```toml
 [dependencies]
-openzeppelin-pausable = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
-openzeppelin-fungible-token = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+stellar-pausable = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+stellar-fungible = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
 ```
 
 We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.

@@ -223,8 +223,8 @@ dependencies = [
 name = "capped-example"
 version = "0.1.0"
 dependencies = [
- "openzeppelin-fungible-token",
  "soroban-sdk",
+ "stellar-fungible",
 ]
 
 [[package]]
@@ -553,20 +553,20 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 name = "fungible-pausable-example"
 version = "0.1.0"
 dependencies = [
- "openzeppelin-fungible-token",
- "openzeppelin-pausable",
- "openzeppelin-pausable-macros",
  "soroban-sdk",
+ "stellar-fungible",
+ "stellar-pausable",
+ "stellar-pausable-macros",
 ]
 
 [[package]]
 name = "fungible-token-interface-example"
 version = "0.1.0"
 dependencies = [
- "openzeppelin-fungible-token",
- "openzeppelin-pausable",
- "openzeppelin-pausable-macros",
  "soroban-sdk",
+ "stellar-fungible",
+ "stellar-pausable",
+ "stellar-pausable-macros",
 ]
 
 [[package]]
@@ -828,36 +828,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
-name = "openzeppelin-fungible-token"
-version = "0.1.0"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
-name = "openzeppelin-non-fungible-token"
-version = "0.1.0"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
-name = "openzeppelin-pausable"
-version = "0.1.0"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
-name = "openzeppelin-pausable-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
-]
-
-[[package]]
 name = "p256"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -879,9 +849,9 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 name = "pausable-example"
 version = "0.1.0"
 dependencies = [
- "openzeppelin-pausable",
- "openzeppelin-pausable-macros",
  "soroban-sdk",
+ "stellar-pausable",
+ "stellar-pausable-macros",
 ]
 
 [[package]]
@@ -1341,6 +1311,36 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stellar-fungible"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "stellar-non-fungible-token"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "stellar-pausable"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "stellar-pausable-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
+]
 
 [[package]]
 name = "stellar-strkey"
