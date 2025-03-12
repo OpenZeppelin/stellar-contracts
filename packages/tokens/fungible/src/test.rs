@@ -11,7 +11,6 @@ use soroban_sdk::{
     },
     vec, Address, Env, IntoVal,
 };
-
 use stellar_constants::{BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD};
 use stellar_event_assertion::EventAssertion;
 
