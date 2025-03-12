@@ -1317,11 +1317,19 @@ name = "stellar-constants"
 version = "0.1.0"
 
 [[package]]
+name = "stellar-event-assertion"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "stellar-fungible"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
  "stellar-constants",
+ "stellar-event-assertion",
 ]
 
 [[package]]

@@ -13,6 +13,7 @@ use soroban_sdk::{
 };
 
 use stellar_constants::{BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD};
+use stellar_event_assertion::EventAssertion;
 
 use crate::{
     extensions::mintable::mint,
@@ -21,9 +22,6 @@ use crate::{
         transfer_from, update, StorageKey,
     },
 };
-
-pub mod event_utils;
-use event_utils::EventAssertion;
 
 #[contract]
 struct MockContract;

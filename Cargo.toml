@@ -3,8 +3,9 @@ resolver = "2"
 members = [
     "examples/*",
     "packages/constants",
+    "packages/contract-utils/*",
+    "packages/test-utils/*",
     "packages/tokens/*",
-    "packages/utils/*",
 ]
 
 [workspace.package]
@@ -21,11 +22,12 @@ quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 
 # members
-stellar-pausable = { path = "packages/utils/pausable" }
-stellar-pausable-macros = { path = "packages/utils/pausable-macros" }
+stellar-constants = { path = "packages/constants" }
+stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-fungible = { path = "packages/tokens/fungible" }
 stellar-non-fungible = { path = "packages/tokens/non-fungible" }
-stellar-constants = { path = "packages/constants" }
+stellar-pausable = { path = "packages/contract-utils/pausable" }
+stellar-pausable-macros = { path = "packages/contract-utils/pausable-macros" }
 
 [profile.release]
 opt-level = "z"

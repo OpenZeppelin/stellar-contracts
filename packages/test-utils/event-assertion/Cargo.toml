@@ -1,5 +1,5 @@
 [package]
-name = "stellar-fungible"
+name = "stellar-event-assertion"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -11,9 +11,4 @@ crate-type = ["lib", "cdylib"]
 doctest = false
 
 [dependencies]
-stellar-constants = { workspace = true }
-soroban-sdk = { workspace = true }
-
-[dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-stellar-event-assertion = { workspace = true }
