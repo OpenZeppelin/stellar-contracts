@@ -3,7 +3,7 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Fungible Token Standard
 
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/token/fungible[Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible[Source Code]
 
 == Purpose
 
@@ -15,7 +15,7 @@ It provides a flexible and secure framework for defining and managing token stan
 We provide the below extensions to enhance the capabilities of the Fungible Token Standard.
 
 === - Mintable
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/token/fungible/src/extensions/mintable[Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/mintable[Source Code]
 
 ==== Summary
 The `FungibleMintable` trait extends the `FungibleToken` trait to provide the capability to mint tokens.
@@ -24,7 +24,7 @@ The `FungibleMintable` trait extends the `FungibleToken` trait to provide the ca
 * `mint_event` :  broadcasted to the network when the `mint()` function is invoked.
 
 === - Capped
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/token/fungible/src/extensions/capped[Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/capped[Source Code]
 
 ==== Summary
 The `Capped` trait extends the `FungibleToken` trait to provide the capability to set a maximum supply for the token.
@@ -35,7 +35,7 @@ Note that the `Capped` trait is designed to be used in conjunction with the `Min
 There are no custom events associated with the `Capped` trait.
 
 === - Burnable
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/token/fungible/src/extensions/burnable[Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/burnable[Source Code]
 
 ==== Summary
 The `FungibleBurnable` trait extends the `FungibleToken` trait to provide the
@@ -53,7 +53,7 @@ for various smart contract use cases.
 * `burn_event`: broadcasted to the network when the `burn()` or `burn_from()` function is invoked.
 
 === - Metadata
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/token/fungible/src/extensions/metadata[Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/metadata[Source Code]
 
 ==== Summary
 Provides `setter` and `getter` methods for `symbol`, `name`, and `decimal` metadata information for your token.

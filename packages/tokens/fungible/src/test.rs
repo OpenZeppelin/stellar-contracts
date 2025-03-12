@@ -12,12 +12,13 @@ use soroban_sdk::{
     vec, Address, Env, IntoVal,
 };
 
+use stellar_constants::{BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD};
+
 use crate::{
     extensions::mintable::mint,
     storage::{
         allowance, approve, balance, set_allowance, spend_allowance, total_supply, transfer,
-        transfer_from, update, StorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT,
-        INSTANCE_TTL_THRESHOLD,
+        transfer_from, update, StorageKey,
     },
 };
 
