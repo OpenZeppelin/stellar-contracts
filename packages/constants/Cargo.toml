@@ -9,3 +9,6 @@ version.workspace = true
 [lib]
 crate-type = ["lib", "cdylib"]
 doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
