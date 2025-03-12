@@ -434,6 +434,10 @@ fn update_with_insufficient_balance_panics() {
 }
 
 // Authorization Tests
+
+// Note: Invocation assertions are temporarily commented out while we investigate
+// an issue where auth entries are not being populated with function name and parameters
+// in the test environment.
 #[test]
 fn approve_requires_auth() {
     let e = Env::default();
