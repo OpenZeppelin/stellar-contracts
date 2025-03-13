@@ -31,7 +31,7 @@ fn burn_works() {
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_mint(&account, 100);
-        event_assert.assert_burn(&account, 50);
+        event_assert.assert_fungible_burn(&account, 50);
     });
 }
 
@@ -53,8 +53,8 @@ fn burn_with_allowance_works() {
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
         event_assert.assert_mint(&owner, 100);
-        event_assert.assert_approve(&owner, &spender, 30, 1000);
-        event_assert.assert_burn(&owner, 30);
+        event_assert.assert_fungible_approve(&owner, &spender, 30, 1000);
+        event_assert.assert_fungible_burn(&owner, 30);
     });
 }
 
