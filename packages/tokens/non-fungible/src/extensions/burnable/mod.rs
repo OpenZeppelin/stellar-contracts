@@ -11,10 +11,6 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// provide the capability to burn tokens. This trait is designed to be used in
 /// conjunction with the `NonFungibleToken` trait.
 ///
-/// To fully comply with the SEP-41 specification one have to implement the
-/// this `NonFungibleBurnable` trait along with the `[NonFungibleToken]` trait.
-/// SEP-41 mandates support for token burning to be considered compliant.
-///
 /// Excluding the `burn` functionality from the `[NonFungibleToken]` trait
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
@@ -32,8 +28,8 @@ pub trait NonFungibleBurnable {
     ///
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - When attempting
     ///   to burn a token that does not exist.
-    /// * [`crate::NonFungibleTokenError::IncorrectOwner`] - When trying to burn
-    ///   a token that is not owned by the caller.
+    /// * [`crate::NonFungibleTokenError::IncorrectOwner`] - If the current owner
+    ///   (before calling this function) is not `from`.
     ///
     /// # Events
     ///
@@ -60,10 +56,10 @@ pub trait NonFungibleBurnable {
     ///
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - When attempting
     ///   to burn a token that does not exist.
-    /// * [`crate::NonFungibleTokenError::IncorrectOwner`] - When trying to burn
-    ///   a token that is not owned by the caller.
-    /// * [`crate::NonFungibleTokenError::InsufficientApproval`] - When the
-    ///   spender does not have sufficient approvals to burn the token.
+    /// * [`crate::NonFungibleTokenError::IncorrectOwner`] - If the current owner
+    ///   (before calling this function) is not `from`.
+    /// * [`crate::NonFungibleTokenError::InsufficientApproval`] - If the spender does
+    ///   not have a valid approval.
     ///
     /// # Events
     ///
