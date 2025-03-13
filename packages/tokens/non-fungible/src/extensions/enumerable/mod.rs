@@ -190,4 +190,7 @@ pub fn update_token_lists(e: &Env, token_id: u128, from: Option<&Address>, to: O
         all.remove(pos);
         e.storage().persistent().set(&EnumerableStorageKey::AllTokens, &all);
     }
-} 
+}
+
+#[cfg(test)]
+mod test; 
