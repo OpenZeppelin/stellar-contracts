@@ -38,8 +38,8 @@ pub fn burn(e: &Env, from: &Address, token_id: u128) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `spender` - The account that is allowed to burn the token
-///   on behalf of the owner.
+/// * `spender` - The account that is allowed to burn the token on behalf of the
+///   owner.
 /// * `from` - The account whose token is destroyed.
 /// * `token_id` - The token to burn.
 ///
