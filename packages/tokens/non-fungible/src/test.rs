@@ -7,6 +7,7 @@ use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Env,
 };
+use stellar_event_assertion::EventAssertion;
 
 use crate::{
     storage::{
@@ -32,6 +33,10 @@ fn set_approval_for_all_works() {
 
         let is_approved = is_approved_for_all(&e, &owner, &operator);
         assert!(is_approved);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_approve_for_all(&owner, &operator, true, 1000);
     });
 }
 
@@ -51,11 +56,14 @@ fn approve_nft_works() {
 
         let approved_address = get_approved(&e, token_id);
         assert_eq!(approved_address, Some(approved.clone()));
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_non_fungible_approve(&owner, &approved, token_id, 1000);
     });
 }
 
 #[test]
-// TODO:
 fn approve_with_operator_works() {
     let e = Env::default();
     e.mock_all_auths();
@@ -75,6 +83,11 @@ fn approve_with_operator_works() {
 
         let approved_address = get_approved(&e, token_id);
         assert_eq!(approved_address, Some(approved.clone()));
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        event_assert.assert_approve_for_all(&owner, &operator, true, 1000);
+        event_assert.assert_non_fungible_approve(&operator, &approved, token_id, 1000);
     });
 }
 
@@ -97,6 +110,10 @@ fn transfer_nft_works() {
         assert_eq!(balance(&e, &owner), 0);
         assert_eq!(balance(&e, &recipient), 1);
         assert_eq!(owner_of(&e, token_id), recipient);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_non_fungible_transfer(&owner, &recipient, token_id);
     });
 }
 
@@ -124,6 +141,11 @@ fn transfer_from_nft_approved_works() {
         assert_eq!(balance(&e, &owner), 0);
         assert_eq!(balance(&e, &recipient), 1);
         assert_eq!(owner_of(&e, token_id), recipient);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        event_assert.assert_non_fungible_approve(&owner, &spender, token_id, 1000);
+        event_assert.assert_non_fungible_transfer(&owner, &recipient, token_id);
     });
 }
 
@@ -151,6 +173,11 @@ fn transfer_from_nft_operator_works() {
         assert_eq!(balance(&e, &owner), 0);
         assert_eq!(balance(&e, &recipient), 1);
         assert_eq!(owner_of(&e, token_id), recipient);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        event_assert.assert_approve_for_all(&owner, &spender, true, 1000);
+        event_assert.assert_non_fungible_transfer(&owner, &recipient, token_id);
     });
 }
 
@@ -174,6 +201,10 @@ fn transfer_from_nft_owner_works() {
         assert_eq!(balance(&e, &owner), 0);
         assert_eq!(balance(&e, &recipient), 1);
         assert_eq!(owner_of(&e, token_id), recipient);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_non_fungible_transfer(&owner, &recipient, token_id);
     });
 }
 
