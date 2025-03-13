@@ -11,10 +11,6 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// provide the capability to burn tokens. This trait is designed to be used in
 /// conjunction with the `NonFungibleToken` trait.
 ///
-/// To fully comply with the SEP-41 specification one have to implement the
-/// this `NonFungibleBurnable` trait along with the `[NonFungibleToken]` trait.
-/// SEP-41 mandates support for token burning to be considered compliant.
-///
 /// Excluding the `burn` functionality from the `[NonFungibleToken]` trait
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
