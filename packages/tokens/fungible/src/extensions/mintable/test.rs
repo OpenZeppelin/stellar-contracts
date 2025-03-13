@@ -6,7 +6,7 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    extensions::mintable::storage::mint,
+    extensions::mintable::{emit_mint, storage::mint},
     storage::{balance, total_supply},
 };
 
@@ -51,5 +51,22 @@ fn mint_base_implementation_has_no_auth() {
     e.as_contract(&address, || {
         mint(&e, &account, 100);
         assert_eq!(balance(&e, &account), 100);
+    });
+}
+
+#[test]
+fn emit_mint_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let account = Address::generate(&e);
+    e.as_contract(&address, || {
+        // Directly test the emit_mint function
+        emit_mint(&e, &account, 100);
+        
+        // Verify the event was emitted correctly
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_mint(&account, 100);
     });
 }

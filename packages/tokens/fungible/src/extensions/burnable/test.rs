@@ -7,7 +7,7 @@ use stellar_event_assertion::EventAssertion;
 
 use crate::{
     extensions::{
-        burnable::storage::{burn, burn_from},
+        burnable::{emit_burn, storage::{burn, burn_from}},
         mintable::mint,
     },
     storage::{allowance, approve, balance, total_supply},
@@ -104,5 +104,22 @@ fn burn_with_insufficient_allowance_panics() {
         assert_eq!(balance(&e, &owner), 100);
         assert_eq!(total_supply(&e), 100);
         burn_from(&e, &spender, &owner, 60);
+    });
+}
+
+#[test]
+fn emit_burn_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let account = Address::generate(&e);
+    e.as_contract(&address, || {
+        // Directly test the emit_burn function
+        emit_burn(&e, &account, 50);
+        
+        // Verify the event was emitted correctly
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_burn(&account, 50);
     });
 }
