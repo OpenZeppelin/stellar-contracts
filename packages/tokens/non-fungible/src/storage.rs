@@ -4,18 +4,6 @@ use crate::non_fungible::{
     emit_approval, emit_approval_for_all, emit_transfer, NonFungibleTokenError,
 };
 
-// TODO: place these in another crate, called `constants`
-pub const DAY_IN_LEDGERS: u32 = 17280;
-
-pub const INSTANCE_EXTEND_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
-pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
-
-pub const BALANCE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
-pub const BALANCE_TTL_THRESHOLD: u32 = BALANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
-
-pub const OWNER_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
-pub const OWNER_TTL_THRESHOLD: u32 = OWNER_EXTEND_AMOUNT - DAY_IN_LEDGERS;
-
 /// Storage container for the token for which an approval is granted
 /// and the ledger number at which this approval expires.
 #[contracttype]
@@ -207,6 +195,11 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger number
 ///   is less than the current ledger number.
 /// * refer to [`owner_of`] errors.
+///
+/// # Events
+///
+/// * topics - `["approval", owner: Address, token_id: u128]`
+/// * data - `[approved: Address, live_until_ledger: u32]`
 pub fn approve(
     e: &Env,
     approver: &Address,
@@ -253,6 +246,11 @@ pub fn approve(
 ///
 /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger number
 ///   is less than the current ledger number.
+///
+/// # Events
+///
+/// * topics - `["approval", owner: Address]`
+/// * data - `[operator: Address, is_approved: bool, live_until_ledger: u32]`
 pub fn set_approval_for_all(
     e: &Env,
     owner: &Address,

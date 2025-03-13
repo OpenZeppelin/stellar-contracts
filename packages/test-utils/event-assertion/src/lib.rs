@@ -12,7 +12,7 @@ impl<'a> EventAssertion<'a> {
         Self { env, contract }
     }
 
-    pub fn assert_transfer(&self, from: &Address, to: &Address, amount: i128) {
+    pub fn assert_fungible_transfer(&self, from: &Address, to: &Address, amount: i128) {
         let events = self.env.events().all();
         let transfer_event = events.iter().find(|e| {
             let topics: Vec<Val> = e.1.clone();
@@ -38,6 +38,34 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(&event_from, from, "Transfer event has wrong from address");
         assert_eq!(&event_to, to, "Transfer event has wrong to address");
         assert_eq!(event_amount, amount, "Transfer event has wrong amount");
+    }
+
+    pub fn assert_non_fungible_transfer(&self, from: &Address, to: &Address, token_id: u128) {
+        let events = self.env.events().all();
+        let transfer_event = events.iter().find(|e| {
+            let topics: Vec<Val> = e.1.clone();
+            let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
+            topic_symbol == symbol_short!("transfer")
+        });
+
+        assert!(transfer_event.is_some(), "Transfer event not found in event log");
+
+        let (contract, topics, data) = transfer_event.unwrap();
+        assert_eq!(contract, self.contract, "Event from wrong contract");
+
+        let topics: Vec<Val> = topics.clone();
+        assert_eq!(topics.len(), 3, "Transfer event should have 3 topics");
+
+        let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
+        assert_eq!(topic_symbol, symbol_short!("transfer"));
+
+        let event_from: Address = topics.get_unchecked(1).into_val(self.env);
+        let event_to: Address = topics.get_unchecked(2).into_val(self.env);
+        let event_token_id: u128 = data.into_val(self.env);
+
+        assert_eq!(&event_from, from, "Transfer event has wrong from address");
+        assert_eq!(&event_to, to, "Transfer event has wrong to address");
+        assert_eq!(event_token_id, token_id, "Transfer event has wrong amount");
     }
 
     pub fn assert_mint(&self, to: &Address, amount: i128) {

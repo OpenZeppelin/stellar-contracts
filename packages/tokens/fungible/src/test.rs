@@ -241,7 +241,7 @@ fn transfer_works() {
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_mint(&from, 100);
-        event_assert.assert_transfer(&from, &recipient, 50);
+        event_assert.assert_fungible_transfer(&from, &recipient, 50);
     });
 }
 
@@ -313,7 +313,7 @@ fn approve_and_transfer_from() {
         event_assert.assert_event_count(3);
         event_assert.assert_mint(&owner, 100);
         event_assert.assert_fungible_approve(&owner, &spender, 50, 1000);
-        event_assert.assert_transfer(&owner, &recipient, 30);
+        event_assert.assert_fungible_transfer(&owner, &recipient, 30);
     });
 }
 
