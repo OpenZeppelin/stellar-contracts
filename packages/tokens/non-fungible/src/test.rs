@@ -16,6 +16,8 @@ use crate::{
     transfer_from,
 };
 
+#[contract]
+struct MockContract;
 
 #[test]
 fn set_approval_for_all_works() {
