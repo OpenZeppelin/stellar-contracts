@@ -63,7 +63,7 @@ fn emit_mint_works() {
     e.as_contract(&address, || {
         // Directly test the emit_mint function
         emit_mint(&e, &account, 100);
-        
+
         // Verify the event was emitted correctly
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);

@@ -130,28 +130,31 @@ fn test_cap_not_set() {
     e.as_contract(&token, || {
         // First verify the cap is not set by querying total supply
         assert_eq!(total_supply(&e), 0);
-        
-        // Attempt to check cap without setting it first - should panic with CapNotSet (error code 208)
+
+        // Attempt to check cap without setting it first - should panic with CapNotSet
+        // (error code 208)
         check_cap(&e, 100);
-        
+
         // The following should never execute due to the panic
-        assert!(false, "This code should not be reached");
+        panic!("This code should not be reached");
     });
 }
 
 #[test]
 fn test_query_cap_direct_error_path() {
     let e = Env::default();
-    e.as_contract(&e.register_contract(None, TestToken), || {
+    e.as_contract(&e.register(TestToken, ()), || {
         // Check the cap is initially unset
-        let result: Option<i128> = e.storage().instance().get(&crate::extensions::capped::storage::CAP_KEY);
+        let result: Option<i128> =
+            e.storage().instance().get(&crate::extensions::capped::storage::CAP_KEY);
         assert_eq!(result, None);
-        
+
         // Set a cap
         e.storage().instance().set(&crate::extensions::capped::storage::CAP_KEY, &1000_i128);
-        
+
         // Verify the cap was set correctly
-        let result: Option<i128> = e.storage().instance().get(&crate::extensions::capped::storage::CAP_KEY);
+        let result: Option<i128> =
+            e.storage().instance().get(&crate::extensions::capped::storage::CAP_KEY);
         assert_eq!(result, Some(1000_i128));
     });
 }

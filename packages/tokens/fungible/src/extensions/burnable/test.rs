@@ -7,7 +7,10 @@ use stellar_event_assertion::EventAssertion;
 
 use crate::{
     extensions::{
-        burnable::{emit_burn, storage::{burn, burn_from}},
+        burnable::{
+            emit_burn,
+            storage::{burn, burn_from},
+        },
         mintable::mint,
     },
     storage::{allowance, approve, balance, total_supply},
@@ -116,7 +119,7 @@ fn emit_burn_works() {
     e.as_contract(&address, || {
         // Directly test the emit_burn function
         emit_burn(&e, &account, 50);
-        
+
         // Verify the event was emitted correctly
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
