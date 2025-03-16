@@ -37,28 +37,25 @@ fn check_env_arg(input_fn: &ItemFn) -> (syn::Ident, bool) {
     });
 
     // Extract the pattern and type from the argument
-    let (pat, ty) = match first_arg {
-        FnArg::Typed(PatType { pat, ty, .. }) => (pat, ty),
-        _ => {
-            panic!("first argument of function '{}' must be a typed parameter", input_fn.sig.ident)
-        }
+    let FnArg::Typed(PatType { pat, ty, .. }) = first_arg else {
+        panic!("first argument of function '{}' must be a typed parameter", input_fn.sig.ident);
     };
 
     // Get the identifier from the pattern
-    let ident = match &**pat {
-        syn::Pat::Ident(pat_ident) => pat_ident.ident.clone(),
-        _ => panic!("first argument of function '{}' must be an identifier", input_fn.sig.ident),
+    let syn::Pat::Ident(pat_ident) = &**pat else {
+        panic!("first argument of function '{}' must be an identifier", input_fn.sig.ident);
     };
+    let ident = pat_ident.ident.clone();
 
     // Check if the type is Env or &Env
     let is_ref = match &**ty {
-        Type::Reference(type_ref) => match &*type_ref.elem {
-            Type::Path(path) => {
-                check_is_env(path, &input_fn.sig.ident);
-                true
-            }
-            _ => panic!("first argument of function '{}' must be Env or &Env", input_fn.sig.ident),
-        },
+        Type::Reference(type_ref) => {
+            let Type::Path(path) = &*type_ref.elem else {
+                panic!("first argument of function '{}' must be Env or &Env", input_fn.sig.ident);
+            };
+            check_is_env(path, &input_fn.sig.ident);
+            true
+        }
         Type::Path(path) => {
             check_is_env(path, &input_fn.sig.ident);
             false

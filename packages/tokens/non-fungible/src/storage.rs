@@ -322,9 +322,8 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u
 
     if let Some(to_address) = to {
         // Update the balance of the `to` address
-        let to_balance = match balance(e, to_address).checked_add(1) {
-            Some(num) => num,
-            _ => panic_with_error!(e, NonFungibleTokenError::MathOverflow),
+        let Some(to_balance) = balance(e, to_address).checked_add(1) else {
+            panic_with_error!(e, NonFungibleTokenError::MathOverflow);
         };
         e.storage().persistent().set(&StorageKey::Balance(to_address.clone()), &to_balance);
 

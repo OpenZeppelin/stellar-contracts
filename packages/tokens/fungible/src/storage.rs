@@ -330,12 +330,11 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i12
         e.storage().persistent().set(&StorageKey::Balance(account.clone()), &from_balance);
     } else {
         // `from` is None, so we're minting tokens.
-        let mut total_supply = total_supply(e);
-        total_supply = match total_supply.checked_add(amount) {
-            Some(num) => num,
-            _ => panic_with_error!(e, FungibleTokenError::MathOverflow),
+        let total_supply = total_supply(e);
+        let Some(new_total_supply) = total_supply.checked_add(amount) else {
+            panic_with_error!(e, FungibleTokenError::MathOverflow);
         };
-        e.storage().instance().set(&StorageKey::TotalSupply, &total_supply);
+        e.storage().instance().set(&StorageKey::TotalSupply, &new_total_supply);
     }
 
     if let Some(account) = to {
