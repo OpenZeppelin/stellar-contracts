@@ -69,6 +69,7 @@ mod extensions;
 mod non_fungible;
 mod storage;
 
+pub use extensions::mintable;
 pub use non_fungible::{
     emit_approval, emit_approval_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenClient,
     NonFungibleTokenError,
