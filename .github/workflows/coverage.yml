@@ -97,15 +97,6 @@ jobs:
           grep -B 1 "\^" coverage-report.txt | grep -v -- "^--$" | head -20 >> $GITHUB_STEP_SUMMARY || echo "No uncovered lines found!" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload coverage report artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-report
-          path: |
-            coverage-report.txt
-            lcov.info
-          retention-days: 14
-
       - name: Upload coverage report to Codecov
         continue-on-error: true  # Don't fail the workflow if Codecov upload fails
         uses: codecov/codecov-action@v3
