@@ -76,8 +76,7 @@ pub use non_fungible::{
 };
 pub use storage::{
     approve, balance, get_approved, is_approved_for_all, owner_of, set_approval_for_all, transfer,
-    transfer_from, ApprovalData, ApprovalForAllData, StorageKey, BALANCE_EXTEND_AMOUNT,
-    BALANCE_TTL_THRESHOLD, DAY_IN_LEDGERS, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
+    transfer_from, ApprovalData, ApprovalForAllData, StorageKey,
 };
 
 mod test;

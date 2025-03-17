@@ -1,4 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use stellar_constants::{
+    BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
+};
 
 use crate::non_fungible::{
     emit_approval, emit_approval_for_all, emit_transfer, NonFungibleTokenError,
