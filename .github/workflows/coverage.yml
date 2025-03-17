@@ -108,7 +108,6 @@ jobs:
 
       - name: Upload coverage report to Codecov
         # Only run if the Codecov token is configured
-        if: ${{ secrets.CODECOV_TOKEN != '' }}
         continue-on-error: true  # Don't fail the workflow if Codecov upload fails
         uses: codecov/codecov-action@v3
         with:
