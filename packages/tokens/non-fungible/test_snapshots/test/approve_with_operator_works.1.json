@@ -54,10 +54,7 @@
                   "symbol": "Approval"
                 },
                 {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 1
                 }
               ]
             },
@@ -77,10 +74,7 @@
                       "symbol": "Approval"
                     },
                     {
-                      "u128": {
-                        "hi": 0,
-                        "lo": 1
-                      }
+                      "u32": 1
                     }
                   ]
                 },
@@ -151,26 +145,19 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "is_approved"
+                        "symbol": "operators"
                       },
                       "val": {
-                        "bool": true
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "live_until_ledger"
-                      },
-                      "val": {
-                        "u32": 1000
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "operator"
-                      },
-                      "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                        "map": [
+                          {
+                            "key": {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                            },
+                            "val": {
+                              "u32": 1000
+                            }
+                          }
+                        ]
                       }
                     }
                   ]
@@ -192,10 +179,7 @@
                   "symbol": "Owner"
                 },
                 {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 1
                 }
               ]
             },
@@ -215,10 +199,7 @@
                       "symbol": "Owner"
                     },
                     {
-                      "u128": {
-                        "hi": 0,
-                        "lo": 1
-                      }
+                      "u32": 1
                     }
                   ]
                 },
@@ -376,9 +357,6 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
-                  "bool": true
-                },
-                {
                   "u32": 1000
                 }
               ]
@@ -403,10 +381,7 @@
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
               },
               {
-                "u128": {
-                  "hi": 0,
-                  "lo": 1
-                }
+                "u32": 1
               }
             ],
             "data": {

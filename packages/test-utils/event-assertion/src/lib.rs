@@ -120,7 +120,7 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(event_amount, amount, "Burn event has wrong amount");
     }
 
-    pub fn assert_non_fungible_burn(&self, from: &Address, token_id: u128) {
+    pub fn assert_non_fungible_burn(&self, from: &Address, token_id: u32) {
         let events = self.env.events().all();
         let burn_event = events.iter().find(|e| {
             let topics: Vec<Val> = e.1.clone();
@@ -140,7 +140,7 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(topic_symbol, symbol_short!("burn"));
 
         let event_from: Address = topics.get_unchecked(1).into_val(self.env);
-        let event_token_id: u128 = data.into_val(self.env);
+        let event_token_id: u32 = data.into_val(self.env);
 
         assert_eq!(&event_from, from, "Burn event has wrong from address");
         assert_eq!(event_token_id, token_id, "Burn event has wrong token_id");
@@ -196,7 +196,7 @@ impl<'a> EventAssertion<'a> {
         &self,
         owner: &Address,
         spender: &Address,
-        token_id: u128,
+        token_id: u32,
         live_until_ledger: u32,
     ) {
         let events = self.env.events().all();
@@ -218,7 +218,7 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(topic_symbol, symbol_short!("approval"));
 
         let event_owner: Address = topics.get_unchecked(1).into_val(self.env);
-        let event_token_id: u128 = topics.get_unchecked(2).into_val(self.env);
+        let event_token_id: u32 = topics.get_unchecked(2).into_val(self.env);
         let event_data: (Address, u32) = data.into_val(self.env);
 
         assert_eq!(&event_owner, owner, "Approve event has wrong owner address");
@@ -231,7 +231,6 @@ impl<'a> EventAssertion<'a> {
         &self,
         owner: &Address,
         operator: &Address,
-        approved: bool,
         live_until_ledger: u32,
     ) {
         let events = self.env.events().all();
@@ -253,11 +252,10 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(topic_symbol, Symbol::new(self.env, "approval_for_all"));
 
         let event_owner: Address = topics.get_unchecked(1).into_val(self.env);
-        let event_data: (Address, bool, u32) = data.into_val(self.env);
+        let event_data: (Address, u32) = data.into_val(self.env);
 
         assert_eq!(&event_owner, owner, "Approve event has wrong owner address");
         assert_eq!(event_data.0, *operator, "Approve event has wrong operator address");
-        assert_eq!(event_data.1, approved, "Approve event has wrong bool flag");
-        assert_eq!(event_data.2, live_until_ledger, "Approve event has wrong live_until_ledger");
+        assert_eq!(event_data.1, live_until_ledger, "Approve event has wrong live_until_ledger");
     }
 }

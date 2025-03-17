@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map};
 use stellar_constants::{
     BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
 };
@@ -15,21 +15,18 @@ pub struct ApprovalData {
     pub live_until_ledger: u32,
 }
 
-/// Storage container for the address for which an operator is granted
-/// and the ledger number at which this operator expires.
+/// Storage container for multiple operators and their expiration ledgers.
 #[contracttype]
 pub struct ApprovalForAllData {
-    pub operator: Address,
-    pub is_approved: bool,
-    pub live_until_ledger: u32,
+    pub operators: Map<Address, u32>,
 }
 
 /// Storage keys for the data associated with `FungibleToken`
 #[contracttype]
 pub enum StorageKey {
-    Owner(u128),
+    Owner(u32),
     Balance(Address),
-    Approval(u128),
+    Approval(u32),
     ApprovalForAll(Address),
 }
 
@@ -42,9 +39,9 @@ pub enum StorageKey {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address for which the balance is being queried.
-pub fn balance(e: &Env, account: &Address) -> u128 {
+pub fn balance(e: &Env, account: &Address) -> u32 {
     let key = StorageKey::Balance(account.clone());
-    if let Some(balance) = e.storage().persistent().get::<_, u128>(&key) {
+    if let Some(balance) = e.storage().persistent().get::<_, u32>(&key) {
         e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
         balance
     } else {
@@ -63,7 +60,7 @@ pub fn balance(e: &Env, account: &Address) -> u128 {
 ///
 /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
 ///   `token_id` does not exist.
-pub fn owner_of(e: &Env, token_id: u128) -> Address {
+pub fn owner_of(e: &Env, token_id: u32) -> Address {
     let key = StorageKey::Owner(token_id);
     if let Some(owner) = e.storage().persistent().get::<_, Address>(&key) {
         e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
@@ -83,7 +80,7 @@ pub fn owner_of(e: &Env, token_id: u128) -> Address {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token_id` - The identifier of the token to check approval for.
-pub fn get_approved(e: &Env, token_id: u128) -> Option<Address> {
+pub fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
     let key = StorageKey::Approval(token_id);
 
     if let Some(approval_data) = e.storage().temporary().get::<_, ApprovalData>(&key) {
@@ -109,15 +106,18 @@ pub fn get_approved(e: &Env, token_id: u128) -> Option<Address> {
 pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool {
     let key = StorageKey::ApprovalForAll(owner.clone());
 
+    // Retrieve the approval data for the owner
     if let Some(approval_data) = e.storage().temporary().get::<_, ApprovalForAllData>(&key) {
-        if approval_data.live_until_ledger < e.ledger().sequence() {
-            return false;
+        // Check if the operator exists and if their approval is valid (non-expired)
+        if let Some(expiry) = approval_data.operators.get(operator.clone()) {
+            if expiry >= e.ledger().sequence() {
+                return true;
+            }
         }
-        approval_data.operator == *operator && approval_data.is_approved
-    } else {
-        // if there is no ApprovalForAllData Entry for this `owner`
-        false
     }
+
+    // If no operator with a valid approval
+    false
 }
 
 // ################## CHANGE STATE ##################
@@ -138,12 +138,12 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u128]`
+/// * data - `[token_id: u32]`
 ///
 /// # Notes
 ///
 /// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
-pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
+pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
     from.require_auth();
     update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
@@ -168,12 +168,12 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u128]`
+/// * data - `[token_id: u32]`
 ///
 /// # Notes
 ///
 /// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
-pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u128) {
+pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
     spender.require_auth();
     check_spender_approval(e, spender, from, token_id);
     update(e, Some(from), Some(to), token_id);
@@ -207,7 +207,7 @@ pub fn approve(
     e: &Env,
     approver: &Address,
     approved: &Address,
-    token_id: u128,
+    token_id: u32,
     live_until_ledger: u32,
 ) {
     approver.require_auth();
@@ -242,8 +242,8 @@ pub fn approve(
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - The address granting approval for all their tokens.
 /// * `operator` - The address being granted or revoked approval.
-/// * `is_approved` - If true, grants approval; if false, revokes approval.
-/// * `live_until_ledger` - The ledger number at which the approval expires.
+/// * `live_until_ledger` - The ledger number at which the allowance
+///   expires. If `live_until_ledger` is `0`, the approval is revoked.
 ///
 /// # Errors
 ///
@@ -253,7 +253,7 @@ pub fn approve(
 /// # Events
 ///
 /// * topics - `["approval", owner: Address]`
-/// * data - `[operator: Address, is_approved: bool, live_until_ledger: u32]`
+/// * data - `[operator: Address, live_until_ledger: u32]`
 pub fn set_approval_for_all(
     e: &Env,
     owner: &Address,
@@ -263,22 +263,46 @@ pub fn set_approval_for_all(
 ) {
     owner.require_auth();
 
+    log!(e, "after auth");
+    let key = StorageKey::ApprovalForAll(owner.clone());
+
+    // If revoking approval (live_until_ledger == 0)
+    if live_until_ledger == 0 {
+        log!(e, "inside revoke!");
+        if let Some(mut approval_data) = e.storage().temporary().get::<_, ApprovalForAllData>(&key)
+        {
+            log!(e, "found approval data");
+            approval_data.operators.remove(operator.clone());
+            e.storage().temporary().set(&key, &approval_data);
+            log!(e, "removed operator");
+        }
+        emit_approval_for_all(e, owner, operator, live_until_ledger);
+        return;
+    }
+
+    // If the provided ledger number is invalid (less than the current ledger number)
     if live_until_ledger < e.ledger().sequence() {
         panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
     }
 
-    let key = StorageKey::ApprovalForAll(owner.clone());
+    // Retrieve or initialize the approval data
+    let mut approval_data = e
+        .storage()
+        .temporary()
+        .get::<_, ApprovalForAllData>(&key)
+        .unwrap_or_else(|| ApprovalForAllData { operators: Map::new(e) });
 
-    let approval_data =
-        ApprovalForAllData { operator: operator.clone(), is_approved, live_until_ledger };
+    // Set the operator's expiration ledger
+    approval_data.operators.set(operator.clone(), live_until_ledger);
 
+    // Update the storage
     e.storage().temporary().set(&key, &approval_data);
 
+    // Update the TTL based on the expiration ledger
     let live_for = live_until_ledger - e.ledger().sequence();
-
     e.storage().temporary().extend_ttl(&key, live_for, live_for);
 
-    emit_approval_for_all(e, owner, operator, is_approved, live_until_ledger);
+    emit_approval_for_all(e, owner, operator, live_until_ledger);
 }
 
 /// Low-level function for handling transfers for NFTs, but doesn't
@@ -298,7 +322,7 @@ pub fn set_approval_for_all(
 ///   the owner of the token.
 /// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `to` would
 ///   overflow.
-pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u128) {
+pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
     if let Some(from_address) = from {
         let owner = owner_of(e, token_id);
 
@@ -348,7 +372,7 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u
 /// # Errors
 /// * [`NonFungibleTokenError::InsufficientApproval`] - If the `spender` don't
 ///   enough approval.
-pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: u128) {
+pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: u32) {
     // If `spender` is not the owner, they must have explicit approval.
     let is_spender_owner = spender == owner;
     let is_spender_approved = get_approved(e, token_id) == Some(spender.clone());

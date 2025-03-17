@@ -26,9 +26,8 @@ fn burn_works() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
-        // Attempt to transfer from the owner without approval
         burn(&e, &owner, token_id);
 
         assert!(balance(&e, &owner) == 0);
@@ -52,11 +51,10 @@ fn burn_from_with_approve_works() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         approve(&e, &owner, &spender, token_id, 1000);
 
-        // Attempt to transfer from the owner without approval
         burn_from(&e, &spender, &owner, token_id);
 
         assert!(balance(&e, &owner) == 0);
@@ -81,11 +79,10 @@ fn burn_from_with_operator_works() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
-        set_approval_for_all(&e, &owner, &operator, true, 1000);
+        set_approval_for_all(&e, &owner, &operator, 1000);
 
-        // Attempt to transfer from the owner without approval
         burn_from(&e, &operator, &owner, token_id);
 
         assert!(balance(&e, &owner) == 0);
@@ -93,7 +90,7 @@ fn burn_from_with_operator_works() {
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         // event_assert.assert_mint(&owner, 100);
-        event_assert.assert_approve_for_all(&owner, &operator, true, 1000);
+        event_assert.assert_approve_for_all(&owner, &operator, 1000);
         event_assert.assert_non_fungible_burn(&owner, 1);
     });
 }
@@ -109,9 +106,8 @@ fn burn_from_with_owner_works() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
-        // Attempt to transfer from the owner without approval
         burn_from(&e, &owner, &owner, token_id);
 
         assert!(balance(&e, &owner) == 0);
@@ -136,9 +132,8 @@ fn burn_with_not_owner_panics() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
-        // Attempt to transfer from the owner without approval
         burn(&e, &spender, token_id);
     });
 }
@@ -156,9 +151,8 @@ fn burn_from_with_insufficient_approval_panics() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
-        // Attempt to transfer from the owner without approval
         burn_from(&e, &spender, &owner, token_id);
     });
 }
@@ -176,9 +170,8 @@ fn burn_with_non_existent_token_panics() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
-        // Attempt to transfer from the owner without approval
         burn(&e, &owner, non_existent_token_id);
     });
 }

@@ -29,7 +29,7 @@ fn set_approval_for_all_works() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        set_approval_for_all(&e, &owner, &operator, true, 1000);
+        set_approval_for_all(&e, &owner, &operator, 1000);
 
         let is_approved = is_approved_for_all(&e, &owner, &operator);
         assert!(is_approved);
@@ -76,7 +76,7 @@ fn approve_with_operator_works() {
     e.as_contract(&address, || {
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
 
-        set_approval_for_all(&e, &owner, &operator, true, 1000);
+        set_approval_for_all(&e, &owner, &operator, 1000);
 
         // approver is the operator on behalf of the owner
         approve(&e, &operator, &approved, token_id, 1000);
@@ -98,12 +98,12 @@ fn transfer_nft_works() {
     let address = e.register(MockContract, ());
     let owner = Address::generate(&e);
     let recipient = Address::generate(&e);
-    let token_id = 1u128;
+    let token_id = 1u32;
 
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         transfer(&e, &owner, &recipient, token_id);
 
@@ -130,7 +130,7 @@ fn transfer_from_nft_approved_works() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         // Approve the spender
         approve(&e, &owner, &spender, token_id, 1000);
@@ -162,10 +162,10 @@ fn transfer_from_nft_operator_works() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         // Approve the spender
-        set_approval_for_all(&e, &owner, &spender, true, 1000);
+        set_approval_for_all(&e, &owner, &spender, 1000);
 
         // Transfer from the owner using the spender's approval
         transfer_from(&e, &spender, &owner, &recipient, token_id);
@@ -193,7 +193,7 @@ fn transfer_from_nft_owner_works() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         // Attempt to transfer from the owner without approval
         transfer_from(&e, &owner, &owner, &recipient, token_id);
@@ -222,7 +222,7 @@ fn transfer_nft_invalid_owner_fails() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         // Attempt to transfer without authorization
         transfer(&e, &unauthorized, &recipient, token_id);
@@ -243,7 +243,7 @@ fn transfer_from_nft_insufficient_approval_fails() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         // Attempt to transfer from the owner without approval
         transfer_from(&e, &spender, &owner, &recipient, token_id);
@@ -277,7 +277,7 @@ fn approve_with_invalid_live_until_ledger_fails() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         e.ledger().set_sequence_number(10);
 
@@ -299,7 +299,7 @@ fn approve_with_invalid_approver_fails() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         // Attempt to approve with an invalid approver
         approve(&e, &invalid_approver, &owner, token_id, 1000);
@@ -319,8 +319,8 @@ fn update_with_math_overflow_fails() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
-        e.storage().persistent().set(&StorageKey::Balance(recipient.clone()), &u128::MAX);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
+        e.storage().persistent().set(&StorageKey::Balance(recipient.clone()), &u32::MAX);
 
         // Attempt to update which would cause a math overflow
         update(&e, Some(&owner), Some(&recipient), token_id);
@@ -356,7 +356,7 @@ fn transfer_from_incorrect_owner_fails() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         // Approve the spender
         approve(&e, &owner, &spender, token_id, 1000);
@@ -380,7 +380,7 @@ fn transfer_from_unauthorized_spender_fails() {
     e.as_contract(&address, || {
         // Mint the NFT by setting the owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u128);
+        e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         // Attempt to transfer from the owner using an unauthorized spender
         transfer_from(&e, &unauthorized_spender, &owner, &recipient, token_id);
