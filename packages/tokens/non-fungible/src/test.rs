@@ -5,7 +5,7 @@ extern crate std;
 use soroban_sdk::{
     contract,
     testutils::{Address as _, Ledger as _},
-    Address, Env,
+    Address, Env, Map,
 };
 use stellar_event_assertion::EventAssertion;
 
@@ -14,7 +14,7 @@ use crate::{
         approve, balance, get_approved, is_approved_for_all, owner_of, set_approval_for_all,
         transfer, update, StorageKey,
     },
-    transfer_from,
+    transfer_from, ApprovalForAllData,
 };
 
 #[contract]
@@ -36,7 +36,37 @@ fn set_approval_for_all_works() {
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
-        event_assert.assert_approve_for_all(&owner, &operator, true, 1000);
+        event_assert.assert_approve_for_all(&owner, &operator, 1000);
+    });
+}
+
+#[test]
+fn revoke_approval_for_all_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let operator = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // set a pre-existing approval_for_all for the operator
+        let key = StorageKey::ApprovalForAll(owner.clone());
+        let mut approval_data = ApprovalForAllData { operators: Map::new(&e) };
+        approval_data.operators.set(operator.clone(), 1000);
+
+        e.storage().temporary().set(&key, &approval_data);
+
+        let is_approved = is_approved_for_all(&e, &owner, &operator);
+        assert!(is_approved);
+
+        // revoke approval
+        set_approval_for_all(&e, &owner, &operator, 0);
+        let is_approved = is_approved_for_all(&e, &owner, &operator);
+        assert!(!is_approved);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_approve_for_all(&owner, &operator, 0);
     });
 }
 
@@ -86,7 +116,7 @@ fn approve_with_operator_works() {
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
-        event_assert.assert_approve_for_all(&owner, &operator, true, 1000);
+        event_assert.assert_approve_for_all(&owner, &operator, 1000);
         event_assert.assert_non_fungible_approve(&operator, &approved, token_id, 1000);
     });
 }
@@ -176,7 +206,7 @@ fn transfer_from_nft_operator_works() {
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
-        event_assert.assert_approve_for_all(&owner, &spender, true, 1000);
+        event_assert.assert_approve_for_all(&owner, &spender, 1000);
         event_assert.assert_non_fungible_transfer(&owner, &recipient, token_id);
     });
 }

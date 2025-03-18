@@ -40,7 +40,7 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(event_amount, amount, "Transfer event has wrong amount");
     }
 
-    pub fn assert_non_fungible_transfer(&self, from: &Address, to: &Address, token_id: u128) {
+    pub fn assert_non_fungible_transfer(&self, from: &Address, to: &Address, token_id: u32) {
         let events = self.env.events().all();
         let transfer_event = events.iter().find(|e| {
             let topics: Vec<Val> = e.1.clone();
@@ -61,7 +61,7 @@ impl<'a> EventAssertion<'a> {
 
         let event_from: Address = topics.get_unchecked(1).into_val(self.env);
         let event_to: Address = topics.get_unchecked(2).into_val(self.env);
-        let event_token_id: u128 = data.into_val(self.env);
+        let event_token_id: u32 = data.into_val(self.env);
 
         assert_eq!(&event_from, from, "Transfer event has wrong from address");
         assert_eq!(&event_to, to, "Transfer event has wrong to address");

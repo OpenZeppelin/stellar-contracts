@@ -254,27 +254,17 @@ pub fn approve(
 ///
 /// * topics - `["approval", owner: Address]`
 /// * data - `[operator: Address, live_until_ledger: u32]`
-pub fn set_approval_for_all(
-    e: &Env,
-    owner: &Address,
-    operator: &Address,
-    is_approved: bool,
-    live_until_ledger: u32,
-) {
+pub fn set_approval_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
     owner.require_auth();
 
-    log!(e, "after auth");
     let key = StorageKey::ApprovalForAll(owner.clone());
 
     // If revoking approval (live_until_ledger == 0)
     if live_until_ledger == 0 {
-        log!(e, "inside revoke!");
         if let Some(mut approval_data) = e.storage().temporary().get::<_, ApprovalForAllData>(&key)
         {
-            log!(e, "found approval data");
             approval_data.operators.remove(operator.clone());
             e.storage().temporary().set(&key, &approval_data);
-            log!(e, "removed operator");
         }
         emit_approval_for_all(e, owner, operator, live_until_ledger);
         return;
