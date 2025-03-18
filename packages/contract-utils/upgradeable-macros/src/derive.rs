@@ -7,13 +7,13 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
 
     let version = env!("CARGO_PKG_VERSION");
 
-    let with_migration = input.attrs.iter().find(|attr| attr.path().is_ident("migrateable"));
-    let migrateable = match with_migration {
+    let with_migration = input.attrs.iter().find(|attr| attr.path().is_ident("migratable"));
+    let migratable = match with_migration {
         Some(attr) => {
             if attr.meta.require_path_only().is_err() {
-                panic!("migrateable attribute cannot have arguments")
+                panic!("migratable attribute cannot have arguments")
             }
-            derive_migrateable(name)
+            derive_migratable(name)
         }
         None => quote! {},
     };
@@ -34,19 +34,19 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
             }
         }
 
-        #migrateable
+        #migratable
     }
 }
 
-fn derive_migrateable(name: &Ident) -> proc_macro2::TokenStream {
+fn derive_migratable(name: &Ident) -> proc_macro2::TokenStream {
     quote! {
-        use stellar_upgradeable::Migrateable as _;
+        use stellar_upgradeable::Migratable as _;
 
         type MigrationData = <#name as stellar_upgradeable::Migration>::MigrationData;
         type RollbackData = <#name as stellar_upgradeable::Migration>::RollbackData;
 
         #[soroban_sdk::contractimpl]
-        impl stellar_upgradeable::Migrateable for #name {
+        impl stellar_upgradeable::Migratable for #name {
 
             fn migrate(e: &soroban_sdk::Env, migration_data: MigrationData) {
                 stellar_upgradeable::ensure_can_migrate(e);

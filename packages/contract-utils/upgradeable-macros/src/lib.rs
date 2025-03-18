@@ -2,13 +2,13 @@
 ///     a. implements the interface; requires only the auth to be defined
 ///     b. sets wasm version by taking the version from Cargo.toml
 ///
-/// 2. Optionally derives Migrateable when migration and rollback are defined.
+/// 2. Optionally derives Migratable when migration and rollback are defined.
 ///
 /// Example:
 /// ```rust,ignore
 ///
 /// #[derive(Upgradeable)]
-/// #[migrateable]
+/// #[migratable]
 /// #[contract]
 /// pub struct ExampleContract;
 ///
@@ -38,7 +38,7 @@ use derive::derive_upgradeable;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
-#[proc_macro_derive(Upgradeable, attributes(migrateable))]
+#[proc_macro_derive(Upgradeable, attributes(migratable))]
 pub fn upgradeable_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 

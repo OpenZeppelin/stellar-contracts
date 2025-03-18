@@ -15,8 +15,8 @@ pub trait Upgradeable {
 }
 
 // No need to manually implement this trait as it can be derived with
-// #[derive(Upgradeable)] and #[migrateable]
-pub trait Migrateable: Migration {
+// #[derive(Upgradeable)] and #[migratable]
+pub trait Migratable: Migration {
     fn migrate(e: &Env, migration_data: Self::MigrationData);
     fn rollback(e: &Env, rollback_data: Self::RollbackData);
 }

@@ -13,7 +13,7 @@ pub struct Data {
 }
 
 #[derive(Upgradeable)]
-#[migrateable]
+#[migratable]
 #[contract]
 pub struct ExampleContract;
 
