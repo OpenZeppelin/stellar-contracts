@@ -32,7 +32,7 @@ fn install_new_wasm(e: &Env) -> BytesN<32> {
 //}
 
 type MigrationData = Data;
-type RollbackData = Data;
+type RollbackData = ();
 
 #[test]
 fn test_upgrade() {
@@ -53,8 +53,8 @@ fn test_upgrade() {
 
     assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }).is_err());
 
-    client_v2.rollback(&Data { num1: 23, num2: 45 });
+    client_v2.rollback(&());
 
-    assert!(client_v2.try_rollback(&Data { num1: 23, num2: 45 }).is_err());
+    assert!(client_v2.try_rollback(&()).is_err());
     assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }).is_err());
 }

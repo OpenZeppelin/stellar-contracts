@@ -7,11 +7,6 @@ contractmeta!(key = "binver", val = "1.0.0");
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
 
-// ROLLBACK ???
-
-// ensure upgrade()
-// set meta
-//#[derive(Upgradeable)]
 #[contract]
 pub struct ExampleContract;
 
@@ -29,10 +24,5 @@ impl Upgradeable for ExampleContract {
         owner.require_auth();
 
         e.deployer().update_current_contract_wasm(new_wasm_hash);
-        //stellar_upgradeable::upgrade(e, new_wasm_hash);
-
-        // 1. set flag
-        // 2. update
-        // upgradeable::upgrade(new_wasm_hash)
     }
 }

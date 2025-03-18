@@ -26,9 +26,11 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
         #[soroban_sdk::contractimpl]
         impl stellar_upgradeable::Upgradeable for #name {
             fn upgrade(e: &soroban_sdk::Env, new_wasm_hash: soroban_sdk::BytesN<32>) {
+                Self::upgrade_auth(e);
+
                 stellar_upgradeable::start_migration(e);
 
-                Self::_upgrade(e, &new_wasm_hash)
+                e.deployer().update_current_contract_wasm(new_wasm_hash);
             }
         }
 
@@ -57,7 +59,7 @@ fn derive_migrateable(name: &Ident) -> proc_macro2::TokenStream {
             fn rollback(e: &soroban_sdk::Env, rollback_data: RollbackData) {
                 stellar_upgradeable::ensure_can_rollback(e);
 
-                Self::_migrate(e, &rollback_data);
+                Self::_rollback(e, &rollback_data);
 
                 stellar_upgradeable::complete_rollback(e);
             }

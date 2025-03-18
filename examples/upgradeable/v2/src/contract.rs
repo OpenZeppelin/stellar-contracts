@@ -1,4 +1,4 @@
-use soroban_sdk::{contract, contracttype, symbol_short, Address, BytesN, Env, Symbol};
+use soroban_sdk::{contract, contracttype, symbol_short, Address, Env, Symbol};
 
 use stellar_upgradeable::{Migration, Upgrade};
 use stellar_upgradeable_macros::Upgradeable;
@@ -18,27 +18,22 @@ pub struct Data {
 pub struct ExampleContract;
 
 impl Upgrade for ExampleContract {
-    fn _upgrade(e: &Env, new_wasm_hash: &BytesN<32>) {
-        let owner: Address = e.storage().instance().get(&OWNER).unwrap();
-        owner.require_auth();
-
-        e.deployer().update_current_contract_wasm(new_wasm_hash.clone());
+    fn upgrade_auth(e: &Env) {
+        e.storage().instance().get::<_, Address>(&OWNER).unwrap().require_auth();
     }
 }
 
 impl Migration for ExampleContract {
     type MigrationData = Data;
-    type RollbackData = Data;
+    type RollbackData = ();
 
     fn _migrate(e: &Env, data: &Self::MigrationData) {
-        let owner: Address = e.storage().instance().get(&OWNER).unwrap();
-        owner.require_auth();
+        e.storage().instance().get::<_, Address>(&OWNER).unwrap().require_auth();
         e.storage().instance().set(&DATA_KEY, data);
     }
 
     fn _rollback(e: &Env, _data: &Self::RollbackData) {
-        let owner: Address = e.storage().instance().get(&OWNER).unwrap();
-        owner.require_auth();
+        e.storage().instance().get::<_, Address>(&OWNER).unwrap().require_auth();
         e.storage().instance().remove(&DATA_KEY);
     }
 }
