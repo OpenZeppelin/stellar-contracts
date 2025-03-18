@@ -242,8 +242,8 @@ pub fn approve(
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - The address granting approval for all their tokens.
 /// * `operator` - The address being granted or revoked approval.
-/// * `live_until_ledger` - The ledger number at which the allowance
-///   expires. If `live_until_ledger` is `0`, the approval is revoked.
+/// * `live_until_ledger` - The ledger number at which the allowance expires. If
+///   `live_until_ledger` is `0`, the approval is revoked.
 ///
 /// # Errors
 ///
@@ -270,7 +270,8 @@ pub fn set_approval_for_all(e: &Env, owner: &Address, operator: &Address, live_u
         return;
     }
 
-    // If the provided ledger number is invalid (less than the current ledger number)
+    // If the provided ledger number is invalid (less than the current ledger
+    // number)
     if live_until_ledger < e.ledger().sequence() {
         panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
     }
