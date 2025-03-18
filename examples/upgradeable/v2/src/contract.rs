@@ -1,5 +1,4 @@
 use soroban_sdk::{contract, contracttype, symbol_short, Address, Env, Symbol};
-
 use stellar_upgradeable::{Migration, Upgrade};
 use stellar_upgradeable_macros::Upgradeable;
 

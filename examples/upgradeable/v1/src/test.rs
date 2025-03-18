@@ -8,28 +8,16 @@ use soroban_sdk::{testutils::Address as _, Address, BytesN, Env};
 use crate::contract::{ExampleContract, ExampleContractClient};
 
 mod contract_v2 {
-    use crate::test::MigrationData;
-    use crate::test::RollbackData;
+    use crate::test::{MigrationData, RollbackData};
 
     soroban_sdk::contractimport!(
         file = "../../../target/wasm32-unknown-unknown/release/upgradeable_v2_example.wasm"
     );
 }
-//const WASM_AFTER_UPGRADE: &[u8] = include_bytes!("testdata/dummy.wasm");
-
-//mod contract_v1 {
-//soroban_sdk::contractimport!(
-//file = "../../../../target/wasm32-unknown-unknown/release/upgradeable_v1_example.wasm"
-//);
-//}
 
 fn install_new_wasm(e: &Env) -> BytesN<32> {
     e.deployer().upload_contract_wasm(contract_v2::WASM)
 }
-
-//fn install_old_wasm(e: &Env) -> BytesN<32> {
-//e.deployer().upload_contract_wasm(contract_v1::WASM)
-//}
 
 type MigrationData = Data;
 type RollbackData = ();

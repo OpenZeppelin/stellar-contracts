@@ -9,8 +9,8 @@ pub trait Upgradeable {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `new_wasm_hash` - The identifier of the WASM blob,
-    /// uploaded to the ledger.
+    /// * `new_wasm_hash` - The identifier of the WASM blob, uploaded to the
+    ///   ledger.
     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>);
 }
 

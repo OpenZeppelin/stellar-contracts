@@ -1,12 +1,11 @@
-/// 1. Derives Upgradeable
-///     a. implements the interface; requires only the auth to be defined
-///     b. sets wasm version by taking the version from Cargo.toml
+/// 1. Derives Upgradeable a) implements the interface; requires only the auth
+///    to be defined b) sets wasm version by taking the version from Cargo.toml
 ///
 /// 2. Optionally derives Migratable when migration and rollback are defined.
 ///
+///
 /// Example:
 /// ```rust,ignore
-///
 /// #[derive(Upgradeable)]
 /// #[migratable]
 /// #[contract]
