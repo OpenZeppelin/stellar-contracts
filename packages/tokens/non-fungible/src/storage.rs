@@ -201,7 +201,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 ///
 /// # Events
 ///
-/// * topics - `["approve", owner: Address, token_id: u128]`
+/// * topics - `["approve", owner: Address, token_id: u32]`
 /// * data - `[approved: Address, live_until_ledger: u32]`
 pub fn approve(
     e: &Env,

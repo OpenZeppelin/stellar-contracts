@@ -260,6 +260,8 @@ pub enum NonFungibleTokenError {
     InvalidLiveUntilLedger = 304,
     /// Indicates overflow when adding two values
     MathOverflow = 305,
+    /// Indicates an attempt to mint a token with an already existing token id.
+    TokenAlreadyExists = 306,
 }
 
 // ################## EVENTS ##################

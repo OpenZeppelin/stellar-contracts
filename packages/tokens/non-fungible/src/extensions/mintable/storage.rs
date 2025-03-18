@@ -2,14 +2,13 @@ use soroban_sdk::{Address, Env};
 
 use crate::{extensions::mintable::emit_mint, storage::update};
 
-/// Creates `amount` of tokens and assigns them to `to`. Updates
-/// the total supply accordingly.
+/// Creates a token with `token_id` and assigns it to `to`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `to` - The address receiving the new tokens.
-/// * `amount` - The amount of tokens to mint.
+/// * `to` - The address receiving the new token.
+/// * `token_id` - Token id as a number.
 ///
 /// # Errors
 ///
@@ -18,7 +17,7 @@ use crate::{extensions::mintable::emit_mint, storage::update};
 /// # Events
 ///
 /// * topics - `["mint", to: Address]`
-/// * data - `[amount: i128]`
+/// * data - `[token_id: u32]`
 ///
 /// # Security Warning
 ///
@@ -35,7 +34,7 @@ use crate::{extensions::mintable::emit_mint, storage::update};
 /// let admin = read_administrator(e);
 /// admin.require_auth();
 /// ```
-pub fn mint(e: &Env, to: &Address, amount: i128) {
-    update(e, None, Some(to), amount);
-    emit_mint(e, to, amount);
+pub fn mint(e: &Env, to: &Address, token_id: u32) {
+    update(e, None, Some(to), token_id);
+    emit_mint(e, to, token_id);
 }

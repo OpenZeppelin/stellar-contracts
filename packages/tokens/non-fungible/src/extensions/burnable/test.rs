@@ -34,7 +34,7 @@ fn burn_works() {
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
-        // event_assert.assert_mint(&owner, 100);
+        // event_assert.assert_fungible_mint(&owner, 100);
         event_assert.assert_non_fungible_burn(&owner, 1);
     });
 }
@@ -61,7 +61,7 @@ fn burn_from_with_approve_works() {
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
-        // event_assert.assert_mint(&owner, 100);
+        // event_assert.assert_fungible_mint(&owner, 100);
         event_assert.assert_non_fungible_approve(&owner, &spender, 1, 1000);
         event_assert.assert_non_fungible_burn(&owner, 1);
     });
@@ -89,7 +89,7 @@ fn burn_from_with_operator_works() {
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
-        // event_assert.assert_mint(&owner, 100);
+        // event_assert.assert_fungible_mint(&owner, 100);
         event_assert.assert_approve_for_all(&owner, &operator, 1000);
         event_assert.assert_non_fungible_burn(&owner, 1);
     });
@@ -114,7 +114,7 @@ fn burn_from_with_owner_works() {
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
-        // event_assert.assert_mint(&owner, 100);
+        // event_assert.assert_fungible_mint(&owner, 100);
         event_assert.assert_non_fungible_burn(&owner, 1);
     });
 }

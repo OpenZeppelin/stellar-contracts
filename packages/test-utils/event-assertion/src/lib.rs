@@ -68,7 +68,7 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(event_token_id, token_id, "Transfer event has wrong amount");
     }
 
-    pub fn assert_mint(&self, to: &Address, amount: i128) {
+    pub fn assert_fungible_mint(&self, to: &Address, amount: i128) {
         let events = self.env.events().all();
         let mint_event = events.iter().find(|e| {
             let topics: Vec<Val> = e.1.clone();
@@ -92,6 +92,32 @@ impl<'a> EventAssertion<'a> {
 
         assert_eq!(&event_to, to, "Mint event has wrong to address");
         assert_eq!(event_amount, amount, "Mint event has wrong amount");
+    }
+
+    pub fn assert_non_fungible_mint(&self, to: &Address, token_id: u32) {
+        let events = self.env.events().all();
+        let mint_event = events.iter().find(|e| {
+            let topics: Vec<Val> = e.1.clone();
+            let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
+            topic_symbol == symbol_short!("mint")
+        });
+
+        assert!(mint_event.is_some(), "Mint event not found in event log");
+
+        let (contract, topics, data) = mint_event.unwrap();
+        assert_eq!(contract, self.contract, "Event from wrong contract");
+
+        let topics: Vec<Val> = topics.clone();
+        assert_eq!(topics.len(), 2, "Mint event should have 2 topics");
+
+        let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
+        assert_eq!(topic_symbol, symbol_short!("mint"));
+
+        let event_to: Address = topics.get_unchecked(1).into_val(self.env);
+        let event_token_id: u32 = data.into_val(self.env);
+
+        assert_eq!(&event_to, to, "Mint event has wrong to address");
+        assert_eq!(event_token_id, token_id, "Mint event has wrong token_id");
     }
 
     pub fn assert_fungible_burn(&self, from: &Address, amount: i128) {
