@@ -1,5 +1,5 @@
 use soroban_sdk::{contract, contracttype, symbol_short, Address, Env, Symbol};
-use stellar_upgradeable::{Migration, Upgrade};
+use stellar_upgradeable::{MigratableInternal, UpgradeableInternal};
 use stellar_upgradeable_macros::Upgradeable;
 
 pub const DATA_KEY: Symbol = symbol_short!("DATA_KEY");
@@ -16,13 +16,15 @@ pub struct Data {
 #[contract]
 pub struct ExampleContract;
 
-impl Upgrade for ExampleContract {
-    fn upgrade_auth(e: &Env) {
+impl UpgradeableInternal for ExampleContract {
+    type UpgradeData = ();
+
+    fn _upgrade(e: &Env, _data: &Self::UpgradeData) {
         e.storage().instance().get::<_, Address>(&OWNER).unwrap().require_auth();
     }
 }
 
-impl Migration for ExampleContract {
+impl MigratableInternal for ExampleContract {
     type MigrationData = Data;
     type RollbackData = ();
 

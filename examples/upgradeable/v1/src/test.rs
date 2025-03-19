@@ -8,7 +8,7 @@ use soroban_sdk::{testutils::Address as _, Address, BytesN, Env};
 use crate::contract::{ExampleContract, ExampleContractClient};
 
 mod contract_v2 {
-    use crate::test::{MigrationData, RollbackData};
+    use crate::test::{MigrationData, RollbackData, UpgradeData};
 
     soroban_sdk::contractimport!(
         file = "../../../target/wasm32-unknown-unknown/release/upgradeable_v2_example.wasm"
@@ -19,6 +19,7 @@ fn install_new_wasm(e: &Env) -> BytesN<32> {
     e.deployer().upload_contract_wasm(contract_v2::WASM)
 }
 
+type UpgradeData = ();
 type MigrationData = Data;
 type RollbackData = ();
 
@@ -34,7 +35,7 @@ fn test_upgrade() {
 
     let new_wasm_hash = install_new_wasm(&env);
 
-    client_v1.upgrade(&new_wasm_hash);
+    client_v1.upgrade(&new_wasm_hash, &());
 
     let client_v2 = contract_v2::Client::new(&env, &contract_id);
     client_v2.migrate(&Data { num1: 12, num2: 34 });

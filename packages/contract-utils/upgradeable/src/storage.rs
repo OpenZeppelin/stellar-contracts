@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, panic_with_error, symbol_short, Env, Symbol};
 
 use crate::upgradeable::UpgradeableError;
 
-pub const UPGRADE_KEY: Symbol = symbol_short!("upgrade");
+pub const UPGRADE_KEY: Symbol = symbol_short!("UPGRADE");
 
 #[contracttype]
 pub enum UpgradeState {
