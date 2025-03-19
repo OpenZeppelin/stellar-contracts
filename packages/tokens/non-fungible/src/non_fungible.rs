@@ -17,7 +17,7 @@ pub trait NonFungibleToken {
     /// # Notes
     ///
     /// We recommend using [`crate::balance()`] when implementing this function.
-    fn balance(e: &Env, owner: Address) -> u128;
+    fn balance(e: &Env, owner: Address) -> u32;
 
     /// Returns the owner of the `token_id` token.
     ///
@@ -35,7 +35,7 @@ pub trait NonFungibleToken {
     ///
     /// We recommend using [`crate::owner_of()`] when implementing this
     /// function.
-    fn owner_of(e: &Env, token_id: u128) -> Address;
+    fn owner_of(e: &Env, token_id: u32) -> Address;
 
     /// Transfers `token_id` token from `from` to `to`.
     ///
@@ -60,13 +60,13 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: u128]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// We recommend using [`crate::transfer()`] when implementing this
     /// function.
-    fn transfer(e: &Env, from: Address, to: Address, token_id: u128);
+    fn transfer(e: &Env, from: Address, to: Address, token_id: u32);
 
     /// Transfers `token_id` token from `from` to `to` by using `spender`s
     /// approval.
@@ -100,13 +100,13 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: u128]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// We recommend using [`crate::transfer_from()`] when implementing this
     /// function.
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u128);
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32);
 
     /// Gives permission to `approved` to transfer `token_id` token to another
     /// account. The approval is cleared when the token is transferred.
@@ -137,7 +137,7 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["approval", from: Address, to: Address]`
-    /// * data - `[token_id: u128]`
+    /// * data - `[token_id: u32, live_until_ledger: u32]`
     ///
     /// # Notes
     ///
@@ -147,7 +147,7 @@ pub trait NonFungibleToken {
         e: &Env,
         approver: Address,
         approved: Address,
-        token_id: u128,
+        token_id: u32,
         live_until_ledger: u32,
     );
 
@@ -161,11 +161,8 @@ pub trait NonFungibleToken {
     /// * `e` - Access to Soroban environment.
     /// * `owner` - The address holding the tokens.
     /// * `operator` - Account to add to the set of authorized operators.
-    /// * `is_approved` - Flag that determines whether or not permission will be
-    ///   granted to `operator`. If true, this means `operator` will be allowed
-    ///   to manage `owner`'s assets.
     /// * `live_until_ledger` - The ledger number at which the allowance
-    ///   expires.
+    ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
     ///
     /// # Errors
     ///
@@ -174,20 +171,14 @@ pub trait NonFungibleToken {
     ///
     /// # Events
     ///
-    /// * topics - `["approval_for_all", from: Address, operator: Address]`
-    /// * data - `[is_approved: bool]`
+    /// * topics - `["approval_for_all", from: Address]`
+    /// * data - `[operator: Address, live_until_ledger: u32]`
     ///
     /// # Notes
     ///
     /// We recommend using [`crate::set_approval_for_all()`] when implementing
     /// this function.
-    fn set_approval_for_all(
-        e: &Env,
-        owner: Address,
-        operator: Address,
-        is_approved: bool,
-        live_until_ledger: u32,
-    );
+    fn set_approval_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32);
 
     /// Returns the account approved for `token_id` token.
     ///
@@ -205,7 +196,7 @@ pub trait NonFungibleToken {
     ///
     /// We recommend using [`crate::get_approved()`] when implementing this
     /// function.
-    fn get_approved(e: &Env, token_id: u128) -> Option<Address>;
+    fn get_approved(e: &Env, token_id: u32) -> Option<Address>;
 
     /// Returns whether the `operator` is allowed to manage all the assets of
     /// `owner`.
@@ -246,7 +237,7 @@ pub trait NonFungibleToken {
     /// # Notes
     ///
     /// If the token does not exist, this function is expected to panic.
-    fn token_uri(e: &Env, token_id: u128) -> String;
+    fn token_uri(e: &Env, token_id: u32) -> String;
 }
 
 // ################## ERRORS ##################
@@ -285,8 +276,8 @@ pub enum NonFungibleTokenError {
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u128]`
-pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
+/// * data - `[token_id: u32]`
+pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
     let topics = (symbol_short!("transfer"), from, to);
     e.events().publish(topics, token_id)
 }
@@ -301,16 +292,17 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 ///   `operator`).
 /// * `approved` - Address of the approved.
 /// * `token_id` - The identifier of the transferred token.
+/// * `live_until_ledger` - The ledger number at which the approval expires.
 ///
 /// # Events
 ///
-/// * topics - `["approval", owner: Address, token_id: u128]`
+/// * topics - `["approval", owner: Address, token_id: u32]`
 /// * data - `[approved: Address, live_until_ledger: u32]`
 pub fn emit_approval(
     e: &Env,
     approver: &Address,
     approved: &Address,
-    token_id: u128,
+    token_id: u32,
     live_until_ledger: u32,
 ) {
     let topics = (symbol_short!("approval"), approver, token_id);
@@ -326,20 +318,14 @@ pub fn emit_approval(
 /// * `owner` - Address of the owner of the token.
 /// * `operator` - Address of an operator that will manage operations on the
 ///   token.
-/// * `is_approved` - Whether or not permission has been granted. If true, this
-///   means `operator` will be allowed to manage `owner`'s assets.
+/// * `live_until_ledger` - The ledger number at which the allowance expires. If
+///   `live_until_ledger` is `0`, the approval is revoked.
 ///
 /// # Events
 ///
 /// * topics - `["approval", owner: Address]`
-/// * data - `[operator: Address, is_approved: bool, live_until_ledger: u32]`
-pub fn emit_approval_for_all(
-    e: &Env,
-    owner: &Address,
-    operator: &Address,
-    is_approved: bool,
-    live_until_ledger: u32,
-) {
+/// * data - `[operator: Address, live_until_ledger: u32]`
+pub fn emit_approval_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
     let topics = (Symbol::new(e, "approval_for_all"), owner);
-    e.events().publish(topics, (operator, is_approved, live_until_ledger))
+    e.events().publish(topics, (operator, live_until_ledger))
 }

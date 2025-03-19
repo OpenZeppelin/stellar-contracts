@@ -83,26 +83,19 @@
                   "map": [
                     {
                       "key": {
-                        "symbol": "is_approved"
+                        "symbol": "operators"
                       },
                       "val": {
-                        "bool": true
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "live_until_ledger"
-                      },
-                      "val": {
-                        "u32": 1000
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "operator"
-                      },
-                      "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                        "map": [
+                          {
+                            "key": {
+                              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                            },
+                            "val": {
+                              "u32": 1000
+                            }
+                          }
+                        ]
                       }
                     }
                   ]
@@ -150,10 +143,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 0
-                  }
+                  "u32": 0
                 }
               }
             },
@@ -305,9 +295,6 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
-                  "bool": true
-                },
-                {
                   "u32": 1000
                 }
               ]
@@ -333,10 +320,7 @@
               }
             ],
             "data": {
-              "u128": {
-                "hi": 0,
-                "lo": 1
-              }
+              "u32": 1
             }
           }
         }

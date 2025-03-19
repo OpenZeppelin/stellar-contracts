@@ -12,6 +12,7 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+stellar-constants = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

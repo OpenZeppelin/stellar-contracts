@@ -80,10 +80,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 0
-                  }
+                  "u32": 0
                 }
               }
             },
@@ -128,10 +125,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 1
                 }
               }
             },
@@ -150,10 +144,7 @@
                   "symbol": "Owner"
                 },
                 {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 1
                 }
               ]
             },
@@ -173,10 +164,7 @@
                       "symbol": "Owner"
                     },
                     {
-                      "u128": {
-                        "hi": 0,
-                        "lo": 1
-                      }
+                      "u32": 1
                     }
                   ]
                 },
@@ -328,10 +316,7 @@
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
               },
               {
-                "u128": {
-                  "hi": 0,
-                  "lo": 1
-                }
+                "u32": 1
               }
             ],
             "data": {
@@ -368,10 +353,7 @@
               }
             ],
             "data": {
-              "u128": {
-                "hi": 0,
-                "lo": 1
-              }
+              "u32": 1
             }
           }
         }

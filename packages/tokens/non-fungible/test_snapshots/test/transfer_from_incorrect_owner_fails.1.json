@@ -26,10 +26,7 @@
                   "symbol": "Approval"
                 },
                 {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 1
                 }
               ]
             },
@@ -49,10 +46,7 @@
                       "symbol": "Approval"
                     },
                     {
-                      "u128": {
-                        "hi": 0,
-                        "lo": 1
-                      }
+                      "u32": 1
                     }
                   ]
                 },
@@ -120,10 +114,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 1
                 }
               }
             },
@@ -142,10 +133,7 @@
                   "symbol": "Owner"
                 },
                 {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 1
                 }
               ]
             },
@@ -165,10 +153,7 @@
                       "symbol": "Owner"
                     },
                     {
-                      "u128": {
-                        "hi": 0,
-                        "lo": 1
-                      }
+                      "u32": 1
                     }
                   ]
                 },
@@ -320,10 +305,7 @@
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
               },
               {
-                "u128": {
-                  "hi": 0,
-                  "lo": 1
-                }
+                "u32": 1
               }
             ],
             "data": {
