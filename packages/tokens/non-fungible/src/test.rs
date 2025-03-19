@@ -273,11 +273,11 @@ fn owner_of_non_existent_token_fails() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let token_id = 1;
+    let non_existent_token_id = 1;
 
     e.as_contract(&address, || {
         // Attempt to get the owner of a non-existent token
-        owner_of(&e, token_id);
+        owner_of(&e, non_existent_token_id);
     });
 }
 
