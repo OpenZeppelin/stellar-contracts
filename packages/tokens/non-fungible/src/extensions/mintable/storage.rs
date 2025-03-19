@@ -68,10 +68,11 @@ pub fn increment_counter(e: &Env) -> u32 {
 /// admin.require_auth();
 /// ```
 ///
-/// This function utilizes [`increment_counter()`] to keep determine the next `token_id`,
-/// but it does NOT check if the provided `token_id` is already in use.
-/// If the developer has other means of minting tokens and generating `token_id`s,
-/// they should ensure that the token_id is unique and not already in use.
+/// This function utilizes [`increment_counter()`] to keep determine the next
+/// `token_id`, but it does NOT check if the provided `token_id` is already in
+/// use. If the developer has other means of minting tokens and generating
+/// `token_id`s, they should ensure that the token_id is unique and not already
+/// in use.
 pub fn mint(e: &Env, to: &Address) -> u32 {
     let token_id = increment_counter(e);
     update(e, None, Some(to), token_id);
