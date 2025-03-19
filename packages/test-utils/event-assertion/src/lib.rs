@@ -32,7 +32,7 @@ impl<'a> EventAssertion<'a> {
         event
     }
 
-    pub fn assert_transfer(&self, from: &Address, to: &Address, amount: i128) {
+    pub fn assert_fungible_transfer(&self, from: &Address, to: &Address, amount: i128) {
         let transfer_event = self.find_event_by_symbol("transfer");
 
         assert!(transfer_event.is_some(), "Transfer event not found in event log");
@@ -56,12 +56,7 @@ impl<'a> EventAssertion<'a> {
     }
 
     pub fn assert_non_fungible_transfer(&self, from: &Address, to: &Address, token_id: u32) {
-        let events = self.env.events().all();
-        let transfer_event = events.iter().find(|e| {
-            let topics: Vec<Val> = e.1.clone();
-            let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
-            topic_symbol == symbol_short!("transfer")
-        });
+        let transfer_event = self.find_event_by_symbol("transfer");
 
         assert!(transfer_event.is_some(), "Transfer event not found in event log");
 
