@@ -203,7 +203,7 @@ impl<'a> EventAssertion<'a> {
         let approve_event = events.iter().find(|e| {
             let topics: Vec<Val> = e.1.clone();
             let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
-            topic_symbol == symbol_short!("approval")
+            topic_symbol == symbol_short!("approve")
         });
 
         assert!(approve_event.is_some(), "Approve event not found in event log");
@@ -215,7 +215,7 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(topics.len(), 3, "Approve event should have 3 topics");
 
         let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-        assert_eq!(topic_symbol, symbol_short!("approval"));
+        assert_eq!(topic_symbol, symbol_short!("approve"));
 
         let event_owner: Address = topics.get_unchecked(1).into_val(self.env);
         let event_token_id: u32 = topics.get_unchecked(2).into_val(self.env);
@@ -237,7 +237,7 @@ impl<'a> EventAssertion<'a> {
         let approve_event = events.iter().find(|e| {
             let topics: Vec<Val> = e.1.clone();
             let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
-            topic_symbol == Symbol::new(self.env, "approval_for_all")
+            topic_symbol == Symbol::new(self.env, "approve_for_all")
         });
 
         assert!(approve_event.is_some(), "ApproveForAll event not found in event log");
@@ -249,7 +249,7 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(topics.len(), 2, "ApproveForAll event should have 2 topics");
 
         let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-        assert_eq!(topic_symbol, Symbol::new(self.env, "approval_for_all"));
+        assert_eq!(topic_symbol, Symbol::new(self.env, "approve_for_all"));
 
         let event_owner: Address = topics.get_unchecked(1).into_val(self.env);
         let event_data: (Address, u32) = data.into_val(self.env);

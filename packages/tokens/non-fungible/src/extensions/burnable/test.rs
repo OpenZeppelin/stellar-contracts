@@ -6,8 +6,8 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
+    approve_for_all,
     extensions::burnable::storage::{burn, burn_from},
-    set_approval_for_all,
     storage::{approve, balance},
     StorageKey,
 };
@@ -81,7 +81,7 @@ fn burn_from_with_operator_works() {
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
         e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
-        set_approval_for_all(&e, &owner, &operator, 1000);
+        approve_for_all(&e, &owner, &operator, 1000);
 
         burn_from(&e, &operator, &owner, token_id);
 

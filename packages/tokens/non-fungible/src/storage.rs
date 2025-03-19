@@ -4,7 +4,7 @@ use stellar_constants::{
 };
 
 use crate::non_fungible::{
-    emit_approval, emit_approval_for_all, emit_transfer, NonFungibleTokenError,
+    emit_approve, emit_approve_for_all, emit_transfer, NonFungibleTokenError,
 };
 
 /// Storage container for the token for which an approval is granted
@@ -201,7 +201,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 ///
 /// # Events
 ///
-/// * topics - `["approval", owner: Address, token_id: u128]`
+/// * topics - `["approve", owner: Address, token_id: u128]`
 /// * data - `[approved: Address, live_until_ledger: u32]`
 pub fn approve(
     e: &Env,
@@ -231,7 +231,7 @@ pub fn approve(
 
     e.storage().temporary().extend_ttl(&key, live_for, live_for);
 
-    emit_approval(e, approver, approved, token_id, live_until_ledger);
+    emit_approve(e, approver, approved, token_id, live_until_ledger);
 }
 
 /// Sets or removes operator approval for managing all tokens owned by the
@@ -252,9 +252,9 @@ pub fn approve(
 ///
 /// # Events
 ///
-/// * topics - `["approval", owner: Address]`
+/// * topics - `["approve", owner: Address]`
 /// * data - `[operator: Address, live_until_ledger: u32]`
-pub fn set_approval_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
+pub fn approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
     owner.require_auth();
 
     let key = StorageKey::ApprovalForAll(owner.clone());
@@ -266,7 +266,7 @@ pub fn set_approval_for_all(e: &Env, owner: &Address, operator: &Address, live_u
             approval_data.operators.remove(operator.clone());
             e.storage().temporary().set(&key, &approval_data);
         }
-        emit_approval_for_all(e, owner, operator, live_until_ledger);
+        emit_approve_for_all(e, owner, operator, live_until_ledger);
         return;
     }
 
@@ -293,7 +293,7 @@ pub fn set_approval_for_all(e: &Env, owner: &Address, operator: &Address, live_u
     let live_for = live_until_ledger - e.ledger().sequence();
     e.storage().temporary().extend_ttl(&key, live_for, live_for);
 
-    emit_approval_for_all(e, owner, operator, live_until_ledger);
+    emit_approve_for_all(e, owner, operator, live_until_ledger);
 }
 
 /// Low-level function for handling transfers for NFTs, but doesn't

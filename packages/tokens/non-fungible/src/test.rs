@@ -11,8 +11,8 @@ use stellar_event_assertion::EventAssertion;
 
 use crate::{
     storage::{
-        approve, balance, get_approved, is_approved_for_all, owner_of, set_approval_for_all,
-        transfer, update, StorageKey,
+        approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,
+        update, StorageKey,
     },
     transfer_from, ApprovalForAllData,
 };
@@ -21,7 +21,7 @@ use crate::{
 struct MockContract;
 
 #[test]
-fn set_approval_for_all_works() {
+fn approve_for_all_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -29,7 +29,7 @@ fn set_approval_for_all_works() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        set_approval_for_all(&e, &owner, &operator, 1000);
+        approve_for_all(&e, &owner, &operator, 1000);
 
         let is_approved = is_approved_for_all(&e, &owner, &operator);
         assert!(is_approved);
@@ -41,7 +41,7 @@ fn set_approval_for_all_works() {
 }
 
 #[test]
-fn revoke_approval_for_all_works() {
+fn revoke_approve_for_all_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -49,7 +49,7 @@ fn revoke_approval_for_all_works() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // set a pre-existing approval_for_all for the operator
+        // set a pre-existing approve_for_all for the operator
         let key = StorageKey::ApprovalForAll(owner.clone());
         let mut approval_data = ApprovalForAllData { operators: Map::new(&e) };
         approval_data.operators.set(operator.clone(), 1000);
@@ -60,7 +60,7 @@ fn revoke_approval_for_all_works() {
         assert!(is_approved);
 
         // revoke approval
-        set_approval_for_all(&e, &owner, &operator, 0);
+        approve_for_all(&e, &owner, &operator, 0);
         let is_approved = is_approved_for_all(&e, &owner, &operator);
         assert!(!is_approved);
 
@@ -106,7 +106,7 @@ fn approve_with_operator_works() {
     e.as_contract(&address, || {
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
 
-        set_approval_for_all(&e, &owner, &operator, 1000);
+        approve_for_all(&e, &owner, &operator, 1000);
 
         // approver is the operator on behalf of the owner
         approve(&e, &operator, &approved, token_id, 1000);
@@ -195,7 +195,7 @@ fn transfer_from_nft_operator_works() {
         e.storage().persistent().set(&StorageKey::Balance(owner.clone()), &1u32);
 
         // Approve the spender
-        set_approval_for_all(&e, &owner, &spender, 1000);
+        approve_for_all(&e, &owner, &spender, 1000);
 
         // Transfer from the owner using the spender's approval
         transfer_from(&e, &spender, &owner, &recipient, token_id);

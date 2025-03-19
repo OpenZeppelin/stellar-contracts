@@ -283,7 +283,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "approval_for_all"
+                "symbol": "approve_for_all"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"

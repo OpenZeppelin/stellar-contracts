@@ -220,7 +220,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "approval"
+                "symbol": "approve"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"

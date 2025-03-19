@@ -71,11 +71,11 @@ mod storage;
 
 pub use extensions::burnable;
 pub use non_fungible::{
-    emit_approval, emit_approval_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenClient,
+    emit_approve, emit_approve_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenClient,
     NonFungibleTokenError,
 };
 pub use storage::{
-    approve, balance, get_approved, is_approved_for_all, owner_of, set_approval_for_all, transfer,
+    approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,
     transfer_from, ApprovalData, ApprovalForAllData, StorageKey,
 };
 

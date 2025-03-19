@@ -136,7 +136,7 @@ pub trait NonFungibleToken {
     ///
     /// # Events
     ///
-    /// * topics - `["approval", from: Address, to: Address]`
+    /// * topics - `["approve", from: Address, to: Address]`
     /// * data - `[token_id: u32, live_until_ledger: u32]`
     ///
     /// # Notes
@@ -171,14 +171,14 @@ pub trait NonFungibleToken {
     ///
     /// # Events
     ///
-    /// * topics - `["approval_for_all", from: Address]`
+    /// * topics - `["approve_for_all", from: Address]`
     /// * data - `[operator: Address, live_until_ledger: u32]`
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::set_approval_for_all()`] when implementing
+    /// We recommend using [`crate::approve_for_all()`] when implementing
     /// this function.
-    fn set_approval_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32);
+    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32);
 
     /// Returns the account approved for `token_id` token.
     ///
@@ -296,16 +296,16 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
 ///
 /// # Events
 ///
-/// * topics - `["approval", owner: Address, token_id: u32]`
+/// * topics - `["approve", owner: Address, token_id: u32]`
 /// * data - `[approved: Address, live_until_ledger: u32]`
-pub fn emit_approval(
+pub fn emit_approve(
     e: &Env,
     approver: &Address,
     approved: &Address,
     token_id: u32,
     live_until_ledger: u32,
 ) {
-    let topics = (symbol_short!("approval"), approver, token_id);
+    let topics = (symbol_short!("approve"), approver, token_id);
     e.events().publish(topics, (approved, live_until_ledger))
 }
 
@@ -323,9 +323,9 @@ pub fn emit_approval(
 ///
 /// # Events
 ///
-/// * topics - `["approval", owner: Address]`
+/// * topics - `["approve_for_all", owner: Address]`
 /// * data - `[operator: Address, live_until_ledger: u32]`
-pub fn emit_approval_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
-    let topics = (Symbol::new(e, "approval_for_all"), owner);
+pub fn emit_approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
+    let topics = (Symbol::new(e, "approve_for_all"), owner);
     e.events().publish(topics, (operator, live_until_ledger))
 }
