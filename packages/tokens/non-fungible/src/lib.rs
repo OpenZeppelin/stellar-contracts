@@ -71,7 +71,7 @@ mod non_fungible;
 mod storage;
 
 pub use contract_behavior::*;
-pub use extensions::{burnable, mintable};
+pub use extensions::{burnable, enumerable, mintable};
 pub use non_fungible::{
     emit_approve, emit_approve_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenError,
     TokenId,
