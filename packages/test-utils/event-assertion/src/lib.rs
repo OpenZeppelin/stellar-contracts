@@ -24,12 +24,11 @@ impl<'a> EventAssertion<'a> {
             _ => Symbol::new(self.env, symbol_name),
         };
 
-        let event = events.iter().find(|e| {
+        events.iter().find(|e| {
             let topics: Vec<Val> = e.1.clone();
             let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
             topic_symbol == target_symbol
-        });
-        event
+        })
     }
 
     pub fn assert_fungible_transfer(&self, from: &Address, to: &Address, amount: i128) {
