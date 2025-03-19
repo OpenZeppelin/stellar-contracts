@@ -12,8 +12,7 @@ impl<'a> EventAssertion<'a> {
         Self { env, contract }
     }
 
-    fn find_event_by_symbol(&self, symbol_name:&str) -> Option<(Address, Vec<Val>, Val)>  {
-
+    fn find_event_by_symbol(&self, symbol_name: &str) -> Option<(Address, Vec<Val>, Val)> {
         let events = self.env.events().all();
 
         let target_symbol = match symbol_name {
@@ -24,7 +23,7 @@ impl<'a> EventAssertion<'a> {
             "approval" => symbol_short!("approval"),
             _ => Symbol::new(self.env, symbol_name),
         };
-        
+
         let event = events.iter().find(|e| {
             let topics: Vec<Val> = e.1.clone();
             let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
@@ -128,7 +127,7 @@ impl<'a> EventAssertion<'a> {
 
     pub fn assert_non_fungible_burn(&self, from: &Address, token_id: u32) {
         let burn_event = self.find_event_by_symbol("burn");
-      
+
         assert!(burn_event.is_some(), "Burn event not found in event log");
 
         let (contract, topics, data) = burn_event.unwrap();
@@ -225,7 +224,7 @@ impl<'a> EventAssertion<'a> {
         live_until_ledger: u32,
     ) {
         let approve_event = self.find_event_by_symbol("approval_for_all");
-        
+
         assert!(approve_event.is_some(), "ApproveForAll event not found in event log");
 
         let (contract, topics, data) = approve_event.unwrap();
