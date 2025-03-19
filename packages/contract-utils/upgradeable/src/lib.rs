@@ -9,5 +9,7 @@ pub use crate::{
         can_migrate, can_rollback, complete_migration, complete_rollback, ensure_can_migrate,
         ensure_can_rollback, start_migration,
     },
-    upgradeable::{Migratable, MigratableInternal, Upgradeable, UpgradeableInternal},
+    upgradeable::{
+        Migratable, MigratableInternal, Upgradeable, UpgradeableClient, UpgradeableInternal,
+    },
 };

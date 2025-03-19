@@ -1,6 +1,7 @@
-use soroban_sdk::{contracterror, Address, BytesN, Env, FromVal, Val};
+use soroban_sdk::{contractclient, contracterror, Address, BytesN, Env, FromVal, Val};
 
-pub trait Upgradeable: UpgradeableInternal {
+#[contractclient(name = "UpgradeableClient")]
+pub trait Upgradeable {
     /// Upgrades the contract by setting a new WASM bytecode. The
     /// contract will only be upgraded after the invocation has
     /// successfully completed.
