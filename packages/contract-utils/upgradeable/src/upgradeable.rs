@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, BytesN, Env, FromVal, Val};
+use soroban_sdk::{contracterror, Address, BytesN, Env, FromVal, Val};
 
 pub trait Upgradeable: UpgradeableInternal {
     /// Upgrades the contract by setting a new WASM bytecode. The
@@ -10,7 +10,7 @@ pub trait Upgradeable: UpgradeableInternal {
     /// * `e` - Access to Soroban environment.
     /// * `new_wasm_hash` - The identifier of the WASM blob, uploaded to the
     ///   ledger.
-    fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, upgrade_data: Self::UpgradeData);
+    fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address);
 }
 
 // No need to manually implement this trait as it can be derived with
@@ -22,10 +22,9 @@ pub trait Migratable: MigratableInternal {
 
 // Trait to be implemented for a concrete upgrade procedure.
 pub trait UpgradeableInternal {
-    type UpgradeData: FromVal<Env, Val>;
-
-    // needs to implement access control and any pre-upgrade logic
-    fn _upgrade(e: &Env, upgrade_data: &Self::UpgradeData);
+    // needs to implement access control
+    // `operator` can be C-account (e.g. owner) or antoher contract such as timelock or governor
+    fn _upgrade_auth(e: &Env, operator: &Address);
 }
 
 // Trait to be implemented for a concrete migrate procedure.

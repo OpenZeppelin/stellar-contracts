@@ -1,9 +1,18 @@
-use soroban_sdk::{contract, contracttype, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{
+    contract, contracterror, contracttype, panic_with_error, symbol_short, Address, Env, Symbol,
+};
 use stellar_upgradeable::{MigratableInternal, UpgradeableInternal};
 use stellar_upgradeable_macros::Upgradeable;
 
 pub const DATA_KEY: Symbol = symbol_short!("DATA_KEY");
 pub const OWNER: Symbol = symbol_short!("OWNER");
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ExampleContractError {
+    Unauthorized = 1,
+}
 
 #[contracttype]
 pub struct Data {
@@ -17,10 +26,12 @@ pub struct Data {
 pub struct ExampleContract;
 
 impl UpgradeableInternal for ExampleContract {
-    type UpgradeData = ();
-
-    fn _upgrade(e: &Env, _data: &Self::UpgradeData) {
-        e.storage().instance().get::<_, Address>(&OWNER).unwrap().require_auth();
+    fn _upgrade_auth(e: &Env, operator: &Address) {
+        operator.require_auth();
+        let owner = e.storage().instance().get::<_, Address>(&OWNER).unwrap();
+        if *operator != owner {
+            panic_with_error!(e, ExampleContractError::Unauthorized)
+        }
     }
 }
 

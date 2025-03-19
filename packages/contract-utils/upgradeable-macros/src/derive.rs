@@ -23,12 +23,10 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
 
         soroban_sdk::contractmeta!(key = "binver", val = #version);
 
-        type UpgradeData = <#name as stellar_upgradeable::UpgradeableInternal>::UpgradeData;
-
         #[soroban_sdk::contractimpl]
         impl stellar_upgradeable::Upgradeable for #name {
-            fn upgrade(e: &soroban_sdk::Env, new_wasm_hash: soroban_sdk::BytesN<32>, upgrade_data: UpgradeData) {
-                Self::_upgrade(e, &upgrade_data);
+            fn upgrade(e: &soroban_sdk::Env, new_wasm_hash: soroban_sdk::BytesN<32>, operator: soroban_sdk::Address) {
+                Self::_upgrade_auth(e, &operator);
 
                 stellar_upgradeable::start_migration(e);
 
