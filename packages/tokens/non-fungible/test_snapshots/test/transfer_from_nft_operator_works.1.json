@@ -267,7 +267,7 @@
                     "storage": [
                       {
                         "key": {
-                          "string": "COUNTER"
+                          "string": "TOKEN_ID_COUNTER"
                         },
                         "val": {
                           "u32": 1

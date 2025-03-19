@@ -27,7 +27,7 @@ pub trait NonFungibleMintable {
     ///
     /// # Errors
     ///
-    /// * [`crate::NonFungibleTokenError::MathOverflow`] - When all the
+    /// * [`crate::NonFungibleTokenError::TokenIDsAreDepleted`] - When all the
     ///   available `token_id`s are consumed for this smart contract.
     ///
     /// # Events

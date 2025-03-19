@@ -2,7 +2,7 @@ use soroban_sdk::{panic_with_error, Address, Env};
 
 use crate::{extensions::mintable::emit_mint, storage::update, NonFungibleTokenError};
 
-const COUNTER: &str = "COUNTER";
+const TOKEN_ID_COUNTER: &str = "TOKEN_ID_COUNTER";
 
 /// Get the current token counter value to determine the next token_id.
 /// The returned value is the next available token_id.
@@ -10,11 +10,11 @@ const COUNTER: &str = "COUNTER";
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-pub fn get_counter(e: &Env) -> u32 {
-    e.storage().instance().get(&COUNTER).unwrap_or(0)
+pub fn next_token_id(e: &Env) -> u32 {
+    e.storage().instance().get(&TOKEN_ID_COUNTER).unwrap_or(0)
 }
 
-/// Increment and return the next token ID.
+/// Return the next free token ID, then increment the counter.
 ///
 /// # Arguments
 ///
@@ -22,14 +22,14 @@ pub fn get_counter(e: &Env) -> u32 {
 ///
 /// # Errors
 ///
-/// * [`crate::NonFungibleTokenError::MathOverflow`] - When all the available
-///   `token_id`s are consumed for this smart contract.
-pub fn increment_counter(e: &Env) -> u32 {
-    let current = get_counter(e);
+/// * [`crate::NonFungibleTokenError::TokenIDsAreDepleted`] - When all the
+///   available `token_id`s are consumed for this smart contract.
+pub fn increment_token_id(e: &Env) -> u32 {
+    let current = next_token_id(e);
     let next = current.checked_add(1).unwrap_or_else(|| {
-        panic_with_error!(e, NonFungibleTokenError::MathOverflow);
+        panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
     });
-    e.storage().instance().set(&COUNTER, &next);
+    e.storage().instance().set(&TOKEN_ID_COUNTER, &next);
 
     current
 }
@@ -74,7 +74,7 @@ pub fn increment_counter(e: &Env) -> u32 {
 /// `token_id`s, they should ensure that the token_id is unique and not already
 /// in use.
 pub fn mint(e: &Env, to: &Address) -> u32 {
-    let token_id = increment_counter(e);
+    let token_id = increment_token_id(e);
     update(e, None, Some(to), token_id);
     emit_mint(e, to, token_id);
 
