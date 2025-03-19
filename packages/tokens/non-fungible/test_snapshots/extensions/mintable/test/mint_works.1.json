@@ -72,7 +72,7 @@
                   "symbol": "Owner"
                 },
                 {
-                  "u32": 100
+                  "u32": 0
                 }
               ]
             },
@@ -92,7 +92,7 @@
                       "symbol": "Owner"
                     },
                     {
-                      "u32": 100
+                      "u32": 0
                     }
                   ]
                 },
@@ -129,7 +129,16 @@
                     "executable": {
                       "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                     },
-                    "storage": null
+                    "storage": [
+                      {
+                        "key": {
+                          "string": "COUNTER"
+                        },
+                        "val": {
+                          "u32": 1
+                        }
+                      }
+                    ]
                   }
                 }
               }
@@ -179,7 +188,7 @@
               }
             ],
             "data": {
-              "u32": 100
+              "u32": 0
             }
           }
         }

@@ -17,12 +17,12 @@ fn mint_works() {
     let address = e.register(MockContract, ());
     let account = Address::generate(&e);
     e.as_contract(&address, || {
-        mint(&e, &account, 100);
+        let token_id = mint(&e, &account);
         assert_eq!(balance(&e, &account), 1);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
-        event_assert.assert_non_fungible_mint(&account, 100);
+        event_assert.assert_non_fungible_mint(&account, token_id);
     });
 }
 
@@ -45,7 +45,7 @@ fn mint_base_implementation_has_no_auth() {
 
     // This should NOT panic even without authorization
     e.as_contract(&address, || {
-        mint(&e, &account, 100);
+        mint(&e, &account);
         assert_eq!(balance(&e, &account), 1);
     });
 }

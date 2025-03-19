@@ -17,18 +17,18 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// contract use cases.
 #[contractclient(name = "NonFungibleMintableClient")]
 pub trait NonFungibleMintable {
-    /// Creates a token with `token_id` and assigns it to `to`.
+    /// Creates a token with the next available `token_id` and assigns it to
+    /// `to`. Returns the `token_id` for the newly minted token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `to` - The address receiving the new token.
-    /// * `token_id` - Token id as a number.
     ///
     /// # Errors
     ///
-    /// * [`crate::NonFungibleTokenError::TokenAlreadyExists`] - When the to be
-    ///   minted `token_id` already exists.
+    /// * [`crate::NonFungibleTokenError::MathOverflow`] - When all the
+    ///   available `token_id`s are consumed for this smart contract.
     ///
     /// # Events
     ///
@@ -58,7 +58,7 @@ pub trait NonFungibleMintable {
     /// ```
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
-    fn mint(e: &Env, to: Address, token_id: u32);
+    fn mint(e: &Env, to: Address) -> u32;
 }
 
 // ################## EVENTS ##################
