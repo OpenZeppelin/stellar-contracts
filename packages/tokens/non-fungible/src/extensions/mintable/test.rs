@@ -26,6 +26,26 @@ fn mint_works() {
     });
 }
 
+#[test]
+fn test_counter_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let token_id1 = mint(&e, &owner);
+        let _token_id2 = mint(&e, &owner);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        event_assert.assert_non_fungible_mint(&owner, token_id1);
+
+        // TODO: below fails because the same event is read by the `event_assert`, not the next one.
+        // event_assert.assert_non_fungible_mint(&owner, token_id2);
+    });
+}
+
 /// Test that confirms the base mint implementation does NOT require
 /// authorization
 ///

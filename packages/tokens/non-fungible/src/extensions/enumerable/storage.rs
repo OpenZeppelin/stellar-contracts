@@ -1,9 +1,11 @@
-use core::ops::Add;
-
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::{
-    balance, burnable::burn, mintable::mint, storage::update, transfer, NonFungibleTokenError,
+    balance,
+    burnable::{burn, burn_from},
+    mintable::{emit_mint, mint},
+    storage::update,
+    transfer, transfer_from, NonFungibleTokenError,
 };
 
 /// Storage key that maps to [`AllowanceData`]
@@ -44,9 +46,18 @@ pub fn total_supply(e: &Env) -> u32 {
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - Account of the token's owner.
 /// * `index` - Index of the token in the owner's local list.
+///
+/// # Errors
+///
+/// * [`NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token ID is
+///   not found in the owner's enumeration.
 pub fn get_owner_token_id(e: &Env, owner: &Address, index: u32) -> u32 {
     let key = StorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index });
-    e.storage().persistent().get::<_, u32>(&key).unwrap()
+    let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
+        panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
+    };
+
+    token_id
 }
 
 /// Returns the `token_id` at a given `index` in the global token list.
@@ -63,9 +74,18 @@ pub fn get_owner_token_id(e: &Env, owner: &Address, index: u32) -> u32 {
 /// **IMPORTANT**: This function is only intended for non-sequential
 /// `token_id`s. For sequential `token_id`s, no need to call a function,
 /// the `token_id` itself acts as the global index.
+///
+/// # Errors
+///
+/// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token ID
+///   is not found in the global enumeration.
 pub fn get_token_id(e: &Env, index: u32) -> u32 {
     let key = StorageKey::GlobalTokens(index);
-    e.storage().persistent().get::<_, u32>(&key).unwrap()
+    let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
+        panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
+    };
+
+    token_id
 }
 
 // ################## CHANGE STATE ##################
@@ -93,7 +113,6 @@ pub fn get_token_id(e: &Env, index: u32) -> u32 {
 /// This is a wrapper around [`crate::mintable::mint()`], that also
 /// handles the storage updates for:
 /// * total supply
-/// * owner_tokens enumeration
 pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
     let token_id = mint(e, to);
 
@@ -207,7 +226,7 @@ pub fn sequential_burn(e: &Env, from: &Address, token_id: u32) {
 pub fn non_sequential_burn(e: &Env, from: &Address, token_id: u32) {
     burn(e, from, token_id);
 
-    remove_from_owner_enumeration(e, owner, token_id);
+    remove_from_owner_enumeration(e, from, token_id);
 
     let total_supply = decrement_total_supply(e);
 
@@ -219,8 +238,8 @@ pub fn non_sequential_burn(e: &Env, from: &Address, token_id: u32) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `spender` - The account that is allowed to burn the token on behalf of
-///   the owner.
+/// * `spender` - The account that is allowed to burn the token on behalf of the
+///   owner.
 /// * `from` - The account whose token is destroyed.
 /// * `token_id` - The token to burn.
 ///
@@ -241,7 +260,7 @@ pub fn non_sequential_burn(e: &Env, from: &Address, token_id: u32) {
 /// * total supply
 /// * owner_tokens enumeration
 pub fn sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
-    burn(e, from, token_id);
+    burn_from(e, spender, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
 
@@ -257,8 +276,8 @@ pub fn sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `spender` - The account that is allowed to burn the token on behalf of
-///   the owner.
+/// * `spender` - The account that is allowed to burn the token on behalf of the
+///   owner.
 /// * `from` - The account whose token is destroyed.
 /// * `token_id` - The token to burn.
 ///
@@ -281,9 +300,9 @@ pub fn sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id
 /// * owner_tokens enumeration
 /// * global_tokens enumeration
 pub fn non_sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
-    burn(e, from, token_id);
+    burn_from(e, spender, from, token_id);
 
-    remove_from_owner_enumeration(e, owner, token_id);
+    remove_from_owner_enumeration(e, from, token_id);
 
     let total_supply = decrement_total_supply(e);
 
@@ -317,8 +336,8 @@ pub fn non_sequential_burn_from(e: &Env, spender: &Address, from: &Address, toke
 pub fn enumerable_transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
     transfer(e, from, to, token_id);
 
-    remove_from_owner_enumeration(e, owner, to_be_removed_id);
-    add_to_owner_enumeration(e, owner, token_id);
+    remove_from_owner_enumeration(e, from, token_id);
+    add_to_owner_enumeration(e, to, token_id);
 }
 
 /// Transfers a non-fungible token (NFT), ensuring ownership and approval
@@ -354,10 +373,10 @@ pub fn enumerable_transfer_from(
     to: &Address,
     token_id: u32,
 ) {
-    transfer_from(e, from, to, token_id);
+    transfer_from(e, spender, from, to, token_id);
 
-    remove_from_owner_enumeration(e, owner, to_be_removed_id);
-    add_to_owner_enumeration(e, owner, token_id);
+    remove_from_owner_enumeration(e, from, token_id);
+    add_to_owner_enumeration(e, to, token_id);
 }
 // ################## LOW-LEVEL HELPERS ##################
 
@@ -369,7 +388,8 @@ pub fn enumerable_transfer_from(
 ///
 /// # Errors
 ///
-/// * [`NonFungibleTokenError::TokenIDsAreDepleted`] - When attempting to mint a new token ID, but all token IDs are already in use.
+/// * [`NonFungibleTokenError::TokenIDsAreDepleted`] - When attempting to mint a
+///   new token ID, but all token IDs are already in use.
 pub fn increment_total_supply(e: &Env) -> u32 {
     let total_supply = total_supply(e);
     let Some(new_total_supply) = total_supply.checked_add(1) else {
@@ -401,7 +421,9 @@ pub fn decrement_total_supply(e: &Env) -> u32 {
 /// * `owner` - The address of the owner.
 /// * `token_id` - The token ID to add.
 pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: u32) {
-    let owner_balance = balance(e, owner);
+    // we decrease 1 from the balance, because this function is called after balance
+    // is manipulated (mint, transfer, etc.)
+    let owner_balance = balance(e, owner) - 1;
     e.storage().persistent().set(
         &StorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index: owner_balance }),
         &token_id,
@@ -419,24 +441,28 @@ pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: u32) {
 ///
 /// # Errors
 ///
-/// * [`NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token ID is not found in the owner's enumeration.
+/// * [`NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token ID is
+///   not found in the owner's enumeration.
 pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id: u32) {
     let Some(to_be_removed_index) =
-        e.storage().persistent().get((&StorageKey::OwnerTokensIndex(to_be_removed_id)))
+        e.storage().persistent().get(&StorageKey::OwnerTokensIndex(to_be_removed_id))
     else {
         panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
     };
-    let last_token_index = balance(e, to) - 1;
+
+    // This function is called after balance is manipulated, so do not need to
+    // decrease 1 from the balance (burn, transfer, etc.).
+    let last_token_index = balance(e, owner);
 
     // Update the `OwnerTokens`.
     if to_be_removed_index != last_token_index {
         // Before swap: [A, B, C, D]  (burning `B`, which is at index 1)
         // After swap:  [A, D, C, D]  (`D` moves to index 1, note that `B` isn't moved)
         // After deletion: [A, D, C]  (last item is deleted, effectively removing `B`)
-        let last_token_id = get_owner_token_id(e, from, last_token_index);
+        let last_token_id = get_owner_token_id(e, owner, last_token_index);
         e.storage().persistent().set(
             &StorageKey::OwnerTokens(OwnerTokensKey {
-                owner: from.clone(),
+                owner: owner.clone(),
                 index: to_be_removed_index,
             }),
             &last_token_id,
@@ -450,7 +476,7 @@ pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id:
 
     // Delete the last token from owner's local list.
     e.storage().persistent().remove(&StorageKey::OwnerTokens(OwnerTokensKey {
-        owner: from.clone(),
+        owner: owner.clone(),
         index: last_token_index,
     }));
     e.storage().persistent().remove(&StorageKey::OwnerTokensIndex(to_be_removed_id));
@@ -464,8 +490,8 @@ pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id:
 /// * `token_id` - The token ID to add.
 /// * `total_supply` - The current total supply, acts as the index.
 pub fn add_to_global_enumeration(e: &Env, token_id: u32, total_supply: u32) {
-    e.storage().instance().set(&StorageKey::GlobalTokens(total_supply), &token_id);
-    e.storage().instance().set(&StorageKey::GlobalTokensIndex(token_id), &total_supply);
+    e.storage().persistent().set(&StorageKey::GlobalTokens(total_supply), &token_id);
+    e.storage().persistent().set(&StorageKey::GlobalTokensIndex(token_id), &total_supply);
 }
 
 /// Removes a token ID from the global enumeration.
@@ -474,14 +500,16 @@ pub fn add_to_global_enumeration(e: &Env, token_id: u32, total_supply: u32) {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `to_be_removed_id` - The token ID to remove.
-/// * `last_token_index` - The index of the last token in the global enumeration.
+/// * `last_token_index` - The index of the last token in the global
+///   enumeration.
 ///
 /// # Errors
 ///
-/// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token ID is not found in the global enumeration.
+/// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token ID
+///   is not found in the global enumeration.
 pub fn remove_from_global_enumeration(e: &Env, to_be_removed_id: u32, last_token_index: u32) {
     let Some(to_be_removed_index) =
-        e.storage().instance().get::<_, u32>((&StorageKey::GlobalTokensIndex(to_be_removed_id)))
+        e.storage().persistent().get::<_, u32>(&StorageKey::GlobalTokensIndex(to_be_removed_id))
     else {
         panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
     };
@@ -494,12 +522,14 @@ pub fn remove_from_global_enumeration(e: &Env, to_be_removed_id: u32, last_token
     // After swap:  [A, D, C, D]  (`D` moves to index 1, note that `B` isn't moved)
     // After deletion: [A, D, C]  (last item is deleted, effectively removing `B`)
     let last_token_id = get_token_id(e, last_token_index);
-    e.storage().instance().set(&StorageKey::GlobalTokens(to_be_removed_index), &last_token_id);
+    e.storage().persistent().set(&StorageKey::GlobalTokens(to_be_removed_index), &last_token_id);
 
     // Update the moved token's index.
-    e.storage().instance().set(&StorageKey::GlobalTokensIndex(last_token_id), &to_be_removed_index);
+    e.storage()
+        .persistent()
+        .set(&StorageKey::GlobalTokensIndex(last_token_id), &to_be_removed_index);
 
     // Delete the last token from the global lists.
-    e.storage().instance().remove(&StorageKey::GlobalTokens(last_token_index));
-    e.storage().instance().remove(&StorageKey::GlobalTokensIndex(to_be_removed_id));
+    e.storage().persistent().remove(&StorageKey::GlobalTokens(last_token_index));
+    e.storage().persistent().remove(&StorageKey::GlobalTokensIndex(to_be_removed_id));
 }

@@ -191,7 +191,11 @@
                     "storage": [
                       {
                         "key": {
-                          "string": "TOKEN_ID_COUNTER"
+                          "vec": [
+                            {
+                              "symbol": "TokenIdCounter"
+                            }
+                          ]
                         },
                         "val": {
                           "u32": 1
