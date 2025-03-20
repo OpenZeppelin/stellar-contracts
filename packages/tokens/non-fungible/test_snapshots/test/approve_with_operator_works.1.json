@@ -345,7 +345,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "approval_for_all"
+                "symbol": "approve_for_all"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -375,7 +375,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "approval"
+                "symbol": "approve"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"

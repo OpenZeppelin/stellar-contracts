@@ -11,9 +11,10 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// the capability to mint tokens. This trait is designed to be used in
 /// conjunction with the `FungibleToken` trait.
 ///
-/// Excluding the `mint` functionality from the `[FungibleToken]` trait
-/// is a deliberate design choice to accommodate flexibility and customization
-/// for various smart contract use cases.
+/// Excluding the `mint` functionality from the
+/// [`crate::fungible::FungibleToken`] trait is a deliberate design choice to
+/// accommodate flexibility and customization for various smart contract use
+/// cases.
 #[contractclient(name = "FungibleMintableClient")]
 pub trait FungibleMintable {
     /// Creates `amount` of tokens and assigns them to `account`. Updates
@@ -22,17 +23,18 @@ pub trait FungibleMintable {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `account` - The address receiving the new tokens.
+    /// * `to` - The address receiving the new tokens.
     /// * `amount` - The amount of tokens to mint.
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::LessThanZero`] - When `amount < 0`.
-    /// * [`FungibleTokenError::MathOverflow`] - When `total_supply` overflows.
+    /// * [`crate::FungibleTokenError::LessThanZero`] - When `amount < 0`.
+    /// * [`crate::FungibleTokenError::MathOverflow`] - When `total_supply`
+    ///   overflows.
     ///
     /// # Events
     ///
-    /// * topics - `["mint", account: Address]`
+    /// * topics - `["mint", to: Address]`
     /// * data - `[amount: i128]`
     ///
     /// # Notes
@@ -64,7 +66,7 @@ pub trait FungibleMintable {
     /// ```
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
-    fn mint(e: &Env, account: Address, amount: i128);
+    fn mint(e: &Env, to: Address, amount: i128);
 }
 
 // ################## EVENTS ##################
@@ -74,14 +76,14 @@ pub trait FungibleMintable {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `account` - The address receiving the new tokens.
+/// * `to` - The address receiving the new tokens.
 /// * `amount` - The amount of tokens to mint.
 ///
 /// # Events
 ///
 /// * topics - `["mint", account: Address]`
 /// * data - `[amount: i128]`
-pub fn emit_mint(e: &Env, account: &Address, amount: i128) {
-    let topics = (symbol_short!("mint"), account);
+pub fn emit_mint(e: &Env, to: &Address, amount: i128) {
+    let topics = (symbol_short!("mint"), to);
     e.events().publish(topics, amount)
 }
