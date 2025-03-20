@@ -1,10 +1,11 @@
-use soroban_sdk::{panic_with_error, Address, Env};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
-use crate::{
-    extensions::mintable::emit_mint, non_fungible::TokenId, storage::update, NonFungibleTokenError,
-};
+use crate::{extensions::mintable::emit_mint, storage::update, NonFungibleTokenError, TokenId};
 
-const TOKEN_ID_COUNTER: &str = "TOKEN_ID_COUNTER";
+#[contracttype]
+pub enum DataKey {
+    TokenIdCounter,
+}
 
 /// Get the current token counter value to determine the next token_id.
 /// The returned value is the next available token_id.
@@ -13,7 +14,7 @@ const TOKEN_ID_COUNTER: &str = "TOKEN_ID_COUNTER";
 ///
 /// * `e` - Access to the Soroban environment.
 pub fn next_token_id(e: &Env) -> TokenId {
-    e.storage().instance().get(&TOKEN_ID_COUNTER).unwrap_or(0)
+    e.storage().instance().get(&DataKey::TokenIdCounter).unwrap_or(0)
 }
 
 /// Return the next free token ID, then increment the counter.
@@ -31,7 +32,7 @@ pub fn increment_token_id(e: &Env) -> TokenId {
     let next = current.checked_add(1).unwrap_or_else(|| {
         panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
     });
-    e.storage().instance().set(&TOKEN_ID_COUNTER, &next);
+    e.storage().instance().set(&DataKey::TokenIdCounter, &next);
 
     current
 }
