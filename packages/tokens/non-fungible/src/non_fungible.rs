@@ -281,16 +281,14 @@ pub enum NonFungibleTokenError {
     InvalidLiveUntilLedger = 304,
     /// Indicates overflow when adding two values
     MathOverflow = 305,
-    /// Indicates an `owner`'s token query was out of bounds for `index`.
-    OutOfBounds = 306,
     /// Indicates all possible `token_id`s are already in use.
     TokenIDsAreDepleted = 306,
     /// Indicates a token with given `token_id` already exists.
     TokenIDInUse = 307,
     /// Indicates the token does not exist in owner's list.
-    TokenNotFoundInOwnerList = 308,
+    TokenNotFoundInOwnerList = 307,
     /// Indicates the token does not exist in global list.
-    TokenNotFoundInGlobalList = 309,
+    TokenNotFoundInGlobalList = 308,
 }
 
 // ################## EVENTS ##################
