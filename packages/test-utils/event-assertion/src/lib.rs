@@ -78,7 +78,7 @@ impl<'a> EventAssertion<'a> {
 
     pub fn assert_fungible_mint(&self, to: &Address, amount: i128) {
         let mint_event = self.find_event_by_symbol("mint");
-      
+
         assert!(mint_event.is_some(), "Mint event not found in event log");
 
         let (contract, topics, data) = mint_event.unwrap();
