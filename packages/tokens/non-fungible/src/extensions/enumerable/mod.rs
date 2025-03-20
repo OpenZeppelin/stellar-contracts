@@ -3,7 +3,7 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{contractclient, symbol_short, Address, Env};
+use soroban_sdk::{contractclient, Address, Env};
 
 /// Enumerable Trait for Non-Fungible Token
 ///
