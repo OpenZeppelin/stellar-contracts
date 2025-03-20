@@ -1,5 +1,4 @@
-mod storage;
-// pub use self::storage::{burn, burn_from};
+pub mod storage;
 
 mod test;
 
@@ -28,7 +27,6 @@ use soroban_sdk::{contractclient, Address, Env};
 ///   first token of the contract can be found with `index` `0`, and so on. To
 ///   retrieve `token_id`s, one can call the
 ///   [`NonFungibleEnumerable::get_token_id()`] function.
-
 ///
 /// This trait is designed to be used in
 /// conjunction with the `NonFungibleToken` trait.
