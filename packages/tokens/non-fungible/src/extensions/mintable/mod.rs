@@ -8,7 +8,12 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// Mintable Trait for Non-Fungible Token
 ///
 /// The `NonFungibleMintable` trait extends the `NonFungibleToken` trait to
-/// provide the capability to mint tokens. This trait is designed to be used in
+/// provide the capability to mint tokens with sequential `token_id`s, utilizing
+/// the counter strategy. If you want to mint tokens with non-sequential
+/// `token_id`s, it is suggested to not use an extension, and implement your
+/// custom `mint()` function directly under your contract.
+///
+/// This trait is designed to be used in
 /// conjunction with the `NonFungibleToken` trait.
 ///
 /// Excluding the `mint` functionality from the
@@ -42,7 +47,7 @@ pub trait NonFungibleMintable {
     ///
     /// # Security Warning
     ///
-    /// IMPORTANT: The base implementation of mint() intentionally lacks
+    /// **IMPORTANT**: The base implementation of mint() intentionally lacks
     /// authorization controls. You MUST implement proper authorization in
     /// your contract. For example:
     ///

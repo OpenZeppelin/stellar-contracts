@@ -33,10 +33,10 @@ fn mint_works() {
 /// Test that confirms the base mint implementation does NOT require
 /// authorization
 ///
-/// IMPORTANT: This test verifies the intentional design choice that the base
-/// mint implementation doesn't include authorization controls. This is NOT a
-/// security flaw but rather a design decision to give implementers flexibility
-/// in how they implement authorization.
+/// **IMPORTANT**: This test verifies the intentional design choice that the
+/// base mint implementation doesn't include authorization controls. This is NOT
+/// a security flaw but rather a design decision to give implementers
+/// flexibility in how they implement authorization.
 ///
 /// When using this function in your contracts, you MUST add your own
 /// authorization controls to ensure only designated accounts can mint tokens.

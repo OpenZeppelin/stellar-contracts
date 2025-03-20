@@ -11,9 +11,10 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// provide the capability to burn tokens. This trait is designed to be used in
 /// conjunction with the `NonFungibleToken` trait.
 ///
-/// Excluding the `burn` functionality from the `[NonFungibleToken]` trait
-/// is a deliberate design choice to accommodate flexibility and customization
-/// for various smart contract use cases.
+/// Excluding the `burn` functionality from the
+/// [`crate::non_fungible::NonFungibleToken`] trait is a deliberate design
+/// choice to accommodate flexibility and customization for various smart
+/// contract use cases.
 #[contractclient(name = "NonFungibleBurnableClient")]
 pub trait NonFungibleBurnable {
     /// Destroys the `token_id` from `account`.
