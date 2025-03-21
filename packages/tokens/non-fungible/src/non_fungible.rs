@@ -240,7 +240,8 @@ pub trait NonFungibleToken {
     fn token_uri(e: &Env, token_id: u32) -> String;
 }
 
-pub trait NonFungibleTokenInternal {
+// trait with internal functions
+pub trait NonFungibleInternal {
     fn increase_balance(e: &Env, to: Address, amount: u32);
 
     fn decrease_balance(e: &Env, from: Address, amount: u32);
@@ -248,7 +249,8 @@ pub trait NonFungibleTokenInternal {
     fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32);
 }
 
-impl<T> NonFungibleTokenInternal for T
+// blanket implementation for internal functions
+impl<T> NonFungibleInternal for T
 where
     T: NonFungibleToken,
 {

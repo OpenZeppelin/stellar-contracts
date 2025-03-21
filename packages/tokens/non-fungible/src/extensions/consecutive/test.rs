@@ -1,19 +1,17 @@
+#![allow(unused_variables)]
 #![cfg(test)]
 
 extern crate std;
 
-use soroban_sdk::{
-    contract, contractimpl, panic_with_error, testutils::Address as _, Address, Env, String,
-};
+use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
 
 use crate::{
-    balance,
     consecutive::storage::{batch_mint, burn, owner_of, transfer, transfer_from, StorageKey},
-    storage2::approve,
-    NonFungibleToken, NonFungibleTokenError,
+    storage2::{approve, balance},
+    NonFungibleToken,
 };
 
-use super::{IBurnable, IMintable, ISequential, NonFungibleConsecutive};
+use super::{IBurnable, IMintable, NonFungibleConsecutive, NonFungibleSequential};
 
 #[contract]
 pub struct MockContract;
@@ -89,24 +87,13 @@ impl IBurnable for MockContract {
     }
 }
 
-impl ISequential for MockContract {
+impl NonFungibleSequential for MockContract {
     fn next_token_id(e: &Env) -> u32 {
-        //crate::sequential::next_token_id::<Self>()
-        e.storage().instance().get(&StorageKey::TokenIdCounter).unwrap_or(0)
+        crate::sequential::next_token_id::<Self>(e)
     }
 
-    fn increment_token_id(e: &Env) -> u32 {
-        Self::increment_token_id_by(e, 1)
-    }
-
-    fn increment_token_id_by(e: &Env, amount: u32) -> u32 {
-        //crate::sequential::increment_token_id_by::<Self>()
-        let current_id = Self::next_token_id(e);
-        let Some(next_id) = current_id.checked_add(amount) else {
-            panic_with_error!(e, NonFungibleTokenError::MathOverflow);
-        };
-        e.storage().instance().set(&StorageKey::TokenIdCounter, &next_id);
-        current_id
+    fn increment_token_id(e: &Env, amount: u32) -> u32 {
+        crate::sequential::increment_token_id::<Self>(e, amount)
     }
 }
 
@@ -129,8 +116,8 @@ fn consecutive_owner_works() {
     e.as_contract(&address, || {
         batch_mint::<MockContract>(&e, &owner, amount);
 
-        assert_eq!(<MockContract as ISequential>::next_token_id(&e), amount);
-        assert_eq!(balance(&e, &owner), amount);
+        assert_eq!(MockContract::next_token_id(&e), amount);
+        assert_eq!(balance::<MockContract>(&e, &owner), amount);
 
         let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(0)).unwrap();
         assert_eq!(_owner, owner);
@@ -150,11 +137,11 @@ fn consecutive_transfer_works() {
 
     e.as_contract(&address, || {
         batch_mint::<MockContract>(&e, &owner, amount);
-        assert_eq!(balance(&e, &owner), amount);
+        assert_eq!(balance::<MockContract>(&e, &owner), amount);
 
         transfer::<MockContract>(&e, &owner, &recipient, 50);
         assert_eq!(owner_of::<MockContract>(&e, 50), recipient);
-        assert_eq!(balance(&e, &recipient), 1);
+        assert_eq!(balance::<MockContract>(&e, &recipient), 1);
 
         assert_eq!(owner_of::<MockContract>(&e, 51), owner);
         let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(51)).unwrap();
@@ -164,7 +151,7 @@ fn consecutive_transfer_works() {
     e.as_contract(&address, || {
         transfer::<MockContract>(&e, &owner, &recipient, 99);
         assert_eq!(owner_of::<MockContract>(&e, 99), recipient);
-        assert_eq!(balance(&e, &recipient), 2);
+        assert_eq!(balance::<MockContract>(&e, &recipient), 2);
     });
 }
 
@@ -182,12 +169,12 @@ fn consecutive_transfer_from_works() {
 
     e.as_contract(&address, || {
         batch_mint::<MockContract>(&e, &owner, amount);
-        assert_eq!(balance(&e, &owner), amount);
+        assert_eq!(balance::<MockContract>(&e, &owner), amount);
 
         approve::<MockContract>(&e, &owner, &spender, token_id, 100);
         transfer_from::<MockContract>(&e, &spender, &owner, &recipient, token_id);
         assert_eq!(owner_of::<MockContract>(&e, token_id), recipient);
-        assert_eq!(balance(&e, &recipient), 1);
+        assert_eq!(balance::<MockContract>(&e, &recipient), 1);
 
         assert_eq!(owner_of::<MockContract>(&e, token_id + 1), owner);
     });
@@ -206,10 +193,10 @@ fn consecutive_burn_works() {
 
     e.as_contract(&address, || {
         batch_mint::<MockContract>(&e, &owner, amount);
-        assert_eq!(balance(&e, &owner), amount);
+        assert_eq!(balance::<MockContract>(&e, &owner), amount);
 
         burn::<MockContract>(&e, &owner, token_id);
-        assert_eq!(balance(&e, &owner), amount - 1);
+        assert_eq!(balance::<MockContract>(&e, &owner), amount - 1);
 
         let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(token_id));
         assert_eq!(_owner, None);

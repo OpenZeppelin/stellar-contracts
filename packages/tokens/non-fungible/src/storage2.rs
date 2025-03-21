@@ -5,8 +5,8 @@ use stellar_constants::{
 
 use crate::{
     non_fungible::{
-        emit_approve, emit_approve_for_all, emit_transfer, NonFungibleTokenError,
-        NonFungibleTokenInternal,
+        emit_approve, emit_approve_for_all, emit_transfer, NonFungibleInternal,
+        NonFungibleTokenError,
     },
     NonFungibleToken,
 };

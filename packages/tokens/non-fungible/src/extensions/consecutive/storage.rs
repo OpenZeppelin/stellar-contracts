@@ -1,11 +1,11 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::{
-    emit_transfer, storage2::check_spender_approval, NonFungibleTokenError,
-    NonFungibleTokenInternal,
+    burnable::emit_burn, emit_transfer, storage2::check_spender_approval, NonFungibleInternal,
+    NonFungibleTokenError,
 };
 
-use super::NonFungibleConsecutive;
+use super::{emit_consecutive_mint, NonFungibleConsecutive};
 
 /// Storage keys for the data associated with `FungibleToken`
 #[contracttype]
@@ -47,21 +47,25 @@ pub fn owner_of<T: NonFungibleConsecutive>(e: &Env, token_id: u32) -> Address {
 // ################## CHANGE STATE ##################
 
 pub fn batch_mint<T: NonFungibleConsecutive>(e: &Env, to: &Address, amount: u32) -> u32 {
-    let next_id = T::increment_token_id_by(e, amount);
+    let next_id = T::increment_token_id(e, amount);
 
     e.storage().persistent().set(&StorageKey::Owner(next_id), &to);
 
     T::increase_balance(e, to.clone(), amount);
 
+    let last_id = next_id + amount - 1;
+    emit_consecutive_mint(e, to, next_id, last_id);
+
     // return the last minted id
-    next_id + amount - 1
+    last_id
 }
 
 pub fn burn<T: NonFungibleConsecutive>(e: &Env, from: &Address, token_id: u32) {
     from.require_auth();
-    T::update(e, Some(from), None, token_id);
 
+    T::update(e, Some(from), None, token_id);
     e.storage().persistent().set(&StorageKey::BurntToken(token_id), &true);
+    emit_burn(e, from, token_id);
 
     // Set the next token to prev owner
     set_owner_for_next_token(e, from, token_id);
@@ -74,8 +78,15 @@ pub fn burn_from<T: NonFungibleConsecutive>(
     token_id: u32,
 ) {
     spender.require_auth();
+
     check_spender_approval::<T>(e, spender, from, token_id);
-    T::burn(e, from.clone(), token_id);
+
+    T::update(e, Some(from), None, token_id);
+    e.storage().persistent().set(&StorageKey::BurntToken(token_id), &true);
+    emit_burn(e, from, token_id);
+
+    // Set the next token to prev owner
+    set_owner_for_next_token(e, from, token_id);
 }
 
 /// Transfers a non-fungible token (NFT), ensuring ownership checks.
@@ -101,6 +112,7 @@ pub fn burn_from<T: NonFungibleConsecutive>(
 /// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
 pub fn transfer<T: NonFungibleConsecutive>(e: &Env, from: &Address, to: &Address, token_id: u32) {
     from.require_auth();
+
     T::update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 
@@ -140,7 +152,9 @@ pub fn transfer_from<T: NonFungibleConsecutive>(
     token_id: u32,
 ) {
     spender.require_auth();
+
     check_spender_approval::<T>(e, spender, from, token_id);
+
     T::update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 
