@@ -2,23 +2,15 @@
 pub mod storage;
 use soroban_sdk::{Address, Env, Symbol};
 
+use crate::NonFungibleToken;
+
 mod test;
 
-pub trait INonFungibleBase {
-    fn transfer(e: &Env, from: Address, to: Address, token_id: u32);
-
-    fn owner_of(e: &Env, token_id: u32) -> Address;
-
-    fn increase_balance(e: &Env, to: Address, amount: u32);
-
-    fn decrease_balance(e: &Env, from: Address, amount: u32);
-}
-
-pub trait IMintable: INonFungibleBase {
+pub trait IMintable: NonFungibleToken {
     fn mint(e: &Env, to: Address, token_id: u32) -> u32;
 }
 
-pub trait IBurnable: INonFungibleBase {
+pub trait IBurnable: NonFungibleToken {
     fn burn(e: &Env, from: Address, token_id: u32);
 
     fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32);
@@ -32,7 +24,7 @@ pub trait ISequential {
     fn increment_token_id_by(e: &Env, amount: u32) -> u32;
 }
 
-pub trait INonFungibleConsecutive: INonFungibleBase + ISequential + IMintable + IBurnable {
+pub trait NonFungibleConsecutive: NonFungibleToken + ISequential + IMintable + IBurnable {
     fn batch_mint(e: &Env, to: Address, amount: u32);
 }
 

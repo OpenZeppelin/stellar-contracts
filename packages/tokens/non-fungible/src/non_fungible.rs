@@ -240,6 +240,31 @@ pub trait NonFungibleToken {
     fn token_uri(e: &Env, token_id: u32) -> String;
 }
 
+pub trait NonFungibleTokenInternal {
+    fn increase_balance(e: &Env, to: Address, amount: u32);
+
+    fn decrease_balance(e: &Env, from: Address, amount: u32);
+
+    fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32);
+}
+
+impl<T> NonFungibleTokenInternal for T
+where
+    T: NonFungibleToken,
+{
+    fn increase_balance(e: &Env, to: Address, amount: u32) {
+        crate::storage2::increase_balance::<Self>(e, &to, amount);
+    }
+
+    fn decrease_balance(e: &Env, from: Address, amount: u32) {
+        crate::storage2::decrease_balance::<Self>(e, &from, amount);
+    }
+
+    fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
+        crate::storage2::update::<Self>(e, from, to, token_id);
+    }
+}
+
 // ################## ERRORS ##################
 
 #[contracterror]

@@ -3,60 +3,82 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, testutils::Address as _, Address, Env,
+    contract, contractimpl, panic_with_error, testutils::Address as _, Address, Env, String,
 };
 
 use crate::{
     balance,
-    consecutive::storage::{batch_mint, burn, owner_of, transfer, StorageKey},
-    NonFungibleTokenError,
+    consecutive::storage::{batch_mint, burn, owner_of, transfer, transfer_from, StorageKey},
+    storage2::approve,
+    NonFungibleToken, NonFungibleTokenError,
 };
 
-use super::{IBurnable, IMintable, INonFungibleBase, INonFungibleConsecutive, ISequential};
+use super::{IBurnable, IMintable, ISequential, NonFungibleConsecutive};
 
 #[contract]
 pub struct MockContract;
 
-impl INonFungibleBase for MockContract {
-    fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {
-        transfer::<Self>(e, &from, &to, token_id);
+#[contractimpl]
+impl NonFungibleToken for MockContract {
+    fn balance(e: &Env, owner: Address) -> u32 {
+        crate::storage2::balance::<Self>(e, &owner)
     }
 
     fn owner_of(e: &Env, token_id: u32) -> Address {
-        owner_of::<Self>(e, token_id)
+        crate::consecutive::storage::owner_of::<Self>(e, token_id)
     }
 
-    fn increase_balance(e: &Env, to: Address, amount: u32) {
-        //crate::storage::increase_balance::<Self>()
-
-        let Some(balance) = balance(e, &to).checked_add(amount) else {
-            panic_with_error!(e, NonFungibleTokenError::MathOverflow);
-        };
-        e.storage().persistent().set(&StorageKey::Balance(to.clone()), &balance);
+    fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {
+        unimplemented!()
     }
 
-    fn decrease_balance(e: &Env, from: Address, amount: u32) {
-        //crate::storage::decrease_balance::<Self>()
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32) {
+        unimplemented!()
+    }
 
-        let Some(balance) = balance(e, &from).checked_sub(amount) else {
-            // TODO: underflow ??
-            panic_with_error!(e, NonFungibleTokenError::MathOverflow);
-        };
-        e.storage().persistent().set(&StorageKey::Balance(from.clone()), &balance);
+    fn approve(
+        e: &Env,
+        approver: Address,
+        approved: Address,
+        token_id: u32,
+        live_until_ledger: u32,
+    ) {
+        unimplemented!()
+    }
+
+    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
+        unimplemented!()
+    }
+
+    fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+        crate::storage2::get_approved::<Self>(e, token_id)
+    }
+
+    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
+        crate::storage2::is_approved_for_all::<Self>(e, &owner, &operator)
+    }
+
+    fn name(e: &Env) -> String {
+        unimplemented!()
+    }
+
+    fn symbol(e: &Env) -> String {
+        unimplemented!()
+    }
+
+    fn token_uri(e: &Env, token_id: u32) -> String {
+        unimplemented!()
     }
 }
 
 #[contractimpl]
 impl IMintable for MockContract {
     fn mint(e: &Env, to: Address, token_id: u32) -> u32 {
-        // custom mint or crate::mintable::mint()
-        // check Self::owner_of(e, token_id)
-        crate::storage::update(e, None, Some(&to), token_id);
-        crate::mintable::emit_mint(e, &to, token_id);
-        token_id
+        unimplemented!()
     }
 }
 
+#[contractimpl]
 impl IBurnable for MockContract {
     fn burn(e: &Env, from: Address, token_id: u32) {
         unimplemented!()
@@ -67,7 +89,6 @@ impl IBurnable for MockContract {
     }
 }
 
-//#[contractimpl]
 impl ISequential for MockContract {
     fn next_token_id(e: &Env) -> u32 {
         //crate::sequential::next_token_id::<Self>()
@@ -89,8 +110,9 @@ impl ISequential for MockContract {
     }
 }
 
-impl INonFungibleConsecutive for MockContract {
+impl NonFungibleConsecutive for MockContract {
     fn batch_mint(e: &Env, to: Address, amount: u32) {
+        // access control
         batch_mint::<Self>(e, &to, amount);
     }
 }
@@ -143,6 +165,31 @@ fn consecutive_transfer_works() {
         transfer::<MockContract>(&e, &owner, &recipient, 99);
         assert_eq!(owner_of::<MockContract>(&e, 99), recipient);
         assert_eq!(balance(&e, &recipient), 2);
+    });
+}
+
+#[test]
+fn consecutive_transfer_from_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+
+    let spender = Address::generate(&e);
+    let owner = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let amount = 100u32;
+    let token_id = 50;
+
+    e.as_contract(&address, || {
+        batch_mint::<MockContract>(&e, &owner, amount);
+        assert_eq!(balance(&e, &owner), amount);
+
+        approve::<MockContract>(&e, &owner, &spender, token_id, 100);
+        transfer_from::<MockContract>(&e, &spender, &owner, &recipient, token_id);
+        assert_eq!(owner_of::<MockContract>(&e, token_id), recipient);
+        assert_eq!(balance(&e, &recipient), 1);
+
+        assert_eq!(owner_of::<MockContract>(&e, token_id + 1), owner);
     });
 }
 

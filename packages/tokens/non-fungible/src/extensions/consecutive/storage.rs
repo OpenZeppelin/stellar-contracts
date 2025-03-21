@@ -1,14 +1,15 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
-use crate::{emit_transfer, storage::check_spender_approval, NonFungibleTokenError};
+use crate::{
+    emit_transfer, storage2::check_spender_approval, NonFungibleTokenError,
+    NonFungibleTokenInternal,
+};
 
-use super::INonFungibleConsecutive;
+use super::NonFungibleConsecutive;
 
 /// Storage keys for the data associated with `FungibleToken`
 #[contracttype]
 pub enum StorageKey {
-    Balance(Address),
-    Approval(u32),
     Owner(u32),
     TokenIdCounter,
     BurntToken(u32),
@@ -27,7 +28,7 @@ pub enum StorageKey {
 ///
 /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
 ///   `token_id` does not exist.
-pub fn owner_of<T: INonFungibleConsecutive>(e: &Env, token_id: u32) -> Address {
+pub fn owner_of<T: NonFungibleConsecutive>(e: &Env, token_id: u32) -> Address {
     let max = T::next_token_id(e);
     let is_burnt = e.storage().persistent().get(&StorageKey::BurntToken(token_id)).unwrap_or(false);
 
@@ -45,33 +46,37 @@ pub fn owner_of<T: INonFungibleConsecutive>(e: &Env, token_id: u32) -> Address {
 
 // ################## CHANGE STATE ##################
 
-pub fn batch_mint<T: INonFungibleConsecutive>(e: &Env, to: &Address, amount: u32) {
+pub fn batch_mint<T: NonFungibleConsecutive>(e: &Env, to: &Address, amount: u32) -> u32 {
     let next_id = T::increment_token_id_by(e, amount);
 
     e.storage().persistent().set(&StorageKey::Owner(next_id), &to);
 
     T::increase_balance(e, to.clone(), amount);
+
+    // return the last minted id
+    next_id + amount - 1
 }
 
-pub fn burn<T: INonFungibleConsecutive>(e: &Env, from: &Address, token_id: u32) {
+pub fn burn<T: NonFungibleConsecutive>(e: &Env, from: &Address, token_id: u32) {
     from.require_auth();
-    update::<T>(e, Some(from), None, token_id);
+    T::update(e, Some(from), None, token_id);
 
     e.storage().persistent().set(&StorageKey::BurntToken(token_id), &true);
+
+    // Set the next token to prev owner
+    set_owner_for_next_token(e, from, token_id);
 }
 
-pub fn burn_from<T: INonFungibleConsecutive>(
+pub fn burn_from<T: NonFungibleConsecutive>(
     e: &Env,
     spender: &Address,
     from: &Address,
     token_id: u32,
 ) {
     spender.require_auth();
-    check_spender_approval(e, spender, from, token_id);
-    burn::<T>(e, from, token_id);
+    check_spender_approval::<T>(e, spender, from, token_id);
+    T::burn(e, from.clone(), token_id);
 }
-
-//pub fn burn(e: &Env, from: &Address, token_id: u32) {}
 
 /// Transfers a non-fungible token (NFT), ensuring ownership checks.
 ///
@@ -94,10 +99,13 @@ pub fn burn_from<T: INonFungibleConsecutive>(
 /// # Notes
 ///
 /// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
-pub fn transfer<T: INonFungibleConsecutive>(e: &Env, from: &Address, to: &Address, token_id: u32) {
+pub fn transfer<T: NonFungibleConsecutive>(e: &Env, from: &Address, to: &Address, token_id: u32) {
     from.require_auth();
-    update::<T>(e, Some(from), Some(to), token_id);
+    T::update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
+
+    // Set the next token to prev owner
+    set_owner_for_next_token(e, from, token_id);
 }
 
 /// Transfers a non-fungible token (NFT), ensuring ownership and approval
@@ -124,7 +132,7 @@ pub fn transfer<T: INonFungibleConsecutive>(e: &Env, from: &Address, to: &Addres
 /// # Notes
 ///
 /// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
-pub fn transfer_from<T: INonFungibleConsecutive>(
+pub fn transfer_from<T: NonFungibleConsecutive>(
     e: &Env,
     spender: &Address,
     from: &Address,
@@ -132,98 +140,12 @@ pub fn transfer_from<T: INonFungibleConsecutive>(
     token_id: u32,
 ) {
     spender.require_auth();
-    check_spender_approval(e, spender, from, token_id);
-    update::<T>(e, Some(from), Some(to), token_id);
+    check_spender_approval::<T>(e, spender, from, token_id);
+    T::update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
-}
-
-/// Approves an address to transfer a specific token.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `approver` - The address of the approver (should be `owner` or
-///   `operator`).
-/// * `approved` - The address receiving the approval.
-/// * `token_id` - The identifier of the token to be approved.
-/// * `live_until_ledger` - The ledger number at which the approval expires.
-///
-/// # Errors
-///
-/// * [`NonFungibleTokenError::InvalidApprover`] - If the owner address is not
-///   the actual owner of the token.
-/// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger number
-///   is less than the current ledger number.
-/// * refer to [`owner_of`] errors.
-///
-/// # Events
-///
-/// * topics - `["approve", owner: Address, token_id: u32]`
-/// * data - `[approved: Address, live_until_ledger: u32]`
-pub fn approve(
-    _e: &Env,
-    _approver: &Address,
-    _approved: &Address,
-    _token_id: u32,
-    _live_until_ledger: u32,
-) {
-}
-
-/// Low-level function for handling transfers for NFTs, but doesn't
-/// handle authorization. Updates ownership records, adjusts balances,
-/// and clears existing approvals.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `from` - The address of the current token owner.
-/// * `to` - The address of the token recipient.
-/// * `token_id` - The identifier of the token to be transferred.
-///
-/// # Errors
-///
-/// * [`NonFungibleTokenError::IncorrectOwner`] - If the `from` address is not
-///   the owner of the token.
-/// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `to` would
-///   overflow.
-pub fn update<T: INonFungibleConsecutive>(
-    e: &Env,
-    from: Option<&Address>,
-    to: Option<&Address>,
-    token_id: u32,
-) {
-    let owner = owner_of::<T>(e, token_id);
-
-    if let Some(from_address) = from {
-        // Ensure the `from` address is indeed the owner.
-        if owner != *from_address {
-            panic_with_error!(e, NonFungibleTokenError::IncorrectOwner);
-        }
-
-        T::decrease_balance(e, from_address.clone(), 1);
-
-        // TODO: change to T::remove_approve(token_id) ??
-        // Clear any existing approval
-        let approval_key = StorageKey::Approval(token_id);
-        e.storage().temporary().remove(&approval_key);
-    } else {
-        // nothing to do for the `None` case, since we don't track
-        // `total_supply`
-    }
-
-    if let Some(to_address) = to {
-        // Update the balance of the `to` address
-        T::increase_balance(e, to_address.clone(), 1);
-
-        // Set the new owner
-        e.storage().persistent().set(&StorageKey::Owner(token_id), &to_address);
-    } else {
-        // Burning: `to` is None
-        e.storage().persistent().remove(&StorageKey::Owner(token_id));
-    }
 
     // Set the next token to prev owner
-    set_owner_for_next_token(e, &owner, token_id);
+    set_owner_for_next_token(e, from, token_id);
 }
 
 fn set_owner_for_next_token(e: &Env, owner: &Address, token_id: u32) {
