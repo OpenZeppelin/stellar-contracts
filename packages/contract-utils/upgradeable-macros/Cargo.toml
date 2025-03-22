@@ -1,0 +1,16 @@
+[package]
+name = "stellar-upgradeable-macros"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[lib]
+proc-macro = true
+doctest = false
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
