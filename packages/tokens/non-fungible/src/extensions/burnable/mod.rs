@@ -1,4 +1,6 @@
 mod storage;
+use crate::NonFungibleToken;
+
 pub use self::storage::{burn, burn_from};
 
 mod test;
@@ -15,7 +17,7 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
 #[contractclient(name = "NonFungibleBurnableClient")]
-pub trait NonFungibleBurnable {
+pub trait NonFungibleBurnable: NonFungibleToken {
     /// Destroys the `token_id` from `account`.
     ///
     /// # Arguments

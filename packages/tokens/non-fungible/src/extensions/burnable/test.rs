@@ -82,7 +82,7 @@ fn burn_works() {
     e.as_contract(&address, || {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
-        burn(&e, &owner, token_id);
+        burn::<MockContract>(&e, &owner, token_id);
 
         assert!(balance(&e, &owner) == 0);
 
@@ -105,7 +105,7 @@ fn burn_from_with_approve_works() {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
         approve(&e, &owner, &spender, token_id, 1000);
-        burn_from(&e, &spender, &owner, token_id);
+        burn_from::<MockContract>(&e, &spender, &owner, token_id);
 
         assert!(balance(&e, &owner) == 0);
 
@@ -130,7 +130,7 @@ fn burn_from_with_operator_works() {
 
         approve_for_all(&e, &owner, &operator, 1000);
 
-        burn_from(&e, &operator, &owner, token_id);
+        burn_from::<MockContract>(&e, &operator, &owner, token_id);
 
         assert!(balance(&e, &owner) == 0);
 
@@ -152,7 +152,7 @@ fn burn_from_with_owner_works() {
     e.as_contract(&address, || {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
-        burn_from(&e, &owner, &owner, token_id);
+        burn_from::<MockContract>(&e, &owner, &owner, token_id);
 
         assert!(balance(&e, &owner) == 0);
 
@@ -175,7 +175,7 @@ fn burn_with_not_owner_panics() {
     e.as_contract(&address, || {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
-        burn(&e, &spender, token_id);
+        burn::<MockContract>(&e, &spender, token_id);
     });
 }
 
@@ -191,7 +191,7 @@ fn burn_from_with_insufficient_approval_panics() {
     e.as_contract(&address, || {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
-        burn_from(&e, &spender, &owner, token_id);
+        burn_from::<MockContract>(&e, &spender, &owner, token_id);
     });
 }
 
@@ -207,6 +207,6 @@ fn burn_with_non_existent_token_panics() {
     e.as_contract(&address, || {
         let _token_id = mint::<MockContract>(&e, &owner, 0);
 
-        burn(&e, &owner, non_existent_token_id);
+        burn::<MockContract>(&e, &owner, non_existent_token_id);
     });
 }

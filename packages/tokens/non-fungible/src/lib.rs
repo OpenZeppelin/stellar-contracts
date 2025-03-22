@@ -70,7 +70,7 @@ mod non_fungible;
 mod storage;
 pub mod storage2;
 
-pub use extensions::{burnable, consecutive, mintable, sequential};
+pub use extensions::{burnable, consecutive, enummerable, mintable, sequential};
 pub use non_fungible::{
     emit_approve, emit_approve_for_all, emit_transfer, NonFungibleInternal, NonFungibleToken,
     NonFungibleTokenClient, NonFungibleTokenError,

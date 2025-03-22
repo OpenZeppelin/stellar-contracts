@@ -289,6 +289,10 @@ pub enum NonFungibleTokenError {
     MathOverflow = 305,
     /// Indicates all possible `token_id`s are already in use.
     TokenIDsAreDepleted = 306,
+    /// Indicates the token does not exist in owner's list.
+    TokenNotFoundInOwnerList = 307,
+    /// Indicates the token does not exist in global list.
+    TokenNotFoundInGlobalList = 308,
 }
 
 // ################## EVENTS ##################
