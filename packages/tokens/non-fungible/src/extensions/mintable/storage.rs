@@ -42,7 +42,7 @@ use crate::{extensions::mintable::emit_mint, sequential::NonFungibleSequential, 
 /// `token_id`s, they should ensure that the token_id is unique and not already
 /// in use.
 pub fn mint<T: NonFungibleToken>(e: &Env, to: &Address, token_id: u32) -> u32 {
-    crate::storage2::update::<T>(e, None, Some(to), token_id);
+    crate::storage::update::<T>(e, None, Some(to), token_id);
     emit_mint(e, to, token_id);
 
     token_id

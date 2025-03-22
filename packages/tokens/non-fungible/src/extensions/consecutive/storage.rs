@@ -1,8 +1,8 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::{
-    burnable::emit_burn, emit_transfer, sequential::NonFungibleSequential,
-    storage2::check_spender_approval, NonFungibleInternal, NonFungibleTokenError,
+    emit_transfer, sequential::NonFungibleSequential, storage::check_spender_approval,
+    NonFungibleInternal, NonFungibleTokenError,
 };
 
 use super::{emit_consecutive_mint, NonFungibleConsecutive};
@@ -60,12 +60,9 @@ pub fn batch_mint<T: NonFungibleConsecutive>(e: &Env, to: &Address, amount: u32)
 }
 
 pub fn burn<T: NonFungibleConsecutive>(e: &Env, from: &Address, token_id: u32) {
-    from.require_auth();
+    crate::burnable::burn::<T>(e, from, token_id);
 
-    T::update(e, Some(from), None, token_id);
     e.storage().persistent().set(&StorageKey::BurntToken(token_id), &true);
-    emit_burn(e, from, token_id);
-
     // Set the next token to prev owner
     set_owner_for_next_token(e, from, token_id);
 }
@@ -76,14 +73,9 @@ pub fn burn_from<T: NonFungibleConsecutive>(
     from: &Address,
     token_id: u32,
 ) {
-    spender.require_auth();
+    crate::burnable::burn_from::<T>(e, spender, from, token_id);
 
-    check_spender_approval::<T>(e, spender, from, token_id);
-
-    T::update(e, Some(from), None, token_id);
     e.storage().persistent().set(&StorageKey::BurntToken(token_id), &true);
-    emit_burn(e, from, token_id);
-
     // Set the next token to prev owner
     set_owner_for_next_token(e, from, token_id);
 }

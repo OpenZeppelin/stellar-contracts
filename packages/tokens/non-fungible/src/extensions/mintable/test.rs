@@ -14,11 +14,11 @@ struct MockContract;
 #[contractimpl]
 impl NonFungibleToken for MockContract {
     fn balance(e: &Env, owner: Address) -> u32 {
-        crate::storage2::balance::<Self>(e, &owner)
+        crate::storage::balance::<Self>(e, &owner)
     }
 
     fn owner_of(e: &Env, token_id: u32) -> Address {
-        crate::storage2::owner_of::<Self>(e, token_id)
+        crate::storage::owner_of::<Self>(e, token_id)
     }
 
     fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {
@@ -44,11 +44,11 @@ impl NonFungibleToken for MockContract {
     }
 
     fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
-        crate::storage2::get_approved::<Self>(e, token_id)
+        crate::storage::get_approved::<Self>(e, token_id)
     }
 
     fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
-        crate::storage2::is_approved_for_all::<Self>(e, &owner, &operator)
+        crate::storage::is_approved_for_all::<Self>(e, &owner, &operator)
     }
 
     fn name(e: &Env) -> String {
@@ -72,7 +72,7 @@ fn mint_works() {
     let account = Address::generate(&e);
     e.as_contract(&address, || {
         let token_id = mint::<MockContract>(&e, &account, 0);
-        assert_eq!(balance(&e, &account), 1);
+        assert_eq!(balance::<MockContract>(&e, &account), 1);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
@@ -100,6 +100,6 @@ fn mint_base_implementation_has_no_auth() {
     // This should NOT panic even without authorization
     e.as_contract(&address, || {
         mint::<MockContract>(&e, &account, 0);
-        assert_eq!(balance(&e, &account), 1);
+        assert_eq!(balance::<MockContract>(&e, &account), 1);
     });
 }

@@ -68,7 +68,6 @@
 mod extensions;
 mod non_fungible;
 mod storage;
-pub mod storage2;
 
 pub use extensions::{burnable, consecutive, enummerable, mintable, sequential};
 pub use non_fungible::{

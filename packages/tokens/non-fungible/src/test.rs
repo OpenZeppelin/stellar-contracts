@@ -25,11 +25,11 @@ struct MockContract;
 #[contractimpl]
 impl NonFungibleToken for MockContract {
     fn balance(e: &Env, owner: Address) -> u32 {
-        crate::storage2::balance::<Self>(e, &owner)
+        crate::storage::balance::<Self>(e, &owner)
     }
 
     fn owner_of(e: &Env, token_id: u32) -> Address {
-        crate::storage2::owner_of::<Self>(e, token_id)
+        crate::storage::owner_of::<Self>(e, token_id)
     }
 
     fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {
@@ -55,11 +55,11 @@ impl NonFungibleToken for MockContract {
     }
 
     fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
-        crate::storage2::get_approved::<Self>(e, token_id)
+        crate::storage::get_approved::<Self>(e, token_id)
     }
 
     fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
-        crate::storage2::is_approved_for_all::<Self>(e, &owner, &operator)
+        crate::storage::is_approved_for_all::<Self>(e, &owner, &operator)
     }
 
     fn name(e: &Env) -> String {
@@ -84,9 +84,9 @@ fn approve_for_all_works() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        approve_for_all(&e, &owner, &operator, 1000);
+        approve_for_all::<MockContract>(&e, &owner, &operator, 1000);
 
-        let is_approved = is_approved_for_all(&e, &owner, &operator);
+        let is_approved = is_approved_for_all::<MockContract>(&e, &owner, &operator);
         assert!(is_approved);
 
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -111,12 +111,12 @@ fn revoke_approve_for_all_works() {
 
         e.storage().temporary().set(&key, &approval_data);
 
-        let is_approved = is_approved_for_all(&e, &owner, &operator);
+        let is_approved = is_approved_for_all::<MockContract>(&e, &owner, &operator);
         assert!(is_approved);
 
         // revoke approval
-        approve_for_all(&e, &owner, &operator, 0);
-        let is_approved = is_approved_for_all(&e, &owner, &operator);
+        approve_for_all::<MockContract>(&e, &owner, &operator, 0);
+        let is_approved = is_approved_for_all::<MockContract>(&e, &owner, &operator);
         assert!(!is_approved);
 
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -137,9 +137,9 @@ fn approve_nft_works() {
     e.as_contract(&address, || {
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
 
-        approve(&e, &owner, &approved, token_id, 1000);
+        approve::<MockContract>(&e, &owner, &approved, token_id, 1000);
 
-        let approved_address = get_approved(&e, token_id);
+        let approved_address = get_approved::<MockContract>(&e, token_id);
         assert_eq!(approved_address, Some(approved.clone()));
 
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -161,12 +161,12 @@ fn approve_with_operator_works() {
     e.as_contract(&address, || {
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
 
-        approve_for_all(&e, &owner, &operator, 1000);
+        approve_for_all::<MockContract>(&e, &owner, &operator, 1000);
 
         // approver is the operator on behalf of the owner
-        approve(&e, &operator, &approved, token_id, 1000);
+        approve::<MockContract>(&e, &operator, &approved, token_id, 1000);
 
-        let approved_address = get_approved(&e, token_id);
+        let approved_address = get_approved::<MockContract>(&e, token_id);
         assert_eq!(approved_address, Some(approved.clone()));
 
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -187,11 +187,11 @@ fn transfer_nft_works() {
     e.as_contract(&address, || {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
-        transfer(&e, &owner, &recipient, token_id);
+        transfer::<MockContract>(&e, &owner, &recipient, token_id);
 
-        assert_eq!(balance(&e, &owner), 0);
-        assert_eq!(balance(&e, &recipient), 1);
-        assert_eq!(owner_of(&e, token_id), recipient);
+        assert_eq!(balance::<MockContract>(&e, &owner), 0);
+        assert_eq!(balance::<MockContract>(&e, &recipient), 1);
+        assert_eq!(owner_of::<MockContract>(&e, token_id), recipient);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -213,14 +213,14 @@ fn transfer_from_nft_approved_works() {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Approve the spender
-        approve(&e, &owner, &spender, token_id, 1000);
+        approve::<MockContract>(&e, &owner, &spender, token_id, 1000);
 
         // Transfer from the owner using the spender's approval
-        transfer_from(&e, &spender, &owner, &recipient, token_id);
+        transfer_from::<MockContract>(&e, &spender, &owner, &recipient, token_id);
 
-        assert_eq!(balance(&e, &owner), 0);
-        assert_eq!(balance(&e, &recipient), 1);
-        assert_eq!(owner_of(&e, token_id), recipient);
+        assert_eq!(balance::<MockContract>(&e, &owner), 0);
+        assert_eq!(balance::<MockContract>(&e, &recipient), 1);
+        assert_eq!(owner_of::<MockContract>(&e, token_id), recipient);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
@@ -243,14 +243,14 @@ fn transfer_from_nft_operator_works() {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Approve the spender
-        approve_for_all(&e, &owner, &spender, 1000);
+        approve_for_all::<MockContract>(&e, &owner, &spender, 1000);
 
         // Transfer from the owner using the spender's approval
-        transfer_from(&e, &spender, &owner, &recipient, token_id);
+        transfer_from::<MockContract>(&e, &spender, &owner, &recipient, token_id);
 
-        assert_eq!(balance(&e, &owner), 0);
-        assert_eq!(balance(&e, &recipient), 1);
-        assert_eq!(owner_of(&e, token_id), recipient);
+        assert_eq!(balance::<MockContract>(&e, &owner), 0);
+        assert_eq!(balance::<MockContract>(&e, &recipient), 1);
+        assert_eq!(owner_of::<MockContract>(&e, token_id), recipient);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
@@ -272,11 +272,11 @@ fn transfer_from_nft_owner_works() {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Attempt to transfer from the owner without approval
-        transfer_from(&e, &owner, &owner, &recipient, token_id);
+        transfer_from::<MockContract>(&e, &owner, &owner, &recipient, token_id);
 
-        assert_eq!(balance(&e, &owner), 0);
-        assert_eq!(balance(&e, &recipient), 1);
-        assert_eq!(owner_of(&e, token_id), recipient);
+        assert_eq!(balance::<MockContract>(&e, &owner), 0);
+        assert_eq!(balance::<MockContract>(&e, &recipient), 1);
+        assert_eq!(owner_of::<MockContract>(&e, token_id), recipient);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -299,7 +299,7 @@ fn transfer_nft_invalid_owner_fails() {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Attempt to transfer without authorization
-        transfer(&e, &unauthorized, &recipient, token_id);
+        transfer::<MockContract>(&e, &unauthorized, &recipient, token_id);
     });
 }
 
@@ -317,7 +317,7 @@ fn transfer_from_nft_insufficient_approval_fails() {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Attempt to transfer from the owner without approval
-        transfer_from(&e, &spender, &owner, &recipient, token_id);
+        transfer_from::<MockContract>(&e, &spender, &owner, &recipient, token_id);
     });
 }
 
@@ -331,7 +331,7 @@ fn owner_of_non_existent_token_fails() {
 
     e.as_contract(&address, || {
         // Attempt to get the owner of a non-existent token
-        owner_of(&e, non_existent_token_id);
+        owner_of::<MockContract>(&e, non_existent_token_id);
     });
 }
 
@@ -350,7 +350,7 @@ fn approve_with_invalid_live_until_ledger_fails() {
         e.ledger().set_sequence_number(10);
 
         // Attempt to approve with an invalid live_until_ledger
-        approve(&e, &owner, &approved, token_id, 1);
+        approve::<MockContract>(&e, &owner, &approved, token_id, 1);
     });
 }
 
@@ -367,7 +367,7 @@ fn approve_with_invalid_approver_fails() {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Attempt to approve with an invalid approver
-        approve(&e, &invalid_approver, &owner, token_id, 1000);
+        approve::<MockContract>(&e, &invalid_approver, &owner, token_id, 1000);
     });
 }
 
@@ -386,7 +386,7 @@ fn update_with_math_overflow_fails() {
         e.storage().persistent().set(&StorageKey::Balance(recipient.clone()), &u32::MAX);
 
         // Attempt to update which would cause a math overflow
-        update(&e, Some(&owner), Some(&recipient), token_id);
+        update::<MockContract>(&e, Some(&owner), Some(&recipient), token_id);
     });
 }
 
@@ -399,7 +399,7 @@ fn balance_of_non_existent_account_is_zero() {
 
     e.as_contract(&address, || {
         // Check balance of a non-existent account
-        let balance_value = balance(&e, &non_existent_account);
+        let balance_value = balance::<MockContract>(&e, &non_existent_account);
         assert_eq!(balance_value, 0);
     });
 }
@@ -419,10 +419,10 @@ fn transfer_from_incorrect_owner_fails() {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Approve the spender
-        approve(&e, &owner, &spender, token_id, 1000);
+        approve::<MockContract>(&e, &owner, &spender, token_id, 1000);
 
         // Attempt to transfer from an incorrect owner
-        transfer_from(&e, &spender, &incorrect_owner, &recipient, token_id);
+        transfer_from::<MockContract>(&e, &spender, &incorrect_owner, &recipient, token_id);
     });
 }
 
@@ -440,6 +440,6 @@ fn transfer_from_unauthorized_spender_fails() {
         let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Attempt to transfer from the owner using an unauthorized spender
-        transfer_from(&e, &unauthorized_spender, &owner, &recipient, token_id);
+        transfer_from::<MockContract>(&e, &unauthorized_spender, &owner, &recipient, token_id);
     });
 }

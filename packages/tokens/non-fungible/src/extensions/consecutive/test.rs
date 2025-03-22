@@ -7,7 +7,7 @@ use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env,
 
 use crate::{
     consecutive::storage::{batch_mint, burn, owner_of, transfer, transfer_from, StorageKey},
-    storage2::{approve, balance},
+    storage::{approve, balance},
     NonFungibleToken,
 };
 
@@ -19,7 +19,7 @@ pub struct MockContract;
 #[contractimpl]
 impl NonFungibleToken for MockContract {
     fn balance(e: &Env, owner: Address) -> u32 {
-        crate::storage2::balance::<Self>(e, &owner)
+        crate::storage::balance::<Self>(e, &owner)
     }
 
     fn owner_of(e: &Env, token_id: u32) -> Address {
@@ -49,11 +49,11 @@ impl NonFungibleToken for MockContract {
     }
 
     fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
-        crate::storage2::get_approved::<Self>(e, token_id)
+        crate::storage::get_approved::<Self>(e, token_id)
     }
 
     fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
-        crate::storage2::is_approved_for_all::<Self>(e, &owner, &operator)
+        crate::storage::is_approved_for_all::<Self>(e, &owner, &operator)
     }
 
     fn name(e: &Env) -> String {

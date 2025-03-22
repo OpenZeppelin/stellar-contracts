@@ -2,7 +2,7 @@ use soroban_sdk::{Address, Env};
 
 use crate::{
     extensions::burnable::emit_burn,
-    storage2::{check_spender_approval, update},
+    storage::{check_spender_approval, update},
     NonFungibleToken,
 };
 

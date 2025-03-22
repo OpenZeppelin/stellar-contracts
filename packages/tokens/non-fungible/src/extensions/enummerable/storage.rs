@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
-use crate::{sequential::NonFungibleSequential, storage2::balance, NonFungibleTokenError};
+use crate::{sequential::NonFungibleSequential, storage::balance, NonFungibleTokenError};
 
 use super::{Enumeration, NonFungibleEnumerable, NonSequential, Sequential};
 
