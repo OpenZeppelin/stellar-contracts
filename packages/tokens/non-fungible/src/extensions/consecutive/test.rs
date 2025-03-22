@@ -11,7 +11,7 @@ use crate::{
     NonFungibleToken,
 };
 
-use super::{IBurnable, IMintable, NonFungibleConsecutive, NonFungibleSequential};
+use super::{NonFungibleConsecutive, NonFungibleSequential};
 
 #[contract]
 pub struct MockContract;
@@ -69,40 +69,7 @@ impl NonFungibleToken for MockContract {
     }
 }
 
-#[contractimpl]
-impl IMintable for MockContract {
-    fn mint(e: &Env, to: Address, token_id: u32) -> u32 {
-        unimplemented!()
-    }
-}
-
-#[contractimpl]
-impl IBurnable for MockContract {
-    fn burn(e: &Env, from: Address, token_id: u32) {
-        unimplemented!()
-    }
-
-    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32) {
-        unimplemented!()
-    }
-}
-
-impl NonFungibleSequential for MockContract {
-    fn next_token_id(e: &Env) -> u32 {
-        crate::sequential::next_token_id::<Self>(e)
-    }
-
-    fn increment_token_id(e: &Env, amount: u32) -> u32 {
-        crate::sequential::increment_token_id::<Self>(e, amount)
-    }
-}
-
-impl NonFungibleConsecutive for MockContract {
-    fn batch_mint(e: &Env, to: Address, amount: u32) {
-        // access control
-        batch_mint::<Self>(e, &to, amount);
-    }
-}
+impl NonFungibleConsecutive for MockContract {}
 
 #[test]
 fn consecutive_owner_works() {

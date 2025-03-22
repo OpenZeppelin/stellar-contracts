@@ -1,8 +1,8 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::{
-    burnable::emit_burn, emit_transfer, storage2::check_spender_approval, NonFungibleInternal,
-    NonFungibleTokenError,
+    burnable::emit_burn, emit_transfer, sequential::NonFungibleSequential,
+    storage2::check_spender_approval, NonFungibleInternal, NonFungibleTokenError,
 };
 
 use super::{emit_consecutive_mint, NonFungibleConsecutive};
@@ -11,7 +11,6 @@ use super::{emit_consecutive_mint, NonFungibleConsecutive};
 #[contracttype]
 pub enum StorageKey {
     Owner(u32),
-    TokenIdCounter,
     BurntToken(u32),
 }
 

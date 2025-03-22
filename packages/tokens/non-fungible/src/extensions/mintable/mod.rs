@@ -1,5 +1,7 @@
 mod storage;
-pub use self::storage::mint;
+use crate::NonFungibleToken;
+
+pub use self::storage::{mint, sequential_mint};
 
 mod test;
 
@@ -16,7 +18,7 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// choice to accommodate flexibility and customization for various smart
 /// contract use cases.
 #[contractclient(name = "NonFungibleMintableClient")]
-pub trait NonFungibleMintable {
+pub trait NonFungibleMintable: NonFungibleToken {
     /// Creates a token with the next available `token_id` and assigns it to
     /// `to`. Returns the `token_id` for the newly minted token.
     ///

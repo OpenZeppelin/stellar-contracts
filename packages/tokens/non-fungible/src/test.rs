@@ -1,11 +1,12 @@
+#![allow(unused_variables)]
 #![cfg(test)]
 
 extern crate std;
 
 use soroban_sdk::{
-    contract,
+    contract, contractimpl,
     testutils::{Address as _, Ledger as _},
-    Address, Env, Map,
+    Address, Env, Map, String,
 };
 use stellar_event_assertion::EventAssertion;
 
@@ -15,11 +16,64 @@ use crate::{
         approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,
         update, StorageKey,
     },
-    transfer_from, ApprovalForAllData,
+    transfer_from, ApprovalForAllData, NonFungibleToken,
 };
 
 #[contract]
 struct MockContract;
+
+#[contractimpl]
+impl NonFungibleToken for MockContract {
+    fn balance(e: &Env, owner: Address) -> u32 {
+        crate::storage2::balance::<Self>(e, &owner)
+    }
+
+    fn owner_of(e: &Env, token_id: u32) -> Address {
+        crate::storage2::owner_of::<Self>(e, token_id)
+    }
+
+    fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {
+        unimplemented!()
+    }
+
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32) {
+        unimplemented!()
+    }
+
+    fn approve(
+        e: &Env,
+        approver: Address,
+        approved: Address,
+        token_id: u32,
+        live_until_ledger: u32,
+    ) {
+        unimplemented!()
+    }
+
+    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
+        unimplemented!()
+    }
+
+    fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+        crate::storage2::get_approved::<Self>(e, token_id)
+    }
+
+    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
+        crate::storage2::is_approved_for_all::<Self>(e, &owner, &operator)
+    }
+
+    fn name(e: &Env) -> String {
+        unimplemented!()
+    }
+
+    fn symbol(e: &Env) -> String {
+        unimplemented!()
+    }
+
+    fn token_uri(e: &Env, token_id: u32) -> String {
+        unimplemented!()
+    }
+}
 
 #[test]
 fn approve_for_all_works() {
@@ -131,7 +185,7 @@ fn transfer_nft_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = mint::<MockContract>(&e, &owner, 0);
 
         transfer(&e, &owner, &recipient, token_id);
 
@@ -156,7 +210,7 @@ fn transfer_from_nft_approved_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Approve the spender
         approve(&e, &owner, &spender, token_id, 1000);
@@ -186,7 +240,7 @@ fn transfer_from_nft_operator_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Approve the spender
         approve_for_all(&e, &owner, &spender, 1000);
@@ -215,7 +269,7 @@ fn transfer_from_nft_owner_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Attempt to transfer from the owner without approval
         transfer_from(&e, &owner, &owner, &recipient, token_id);
@@ -242,7 +296,7 @@ fn transfer_nft_invalid_owner_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Attempt to transfer without authorization
         transfer(&e, &unauthorized, &recipient, token_id);
@@ -260,7 +314,7 @@ fn transfer_from_nft_insufficient_approval_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Attempt to transfer from the owner without approval
         transfer_from(&e, &spender, &owner, &recipient, token_id);
@@ -291,7 +345,7 @@ fn approve_with_invalid_live_until_ledger_fails() {
     let approved = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = mint::<MockContract>(&e, &owner, 0);
 
         e.ledger().set_sequence_number(10);
 
@@ -310,7 +364,7 @@ fn approve_with_invalid_approver_fails() {
     let invalid_approver = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Attempt to approve with an invalid approver
         approve(&e, &invalid_approver, &owner, token_id, 1000);
@@ -327,7 +381,7 @@ fn update_with_math_overflow_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = mint::<MockContract>(&e, &owner, 0);
 
         e.storage().persistent().set(&StorageKey::Balance(recipient.clone()), &u32::MAX);
 
@@ -362,7 +416,7 @@ fn transfer_from_incorrect_owner_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Approve the spender
         approve(&e, &owner, &spender, token_id, 1000);
@@ -383,7 +437,7 @@ fn transfer_from_unauthorized_spender_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = mint::<MockContract>(&e, &owner, 0);
 
         // Attempt to transfer from the owner using an unauthorized spender
         transfer_from(&e, &unauthorized_spender, &owner, &recipient, token_id);

@@ -7,20 +7,19 @@ use super::sequential::NonFungibleSequential;
 
 mod test;
 
-pub trait IMintable: NonFungibleToken {
-    fn mint(e: &Env, to: Address, token_id: u32) -> u32;
-}
+pub trait NonFungibleConsecutive: NonFungibleToken {}
 
-pub trait IBurnable: NonFungibleToken {
-    fn burn(e: &Env, from: Address, token_id: u32);
-
-    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32);
-}
-
-pub trait NonFungibleConsecutive:
-    NonFungibleToken + NonFungibleSequential + IMintable + IBurnable
+impl<T> NonFungibleSequential for T
+where
+    T: NonFungibleConsecutive,
 {
-    fn batch_mint(e: &Env, to: Address, amount: u32);
+    fn next_token_id(e: &Env) -> u32 {
+        crate::sequential::next_token_id::<Self>(e)
+    }
+
+    fn increment_token_id(e: &Env, amount: u32) -> u32 {
+        crate::sequential::increment_token_id::<Self>(e, amount)
+    }
 }
 
 // ################## EVENTS ##################
