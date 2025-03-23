@@ -3,24 +3,9 @@ use soroban_sdk::{Address, Env, Symbol};
 
 use crate::NonFungibleToken;
 
-use super::sequential::NonFungibleSequential;
-
 mod test;
 
 pub trait NonFungibleConsecutive: NonFungibleToken {}
-
-impl<T> NonFungibleSequential for T
-where
-    T: NonFungibleConsecutive,
-{
-    fn next_token_id(e: &Env) -> u32 {
-        crate::sequential::next_token_id::<Self>(e)
-    }
-
-    fn increment_token_id(e: &Env, amount: u32) -> u32 {
-        crate::sequential::increment_token_id::<Self>(e, amount)
-    }
-}
 
 // ################## EVENTS ##################
 

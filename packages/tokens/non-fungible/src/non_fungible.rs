@@ -6,7 +6,7 @@ use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, Str
 /// tokens. It provides a standard interface for managing
 /// transfers and approvals associated with non-fungible tokens.
 #[contractclient(name = "NonFungibleTokenClient")]
-pub trait NonFungibleToken {
+pub trait NonFungibleToken: Sized {
     /// Returns the number of tokens in `owner`'s account.
     ///
     /// # Arguments

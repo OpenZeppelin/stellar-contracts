@@ -7,11 +7,12 @@ use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env,
 
 use crate::{
     consecutive::storage::{batch_mint, burn, owner_of, transfer, transfer_from, StorageKey},
+    sequential::NonFungibleSequential,
     storage::{approve, balance},
     NonFungibleToken,
 };
 
-use super::{NonFungibleConsecutive, NonFungibleSequential};
+use super::NonFungibleConsecutive;
 
 #[contract]
 pub struct MockContract;

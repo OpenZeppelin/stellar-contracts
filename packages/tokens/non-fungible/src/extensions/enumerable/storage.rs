@@ -75,7 +75,10 @@ pub fn get_owner_token_id<T: NonFungibleEnumerable>(e: &Env, owner: &Address, in
 ///
 /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token ID
 ///   is not found in the global enumeration.
-pub fn get_token_id<T: NonFungibleEnumerable>(e: &Env, index: u32) -> u32 {
+pub fn get_token_id<T: NonFungibleEnumerable<EnumerationStrategy = NonSequential>>(
+    e: &Env,
+    index: u32,
+) -> u32 {
     let key = StorageKey::GlobalTokens(index);
     let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
         panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
@@ -162,7 +165,7 @@ pub fn non_sequential_mint<T: NonFungibleEnumerable<EnumerationStrategy = NonSeq
 
     let total_supply = increment_total_supply::<T>(e);
 
-    add_to_global_enumeration(e, token_id, total_supply);
+    add_to_global_enumeration::<T>(e, token_id, total_supply);
 }
 
 /// Destroys the `token_id` from `account`.
@@ -193,7 +196,8 @@ pub fn non_sequential_mint<T: NonFungibleEnumerable<EnumerationStrategy = NonSeq
 /// * global_tokens enumeration
 pub fn burn<T: NonFungibleEnumerable>(e: &Env, from: &Address, token_id: u32) {
     crate::burnable::burn::<T>(e, from, token_id);
-    T::EnumerationStrategy::remove(e, from, token_id);
+    T::EnumerationStrategy::remove_owner(e, from, token_id);
+    T::EnumerationStrategy::remove_global(e, token_id);
 }
 
 pub fn burn_from<T: NonFungibleEnumerable>(
@@ -203,7 +207,26 @@ pub fn burn_from<T: NonFungibleEnumerable>(
     token_id: u32,
 ) {
     crate::burnable::burn_from::<T>(e, spender, from, token_id);
-    T::EnumerationStrategy::remove(e, from, token_id);
+    T::EnumerationStrategy::remove_owner(e, from, token_id);
+    T::EnumerationStrategy::remove_global(e, token_id);
+}
+
+pub fn transfer<T: NonFungibleEnumerable>(e: &Env, from: &Address, to: &Address, token_id: u32) {
+    crate::transfer::<T>(e, from, to, token_id);
+    T::EnumerationStrategy::remove_owner(e, from, token_id);
+    T::EnumerationStrategy::add_owner(e, to, token_id);
+}
+
+pub fn transfer_from<T: NonFungibleEnumerable>(
+    e: &Env,
+    spender: &Address,
+    from: &Address,
+    to: &Address,
+    token_id: u32,
+) {
+    crate::transfer_from::<T>(e, spender, from, to, token_id);
+    T::EnumerationStrategy::remove_owner(e, from, token_id);
+    T::EnumerationStrategy::add_owner(e, to, token_id);
 }
 
 // ################## LOW-LEVEL HELPERS ##################
@@ -321,7 +344,11 @@ pub fn remove_from_owner_enumeration<T: NonFungibleEnumerable>(
 /// * `e` - Access to the Soroban environment.
 /// * `token_id` - The token ID to add.
 /// * `total_supply` - The current total supply, acts as the index.
-pub fn add_to_global_enumeration(e: &Env, token_id: u32, total_supply: u32) {
+pub fn add_to_global_enumeration<T: NonFungibleEnumerable<EnumerationStrategy = NonSequential>>(
+    e: &Env,
+    token_id: u32,
+    total_supply: u32,
+) {
     e.storage().persistent().set(&StorageKey::GlobalTokens(total_supply), &token_id);
     e.storage().persistent().set(&StorageKey::GlobalTokensIndex(token_id), &total_supply);
 }
@@ -339,7 +366,9 @@ pub fn add_to_global_enumeration(e: &Env, token_id: u32, total_supply: u32) {
 ///
 /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token ID
 ///   is not found in the global enumeration.
-pub fn remove_from_global_enumeration<T: NonFungibleEnumerable>(
+pub fn remove_from_global_enumeration<
+    T: NonFungibleEnumerable<EnumerationStrategy = NonSequential>,
+>(
     e: &Env,
     to_be_removed_id: u32,
     last_token_index: u32,

@@ -1,5 +1,5 @@
 pub mod burnable;
 pub mod consecutive;
-pub mod enummerable;
+pub mod enumerable;
 pub mod mintable;
 pub mod sequential;
