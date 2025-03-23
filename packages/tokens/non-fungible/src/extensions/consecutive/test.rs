@@ -70,6 +70,16 @@ impl NonFungibleToken for MockContract {
     }
 }
 
+impl NonFungibleSequential for MockContract {
+    fn next_token_id(e: &Env) -> u32 {
+        crate::sequential::next_token_id::<Self>(e)
+    }
+
+    fn increment_token_id(e: &Env, amount: u32) -> u32 {
+        crate::sequential::increment_token_id::<Self>(e, amount)
+    }
+}
+
 impl NonFungibleConsecutive for MockContract {}
 
 #[test]

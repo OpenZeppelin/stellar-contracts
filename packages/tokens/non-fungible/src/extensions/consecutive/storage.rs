@@ -27,7 +27,10 @@ pub enum StorageKey {
 ///
 /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
 ///   `token_id` does not exist.
-pub fn owner_of<T: NonFungibleConsecutive>(e: &Env, token_id: u32) -> Address {
+pub fn owner_of<T: NonFungibleConsecutive + NonFungibleSequential>(
+    e: &Env,
+    token_id: u32,
+) -> Address {
     let max = T::next_token_id(e);
     let is_burnt = e.storage().persistent().get(&StorageKey::BurntToken(token_id)).unwrap_or(false);
 
@@ -45,7 +48,11 @@ pub fn owner_of<T: NonFungibleConsecutive>(e: &Env, token_id: u32) -> Address {
 
 // ################## CHANGE STATE ##################
 
-pub fn batch_mint<T: NonFungibleConsecutive>(e: &Env, to: &Address, amount: u32) -> u32 {
+pub fn batch_mint<T: NonFungibleConsecutive + NonFungibleSequential>(
+    e: &Env,
+    to: &Address,
+    amount: u32,
+) -> u32 {
     let next_id = T::increment_token_id(e, amount);
 
     e.storage().persistent().set(&StorageKey::Owner(next_id), &to);

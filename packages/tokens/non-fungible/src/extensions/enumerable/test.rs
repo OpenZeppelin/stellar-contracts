@@ -20,6 +20,8 @@ use crate::{
 use super::{NonFungibleEnumerable, NonSequential, Sequential};
 
 mod sequential_contract_test {
+    use crate::sequential::NonFungibleSequential;
+
     use super::*;
 
     #[contract]
@@ -91,6 +93,16 @@ mod sequential_contract_test {
 
         fn get_owner_token_id(e: &Env, owner: &Address, index: u32) -> u32 {
             unimplemented!()
+        }
+    }
+
+    impl NonFungibleSequential for MockContractSequential {
+        fn next_token_id(e: &Env) -> u32 {
+            crate::sequential::next_token_id::<Self>(e)
+        }
+
+        fn increment_token_id(e: &Env, amount: u32) -> u32 {
+            crate::sequential::increment_token_id::<Self>(e, amount)
         }
     }
 
