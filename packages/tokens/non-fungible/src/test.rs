@@ -10,7 +10,7 @@ use soroban_sdk::{
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    mintable::mint,
+    mintable::sequential_mint,
     storage::{
         approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,
         update, StorageKey,
@@ -131,7 +131,7 @@ fn transfer_nft_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         transfer(&e, &owner, &recipient, token_id);
 
@@ -156,7 +156,7 @@ fn transfer_from_nft_approved_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         // Approve the spender
         approve(&e, &owner, &spender, token_id, 1000);
@@ -186,7 +186,7 @@ fn transfer_from_nft_operator_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         // Approve the spender
         approve_for_all(&e, &owner, &spender, 1000);
@@ -215,7 +215,7 @@ fn transfer_from_nft_owner_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner without approval
         transfer_from(&e, &owner, &owner, &recipient, token_id);
@@ -242,7 +242,7 @@ fn transfer_nft_invalid_owner_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         // Attempt to transfer without authorization
         transfer(&e, &unauthorized, &recipient, token_id);
@@ -260,7 +260,7 @@ fn transfer_from_nft_insufficient_approval_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner without approval
         transfer_from(&e, &spender, &owner, &recipient, token_id);
@@ -291,7 +291,7 @@ fn approve_with_invalid_live_until_ledger_fails() {
     let approved = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         e.ledger().set_sequence_number(10);
 
@@ -310,7 +310,7 @@ fn approve_with_invalid_approver_fails() {
     let invalid_approver = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         // Attempt to approve with an invalid approver
         approve(&e, &invalid_approver, &owner, token_id, 1000);
@@ -327,7 +327,7 @@ fn update_with_math_overflow_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         e.storage().persistent().set(&StorageKey::Balance(recipient.clone()), &u32::MAX);
 
@@ -362,7 +362,7 @@ fn transfer_from_incorrect_owner_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         // Approve the spender
         approve(&e, &owner, &spender, token_id, 1000);
@@ -383,7 +383,7 @@ fn transfer_from_unauthorized_spender_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner using an unauthorized spender
         transfer_from(&e, &unauthorized_spender, &owner, &recipient, token_id);

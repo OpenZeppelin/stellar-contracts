@@ -9,7 +9,7 @@ use crate::{
     approve_for_all,
     extensions::{
         burnable::storage::{burn, burn_from},
-        mintable::mint,
+        mintable::sequential_mint,
     },
     storage::{approve, balance},
 };
@@ -25,7 +25,7 @@ fn burn_works() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         burn(&e, &owner, token_id);
 
@@ -47,7 +47,7 @@ fn burn_from_with_approve_works() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         approve(&e, &owner, &spender, token_id, 1000);
         burn_from(&e, &spender, &owner, token_id);
@@ -71,7 +71,7 @@ fn burn_from_with_operator_works() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         approve_for_all(&e, &owner, &operator, 1000);
 
@@ -95,7 +95,7 @@ fn burn_from_with_owner_works() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         burn_from(&e, &owner, &owner, token_id);
 
@@ -118,7 +118,7 @@ fn burn_with_not_owner_panics() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         burn(&e, &spender, token_id);
     });
@@ -134,7 +134,7 @@ fn burn_from_with_insufficient_approval_panics() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = mint(&e, &owner);
+        let token_id = sequential_mint(&e, &owner);
 
         burn_from(&e, &spender, &owner, token_id);
     });
@@ -150,7 +150,7 @@ fn burn_with_non_existent_token_panics() {
     let non_existent_token_id = 2;
 
     e.as_contract(&address, || {
-        let _token_id = mint(&e, &owner);
+        let _token_id = sequential_mint(&e, &owner);
 
         burn(&e, &owner, non_existent_token_id);
     });

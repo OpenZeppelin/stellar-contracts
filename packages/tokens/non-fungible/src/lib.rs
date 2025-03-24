@@ -65,10 +65,12 @@
 //!   extensions.
 #![no_std]
 
+mod contract_behavior;
 mod extensions;
 mod non_fungible;
 mod storage;
 
+pub use contract_behavior::*;
 pub use extensions::{burnable, mintable};
 pub use non_fungible::{
     emit_approve, emit_approve_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenClient,

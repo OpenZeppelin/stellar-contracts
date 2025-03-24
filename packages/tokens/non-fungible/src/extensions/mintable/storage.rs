@@ -73,7 +73,7 @@ pub fn increment_token_id(e: &Env) -> u32 {
 /// use. If the developer has other means of minting tokens and generating
 /// `token_id`s, they should ensure that the token_id is unique and not already
 /// in use.
-pub fn mint(e: &Env, to: &Address) -> u32 {
+pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
     let token_id = increment_token_id(e);
     update(e, None, Some(to), token_id);
     emit_mint(e, to, token_id);

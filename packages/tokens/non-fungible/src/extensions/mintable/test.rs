@@ -5,7 +5,7 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
-use crate::{extensions::mintable::storage::mint, storage::balance};
+use crate::{extensions::mintable::storage::sequential_mint, storage::balance};
 
 #[contract]
 struct MockContract;
@@ -17,7 +17,7 @@ fn mint_works() {
     let address = e.register(MockContract, ());
     let account = Address::generate(&e);
     e.as_contract(&address, || {
-        let token_id = mint(&e, &account);
+        let token_id = sequential_mint(&e, &account);
         assert_eq!(balance(&e, &account), 1);
 
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -45,7 +45,7 @@ fn mint_base_implementation_has_no_auth() {
 
     // This should NOT panic even without authorization
     e.as_contract(&address, || {
-        mint(&e, &account);
+        sequential_mint(&e, &account);
         assert_eq!(balance(&e, &account), 1);
     });
 }
