@@ -38,9 +38,11 @@ pub trait NonFungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::owner_of()`] when implementing this
-    /// function.
-    fn owner_of(e: &Env, token_id: u32) -> Address;
+    /// This function's behavior is shaped by the extensions implemented.
+    /// It should be configured via the `ContractBehavior` helper trait.
+    fn owner_of(e: &Env, token_id: u32) -> Address {
+        Self::ContractType::owner_of(e, token_id)
+    }
 
     /// Transfers `token_id` token from `from` to `to`.
     ///
@@ -69,9 +71,11 @@ pub trait NonFungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::transfer()`] when implementing this
-    /// function.
-    fn transfer(e: &Env, from: Address, to: Address, token_id: u32);
+    /// This function's behavior is shaped by the extensions implemented.
+    /// It should be configured via the `ContractBehavior` helper trait.
+    fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {
+        Self::ContractType::transfer(e, from, to, token_id);
+    }
 
     /// Transfers `token_id` token from `from` to `to` by using `spender`s
     /// approval.
@@ -109,9 +113,11 @@ pub trait NonFungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::transfer_from()`] when implementing this
-    /// function.
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32);
+    /// This function's behavior is shaped by the extensions implemented.
+    /// It should be configured via the `ContractBehavior` helper trait.
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32) {
+        Self::ContractType::transfer_from(e, spender, from, to, token_id);
+    }
 
     /// Gives permission to `approved` to transfer `token_id` token to another
     /// account. The approval is cleared when the token is transferred.
@@ -146,15 +152,17 @@ pub trait NonFungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::approve()`] when implementing this
-    /// function.
+    /// This function's behavior is shaped by the extensions implemented.
+    /// It should be configured via the `ContractBehavior` helper trait.
     fn approve(
         e: &Env,
         approver: Address,
         approved: Address,
         token_id: u32,
         live_until_ledger: u32,
-    );
+    ) {
+        Self::ContractType::approve(e, approver, approved, token_id, live_until_ledger);
+    }
 
     /// Approve or remove `operator` as an operator for the owner.
     ///
