@@ -6,11 +6,9 @@ pub trait Pausable {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::paused()`] when implementing this function.
-    fn paused(e: &Env) -> bool;
+    fn paused(e: &Env) -> bool {
+        crate::paused(e)
+    }
 
     /// Triggers `Paused` state.
     ///
@@ -28,11 +26,9 @@ pub trait Pausable {
     ///
     /// * topics - `["paused"]`
     /// * data - `[caller: Address]`
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::pause()`] when implementing this function.
-    fn pause(e: &Env, caller: Address);
+    fn pause(e: &Env, caller: Address) {
+        crate::pause(e, &caller);
+    }
 
     /// Triggers `Unpaused` state.
     ///
@@ -50,11 +46,9 @@ pub trait Pausable {
     ///
     /// * topics - `["unpaused"]`
     /// * data - `[caller: Address]`
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::unpause()`] when implementing this function.
-    fn unpause(e: &Env, caller: Address);
+    fn unpause(e: &Env, caller: Address) {
+        crate::unpause(e, &caller);
+    }
 }
 
 // ################## ERRORS ##################

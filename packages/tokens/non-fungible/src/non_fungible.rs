@@ -20,11 +20,9 @@ pub trait NonFungibleToken {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::balance()`] when implementing this function.
-    fn balance(e: &Env, owner: Address) -> u32;
+    fn balance(e: &Env, owner: Address) -> u32 {
+        crate::balance(e, &owner)
+    }
 
     /// Returns the owner of the `token_id` token.
     ///
@@ -188,12 +186,9 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["approve_for_all", from: Address]`
     /// * data - `[operator: Address, live_until_ledger: u32]`
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::approve_for_all()`] when implementing
-    /// this function.
-    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32);
+    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
+        crate::approve_for_all(e, &owner, &operator, live_until_ledger);
+    }
 
     /// Returns the account approved for `token_id` token.
     ///
@@ -206,12 +201,9 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::get_approved()`] when implementing this
-    /// function.
-    fn get_approved(e: &Env, token_id: u32) -> Option<Address>;
+    fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+        crate::get_approved(e, token_id)
+    }
 
     /// Returns whether the `operator` is allowed to manage all the assets of
     /// `owner`.
@@ -221,12 +213,9 @@ pub trait NonFungibleToken {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `operator` - Account to be checked.
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::is_approved_for_all()`] when implementing
-    /// this function.
-    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool;
+    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
+        crate::is_approved_for_all(e, &owner, &operator)
+    }
 
     /// Returns the token collection name.
     ///

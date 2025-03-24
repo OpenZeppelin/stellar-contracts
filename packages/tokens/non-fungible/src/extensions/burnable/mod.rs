@@ -35,12 +35,9 @@ pub trait NonFungibleBurnable: NonFungibleToken<ContractType = BaseContract> {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: u32]`
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::burnable::burn()`] when implementing this
-    /// function.
-    fn burn(e: &Env, from: Address, token_id: u32);
+    fn burn(e: &Env, from: Address, token_id: u32) {
+        crate::burnable::burn(e, &from, token_id);
+    }
 
     /// Destroys the `token_id` from `account`, by using `spender`s approval.
     ///
@@ -65,12 +62,9 @@ pub trait NonFungibleBurnable: NonFungibleToken<ContractType = BaseContract> {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: u32]`
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::burnable::burn_from()`] when implementing
-    /// this function.
-    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32);
+    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32) {
+        crate::burnable::burn_from(e, &spender, &from, token_id);
+    }
 }
 
 // ################## EVENTS ##################

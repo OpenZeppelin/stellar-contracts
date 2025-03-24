@@ -92,11 +92,6 @@ pub trait NonFungibleSequentialMintable: NonFungibleToken<ContractType = BaseCon
     /// * topics - `["mint", to: Address]`
     /// * data - `[token_id: u32]`
     ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::mintable::sequential_mint()`] when
-    /// implementing this function.
-    ///
     /// # Security Warning
     ///
     /// IMPORTANT: The base implementation of `mint()`` intentionally lacks
@@ -115,7 +110,9 @@ pub trait NonFungibleSequentialMintable: NonFungibleToken<ContractType = BaseCon
     /// ```
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
-    fn mint(e: &Env, to: Address) -> u32;
+    fn mint(e: &Env, to: Address) -> u32 {
+        crate::mintable::sequential_mint(e, &to)
+    }
 }
 
 // ################## EVENTS ##################

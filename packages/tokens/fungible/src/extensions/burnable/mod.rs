@@ -38,12 +38,9 @@ pub trait FungibleBurnable {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[amount: i128]`
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::burnable::burn()`] when implementing this
-    /// function.
-    fn burn(e: &Env, from: Address, amount: i128);
+    fn burn(e: &Env, from: Address, amount: i128) {
+        crate::burnable::burn(e, &from, amount);
+    }
 
     /// Destroys `amount` of tokens from `account`. Updates the total
     /// supply accordingly.
@@ -67,12 +64,9 @@ pub trait FungibleBurnable {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[amount: i128]`
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::burnable::burn_from()`] when implementing
-    /// this function.
-    fn burn_from(e: &Env, spender: Address, from: Address, amount: i128);
+    fn burn_from(e: &Env, spender: Address, from: Address, amount: i128) {
+        crate::burnable::burn_from(e, &spender, &from, amount);
+    }
 }
 
 // ################## EVENTS ##################
