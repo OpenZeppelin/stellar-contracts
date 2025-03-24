@@ -3,10 +3,6 @@ pub mod storage;
 mod test;
 
 use soroban_sdk::{contractclient, Address, Env};
-use storage::{
-    add_to_global_enumeration, add_to_owner_enumeration, decrement_total_supply,
-    increment_total_supply, remove_from_global_enumeration, remove_from_owner_enumeration,
-};
 
 use crate::NonFungibleToken;
 
@@ -47,8 +43,6 @@ use crate::NonFungibleToken;
 /// an on-chain operation.
 #[contractclient(name = "NonFungibleEnumerableClient")]
 pub trait NonFungibleEnumerable: NonFungibleToken {
-    type EnumerationStrategy: Enumeration<Self>;
-
     /// Returns the total amount of tokens stored by the contract.
     ///
     /// # Arguments
@@ -92,52 +86,4 @@ pub trait NonFungibleEnumerable: NonFungibleToken {
     /// `token_id`s. For sequential `token_id`s, no need to call a function,
     /// the `token_id` itself acts as the global index.
     fn get_token_id(e: &Env, index: u32) -> u32;
-}
-
-pub struct Sequential;
-pub struct NonSequential;
-
-pub trait Enumeration<T: NonFungibleEnumerable> {
-    fn add_owner(e: &Env, to: &Address, token_id: u32);
-    fn remove_owner(e: &Env, from: &Address, token_id: u32);
-
-    fn add_global(e: &Env, token_id: u32);
-    fn remove_global(e: &Env, token_id: u32);
-}
-
-impl<T: NonFungibleEnumerable<EnumerationStrategy = Self>> Enumeration<T> for Sequential {
-    fn add_owner(e: &Env, to: &Address, token_id: u32) {
-        add_to_owner_enumeration::<T>(e, to, token_id);
-        let _ = increment_total_supply::<T>(e);
-    }
-
-    fn remove_owner(e: &Env, from: &Address, token_id: u32) {
-        remove_from_owner_enumeration::<T>(e, from, token_id);
-        let _ = decrement_total_supply::<T>(e);
-    }
-
-    fn add_global(_e: &Env, _token_id: u32) {}
-    fn remove_global(_e: &Env, _token_id: u32) {}
-}
-
-impl<T: NonFungibleEnumerable<EnumerationStrategy = Self>> Enumeration<T> for NonSequential {
-    fn add_owner(e: &Env, to: &Address, token_id: u32) {
-        add_to_owner_enumeration::<T>(e, to, token_id);
-        let _ = increment_total_supply::<T>(e);
-    }
-
-    fn remove_owner(e: &Env, from: &Address, token_id: u32) {
-        remove_from_owner_enumeration::<T>(e, from, token_id);
-        let _ = decrement_total_supply::<T>(e);
-    }
-
-    fn add_global(e: &Env, token_id: u32) {
-        let total_supply = T::total_supply(e);
-        add_to_global_enumeration::<T>(e, token_id, total_supply);
-    }
-
-    fn remove_global(e: &Env, token_id: u32) {
-        let total_supply = T::total_supply(e);
-        remove_from_global_enumeration::<T>(e, token_id, total_supply);
-    }
 }

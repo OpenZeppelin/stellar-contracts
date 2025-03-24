@@ -9,18 +9,19 @@ use stellar_event_assertion::EventAssertion;
 use crate::{
     approve,
     extensions::enumerable::storage::{
-        add_to_global_enumeration, add_to_owner_enumeration, burn, burn_from,
-        decrement_total_supply, get_owner_token_id, get_token_id, increment_total_supply,
-        non_sequential_mint, remove_from_global_enumeration, remove_from_owner_enumeration,
-        sequential_mint, total_supply, transfer, transfer_from,
+        add_to_global_enumeration, add_to_owner_enumeration, decrement_total_supply,
+        get_owner_token_id, get_token_id, increment_total_supply, non_sequential_burn,
+        non_sequential_burn_from, non_sequential_mint, remove_from_global_enumeration,
+        remove_from_owner_enumeration, sequential_burn, sequential_burn_from, sequential_mint,
+        total_supply, transfer, transfer_from,
     },
+    extensions::sequential::NonFungibleSequential,
     NonFungibleToken, StorageKey,
 };
 
-use super::{NonFungibleEnumerable, NonSequential, Sequential};
+use super::NonFungibleEnumerable;
 
 mod sequential_contract_test {
-    use crate::sequential::NonFungibleSequential;
 
     use super::*;
 
@@ -81,8 +82,6 @@ mod sequential_contract_test {
     }
 
     impl NonFungibleEnumerable for MockContractSequential {
-        type EnumerationStrategy = Sequential;
-
         fn total_supply(e: &Env) -> u32 {
             unimplemented!()
         }
@@ -168,7 +167,7 @@ mod sequential_contract_test {
 
         e.as_contract(&address, || {
             let token_id = sequential_mint::<MockContractSequential>(&e, &owner);
-            burn::<MockContractSequential>(&e, &owner, token_id);
+            sequential_burn::<MockContractSequential>(&e, &owner, token_id);
             assert_eq!(total_supply::<MockContractSequential>(&e), 0);
         });
     }
@@ -184,7 +183,7 @@ mod sequential_contract_test {
         e.as_contract(&address, || {
             let token_id = sequential_mint::<MockContractSequential>(&e, &owner);
             approve::<MockContractSequential>(&e, &owner, &spender, token_id, 1000);
-            burn_from::<MockContractSequential>(&e, &spender, &owner, token_id);
+            sequential_burn_from::<MockContractSequential>(&e, &spender, &owner, token_id);
             assert_eq!(total_supply::<MockContractSequential>(&e), 0);
         });
     }
@@ -334,8 +333,6 @@ mod non_sequential_contract_test {
     }
 
     impl NonFungibleEnumerable for MockContractNonSequential {
-        type EnumerationStrategy = NonSequential;
-
         fn total_supply(e: &Env) -> u32 {
             crate::enumerable::storage::total_supply::<Self>(e)
         }
@@ -393,7 +390,7 @@ mod non_sequential_contract_test {
         e.as_contract(&address, || {
             let token_id = 42;
             non_sequential_mint::<MockContractNonSequential>(&e, &owner, token_id);
-            burn::<MockContractNonSequential>(&e, &owner, token_id);
+            non_sequential_burn::<MockContractNonSequential>(&e, &owner, token_id);
             assert_eq!(total_supply::<MockContractNonSequential>(&e), 0);
         });
     }
@@ -410,7 +407,7 @@ mod non_sequential_contract_test {
             let token_id = 42;
             non_sequential_mint::<MockContractNonSequential>(&e, &owner, token_id);
             approve::<MockContractNonSequential>(&e, &owner, &spender, token_id, 1000);
-            burn_from::<MockContractNonSequential>(&e, &spender, &owner, token_id);
+            non_sequential_burn_from::<MockContractNonSequential>(&e, &spender, &owner, token_id);
             assert_eq!(total_supply::<MockContractNonSequential>(&e), 0);
         });
     }

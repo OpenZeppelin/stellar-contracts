@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::{sequential::NonFungibleSequential, storage::balance, NonFungibleTokenError};
 
-use super::{Enumeration, NonFungibleEnumerable, NonSequential, Sequential};
+use super::NonFungibleEnumerable;
 
 /// Storage key that maps to [`AllowanceData`]
 #[contracttype]
@@ -75,10 +75,7 @@ pub fn get_owner_token_id<T: NonFungibleEnumerable>(e: &Env, owner: &Address, in
 ///
 /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token ID
 ///   is not found in the global enumeration.
-pub fn get_token_id<T: NonFungibleEnumerable<EnumerationStrategy = NonSequential>>(
-    e: &Env,
-    index: u32,
-) -> u32 {
+pub fn get_token_id<T: NonFungibleEnumerable>(e: &Env, index: u32) -> u32 {
     let key = StorageKey::GlobalTokens(index);
     let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
         panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
@@ -112,9 +109,7 @@ pub fn get_token_id<T: NonFungibleEnumerable<EnumerationStrategy = NonSequential
 /// This is a wrapper around [`crate::mintable::mint()`], that also
 /// handles the storage updates for:
 /// * total supply
-pub fn sequential_mint<
-    T: NonFungibleEnumerable<EnumerationStrategy = Sequential> + NonFungibleSequential,
->(
+pub fn sequential_mint<T: NonFungibleEnumerable + NonFungibleSequential>(
     e: &Env,
     to: &Address,
 ) -> u32 {
@@ -154,11 +149,7 @@ pub fn sequential_mint<
 /// * total supply
 /// * owner_tokens enumeration
 /// * global_tokens enumeration
-pub fn non_sequential_mint<T: NonFungibleEnumerable<EnumerationStrategy = NonSequential>>(
-    e: &Env,
-    to: &Address,
-    token_id: u32,
-) {
+pub fn non_sequential_mint<T: NonFungibleEnumerable>(e: &Env, to: &Address, token_id: u32) {
     crate::mintable::mint::<T>(e, to, token_id);
 
     add_to_owner_enumeration::<T>(e, to, token_id);
@@ -194,29 +185,201 @@ pub fn non_sequential_mint<T: NonFungibleEnumerable<EnumerationStrategy = NonSeq
 /// * total supply
 /// * owner_tokens enumeration
 /// * global_tokens enumeration
-pub fn burn<T: NonFungibleEnumerable>(e: &Env, from: &Address, token_id: u32) {
+pub fn sequential_burn<T: NonFungibleEnumerable + NonFungibleSequential>(
+    e: &Env,
+    from: &Address,
+    token_id: u32,
+) {
     crate::burnable::burn::<T>(e, from, token_id);
-    T::EnumerationStrategy::remove_owner(e, from, token_id);
-    T::EnumerationStrategy::remove_global(e, token_id);
+
+    remove_from_owner_enumeration::<T>(e, from, token_id);
+
+    // We don't need the total supply, we just need to increment it.
+    let _ = decrement_total_supply::<T>(e);
+
+    // We don't need to update the global lists, `token_id`s act as the global
+    // index in sequential minting.
 }
 
-pub fn burn_from<T: NonFungibleEnumerable>(
+/// Destroys the `token_id` from `account`.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The account whose token is destroyed.
+/// * `token_id` - The token to burn.
+///
+/// # Errors
+///
+/// * refer to [`crate::burnable::burn`] errors.
+/// * refer to [`remove_from_owner_enumeration`] errors.
+/// * refer to [`remove_from_global_enumeration`] errors.
+///
+/// # Events
+///
+/// * topics - `["burn", from: Address]`
+/// * data - `[token_id: u32]`
+///
+/// # Notes
+///
+/// This is a wrapper around [`crate::burnable::burn()`], that also
+/// handles the storage updates for:
+/// * total supply
+/// * owner_tokens enumeration
+/// * global_tokens enumeration
+pub fn non_sequential_burn<T: NonFungibleEnumerable>(e: &Env, from: &Address, token_id: u32) {
+    crate::burnable::burn::<T>(e, from, token_id);
+
+    remove_from_owner_enumeration::<T>(e, from, token_id);
+
+    let total_supply = decrement_total_supply::<T>(e);
+
+    remove_from_global_enumeration::<T>(e, token_id, total_supply);
+}
+
+/// Destroys the `token_id` from `account`, by using `spender`s approval.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `spender` - The account that is allowed to burn the token on behalf of the
+///   owner.
+/// * `from` - The account whose token is destroyed.
+/// * `token_id` - The token to burn.
+///
+/// # Errors
+///
+/// * refer to [`crate::burnable::burn`] errors.
+/// * refer to [`remove_from_owner_enumeration`] errors.
+///
+/// # Events
+///
+/// * topics - `["burn", from: Address]`
+/// * data - `[token_id: u32]`
+///
+/// # Notes
+///
+/// This is a wrapper around [`crate::burnable::burn()`], that also
+/// handles the storage updates for:
+/// * total supply
+/// * owner_tokens enumeration
+pub fn sequential_burn_from<T: NonFungibleEnumerable + NonFungibleSequential>(
     e: &Env,
     spender: &Address,
     from: &Address,
     token_id: u32,
 ) {
     crate::burnable::burn_from::<T>(e, spender, from, token_id);
-    T::EnumerationStrategy::remove_owner(e, from, token_id);
-    T::EnumerationStrategy::remove_global(e, token_id);
+
+    remove_from_owner_enumeration::<T>(e, from, token_id);
+
+    // We don't need the total supply, we just need to increment it.
+    let _ = decrement_total_supply::<T>(e);
+
+    // We don't need to update the global lists, `token_id`s act as the global
+    // index in sequential minting.
 }
 
+/// Destroys the `token_id` from `account`, by using `spender`s approval.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `spender` - The account that is allowed to burn the token on behalf of the
+///   owner.
+/// * `from` - The account whose token is destroyed.
+/// * `token_id` - The token to burn.
+///
+/// # Errors
+///
+/// * refer to [`crate::burnable::burn`] errors.
+/// * refer to [`remove_from_owner_enumeration`] errors.
+/// * refer to [`remove_from_global_enumeration`] errors.
+///
+/// # Events
+///
+/// * topics - `["burn", from: Address]`
+/// * data - `[token_id: u32]`
+///
+/// # Notes
+///
+/// This is a wrapper around [`crate::burnable::burn()`], that also
+/// handles the storage updates for:
+/// * total supply
+/// * owner_tokens enumeration
+/// * global_tokens enumeration
+pub fn non_sequential_burn_from<T: NonFungibleEnumerable>(
+    e: &Env,
+    spender: &Address,
+    from: &Address,
+    token_id: u32,
+) {
+    crate::burnable::burn_from::<T>(e, spender, from, token_id);
+
+    remove_from_owner_enumeration::<T>(e, from, token_id);
+
+    let total_supply = decrement_total_supply::<T>(e);
+
+    remove_from_global_enumeration::<T>(e, token_id, total_supply);
+}
+
+/// Transfers a non-fungible token (NFT), ensuring ownership checks.
+///
+/// # Arguments
+///
+/// * `e` - The environment reference.
+/// * `from` - The current owner's address.
+/// * `to` - The recipient's address.
+/// * `token_id` - The identifier of the token being transferred.
+///
+/// # Errors
+///
+/// * refer to [`crate::storage::transfer`] errors.
+/// * refer to [`remove_from_owner_enumeration`] errors.
+///
+/// # Events
+///
+/// * topics - `["transfer", from: Address, to: Address]`
+/// * data - `[token_id: u32]`
+///
+/// # Notes
+///
+/// This is a wrapper around [`crate::storage::transfer`], that also
+/// handles the storage updates for:
+/// * owner_tokens enumeration
 pub fn transfer<T: NonFungibleEnumerable>(e: &Env, from: &Address, to: &Address, token_id: u32) {
     crate::transfer::<T>(e, from, to, token_id);
-    T::EnumerationStrategy::remove_owner(e, from, token_id);
-    T::EnumerationStrategy::add_owner(e, to, token_id);
+
+    remove_from_owner_enumeration::<T>(e, from, token_id);
+    add_to_owner_enumeration::<T>(e, to, token_id);
 }
 
+/// Transfers a non-fungible token (NFT), ensuring ownership and approval
+/// checks.
+///
+/// # Arguments
+///
+/// * `e` - The environment reference.
+/// * `spender` - The address attempting to transfer the token.
+/// * `from` - The current owner's address.
+/// * `to` - The recipient's address.
+/// * `token_id` - The identifier of the token being transferred.
+///
+/// # Errors
+///
+/// * refer to [`crate::storage::transfer_from`] errors.
+/// * refer to [`remove_from_owner_enumeration`] errors.
+///
+/// # Events
+///
+/// * topics - `["transfer", from: Address, to: Address]`
+/// * data - `[token_id: u32]`
+///
+/// # Notes
+///
+/// This is a wrapper around [`crate::storage::transfer_from`], that also
+/// handles the storage updates for:
+/// * owner_tokens enumeration
 pub fn transfer_from<T: NonFungibleEnumerable>(
     e: &Env,
     spender: &Address,
@@ -225,8 +388,9 @@ pub fn transfer_from<T: NonFungibleEnumerable>(
     token_id: u32,
 ) {
     crate::transfer_from::<T>(e, spender, from, to, token_id);
-    T::EnumerationStrategy::remove_owner(e, from, token_id);
-    T::EnumerationStrategy::add_owner(e, to, token_id);
+
+    remove_from_owner_enumeration::<T>(e, from, token_id);
+    add_to_owner_enumeration::<T>(e, to, token_id);
 }
 
 // ################## LOW-LEVEL HELPERS ##################
@@ -344,7 +508,7 @@ pub fn remove_from_owner_enumeration<T: NonFungibleEnumerable>(
 /// * `e` - Access to the Soroban environment.
 /// * `token_id` - The token ID to add.
 /// * `total_supply` - The current total supply, acts as the index.
-pub fn add_to_global_enumeration<T: NonFungibleEnumerable<EnumerationStrategy = NonSequential>>(
+pub fn add_to_global_enumeration<T: NonFungibleEnumerable>(
     e: &Env,
     token_id: u32,
     total_supply: u32,
@@ -366,9 +530,7 @@ pub fn add_to_global_enumeration<T: NonFungibleEnumerable<EnumerationStrategy = 
 ///
 /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token ID
 ///   is not found in the global enumeration.
-pub fn remove_from_global_enumeration<
-    T: NonFungibleEnumerable<EnumerationStrategy = NonSequential>,
->(
+pub fn remove_from_global_enumeration<T: NonFungibleEnumerable>(
     e: &Env,
     to_be_removed_id: u32,
     last_token_index: u32,
