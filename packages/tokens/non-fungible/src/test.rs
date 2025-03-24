@@ -11,6 +11,7 @@ use stellar_event_assertion::EventAssertion;
 
 use crate::{
     mintable::sequential_mint,
+    non_fungible::Balance,
     storage::{
         approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,
         update, StorageKey,
@@ -329,7 +330,7 @@ fn update_with_math_overflow_fails() {
     e.as_contract(&address, || {
         let token_id = sequential_mint(&e, &owner);
 
-        e.storage().persistent().set(&StorageKey::Balance(recipient.clone()), &u32::MAX);
+        e.storage().persistent().set(&StorageKey::Balance(recipient.clone()), &Balance::MAX);
 
         // Attempt to update which would cause a math overflow
         update(&e, Some(&owner), Some(&recipient), token_id);

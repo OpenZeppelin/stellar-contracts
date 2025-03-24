@@ -1,6 +1,6 @@
 mod storage;
 pub use self::storage::sequential_mint;
-use crate::{Base, NonFungibleToken};
+use crate::{Base, NonFungibleToken, TokenId};
 
 mod test;
 
@@ -33,7 +33,7 @@ pub trait NonFungibleNonSequentialMintable: NonFungibleToken<ContractType = Base
     /// # Events
     ///
     /// * topics - `["mint", to: Address]`
-    /// * data - `[token_id: u32]`
+    /// * data - `[token_id: TokenId]`
     ///
     /// # Notes
     ///
@@ -60,7 +60,7 @@ pub trait NonFungibleNonSequentialMintable: NonFungibleToken<ContractType = Base
     /// ```
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
-    fn mint(e: &Env, to: Address, token_id: u32);
+    fn mint(e: &Env, to: Address, token_id: TokenId);
 }
 
 /// Sequential Mintable Trait for Non-Fungible Token
@@ -90,7 +90,7 @@ pub trait NonFungibleSequentialMintable: NonFungibleToken<ContractType = Base> {
     /// # Events
     ///
     /// * topics - `["mint", to: Address]`
-    /// * data - `[token_id: u32]`
+    /// * data - `[token_id: TokenId]`
     ///
     /// # Notes
     ///
@@ -115,7 +115,7 @@ pub trait NonFungibleSequentialMintable: NonFungibleToken<ContractType = Base> {
     /// ```
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
-    fn mint(e: &Env, to: Address) -> u32;
+    fn mint(e: &Env, to: Address) -> TokenId;
 }
 
 // ################## EVENTS ##################
@@ -131,8 +131,8 @@ pub trait NonFungibleSequentialMintable: NonFungibleToken<ContractType = Base> {
 /// # Events
 ///
 /// * topics - `["mint", to: Address]`
-/// * data - `[token_id: u32]`
-pub fn emit_mint(e: &Env, to: &Address, token_id: u32) {
+/// * data - `[token_id: TokenId]`
+pub fn emit_mint(e: &Env, to: &Address, token_id: TokenId) {
     let topics = (symbol_short!("mint"), to);
     e.events().publish(topics, token_id)
 }

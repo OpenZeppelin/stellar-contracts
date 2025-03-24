@@ -1,6 +1,8 @@
 use soroban_sdk::{panic_with_error, Address, Env};
 
-use crate::{extensions::mintable::emit_mint, storage::update, NonFungibleTokenError};
+use crate::{
+    extensions::mintable::emit_mint, non_fungible::TokenId, storage::update, NonFungibleTokenError,
+};
 
 const TOKEN_ID_COUNTER: &str = "TOKEN_ID_COUNTER";
 
@@ -10,7 +12,7 @@ const TOKEN_ID_COUNTER: &str = "TOKEN_ID_COUNTER";
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-pub fn next_token_id(e: &Env) -> u32 {
+pub fn next_token_id(e: &Env) -> TokenId {
     e.storage().instance().get(&TOKEN_ID_COUNTER).unwrap_or(0)
 }
 
@@ -24,7 +26,7 @@ pub fn next_token_id(e: &Env) -> u32 {
 ///
 /// * [`crate::NonFungibleTokenError::TokenIDsAreDepleted`] - When all the
 ///   available `token_id`s are consumed for this smart contract.
-pub fn increment_token_id(e: &Env) -> u32 {
+pub fn increment_token_id(e: &Env) -> TokenId {
     let current = next_token_id(e);
     let next = current.checked_add(1).unwrap_or_else(|| {
         panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
@@ -50,7 +52,7 @@ pub fn increment_token_id(e: &Env) -> u32 {
 /// # Events
 ///
 /// * topics - `["mint", to: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Security Warning
 ///
@@ -73,7 +75,7 @@ pub fn increment_token_id(e: &Env) -> u32 {
 /// use. If the developer has other means of minting tokens and generating
 /// `token_id`s, they should ensure that the token_id is unique and not already
 /// in use.
-pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
+pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
     let token_id = increment_token_id(e);
     update(e, None, Some(to), token_id);
     emit_mint(e, to, token_id);

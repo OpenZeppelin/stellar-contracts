@@ -1,3 +1,4 @@
+use crate::TokenId;
 use soroban_sdk::{Address, Env};
 
 /// Based on the Extension, some default behavior of [`crate::NonFungibleToken`]
@@ -11,7 +12,7 @@ pub trait ContractOverrides {
         e: &Env,
         approver: Address,
         approved: Address,
-        token_id: u32,
+        token_id: TokenId,
         live_until_ledger: u32,
     );
 }
@@ -28,17 +29,17 @@ impl ContractOverrides for Base {
         e: &Env,
         approver: Address,
         approved: Address,
-        token_id: u32,
+        token_id: TokenId,
         live_until_ledger: u32,
     ) {
         crate::approve(e, &approver, &approved, token_id, live_until_ledger);
     }
 
-    fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {
+    fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
         crate::transfer(e, &from, &to, token_id);
     }
 
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32) {
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
         crate::transfer_from(e, &spender, &from, &to, token_id);
     }
 }
