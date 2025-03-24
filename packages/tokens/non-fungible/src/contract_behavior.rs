@@ -1,7 +1,8 @@
 use soroban_sdk::{Address, Env};
 
-/// Based on the Extension, some default behavior of [`crate::NonFungibleToken`] might
-/// have to be overridden. This is a helper trait that allows us this override mechanism.
+/// Based on the Extension, some default behavior of [`crate::NonFungibleToken`]
+/// might have to be overridden. This is a helper trait that allows us this
+/// override mechanism.
 pub trait ContractBehavior {
     fn owner_of(e: &Env, token_id: u32) -> Address;
     fn transfer(e: &Env, from: Address, to: Address, token_id: u32);

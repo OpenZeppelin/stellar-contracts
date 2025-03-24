@@ -1,5 +1,6 @@
-use crate::ContractBehavior;
 use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
+
+use crate::ContractBehavior;
 
 /// Vanilla NonFungible Token Trait
 ///
@@ -7,9 +8,10 @@ use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
 /// tokens. It provides a standard interface for managing
 /// transfers and approvals associated with non-fungible tokens.
 pub trait NonFungibleToken {
-    /// Helper type that allows us to override some of the functionality of the base trait
-    /// based on the extensions implemented. You should use `BaseContract` as the type if
-    /// you are not using `Enumerable` or `Consecutive` extensions.
+    /// Helper type that allows us to override some of the functionality of the
+    /// base trait based on the extensions implemented. You should use
+    /// `BaseContract` as the type if you are not using `Enumerable` or
+    /// `Consecutive` extensions.
     type ContractType: ContractBehavior;
 
     /// Returns the number of tokens in `owner`'s account.

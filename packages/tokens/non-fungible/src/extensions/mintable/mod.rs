@@ -1,7 +1,6 @@
 mod storage;
-use crate::{BaseContract, NonFungibleToken};
-
 pub use self::storage::sequential_mint;
+use crate::{BaseContract, NonFungibleToken};
 
 mod test;
 
@@ -9,9 +8,10 @@ use soroban_sdk::{symbol_short, Address, Env};
 
 /// Non-Sequential Mintable Trait for Non-Fungible Token
 ///
-/// The `NonFungibleNonSequentialMintable` trait extends the `NonFungibleToken` trait to
-/// provide the capability to mint tokens in a non-sequential fashion.
-/// This trait is designed to be used in conjunction with the `NonFungibleToken` trait.
+/// The `NonFungibleNonSequentialMintable` trait extends the `NonFungibleToken`
+/// trait to provide the capability to mint tokens in a non-sequential fashion.
+/// This trait is designed to be used in conjunction with the `NonFungibleToken`
+/// trait.
 ///
 /// Excluding the `mint` functionality from the
 /// [`crate::non_fungible::NonFungibleToken`] trait is a deliberate design
@@ -27,8 +27,8 @@ pub trait NonFungibleNonSequentialMintable: NonFungibleToken<ContractType = Base
     ///
     /// # Errors
     ///
-    /// * [`crate::NonFungibleTokenError::TokenIDInUse`] - When there
-    ///   already exists a token with the given `token_id`.
+    /// * [`crate::NonFungibleTokenError::TokenIDInUse`] - When there already
+    ///   exists a token with the given `token_id`.
     ///
     /// # Events
     ///
@@ -38,8 +38,9 @@ pub trait NonFungibleNonSequentialMintable: NonFungibleToken<ContractType = Base
     /// # Notes
     ///
     /// There is no standard way to generate the `token_id`, hence
-    /// we do not provide a `non_sequential_mint()` function in our `storage.rs`.
-    /// The developer should implement this based on their needs.
+    /// we do not provide a `non_sequential_mint()` function in our
+    /// `storage.rs`. The developer should implement this based on their
+    /// needs.
     ///
     /// # Security Warning
     ///
@@ -64,9 +65,9 @@ pub trait NonFungibleNonSequentialMintable: NonFungibleToken<ContractType = Base
 
 /// Sequential Mintable Trait for Non-Fungible Token
 ///
-/// The `NonFungibleSequentialMintable` trait extends the `NonFungibleToken` trait to
-/// provide the capability to sequentially mint tokens. This trait is designed to be used in
-/// conjunction with the `NonFungibleToken` trait.
+/// The `NonFungibleSequentialMintable` trait extends the `NonFungibleToken`
+/// trait to provide the capability to sequentially mint tokens. This trait is
+/// designed to be used in conjunction with the `NonFungibleToken` trait.
 ///
 /// Excluding the `mint` functionality from the
 /// [`crate::non_fungible::NonFungibleToken`] trait is a deliberate design
@@ -93,8 +94,8 @@ pub trait NonFungibleSequentialMintable: NonFungibleToken<ContractType = BaseCon
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::mintable::sequential_mint()`] when implementing this
-    /// function.
+    /// We recommend using [`crate::mintable::sequential_mint()`] when
+    /// implementing this function.
     ///
     /// # Security Warning
     ///

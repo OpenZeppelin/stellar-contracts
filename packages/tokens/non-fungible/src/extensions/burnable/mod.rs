@@ -1,7 +1,6 @@
 mod storage;
-use crate::{BaseContract, NonFungibleToken};
-
 pub use self::storage::{burn, burn_from};
+use crate::{BaseContract, NonFungibleToken};
 
 mod test;
 
