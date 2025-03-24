@@ -1,5 +1,6 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
+use super::emit_consecutive_mint;
 use crate::{
     burnable::emit_burn,
     emit_transfer,
@@ -7,8 +8,6 @@ use crate::{
     storage::{approve_for_owner, check_spender_approval, decrease_balance, increase_balance},
     NonFungibleTokenError,
 };
-
-use super::emit_consecutive_mint;
 
 /// Storage keys for the data associated with `FungibleToken`
 #[contracttype]
@@ -39,7 +38,8 @@ pub fn owner_of(e: &Env, token_id: u32) -> Address {
         panic_with_error!(&e, NonFungibleTokenError::NonExistentToken);
     }
 
-    //e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
+    //e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD,
+    // OWNER_EXTEND_AMOUNT);
     (0..=token_id)
         .rev()
         .map(StorageKey::Owner)

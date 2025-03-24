@@ -1,7 +1,6 @@
 mod storage;
-use crate::NonFungibleToken;
-
 pub use self::storage::{mint, sequential_mint};
+use crate::NonFungibleToken;
 
 mod test;
 
