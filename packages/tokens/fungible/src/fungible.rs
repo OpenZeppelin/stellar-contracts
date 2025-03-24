@@ -62,7 +62,6 @@ pub trait FungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
-    ///
     fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
         crate::transfer(e, &from, &to, amount);
     }
