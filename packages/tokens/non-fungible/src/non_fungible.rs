@@ -1,5 +1,18 @@
 use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, String, Symbol};
 
+pub struct BaseContract;
+pub struct EnumerableContract;
+
+pub trait ContractBehavior {
+    fn transfer(e: &Env, from: Address, to: Address, token_id: u32);
+}
+
+impl ContractBehavior for BaseContract {
+    fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {
+        crate::transfer(e, &from, &to, token_id);
+    }
+}
+
 /// Vanilla NonFungible Token Trait
 ///
 /// The `NonFungibleToken` trait defines the core functionality for non-fungible
@@ -7,6 +20,8 @@ use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, Str
 /// transfers and approvals associated with non-fungible tokens.
 #[contractclient(name = "NonFungibleTokenClient")]
 pub trait NonFungibleToken {
+    type ContractType: ContractBehavior;
+
     /// Returns the number of tokens in `owner`'s account.
     ///
     /// # Arguments
@@ -66,7 +81,9 @@ pub trait NonFungibleToken {
     ///
     /// We recommend using [`crate::transfer()`] when implementing this
     /// function.
-    fn transfer(e: &Env, from: Address, to: Address, token_id: u32);
+    fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {
+        Self::ContractType::transfer(e, from, to, token_id);
+    }
 
     /// Transfers `token_id` token from `from` to `to` by using `spender`s
     /// approval.
