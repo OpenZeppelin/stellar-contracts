@@ -1,0 +1,113 @@
+:source-highlighter: highlight.js
+:highlightjs-languages: rust
+:github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
+= Non-Fungible Token Standard
+
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/non-fungible[Source Code]
+
+== Purpose
+
+The Non-Fungible Token Standard is a contract template designed to facilitate the creation and management of non-fungible tokens on the Stellar network.
+It provides a flexible and secure framework for defining and managing token standards, enabling developers to create and manage tokens with ease.
+
+== Extensions
+
+We provide the below extensions to enhance the capabilities of the Fungible Token Standard.
+
+=== - Mintable
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/mintable[Source Code]
+
+==== Summary
+There are 2 strategies for NFTs to mint tokens:
+* `sequential_mint` - the `token_id`s are incremented by 1 for each `mint()` operation, making the `token_id`s sequential (e.g. 1, 2, 3, 4, 5, ...).
+* `non_sequential` - a randomly generated `token_id` is assigned to the NFT to be minted, making the `token_id`s non-sequential (e.g. 32, 6, 789, 47, ...).
+
+For sequential minting, one does not need to supply the `token_id` to the `mint()` function, but keep a `Counter` logic to keep track of `token_id`s. The `FungibleMintable` trait extends the `FungibleToken` trait to provide this sequential minting capability.
+
+WARNING: `FungibleMintable` trait does not support `non_sequential` minting. This is a deliberate design choice. `non_sequential` minting is agnostic towards the `token_id` generation strategy, hence there is no standard to enforce, or no logic to abstract over.
+If you want to use `non_sequential` minting, you should directly implement your custom `mint()` function on your contract:
+
+```rust
+#[contractimpl]
+impl MyContract {
+    pub fn mint(e: &Env, owner: Address, token_id: u128) {
+        // your custom logic here
+    }
+
+    / * other methods * /
+}
+```
+
+IMPORTANT: `FungibleMintable` trait is incompatible with `NonFungibleEnumerable` and `NonFungibleConsecutive` traits by nature. Please use the corresponding `mint()` functions from these extensions instead, for example: `enumerable::sequential_mint()`.
+
+==== Events
+* `mint_event` :  broadcasted to the network when the `mint()` function is invoked.
+
+=== - Burnable
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/burnable[Source Code]
+
+==== Summary
+The `FungibleBurnable` trait extends the `FungibleToken` trait to provide the
+capability to burn tokens.
+
+IMPORTANT: `FungibleBurnable` trait is incompatible with `NonFungibleEnumerable` and `NonFungibleConsecutive` traits by nature. Please use the corresponding `burn()` functions from these extensions instead, for example: `enumerable::sequential_burn()`.
+
+==== Events
+* `burn_event`: broadcasted to the network when the `burn()` or `burn_from()` function is invoked.
+
+=== - Enumerable
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/enumerable[Source Code]
+
+==== Summary
+Provides the methods:
+* `total_supply()` for querying how many NFTs are there in the smart contract,
+* `get_owner_token_id()` for enumerating the NFTs of an account,
+* `get_token_id()` for enumerating the tokens of the smart contract.
+
+TIP: you will see that some internal functions in `storage.rs` file, that will be used for implementing the trait, has `sequential` and `non_sequential` variants.
+The reason for that is, the business logic changes drastically with respect to the minting strategy, and we offer optimized implementations for both cases.
+When implementing the trait, please use the the variant based on your minting strategy.
+
+IMPORTANT: Due to tracking ownership for enumeration (which is `NonFungibleEnumerable` trait is about),
+the `NonFungibleEnumerable` trait is incompatible with the following:
+* `NonFungibleMintable` trait (to `mint()`, please use the `enumerable::mint()` function variants),
+* `NonFungibleBurnable` trait (to `burn()`, please use the `enumerable::burn()` function variants),
+* `NonFungibleConsecutive` trait (`Consecutive` and `Enumerable` are incompatible by nature).
+
+IMPORTANT: Due to tracking ownership for enumeration (which is `NonFungibleEnumerable` trait is about), you also have to override
+the `transfer()` method from the `NonFungibleToken` trait. Please use the `enumerable::transfer()`, and `enumerable::transfer_from`
+functions instead when implementing the `NonFungibleToken` trait.
+
+==== Events
+There are no custom events associated with the `Enumerable` trait.
+
+=== - Consecutive
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/consecutive[Source Code]
+
+==== Summary
+// TODO
+
+==== Events
+// TODO
+
+=== - Metadata
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/metadata[Source Code]
+
+==== Summary
+// TODO
+
+==== Events
+// TODO
+
+=== - Claimable
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/claimable[Source Code]
+
+==== Summary
+// TODO
+
+==== Events
+// TODO
+
+== Misc
+
+
