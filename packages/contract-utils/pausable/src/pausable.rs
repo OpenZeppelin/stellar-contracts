@@ -1,6 +1,5 @@
-use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env};
+use soroban_sdk::{contracterror, symbol_short, Address, Env};
 
-#[contractclient(name = "PausableClient")]
 pub trait Pausable {
     /// Returns true if the contract is paused, and false otherwise.
     ///

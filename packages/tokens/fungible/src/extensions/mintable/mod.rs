@@ -3,7 +3,7 @@ pub use self::storage::mint;
 
 mod test;
 
-use soroban_sdk::{contractclient, symbol_short, Address, Env};
+use soroban_sdk::{symbol_short, Address, Env};
 
 /// Mintable Trait for Fungible Token
 ///
@@ -15,7 +15,6 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// [`crate::fungible::FungibleToken`] trait is a deliberate design choice to
 /// accommodate flexibility and customization for various smart contract use
 /// cases.
-#[contractclient(name = "FungibleMintableClient")]
 pub trait FungibleMintable {
     /// Creates `amount` of tokens and assigns them to `account`. Updates
     /// the total supply accordingly.

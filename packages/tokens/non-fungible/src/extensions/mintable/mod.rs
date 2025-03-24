@@ -5,7 +5,7 @@ pub use self::storage::sequential_mint;
 
 mod test;
 
-use soroban_sdk::{contractclient, symbol_short, Address, Env};
+use soroban_sdk::{symbol_short, Address, Env};
 
 /// Non-Sequential Mintable Trait for Non-Fungible Token
 ///
@@ -17,7 +17,6 @@ use soroban_sdk::{contractclient, symbol_short, Address, Env};
 /// [`crate::non_fungible::NonFungibleToken`] trait is a deliberate design
 /// choice to accommodate flexibility and customization for various smart
 /// contract use cases.
-#[contractclient(name = "NonFungibleNonSequentialMintableClient")]
 pub trait NonFungibleNonSequentialMintable: NonFungibleToken<ContractType = BaseContract> {
     /// Creates a token with the provided `token_id` and assigns it to `to`.
     ///
@@ -73,7 +72,6 @@ pub trait NonFungibleNonSequentialMintable: NonFungibleToken<ContractType = Base
 /// [`crate::non_fungible::NonFungibleToken`] trait is a deliberate design
 /// choice to accommodate flexibility and customization for various smart
 /// contract use cases.
-#[contractclient(name = "NonFungibleSequentialMintableClient")]
 pub trait NonFungibleSequentialMintable: NonFungibleToken<ContractType = BaseContract> {
     /// Creates a token with the next available `token_id` and assigns it to
     /// `to`. Returns the `token_id` for the newly minted token.
