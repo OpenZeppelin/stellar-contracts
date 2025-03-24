@@ -1,11 +1,7 @@
 pub mod storage;
 use soroban_sdk::{Address, Env, Symbol};
 
-use crate::NonFungibleToken;
-
 mod test;
-
-pub trait NonFungibleConsecutive: NonFungibleToken {}
 
 // ################## EVENTS ##################
 

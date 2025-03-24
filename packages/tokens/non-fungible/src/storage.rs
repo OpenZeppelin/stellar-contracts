@@ -3,12 +3,8 @@ use stellar_constants::{
     BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
 };
 
-use crate::{
-    non_fungible::{
-        emit_approve, emit_approve_for_all, emit_transfer, NonFungibleInternal,
-        NonFungibleTokenError,
-    },
-    NonFungibleToken,
+use crate::non_fungible::{
+    emit_approve, emit_approve_for_all, emit_transfer, NonFungibleTokenError,
 };
 
 /// Storage container for the token for which an approval is granted
@@ -43,7 +39,7 @@ pub enum StorageKey {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address for which the balance is being queried.
-pub fn balance<T: NonFungibleToken>(e: &Env, account: &Address) -> u32 {
+pub fn balance(e: &Env, account: &Address) -> u32 {
     let key = StorageKey::Balance(account.clone());
     if let Some(balance) = e.storage().persistent().get::<_, u32>(&key) {
         e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
@@ -64,7 +60,7 @@ pub fn balance<T: NonFungibleToken>(e: &Env, account: &Address) -> u32 {
 ///
 /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
 ///   `token_id` does not exist.
-pub fn owner_of<T: NonFungibleToken>(e: &Env, token_id: u32) -> Address {
+pub fn owner_of(e: &Env, token_id: u32) -> Address {
     let key = StorageKey::Owner(token_id);
     if let Some(owner) = e.storage().persistent().get::<_, Address>(&key) {
         e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
@@ -84,7 +80,7 @@ pub fn owner_of<T: NonFungibleToken>(e: &Env, token_id: u32) -> Address {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token_id` - The identifier of the token to check approval for.
-pub fn get_approved<T: NonFungibleToken>(e: &Env, token_id: u32) -> Option<Address> {
+pub fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
     let key = StorageKey::Approval(token_id);
 
     if let Some(approval_data) = e.storage().temporary().get::<_, ApprovalData>(&key) {
@@ -107,11 +103,7 @@ pub fn get_approved<T: NonFungibleToken>(e: &Env, token_id: u32) -> Option<Addre
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - The address that owns the tokens.
 /// * `operator` - The address to check for approval status.
-pub fn is_approved_for_all<T: NonFungibleToken>(
-    e: &Env,
-    owner: &Address,
-    operator: &Address,
-) -> bool {
+pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool {
     let key = StorageKey::ApprovalForAll(owner.clone());
 
     // Retrieve the approval data for the owner
@@ -151,9 +143,9 @@ pub fn is_approved_for_all<T: NonFungibleToken>(
 /// # Notes
 ///
 /// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
-pub fn transfer<T: NonFungibleToken>(e: &Env, from: &Address, to: &Address, token_id: u32) {
+pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
     from.require_auth();
-    T::update(e, Some(from), Some(to), token_id);
+    update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 }
 
@@ -181,16 +173,10 @@ pub fn transfer<T: NonFungibleToken>(e: &Env, from: &Address, to: &Address, toke
 /// # Notes
 ///
 /// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
-pub fn transfer_from<T: NonFungibleToken>(
-    e: &Env,
-    spender: &Address,
-    from: &Address,
-    to: &Address,
-    token_id: u32,
-) {
+pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
     spender.require_auth();
-    check_spender_approval::<T>(e, spender, from, token_id);
-    T::update(e, Some(from), Some(to), token_id);
+    check_spender_approval(e, spender, from, token_id);
+    update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 }
 
@@ -217,7 +203,7 @@ pub fn transfer_from<T: NonFungibleToken>(
 ///
 /// * topics - `["approve", owner: Address, token_id: u32]`
 /// * data - `[approved: Address, live_until_ledger: u32]`
-pub fn approve<T: NonFungibleToken>(
+pub fn approve(
     e: &Env,
     approver: &Address,
     approved: &Address,
@@ -226,26 +212,8 @@ pub fn approve<T: NonFungibleToken>(
 ) {
     approver.require_auth();
 
-    let owner = T::owner_of(e, token_id);
-    if *approver != owner && !is_approved_for_all::<T>(e, &owner, approver) {
-        panic_with_error!(e, NonFungibleTokenError::InvalidApprover);
-    }
-
-    if live_until_ledger < e.ledger().sequence() {
-        panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
-    }
-
-    let key = StorageKey::Approval(token_id);
-
-    let approval_data = ApprovalData { approved: approved.clone(), live_until_ledger };
-
-    e.storage().temporary().set(&key, &approval_data);
-
-    let live_for = live_until_ledger - e.ledger().sequence();
-
-    e.storage().temporary().extend_ttl(&key, live_for, live_for);
-
-    emit_approve(e, approver, approved, token_id, live_until_ledger);
+    let owner = owner_of(e, token_id);
+    approve_for_owner(e, &owner, approver, approved, token_id, live_until_ledger);
 }
 
 /// Sets or removes operator approval for managing all tokens owned by the
@@ -268,12 +236,7 @@ pub fn approve<T: NonFungibleToken>(
 ///
 /// * topics - `["approve", owner: Address]`
 /// * data - `[operator: Address, live_until_ledger: u32]`
-pub fn approve_for_all<T: NonFungibleToken>(
-    e: &Env,
-    owner: &Address,
-    operator: &Address,
-    live_until_ledger: u32,
-) {
+pub fn approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
     owner.require_auth();
 
     let key = StorageKey::ApprovalForAll(owner.clone());
@@ -332,21 +295,16 @@ pub fn approve_for_all<T: NonFungibleToken>(
 ///   the owner of the token.
 /// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `to` would
 ///   overflow.
-pub fn update<T: NonFungibleToken>(
-    e: &Env,
-    from: Option<&Address>,
-    to: Option<&Address>,
-    token_id: u32,
-) {
+pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
     if let Some(from_address) = from {
-        let owner = T::owner_of(e, token_id);
+        let owner = owner_of(e, token_id);
 
         // Ensure the `from` address is indeed the owner.
         if owner != *from_address {
             panic_with_error!(e, NonFungibleTokenError::IncorrectOwner);
         }
 
-        T::decrease_balance(e, from_address.clone(), 1);
+        decrease_balance(e, from_address, 1);
 
         // Clear any existing approval
         let approval_key = StorageKey::Approval(token_id);
@@ -357,7 +315,7 @@ pub fn update<T: NonFungibleToken>(
     }
 
     if let Some(to_address) = to {
-        T::increase_balance(e, to_address.clone(), 1);
+        increase_balance(e, to_address, 1);
 
         // Set the new owner
         e.storage().persistent().set(&StorageKey::Owner(token_id), to_address);
@@ -365,6 +323,36 @@ pub fn update<T: NonFungibleToken>(
         // Burning: `to` is None
         e.storage().persistent().remove(&StorageKey::Owner(token_id));
     }
+}
+
+/// Low-level function for approving `token_id` without checking ownership.
+pub(crate) fn approve_for_owner(
+    e: &Env,
+    owner: &Address,
+    approver: &Address,
+    approved: &Address,
+    token_id: u32,
+    live_until_ledger: u32,
+) {
+    if approver != owner && !is_approved_for_all(e, owner, approver) {
+        panic_with_error!(e, NonFungibleTokenError::InvalidApprover);
+    }
+
+    if live_until_ledger < e.ledger().sequence() {
+        panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
+    }
+
+    let key = StorageKey::Approval(token_id);
+
+    let approval_data = ApprovalData { approved: approved.clone(), live_until_ledger };
+
+    e.storage().temporary().set(&key, &approval_data);
+
+    let live_for = live_until_ledger - e.ledger().sequence();
+
+    e.storage().temporary().extend_ttl(&key, live_for, live_for);
+
+    emit_approve(e, approver, approved, token_id, live_until_ledger);
 }
 
 /// Low-level function for checking if the `spender` has enough approval.
@@ -379,31 +367,26 @@ pub fn update<T: NonFungibleToken>(
 /// # Errors
 /// * [`NonFungibleTokenError::InsufficientApproval`] - If the `spender` don't
 ///   enough approval.
-pub fn check_spender_approval<T: NonFungibleToken>(
-    e: &Env,
-    spender: &Address,
-    owner: &Address,
-    token_id: u32,
-) {
+pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: u32) {
     // If `spender` is not the owner, they must have explicit approval.
     let is_spender_owner = spender == owner;
-    let is_spender_approved = T::get_approved(e, token_id) == Some(spender.clone());
-    let has_spender_approval_for_all = T::is_approved_for_all(e, owner.clone(), spender.clone());
+    let is_spender_approved = get_approved(e, token_id) == Some(spender.clone());
+    let has_spender_approval_for_all = is_approved_for_all(e, owner, spender);
 
     if !is_spender_owner && !is_spender_approved && !has_spender_approval_for_all {
         panic_with_error!(e, NonFungibleTokenError::InsufficientApproval);
     }
 }
 
-pub fn increase_balance<T: NonFungibleToken>(e: &Env, to: &Address, amount: u32) {
-    let Some(balance) = T::balance(e, to.clone()).checked_add(amount) else {
+pub fn increase_balance(e: &Env, to: &Address, amount: u32) {
+    let Some(balance) = balance(e, to).checked_add(amount) else {
         panic_with_error!(e, NonFungibleTokenError::MathOverflow);
     };
     e.storage().persistent().set(&StorageKey::Balance(to.clone()), &balance);
 }
 
-pub fn decrease_balance<T: NonFungibleToken>(e: &Env, from: &Address, amount: u32) {
-    let Some(balance) = T::balance(e, from.clone()).checked_sub(amount) else {
+pub fn decrease_balance(e: &Env, from: &Address, amount: u32) {
+    let Some(balance) = balance(e, from).checked_sub(amount) else {
         // TODO: underflow ??
         panic_with_error!(e, NonFungibleTokenError::MathOverflow);
     };

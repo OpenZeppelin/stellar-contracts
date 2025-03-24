@@ -71,8 +71,8 @@ mod storage;
 
 pub use extensions::{burnable, consecutive, mintable, sequential};
 pub use non_fungible::{
-    emit_approve, emit_approve_for_all, emit_transfer, NonFungibleInternal, NonFungibleToken,
-    NonFungibleTokenClient, NonFungibleTokenError,
+    emit_approve, emit_approve_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenClient,
+    NonFungibleTokenError,
 };
 pub use storage::{
     approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,

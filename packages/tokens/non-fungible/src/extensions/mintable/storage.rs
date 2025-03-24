@@ -1,6 +1,6 @@
 use soroban_sdk::{Address, Env};
 
-use crate::{extensions::mintable::emit_mint, sequential::NonFungibleSequential, NonFungibleToken};
+use crate::{extensions::mintable::emit_mint, sequential::increment_token_id};
 
 /// Creates a token with the next available `token_id` and assigns it to `to`.
 /// Returns the `token_id` for the newly minted token.
@@ -41,14 +41,14 @@ use crate::{extensions::mintable::emit_mint, sequential::NonFungibleSequential, 
 /// use. If the developer has other means of minting tokens and generating
 /// `token_id`s, they should ensure that the token_id is unique and not already
 /// in use.
-pub fn mint<T: NonFungibleToken>(e: &Env, to: &Address, token_id: u32) -> u32 {
-    crate::storage::update::<T>(e, None, Some(to), token_id);
+pub fn mint(e: &Env, to: &Address, token_id: u32) -> u32 {
+    crate::storage::update(e, None, Some(to), token_id);
     emit_mint(e, to, token_id);
 
     token_id
 }
 
-pub fn sequential_mint<T: NonFungibleToken + NonFungibleSequential>(e: &Env, to: &Address) -> u32 {
-    let token_id = T::increment_token_id(e, 1);
-    mint::<T>(e, to, token_id)
+pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
+    let token_id = increment_token_id(e, 1);
+    mint(e, to, token_id)
 }
