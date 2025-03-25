@@ -3,6 +3,7 @@ use soroban_sdk::{Address, Env};
 use crate::{
     extensions::burnable::emit_burn,
     storage::{check_spender_approval, update},
+    TokenId,
 };
 
 /// Destroys the `token_id` from `account`, ensuring ownership

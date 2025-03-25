@@ -4,7 +4,7 @@ use stellar_constants::{
 };
 
 use crate::non_fungible::{
-    emit_approve, emit_approve_for_all, emit_transfer, Balance, NonFungibleTokenError,
+    emit_approve, emit_approve_for_all, emit_transfer, Balance, NonFungibleTokenError, TokenId,
 };
 
 /// Storage container for the token for which an approval is granted

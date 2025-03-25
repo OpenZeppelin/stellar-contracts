@@ -1324,6 +1324,7 @@ name = "stellar-event-assertion"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-non-fungible",
 ]
 
 [[package]]

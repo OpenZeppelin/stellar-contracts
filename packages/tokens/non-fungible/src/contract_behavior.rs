@@ -1,5 +1,6 @@
-use crate::TokenId;
 use soroban_sdk::{Address, Env};
+
+use crate::TokenId;
 
 /// Based on the Extension, some default behavior of [`crate::NonFungibleToken`]
 /// might have to be overridden. This is a helper trait that allows us this
