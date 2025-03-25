@@ -44,6 +44,9 @@ pub trait FungibleMintable {
     /// [`crate::extensions::capped`], and check the `fungible-capped`
     /// example.
     ///
+    /// We recommend using [`crate::mintable::mint()`] when implementing this
+    /// function.
+    ///
     /// # Security Warning
     ///
     /// IMPORTANT: The base implementation of mint() intentionally lacks
@@ -62,9 +65,7 @@ pub trait FungibleMintable {
     /// ```
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
-    fn mint(e: &Env, to: Address, amount: i128) {
-        crate::mintable::mint(e, &to, amount);
-    }
+    fn mint(e: &Env, to: Address, amount: i128);
 }
 
 // ################## EVENTS ##################
