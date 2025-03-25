@@ -1,6 +1,6 @@
 use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
 
-use crate::ContractBehavior;
+use crate::ContractOverrides;
 
 /// Vanilla NonFungible Token Trait
 ///
@@ -12,7 +12,7 @@ pub trait NonFungibleToken {
     /// base trait based on the extensions implemented. You should use
     /// `BaseContract` as the type if you are not using `Enumerable` or
     /// `Consecutive` extensions.
-    type ContractType: ContractBehavior;
+    type ContractType: ContractOverrides;
 
     /// Returns the number of tokens in `owner`'s account.
     ///

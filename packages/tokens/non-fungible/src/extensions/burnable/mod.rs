@@ -1,6 +1,6 @@
 mod storage;
 pub use self::storage::{burn, burn_from};
-use crate::{BaseContract, NonFungibleToken};
+use crate::{Base, NonFungibleToken};
 
 mod test;
 
@@ -15,7 +15,7 @@ use soroban_sdk::{symbol_short, Address, Env};
 /// Excluding the `burn` functionality from the `[NonFungibleToken]` trait
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
-pub trait NonFungibleBurnable: NonFungibleToken<ContractType = BaseContract> {
+pub trait NonFungibleBurnable: NonFungibleToken<ContractType = Base> {
     /// Destroys the `token_id` from `account`.
     ///
     /// # Arguments

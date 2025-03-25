@@ -3,7 +3,7 @@ use soroban_sdk::{Address, Env};
 /// Based on the Extension, some default behavior of [`crate::NonFungibleToken`]
 /// might have to be overridden. This is a helper trait that allows us this
 /// override mechanism.
-pub trait ContractBehavior {
+pub trait ContractOverrides {
     fn owner_of(e: &Env, token_id: u32) -> Address;
     fn transfer(e: &Env, from: Address, to: Address, token_id: u32);
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32);
@@ -17,9 +17,9 @@ pub trait ContractBehavior {
 }
 
 /// Default marker type
-pub struct BaseContract;
+pub struct Base;
 
-impl ContractBehavior for BaseContract {
+impl ContractOverrides for Base {
     fn owner_of(e: &Env, token_id: u32) -> Address {
         crate::owner_of(e, token_id)
     }
