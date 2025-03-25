@@ -34,7 +34,7 @@ pub trait NonFungibleBurnable: NonFungibleToken<ContractType = Base> {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: u32]`
+    /// * data - `[token_id: TokenId]`
     fn burn(e: &Env, from: Address, token_id: TokenId) {
         crate::burnable::burn(e, &from, token_id);
     }
@@ -61,7 +61,7 @@ pub trait NonFungibleBurnable: NonFungibleToken<ContractType = Base> {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: u32]`
+    /// * data - `[token_id: TokenId]`
     fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId) {
         crate::burnable::burn_from(e, &spender, &from, token_id);
     }
