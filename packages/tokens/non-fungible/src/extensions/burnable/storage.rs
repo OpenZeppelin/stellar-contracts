@@ -3,6 +3,7 @@ use soroban_sdk::{Address, Env};
 use crate::{
     extensions::burnable::emit_burn,
     storage::{check_spender_approval, update},
+    TokenId,
 };
 
 /// Destroys the `token_id` from `account`, ensuring ownership
@@ -21,12 +22,12 @@ use crate::{
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
 /// Authorization for `from` is required.
-pub fn burn(e: &Env, from: &Address, token_id: u32) {
+pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
     from.require_auth();
     update(e, Some(from), None, token_id);
     emit_burn(e, from, token_id);
@@ -51,12 +52,12 @@ pub fn burn(e: &Env, from: &Address, token_id: u32) {
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
 /// Authorization for `spender` is required.
-pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
     spender.require_auth();
     check_spender_approval(e, spender, from, token_id);
     update(e, Some(from), None, token_id);

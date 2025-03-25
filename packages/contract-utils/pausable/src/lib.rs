@@ -53,7 +53,7 @@ mod pausable;
 mod storage;
 
 pub use crate::{
-    pausable::{emit_paused, emit_unpaused, Pausable, PausableClient, PausableError},
+    pausable::{emit_paused, emit_unpaused, Pausable, PausableError},
     storage::{pause, paused, unpause, when_not_paused, when_paused},
 };
 

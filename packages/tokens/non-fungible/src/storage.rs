@@ -4,7 +4,7 @@ use stellar_constants::{
 };
 
 use crate::non_fungible::{
-    emit_approve, emit_approve_for_all, emit_transfer, NonFungibleTokenError,
+    emit_approve, emit_approve_for_all, emit_transfer, Balance, NonFungibleTokenError, TokenId,
 };
 
 /// Storage container for the token for which an approval is granted
@@ -18,15 +18,15 @@ pub struct ApprovalData {
 /// Storage container for multiple operators and their expiration ledgers.
 #[contracttype]
 pub struct ApprovalForAllData {
-    pub operators: Map<Address, u32>,
+    pub operators: Map<Address /* operator */, u32 /* live_until_ledger */>,
 }
 
 /// Storage keys for the data associated with `FungibleToken`
 #[contracttype]
 pub enum StorageKey {
-    Owner(u32),
+    Owner(TokenId),
     Balance(Address),
-    Approval(u32),
+    Approval(TokenId),
     ApprovalForAll(Address),
 }
 
@@ -39,9 +39,9 @@ pub enum StorageKey {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address for which the balance is being queried.
-pub fn balance(e: &Env, account: &Address) -> u32 {
+pub fn balance(e: &Env, account: &Address) -> Balance {
     let key = StorageKey::Balance(account.clone());
-    if let Some(balance) = e.storage().persistent().get::<_, u32>(&key) {
+    if let Some(balance) = e.storage().persistent().get::<_, Balance>(&key) {
         e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
         balance
     } else {
@@ -60,7 +60,7 @@ pub fn balance(e: &Env, account: &Address) -> u32 {
 ///
 /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
 ///   `token_id` does not exist.
-pub fn owner_of(e: &Env, token_id: u32) -> Address {
+pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
     let key = StorageKey::Owner(token_id);
     if let Some(owner) = e.storage().persistent().get::<_, Address>(&key) {
         e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
@@ -80,7 +80,7 @@ pub fn owner_of(e: &Env, token_id: u32) -> Address {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token_id` - The identifier of the token to check approval for.
-pub fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+pub fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
     let key = StorageKey::Approval(token_id);
 
     if let Some(approval_data) = e.storage().temporary().get::<_, ApprovalData>(&key) {
@@ -138,13 +138,13 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
 /// * Authorization for `from` is required.
 /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
-pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
+pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
     from.require_auth();
     update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
@@ -169,13 +169,13 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
 /// * Authorization for `spender` is required.
 /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
-pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
+pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
     spender.require_auth();
     check_spender_approval(e, spender, from, token_id);
     update(e, Some(from), Some(to), token_id);
@@ -200,7 +200,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 ///
 /// # Events
 ///
-/// * topics - `["approve", owner: Address, token_id: u32]`
+/// * topics - `["approve", owner: Address, token_id: TokenId]`
 /// * data - `[approved: Address, live_until_ledger: u32]`
 ///
 /// # Notes
@@ -210,7 +210,7 @@ pub fn approve(
     e: &Env,
     approver: &Address,
     approved: &Address,
-    token_id: u32,
+    token_id: TokenId,
     live_until_ledger: u32,
 ) {
     approver.require_auth();
@@ -302,7 +302,7 @@ pub fn approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_
 ///   the owner of the token.
 /// * refer to [`owner_of`] errors.
 /// * refer to [`increase_balance`] errors.
-pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
+pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: TokenId) {
     if let Some(from_address) = from {
         let owner = owner_of(e, token_id);
 
@@ -355,7 +355,7 @@ pub fn approve_for_owner(
     owner: &Address,
     approver: &Address,
     approved: &Address,
-    token_id: u32,
+    token_id: TokenId,
     live_until_ledger: u32,
 ) {
     if approver != owner && !is_approved_for_all(e, owner, approver) {
@@ -393,7 +393,7 @@ pub fn approve_for_owner(
 /// # Errors
 /// * [`NonFungibleTokenError::InsufficientApproval`] - If the `spender` don't
 ///   enough approval.
-pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: u32) {
+pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: TokenId) {
     // If `spender` is not the owner, they must have explicit approval.
     let is_spender_owner = spender == owner;
     let is_spender_approved = get_approved(e, token_id) == Some(spender.clone());
@@ -417,7 +417,7 @@ pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token
 ///
 /// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `to` would
 ///   overflow.
-pub fn increase_balance(e: &Env, to: &Address, amount: u32) {
+pub fn increase_balance(e: &Env, to: &Address, amount: TokenId) {
     let Some(balance) = balance(e, to).checked_add(amount) else {
         panic_with_error!(e, NonFungibleTokenError::MathOverflow);
     };
@@ -432,7 +432,7 @@ pub fn increase_balance(e: &Env, to: &Address, amount: u32) {
 /// * `e` - Access to the Soroban environment.
 /// * `to` - The address whose balance gets decreased.
 /// * `amount` - The amount by which the balance gets decreased.
-pub fn decrease_balance(e: &Env, from: &Address, amount: u32) {
+pub fn decrease_balance(e: &Env, from: &Address, amount: TokenId) {
     let new_balance = balance(e, from).saturating_sub(amount);
     e.storage().persistent().set(&StorageKey::Balance(from.clone()), &new_balance);
 }

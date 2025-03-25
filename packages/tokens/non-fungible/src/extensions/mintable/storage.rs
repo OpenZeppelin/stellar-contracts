@@ -1,6 +1,40 @@
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{panic_with_error, Address, Env};
 
-use crate::{extensions::mintable::emit_mint, sequential::increment_token_id};
+use crate::{
+    extensions::mintable::emit_mint, non_fungible::TokenId, storage::update, NonFungibleTokenError,
+};
+
+const TOKEN_ID_COUNTER: &str = "TOKEN_ID_COUNTER";
+
+/// Get the current token counter value to determine the next token_id.
+/// The returned value is the next available token_id.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+pub fn next_token_id(e: &Env) -> TokenId {
+    e.storage().instance().get(&TOKEN_ID_COUNTER).unwrap_or(0)
+}
+
+/// Return the next free token ID, then increment the counter.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * [`crate::NonFungibleTokenError::TokenIDsAreDepleted`] - When all the
+///   available `token_id`s are consumed for this smart contract.
+pub fn increment_token_id(e: &Env) -> TokenId {
+    let current = next_token_id(e);
+    let next = current.checked_add(1).unwrap_or_else(|| {
+        panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
+    });
+    e.storage().instance().set(&TOKEN_ID_COUNTER, &next);
+
+    current
+}
 
 /// Creates a token with the next available `token_id` and assigns it to `to`.
 /// Returns the `token_id` for the newly minted token.
@@ -18,7 +52,7 @@ use crate::{extensions::mintable::emit_mint, sequential::increment_token_id};
 /// # Events
 ///
 /// * topics - `["mint", to: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Security Warning
 ///
@@ -41,14 +75,10 @@ use crate::{extensions::mintable::emit_mint, sequential::increment_token_id};
 /// use. If the developer has other means of minting tokens and generating
 /// `token_id`s, they should ensure that the token_id is unique and not already
 /// in use.
-pub fn mint(e: &Env, to: &Address, token_id: u32) -> u32 {
-    crate::storage::update(e, None, Some(to), token_id);
+pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
+    let token_id = increment_token_id(e);
+    update(e, None, Some(to), token_id);
     emit_mint(e, to, token_id);
 
     token_id
-}
-
-pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
-    let token_id = increment_token_id(e, 1);
-    mint(e, to, token_id)
 }
