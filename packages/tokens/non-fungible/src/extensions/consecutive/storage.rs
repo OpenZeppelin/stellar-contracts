@@ -43,12 +43,50 @@ pub fn owner_of(e: &Env, token_id: u32) -> Address {
     (0..=token_id)
         .rev()
         .map(StorageKey::Owner)
+        // after the Protocol 23 upgrade, storage read cost is marginal,
+        // making the consecutive storage reads justifiable
         .find_map(|key| e.storage().persistent().get::<_, Address>(&key))
         .unwrap_or_else(|| panic_with_error!(&e, NonFungibleTokenError::NonExistentToken))
 }
 
 // ################## CHANGE STATE ##################
 
+/// Mints a batch of tokens with consecutive ids and attributes them to `to`.
+/// This function does NOT handle authorization.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `to` - The address of the recipient.
+/// * `amount` - The number of tokens to mint.
+///
+/// # Errors
+///
+/// * refer to [`crate::storage::increase_balance`] errors.
+///
+/// # Events
+///
+/// * topics - `["consecutive_mint", to: Address]`
+/// * data - `[from_token_id: u32, to_token_id: u32]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: The function intentionally lacks authorization controls. You
+/// MUST invoke it only from the constructor or implement proper authorization in
+/// the calling function. For example:
+///
+/// ```igrnore,rust
+/// fn mint_batch(e: &Env, to: &Address, amount: u32) {
+///     // 1. Verify admin has minting privileges (optional)
+///     let admin = e.storage().instance().get(&ADMIN_KEY).unwrap();
+///     admin.require_auth();
+///
+///     // 2. Only then call the actual mint function
+///     crate::consecutive::batch_mint(e, &to, amount);
+/// }
+/// ```
+///
+/// Failing to add proper authorization could allow anyone to mint tokens!
 pub fn batch_mint(e: &Env, to: &Address, amount: u32) -> u32 {
     let next_id = increment_token_id(e, amount);
 
@@ -63,25 +101,65 @@ pub fn batch_mint(e: &Env, to: &Address, amount: u32) -> u32 {
     last_id
 }
 
+/// Destroys the `token_id` from `account`, ensuring ownership
+/// checks, and emits a `burn` event.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The account whose token is destroyed.
+/// * `token_id` - The token to burn.
+///
+/// # Errors
+///
+/// * refer to [`self::update`] errors.
+///
+/// # Events
+///
+/// * topics - `["burn", from: Address]`
+/// * data - `[token_id: u32]`
+///
+/// # Notes
+///
+/// Authorization for `from` is required.
 pub fn burn(e: &Env, from: &Address, token_id: u32) {
     from.require_auth();
+
     update(e, Some(from), None, token_id);
     emit_burn(e, from, token_id);
-
-    e.storage().persistent().set(&StorageKey::BurntToken(token_id), &true);
-    // Set the next token to prev owner
-    set_owner_for_next_token(e, from, token_id);
 }
 
+/// Destroys the `token_id` from `account`, ensuring ownership
+/// and approval checks, and emits a `burn` event.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `spender` - The account that is allowed to burn the token on behalf of the
+///   owner.
+/// * `from` - The account whose token is destroyed.
+/// * `token_id` - The token to burn.
+///
+/// # Errors
+///
+/// * refer to [`crate::storage::check_spender_approval`] errors.
+/// * refer to [`self::update`] errors.
+///
+/// # Events
+///
+/// * topics - `["burn", from: Address]`
+/// * data - `[token_id: u32]`
+///
+/// # Notes
+///
+/// Authorization for `spender` is required.
 pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
     spender.require_auth();
+
     check_spender_approval(e, spender, from, token_id);
+
     update(e, Some(from), None, token_id);
     emit_burn(e, from, token_id);
-
-    e.storage().persistent().set(&StorageKey::BurntToken(token_id), &true);
-    // Set the next token to prev owner
-    set_owner_for_next_token(e, from, token_id);
 }
 
 /// Transfers a non-fungible token (NFT), ensuring ownership checks.
@@ -95,7 +173,7 @@ pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
 ///
 /// # Errors
 ///
-/// * refer to [`update`] errors.
+/// * refer to [`self::update`] errors.
 ///
 /// # Events
 ///
@@ -104,15 +182,14 @@ pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
 ///
 /// # Notes
 ///
-/// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
+/// * Authorization for `from` is required.
+/// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
+///   lost.
 pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
     from.require_auth();
 
     update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
-
-    // Set the next token to prev owner
-    set_owner_for_next_token(e, from, token_id);
 }
 
 /// Transfers a non-fungible token (NFT), ensuring ownership and approval
@@ -128,8 +205,8 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
 ///
 /// # Errors
 ///
-/// * refer to [`check_spender_approval`] errors.
-/// * refer to [`update`] errors.
+/// * refer to [`crate::storage::check_spender_approval`] errors.
+/// * refer to [`self::update`] errors.
 ///
 /// # Events
 ///
@@ -138,7 +215,9 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
 ///
 /// # Notes
 ///
-/// **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
+/// * Authorization for `spender` is required.
+/// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
+///   lost.
 pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
     spender.require_auth();
 
@@ -146,9 +225,6 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 
     update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
-
-    // Set the next token to prev owner
-    set_owner_for_next_token(e, from, token_id);
 }
 
 /// Approves an address to transfer a specific token.
@@ -164,16 +240,17 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 ///
 /// # Errors
 ///
-/// * [`NonFungibleTokenError::InvalidApprover`] - If the owner address is not
-///   the actual owner of the token.
-/// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger number
-///   is less than the current ledger number.
-/// * refer to [`owner_of`] errors.
+/// * refer to [`self::owner_of`] errors.
+/// * refer to [`crate::storage::approve_for_owner`] errors.
 ///
 /// # Events
 ///
 /// * topics - `["approve", owner: Address, token_id: u32]`
 /// * data - `[approved: Address, live_until_ledger: u32]`
+///
+/// # Notes
+///
+/// * Authorization for `approver` is required.
 pub fn approve(
     e: &Env,
     approver: &Address,
@@ -187,6 +264,27 @@ pub fn approve(
     approve_for_owner(e, &owner, approver, approved, token_id, live_until_ledger);
 }
 
+/// Low-level function for handling transfers, mints and burns of an NFT,
+/// without handling authorization. Updates ownership records, adjusts balances,
+/// and clears existing approvals.
+///
+/// The difference with [`crate::storage::update`] is that the current function:
+/// 1. explicitly adds burnt tokens to storage in `StorageKey::BurntToken`,
+/// 2. sets the next token (if any) to the previous owner.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The address of the current token owner.
+/// * `to` - The address of the token recipient.
+/// * `token_id` - The identifier of the token to be transferred.
+///
+/// # Errors
+///
+/// * [`NonFungibleTokenError::IncorrectOwner`] - If the `from` address is not
+///   the owner of the token.
+/// * refer to [`owner_of`] errors.
+/// * refer to [`increase_balance`] errors.
 pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
     if let Some(from_address) = from {
         let owner = owner_of(e, token_id);
@@ -201,6 +299,9 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u
         // Clear any existing approval
         let approval_key = StorageKey::Approval(token_id);
         e.storage().temporary().remove(&approval_key);
+
+        // Set the next token to prev owner
+        set_owner_for(e, from_address, token_id + 1);
     } else {
         // nothing to do for the `None` case, since we don't track
         // `total_supply`
@@ -214,16 +315,25 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u
     } else {
         // Burning: `to` is None
         e.storage().persistent().remove(&StorageKey::Owner(token_id));
+
+        e.storage().persistent().set(&StorageKey::BurntToken(token_id), &true);
     }
 }
 
-fn set_owner_for_next_token(e: &Env, owner: &Address, token_id: u32) {
-    let next_token_id = token_id + 1;
-    let has_owner = e.storage().persistent().has(&StorageKey::Owner(next_token_id));
-    let is_burnt =
-        e.storage().persistent().get(&StorageKey::BurntToken(next_token_id)).unwrap_or(false);
+/// Low-level function that sets owner of `token_id` to `to` if the token
+/// exists, without handling authorization.
+///
+/// # Arguments
+///
+/// * `e` - The environment reference.
+/// * `to` - The owner's address.
+/// * `token_id` - The identifier of the token being set.
+pub fn set_owner_for(e: &Env, to: &Address, token_id: u32) {
+    let max = next_token_id(e);
+    let has_owner = e.storage().persistent().has(&StorageKey::Owner(token_id));
+    let is_burnt = e.storage().persistent().get(&StorageKey::BurntToken(token_id)).unwrap_or(false);
 
-    if !has_owner && !is_burnt {
-        e.storage().persistent().set(&StorageKey::Owner(next_token_id), owner);
+    if token_id < max && !has_owner && !is_burnt {
+        e.storage().persistent().set(&StorageKey::Owner(token_id), to);
     }
 }
