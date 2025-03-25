@@ -34,8 +34,8 @@ fn test_counter_works() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id1 = mint(&e, &owner);
-        let _token_id2 = mint(&e, &owner);
+        let token_id1 = sequential_mint(&e, &owner);
+        let _token_id2 = sequential_mint(&e, &owner);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);

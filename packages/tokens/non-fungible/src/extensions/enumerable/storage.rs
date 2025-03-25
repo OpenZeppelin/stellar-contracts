@@ -3,7 +3,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 use crate::{
     balance,
     burnable::{burn, burn_from},
-    mintable::{emit_mint, mint},
+    mintable::{emit_mint, sequential_mint},
     storage::update,
     transfer, transfer_from, NonFungibleTokenError,
 };
@@ -110,11 +110,11 @@ pub fn get_token_id(e: &Env, index: u32) -> u32 {
 ///
 /// # Notes
 ///
-/// This is a wrapper around [`crate::mintable::mint()`], that also
+/// This is a wrapper around [`crate::mintable::sequential_mint()`], that also
 /// handles the storage updates for:
 /// * total supply
-pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
-    let token_id = mint(e, to);
+pub fn enumerable_sequential_mint(e: &Env, to: &Address) -> u32 {
+    let token_id = sequential_mint(e, to);
 
     add_to_owner_enumeration(e, to, token_id);
 
@@ -150,7 +150,7 @@ pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
 /// * total supply
 /// * owner_tokens enumeration
 /// * global_tokens enumeration
-pub fn non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
+pub fn enumerable_non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
     update(e, None, Some(to), token_id);
     emit_mint(e, to, token_id);
 
@@ -185,7 +185,7 @@ pub fn non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
 /// handles the storage updates for:
 /// * total supply
 /// * owner_tokens enumeration
-pub fn sequential_burn(e: &Env, from: &Address, token_id: u32) {
+pub fn enumerable_sequential_burn(e: &Env, from: &Address, token_id: u32) {
     burn(e, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
@@ -223,7 +223,7 @@ pub fn sequential_burn(e: &Env, from: &Address, token_id: u32) {
 /// * total supply
 /// * owner_tokens enumeration
 /// * global_tokens enumeration
-pub fn non_sequential_burn(e: &Env, from: &Address, token_id: u32) {
+pub fn enumerable_non_sequential_burn(e: &Env, from: &Address, token_id: u32) {
     burn(e, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
@@ -259,7 +259,7 @@ pub fn non_sequential_burn(e: &Env, from: &Address, token_id: u32) {
 /// handles the storage updates for:
 /// * total supply
 /// * owner_tokens enumeration
-pub fn sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+pub fn enumerable_sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
     burn_from(e, spender, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
@@ -299,7 +299,12 @@ pub fn sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id
 /// * total supply
 /// * owner_tokens enumeration
 /// * global_tokens enumeration
-pub fn non_sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+pub fn enumerable_non_sequential_burn_from(
+    e: &Env,
+    spender: &Address,
+    from: &Address,
+    token_id: u32,
+) {
     burn_from(e, spender, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);

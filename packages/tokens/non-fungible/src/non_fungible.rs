@@ -286,9 +286,9 @@ pub enum NonFungibleTokenError {
     /// Indicates a token with given `token_id` already exists.
     TokenIDInUse = 307,
     /// Indicates the token does not exist in owner's list.
-    TokenNotFoundInOwnerList = 307,
+    TokenNotFoundInOwnerList = 308,
     /// Indicates the token does not exist in global list.
-    TokenNotFoundInGlobalList = 308,
+    TokenNotFoundInGlobalList = 309,
 }
 
 // ################## EVENTS ##################

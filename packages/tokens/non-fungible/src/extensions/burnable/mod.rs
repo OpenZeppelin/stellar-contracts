@@ -16,7 +16,7 @@ use soroban_sdk::{symbol_short, Address, Env};
 /// [`crate::non_fungible::NonFungibleToken`] trait is a deliberate design
 /// choice to accommodate flexibility and customization for various smart
 /// contract use cases.
-pub trait NonFungibleBurnable {
+pub trait NonFungibleBurnable: NonFungibleToken<ContractType = Base> {
     /// Destroys the `token_id` from `account`.
     ///
     /// # Arguments

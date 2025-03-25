@@ -1,8 +1,12 @@
+pub mod overrides;
 pub mod storage;
 
 mod test;
 
-use soroban_sdk::{contractclient, Address, Env};
+use overrides::Enumerable;
+use soroban_sdk::{Address, Env};
+
+use crate::{Balance, NonFungibleToken, TokenId};
 
 /// Enumerable Trait for Non-Fungible Token
 ///
@@ -39,8 +43,7 @@ use soroban_sdk::{contractclient, Address, Env};
 /// Note that, `Enumerable` trait can also be offloaded to off-chain services.
 /// This extension exists for the use-cases where the enumeration is required as
 /// an on-chain operation.
-#[contractclient(name = "NonFungibleEnumerableClient")]
-pub trait NonFungibleEnumerable {
+pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// Returns the total amount of tokens stored by the contract.
     ///
     /// # Arguments
@@ -49,7 +52,7 @@ pub trait NonFungibleEnumerable {
     ///
     /// We recommend using [`crate::enumerable::total_supply()`] when
     /// implementing this function.
-    fn total_supply(e: &Env) -> u32;
+    fn total_supply(e: &Env) -> Balance;
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
     /// owner's local list. Use along with
@@ -64,7 +67,7 @@ pub trait NonFungibleEnumerable {
     ///
     /// We recommend using [`crate::enumerable::get_owner_token_id()`] when
     /// implementing this function.
-    fn get_owner_token_id(e: &Env, owner: &Address, index: u32) -> u32;
+    fn get_owner_token_id(e: &Env, owner: &Address, index: TokenId) -> TokenId;
 
     /// Returns the `token_id` at a given `index` in the global token list.
     /// Use along with [`NonFungibleEnumerable::total_supply()`] to enumerate
@@ -83,5 +86,5 @@ pub trait NonFungibleEnumerable {
     /// **IMPORTANT**: This function is only intended for non-sequential
     /// `token_id`s. For sequential `token_id`s, no need to call a function,
     /// the `token_id` itself acts as the global index.
-    fn get_token_id(e: &Env, index: u32) -> u32;
+    fn get_token_id(e: &Env, index: TokenId) -> TokenId;
 }
