@@ -65,17 +65,19 @@
 //!   extensions.
 #![no_std]
 
+mod contract_behavior;
 mod extensions;
 mod non_fungible;
 mod storage;
 
-pub use extensions::burnable;
+pub use contract_behavior::*;
+pub use extensions::{burnable, mintable};
 pub use non_fungible::{
-    emit_approval, emit_approval_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenClient,
-    NonFungibleTokenError,
+    emit_approve, emit_approve_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenError,
+    TokenId,
 };
 pub use storage::{
-    approve, balance, get_approved, is_approved_for_all, owner_of, set_approval_for_all, transfer,
+    approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,
     transfer_from, ApprovalData, ApprovalForAllData, StorageKey,
 };
 

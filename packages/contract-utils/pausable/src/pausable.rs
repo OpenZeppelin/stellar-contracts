@@ -1,17 +1,14 @@
-use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env};
+use soroban_sdk::{contracterror, symbol_short, Address, Env};
 
-#[contractclient(name = "PausableClient")]
 pub trait Pausable {
     /// Returns true if the contract is paused, and false otherwise.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::paused()`] when implementing this function.
-    fn paused(e: &Env) -> bool;
+    fn paused(e: &Env) -> bool {
+        crate::paused(e)
+    }
 
     /// Triggers `Paused` state.
     ///
@@ -33,6 +30,13 @@ pub trait Pausable {
     /// # Notes
     ///
     /// We recommend using [`crate::pause()`] when implementing this function.
+    ///
+    /// # Security Warning
+    ///
+    /// IMPORTANT: The base implementation of [`crate::pause()`] intentionally
+    /// lacks authorization controls. If you want to restrict who can
+    /// `pause` the contract, you MUST implement proper authorization in
+    /// your contract.
     fn pause(e: &Env, caller: Address);
 
     /// Triggers `Unpaused` state.
@@ -55,6 +59,13 @@ pub trait Pausable {
     /// # Notes
     ///
     /// We recommend using [`crate::unpause()`] when implementing this function.
+    ///
+    /// # Security Warning
+    ///
+    /// IMPORTANT: The base implementation of [`crate::unpause()`] intentionally
+    /// lacks authorization controls. If you want to restrict who can
+    /// `unpause` the contract, you MUST implement proper authorization in
+    /// your contract.
     fn unpause(e: &Env, caller: Address);
 }
 

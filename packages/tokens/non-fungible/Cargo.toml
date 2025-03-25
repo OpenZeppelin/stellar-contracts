@@ -17,3 +17,10 @@ stellar-constants = { workspace = true }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 stellar-event-assertion = { workspace = true }
+
+[features]
+default = ["token_u32"]
+token_u32 = []
+token_u64 = []
+token_u128 = []
+token_u256 = []

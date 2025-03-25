@@ -26,10 +26,7 @@
                   "symbol": "Approval"
                 },
                 {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 0
                 }
               ]
             },
@@ -49,10 +46,7 @@
                       "symbol": "Approval"
                     },
                     {
-                      "u128": {
-                        "hi": 0,
-                        "lo": 1
-                      }
+                      "u32": 0
                     }
                   ]
                 },
@@ -120,10 +114,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 1
                 }
               }
             },
@@ -142,10 +133,7 @@
                   "symbol": "Owner"
                 },
                 {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 0
                 }
               ]
             },
@@ -165,10 +153,7 @@
                       "symbol": "Owner"
                     },
                     {
-                      "u128": {
-                        "hi": 0,
-                        "lo": 1
-                      }
+                      "u32": 0
                     }
                   ]
                 },
@@ -314,16 +299,36 @@
           "v0": {
             "topics": [
               {
-                "symbol": "approval"
+                "symbol": "mint"
+              },
+              {
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+              }
+            ],
+            "data": {
+              "u32": 0
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "approve"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
               },
               {
-                "u128": {
-                  "hi": 0,
-                  "lo": 1
-                }
+                "u32": 0
               }
             ],
             "data": {

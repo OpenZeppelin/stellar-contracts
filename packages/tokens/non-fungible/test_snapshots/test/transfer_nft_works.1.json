@@ -67,10 +67,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 0
-                  }
+                  "u32": 0
                 }
               }
             },
@@ -115,10 +112,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 1
                 }
               }
             },
@@ -137,10 +131,7 @@
                   "symbol": "Owner"
                 },
                 {
-                  "u128": {
-                    "hi": 0,
-                    "lo": 1
-                  }
+                  "u32": 0
                 }
               ]
             },
@@ -160,10 +151,7 @@
                       "symbol": "Owner"
                     },
                     {
-                      "u128": {
-                        "hi": 0,
-                        "lo": 1
-                      }
+                      "u32": 0
                     }
                   ]
                 },
@@ -200,7 +188,16 @@
                     "executable": {
                       "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                     },
-                    "storage": null
+                    "storage": [
+                      {
+                        "key": {
+                          "string": "TOKEN_ID_COUNTER"
+                        },
+                        "val": {
+                          "u32": 1
+                        }
+                      }
+                    ]
                   }
                 }
               }
@@ -276,6 +273,29 @@
           "v0": {
             "topics": [
               {
+                "symbol": "mint"
+              },
+              {
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+              }
+            ],
+            "data": {
+              "u32": 0
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
                 "symbol": "transfer"
               },
               {
@@ -286,10 +306,7 @@
               }
             ],
             "data": {
-              "u128": {
-                "hi": 0,
-                "lo": 1
-              }
+              "u32": 0
             }
           }
         }

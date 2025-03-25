@@ -1,23 +1,45 @@
-use soroban_sdk::{contractclient, contracterror, symbol_short, Address, Env, String, Symbol};
+#[cfg(feature = "token_u256")]
+use soroban_sdk::U256;
+use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
+
+use crate::ContractOverrides;
+
+#[cfg(feature = "token_u32")]
+pub type TokenId = u32;
+
+#[cfg(feature = "token_u64")]
+pub type TokenId = u64;
+
+#[cfg(feature = "token_u128")]
+pub type TokenId = u128;
+
+#[cfg(feature = "token_u256")]
+pub type TokenId = U256;
+
+// one user can possess at most `TokenId` cap of tokens.
+pub type Balance = TokenId;
 
 /// Vanilla NonFungible Token Trait
 ///
 /// The `NonFungibleToken` trait defines the core functionality for non-fungible
 /// tokens. It provides a standard interface for managing
 /// transfers and approvals associated with non-fungible tokens.
-#[contractclient(name = "NonFungibleTokenClient")]
 pub trait NonFungibleToken {
+    /// Helper type that allows us to override some of the functionality of the
+    /// base trait based on the extensions implemented. You should use
+    /// `BaseContract` as the type if you are not using `Enumerable` or
+    /// `Consecutive` extensions.
+    type ContractType: ContractOverrides;
+
     /// Returns the number of tokens in `owner`'s account.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::balance()`] when implementing this function.
-    fn balance(e: &Env, owner: Address) -> u128;
+    fn balance(e: &Env, owner: Address) -> Balance {
+        crate::balance(e, &owner)
+    }
 
     /// Returns the owner of the `token_id` token.
     ///
@@ -33,9 +55,11 @@ pub trait NonFungibleToken {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::owner_of()`] when implementing this
-    /// function.
-    fn owner_of(e: &Env, token_id: u128) -> Address;
+    /// This function's behavior is shaped by the extensions implemented.
+    /// It should be configured via the `ContractBehavior` helper trait.
+    fn owner_of(e: &Env, token_id: TokenId) -> Address {
+        Self::ContractType::owner_of(e, token_id)
+    }
 
     /// Transfers `token_id` token from `from` to `to`.
     ///
@@ -60,13 +84,15 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: u128]`
+    /// * data - `[token_id: TokenId]`
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::transfer()`] when implementing this
-    /// function.
-    fn transfer(e: &Env, from: Address, to: Address, token_id: u128);
+    /// This function's behavior is shaped by the extensions implemented.
+    /// It should be configured via the `ContractBehavior` helper trait.
+    fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
+        Self::ContractType::transfer(e, from, to, token_id);
+    }
 
     /// Transfers `token_id` token from `from` to `to` by using `spender`s
     /// approval.
@@ -100,13 +126,15 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: u128]`
+    /// * data - `[token_id: TokenId]`
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::transfer_from()`] when implementing this
-    /// function.
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u128);
+    /// This function's behavior is shaped by the extensions implemented.
+    /// It should be configured via the `ContractBehavior` helper trait.
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
+        Self::ContractType::transfer_from(e, spender, from, to, token_id);
+    }
 
     /// Gives permission to `approved` to transfer `token_id` token to another
     /// account. The approval is cleared when the token is transferred.
@@ -136,20 +164,22 @@ pub trait NonFungibleToken {
     ///
     /// # Events
     ///
-    /// * topics - `["approval", from: Address, to: Address]`
-    /// * data - `[token_id: u128]`
+    /// * topics - `["approve", from: Address, to: Address]`
+    /// * data - `[token_id: TokenId, live_until_ledger: u32]`
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::approve()`] when implementing this
-    /// function.
+    /// This function's behavior is shaped by the extensions implemented.
+    /// It should be configured via the `ContractBehavior` helper trait.
     fn approve(
         e: &Env,
         approver: Address,
         approved: Address,
-        token_id: u128,
+        token_id: TokenId,
         live_until_ledger: u32,
-    );
+    ) {
+        Self::ContractType::approve(e, approver, approved, token_id, live_until_ledger);
+    }
 
     /// Approve or remove `operator` as an operator for the owner.
     ///
@@ -161,11 +191,8 @@ pub trait NonFungibleToken {
     /// * `e` - Access to Soroban environment.
     /// * `owner` - The address holding the tokens.
     /// * `operator` - Account to add to the set of authorized operators.
-    /// * `is_approved` - Flag that determines whether or not permission will be
-    ///   granted to `operator`. If true, this means `operator` will be allowed
-    ///   to manage `owner`'s assets.
     /// * `live_until_ledger` - The ledger number at which the allowance
-    ///   expires.
+    ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
     ///
     /// # Errors
     ///
@@ -174,20 +201,11 @@ pub trait NonFungibleToken {
     ///
     /// # Events
     ///
-    /// * topics - `["approval_for_all", from: Address, operator: Address]`
-    /// * data - `[is_approved: bool]`
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::set_approval_for_all()`] when implementing
-    /// this function.
-    fn set_approval_for_all(
-        e: &Env,
-        owner: Address,
-        operator: Address,
-        is_approved: bool,
-        live_until_ledger: u32,
-    );
+    /// * topics - `["approve_for_all", from: Address]`
+    /// * data - `[operator: Address, live_until_ledger: u32]`
+    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
+        crate::approve_for_all(e, &owner, &operator, live_until_ledger);
+    }
 
     /// Returns the account approved for `token_id` token.
     ///
@@ -200,12 +218,9 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
     ///   exist.
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::get_approved()`] when implementing this
-    /// function.
-    fn get_approved(e: &Env, token_id: u128) -> Option<Address>;
+    fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
+        crate::get_approved(e, token_id)
+    }
 
     /// Returns whether the `operator` is allowed to manage all the assets of
     /// `owner`.
@@ -215,12 +230,9 @@ pub trait NonFungibleToken {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `operator` - Account to be checked.
-    ///
-    /// # Notes
-    ///
-    /// We recommend using [`crate::is_approved_for_all()`] when implementing
-    /// this function.
-    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool;
+    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
+        crate::is_approved_for_all(e, &owner, &operator)
+    }
 
     /// Returns the token collection name.
     ///
@@ -246,7 +258,7 @@ pub trait NonFungibleToken {
     /// # Notes
     ///
     /// If the token does not exist, this function is expected to panic.
-    fn token_uri(e: &Env, token_id: u128) -> String;
+    fn token_uri(e: &Env, token_id: TokenId) -> String;
 }
 
 // ################## ERRORS ##################
@@ -269,6 +281,10 @@ pub enum NonFungibleTokenError {
     InvalidLiveUntilLedger = 304,
     /// Indicates overflow when adding two values
     MathOverflow = 305,
+    /// Indicates all possible `token_id`s are already in use.
+    TokenIDsAreDepleted = 306,
+    /// Indicates a token with given `token_id` already exists.
+    TokenIDInUse = 307,
 }
 
 // ################## EVENTS ##################
@@ -285,8 +301,8 @@ pub enum NonFungibleTokenError {
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u128]`
-pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
+/// * data - `[token_id: TokenId]`
+pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
     let topics = (symbol_short!("transfer"), from, to);
     e.events().publish(topics, token_id)
 }
@@ -301,19 +317,20 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u128) {
 ///   `operator`).
 /// * `approved` - Address of the approved.
 /// * `token_id` - The identifier of the transferred token.
+/// * `live_until_ledger` - The ledger number at which the approval expires.
 ///
 /// # Events
 ///
-/// * topics - `["approval", owner: Address, token_id: u128]`
+/// * topics - `["approve", owner: Address, token_id: TokenId]`
 /// * data - `[approved: Address, live_until_ledger: u32]`
-pub fn emit_approval(
+pub fn emit_approve(
     e: &Env,
     approver: &Address,
     approved: &Address,
-    token_id: u128,
+    token_id: TokenId,
     live_until_ledger: u32,
 ) {
-    let topics = (symbol_short!("approval"), approver, token_id);
+    let topics = (symbol_short!("approve"), approver, token_id);
     e.events().publish(topics, (approved, live_until_ledger))
 }
 
@@ -326,20 +343,14 @@ pub fn emit_approval(
 /// * `owner` - Address of the owner of the token.
 /// * `operator` - Address of an operator that will manage operations on the
 ///   token.
-/// * `is_approved` - Whether or not permission has been granted. If true, this
-///   means `operator` will be allowed to manage `owner`'s assets.
+/// * `live_until_ledger` - The ledger number at which the allowance expires. If
+///   `live_until_ledger` is `0`, the approval is revoked.
 ///
 /// # Events
 ///
-/// * topics - `["approval", owner: Address]`
-/// * data - `[operator: Address, is_approved: bool, live_until_ledger: u32]`
-pub fn emit_approval_for_all(
-    e: &Env,
-    owner: &Address,
-    operator: &Address,
-    is_approved: bool,
-    live_until_ledger: u32,
-) {
-    let topics = (Symbol::new(e, "approval_for_all"), owner);
-    e.events().publish(topics, (operator, is_approved, live_until_ledger))
+/// * topics - `["approve_for_all", owner: Address]`
+/// * data - `[operator: Address, live_until_ledger: u32]`
+pub fn emit_approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
+    let topics = (Symbol::new(e, "approve_for_all"), owner);
+    e.events().publish(topics, (operator, live_until_ledger))
 }
