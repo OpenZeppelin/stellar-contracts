@@ -33,6 +33,7 @@
 //! It is not recommended to use this model if each token is expected to be
 //! minted separately. It is rather best suited for NFTs where minting happens
 //! in large batches.
+pub mod storage;
 use soroban_sdk::{Address, Env, Symbol};
 
 use crate::TokenId;

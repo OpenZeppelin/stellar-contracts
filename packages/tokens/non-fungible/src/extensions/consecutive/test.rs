@@ -12,6 +12,7 @@ use crate::{
     sequential::next_token_id,
     storage::balance,
 };
+use stellar_event_assertion::EventAssertion;
 
 #[contract]
 pub struct MockContract;
@@ -26,6 +27,10 @@ fn consecutive_batch_mint_works() {
 
     e.as_contract(&address, || {
         batch_mint(&e, &owner, amount);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_consecutive_mint(&owner, 0, 99);
 
         assert_eq!(next_token_id(&e), amount);
         assert_eq!(balance(&e, &owner), amount);
@@ -45,7 +50,6 @@ fn consecutive_batch_mint_works() {
 #[should_panic(expected = "Error(Contract, #300)")]
 fn consecutive_owner_of_on_nonexistent_token_fails() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockContract, ());
     let user = Address::generate(&e);
 
@@ -92,6 +96,11 @@ fn consecutive_transfer_works() {
         assert_eq!(owner_of(&e, 51), owner);
         let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(51)).unwrap();
         assert_eq!(_owner, owner);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        event_assert.assert_consecutive_mint(&owner, 0, 99);
+        event_assert.assert_non_fungible_transfer(&owner, &recipient, 50);
     });
 
     e.as_contract(&address, || {
@@ -123,6 +132,12 @@ fn consecutive_transfer_from_works() {
         assert_eq!(balance(&e, &recipient), 1);
 
         assert_eq!(owner_of(&e, token_id + 1), owner);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(3);
+        event_assert.assert_consecutive_mint(&owner, 0, 99);
+        event_assert.assert_non_fungible_approve(&owner, &spender, token_id, 100);
+        event_assert.assert_non_fungible_transfer(&owner, &recipient, token_id);
     });
 }
 
@@ -148,6 +163,11 @@ fn consecutive_burn_works() {
         let _owner =
             e.storage().persistent().get::<_, Address>(&StorageKey::Owner(token_id + 1)).unwrap();
         assert_eq!(_owner, owner);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        event_assert.assert_consecutive_mint(&owner, 0, 99);
+        event_assert.assert_non_fungible_burn(&owner, token_id);
     });
 }
 
@@ -172,6 +192,12 @@ fn consecutive_burn_from_works() {
             e.storage().persistent().get::<_, bool>(&StorageKey::BurnedToken(token_id)).unwrap();
         assert!(burned);
         assert_eq!(owner_of(&e, token_id + 1), owner);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(3);
+        event_assert.assert_consecutive_mint(&owner, 0, 99);
+        event_assert.assert_non_fungible_approve(&owner, &spender, token_id, 100);
+        event_assert.assert_non_fungible_burn(&owner, token_id);
     });
 }
 
