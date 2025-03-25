@@ -76,7 +76,7 @@ pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
 /// MUST invoke it only from the constructor or implement proper authorization
 /// in the calling function. For example:
 ///
-/// ```igrnore,rust
+/// ```ignore,rust
 /// fn mint_batch(e: &Env, to: &Address, amount: TokenId) {
 ///     // 1. Verify admin has minting privileges (optional)
 ///     let admin = e.storage().instance().get(&ADMIN_KEY).unwrap();
