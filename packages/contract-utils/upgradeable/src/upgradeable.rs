@@ -9,43 +9,87 @@ pub trait Upgradeable {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `new_wasm_hash` - The identifier of the WASM blob, uploaded to the
-    ///   ledger.
+    /// * `new_wasm_hash` - A 32-byte hash identifying the new WASM blob,
+    ///   uploaded to the ledger.
+    /// * `operator` - The authorized address performing the upgrade.
     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address);
 }
 
-// No need to manually implement this trait as it can be derived with
-// #[derive(Upgradeable)] and #[migratable]
+/// High-level trait representing upgradeable contracts that support migrations
+/// and rollbacks.
+///
+/// This trait should be used with the `#[derive(Upgradeable)]` and/or
+/// `#[migratable]` macros to automate implementation. It exposes the `migrate`
+/// and `rollback` entry points for upgrade lifecycle handling.
 pub trait Migratable: MigratableInternal {
+    /// Entry point to handle a contract migration. Can only be called during
+    /// upgrade.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `migration_data` - Arbitrary data passed to the migration logic.
     fn migrate(e: &Env, migration_data: Self::MigrationData);
+
+    /// Entry point to handle a rollback of a migration.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `rollback_data` - Arbitrary data passed to the rollback logic.
     fn rollback(e: &Env, rollback_data: Self::RollbackData);
 }
 
-// Trait to be implemented for a concrete upgrade procedure.
+/// Trait to be implemented for a custom upgrade authorization mechanism.
+/// Requires defining custom access control logic for who can upgrade the
+/// contract.
 pub trait UpgradeableInternal {
-    // needs to implement access control
-    // `operator` can be C-account (e.g. owner) or antoher contract such as timelock or governor
+    /// Ensures the `operator` is authorized to perform the upgrade.
+    ///
+    /// This must be implemented by the consuming contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `operator` - The address attempting the upgrade. Can be C-account or
+    ///   antoher contract such as timelock or governor.
     fn _upgrade_auth(e: &Env, operator: &Address);
 }
 
-// Trait to be implemented for a concrete migrate procedure.
+/// Trait to be implemented for custom migration and rollback behavior. Provides
+/// fine-grained control over data transformations during upgrades.
 pub trait MigratableInternal {
+    /// Type representing structured data needed during migration.
     type MigrationData: FromVal<Env, Val>;
+
+    /// Type representing structured data needed during rollback.
     type RollbackData: FromVal<Env, Val>;
 
-    // needs to implement access control and migrate logic
+    /// Applies migration logic using the given data. Must be implemented by the
+    /// consuming contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `migration_data` - Migration-specific input data.
     fn _migrate(e: &Env, migration_data: &Self::MigrationData);
 
-    // needs to implement access control and rollback logic
+    /// Applies rollback logic using the given data. Must be implemented by the
+    /// consuming contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `rollback_data` - Rollback-specific input data.
     fn _rollback(e: &Env, rollback_data: &Self::RollbackData);
 }
-
-// TODO: EVENT for migration ?
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum UpgradeableError {
+    /// When migration is attempted but not allowed due to upgrade state.
     MigrationNotAllowed = 200,
+    /// When rollback is attempted but not allowed due to upgrade state.
     RollbackNotAllowed = 201,
 }
