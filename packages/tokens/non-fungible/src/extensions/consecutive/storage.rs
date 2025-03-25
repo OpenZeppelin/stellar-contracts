@@ -14,7 +14,7 @@ use crate::{
 pub enum StorageKey {
     Approval(u32),
     Owner(u32),
-    BurntToken(u32),
+    BurnedToken(u32),
 }
 
 // ################## QUERY STATE ##################
@@ -32,9 +32,10 @@ pub enum StorageKey {
 ///   `token_id` does not exist.
 pub fn owner_of(e: &Env, token_id: u32) -> Address {
     let max = next_token_id(e);
-    let is_burnt = e.storage().persistent().get(&StorageKey::BurntToken(token_id)).unwrap_or(false);
+    let is_burned =
+        e.storage().persistent().get(&StorageKey::BurnedToken(token_id)).unwrap_or(false);
 
-    if token_id >= max || is_burnt {
+    if token_id >= max || is_burned {
         panic_with_error!(&e, NonFungibleTokenError::NonExistentToken);
     }
 
@@ -72,8 +73,8 @@ pub fn owner_of(e: &Env, token_id: u32) -> Address {
 /// # Security Warning
 ///
 /// **IMPORTANT**: The function intentionally lacks authorization controls. You
-/// MUST invoke it only from the constructor or implement proper authorization in
-/// the calling function. For example:
+/// MUST invoke it only from the constructor or implement proper authorization
+/// in the calling function. For example:
 ///
 /// ```igrnore,rust
 /// fn mint_batch(e: &Env, to: &Address, amount: u32) {
@@ -269,7 +270,7 @@ pub fn approve(
 /// and clears existing approvals.
 ///
 /// The difference with [`crate::storage::update`] is that the current function:
-/// 1. explicitly adds burnt tokens to storage in `StorageKey::BurntToken`,
+/// 1. explicitly adds burned tokens to storage in `StorageKey::BurnedToken`,
 /// 2. sets the next token (if any) to the previous owner.
 ///
 /// # Arguments
@@ -316,7 +317,7 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u
         // Burning: `to` is None
         e.storage().persistent().remove(&StorageKey::Owner(token_id));
 
-        e.storage().persistent().set(&StorageKey::BurntToken(token_id), &true);
+        e.storage().persistent().set(&StorageKey::BurnedToken(token_id), &true);
     }
 }
 
@@ -331,9 +332,10 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u
 pub fn set_owner_for(e: &Env, to: &Address, token_id: u32) {
     let max = next_token_id(e);
     let has_owner = e.storage().persistent().has(&StorageKey::Owner(token_id));
-    let is_burnt = e.storage().persistent().get(&StorageKey::BurntToken(token_id)).unwrap_or(false);
+    let is_burned =
+        e.storage().persistent().get(&StorageKey::BurnedToken(token_id)).unwrap_or(false);
 
-    if token_id < max && !has_owner && !is_burnt {
+    if token_id < max && !has_owner && !is_burned {
         e.storage().persistent().set(&StorageKey::Owner(token_id), to);
     }
 }

@@ -4,7 +4,6 @@
     "nonce": 0
   },
   "auth": [
-    [],
     []
   ],
   "ledger": {
@@ -53,13 +52,13 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u32": 100
+                  "u32": 5
                 }
               }
             },
             "ext": "v0"
           },
-          518400
+          4095
         ]
       ],
       [
@@ -129,20 +128,7 @@
                     "executable": {
                       "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                     },
-                    "storage": [
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "TokenIdCounter"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "u32": 100
-                        }
-                      }
-                    ]
+                    "storage": null
                   }
                 }
               }
@@ -175,5 +161,36 @@
       ]
     ]
   },
-  "events": []
+  "events": [
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "consecutive_mint"
+              },
+              {
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+              }
+            ],
+            "data": {
+              "vec": [
+                {
+                  "u32": 0
+                },
+                {
+                  "u32": 4
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    }
+  ]
 }
