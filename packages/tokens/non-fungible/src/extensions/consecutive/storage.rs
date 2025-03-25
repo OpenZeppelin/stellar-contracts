@@ -6,15 +6,15 @@ use crate::{
     emit_transfer,
     sequential::{increment_token_id, next_token_id},
     storage::{approve_for_owner, check_spender_approval, decrease_balance, increase_balance},
-    NonFungibleTokenError,
+    NonFungibleTokenError, TokenId,
 };
 
 /// Storage keys for the data associated with `FungibleToken`
 #[contracttype]
 pub enum StorageKey {
-    Approval(u32),
-    Owner(u32),
-    BurnedToken(u32),
+    Approval(TokenId),
+    Owner(TokenId),
+    BurnedToken(TokenId),
 }
 
 // ################## QUERY STATE ##################
@@ -30,7 +30,7 @@ pub enum StorageKey {
 ///
 /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
 ///   `token_id` does not exist.
-pub fn owner_of(e: &Env, token_id: u32) -> Address {
+pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
     let max = next_token_id(e);
     let is_burned =
         e.storage().persistent().get(&StorageKey::BurnedToken(token_id)).unwrap_or(false);
@@ -68,7 +68,7 @@ pub fn owner_of(e: &Env, token_id: u32) -> Address {
 /// # Events
 ///
 /// * topics - `["consecutive_mint", to: Address]`
-/// * data - `[from_token_id: u32, to_token_id: u32]`
+/// * data - `[from_token_id: TokenId, to_token_id: TokenId]`
 ///
 /// # Security Warning
 ///
@@ -77,7 +77,7 @@ pub fn owner_of(e: &Env, token_id: u32) -> Address {
 /// in the calling function. For example:
 ///
 /// ```igrnore,rust
-/// fn mint_batch(e: &Env, to: &Address, amount: u32) {
+/// fn mint_batch(e: &Env, to: &Address, amount: TokenId) {
 ///     // 1. Verify admin has minting privileges (optional)
 ///     let admin = e.storage().instance().get(&ADMIN_KEY).unwrap();
 ///     admin.require_auth();
@@ -88,7 +88,7 @@ pub fn owner_of(e: &Env, token_id: u32) -> Address {
 /// ```
 ///
 /// Failing to add proper authorization could allow anyone to mint tokens!
-pub fn batch_mint(e: &Env, to: &Address, amount: u32) -> u32 {
+pub fn batch_mint(e: &Env, to: &Address, amount: TokenId) -> TokenId {
     let next_id = increment_token_id(e, amount);
 
     e.storage().persistent().set(&StorageKey::Owner(next_id), &to);
@@ -118,12 +118,12 @@ pub fn batch_mint(e: &Env, to: &Address, amount: u32) -> u32 {
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
 /// Authorization for `from` is required.
-pub fn burn(e: &Env, from: &Address, token_id: u32) {
+pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
     from.require_auth();
 
     update(e, Some(from), None, token_id);
@@ -149,12 +149,12 @@ pub fn burn(e: &Env, from: &Address, token_id: u32) {
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
 /// Authorization for `spender` is required.
-pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
     spender.require_auth();
 
     check_spender_approval(e, spender, from, token_id);
@@ -179,14 +179,14 @@ pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
 /// * Authorization for `from` is required.
 /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
 ///   lost.
-pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
+pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
     from.require_auth();
 
     update(e, Some(from), Some(to), token_id);
@@ -212,14 +212,14 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
 /// * Authorization for `spender` is required.
 /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
 ///   lost.
-pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
+pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
     spender.require_auth();
 
     check_spender_approval(e, spender, from, token_id);
@@ -246,7 +246,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 ///
 /// # Events
 ///
-/// * topics - `["approve", owner: Address, token_id: u32]`
+/// * topics - `["approve", owner: Address, token_id: TokenId]`
 /// * data - `[approved: Address, live_until_ledger: u32]`
 ///
 /// # Notes
@@ -256,7 +256,7 @@ pub fn approve(
     e: &Env,
     approver: &Address,
     approved: &Address,
-    token_id: u32,
+    token_id: TokenId,
     live_until_ledger: u32,
 ) {
     approver.require_auth();
@@ -286,7 +286,7 @@ pub fn approve(
 ///   the owner of the token.
 /// * refer to [`owner_of`] errors.
 /// * refer to [`increase_balance`] errors.
-pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
+pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: TokenId) {
     if let Some(from_address) = from {
         let owner = owner_of(e, token_id);
 
@@ -329,7 +329,7 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u
 /// * `e` - The environment reference.
 /// * `to` - The owner's address.
 /// * `token_id` - The identifier of the token being set.
-pub fn set_owner_for(e: &Env, to: &Address, token_id: u32) {
+pub fn set_owner_for(e: &Env, to: &Address, token_id: TokenId) {
     let max = next_token_id(e);
     let has_owner = e.storage().persistent().has(&StorageKey::Owner(token_id));
     let is_burned =

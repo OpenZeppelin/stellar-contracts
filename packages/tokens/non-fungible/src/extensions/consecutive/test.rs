@@ -22,7 +22,7 @@ fn consecutive_batch_mint_works() {
     let address = e.register(MockContract, ());
 
     let owner = Address::generate(&e);
-    let amount = 100u32;
+    let amount = 100;
 
     e.as_contract(&address, || {
         batch_mint(&e, &owner, amount);
@@ -79,7 +79,7 @@ fn consecutive_transfer_works() {
 
     let owner = Address::generate(&e);
     let recipient = Address::generate(&e);
-    let amount = 100u32;
+    let amount = 100;
 
     e.as_contract(&address, || {
         batch_mint(&e, &owner, amount);
@@ -110,7 +110,7 @@ fn consecutive_transfer_from_works() {
     let spender = Address::generate(&e);
     let owner = Address::generate(&e);
     let recipient = Address::generate(&e);
-    let amount = 100u32;
+    let amount = 100;
     let token_id = 50;
 
     e.as_contract(&address, || {
@@ -133,7 +133,7 @@ fn consecutive_burn_works() {
     let address = e.register(MockContract, ());
 
     let owner = Address::generate(&e);
-    let amount = 100u32;
+    let amount = 100;
     let token_id = 50;
 
     e.as_contract(&address, || {
@@ -159,7 +159,7 @@ fn consecutive_burn_from_works() {
 
     let owner = Address::generate(&e);
     let spender = Address::generate(&e);
-    let amount = 100u32;
+    let amount = 100;
     let token_id = 42;
 
     e.as_contract(&address, || {

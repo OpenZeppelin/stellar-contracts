@@ -1,6 +1,8 @@
 pub mod storage;
 use soroban_sdk::{Address, Env, Symbol};
 
+use crate::TokenId;
+
 mod test;
 
 // ################## EVENTS ##################
@@ -17,8 +19,8 @@ mod test;
 /// # Events
 ///
 /// * topics - `["consecutive_mint", to: Address]`
-/// * data - `[from_token_id: u32, to_token_id: u32]`
-pub fn emit_consecutive_mint(e: &Env, to: &Address, from_token_id: u32, to_token_id: u32) {
+/// * data - `[from_token_id: TokenId, to_token_id: TokenId]`
+pub fn emit_consecutive_mint(e: &Env, to: &Address, from_token_id: TokenId, to_token_id: TokenId) {
     let topics = (Symbol::new(e, "consecutive_mint"), to);
     e.events().publish(topics, (from_token_id, to_token_id))
 }

@@ -143,7 +143,8 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 /// # Notes
 ///
 /// * Authorization for `from` is required.
-/// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
+/// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
+///   lost.
 pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
     from.require_auth();
     update(e, Some(from), Some(to), token_id);
@@ -174,7 +175,8 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
 /// # Notes
 ///
 /// * Authorization for `spender` is required.
-/// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get lost.
+/// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
+///   lost.
 pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
     spender.require_auth();
     check_spender_approval(e, spender, from, token_id);
