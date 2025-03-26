@@ -42,7 +42,7 @@ pub trait UpgradeableInternal {
     ///
     /// * `e` - The Soroban environment.
     /// * `operator` - The address attempting the upgrade. Can be C-account or
-    ///   antoher contract such as timelock or governor.
+    ///   another contract such as timelock or governor.
     fn _upgrade_auth(e: &Env, operator: &Address);
 }
 
