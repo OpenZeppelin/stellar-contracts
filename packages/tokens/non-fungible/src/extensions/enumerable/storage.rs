@@ -1,15 +1,9 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::{
-    balance,
-    burnable::{burn, burn_from},
-    mintable::{emit_mint, sequential_mint as mintable_sequential_mint},
-    storage::update,
-    transfer as base_transfer, transfer_from as base_transfer_from, Balance, NonFungibleTokenError,
-    TokenId,
+    balance, mintable::emit_mint, storage::update, Balance, NonFungibleTokenError, TokenId,
 };
 
-/// Storage key that maps to [`AllowanceData`]
 #[contracttype]
 pub struct OwnerTokensKey {
     pub owner: Address,
@@ -74,7 +68,8 @@ pub fn get_owner_token_id(e: &Env, owner: &Address, index: TokenId) -> TokenId {
 ///
 /// **IMPORTANT**: This function is only intended for non-sequential
 /// `token_id`s. For sequential `token_id`s, no need to call a function,
-/// the `token_id` itself acts as the global index.
+/// the `token_id` itself acts as the global index. Calling this function
+/// while using sequential minting strategy will result in error.
 ///
 /// # Errors
 ///
@@ -101,7 +96,7 @@ pub fn get_token_id(e: &Env, index: TokenId) -> TokenId {
 ///
 /// # Errors
 ///
-/// * refer to [`crate::mintable::mint`] errors.
+/// * refer to [`crate::mintable::sequential_mint`] errors.
 /// * refer to [`increment_total_supply`] errors.
 ///
 /// # Events
@@ -115,7 +110,7 @@ pub fn get_token_id(e: &Env, index: TokenId) -> TokenId {
 /// handles the storage updates for:
 /// * total supply
 pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
-    let token_id = mintable_sequential_mint(e, to);
+    let token_id = crate::mintable::sequential_mint(e, to);
 
     add_to_owner_enumeration(e, to, token_id);
 
@@ -187,7 +182,7 @@ pub fn non_sequential_mint(e: &Env, to: &Address, token_id: TokenId) {
 /// * total supply
 /// * owner_tokens enumeration
 pub fn sequential_burn(e: &Env, from: &Address, token_id: TokenId) {
-    burn(e, from, token_id);
+    crate::burnable::burn(e, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
 
@@ -225,7 +220,7 @@ pub fn sequential_burn(e: &Env, from: &Address, token_id: TokenId) {
 /// * owner_tokens enumeration
 /// * global_tokens enumeration
 pub fn non_sequential_burn(e: &Env, from: &Address, token_id: TokenId) {
-    burn(e, from, token_id);
+    crate::burnable::burn(e, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
 
@@ -246,7 +241,7 @@ pub fn non_sequential_burn(e: &Env, from: &Address, token_id: TokenId) {
 ///
 /// # Errors
 ///
-/// * refer to [`crate::burnable::burn`] errors.
+/// * refer to [`crate::burnable::burn_from`] errors.
 /// * refer to [`remove_from_owner_enumeration`] errors.
 ///
 /// # Events
@@ -256,12 +251,12 @@ pub fn non_sequential_burn(e: &Env, from: &Address, token_id: TokenId) {
 ///
 /// # Notes
 ///
-/// This is a wrapper around [`crate::burnable::burn()`], that also
+/// This is a wrapper around [`crate::burnable::burn_from()`], that also
 /// handles the storage updates for:
 /// * total supply
 /// * owner_tokens enumeration
 pub fn sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
-    burn_from(e, spender, from, token_id);
+    crate::burnable::burn_from(e, spender, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
 
@@ -284,7 +279,7 @@ pub fn sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id
 ///
 /// # Errors
 ///
-/// * refer to [`crate::burnable::burn`] errors.
+/// * refer to [`crate::burnable::burn_from`] errors.
 /// * refer to [`remove_from_owner_enumeration`] errors.
 /// * refer to [`remove_from_global_enumeration`] errors.
 ///
@@ -295,13 +290,13 @@ pub fn sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id
 ///
 /// # Notes
 ///
-/// This is a wrapper around [`crate::burnable::burn()`], that also
+/// This is a wrapper around [`crate::burnable::burn_from()`], that also
 /// handles the storage updates for:
 /// * total supply
 /// * owner_tokens enumeration
 /// * global_tokens enumeration
 pub fn non_sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
-    burn_from(e, spender, from, token_id);
+    crate::burnable::burn_from(e, spender, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
 
@@ -321,7 +316,7 @@ pub fn non_sequential_burn_from(e: &Env, spender: &Address, from: &Address, toke
 ///
 /// # Errors
 ///
-/// * refer to [`crate::storage::transfer`] errors.
+/// * refer to [`crate::transfer`] errors.
 /// * refer to [`remove_from_owner_enumeration`] errors.
 ///
 /// # Events
@@ -331,11 +326,11 @@ pub fn non_sequential_burn_from(e: &Env, spender: &Address, from: &Address, toke
 ///
 /// # Notes
 ///
-/// This is a wrapper around [`crate::storage::transfer`], that also
+/// This is a wrapper around [`crate::transfer`], that also
 /// handles the storage updates for:
 /// * owner_tokens enumeration
 pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
-    base_transfer(e, from, to, token_id);
+    crate::transfer(e, from, to, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
     add_to_owner_enumeration(e, to, token_id);
@@ -368,7 +363,7 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
 /// handles the storage updates for:
 /// * owner_tokens enumeration
 pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
-    base_transfer_from(e, spender, from, to, token_id);
+    crate::transfer_from(e, spender, from, to, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
     add_to_owner_enumeration(e, to, token_id);
@@ -400,9 +395,16 @@ pub fn increment_total_supply(e: &Env) -> TokenId {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * [`NonFungibleTokenError::MathOverflow`] - If this function is called when
+///   there are no tokens present.
 pub fn decrement_total_supply(e: &Env) -> TokenId {
     let total_supply = total_supply(e);
-    let new_total_supply = total_supply.checked_sub(1).expect("Total supply cannot be negative");
+    let Some(new_total_supply) = total_supply.checked_sub(1) else {
+        panic_with_error!(e, NonFungibleTokenError::MathOverflow);
+    };
     e.storage().instance().set(&StorageKey::TotalSupply, &new_total_supply);
 
     new_total_supply
@@ -415,10 +417,18 @@ pub fn decrement_total_supply(e: &Env) -> TokenId {
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - The address of the owner.
 /// * `token_id` - The token ID to add.
+///
+/// # Errors
+///
+/// * [`NonFungibleTokenError::MathOverflow`] - When owner has no tokens, and
+///   this function is called BEFORE the owner's balance is manipulated, the
+///   indexing logic will underflow.
 pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: TokenId) {
     // we decrease 1 from the balance, because this function is called after balance
     // is manipulated (mint, transfer, etc.)
-    let owner_balance = balance(e, owner) - 1;
+    let Some(owner_balance) = balance(e, owner).checked_sub(1) else {
+        panic_with_error!(e, NonFungibleTokenError::MathOverflow);
+    };
     e.storage().persistent().set(
         &StorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index: owner_balance }),
         &token_id,

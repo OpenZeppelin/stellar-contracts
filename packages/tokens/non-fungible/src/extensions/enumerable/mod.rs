@@ -49,10 +49,9 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    ///
-    /// We recommend using [`crate::enumerable::total_supply()`] when
-    /// implementing this function.
-    fn total_supply(e: &Env) -> Balance;
+    fn total_supply(e: &Env) -> Balance {
+        storage::total_supply(e)
+    }
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
     /// owner's local list. Use along with
@@ -64,10 +63,9 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `index` - Index of the token in the owner's local list.
-    ///
-    /// We recommend using [`crate::enumerable::get_owner_token_id()`] when
-    /// implementing this function.
-    fn get_owner_token_id(e: &Env, owner: &Address, index: TokenId) -> TokenId;
+    fn get_owner_token_id(e: &Env, owner: Address, index: TokenId) -> TokenId {
+        storage::get_owner_token_id(e, &owner, index)
+    }
 
     /// Returns the `token_id` at a given `index` in the global token list.
     /// Use along with [`NonFungibleEnumerable::total_supply()`] to enumerate
@@ -77,14 +75,12 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `index` - Index of the token in the owner's local list.
-    ///
-    /// We recommend using [`crate::enumerable::get_token_id()`] when
-    /// implementing this function.
-    ///
     /// # Notes
     ///
     /// **IMPORTANT**: This function is only intended for non-sequential
     /// `token_id`s. For sequential `token_id`s, no need to call a function,
     /// the `token_id` itself acts as the global index.
-    fn get_token_id(e: &Env, index: TokenId) -> TokenId;
+    fn get_token_id(e: &Env, index: TokenId) -> TokenId {
+        storage::get_token_id(e, index)
+    }
 }
