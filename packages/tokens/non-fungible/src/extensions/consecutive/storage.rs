@@ -4,7 +4,7 @@ use super::emit_consecutive_mint;
 use crate::{
     burnable::emit_burn,
     emit_transfer,
-    sequential::{increment_token_id, next_token_id},
+    sequential::{self as sequential},
     storage::{approve_for_owner, check_spender_approval, decrease_balance, increase_balance},
     NonFungibleTokenError, TokenId,
 };
@@ -31,7 +31,7 @@ pub enum StorageKey {
 /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
 ///   `token_id` does not exist.
 pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
-    let max = next_token_id(e);
+    let max = sequential::next_token_id(e);
     let is_burned =
         e.storage().persistent().get(&StorageKey::BurnedToken(token_id)).unwrap_or(false);
 
@@ -89,7 +89,7 @@ pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
 ///
 /// Failing to add proper authorization could allow anyone to mint tokens!
 pub fn batch_mint(e: &Env, to: &Address, amount: TokenId) -> TokenId {
-    let next_id = increment_token_id(e, amount);
+    let next_id = sequential::increment_token_id(e, amount);
 
     e.storage().persistent().set(&StorageKey::Owner(next_id), &to);
 
@@ -126,7 +126,7 @@ pub fn batch_mint(e: &Env, to: &Address, amount: TokenId) -> TokenId {
 pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
     from.require_auth();
 
-    update(e, Some(from), None, token_id);
+    self::update(e, Some(from), None, token_id);
     emit_burn(e, from, token_id);
 }
 
@@ -159,7 +159,7 @@ pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) 
 
     check_spender_approval(e, spender, from, token_id);
 
-    update(e, Some(from), None, token_id);
+    self::update(e, Some(from), None, token_id);
     emit_burn(e, from, token_id);
 }
 
@@ -189,7 +189,7 @@ pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) 
 pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
     from.require_auth();
 
-    update(e, Some(from), Some(to), token_id);
+    self::update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 }
 
@@ -224,7 +224,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 
     check_spender_approval(e, spender, from, token_id);
 
-    update(e, Some(from), Some(to), token_id);
+    self::update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 }
 
@@ -330,7 +330,7 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: T
 /// * `to` - The owner's address.
 /// * `token_id` - The identifier of the token being set.
 pub fn set_owner_for(e: &Env, to: &Address, token_id: TokenId) {
-    let max = next_token_id(e);
+    let max = sequential::next_token_id(e);
     let has_owner = e.storage().persistent().has(&StorageKey::Owner(token_id));
     let is_burned =
         e.storage().persistent().get(&StorageKey::BurnedToken(token_id)).unwrap_or(false);
