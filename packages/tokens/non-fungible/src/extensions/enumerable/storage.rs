@@ -3,16 +3,17 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 use crate::{
     balance,
     burnable::{burn, burn_from},
-    mintable::{emit_mint, sequential_mint},
+    mintable::{emit_mint, sequential_mint as mintable_sequential_mint},
     storage::update,
-    transfer, transfer_from, NonFungibleTokenError,
+    transfer as base_transfer, transfer_from as base_transfer_from, Balance, NonFungibleTokenError,
+    TokenId,
 };
 
 /// Storage key that maps to [`AllowanceData`]
 #[contracttype]
 pub struct OwnerTokensKey {
     pub owner: Address,
-    pub index: u32,
+    pub index: TokenId,
 }
 
 /// Storage keys for the data associated with `FungibleToken`
@@ -20,9 +21,9 @@ pub struct OwnerTokensKey {
 pub enum StorageKey {
     TotalSupply,
     OwnerTokens(OwnerTokensKey),
-    OwnerTokensIndex(/* token_id */ u32),
-    GlobalTokens(/* index */ u32),
-    GlobalTokensIndex(/* token_id */ u32),
+    OwnerTokensIndex(/* token_id */ TokenId),
+    GlobalTokens(/* index */ TokenId),
+    GlobalTokensIndex(/* token_id */ TokenId),
 }
 
 // ################## QUERY STATE ##################
@@ -32,7 +33,7 @@ pub enum StorageKey {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-pub fn total_supply(e: &Env) -> u32 {
+pub fn total_supply(e: &Env) -> Balance {
     e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0)
 }
 
@@ -51,9 +52,9 @@ pub fn total_supply(e: &Env) -> u32 {
 ///
 /// * [`NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token ID is
 ///   not found in the owner's enumeration.
-pub fn get_owner_token_id(e: &Env, owner: &Address, index: u32) -> u32 {
+pub fn get_owner_token_id(e: &Env, owner: &Address, index: TokenId) -> TokenId {
     let key = StorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index });
-    let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
+    let Some(token_id) = e.storage().persistent().get::<_, TokenId>(&key) else {
         panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
     };
 
@@ -79,9 +80,9 @@ pub fn get_owner_token_id(e: &Env, owner: &Address, index: u32) -> u32 {
 ///
 /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token ID
 ///   is not found in the global enumeration.
-pub fn get_token_id(e: &Env, index: u32) -> u32 {
+pub fn get_token_id(e: &Env, index: TokenId) -> TokenId {
     let key = StorageKey::GlobalTokens(index);
-    let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
+    let Some(token_id) = e.storage().persistent().get::<_, TokenId>(&key) else {
         panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
     };
 
@@ -106,15 +107,15 @@ pub fn get_token_id(e: &Env, index: u32) -> u32 {
 /// # Events
 ///
 /// * topics - `["mint", to: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
 /// This is a wrapper around [`crate::mintable::sequential_mint()`], that also
 /// handles the storage updates for:
 /// * total supply
-pub fn enumerable_sequential_mint(e: &Env, to: &Address) -> u32 {
-    let token_id = sequential_mint(e, to);
+pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
+    let token_id = mintable_sequential_mint(e, to);
 
     add_to_owner_enumeration(e, to, token_id);
 
@@ -143,14 +144,14 @@ pub fn enumerable_sequential_mint(e: &Env, to: &Address) -> u32 {
 /// # Events
 ///
 /// * topics - `["mint", to: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// This is a wrapper around [`crate::storage::update()`], that also
 /// handles the storage updates for:
 /// * total supply
 /// * owner_tokens enumeration
 /// * global_tokens enumeration
-pub fn enumerable_non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
+pub fn non_sequential_mint(e: &Env, to: &Address, token_id: TokenId) {
     update(e, None, Some(to), token_id);
     emit_mint(e, to, token_id);
 
@@ -177,7 +178,7 @@ pub fn enumerable_non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
@@ -185,7 +186,7 @@ pub fn enumerable_non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
 /// handles the storage updates for:
 /// * total supply
 /// * owner_tokens enumeration
-pub fn enumerable_sequential_burn(e: &Env, from: &Address, token_id: u32) {
+pub fn sequential_burn(e: &Env, from: &Address, token_id: TokenId) {
     burn(e, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
@@ -214,7 +215,7 @@ pub fn enumerable_sequential_burn(e: &Env, from: &Address, token_id: u32) {
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
@@ -223,7 +224,7 @@ pub fn enumerable_sequential_burn(e: &Env, from: &Address, token_id: u32) {
 /// * total supply
 /// * owner_tokens enumeration
 /// * global_tokens enumeration
-pub fn enumerable_non_sequential_burn(e: &Env, from: &Address, token_id: u32) {
+pub fn non_sequential_burn(e: &Env, from: &Address, token_id: TokenId) {
     burn(e, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
@@ -251,7 +252,7 @@ pub fn enumerable_non_sequential_burn(e: &Env, from: &Address, token_id: u32) {
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
@@ -259,7 +260,7 @@ pub fn enumerable_non_sequential_burn(e: &Env, from: &Address, token_id: u32) {
 /// handles the storage updates for:
 /// * total supply
 /// * owner_tokens enumeration
-pub fn enumerable_sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+pub fn sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
     burn_from(e, spender, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
@@ -290,7 +291,7 @@ pub fn enumerable_sequential_burn_from(e: &Env, spender: &Address, from: &Addres
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
@@ -299,12 +300,7 @@ pub fn enumerable_sequential_burn_from(e: &Env, spender: &Address, from: &Addres
 /// * total supply
 /// * owner_tokens enumeration
 /// * global_tokens enumeration
-pub fn enumerable_non_sequential_burn_from(
-    e: &Env,
-    spender: &Address,
-    from: &Address,
-    token_id: u32,
-) {
+pub fn non_sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
     burn_from(e, spender, from, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
@@ -331,15 +327,15 @@ pub fn enumerable_non_sequential_burn_from(
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
 /// This is a wrapper around [`crate::storage::transfer`], that also
 /// handles the storage updates for:
 /// * owner_tokens enumeration
-pub fn enumerable_transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-    transfer(e, from, to, token_id);
+pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+    base_transfer(e, from, to, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
     add_to_owner_enumeration(e, to, token_id);
@@ -364,21 +360,15 @@ pub fn enumerable_transfer(e: &Env, from: &Address, to: &Address, token_id: u32)
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u32]`
+/// * data - `[token_id: TokenId]`
 ///
 /// # Notes
 ///
 /// This is a wrapper around [`crate::storage::transfer_from`], that also
 /// handles the storage updates for:
 /// * owner_tokens enumeration
-pub fn enumerable_transfer_from(
-    e: &Env,
-    spender: &Address,
-    from: &Address,
-    to: &Address,
-    token_id: u32,
-) {
-    transfer_from(e, spender, from, to, token_id);
+pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
+    base_transfer_from(e, spender, from, to, token_id);
 
     remove_from_owner_enumeration(e, from, token_id);
     add_to_owner_enumeration(e, to, token_id);
@@ -395,7 +385,7 @@ pub fn enumerable_transfer_from(
 ///
 /// * [`NonFungibleTokenError::TokenIDsAreDepleted`] - When attempting to mint a
 ///   new token ID, but all token IDs are already in use.
-pub fn increment_total_supply(e: &Env) -> u32 {
+pub fn increment_total_supply(e: &Env) -> TokenId {
     let total_supply = total_supply(e);
     let Some(new_total_supply) = total_supply.checked_add(1) else {
         panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
@@ -410,7 +400,7 @@ pub fn increment_total_supply(e: &Env) -> u32 {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-pub fn decrement_total_supply(e: &Env) -> u32 {
+pub fn decrement_total_supply(e: &Env) -> TokenId {
     let total_supply = total_supply(e);
     let new_total_supply = total_supply.checked_sub(1).expect("Total supply cannot be negative");
     e.storage().instance().set(&StorageKey::TotalSupply, &new_total_supply);
@@ -425,7 +415,7 @@ pub fn decrement_total_supply(e: &Env) -> u32 {
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - The address of the owner.
 /// * `token_id` - The token ID to add.
-pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: u32) {
+pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: TokenId) {
     // we decrease 1 from the balance, because this function is called after balance
     // is manipulated (mint, transfer, etc.)
     let owner_balance = balance(e, owner) - 1;
@@ -448,7 +438,7 @@ pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: u32) {
 ///
 /// * [`NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token ID is
 ///   not found in the owner's enumeration.
-pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id: u32) {
+pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id: TokenId) {
     let Some(to_be_removed_index) =
         e.storage().persistent().get(&StorageKey::OwnerTokensIndex(to_be_removed_id))
     else {
@@ -494,7 +484,7 @@ pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id:
 /// * `e` - Access to the Soroban environment.
 /// * `token_id` - The token ID to add.
 /// * `total_supply` - The current total supply, acts as the index.
-pub fn add_to_global_enumeration(e: &Env, token_id: u32, total_supply: u32) {
+pub fn add_to_global_enumeration(e: &Env, token_id: TokenId, total_supply: TokenId) {
     e.storage().persistent().set(&StorageKey::GlobalTokens(total_supply), &token_id);
     e.storage().persistent().set(&StorageKey::GlobalTokensIndex(token_id), &total_supply);
 }
@@ -512,9 +502,15 @@ pub fn add_to_global_enumeration(e: &Env, token_id: u32, total_supply: u32) {
 ///
 /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token ID
 ///   is not found in the global enumeration.
-pub fn remove_from_global_enumeration(e: &Env, to_be_removed_id: u32, last_token_index: u32) {
-    let Some(to_be_removed_index) =
-        e.storage().persistent().get::<_, u32>(&StorageKey::GlobalTokensIndex(to_be_removed_id))
+pub fn remove_from_global_enumeration(
+    e: &Env,
+    to_be_removed_id: TokenId,
+    last_token_index: TokenId,
+) {
+    let Some(to_be_removed_index) = e
+        .storage()
+        .persistent()
+        .get::<_, TokenId>(&StorageKey::GlobalTokensIndex(to_be_removed_id))
     else {
         panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
     };

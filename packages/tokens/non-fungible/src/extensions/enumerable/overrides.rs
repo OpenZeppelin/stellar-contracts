@@ -10,13 +10,11 @@ impl ContractOverrides for Enumerable {
     }
 
     fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
-        crate::extensions::enumerable::storage::enumerable_transfer(e, &from, &to, token_id);
+        crate::extensions::enumerable::storage::transfer(e, &from, &to, token_id);
     }
 
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
-        crate::extensions::enumerable::storage::enumerable_transfer_from(
-            e, &spender, &from, &to, token_id,
-        );
+        crate::extensions::enumerable::storage::transfer_from(e, &spender, &from, &to, token_id);
     }
 
     fn approve(
