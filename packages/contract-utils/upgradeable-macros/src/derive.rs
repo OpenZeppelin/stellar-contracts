@@ -2,6 +2,35 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{DeriveInput, Ident};
 
+/// Procedural macro implementation for `#[derive(Upgradeable)]`.
+///
+/// This function generates the implementation of the `Upgradeable` trait for a
+/// given contract type, enabling the contract to be upgraded by replacing its
+/// WASM bytecode.
+///
+/// If the contract struct is annotated with the `#[migratable]` attribute, this
+/// macro will also generate an implementation of the `Migratable` trait, wiring
+/// up the migration and rollback logic based on the `MigratableInternal` trait
+/// provided by the user.
+///
+/// # Behavior
+///
+/// - Sets the current crate version (`CARGO_PKG_VERSION`) as `"binver"`
+///   metadata using `contractmeta!`.
+/// - Implements the `upgrade` function with access control (`_upgrade_auth`).
+/// - Optionally implements the `migrate` and `rollback` functions for the
+///   `Migratable` trait, if `#[migratable]` is present.
+///
+/// # Panics
+///
+/// Panics at compile time if `#[migratable]` is used with arguments.
+///
+/// # Example
+/// ```ignore,rust
+/// #[derive(Upgradeable)]
+/// #[migratable]
+/// pub struct MyContract;
+/// ```
 pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
     let name = &input.ident;
 
@@ -38,6 +67,7 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
     }
 }
 
+// Internal helper to derive the `Migratable` trait
 fn derive_migratable(name: &Ident) -> proc_macro2::TokenStream {
     quote! {
         use stellar_upgradeable::Migratable as _;

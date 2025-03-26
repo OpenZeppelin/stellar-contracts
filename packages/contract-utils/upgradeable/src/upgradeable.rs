@@ -1,5 +1,21 @@
 use soroban_sdk::{contractclient, contracterror, Address, BytesN, Env, FromVal, Val};
 
+/// High-level trait for contract upgrades.
+///
+/// This trait defines the external entry point and can be used in two ways:
+///
+/// 1. Standalone – Implement this trait directly when full control over access
+///    control and upgrade logic is required. In this case, the implementor is
+///    responsible for ensuring:
+///    - Proper authorization of the `operator`
+///    - Versioning management
+///
+/// 2. Framework-assisted usage – When using the lightweight upgrade framework
+///    provided in this module, you should NOT manually implement this trait.
+///    Instead:
+///    - Derive it using `#[derive(Upgradeable)]`
+///    - Provide access control by implementing [`UpgradeableInternal`] with
+///      your custom logic
 #[contractclient(name = "UpgradeableClient")]
 pub trait Upgradeable {
     /// Upgrades the contract by setting a new WASM bytecode. The
@@ -15,15 +31,33 @@ pub trait Upgradeable {
     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address);
 }
 
-/// High-level trait representing upgradeable contracts that support migrations
-/// and rollbacks.
+/// Trait to be implemented for a custom upgrade authorization mechanism.
+/// Requires defining access control logic for who can upgrade the contract.
+pub trait UpgradeableInternal {
+    /// Ensures the `operator` is authorized to perform the upgrade.
+    ///
+    /// This must be implemented by the consuming contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `operator` - The address attempting the upgrade. Can be C-account or
+    ///   antoher contract such as timelock or governor.
+    fn _upgrade_auth(e: &Env, operator: &Address);
+}
+
+/// High-level trait for migration and rollback logic in upgradeable contracts.
 ///
-/// This trait should be used with the `#[derive(Upgradeable)]` and/or
-/// `#[migratable]` macros to automate implementation. It exposes the `migrate`
-/// and `rollback` entry points for upgrade lifecycle handling.
+/// This trait defines the external entry points for applying a migration or
+/// performing a rollback. It is recommended to be used only as part of the
+/// lightweight upgrade framework provided in this module.
+///
+/// When using the framework, this trait is automatically derived with
+/// `#[derive(Upgradeable)]` and the accompanying attribute `#[migratable]`, and
+/// should not be manually implemented. Instead, the contract must provide its
+/// custom migration and rollback logic by implementing `MigratableInternal`.
 pub trait Migratable: MigratableInternal {
-    /// Entry point to handle a contract migration. Can only be called during
-    /// upgrade.
+    /// Entry point to handle a contract migration.
     ///
     /// # Arguments
     ///
@@ -40,24 +74,9 @@ pub trait Migratable: MigratableInternal {
     fn rollback(e: &Env, rollback_data: Self::RollbackData);
 }
 
-/// Trait to be implemented for a custom upgrade authorization mechanism.
-/// Requires defining custom access control logic for who can upgrade the
-/// contract.
-pub trait UpgradeableInternal {
-    /// Ensures the `operator` is authorized to perform the upgrade.
-    ///
-    /// This must be implemented by the consuming contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The Soroban environment.
-    /// * `operator` - The address attempting the upgrade. Can be C-account or
-    ///   antoher contract such as timelock or governor.
-    fn _upgrade_auth(e: &Env, operator: &Address);
-}
-
-/// Trait to be implemented for custom migration and rollback behavior. Provides
-/// fine-grained control over data transformations during upgrades.
+/// Trait to be implemented for custom migration and rollback behavior. Requires
+/// defining access control and custom business logic for a migration after an
+/// upgrade, as well as the applicable rollback logic.
 pub trait MigratableInternal {
     /// Type representing structured data needed during migration.
     type MigrationData: FromVal<Env, Val>;
@@ -65,8 +84,7 @@ pub trait MigratableInternal {
     /// Type representing structured data needed during rollback.
     type RollbackData: FromVal<Env, Val>;
 
-    /// Applies migration logic using the given data. Must be implemented by the
-    /// consuming contract.
+    /// Applies migration logic using the given data.
     ///
     /// # Arguments
     ///
@@ -74,8 +92,7 @@ pub trait MigratableInternal {
     /// * `migration_data` - Migration-specific input data.
     fn _migrate(e: &Env, migration_data: &Self::MigrationData);
 
-    /// Applies rollback logic using the given data. Must be implemented by the
-    /// consuming contract.
+    /// Applies rollback logic using the given data.
     ///
     /// # Arguments
     ///
