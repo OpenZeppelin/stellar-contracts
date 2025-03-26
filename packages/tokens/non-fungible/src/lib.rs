@@ -65,18 +65,18 @@
 //!   extensions.
 #![no_std]
 
-mod contract_behavior;
 mod extensions;
 mod non_fungible;
+mod overrides;
 mod storage;
 mod utils;
 
-pub use contract_behavior::*;
-pub use extensions::{burnable, consecutive, mintable};
+pub use extensions::{burnable, consecutive, enumerable, mintable};
 pub use non_fungible::{
-    emit_approve, emit_approve_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenError,
-    TokenId,
+    emit_approve, emit_approve_for_all, emit_transfer, Balance, NonFungibleToken,
+    NonFungibleTokenError, TokenId,
 };
+pub use overrides::*;
 pub use storage::{
     approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,
     transfer_from, ApprovalData, ApprovalForAllData, StorageKey,
