@@ -7,6 +7,8 @@ use soroban_sdk::{testutils::Address as _, Address, BytesN, Env};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
+// build with
+// `cargo build --target wasm32-unknown-unknown --release`
 mod contract_v2 {
     use crate::test::{MigrationData, RollbackData};
 

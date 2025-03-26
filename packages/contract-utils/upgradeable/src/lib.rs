@@ -24,7 +24,6 @@
 //!
 //! # Example
 //! ```ignore,rust
-//!
 //! #[contracttype]
 //! pub struct Data {
 //!     pub num1: u32,
