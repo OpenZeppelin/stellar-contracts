@@ -1,7 +1,6 @@
 use soroban_sdk::{Address, Env};
 
-use crate::consecutive::storage;
-use crate::{ContractOverrides, TokenId};
+use crate::{consecutive::storage, ContractOverrides, TokenId};
 
 pub struct Consecutive;
 

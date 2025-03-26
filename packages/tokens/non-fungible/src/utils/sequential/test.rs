@@ -2,11 +2,12 @@
 
 extern crate std;
 
+use soroban_sdk::{contract, Env};
+
 use crate::{
     sequential::{increment_token_id, next_token_id, StorageKey},
     TokenId,
 };
-use soroban_sdk::{contract, Env};
 
 #[contract]
 pub struct MockContract;
