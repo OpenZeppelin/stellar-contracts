@@ -32,10 +32,11 @@ use crate::{Balance, NonFungibleToken, TokenId};
 ///   retrieve `token_id`s, one can call the
 ///   [`NonFungibleEnumerable::get_token_id()`] function.
 ///
-/// This trait is designed to be used in
-/// conjunction with the `NonFungibleToken` trait.
+/// This trait is designed to be used in conjunction with the `NonFungibleToken`
+/// trait.
 ///
 /// # Notes
+///
 /// Enumerable trait has its own business logic for creating and destroying
 /// tokens. Therefore, this trait is INCOMPATIBLE with the `Mintable`,
 /// `Burnable`, and `Consecutive` extensions.

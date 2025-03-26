@@ -1,4 +1,4 @@
-//! # Consecutive Extension for NonFungible Token
+//! # Consecutive Extension for Non-Fungible Token
 //!
 //! The `consecutive` module provides an implementation for managing
 //! NFTs by using consecutive token ownership tracking. This design is
@@ -33,10 +33,21 @@
 //! It is not recommended to use this model if each token is expected to be
 //! minted separately. It is rather best suited for NFTs where minting happens
 //! in large batches.
+pub mod overrides;
 pub mod storage;
+use overrides::Consecutive;
 use soroban_sdk::{Address, Env, Symbol};
 
-use crate::TokenId;
+use crate::{NonFungibleToken, TokenId};
+
+/// Consecutive Marker Trait for Non-Fungible Token
+///
+/// # Notes
+///
+/// The `consecutive` extension provides its own business logic for creating and
+/// destroying tokens. Therefore, this trait is INCOMPATIBLE with the
+/// `Mintable`, `Burnable`, and `Enumerable` extensions.
+pub trait NonFungibleConsecutive: NonFungibleToken<ContractType = Consecutive> {}
 
 mod test;
 

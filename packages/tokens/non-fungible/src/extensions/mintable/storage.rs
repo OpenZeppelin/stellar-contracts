@@ -1,41 +1,8 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use soroban_sdk::{Address, Env};
 
-use crate::{extensions::mintable::emit_mint, storage::update, NonFungibleTokenError, TokenId};
-
-#[contracttype]
-pub enum DataKey {
-    TokenIdCounter,
-}
-
-/// Get the current token counter value to determine the next token_id.
-/// The returned value is the next available token_id.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-pub fn next_token_id(e: &Env) -> TokenId {
-    e.storage().instance().get(&DataKey::TokenIdCounter).unwrap_or(0)
-}
-
-/// Return the next free token ID, then increment the counter.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Errors
-///
-/// * [`crate::NonFungibleTokenError::TokenIDsAreDepleted`] - When all the
-///   available `token_id`s are consumed for this smart contract.
-pub fn increment_token_id(e: &Env) -> TokenId {
-    let current = next_token_id(e);
-    let next = current.checked_add(1).unwrap_or_else(|| {
-        panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
-    });
-    e.storage().instance().set(&DataKey::TokenIdCounter, &next);
-
-    current
-}
+use crate::{
+    extensions::mintable::emit_mint, sequential::increment_token_id, storage::update, TokenId,
+};
 
 /// Creates a token with the next available `token_id` and assigns it to `to`.
 /// Returns the `token_id` for the newly minted token.
@@ -47,7 +14,7 @@ pub fn increment_token_id(e: &Env) -> TokenId {
 ///
 /// # Errors
 ///
-/// * refer to [`increment_counter`] errors.
+/// * refer to [`increment_token_id`] errors.
 /// * refer to [`update`] errors.
 ///
 /// # Events
@@ -71,13 +38,13 @@ pub fn increment_token_id(e: &Env) -> TokenId {
 /// admin.require_auth();
 /// ```
 ///
-/// This function utilizes [`increment_counter()`] to keep determine the next
+/// This function utilizes [`increment_token_id()`] to keep determine the next
 /// `token_id`, but it does NOT check if the provided `token_id` is already in
 /// use. If the developer has other means of minting tokens and generating
 /// `token_id`s, they should ensure that the token_id is unique and not already
 /// in use.
 pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
-    let token_id = increment_token_id(e);
+    let token_id = increment_token_id(e, 1);
     update(e, None, Some(to), token_id);
     emit_mint(e, to, token_id);
 
