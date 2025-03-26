@@ -10,6 +10,9 @@ members = [
     "packages/test-utils/*",
     "packages/tokens/*",
 ]
+exclude = [
+    "examples/upgradeable/testdata"
+]
 
 [workspace.package]
 authors = ["OpenZeppelin"]

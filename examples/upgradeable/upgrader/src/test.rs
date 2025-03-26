@@ -7,22 +7,14 @@ use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, TryIntoVal};
 
 use crate::contract::{Upgrader, UpgraderClient};
 
-// build with
-// `cargo build --target wasm32-unknown-unknown --release`
 mod contract_v1 {
-    soroban_sdk::contractimport!(
-        file = "../../../target/wasm32-unknown-unknown/release/upgradeable_v1_example.wasm"
-    );
+    soroban_sdk::contractimport!(file = "../testdata/upgradeable_v1_example.wasm");
 }
 
-// build with
-// `cargo build --target wasm32-unknown-unknown --release`
 mod contract_v2 {
     use crate::test::{MigrationData, RollbackData};
 
-    soroban_sdk::contractimport!(
-        file = "../../../target/wasm32-unknown-unknown/release/upgradeable_v2_example.wasm"
-    );
+    soroban_sdk::contractimport!(file = "../testdata/upgradeable_v2_example.wasm");
 }
 
 fn install_new_wasm(e: &Env) -> BytesN<32> {
