@@ -102,6 +102,30 @@ fn consecutive_transfer_works() {
         event_assert.assert_consecutive_mint(&owner, 0, 99);
         event_assert.assert_non_fungible_transfer(&owner, &recipient, 50);
     });
+}
+
+#[test]
+fn consecutive_transfer_edge_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+
+    let owner = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let amount = 100;
+
+    e.as_contract(&address, || {
+        batch_mint(&e, &owner, amount);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_consecutive_mint(&owner, 0, 99);
+
+        assert_eq!(owner_of(&e, 0), owner);
+        transfer(&e, &owner, &recipient, 0);
+        assert_eq!(owner_of(&e, 0), recipient);
+        assert_eq!(owner_of(&e, 1), owner);
+    });
 
     e.as_contract(&address, || {
         transfer(&e, &owner, &recipient, 99);
