@@ -30,7 +30,7 @@ pub enum StorageKey {
 ///
 /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
 ///   `token_id` does not exist.
-pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
+pub fn consecutive_owner_of(e: &Env, token_id: TokenId) -> Address {
     let max = sequential::next_token_id(e);
     let is_burned =
         e.storage().persistent().get(&StorageKey::BurnedToken(token_id)).unwrap_or(false);
@@ -86,7 +86,7 @@ pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
 /// ```
 ///
 /// Failing to add proper authorization could allow anyone to mint tokens!
-pub fn batch_mint(e: &Env, to: &Address, amount: TokenId) -> TokenId {
+pub fn consecutive_batch_mint(e: &Env, to: &Address, amount: TokenId) -> TokenId {
     let first_id = sequential::increment_token_id(e, amount);
 
     e.storage().persistent().set(&StorageKey::Owner(first_id), &to);
@@ -111,7 +111,7 @@ pub fn batch_mint(e: &Env, to: &Address, amount: TokenId) -> TokenId {
 ///
 /// # Errors
 ///
-/// * refer to [`self::update`] errors.
+/// * refer to [`self::consecutive_update`] errors.
 ///
 /// # Events
 ///
@@ -121,10 +121,10 @@ pub fn batch_mint(e: &Env, to: &Address, amount: TokenId) -> TokenId {
 /// # Notes
 ///
 /// Authorization for `from` is required.
-pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
+pub fn consecutive_burn(e: &Env, from: &Address, token_id: TokenId) {
     from.require_auth();
 
-    self::update(e, Some(from), None, token_id);
+    self::consecutive_update(e, Some(from), None, token_id);
     emit_burn(e, from, token_id);
 }
 
@@ -142,7 +142,7 @@ pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
 /// # Errors
 ///
 /// * refer to [`crate::storage::check_spender_approval`] errors.
-/// * refer to [`self::update`] errors.
+/// * refer to [`self::consecutive_update`] errors.
 ///
 /// # Events
 ///
@@ -152,12 +152,12 @@ pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
 /// # Notes
 ///
 /// Authorization for `spender` is required.
-pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
+pub fn consecutive_burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
     spender.require_auth();
 
     check_spender_approval(e, spender, from, token_id);
 
-    self::update(e, Some(from), None, token_id);
+    self::consecutive_update(e, Some(from), None, token_id);
     emit_burn(e, from, token_id);
 }
 
@@ -172,7 +172,7 @@ pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) 
 ///
 /// # Errors
 ///
-/// * refer to [`self::update`] errors.
+/// * refer to [`self::consecutive_update`] errors.
 ///
 /// # Events
 ///
@@ -184,10 +184,10 @@ pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) 
 /// * Authorization for `from` is required.
 /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
 ///   lost.
-pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+pub fn consecutive_transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
     from.require_auth();
 
-    self::update(e, Some(from), Some(to), token_id);
+    self::consecutive_update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 }
 
@@ -205,7 +205,7 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
 /// # Errors
 ///
 /// * refer to [`crate::storage::check_spender_approval`] errors.
-/// * refer to [`self::update`] errors.
+/// * refer to [`self::consecutive_update`] errors.
 ///
 /// # Events
 ///
@@ -217,12 +217,18 @@ pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
 /// * Authorization for `spender` is required.
 /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
 ///   lost.
-pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
+pub fn consecutive_transfer_from(
+    e: &Env,
+    spender: &Address,
+    from: &Address,
+    to: &Address,
+    token_id: TokenId,
+) {
     spender.require_auth();
 
     check_spender_approval(e, spender, from, token_id);
 
-    self::update(e, Some(from), Some(to), token_id);
+    self::consecutive_update(e, Some(from), Some(to), token_id);
     emit_transfer(e, from, to, token_id);
 }
 
@@ -239,7 +245,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 ///
 /// # Errors
 ///
-/// * refer to [`self::owner_of`] errors.
+/// * refer to [`self::consecutive_owner_of`] errors.
 /// * refer to [`crate::storage::approve_for_owner`] errors.
 ///
 /// # Events
@@ -250,7 +256,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, t
 /// # Notes
 ///
 /// * Authorization for `approver` is required.
-pub fn approve(
+pub fn consecutive_approve(
     e: &Env,
     approver: &Address,
     approved: &Address,
@@ -259,7 +265,7 @@ pub fn approve(
 ) {
     approver.require_auth();
 
-    let owner = owner_of(e, token_id);
+    let owner = consecutive_owner_of(e, token_id);
     approve_for_owner(e, &owner, approver, approved, token_id, live_until_ledger);
 }
 
@@ -267,7 +273,7 @@ pub fn approve(
 /// without handling authorization. Updates ownership records, adjusts balances,
 /// and clears existing approvals.
 ///
-/// The difference with [`crate::storage::update`] is that the current function:
+/// The difference with [`crate::storage::consecutive_update`] is that the current function:
 /// 1. explicitly adds burned tokens to storage in `StorageKey::BurnedToken`,
 /// 2. sets the next token (if any) to the previous owner.
 ///
@@ -282,12 +288,17 @@ pub fn approve(
 ///
 /// * [`NonFungibleTokenError::IncorrectOwner`] - If the `from` address is not
 ///   the owner of the token.
-/// * refer to [`owner_of`] errors.
+/// * refer to [`consecutive_owner_of`] errors.
 /// * refer to [`decrease_balance`] errors.
 /// * refer to [`increase_balance`] errors.
-pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: TokenId) {
+pub fn consecutive_update(
+    e: &Env,
+    from: Option<&Address>,
+    to: Option<&Address>,
+    token_id: TokenId,
+) {
     if let Some(from_address) = from {
-        let owner = owner_of(e, token_id);
+        let owner = consecutive_owner_of(e, token_id);
 
         // Ensure the `from` address is indeed the owner.
         if owner != *from_address {
@@ -301,7 +312,7 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: T
         e.storage().temporary().remove(&approval_key);
 
         // Set the next token to prev owner
-        set_owner_for(e, from_address, token_id + 1);
+        consecutive_set_owner_for(e, from_address, token_id + 1);
     } else {
         // nothing to do for the `None` case, since we don't track
         // `total_supply`
@@ -331,7 +342,7 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: T
 /// * `e` - The environment reference.
 /// * `to` - The owner's address.
 /// * `token_id` - The identifier of the token being set.
-pub fn set_owner_for(e: &Env, to: &Address, token_id: TokenId) {
+pub fn consecutive_set_owner_for(e: &Env, to: &Address, token_id: TokenId) {
     let max = sequential::next_token_id(e);
     let has_owner = e.storage().persistent().has(&StorageKey::Owner(token_id));
     let is_burned =

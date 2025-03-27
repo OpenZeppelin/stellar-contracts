@@ -1,6 +1,6 @@
 use soroban_sdk::{contract, contracterror, contractimpl, contracttype, Address, Env, String};
 use stellar_non_fungible::{
-    consecutive::{overrides::Consecutive, storage::batch_mint},
+    consecutive::{overrides::Consecutive, storage::consecutive_batch_mint},
     Balance, ContractOverrides, NonFungibleToken, TokenId,
 };
 
@@ -23,7 +23,7 @@ pub struct ExampleContract;
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address, recipient: Address, amount: Balance) {
         e.storage().instance().set(&DataKey::Owner, &owner);
-        batch_mint(e, &recipient, amount);
+        consecutive_batch_mint(e, &recipient, amount);
     }
 }
 

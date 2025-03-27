@@ -7,8 +7,10 @@ use stellar_event_assertion::EventAssertion;
 
 use crate::{
     consecutive::storage::{
-        approve, batch_mint, burn, burn_from, owner_of, set_owner_for, transfer, transfer_from,
-        StorageKey,
+        consecutive_approve as approve, consecutive_batch_mint as batch_mint,
+        consecutive_burn as burn, consecutive_burn_from as burn_from,
+        consecutive_owner_of as owner_of, consecutive_set_owner_for as set_owner_for,
+        consecutive_transfer as transfer, consecutive_transfer_from as transfer_from, StorageKey,
     },
     sequential::next_token_id,
     storage::balance,
