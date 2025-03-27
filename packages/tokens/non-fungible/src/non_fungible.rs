@@ -50,7 +50,7 @@ pub trait NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
     ///
     /// # Notes
@@ -78,7 +78,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::IncorrectOwner`] - If the current owner
     ///   (before calling this function) is not `from`.
-    /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
     ///
     /// # Events
@@ -120,7 +120,7 @@ pub trait NonFungibleToken {
     ///   (before calling this function) is not `from`.
     /// * [`NonFungibleTokenError::InsufficientApproval`] - If the spender does
     ///   not have a valid approval.
-    /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
     ///
     /// # Events
@@ -155,7 +155,7 @@ pub trait NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
     /// * [`NonFungibleTokenError::InvalidApprover`] - If the owner address is
     ///   not the actual owner of the token.
@@ -216,7 +216,7 @@ pub trait NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::NonexistentToken`] - If the token does not
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
     fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
         crate::get_approved(e, token_id)
