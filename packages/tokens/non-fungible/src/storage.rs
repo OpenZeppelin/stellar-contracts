@@ -438,8 +438,8 @@ pub fn increase_balance(e: &Env, to: &Address, amount: TokenId) {
 ///
 /// # Errors
 ///
-/// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `from` would
-///   overflow.
+/// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `from`
+///   would overflow.
 pub fn decrease_balance(e: &Env, from: &Address, amount: TokenId) {
     let Some(balance) = balance(e, from).checked_sub(amount) else {
         panic_with_error!(e, NonFungibleTokenError::MathOverflow);
