@@ -303,6 +303,7 @@ pub fn approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_
 /// * [`NonFungibleTokenError::IncorrectOwner`] - If the `from` address is not
 ///   the owner of the token.
 /// * refer to [`owner_of`] errors.
+/// * refer to [`decrease_balance`] errors.
 /// * refer to [`increase_balance`] errors.
 pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: TokenId) {
     if let Some(from_address) = from {
@@ -427,14 +428,21 @@ pub fn increase_balance(e: &Env, to: &Address, amount: TokenId) {
 }
 
 /// Low-level function for decreasing the balance of `to`, without handling
-/// authorization. Balance cannot go negative.
+/// authorization.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `to` - The address whose balance gets decreased.
 /// * `amount` - The amount by which the balance gets decreased.
+///
+/// # Errors
+///
+/// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `from` would
+///   overflow.
 pub fn decrease_balance(e: &Env, from: &Address, amount: TokenId) {
-    let new_balance = balance(e, from).saturating_sub(amount);
-    e.storage().persistent().set(&StorageKey::Balance(from.clone()), &new_balance);
+    let Some(balance) = balance(e, from).checked_sub(amount) else {
+        panic_with_error!(e, NonFungibleTokenError::MathOverflow);
+    };
+    e.storage().persistent().set(&StorageKey::Balance(from.clone()), &balance);
 }

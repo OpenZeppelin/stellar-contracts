@@ -39,8 +39,6 @@ pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
         panic_with_error!(&e, NonFungibleTokenError::NonExistentToken);
     }
 
-    //e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD,
-    // OWNER_EXTEND_AMOUNT);
     (0..=token_id)
         .rev()
         .map(StorageKey::Owner)
@@ -89,14 +87,14 @@ pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
 ///
 /// Failing to add proper authorization could allow anyone to mint tokens!
 pub fn batch_mint(e: &Env, to: &Address, amount: TokenId) -> TokenId {
-    let next_id = sequential::increment_token_id(e, amount);
+    let first_id = sequential::increment_token_id(e, amount);
 
-    e.storage().persistent().set(&StorageKey::Owner(next_id), &to);
+    e.storage().persistent().set(&StorageKey::Owner(first_id), &to);
 
     increase_balance(e, to, amount);
 
-    let last_id = next_id + amount - 1;
-    emit_consecutive_mint(e, to, next_id, last_id);
+    let last_id = first_id + amount - 1;
+    emit_consecutive_mint(e, to, first_id, last_id);
 
     // return the last minted id
     last_id
@@ -285,6 +283,7 @@ pub fn approve(
 /// * [`NonFungibleTokenError::IncorrectOwner`] - If the `from` address is not
 ///   the owner of the token.
 /// * refer to [`owner_of`] errors.
+/// * refer to [`decrease_balance`] errors.
 /// * refer to [`increase_balance`] errors.
 pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: TokenId) {
     if let Some(from_address) = from {
@@ -321,8 +320,11 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: T
     }
 }
 
-/// Low-level function that sets owner of `token_id` to `to` if the token
-/// exists, without handling authorization.
+/// Low-level function that sets owner of `token_id` to `to`, without handling
+/// authorization. The function does not panic and sets the owner only if:
+/// - the token exists and
+/// - the token has not been burned and
+/// - the token doesn't have an owner.
 ///
 /// # Arguments
 ///
