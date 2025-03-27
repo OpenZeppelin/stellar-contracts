@@ -30,9 +30,12 @@
 //!
 //! ## Usage
 //!
-//! It is not recommended to use this model if each token is expected to be
-//! minted separately. It is rather best suited for NFTs where minting happens
-//! in large batches.
+//! - It is not recommended to use this model if each token is expected to be
+//!   minted separately. It is rather best suited for NFTs where minting happens
+//!   in large batches.
+//! - **IMPORTANT** - For minting tokens ONLY the function `batch_mint` provided
+//!   in this extension must be used. Using other minting functions will break
+//!   the logic of tracking ownership.
 pub mod overrides;
 pub mod storage;
 use overrides::Consecutive;
