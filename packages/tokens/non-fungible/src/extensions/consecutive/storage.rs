@@ -273,7 +273,8 @@ pub fn consecutive_approve(
 /// without handling authorization. Updates ownership records, adjusts balances,
 /// and clears existing approvals.
 ///
-/// The difference with [`crate::storage::consecutive_update`] is that the current function:
+/// The difference with [`crate::storage::consecutive_update`] is that the
+/// current function:
 /// 1. explicitly adds burned tokens to storage in `StorageKey::BurnedToken`,
 /// 2. sets the next token (if any) to the previous owner.
 ///
