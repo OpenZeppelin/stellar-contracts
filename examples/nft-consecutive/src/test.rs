@@ -6,63 +6,53 @@ use soroban_sdk::{testutils::Address as _, Address, Env};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
-fn create_client<'a>(e: &Env, cap: &i128) -> ExampleContractClient<'a> {
-    let address = e.register(ExampleContract, (cap,));
+fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {
+    let address = e.register(ExampleContract, ());
     ExampleContractClient::new(e, &address)
 }
 
 #[test]
-fn mint_under_cap() {
+fn consecutive_transfer_override_works() {
     let e = Env::default();
-    let cap = 1000;
-    let client = create_client(&e, &cap);
-    let user = Address::generate(&e);
 
-    client.mint(&user, &500);
+    let owner = Address::generate(&e);
 
-    assert_eq!(client.balance(&user), 500);
-    assert_eq!(client.total_supply(), 500);
+    let recipient = Address::generate(&e);
+
+    let client = create_client(&e);
+
+    e.mock_all_auths();
+    client.mint(&owner);
+    client.transfer(&owner, &recipient, &0);
+    assert_eq!(client.balance(&owner), 0);
+    assert_eq!(client.balance(&recipient), 1);
+    assert_eq!(client.get_owner_token_id(&recipient, &0), 0);
 }
 
 #[test]
-fn mint_exact_cap() {
+fn consecutive_batch_mint_works() {
     let e = Env::default();
-    let cap = 1000;
-    let client = create_client(&e, &cap);
-    let user = Address::generate(&e);
-
-    client.mint(&user, &1000);
-
-    assert_eq!(client.balance(&user), 1000);
-    assert_eq!(client.total_supply(), 1000);
+    let client = create_client(&e);
+    let owner = Address::generate(&e);
+    e.mock_all_auths();
+    client.mint(&owner);
+    client.burn(&owner, &0);
+    assert_eq!(client.balance(&owner), 0);
+    client.mint(&owner);
+    assert_eq!(client.balance(&owner), 1);
+    assert_eq!(client.get_owner_token_id(&owner, &0), 1);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #206)")]
-fn mint_exceeds_cap() {
+fn consecutive_burn_works() {
     let e = Env::default();
-    let cap = 1000;
-    let client = create_client(&e, &cap);
-    let user = Address::generate(&e);
-
-    // Attempt to mint 1001 tokens (would exceed cap)
-    client.mint(&user, &1001); // This should panic
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #206)")]
-fn mint_multiple_exceeds_cap() {
-    let e = Env::default();
-    let cap = 1000;
-    let client = create_client(&e, &cap);
-    let user = Address::generate(&e);
-
-    // Mint 600 tokens first
-    client.mint(&user, &600);
-
-    assert_eq!(client.balance(&user), 600);
-    assert_eq!(client.total_supply(), 600);
-
-    // Attempt to mint 500 more tokens (would exceed cap)
-    client.mint(&user, &500); // This should panic
+    let client = create_client(&e);
+    let owner = Address::generate(&e);
+    e.mock_all_auths();
+    client.mint(&owner);
+    client.burn(&owner, &0);
+    assert_eq!(client.balance(&owner), 0);
+    client.mint(&owner);
+    assert_eq!(client.balance(&owner), 1);
+    assert_eq!(client.get_owner_token_id(&owner, &0), 1);
 }

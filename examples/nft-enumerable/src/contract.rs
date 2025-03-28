@@ -9,8 +9,9 @@
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_non_fungible::{
-    self as non_fungible, burnable::NonFungibleBurnable, enumerable::NonFungibleEnumerable,
-    mintable::NonFungibleSequentialMintable, Base, NonFungibleToken,
+    self as non_fungible,
+    enumerable::{overrides::Enumerable, NonFungibleEnumerable},
+    Balance, ContractOverrides, NonFungibleToken, TokenId,
 };
 
 #[contract]
@@ -18,7 +19,7 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl NonFungibleToken for ExampleContract {
-    type ContractType: Base;
+    type ContractType = Enumerable;
 
     fn balance(e: &Env, owner: Address) -> Balance {
         non_fungible::balance(e, &owner)
@@ -59,14 +60,14 @@ impl NonFungibleToken for ExampleContract {
     }
 
     fn name(e: &Env) -> String {
-        String::from("My NFT")
+        String::from_str(e, "My NFT")
     }
 
     fn symbol(e: &Env) -> String {
-        String::from("MTKN")
+        String::from_str(e, "MTKN")
     }
 
-    fn token_uri(e: &Env, token_id: TokenId) -> String {
+    fn token_uri(_e: &Env, _token_id: TokenId) -> String {
         unimplemented!("token_uri not implemented for this example")
     }
 }
@@ -83,6 +84,17 @@ impl NonFungibleEnumerable for ExampleContract {
 
     fn get_token_id(e: &Env, index: TokenId) -> TokenId {
         non_fungible::enumerable::storage::get_token_id(e, index)
+    }
+}
+
+#[contractimpl]
+impl ExampleContract {
+    pub fn mint(e: &Env, to: Address) -> TokenId {
+        non_fungible::enumerable::storage::sequential_mint(e, &to)
+    }
+
+    pub fn burn(e: &Env, from: Address, token_id: TokenId) {
+        non_fungible::enumerable::storage::sequential_burn(e, &from, token_id);
     }
 }
 

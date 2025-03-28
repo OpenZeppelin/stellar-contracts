@@ -9,8 +9,11 @@
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_non_fungible::{
-    self as non_fungible, burnable::NonFungibleBurnable, enumerable::NonFungibleEnumerable,
-    mintable::NonFungibleSequentialMintable, Base, NonFungibleToken,
+    self as non_fungible,
+    burnable::NonFungibleBurnable,
+    consecutive::{overrides::Consecutive, NonFungibleConsecutive},
+    mintable::NonFungibleSequentialMintable,
+    NonFungibleToken,
 };
 
 #[contract]
@@ -18,7 +21,7 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl NonFungibleToken for ExampleContract {
-    type ContractType: Base;
+    type ContractType = Consecutive;
 
     fn balance(e: &Env, owner: Address) -> Balance {
         non_fungible::balance(e, &owner)
@@ -71,22 +74,9 @@ impl NonFungibleToken for ExampleContract {
     }
 }
 
-#[contractimpl]
-impl NonFungibleEnumerable for ExampleContract {
-    fn total_supply(e: &Env) -> Balance {
-        non_fungible::enumerable::storage::total_supply(e)
-    }
+impl NonFungibleConsecutive for ExampleContract {}
 
-    fn get_owner_token_id(e: &Env, owner: Address, index: TokenId) -> TokenId {
-        non_fungible::enumerable::storage::get_owner_token_id(e, &owner, index)
-    }
-
-    fn get_token_id(e: &Env, index: TokenId) -> TokenId {
-        non_fungible::enumerable::storage::get_token_id(e, index)
-    }
-}
-
-/* BELOW WILL CREATE A COMPILE TIME ERROR, SINCE CONSECUTIVE IS NOT COMPATIBLE WITH THEM */
+/* BELOW WILL CREATE A COMPILE TIME ERROR, SINCE E IS NOT COMPATIBLE WITH THEM */
 
 // #[contractimpl]
 // impl NonFungibleSequentialMintable for ExampleContract {

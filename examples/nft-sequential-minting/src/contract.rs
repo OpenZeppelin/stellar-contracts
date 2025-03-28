@@ -10,7 +10,7 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_non_fungible::{
     self as non_fungible, burnable::NonFungibleBurnable, mintable::NonFungibleSequentialMintable,
-    Base, NonFungibleToken,
+    Balance, Base, ContractOverrides, NonFungibleToken, TokenId,
 };
 
 #[contract]
@@ -18,7 +18,7 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl NonFungibleToken for ExampleContract {
-    type ContractType: Base;
+    type ContractType = Base;
 
     fn balance(e: &Env, owner: Address) -> Balance {
         non_fungible::balance(e, &owner)
@@ -59,14 +59,14 @@ impl NonFungibleToken for ExampleContract {
     }
 
     fn name(e: &Env) -> String {
-        String::from("My NFT")
+        String::from_str(e, "My NFT")
     }
 
     fn symbol(e: &Env) -> String {
-        String::from("MTKN")
+        String::from_str(e, "MTKN")
     }
 
-    fn token_uri(e: &Env, token_id: TokenId) -> String {
+    fn token_uri(_e: &Env, _token_id: TokenId) -> String {
         unimplemented!("token_uri not implemented for this example")
     }
 }

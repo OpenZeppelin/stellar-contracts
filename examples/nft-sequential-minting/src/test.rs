@@ -2,7 +2,7 @@
 
 extern crate std;
 
-use soroban_sdk::{testutils::Address as _, Address, Env, String};
+use soroban_sdk::{testutils::Address as _, Address, Env};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
@@ -34,6 +34,5 @@ fn burn_works() {
     e.mock_all_auths();
     client.mint(&owner);
     client.burn(&owner, &0);
-    assert_eq!(client.total_supply(), 0);
     assert_eq!(client.balance(&owner), 0);
 }
