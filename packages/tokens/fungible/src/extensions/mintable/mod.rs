@@ -49,7 +49,7 @@ pub trait FungibleMintable {
     ///
     /// # Security Warning
     ///
-    /// IMPORTANT: The base implementation of mint() intentionally lacks
+    /// **IMPORTANT**: The base implementation of mint() intentionally lacks
     /// authorization controls. You MUST implement proper authorization in
     /// your contract. For example:
     ///

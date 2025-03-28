@@ -44,7 +44,7 @@ pub trait NonFungibleNonSequentialMintable: NonFungibleToken<ContractType = Base
     ///
     /// # Security Warning
     ///
-    /// IMPORTANT: The base implementation of `mint()` intentionally lacks
+    /// **IMPORTANT**: The base implementation of `mint()` intentionally lacks
     /// authorization controls. You MUST implement proper authorization in
     /// your contract. For example:
     ///
@@ -99,7 +99,7 @@ pub trait NonFungibleSequentialMintable: NonFungibleToken<ContractType = Base> {
     ///
     /// # Security Warning
     ///
-    /// IMPORTANT: The base implementation of `mint()` intentionally lacks
+    /// **IMPORTANT**: The base implementation of mint() intentionally lacks
     /// authorization controls. You MUST implement proper authorization in
     /// your contract. For example:
     ///

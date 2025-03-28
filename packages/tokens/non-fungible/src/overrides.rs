@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{Address, Env, String};
 
 use crate::TokenId;
 
@@ -7,6 +7,7 @@ use crate::TokenId;
 /// override mechanism.
 pub trait ContractOverrides {
     fn owner_of(e: &Env, token_id: TokenId) -> Address;
+    fn token_uri(e: &Env, token_id: TokenId) -> String;
     fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId);
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId);
     fn approve(
@@ -24,6 +25,10 @@ pub struct Base;
 impl ContractOverrides for Base {
     fn owner_of(e: &Env, token_id: TokenId) -> Address {
         crate::owner_of(e, token_id)
+    }
+
+    fn token_uri(e: &Env, token_id: TokenId) -> String {
+        crate::token_uri(e, token_id)
     }
 
     fn approve(

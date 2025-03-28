@@ -263,4 +263,26 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(event_data.0, *operator, "Approve event has wrong operator address");
         assert_eq!(event_data.1, live_until_ledger, "Approve event has wrong live_until_ledger");
     }
+
+    pub fn assert_consecutive_mint(&self, to: &Address, from_id: TokenId, to_id: TokenId) {
+        let event = self.find_event_by_symbol("consecutive_mint");
+
+        assert!(event.is_some(), "ConsecutiveMint event not found in event log");
+
+        let (contract, topics, data) = event.unwrap();
+        assert_eq!(contract, self.contract, "Event from wrong contract");
+
+        let topics: Vec<Val> = topics.clone();
+        assert_eq!(topics.len(), 2, "ConsecutiveMint event should have 2 topics");
+
+        let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
+        assert_eq!(topic_symbol, Symbol::new(self.env, "consecutive_mint"));
+
+        let event_to: Address = topics.get_unchecked(1).into_val(self.env);
+        let event_data: (TokenId, TokenId) = data.into_val(self.env);
+
+        assert_eq!(&event_to, to, "ConsecutiveMint event has wrong to address");
+        assert_eq!(event_data.0, from_id, "ConsecutiveMint event has wrong from_token_id");
+        assert_eq!(event_data.1, to_id, "ConsecutiveMint event has wrong to_token_id");
+    }
 }
