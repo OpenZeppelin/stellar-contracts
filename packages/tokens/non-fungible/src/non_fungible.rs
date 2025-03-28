@@ -1,20 +1,27 @@
-#[cfg(feature = "token_u256")]
-use soroban_sdk::U256;
 use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
 
 use crate::ContractOverrides;
 
+/// Max. allowed length for a base uri.
+pub const MAX_BASE_URI_LEN: usize = 200;
+
 #[cfg(feature = "token_u32")]
 pub type TokenId = u32;
+/// u32::MAX == 4294967295
+#[cfg(feature = "token_u32")]
+pub const MAX_NUM_DIGITS: usize = 10;
 
 #[cfg(feature = "token_u64")]
 pub type TokenId = u64;
+/// u64::MAX == 18446744073709551615
+#[cfg(feature = "token_u64")]
+pub const MAX_NUM_DIGITS: usize = 20;
 
 #[cfg(feature = "token_u128")]
 pub type TokenId = u128;
-
-#[cfg(feature = "token_u256")]
-pub type TokenId = U256;
+/// u128::MAX == 18446744073709551615
+#[cfg(feature = "token_u128")]
+pub const MAX_NUM_DIGITS: usize = 39;
 
 // one user can possess at most `TokenId` cap of tokens.
 pub type Balance = TokenId;
@@ -289,6 +296,10 @@ pub enum NonFungibleTokenError {
     TokenNotFoundInOwnerList = 308,
     /// Indicates the token does not exist in global list.
     TokenNotFoundInGlobalList = 309,
+    /// Indicates access to unset metadata
+    UnsetMetadata = 310,
+    /// Indicates the length of the base URI exceeds the maximum allowed
+    BaseUriMaxLenExceeded = 311,
 }
 
 // ################## EVENTS ##################

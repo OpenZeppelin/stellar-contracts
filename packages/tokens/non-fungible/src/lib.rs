@@ -78,8 +78,9 @@ pub use non_fungible::{
 };
 pub use overrides::*;
 pub use storage::{
-    approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,
-    transfer_from, ApprovalData, ApprovalForAllData, StorageKey,
+    approve, approve_for_all, balance, base_uri, get_approved, get_metadata, is_approved_for_all,
+    name, owner_of, set_metadata, symbol, token_uri, transfer, transfer_from, ApprovalData,
+    ApprovalForAllData, StorageKey,
 };
 pub use utils::sequential;
 
