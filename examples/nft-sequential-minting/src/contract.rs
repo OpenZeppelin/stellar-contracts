@@ -8,66 +8,83 @@
 //! is not taken into consideration
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_fungible::{
-    self as fungible,
-    capped::{check_cap, set_cap},
-    mintable::{mint, FungibleMintable},
-    FungibleToken,
+use stellar_non_fungible::{
+    self as non_fungible, burnable::NonFungibleBurnable, mintable::NonFungibleSequentialMintable,
+    Base, NonFungibleToken,
 };
 
 #[contract]
 pub struct ExampleContract;
 
 #[contractimpl]
-impl ExampleContract {
-    pub fn __constructor(e: &Env, cap: i128) {
-        set_cap(e, cap);
-    }
-}
+impl NonFungibleToken for ExampleContract {
+    type ContractType: Base;
 
-#[contractimpl]
-impl FungibleToken for ExampleContract {
-    fn total_supply(e: &Env) -> i128 {
-        fungible::total_supply(e)
+    fn balance(e: &Env, owner: Address) -> Balance {
+        non_fungible::balance(e, &owner)
     }
 
-    fn balance(e: &Env, account: Address) -> i128 {
-        fungible::balance(e, &account)
+    fn owner_of(e: &Env, token_id: TokenId) -> Address {
+        Self::ContractType::owner_of(e, token_id)
     }
 
-    fn allowance(e: &Env, owner: Address, spender: Address) -> i128 {
-        fungible::allowance(e, &owner, &spender)
+    fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
+        Self::ContractType::transfer(e, from, to, token_id);
     }
 
-    fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
-        fungible::transfer(e, &from, &to, amount);
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
+        Self::ContractType::transfer_from(e, spender, from, to, token_id);
     }
 
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128) {
-        fungible::transfer_from(e, &spender, &from, &to, amount);
+    fn approve(
+        e: &Env,
+        approver: Address,
+        approved: Address,
+        token_id: TokenId,
+        live_until_ledger: u32,
+    ) {
+        Self::ContractType::approve(e, approver, approved, token_id, live_until_ledger);
     }
 
-    fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32) {
-        fungible::approve(e, &owner, &spender, amount, live_until_ledger);
+    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
+        non_fungible::approve_for_all(e, &owner, &operator, live_until_ledger);
     }
 
-    fn decimals(e: &Env) -> u32 {
-        fungible::metadata::decimals(e)
+    fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
+        non_fungible::get_approved(e, token_id)
+    }
+
+    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
+        non_fungible::is_approved_for_all(e, &owner, &operator)
     }
 
     fn name(e: &Env) -> String {
-        fungible::metadata::name(e)
+        String::from("My NFT")
     }
 
     fn symbol(e: &Env) -> String {
-        fungible::metadata::symbol(e)
+        String::from("MTKN")
+    }
+
+    fn token_uri(e: &Env, token_id: TokenId) -> String {
+        unimplemented!("token_uri not implemented for this example")
     }
 }
 
 #[contractimpl]
-impl FungibleMintable for ExampleContract {
-    fn mint(e: &Env, account: Address, amount: i128) {
-        check_cap(e, amount);
-        mint(e, &account, amount);
+impl NonFungibleSequentialMintable for ExampleContract {
+    fn mint(e: &Env, to: Address) -> TokenId {
+        non_fungible::mintable::sequential_mint(e, &to)
+    }
+}
+
+#[contractimpl]
+impl NonFungibleBurnable for ExampleContract {
+    fn burn(e: &Env, from: Address, token_id: TokenId) {
+        non_fungible::burnable::burn(e, &from, token_id);
+    }
+
+    fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId) {
+        non_fungible::burnable::burn_from(e, &spender, &from, token_id);
     }
 }
