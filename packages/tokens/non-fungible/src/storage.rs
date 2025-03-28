@@ -1,10 +1,11 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map, String};
 use stellar_constants::{
     BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
 };
 
 use crate::non_fungible::{
     emit_approve, emit_approve_for_all, emit_transfer, Balance, NonFungibleTokenError, TokenId,
+    MAX_BASE_URI_LEN,
 };
 
 /// Storage container for the token for which an approval is granted
@@ -21,6 +22,14 @@ pub struct ApprovalForAllData {
     pub operators: Map<Address /* operator */, u32 /* live_until_ledger */>,
 }
 
+/// Storage container for token metadata
+#[contracttype]
+pub struct Metadata {
+    pub base_uri: String,
+    pub name: String,
+    pub symbol: String,
+}
+
 /// Storage keys for the data associated with `FungibleToken`
 #[contracttype]
 pub enum StorageKey {
@@ -28,6 +37,7 @@ pub enum StorageKey {
     Balance(Address),
     Approval(TokenId),
     ApprovalForAll(Address),
+    Metadata,
 }
 
 // ################## QUERY STATE ##################
@@ -118,6 +128,108 @@ pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool
 
     // If no operator with a valid approval
     false
+}
+
+/// Returns the token metadata such as base_uri, name and symbol.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * [`NonFungibleTokenError::UnsetMetadata`] - If trying to access
+///   uninitialized metadata.
+pub fn get_metadata(e: &Env) -> Metadata {
+    e.storage()
+        .instance()
+        .get(&StorageKey::Metadata)
+        .unwrap_or_else(|| panic_with_error!(e, NonFungibleTokenError::UnsetMetadata))
+}
+
+/// Returns the collection base URI.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * refer to [`get_metadata`] errors.
+pub fn base_uri(e: &Env) -> String {
+    get_metadata(e).base_uri
+}
+
+fn id_to_string(env: &Env, value: TokenId) -> (String, usize) {
+    if value == 0 {
+        return (String::from_str(env, "0"), 0);
+    }
+
+    let mut num_digits: usize = 0;
+    let mut temp: TokenId = value;
+
+    while temp > 0 {
+        num_digits += 1;
+        temp /= 10;
+    }
+
+    const SIZE: usize = core::mem::size_of::<TokenId>();
+    let mut slice: [u8; SIZE] = [0u8; SIZE];
+    let mut index = num_digits;
+    temp = value;
+
+    while temp != 0 {
+        index -= 1;
+        slice[index] = (48 + temp % 10) as u8;
+        temp /= 10;
+    }
+
+    (String::from_bytes(env, &slice[..num_digits]), num_digits)
+}
+
+pub fn token_uri(e: &Env, token_id: TokenId) -> String {
+    let base_uri = base_uri(e);
+
+    let len = base_uri.len() as usize;
+    if len > 0 {
+        let uri_as_bytes = &mut [0u8; MAX_BASE_URI_LEN];
+
+        let (id_str, num_digits) = id_to_string(e, token_id);
+
+        base_uri.copy_into_slice(&mut uri_as_bytes[..len]);
+        // TODO: check for '/' and add
+        id_str.copy_into_slice(&mut uri_as_bytes[len..(len + num_digits)]);
+
+        String::from_bytes(e, &uri_as_bytes[..(len + num_digits)])
+    } else {
+        String::from_str(e, "")
+    }
+}
+
+/// Returns the token collection name.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * refer to [`get_metadata`] errors.
+pub fn name(e: &Env) -> String {
+    get_metadata(e).name
+}
+
+/// Returns the token collection symbol.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * refer to [`get_metadata`] errors.
+pub fn symbol(e: &Env) -> String {
+    get_metadata(e).symbol
 }
 
 // ################## CHANGE STATE ##################
@@ -445,4 +557,33 @@ pub fn decrease_balance(e: &Env, from: &Address, amount: TokenId) {
         panic_with_error!(e, NonFungibleTokenError::MathOverflow);
     };
     e.storage().persistent().set(&StorageKey::Balance(from.clone()), &balance);
+}
+
+/// Sets the token metadata such as token collection URI, name and symbol.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `base_uri` - The base collection URI.
+/// * `name` - The token collection name.
+/// * `symbol` - The token collection symbol.
+///
+/// # Errors
+///
+/// * [`NonFungibleTokenError::BaseUriMaxLenExceeded`] - If the length of
+///   `base_uri` exceeds the
+/// maximum allowed.
+///
+/// # Notes
+///
+/// **IMPORTANT**: This function lacks authorization controls. You want to
+/// invoke it most likely from a constructor or from another function with
+/// admin-only authorization.
+pub fn set_metadata(e: &Env, base_uri: String, name: String, symbol: String) {
+    if base_uri.len() as usize > MAX_BASE_URI_LEN {
+        panic_with_error!(e, NonFungibleTokenError::BaseUriMaxLenExceeded)
+    }
+
+    let metadata = Metadata { base_uri, name, symbol };
+    e.storage().instance().set(&StorageKey::Metadata, &metadata);
 }

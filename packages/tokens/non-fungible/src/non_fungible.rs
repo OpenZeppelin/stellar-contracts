@@ -19,6 +19,8 @@ pub type TokenId = U256;
 // one user can possess at most `TokenId` cap of tokens.
 pub type Balance = TokenId;
 
+pub const MAX_BASE_URI_LEN: usize = 200;
+
 /// Vanilla NonFungible Token Trait
 ///
 /// The `NonFungibleToken` trait defines the core functionality for non-fungible
@@ -289,6 +291,10 @@ pub enum NonFungibleTokenError {
     TokenNotFoundInOwnerList = 308,
     /// Indicates the token does not exist in global list.
     TokenNotFoundInGlobalList = 309,
+    /// Indicates access to unset metadata
+    UnsetMetadata = 310,
+    /// Indicates the length of the base URI exceeds the maximum allowed
+    BaseUriMaxLenExceeded = 311,
 }
 
 // ################## EVENTS ##################

@@ -5,22 +5,40 @@ extern crate std;
 use soroban_sdk::{
     contract,
     testutils::{Address as _, Ledger as _},
-    Address, Env, Map,
+    Address, Env, Map, String,
 };
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
     mintable::sequential_mint,
     non_fungible::Balance,
+    set_metadata,
     storage::{
         approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,
         update, StorageKey,
     },
-    transfer_from, ApprovalForAllData,
+    token_uri, transfer_from, ApprovalForAllData,
 };
 
 #[contract]
 struct MockContract;
+
+#[test]
+fn metadata_works() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let base_uri = String::from_str(&e, "https://smth.com/");
+        let name = String::from_str(&e, "My NFT collection");
+        let symbol = String::from_str(&e, "NFT");
+        set_metadata(&e, base_uri.clone(), name, symbol);
+
+        let id = 113;
+        let uri = token_uri(&e, id);
+        assert_eq!(uri, String::from_str(&e, "https://smth.com/113"))
+    });
+}
 
 #[test]
 fn approve_for_all_works() {
