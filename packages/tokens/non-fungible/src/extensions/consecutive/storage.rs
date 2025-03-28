@@ -51,9 +51,8 @@ pub fn consecutive_owner_of(e: &Env, token_id: TokenId) -> Address {
         // after the Protocol 23 upgrade, storage read cost is marginal,
         // making the consecutive storage reads justifiable
         .find_map(|key| {
-            e.storage().persistent().get::<_, Address>(&key).map(|addr| {
+            e.storage().persistent().get::<_, Address>(&key).inspect(|_| {
                 e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
-                addr
             })
         })
         .unwrap_or_else(|| panic_with_error!(&e, NonFungibleTokenError::NonExistentToken))
