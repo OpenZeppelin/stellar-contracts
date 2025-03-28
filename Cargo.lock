@@ -846,15 +846,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
-name = "pausable-example"
-version = "0.1.0"
-dependencies = [
- "soroban-sdk",
- "stellar-pausable",
- "stellar-pausable-macros",
-]
-
-[[package]]
 name = "pkcs8"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1373,6 +1364,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-upgradeable"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "stellar-upgradeable-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "stellar-xdr"
 version = "22.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1484,6 +1491,32 @@ name = "unicode-ident"
 version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a210d160f08b701c8721ba1c726c11662f877ea6b7094007e1ca9a1041945034"
+
+[[package]]
+name = "upgradeable-v1-example"
+version = "1.0.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-upgradeable",
+ "stellar-upgradeable-macros",
+]
+
+[[package]]
+name = "upgradeable-v2-example"
+version = "2.0.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-upgradeable",
+ "stellar-upgradeable-macros",
+]
+
+[[package]]
+name = "upgrader-example"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-upgradeable",
+]
 
 [[package]]
 name = "version_check"

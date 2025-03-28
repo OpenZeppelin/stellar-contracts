@@ -1,11 +1,17 @@
 [workspace]
 resolver = "2"
 members = [
-    "examples/*",
+    "examples/fungible-capped",
+    "examples/fungible-pausable",
+    "examples/fungible-token-interface",
+    "examples/upgradeable/*",
     "packages/constants",
     "packages/contract-utils/*",
     "packages/test-utils/*",
     "packages/tokens/*",
+]
+exclude = [
+    "examples/upgradeable/testdata"
 ]
 
 [workspace.package]
@@ -28,6 +34,8 @@ stellar-fungible = { path = "packages/tokens/fungible" }
 stellar-non-fungible = { path = "packages/tokens/non-fungible" }
 stellar-pausable = { path = "packages/contract-utils/pausable" }
 stellar-pausable-macros = { path = "packages/contract-utils/pausable-macros" }
+stellar-upgradeable = { path = "packages/contract-utils/upgradeable" }
+stellar-upgradeable-macros = { path = "packages/contract-utils/upgradeable-macros" }
 
 [profile.release]
 opt-level = "z"

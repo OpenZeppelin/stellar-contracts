@@ -1,0 +1,19 @@
+[package]
+name = "upgradeable-v1-example"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version = "1.0.0"
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+stellar-upgradeable = { workspace = true }
+stellar-upgradeable-macros = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
