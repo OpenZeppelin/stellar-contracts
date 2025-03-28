@@ -13,7 +13,7 @@ use stellar_non_fungible::{
     burnable::NonFungibleBurnable,
     consecutive::{overrides::Consecutive, NonFungibleConsecutive},
     mintable::NonFungibleSequentialMintable,
-    NonFungibleToken,
+    NonFungibleToken, TokenId,
 };
 
 #[contract]
@@ -75,6 +75,17 @@ impl NonFungibleToken for ExampleContract {
 }
 
 impl NonFungibleConsecutive for ExampleContract {}
+
+#[contractimpl]
+impl ExampleContract {
+    pub fn batch_mint(e: &Env, to: Address, amount: TokenId) -> TokenId {
+        non_fungible::consecutive::storage::consecutive_batch_mint(e, to, amount)
+    }
+
+    pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
+        non_fungible::consecutive::storage::consecutive_burn(e, from, token_id);
+    }
+}
 
 /* BELOW WILL CREATE A COMPILE TIME ERROR, SINCE E IS NOT COMPATIBLE WITH THEM */
 
