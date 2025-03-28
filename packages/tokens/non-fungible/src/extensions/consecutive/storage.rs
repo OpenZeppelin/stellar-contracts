@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 
 use super::emit_consecutive_mint;
 use crate::{
@@ -46,6 +46,23 @@ pub fn consecutive_owner_of(e: &Env, token_id: TokenId) -> Address {
         // making the consecutive storage reads justifiable
         .find_map(|key| e.storage().persistent().get::<_, Address>(&key))
         .unwrap_or_else(|| panic_with_error!(&e, NonFungibleTokenError::NonExistentToken))
+}
+
+/// Returns the URI for a specific `token_id`.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token_id` - The identifier of the token.
+///
+/// # Errors
+///
+/// * refer to [`owner_of`] errors.
+/// * refer to [`base_uri`] errors.
+pub fn consecutive_token_uri(e: &Env, token_id: TokenId) -> String {
+    let _ = consecutive_owner_of(e, token_id);
+    let base_uri = crate::base_uri(e);
+    crate::storage::compose_uri_for_token(e, base_uri, token_id)
 }
 
 // ################## CHANGE STATE ##################

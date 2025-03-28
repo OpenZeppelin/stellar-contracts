@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{Address, Env, String};
 
 use crate::{consecutive::storage, ContractOverrides, TokenId};
 
@@ -7,6 +7,10 @@ pub struct Consecutive;
 impl ContractOverrides for Consecutive {
     fn owner_of(e: &Env, token_id: TokenId) -> Address {
         self::storage::consecutive_owner_of(e, token_id)
+    }
+
+    fn token_uri(e: &Env, token_id: TokenId) -> String {
+        self::storage::consecutive_token_uri(e, token_id)
     }
 
     fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
