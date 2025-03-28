@@ -11,13 +11,14 @@ use stellar_event_assertion::EventAssertion;
 
 use crate::{
     mintable::sequential_mint,
+    name,
     non_fungible::Balance,
     set_metadata,
     storage::{
         approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,
         update, StorageKey,
     },
-    token_uri, transfer_from, ApprovalForAllData,
+    symbol, token_uri, transfer_from, ApprovalForAllData,
 };
 
 #[contract]
@@ -27,16 +28,21 @@ struct MockContract;
 fn metadata_works() {
     let e = Env::default();
     let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
         let base_uri = String::from_str(&e, "https://smth.com/");
-        let name = String::from_str(&e, "My NFT collection");
-        let symbol = String::from_str(&e, "NFT");
-        set_metadata(&e, base_uri.clone(), name, symbol);
+        let collection_name = String::from_str(&e, "My NFT collection");
+        let collection_symbol = String::from_str(&e, "NFT");
+        set_metadata(&e, base_uri.clone(), collection_name.clone(), collection_symbol.clone());
 
-        let id = 113;
-        let uri = token_uri(&e, id);
-        assert_eq!(uri, String::from_str(&e, "https://smth.com/113"))
+        let token_id = 4294967295;
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        let uri = token_uri(&e, token_id);
+
+        assert_eq!(uri, String::from_str(&e, "https://smth.com/4294967295"));
+        assert_eq!(collection_name, name(&e));
+        assert_eq!(collection_symbol, symbol(&e));
     });
 }
 
