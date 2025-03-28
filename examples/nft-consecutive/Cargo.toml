@@ -1,5 +1,5 @@
 [package]
-name = "fungible-capped-example"
+name = "nft-consecutive-example"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
