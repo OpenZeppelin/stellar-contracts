@@ -1,3 +1,7 @@
+/// A basic contract that demonstrates the usage of the `Upgradeable` derive
+/// macro. It only implements `UpgradeableInternal` and the derive macro do the
+/// rest of the job. The goal is to upgrade this "v1" contract with the contract
+/// in "v2".
 use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env, Symbol,
 };

@@ -26,21 +26,26 @@ fn test_upgrade() {
     env.mock_all_auths();
 
     let admin = Address::generate(&env);
-    let contract_id = env.register(ExampleContract, (&admin,));
+    // deploy v1
+    let address = env.register(ExampleContract, (&admin,));
 
-    let client_v1 = ExampleContractClient::new(&env, &contract_id);
+    let client_v1 = ExampleContractClient::new(&env, &address);
 
+    // install the new wasm and upgrade
     let new_wasm_hash = install_new_wasm(&env);
-
     client_v1.upgrade(&new_wasm_hash, &admin);
 
-    let client_v2 = contract_v2::Client::new(&env, &contract_id);
+    // init the upgraded client and migrate
+    let client_v2 = contract_v2::Client::new(&env, &address);
     client_v2.migrate(&Data { num1: 12, num2: 34 });
 
+    // ensure migrate can't be invoked again
     assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }).is_err());
 
+    // rollback
     client_v2.rollback(&());
 
+    // ensure migrate and rollback can't be invoked before another upgrade
     assert!(client_v2.try_rollback(&()).is_err());
     assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }).is_err());
 }

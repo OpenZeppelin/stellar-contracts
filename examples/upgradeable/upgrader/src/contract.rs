@@ -11,44 +11,39 @@ pub struct Upgrader;
 
 #[contractimpl]
 impl Upgrader {
-    pub fn upgrade(
-        env: Env,
-        contract_address: Address,
-        operator: Address,
-        new_wasm_hash: BytesN<32>,
-    ) {
+    pub fn upgrade(env: Env, contract_address: Address, operator: Address, wasm_hash: BytesN<32>) {
         let contract_client = UpgradeableClient::new(&env, &contract_address);
 
-        contract_client.upgrade(&new_wasm_hash, &operator);
+        contract_client.upgrade(&wasm_hash, &operator);
     }
 
     pub fn upgrade_and_migrate(
         env: Env,
         contract_address: Address,
         operator: Address,
-        new_wasm_hash: BytesN<32>,
+        wasm_hash: BytesN<32>,
         migration_data: soroban_sdk::Vec<Val>,
     ) {
         let contract_client = UpgradeableClient::new(&env, &contract_address);
 
-        contract_client.upgrade(&new_wasm_hash, &operator);
+        contract_client.upgrade(&wasm_hash, &operator);
         // The types of the arguments to the migrate function are unknown to this
         // contract, so we need to call it with invoke_contract.
         env.invoke_contract::<()>(&contract_address, &MIGRATE, migration_data);
     }
 
-    pub fn rollback_and_downgrade(
+    pub fn rollback_and_upgrade(
         env: Env,
         contract_address: Address,
         operator: Address,
-        old_wasm_hash: BytesN<32>,
+        wasm_hash: BytesN<32>,
         rollback_data: soroban_sdk::Vec<Val>,
     ) {
         let contract_client = UpgradeableClient::new(&env, &contract_address);
 
-        // The types of the arguments to the migrate function are unknown to this
+        // The types of the arguments to the rollback function are unknown to this
         // contract, so we need to call it with invoke_contract.
         env.invoke_contract::<()>(&contract_address, &ROLLBACK, rollback_data);
-        contract_client.upgrade(&old_wasm_hash, &operator);
+        contract_client.upgrade(&wasm_hash, &operator);
     }
 }

@@ -53,9 +53,9 @@ pub trait UpgradeableInternal {
 /// lightweight upgrade framework provided in this module.
 ///
 /// When using the framework, this trait is automatically derived with
-/// `#[derive(Upgradeable)]` and the accompanying attribute `#[migratable]`, and
-/// should not be manually implemented. Instead, the contract must provide its
-/// custom migration and rollback logic by implementing `MigratableInternal`.
+/// `#[derive(Migratable)]`, and should NOT be manually implemented. Instead,
+/// the contract must provide its custom migration and rollback logic by
+/// implementing `MigratableInternal`.
 pub trait Migratable: MigratableInternal {
     /// Entry point to handle a contract migration.
     ///

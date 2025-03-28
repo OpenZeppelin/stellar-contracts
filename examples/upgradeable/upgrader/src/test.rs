@@ -54,7 +54,7 @@ fn test_upgrade_with_upgrader() {
 
     assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }).is_err());
 
-    upgrader_client.rollback_and_downgrade(
+    upgrader_client.rollback_and_upgrade(
         &contract_id,
         &admin,
         &old_wasm_hash,

@@ -9,8 +9,8 @@
 //! migration), ensuring safe and predictable transitions.
 //!
 //! It is recommended to use this module via the `#[derive(Upgradeable)]` macro,
-//! and the optional `#[migratable]` when custom migration or rollback logic is
-//! needed.
+//! or via the combination `#[derive(Upgradeable, Migratable)]` when custom
+//! migration or rollback logic is additionally needed.
 //!
 //! **Important**: While the framework structures the upgrade flow, it does NOT
 //! perform deeper checks and verifications such as:
@@ -30,8 +30,7 @@
 //!     pub num2: u32,
 //! }
 //!
-//! #[derive(Upgradeable)]
-//! #[migratable]
+//! #[derive(Upgradeable, Migratable)]
 //! #[contract]
 //! pub struct ExampleContract;
 //!
