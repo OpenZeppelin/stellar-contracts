@@ -256,6 +256,8 @@ pub fn approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_
         {
             approval_data.operators.remove(operator.clone());
             e.storage().temporary().set(&key, &approval_data);
+            let live_for = live_until_ledger - e.ledger().sequence();
+            e.storage().temporary().extend_ttl(&key, live_for, live_for);
         }
         emit_approve_for_all(e, owner, operator, live_until_ledger);
         return;
