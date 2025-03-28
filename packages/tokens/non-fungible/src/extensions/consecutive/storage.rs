@@ -1,4 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use stellar_constants::{
+    OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
+};
 
 use super::emit_consecutive_mint;
 use crate::{
@@ -32,8 +35,9 @@ pub enum StorageKey {
 ///   `token_id` does not exist.
 pub fn consecutive_owner_of(e: &Env, token_id: TokenId) -> Address {
     let max = sequential::next_token_id(e);
-    let is_burned =
-        e.storage().persistent().get(&StorageKey::BurnedToken(token_id)).unwrap_or(false);
+    let key = StorageKey::BurnedToken(token_id);
+    let is_burned = e.storage().persistent().get(&key).unwrap_or(false);
+    e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
 
     if token_id >= max || is_burned {
         panic_with_error!(&e, NonFungibleTokenError::NonExistentToken);
@@ -44,7 +48,11 @@ pub fn consecutive_owner_of(e: &Env, token_id: TokenId) -> Address {
         .map(StorageKey::Owner)
         // after the Protocol 23 upgrade, storage read cost is marginal,
         // making the consecutive storage reads justifiable
-        .find_map(|key| e.storage().persistent().get::<_, Address>(&key))
+        .find_map(|key| {
+            e.storage().persistent().get::<_, Address>(&key).map(|| {
+                e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT)
+            })
+        })
         .unwrap_or_else(|| panic_with_error!(&e, NonFungibleTokenError::NonExistentToken))
 }
 
@@ -345,9 +353,21 @@ pub fn consecutive_update(
 /// * `token_id` - The identifier of the token being set.
 pub fn consecutive_set_owner_for(e: &Env, to: &Address, token_id: TokenId) {
     let max = sequential::next_token_id(e);
-    let has_owner = e.storage().persistent().has(&StorageKey::Owner(token_id));
-    let is_burned =
-        e.storage().persistent().get(&StorageKey::BurnedToken(token_id)).unwrap_or(false);
+    let owner_key = StorageKey::Owner(token_id);
+    let has_owner = e.storage().persistent().has(&owner_key);
+    if has_owner {
+        e.storage().persistent().extend_ttl(&owner_key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
+    }
+
+    let burned_token_key = StorageKey::BurnedToken(token_id);
+    let is_burned = e.storage().persistent().get(&burned_token_key).unwrap_or(false);
+    if is_burned {
+        e.storage().persistent().extend_ttl(
+            &burned_token_key,
+            TOKEN_TTL_THRESHOLD,
+            TOKEN_EXTEND_AMOUNT,
+        );
+    }
 
     if token_id < max && !has_owner && !is_burned {
         e.storage().persistent().set(&StorageKey::Owner(token_id), to);

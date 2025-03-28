@@ -1,4 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use stellar_constants::{
+    OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
+};
 
 use crate::{
     balance, mintable::emit_mint, storage::update, Balance, NonFungibleTokenError, TokenId,
@@ -51,6 +54,7 @@ pub fn get_owner_token_id(e: &Env, owner: &Address, index: TokenId) -> TokenId {
     let Some(token_id) = e.storage().persistent().get::<_, TokenId>(&key) else {
         panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
     };
+    e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
 
     token_id
 }
@@ -80,6 +84,7 @@ pub fn get_token_id(e: &Env, index: TokenId) -> TokenId {
     let Some(token_id) = e.storage().persistent().get::<_, TokenId>(&key) else {
         panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
     };
+    e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
 
     token_id
 }
@@ -449,11 +454,11 @@ pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: TokenId) {
 /// * [`NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token ID is
 ///   not found in the owner's enumeration.
 pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id: TokenId) {
-    let Some(to_be_removed_index) =
-        e.storage().persistent().get(&StorageKey::OwnerTokensIndex(to_be_removed_id))
-    else {
+    let key = StorageKey::OwnerTokensIndex(to_be_removed_id);
+    let Some(to_be_removed_index) = e.storage().persistent().get(&key) else {
         panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
     };
+    e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
 
     // This function is called after balance is manipulated, so do not need to
     // decrease 1 from the balance (burn, transfer, etc.).
@@ -517,13 +522,11 @@ pub fn remove_from_global_enumeration(
     to_be_removed_id: TokenId,
     last_token_index: TokenId,
 ) {
-    let Some(to_be_removed_index) = e
-        .storage()
-        .persistent()
-        .get::<_, TokenId>(&StorageKey::GlobalTokensIndex(to_be_removed_id))
-    else {
+    let key = StorageKey::GlobalTokensIndex(to_be_removed_id);
+    let Some(to_be_removed_index) = e.storage().persistent().get::<_, TokenId>(&key) else {
         panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
     };
+    e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
 
     // unlike `remove_from_owner_enumeration`, we perform the swap without
     // checking if it's already the last token_id to avoid extra gas cost (being
