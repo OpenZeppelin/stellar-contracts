@@ -1,9 +1,8 @@
-#[cfg(feature = "token_u256")]
-use soroban_sdk::U256;
 use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
 
 use crate::ContractOverrides;
 
+/// Max. allowed length for a base uri.
 pub const MAX_BASE_URI_LEN: usize = 200;
 
 #[cfg(feature = "token_u32")]
@@ -23,9 +22,6 @@ pub type TokenId = u128;
 /// u128::MAX == 18446744073709551615
 #[cfg(feature = "token_u128")]
 pub const MAX_NUM_DIGITS: usize = 39;
-
-#[cfg(feature = "token_u256")]
-pub type TokenId = U256;
 
 // one user can possess at most `TokenId` cap of tokens.
 pub type Balance = TokenId;
