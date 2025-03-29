@@ -6,14 +6,9 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    consecutive::storage::{
-        consecutive_approve as approve, consecutive_batch_mint as batch_mint,
-        consecutive_burn as burn, consecutive_burn_from as burn_from,
-        consecutive_owner_of as owner_of, consecutive_set_owner_for as set_owner_for,
-        consecutive_transfer as transfer, consecutive_transfer_from as transfer_from, StorageKey,
-    },
+    consecutive::{storage::StorageKey, Consecutive},
     sequential::next_token_id,
-    storage::balance,
+    Base,
 };
 
 #[contract]
@@ -28,23 +23,23 @@ fn consecutive_batch_mint_works() {
     let amount = 100;
 
     e.as_contract(&address, || {
-        batch_mint(&e, &owner, amount);
+        Consecutive::batch_mint(&e, &owner, amount);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
         event_assert.assert_consecutive_mint(&owner, 0, 99);
 
         assert_eq!(next_token_id(&e), amount);
-        assert_eq!(balance(&e, &owner), amount);
+        assert_eq!(Base::balance(&e, &owner), amount);
 
         let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(0)).unwrap();
         assert_eq!(_owner, owner);
-        assert_eq!(owner_of(&e, 50), owner);
+        assert_eq!(Consecutive::owner_of(&e, 50), owner);
 
         // new mint
-        let last_id = batch_mint(&e, &owner, amount);
+        let last_id = Consecutive::batch_mint(&e, &owner, amount);
         assert_eq!(last_id, 2 * amount - 1);
-        assert_eq!(balance(&e, &owner), 2 * amount);
+        assert_eq!(Base::balance(&e, &owner), 2 * amount);
     });
 }
 
@@ -56,9 +51,9 @@ fn consecutive_owner_of_on_nonexistent_token_fails() {
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        batch_mint(&e, &user, 5);
+        Consecutive::batch_mint(&e, &user, 5);
         // token 5 is out of range
-        owner_of(&e, 5);
+        Consecutive::owner_of(&e, 5);
     });
 }
 
@@ -71,9 +66,9 @@ fn consecutive_owner_of_panics_on_burnt_token_fails() {
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        batch_mint(&e, &user, 10);
-        burn(&e, &user, 2);
-        owner_of(&e, 2);
+        Consecutive::batch_mint(&e, &user, 10);
+        Consecutive::burn(&e, &user, 2);
+        Consecutive::owner_of(&e, 2);
     });
 }
 
@@ -88,14 +83,14 @@ fn consecutive_transfer_works() {
     let amount = 100;
 
     e.as_contract(&address, || {
-        batch_mint(&e, &owner, amount);
-        assert_eq!(balance(&e, &owner), amount);
+        Consecutive::batch_mint(&e, &owner, amount);
+        assert_eq!(Base::balance(&e, &owner), amount);
 
-        transfer(&e, &owner, &recipient, 50);
-        assert_eq!(owner_of(&e, 50), recipient);
-        assert_eq!(balance(&e, &recipient), 1);
+        Consecutive::transfer(&e, &owner, &recipient, 50);
+        assert_eq!(Consecutive::owner_of(&e, 50), recipient);
+        assert_eq!(Base::balance(&e, &recipient), 1);
 
-        assert_eq!(owner_of(&e, 51), owner);
+        assert_eq!(Consecutive::owner_of(&e, 51), owner);
         let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(51)).unwrap();
         assert_eq!(_owner, owner);
 
@@ -117,22 +112,22 @@ fn consecutive_transfer_edge_works() {
     let amount = 100;
 
     e.as_contract(&address, || {
-        batch_mint(&e, &owner, amount);
+        Consecutive::batch_mint(&e, &owner, amount);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
         event_assert.assert_consecutive_mint(&owner, 0, 99);
 
-        assert_eq!(owner_of(&e, 0), owner);
-        transfer(&e, &owner, &recipient, 0);
-        assert_eq!(owner_of(&e, 0), recipient);
-        assert_eq!(owner_of(&e, 1), owner);
+        assert_eq!(Consecutive::owner_of(&e, 0), owner);
+        Consecutive::transfer(&e, &owner, &recipient, 0);
+        assert_eq!(Consecutive::owner_of(&e, 0), recipient);
+        assert_eq!(Consecutive::owner_of(&e, 1), owner);
     });
 
     e.as_contract(&address, || {
-        transfer(&e, &owner, &recipient, 99);
-        assert_eq!(owner_of(&e, 99), recipient);
-        assert_eq!(balance(&e, &recipient), 2);
+        Consecutive::transfer(&e, &owner, &recipient, 99);
+        assert_eq!(Consecutive::owner_of(&e, 99), recipient);
+        assert_eq!(Base::balance(&e, &recipient), 2);
     });
 }
 
@@ -149,15 +144,15 @@ fn consecutive_transfer_from_works() {
     let token_id = 50;
 
     e.as_contract(&address, || {
-        batch_mint(&e, &owner, amount);
-        assert_eq!(balance(&e, &owner), amount);
+        Consecutive::batch_mint(&e, &owner, amount);
+        assert_eq!(Base::balance(&e, &owner), amount);
 
-        approve(&e, &owner, &spender, token_id, 100);
-        transfer_from(&e, &spender, &owner, &recipient, token_id);
-        assert_eq!(owner_of(&e, token_id), recipient);
-        assert_eq!(balance(&e, &recipient), 1);
+        Consecutive::approve(&e, &owner, &spender, token_id, 100);
+        Consecutive::transfer_from(&e, &spender, &owner, &recipient, token_id);
+        assert_eq!(Consecutive::owner_of(&e, token_id), recipient);
+        assert_eq!(Base::balance(&e, &recipient), 1);
 
-        assert_eq!(owner_of(&e, token_id + 1), owner);
+        assert_eq!(Consecutive::owner_of(&e, token_id + 1), owner);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
@@ -178,11 +173,11 @@ fn consecutive_burn_works() {
     let token_id = 50;
 
     e.as_contract(&address, || {
-        batch_mint(&e, &owner, amount);
-        assert_eq!(balance(&e, &owner), amount);
+        Consecutive::batch_mint(&e, &owner, amount);
+        assert_eq!(Base::balance(&e, &owner), amount);
 
-        burn(&e, &owner, token_id);
-        assert_eq!(balance(&e, &owner), amount - 1);
+        Consecutive::burn(&e, &owner, token_id);
+        assert_eq!(Base::balance(&e, &owner), amount - 1);
 
         let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(token_id));
         assert_eq!(_owner, None);
@@ -209,15 +204,15 @@ fn consecutive_burn_from_works() {
     let token_id = 42;
 
     e.as_contract(&address, || {
-        batch_mint(&e, &owner, amount);
-        approve(&e, &owner, &spender, token_id, 100);
-        burn_from(&e, &spender, &owner, token_id);
+        Consecutive::batch_mint(&e, &owner, amount);
+        Consecutive::approve(&e, &owner, &spender, token_id, 100);
+        Consecutive::burn_from(&e, &spender, &owner, token_id);
 
-        assert_eq!(balance(&e, &owner), amount - 1);
+        assert_eq!(Base::balance(&e, &owner), amount - 1);
         let burned =
             e.storage().persistent().get::<_, bool>(&StorageKey::BurnedToken(token_id)).unwrap();
         assert!(burned);
-        assert_eq!(owner_of(&e, token_id + 1), owner);
+        assert_eq!(Consecutive::owner_of(&e, token_id + 1), owner);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
@@ -238,25 +233,25 @@ fn consecutive_set_owner_for_works() {
     let user3 = Address::generate(&e);
 
     e.as_contract(&address, || {
-        batch_mint(&e, &user1, 5); // 0,1,2,3,4
+        Consecutive::batch_mint(&e, &user1, 5); // 0,1,2,3,4
 
         // existing id
-        set_owner_for(&e, &user2, 2);
-        assert_eq!(owner_of(&e, 2), user2);
+        Consecutive::set_owner_for(&e, &user2, 2);
+        assert_eq!(Consecutive::owner_of(&e, 2), user2);
 
         // when more than max -> does nothing
-        set_owner_for(&e, &user2, 5);
+        Consecutive::set_owner_for(&e, &user2, 5);
         let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(5));
         assert_eq!(owner, None);
 
         // when already has owner -> does nothing
         e.storage().persistent().set(&StorageKey::Owner(3), &user3);
-        set_owner_for(&e, &user2, 3);
-        assert_eq!(owner_of(&e, 3), user3);
+        Consecutive::set_owner_for(&e, &user2, 3);
+        assert_eq!(Consecutive::owner_of(&e, 3), user3);
 
         // when is burned -> does nothing
-        burn(&e, &user1, 0);
-        set_owner_for(&e, &user2, 0);
+        Consecutive::burn(&e, &user1, 0);
+        Consecutive::set_owner_for(&e, &user2, 0);
         let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(0));
         assert_eq!(owner, None);
     });

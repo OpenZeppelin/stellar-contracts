@@ -10,15 +10,7 @@ use soroban_sdk::{
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    mintable::sequential_mint,
-    name,
-    non_fungible::Balance,
-    set_metadata,
-    storage::{
-        approve, approve_for_all, balance, get_approved, is_approved_for_all, owner_of, transfer,
-        update, StorageKey,
-    },
-    symbol, token_uri, transfer_from, ApprovalForAllData,
+    mintable::sequential_mint, non_fungible::Balance, ApprovalForAllData, Base, StorageKey,
 };
 
 #[contract]
@@ -34,15 +26,20 @@ fn metadata_works() {
         let base_uri = String::from_str(&e, "https://smth.com/");
         let collection_name = String::from_str(&e, "My NFT collection");
         let collection_symbol = String::from_str(&e, "NFT");
-        set_metadata(&e, base_uri.clone(), collection_name.clone(), collection_symbol.clone());
+        Base::set_metadata(
+            &e,
+            base_uri.clone(),
+            collection_name.clone(),
+            collection_symbol.clone(),
+        );
 
         let token_id = 4294967295;
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
-        let uri = token_uri(&e, token_id);
+        let uri = Base::token_uri(&e, token_id);
 
         assert_eq!(uri, String::from_str(&e, "https://smth.com/4294967295"));
-        assert_eq!(collection_name, name(&e));
-        assert_eq!(collection_symbol, symbol(&e));
+        assert_eq!(collection_name, Base::name(&e));
+        assert_eq!(collection_symbol, Base::symbol(&e));
     });
 }
 
@@ -55,9 +52,9 @@ fn approve_for_all_works() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        approve_for_all(&e, &owner, &operator, 1000);
+        Base::approve_for_all(&e, &owner, &operator, 1000);
 
-        let is_approved = is_approved_for_all(&e, &owner, &operator);
+        let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
         assert!(is_approved);
 
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -82,12 +79,12 @@ fn revoke_approve_for_all_works() {
 
         e.storage().temporary().set(&key, &approval_data);
 
-        let is_approved = is_approved_for_all(&e, &owner, &operator);
+        let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
         assert!(is_approved);
 
         // revoke approval
-        approve_for_all(&e, &owner, &operator, 0);
-        let is_approved = is_approved_for_all(&e, &owner, &operator);
+        Base::approve_for_all(&e, &owner, &operator, 0);
+        let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
         assert!(!is_approved);
 
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -108,9 +105,9 @@ fn approve_nft_works() {
     e.as_contract(&address, || {
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
 
-        approve(&e, &owner, &approved, token_id, 1000);
+        Base::approve(&e, &owner, &approved, token_id, 1000);
 
-        let approved_address = get_approved(&e, token_id);
+        let approved_address = Base::get_approved(&e, token_id);
         assert_eq!(approved_address, Some(approved.clone()));
 
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -132,12 +129,12 @@ fn approve_with_operator_works() {
     e.as_contract(&address, || {
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
 
-        approve_for_all(&e, &owner, &operator, 1000);
+        Base::approve_for_all(&e, &owner, &operator, 1000);
 
         // approver is the operator on behalf of the owner
-        approve(&e, &operator, &approved, token_id, 1000);
+        Base::approve(&e, &operator, &approved, token_id, 1000);
 
-        let approved_address = get_approved(&e, token_id);
+        let approved_address = Base::get_approved(&e, token_id);
         assert_eq!(approved_address, Some(approved.clone()));
 
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -158,11 +155,11 @@ fn transfer_nft_works() {
     e.as_contract(&address, || {
         let token_id = sequential_mint(&e, &owner);
 
-        transfer(&e, &owner, &recipient, token_id);
+        Base::transfer(&e, &owner, &recipient, token_id);
 
-        assert_eq!(balance(&e, &owner), 0);
-        assert_eq!(balance(&e, &recipient), 1);
-        assert_eq!(owner_of(&e, token_id), recipient);
+        assert_eq!(Base::balance(&e, &owner), 0);
+        assert_eq!(Base::balance(&e, &recipient), 1);
+        assert_eq!(Base::owner_of(&e, token_id), recipient);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -184,14 +181,14 @@ fn transfer_from_nft_approved_works() {
         let token_id = sequential_mint(&e, &owner);
 
         // Approve the spender
-        approve(&e, &owner, &spender, token_id, 1000);
+        Base::approve(&e, &owner, &spender, token_id, 1000);
 
         // Transfer from the owner using the spender's approval
-        transfer_from(&e, &spender, &owner, &recipient, token_id);
+        Base::transfer_from(&e, &spender, &owner, &recipient, token_id);
 
-        assert_eq!(balance(&e, &owner), 0);
-        assert_eq!(balance(&e, &recipient), 1);
-        assert_eq!(owner_of(&e, token_id), recipient);
+        assert_eq!(Base::balance(&e, &owner), 0);
+        assert_eq!(Base::balance(&e, &recipient), 1);
+        assert_eq!(Base::owner_of(&e, token_id), recipient);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
@@ -214,14 +211,14 @@ fn transfer_from_nft_operator_works() {
         let token_id = sequential_mint(&e, &owner);
 
         // Approve the spender
-        approve_for_all(&e, &owner, &spender, 1000);
+        Base::approve_for_all(&e, &owner, &spender, 1000);
 
         // Transfer from the owner using the spender's approval
-        transfer_from(&e, &spender, &owner, &recipient, token_id);
+        Base::transfer_from(&e, &spender, &owner, &recipient, token_id);
 
-        assert_eq!(balance(&e, &owner), 0);
-        assert_eq!(balance(&e, &recipient), 1);
-        assert_eq!(owner_of(&e, token_id), recipient);
+        assert_eq!(Base::balance(&e, &owner), 0);
+        assert_eq!(Base::balance(&e, &recipient), 1);
+        assert_eq!(Base::owner_of(&e, token_id), recipient);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
@@ -243,11 +240,11 @@ fn transfer_from_nft_owner_works() {
         let token_id = sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner without approval
-        transfer_from(&e, &owner, &owner, &recipient, token_id);
+        Base::transfer_from(&e, &owner, &owner, &recipient, token_id);
 
-        assert_eq!(balance(&e, &owner), 0);
-        assert_eq!(balance(&e, &recipient), 1);
-        assert_eq!(owner_of(&e, token_id), recipient);
+        assert_eq!(Base::balance(&e, &owner), 0);
+        assert_eq!(Base::balance(&e, &recipient), 1);
+        assert_eq!(Base::owner_of(&e, token_id), recipient);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -270,7 +267,7 @@ fn transfer_nft_invalid_owner_fails() {
         let token_id = sequential_mint(&e, &owner);
 
         // Attempt to transfer without authorization
-        transfer(&e, &unauthorized, &recipient, token_id);
+        Base::transfer(&e, &unauthorized, &recipient, token_id);
     });
 }
 
@@ -288,7 +285,7 @@ fn transfer_from_nft_insufficient_approval_fails() {
         let token_id = sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner without approval
-        transfer_from(&e, &spender, &owner, &recipient, token_id);
+        Base::transfer_from(&e, &spender, &owner, &recipient, token_id);
     });
 }
 
@@ -302,7 +299,7 @@ fn owner_of_non_existent_token_fails() {
 
     e.as_contract(&address, || {
         // Attempt to get the owner of a non-existent token
-        owner_of(&e, non_existent_token_id);
+        Base::owner_of(&e, non_existent_token_id);
     });
 }
 
@@ -321,7 +318,7 @@ fn approve_with_invalid_live_until_ledger_fails() {
         e.ledger().set_sequence_number(10);
 
         // Attempt to approve with an invalid live_until_ledger
-        approve(&e, &owner, &approved, token_id, 1);
+        Base::approve(&e, &owner, &approved, token_id, 1);
     });
 }
 
@@ -338,7 +335,7 @@ fn approve_with_invalid_approver_fails() {
         let token_id = sequential_mint(&e, &owner);
 
         // Attempt to approve with an invalid approver
-        approve(&e, &invalid_approver, &owner, token_id, 1000);
+        Base::approve(&e, &invalid_approver, &owner, token_id, 1000);
     });
 }
 
@@ -357,7 +354,7 @@ fn update_with_math_overflow_fails() {
         e.storage().persistent().set(&StorageKey::Balance(recipient.clone()), &Balance::MAX);
 
         // Attempt to update which would cause a math overflow
-        update(&e, Some(&owner), Some(&recipient), token_id);
+        Base::update(&e, Some(&owner), Some(&recipient), token_id);
     });
 }
 
@@ -370,7 +367,7 @@ fn balance_of_non_existent_account_is_zero() {
 
     e.as_contract(&address, || {
         // Check balance of a non-existent account
-        let balance_value = balance(&e, &non_existent_account);
+        let balance_value = Base::balance(&e, &non_existent_account);
         assert_eq!(balance_value, 0);
     });
 }
@@ -390,10 +387,10 @@ fn transfer_from_incorrect_owner_fails() {
         let token_id = sequential_mint(&e, &owner);
 
         // Approve the spender
-        approve(&e, &owner, &spender, token_id, 1000);
+        Base::approve(&e, &owner, &spender, token_id, 1000);
 
         // Attempt to transfer from an incorrect owner
-        transfer_from(&e, &spender, &incorrect_owner, &recipient, token_id);
+        Base::transfer_from(&e, &spender, &incorrect_owner, &recipient, token_id);
     });
 }
 
@@ -411,6 +408,6 @@ fn transfer_from_unauthorized_spender_fails() {
         let token_id = sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner using an unauthorized spender
-        transfer_from(&e, &unauthorized_spender, &owner, &recipient, token_id);
+        Base::transfer_from(&e, &unauthorized_spender, &owner, &recipient, token_id);
     });
 }
