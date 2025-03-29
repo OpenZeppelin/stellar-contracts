@@ -110,7 +110,10 @@ impl ExampleContract {
     }
 }
 
-/* BELOW WILL CREATE A COMPILE TIME ERROR, SINCE ENUMERABLE IS NOT COMPATIBLE WITH THEM */
+/*
+  BELOW WILL CREATE A COMPILE ERROR,
+  SINCE ENUMERABLE IS NOT COMPATIBLE WITH THEM
+*/
 
 // #[contractimpl]
 // impl NonFungibleSequentialMintable for ExampleContract {
@@ -125,7 +128,7 @@ impl ExampleContract {
 //         non_fungible::burnable::burn(e, &from, token_id);
 //     }
 
-//     fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId) {
-//         non_fungible::burnable::burn_from(e, &spender, &from, token_id);
+//     fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId)
+// {         non_fungible::burnable::burn_from(e, &spender, &from, token_id);
 //     }
 // }
