@@ -9,9 +9,8 @@
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_non_fungible::{
-    self as non_fungible,
-    consecutive::{overrides::Consecutive, NonFungibleConsecutive},
-    Balance, ContractOverrides, NonFungibleToken, TokenId,
+    consecutive::{Consecutive, NonFungibleConsecutive},
+    Balance, Base, ContractOverrides, NonFungibleToken, TokenId,
 };
 
 #[contract]
@@ -20,7 +19,7 @@ pub struct ExampleContract;
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env) {
-        non_fungible::set_metadata(
+        Base::set_metadata(
             e,
             String::from_str(e, "www.mytoken.com"),
             String::from_str(e, "My Token"),
@@ -34,7 +33,7 @@ impl NonFungibleToken for ExampleContract {
     type ContractType = Consecutive;
 
     fn balance(e: &Env, owner: Address) -> Balance {
-        non_fungible::balance(e, &owner)
+        Self::ContractType::balance(e, owner)
     }
 
     fn owner_of(e: &Env, token_id: TokenId) -> Address {
@@ -42,11 +41,11 @@ impl NonFungibleToken for ExampleContract {
     }
 
     fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
-        Self::ContractType::transfer(e, from, to, token_id);
+        Self::ContractType::transfer(e, &from, &to, token_id);
     }
 
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
-        Self::ContractType::transfer_from(e, spender, from, to, token_id);
+        Self::ContractType::transfer_from(e, &spender, &from, &to, token_id);
     }
 
     fn approve(
@@ -56,31 +55,31 @@ impl NonFungibleToken for ExampleContract {
         token_id: TokenId,
         live_until_ledger: u32,
     ) {
-        Self::ContractType::approve(e, approver, approved, token_id, live_until_ledger);
+        Self::ContractType::approve(e, &approver, &approved, token_id, live_until_ledger);
     }
 
     fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
-        non_fungible::approve_for_all(e, &owner, &operator, live_until_ledger);
+        Self::ContractType::approve_for_all(e, owner, operator, live_until_ledger);
     }
 
     fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
-        non_fungible::get_approved(e, token_id)
+        Self::ContractType::get_approved(e, token_id)
     }
 
     fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
-        non_fungible::is_approved_for_all(e, &owner, &operator)
+        Self::ContractType::is_approved_for_all(e, owner, operator)
     }
 
     fn name(e: &Env) -> String {
-        non_fungible::name(e)
+        Self::ContractType::name(e)
     }
 
     fn symbol(e: &Env) -> String {
-        non_fungible::symbol(e)
+        Self::ContractType::symbol(e)
     }
 
     fn token_uri(e: &Env, token_id: TokenId) -> String {
-        non_fungible::token_uri(e, token_id)
+        Self::ContractType::token_uri(e, token_id)
     }
 }
 
@@ -89,11 +88,11 @@ impl NonFungibleConsecutive for ExampleContract {}
 #[contractimpl]
 impl ExampleContract {
     pub fn batch_mint(e: &Env, to: Address, amount: TokenId) -> TokenId {
-        non_fungible::consecutive::storage::consecutive_batch_mint(e, &to, amount)
+        Consecutive::batch_mint(e, &to, amount)
     }
 
     pub fn burn(e: &Env, from: Address, token_id: TokenId) {
-        non_fungible::consecutive::storage::consecutive_burn(e, &from, token_id);
+        Consecutive::burn(e, &from, token_id);
     }
 }
 
@@ -102,20 +101,22 @@ impl ExampleContract {
   SINCE CONSECUTIVE IS NOT COMPATIBLE WITH THEM
 */
 
+// ```rust
 // #[contractimpl]
 // impl NonFungibleSequentialMintable for ExampleContract {
 //     fn mint(e: &Env, to: Address) -> TokenId {
 //         non_fungible::mintable::sequential_mint(e, &to)
 //     }
 // }
-
+//
 // #[contractimpl]
 // impl NonFungibleBurnable for ExampleContract {
 //     fn burn(e: &Env, from: Address, token_id: TokenId) {
-//         non_fungible::burnable::burn(e, &from, token_id);
+//         Base::burn(e, &from, token_id);
 //     }
-
-//     fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId)
-// {         non_fungible::burnable::burn_from(e, &spender, &from, token_id);
+//
+//     fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId) {
+//         Base::burn_from(e, &spender, &from, token_id);
 //     }
 // }
+// ```

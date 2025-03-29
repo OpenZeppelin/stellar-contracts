@@ -45,7 +45,7 @@ pub trait NonFungibleToken {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     fn balance(e: &Env, owner: Address) -> Balance {
-        crate::balance(e, &owner)
+        Self::ContractType::balance(e, owner)
     }
 
     /// Returns the owner of the `token_id` token.
@@ -211,7 +211,7 @@ pub trait NonFungibleToken {
     /// * topics - `["approve_for_all", from: Address]`
     /// * data - `[operator: Address, live_until_ledger: u32]`
     fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
-        crate::approve_for_all(e, &owner, &operator, live_until_ledger);
+        Self::ContractType::approve_for_all(e, owner, operator, live_until_ledger);
     }
 
     /// Returns the account approved for `token_id` token.
@@ -226,7 +226,7 @@ pub trait NonFungibleToken {
     /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
     fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
-        crate::get_approved(e, token_id)
+        Self::ContractType::get_approved(e, token_id)
     }
 
     /// Returns whether the `operator` is allowed to manage all the assets of
@@ -238,7 +238,7 @@ pub trait NonFungibleToken {
     /// * `owner` - Account of the token's owner.
     /// * `operator` - Account to be checked.
     fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
-        crate::is_approved_for_all(e, &owner, &operator)
+        Self::ContractType::is_approved_for_all(e, owner, operator)
     }
 
     /// Returns the token collection name.

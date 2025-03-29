@@ -36,10 +36,9 @@
 //! - **IMPORTANT** - For minting tokens ONLY the function `batch_mint` provided
 //!   in this extension must be used. Using other minting functions will break
 //!   the logic of tracking ownership.
-pub mod overrides;
 pub mod storage;
-use overrides::Consecutive;
 use soroban_sdk::{Address, Env, Symbol};
+pub use storage::Consecutive;
 
 use crate::{NonFungibleToken, TokenId};
 

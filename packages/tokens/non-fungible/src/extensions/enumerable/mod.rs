@@ -1,10 +1,9 @@
-pub mod overrides;
 pub mod storage;
 
 mod test;
 
-use overrides::Enumerable;
 use soroban_sdk::{Address, Env};
+pub use storage::Enumerable;
 
 use crate::{Balance, NonFungibleToken, TokenId};
 
@@ -51,7 +50,7 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     ///
     /// * `e` - Access to the Soroban environment.
     fn total_supply(e: &Env) -> Balance {
-        storage::total_supply(e)
+        Enumerable::total_supply(e)
     }
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
@@ -65,7 +64,7 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// * `owner` - Account of the token's owner.
     /// * `index` - Index of the token in the owner's local list.
     fn get_owner_token_id(e: &Env, owner: Address, index: TokenId) -> TokenId {
-        storage::get_owner_token_id(e, &owner, index)
+        Enumerable::get_owner_token_id(e, &owner, index)
     }
 
     /// Returns the `token_id` at a given `index` in the global token list.
@@ -82,6 +81,6 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// `token_id`s. For sequential `token_id`s, no need to call a function,
     /// the `token_id` itself acts as the global index.
     fn get_token_id(e: &Env, index: TokenId) -> TokenId {
-        storage::get_token_id(e, index)
+        Enumerable::get_token_id(e, index)
     }
 }
