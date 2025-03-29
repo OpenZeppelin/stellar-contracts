@@ -116,13 +116,6 @@ impl ExampleContract {
 
 // ```rust
 // #[contractimpl]
-// impl NonFungibleSequentialMintable for ExampleContract {
-//     fn mint(e: &Env, to: Address) -> TokenId {
-//         non_fungible::mintable::sequential_mint(e, &to)
-//     }
-// }
-//
-// #[contractimpl]
 // impl NonFungibleBurnable for ExampleContract {
 //     fn burn(e: &Env, from: Address, token_id: TokenId) {
 //         Base::burn(e, &from, token_id);

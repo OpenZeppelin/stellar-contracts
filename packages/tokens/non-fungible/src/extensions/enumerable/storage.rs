@@ -4,7 +4,7 @@ use stellar_constants::{
 };
 
 use crate::{
-    mintable::emit_mint, Balance, Base, ContractOverrides, NonFungibleTokenError, TokenId,
+    non_fungible::emit_mint, Balance, Base, ContractOverrides, NonFungibleTokenError, TokenId,
 };
 
 pub struct Enumerable;
@@ -114,7 +114,7 @@ impl Enumerable {
     ///
     /// # Errors
     ///
-    /// * refer to [`crate::mintable::sequential_mint`] errors.
+    /// * refer to [`Base::sequential_mint`] errors.
     /// * refer to [`increment_total_supply`] errors.
     ///
     /// # Events
@@ -124,11 +124,11 @@ impl Enumerable {
     ///
     /// # Notes
     ///
-    /// This is a wrapper around [`crate::mintable::sequential_mint()`], that
+    /// This is a wrapper around [`Base::sequential_mint()`], that
     /// also handles the storage updates for:
     /// * total supply
     pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
-        let token_id = crate::mintable::sequential_mint(e, to);
+        let token_id = Base::sequential_mint(e, to);
 
         Enumerable::add_to_owner_enumeration(e, to, token_id);
 

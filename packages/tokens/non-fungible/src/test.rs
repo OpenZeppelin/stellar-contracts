@@ -9,9 +9,7 @@ use soroban_sdk::{
 };
 use stellar_event_assertion::EventAssertion;
 
-use crate::{
-    mintable::sequential_mint, non_fungible::Balance, ApprovalForAllData, Base, StorageKey,
-};
+use crate::{non_fungible::Balance, ApprovalForAllData, Base, StorageKey};
 
 #[contract]
 struct MockContract;
@@ -153,7 +151,7 @@ fn transfer_nft_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = sequential_mint(&e, &owner);
+        let token_id = Base::sequential_mint(&e, &owner);
 
         Base::transfer(&e, &owner, &recipient, token_id);
 
@@ -178,7 +176,7 @@ fn transfer_from_nft_approved_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = sequential_mint(&e, &owner);
+        let token_id = Base::sequential_mint(&e, &owner);
 
         // Approve the spender
         Base::approve(&e, &owner, &spender, token_id, 1000);
@@ -208,7 +206,7 @@ fn transfer_from_nft_operator_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = sequential_mint(&e, &owner);
+        let token_id = Base::sequential_mint(&e, &owner);
 
         // Approve the spender
         Base::approve_for_all(&e, &owner, &spender, 1000);
@@ -237,7 +235,7 @@ fn transfer_from_nft_owner_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = sequential_mint(&e, &owner);
+        let token_id = Base::sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner without approval
         Base::transfer_from(&e, &owner, &owner, &recipient, token_id);
@@ -264,7 +262,7 @@ fn transfer_nft_invalid_owner_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = sequential_mint(&e, &owner);
+        let token_id = Base::sequential_mint(&e, &owner);
 
         // Attempt to transfer without authorization
         Base::transfer(&e, &unauthorized, &recipient, token_id);
@@ -282,7 +280,7 @@ fn transfer_from_nft_insufficient_approval_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = sequential_mint(&e, &owner);
+        let token_id = Base::sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner without approval
         Base::transfer_from(&e, &spender, &owner, &recipient, token_id);
@@ -313,7 +311,7 @@ fn approve_with_invalid_live_until_ledger_fails() {
     let approved = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = sequential_mint(&e, &owner);
+        let token_id = Base::sequential_mint(&e, &owner);
 
         e.ledger().set_sequence_number(10);
 
@@ -332,7 +330,7 @@ fn approve_with_invalid_approver_fails() {
     let invalid_approver = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = sequential_mint(&e, &owner);
+        let token_id = Base::sequential_mint(&e, &owner);
 
         // Attempt to approve with an invalid approver
         Base::approve(&e, &invalid_approver, &owner, token_id, 1000);
@@ -349,7 +347,7 @@ fn update_with_math_overflow_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = sequential_mint(&e, &owner);
+        let token_id = Base::sequential_mint(&e, &owner);
 
         e.storage().persistent().set(&StorageKey::Balance(recipient.clone()), &Balance::MAX);
 
@@ -384,7 +382,7 @@ fn transfer_from_incorrect_owner_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = sequential_mint(&e, &owner);
+        let token_id = Base::sequential_mint(&e, &owner);
 
         // Approve the spender
         Base::approve(&e, &owner, &spender, token_id, 1000);
@@ -405,9 +403,70 @@ fn transfer_from_unauthorized_spender_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = sequential_mint(&e, &owner);
+        let token_id = Base::sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner using an unauthorized spender
         Base::transfer_from(&e, &unauthorized_spender, &owner, &recipient, token_id);
+    });
+}
+
+#[test]
+fn mint_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let account = Address::generate(&e);
+    e.as_contract(&address, || {
+        let token_id = Base::sequential_mint(&e, &account);
+        assert_eq!(Base::balance(&e, &account), 1);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_non_fungible_mint(&account, token_id);
+    });
+}
+
+#[test]
+fn test_counter_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let token_id1 = Base::sequential_mint(&e, &owner);
+        let _token_id2 = Base::sequential_mint(&e, &owner);
+
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        event_assert.assert_non_fungible_mint(&owner, token_id1);
+
+        // TODO: below fails because the same event is read by the
+        // `event_assert`, not the next one. event_assert.
+        // assert_non_fungible_mint(&owner, token_id2);
+    });
+}
+
+/// Test that confirms the base mint implementation does NOT require
+/// authorization
+///
+/// **IMPORTANT**: This test verifies the intentional design choice that the
+/// base mint implementation doesn't include authorization controls. This is NOT
+/// a security flaw but rather a design decision to give implementers
+/// flexibility in how they implement authorization.
+///
+/// When using this function in your contracts, you MUST add your own
+/// authorization controls to ensure only designated accounts can mint tokens.
+#[test]
+fn mint_base_implementation_has_no_auth() {
+    let e = Env::default();
+    // Note: we're intentionally NOT mocking any auths
+    let address = e.register(MockContract, ());
+    let account = Address::generate(&e);
+
+    // This should NOT panic even without authorization
+    e.as_contract(&address, || {
+        Base::sequential_mint(&e, &account);
+        assert_eq!(Base::balance(&e, &account), 1);
     });
 }

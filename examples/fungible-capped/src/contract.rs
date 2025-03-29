@@ -11,7 +11,6 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_fungible::{
     self as fungible,
     capped::{check_cap, set_cap},
-    mintable::{mint, FungibleMintable},
     FungibleToken,
 };
 
@@ -22,6 +21,11 @@ pub struct ExampleContract;
 impl ExampleContract {
     pub fn __constructor(e: &Env, cap: i128) {
         set_cap(e, cap);
+    }
+
+    pub fn mint(e: &Env, account: Address, amount: i128) {
+        check_cap(e, amount);
+        fungible::mint(e, &account, amount);
     }
 }
 
@@ -61,13 +65,5 @@ impl FungibleToken for ExampleContract {
 
     fn symbol(e: &Env) -> String {
         fungible::metadata::symbol(e)
-    }
-}
-
-#[contractimpl]
-impl FungibleMintable for ExampleContract {
-    fn mint(e: &Env, account: Address, amount: i128) {
-        check_cap(e, amount);
-        mint(e, &account, amount);
     }
 }
