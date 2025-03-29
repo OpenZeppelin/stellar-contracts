@@ -31,6 +31,12 @@ pub type Balance = TokenId;
 /// The `NonFungibleToken` trait defines the core functionality for non-fungible
 /// tokens. It provides a standard interface for managing
 /// transfers and approvals associated with non-fungible tokens.
+///
+/// Event for `mint` is defined, but `mint` function itself is not included
+/// as a method in this trait because it is not a part of the standard,
+/// the function signature may change depending on the implementation.
+///
+/// We do provide a function [`crate::Base::sequential_mint`] for sequential minting case.
 pub trait NonFungibleToken {
     /// Helper type that allows us to override some of the functionality of the
     /// base trait based on the extensions implemented. You should use
@@ -368,4 +374,21 @@ pub fn emit_approve(
 pub fn emit_approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
     let topics = (Symbol::new(e, "approve_for_all"), owner);
     e.events().publish(topics, (operator, live_until_ledger))
+}
+
+/// Emits an event indicating a mint of a token.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `to` - The address receiving the new token.
+/// * `token_id` - Token id as a number.
+///
+/// # Events
+///
+/// * topics - `["mint", to: Address]`
+/// * data - `[token_id: TokenId]`
+pub fn emit_mint(e: &Env, to: &Address, token_id: TokenId) {
+    let topics = (symbol_short!("mint"), to);
+    e.events().publish(topics, token_id)
 }

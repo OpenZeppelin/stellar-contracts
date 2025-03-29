@@ -6,11 +6,8 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    extensions::{
-        burnable::storage::{burn, burn_from},
-        mintable::mint,
-    },
-    storage::{allowance, approve, balance, total_supply},
+    extensions::burnable::storage::{burn, burn_from},
+    storage::{allowance, approve, balance, mint, total_supply},
 };
 
 #[contract]
@@ -105,4 +102,83 @@ fn burn_with_insufficient_allowance_panics() {
         assert_eq!(total_supply(&e), 100);
         burn_from(&e, &spender, &owner, 60);
     });
+}
+
+#[test]
+fn burn_requires_auth() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let from = Address::generate(&e);
+    let amount = 50;
+
+    e.as_contract(&address, || {
+        mint(&e, &from, 100);
+        burn(&e, &from, amount);
+    });
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 1);
+    let (addr, _invocation) = &auths[0];
+    assert_eq!(addr, &from);
+    // assert_eq!(
+    //     invocation.function,
+    //     AuthorizedFunction::Contract((
+    //         address.clone(),
+    //         symbol_short!("burn"),
+    //         vec![&e, from.clone().into_val(&e), amount.into_val(&e)]
+    //     ))
+    // );
+}
+
+#[test]
+fn burn_from_requires_auth() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let amount = 50;
+
+    e.as_contract(&address, || {
+        mint(&e, &owner, 100);
+        approve(&e, &owner, &spender, amount, 1000);
+        burn_from(&e, &spender, &owner, amount);
+    });
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 2);
+    // Verify approve auth
+    let (addr, _invocation) = &auths[0];
+    assert_eq!(addr, &owner);
+    // assert_eq!(
+    //     invocation.function,
+    //     AuthorizedFunction::Contract((
+    //         address.clone(),
+    //         symbol_short!("approve"),
+    //         vec![
+    //             &e,
+    //             owner.clone().into_val(&e),
+    //             spender.clone().into_val(&e),
+    //             amount.into_val(&e),
+    //             1000.into_val(&e)
+    //         ]
+    //     ))
+    // );
+    // Verify burn_from auth
+    let (addr, _invocation) = &auths[1];
+    assert_eq!(addr, &spender);
+    // assert_eq!(
+    //     invocation.function,
+    //     AuthorizedFunction::Contract((
+    //         address.clone(),
+    //         symbol_short!("burn_from"),
+    //         vec![
+    //             &e,
+    //             spender.clone().into_val(&e),
+    //             owner.clone().into_val(&e),
+    //             amount.into_val(&e)
+    //         ]
+    //     ))
+    // );
 }

@@ -17,7 +17,7 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, token::TokenInterface,
     Address, Env, String, Symbol,
 };
-use stellar_fungible::{self as fungible, mintable::FungibleMintable};
+use stellar_fungible::{self as fungible};
 use stellar_pausable::{self as pausable, Pausable};
 use stellar_pausable_macros::when_not_paused;
 
@@ -42,7 +42,7 @@ impl ExampleContract {
             String::from_str(e, "My Token"),
             String::from_str(e, "TKN"),
         );
-        fungible::mintable::mint(e, &owner, initial_supply);
+        fungible::mint(e, &owner, initial_supply);
         e.storage().instance().set(&OWNER, &owner);
     }
 
@@ -50,6 +50,17 @@ impl ExampleContract {
     /// of the need for backwards compatibility with Stellar classic assets.
     pub fn total_supply(e: &Env) -> i128 {
         fungible::total_supply(e)
+    }
+
+    #[when_not_paused]
+    pub fn mint(e: &Env, account: Address, amount: i128) {
+        // When `ownable` module is available,
+        // the following checks should be equivalent to:
+        // `ownable::only_owner(&e);`
+        let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
+        owner.require_auth();
+
+        fungible::mint(e, &account, amount);
     }
 }
 
@@ -128,19 +139,5 @@ impl TokenInterface for ExampleContract {
 
     fn symbol(e: Env) -> String {
         fungible::metadata::symbol(&e)
-    }
-}
-
-#[contractimpl]
-impl FungibleMintable for ExampleContract {
-    #[when_not_paused]
-    fn mint(e: &Env, account: Address, amount: i128) {
-        // When `ownable` module is available,
-        // the following checks should be equivalent to:
-        // `ownable::only_owner(&e);`
-        let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
-        owner.require_auth();
-
-        fungible::mintable::mint(e, &account, amount);
     }
 }

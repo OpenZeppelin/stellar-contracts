@@ -9,8 +9,7 @@
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_non_fungible::{
-    burnable::NonFungibleBurnable, mintable::NonFungibleSequentialMintable, Balance, Base,
-    NonFungibleToken, TokenId,
+    burnable::NonFungibleBurnable, Balance, Base, NonFungibleToken, TokenId,
 };
 
 #[contract]
@@ -25,6 +24,10 @@ impl ExampleContract {
             String::from_str(e, "My Token"),
             String::from_str(e, "TKN"),
         );
+    }
+
+    pub fn mint(e: &Env, to: Address) -> TokenId {
+        Base::sequential_mint(e, &to)
     }
 }
 
@@ -80,13 +83,6 @@ impl NonFungibleToken for ExampleContract {
 
     fn token_uri(e: &Env, token_id: TokenId) -> String {
         Self::ContractType::token_uri(e, token_id)
-    }
-}
-
-#[contractimpl]
-impl NonFungibleSequentialMintable for ExampleContract {
-    fn mint(e: &Env, to: Address) -> TokenId {
-        stellar_non_fungible::mintable::sequential_mint(e, &to)
     }
 }
 
