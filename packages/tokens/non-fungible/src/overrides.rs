@@ -10,17 +10,14 @@ use crate::{Balance, TokenId};
 /// we have another trait for the same methods, is to provide the default
 /// implementations in an easier way for the end developer.
 ///
-/// Due to the macro scope limitations, currently `#[contractimpl]` macro cannot
-/// find the implemented trait's default methods. All the methods have to be
-/// specified under the scope of `#[contractimpl]` macro, otherwise, the missing
-/// methods (default ones) won't be available for the generated client.
-///
-/// This means, the end-developer cannot leave the methods with default
-/// implementations out, and must provide these default implementations in the
-/// `impl Trait for Contract` block as well. For different extensions, the
-/// required overrides are different, and we want to alleviate the burden of
-/// remembering for which method the end-developer need to use the default
-/// implementation, and for which method the end-developer need to override.
+/// The way to provide different default implementations for different
+/// extensions is by implementing the trait for different types (unit structs).
+/// The problem is, `NonFungbileToken` trait has to be implemented for the smart
+/// contract (which is another struct) by the end-developer. So, we need a level
+/// of abstraction by introducing an associated type, which will grant
+/// `NonFungibleTrait` the ability to switch between different default
+/// implementations by calling the methods on this associated type. And for
+/// this, we need another trait, which this associated type will implement.
 ///
 /// By introducing this abstraction, we allow the end-developer to implement
 /// every method of the `NonFungibleToken` trait using
