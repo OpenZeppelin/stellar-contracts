@@ -1,8 +1,6 @@
 use soroban_sdk::{Address, Env};
 
-use crate::{
-    extensions::mintable::emit_mint, sequential::increment_token_id, storage::update, TokenId,
-};
+use crate::{extensions::mintable::emit_mint, sequential::increment_token_id, Base, TokenId};
 
 /// Creates a token with the next available `token_id` and assigns it to `to`.
 /// Returns the `token_id` for the newly minted token.
@@ -45,7 +43,7 @@ use crate::{
 /// in use.
 pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
     let token_id = increment_token_id(e, 1);
-    update(e, None, Some(to), token_id);
+    Base::update(e, None, Some(to), token_id);
     emit_mint(e, to, token_id);
 
     token_id

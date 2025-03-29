@@ -5,14 +5,7 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
-use crate::{
-    approve_for_all,
-    extensions::{
-        burnable::storage::{burn, burn_from},
-        mintable::sequential_mint,
-    },
-    storage::{approve, balance},
-};
+use crate::{extensions::mintable::sequential_mint, Base};
 
 #[contract]
 struct MockContract;
@@ -27,9 +20,9 @@ fn burn_works() {
     e.as_contract(&address, || {
         let token_id = sequential_mint(&e, &owner);
 
-        burn(&e, &owner, token_id);
+        Base::burn(&e, &owner, token_id);
 
-        assert!(balance(&e, &owner) == 0);
+        assert!(Base::balance(&e, &owner) == 0);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -49,10 +42,10 @@ fn burn_from_with_approve_works() {
     e.as_contract(&address, || {
         let token_id = sequential_mint(&e, &owner);
 
-        approve(&e, &owner, &spender, token_id, 1000);
-        burn_from(&e, &spender, &owner, token_id);
+        Base::approve(&e, &owner, &spender, token_id, 1000);
+        Base::burn_from(&e, &spender, &owner, token_id);
 
-        assert!(balance(&e, &owner) == 0);
+        assert!(Base::balance(&e, &owner) == 0);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
@@ -73,11 +66,11 @@ fn burn_from_with_operator_works() {
     e.as_contract(&address, || {
         let token_id = sequential_mint(&e, &owner);
 
-        approve_for_all(&e, &owner, &operator, 1000);
+        Base::approve_for_all(&e, &owner, &operator, 1000);
 
-        burn_from(&e, &operator, &owner, token_id);
+        Base::burn_from(&e, &operator, &owner, token_id);
 
-        assert!(balance(&e, &owner) == 0);
+        assert!(Base::balance(&e, &owner) == 0);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
@@ -97,9 +90,9 @@ fn burn_from_with_owner_works() {
     e.as_contract(&address, || {
         let token_id = sequential_mint(&e, &owner);
 
-        burn_from(&e, &owner, &owner, token_id);
+        Base::burn_from(&e, &owner, &owner, token_id);
 
-        assert!(balance(&e, &owner) == 0);
+        assert!(Base::balance(&e, &owner) == 0);
 
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -120,7 +113,7 @@ fn burn_with_not_owner_panics() {
     e.as_contract(&address, || {
         let token_id = sequential_mint(&e, &owner);
 
-        burn(&e, &spender, token_id);
+        Base::burn(&e, &spender, token_id);
     });
 }
 
@@ -136,7 +129,7 @@ fn burn_from_with_insufficient_approval_panics() {
     e.as_contract(&address, || {
         let token_id = sequential_mint(&e, &owner);
 
-        burn_from(&e, &spender, &owner, token_id);
+        Base::burn_from(&e, &spender, &owner, token_id);
     });
 }
 
@@ -152,6 +145,6 @@ fn burn_with_non_existent_token_panics() {
     e.as_contract(&address, || {
         let _token_id = sequential_mint(&e, &owner);
 
-        burn(&e, &owner, non_existent_token_id);
+        Base::burn(&e, &owner, non_existent_token_id);
     });
 }

@@ -1,5 +1,4 @@
 mod storage;
-pub use self::storage::{burn, burn_from};
 use crate::{Base, NonFungibleToken, TokenId};
 
 mod test;
@@ -37,7 +36,7 @@ pub trait NonFungibleBurnable: NonFungibleToken<ContractType = Base> {
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: TokenId]`
     fn burn(e: &Env, from: Address, token_id: TokenId) {
-        crate::burnable::burn(e, &from, token_id);
+        Base::burn(e, &from, token_id);
     }
 
     /// Destroys the `token_id` from `account`, by using `spender`s approval.
@@ -64,7 +63,7 @@ pub trait NonFungibleBurnable: NonFungibleToken<ContractType = Base> {
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: TokenId]`
     fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId) {
-        crate::burnable::burn_from(e, &spender, &from, token_id);
+        Base::burn_from(e, &spender, &from, token_id);
     }
 }
 

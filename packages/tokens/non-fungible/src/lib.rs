@@ -77,11 +77,7 @@ pub use non_fungible::{
     NonFungibleTokenError, TokenId,
 };
 pub use overrides::*;
-pub use storage::{
-    approve, approve_for_all, balance, base_uri, get_approved, get_metadata, is_approved_for_all,
-    name, owner_of, set_metadata, symbol, token_uri, transfer, transfer_from, ApprovalData,
-    ApprovalForAllData, StorageKey,
-};
+pub use storage::{ApprovalData, ApprovalForAllData, StorageKey};
 pub use utils::sequential;
 
 mod test;
