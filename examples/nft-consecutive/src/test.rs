@@ -22,11 +22,11 @@ fn consecutive_transfer_override_works() {
     let client = create_client(&e);
 
     e.mock_all_auths();
-    client.batch_mint(&owner, 100);
+    client.batch_mint(&owner, &100);
     client.transfer(&owner, &recipient, &10);
     assert_eq!(client.balance(&owner), 99);
     assert_eq!(client.balance(&recipient), 1);
-    assert_eq!(client.owner_of(10), recipient);
+    assert_eq!(client.owner_of(&10), recipient);
 }
 
 #[test]
@@ -35,11 +35,11 @@ fn consecutive_batch_mint_works() {
     let client = create_client(&e);
     let owner = Address::generate(&e);
     e.mock_all_auths();
-    client.batch_mint(&owner, 100);
+    client.batch_mint(&owner, &100);
     client.burn(&owner, &0);
     assert_eq!(client.balance(&owner), 99);
-    client.batch_mint(&owner, 100);
-    assert_eq!(client.owner_of(101), owner);
+    client.batch_mint(&owner, &100);
+    assert_eq!(client.owner_of(&101), owner);
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn consecutive_burn_works() {
     let client = create_client(&e);
     let owner = Address::generate(&e);
     e.mock_all_auths();
-    client.batch_mint(&owner, 100);
+    client.batch_mint(&owner, &100);
     client.burn(&owner, &0);
     assert_eq!(client.balance(&owner), 99);
 }

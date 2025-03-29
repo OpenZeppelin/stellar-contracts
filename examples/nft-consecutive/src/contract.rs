@@ -10,10 +10,8 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_non_fungible::{
     self as non_fungible,
-    burnable::NonFungibleBurnable,
     consecutive::{overrides::Consecutive, NonFungibleConsecutive},
-    mintable::NonFungibleSequentialMintable,
-    NonFungibleToken, TokenId,
+    Balance, ContractOverrides, NonFungibleToken, TokenId,
 };
 
 #[contract]
@@ -62,14 +60,14 @@ impl NonFungibleToken for ExampleContract {
     }
 
     fn name(e: &Env) -> String {
-        String::from("My NFT")
+        String::from_str(e, "My NFT")
     }
 
     fn symbol(e: &Env) -> String {
-        String::from("MTKN")
+        String::from_str(e, "MTKN")
     }
 
-    fn token_uri(e: &Env, token_id: TokenId) -> String {
+    fn token_uri(_e: &Env, _token_id: TokenId) -> String {
         unimplemented!("token_uri not implemented for this example")
     }
 }
@@ -79,11 +77,11 @@ impl NonFungibleConsecutive for ExampleContract {}
 #[contractimpl]
 impl ExampleContract {
     pub fn batch_mint(e: &Env, to: Address, amount: TokenId) -> TokenId {
-        non_fungible::consecutive::storage::consecutive_batch_mint(e, to, amount)
+        non_fungible::consecutive::storage::consecutive_batch_mint(e, &to, amount)
     }
 
-    pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
-        non_fungible::consecutive::storage::consecutive_burn(e, from, token_id);
+    pub fn burn(e: &Env, from: Address, token_id: TokenId) {
+        non_fungible::consecutive::storage::consecutive_burn(e, &from, token_id);
     }
 }
 
