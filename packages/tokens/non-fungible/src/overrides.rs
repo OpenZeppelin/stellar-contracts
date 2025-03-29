@@ -22,7 +22,7 @@ use crate::{Balance, TokenId};
 /// By introducing this abstraction, we allow the end-developer to implement
 /// every method of the `NonFungibleToken` trait using
 /// `Self::ContractType::{function_name}`, which will in turn use either the
-/// overridden or the base variant according to the extension, provided the by
+/// overridden or the base variant according to the extension, provided by the
 /// `ContractOverrides` trait implementation for the respective ContractType.
 ///
 /// Example:
