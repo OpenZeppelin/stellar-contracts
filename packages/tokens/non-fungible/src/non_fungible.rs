@@ -36,7 +36,8 @@ pub type Balance = TokenId;
 /// as a method in this trait because it is not a part of the standard,
 /// the function signature may change depending on the implementation.
 ///
-/// We do provide a function [`crate::Base::sequential_mint`] for sequential minting case.
+/// We do provide a function [`crate::Base::sequential_mint`] for sequential
+/// minting case.
 pub trait NonFungibleToken {
     /// Helper type that allows us to override some of the functionality of the
     /// base trait based on the extensions implemented. You should use
