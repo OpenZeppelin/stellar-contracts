@@ -17,6 +17,18 @@ use stellar_non_fungible::{
 pub struct ExampleContract;
 
 #[contractimpl]
+impl ExampleContract {
+    pub fn __constructor(e: &Env) {
+        non_fungible::set_metadata(
+            e,
+            String::from_str(e, "www.mytoken.com"),
+            String::from_str(e, "My Token"),
+            String::from_str(e, "TKN"),
+        );
+    }
+}
+
+#[contractimpl]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Base;
 
@@ -59,15 +71,15 @@ impl NonFungibleToken for ExampleContract {
     }
 
     fn name(e: &Env) -> String {
-        String::from_str(e, "My NFT")
+        non_fungible::name(e)
     }
 
     fn symbol(e: &Env) -> String {
-        String::from_str(e, "MTKN")
+        non_fungible::symbol(e)
     }
 
-    fn token_uri(_e: &Env, _token_id: TokenId) -> String {
-        unimplemented!("token_uri not implemented for this example")
+    fn token_uri(e: &Env, token_id: TokenId) -> String {
+        non_fungible::token_uri(e, token_id)
     }
 }
 
