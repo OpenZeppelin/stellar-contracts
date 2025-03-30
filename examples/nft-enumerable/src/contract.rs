@@ -7,6 +7,7 @@
 //! **IMPORTANT**: this example is for demonstration purposes, and authorization
 //! is not taken into consideration
 
+use oz_stellar_macro::oz_stellar;
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_non_fungible::{
     enumerable::{Enumerable, NonFungibleEnumerable},
@@ -28,47 +29,10 @@ impl ExampleContract {
     }
 }
 
+#[oz_stellar]
 #[contractimpl]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Enumerable;
-
-    fn balance(e: &Env, owner: Address) -> Balance {
-        Enumerable::balance(e, owner)
-    }
-
-    fn owner_of(e: &Env, token_id: TokenId) -> Address {
-        Enumerable::owner_of(e, token_id)
-    }
-
-    fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
-        Enumerable::transfer(e, &from, &to, token_id);
-    }
-
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
-        Enumerable::transfer_from(e, &spender, &from, &to, token_id);
-    }
-
-    fn approve(
-        e: &Env,
-        approver: Address,
-        approved: Address,
-        token_id: TokenId,
-        live_until_ledger: u32,
-    ) {
-        Enumerable::approve(e, approver, approved, token_id, live_until_ledger);
-    }
-
-    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
-        Enumerable::approve_for_all(e, owner, operator, live_until_ledger);
-    }
-
-    fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
-        Enumerable::get_approved(e, token_id)
-    }
-
-    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
-        Enumerable::is_approved_for_all(e, owner, operator)
-    }
 
     fn name(e: &Env) -> String {
         Enumerable::name(e)
@@ -83,20 +47,9 @@ impl NonFungibleToken for ExampleContract {
     }
 }
 
+#[oz_stellar]
 #[contractimpl]
-impl NonFungibleEnumerable for ExampleContract {
-    fn total_supply(e: &Env) -> Balance {
-        Enumerable::total_supply(e)
-    }
-
-    fn get_owner_token_id(e: &Env, owner: Address, index: TokenId) -> TokenId {
-        Enumerable::get_owner_token_id(e, &owner, index)
-    }
-
-    fn get_token_id(e: &Env, index: TokenId) -> TokenId {
-        Enumerable::get_token_id(e, index)
-    }
-}
+impl NonFungibleEnumerable for ExampleContract {}
 
 #[contractimpl]
 impl ExampleContract {
