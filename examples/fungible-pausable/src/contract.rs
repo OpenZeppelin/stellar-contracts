@@ -14,7 +14,8 @@ use soroban_sdk::{
     Symbol,
 };
 use stellar_fungible::{
-    self as fungible, burnable::FungibleBurnable, impl_token_interface, FungibleToken,
+    self as fungible, burnable::FungibleBurnable, impl_token_interface, mintable::FungibleMintable,
+    FungibleToken,
 };
 use stellar_pausable::{self as pausable, Pausable};
 use stellar_pausable_macros::when_not_paused;
@@ -40,19 +41,8 @@ impl ExampleContract {
             String::from_str(e, "My Token"),
             String::from_str(e, "TKN"),
         );
-        fungible::mint(e, &owner, initial_supply);
+        fungible::mintable::mint(e, &owner, initial_supply);
         e.storage().instance().set(&OWNER, &owner);
-    }
-
-    #[when_not_paused]
-    pub fn mint(e: &Env, account: Address, amount: i128) {
-        // When `ownable` module is available,
-        // the following checks should be equivalent to:
-        // `ownable::only_owner(&e);`
-        let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
-        owner.require_auth();
-
-        fungible::mint(e, &account, amount);
     }
 }
 
@@ -138,6 +128,20 @@ impl FungibleBurnable for ExampleContract {
     #[when_not_paused]
     fn burn_from(e: &Env, spender: Address, from: Address, amount: i128) {
         fungible::burnable::burn_from(e, &spender, &from, amount)
+    }
+}
+
+#[contractimpl]
+impl FungibleMintable for ExampleContract {
+    #[when_not_paused]
+    fn mint(e: &Env, account: Address, amount: i128) {
+        // When `ownable` module is available,
+        // the following checks should be equivalent to:
+        // `ownable::only_owner(&e);`
+        let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
+        owner.require_auth();
+
+        fungible::mintable::mint(e, &account, amount);
     }
 }
 

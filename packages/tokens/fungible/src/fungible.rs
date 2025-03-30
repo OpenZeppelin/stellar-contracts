@@ -11,12 +11,6 @@ use soroban_sdk::{contracterror, symbol_short, Address, Env, String};
 /// To fully comply with the SEP-41 specification one has to implement the
 /// `FungibleBurnable` trait in addition to this one. SEP-41 mandates support
 /// for token burning to be considered compliant.
-///
-/// Event for `mint` is defined, but `mint` function itself is not included
-/// as a method in this trait because it is not a part of the standard,
-/// the function signature may change depending on the implementation.
-///
-/// We do provide a function [`crate::mint`] for sequential minting case.
 pub trait FungibleToken {
     /// Returns the total amount of tokens in circulation.
     ///
@@ -230,21 +224,4 @@ pub fn emit_approve(
 ) {
     let topics = (symbol_short!("approve"), owner, spender);
     e.events().publish(topics, (amount, live_until_ledger))
-}
-
-/// Emits an event indicating a mint of tokens.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `to` - The address receiving the new tokens.
-/// * `amount` - The amount of tokens to mint.
-///
-/// # Events
-///
-/// * topics - `["mint", account: Address]`
-/// * data - `[amount: i128]`
-pub fn emit_mint(e: &Env, to: &Address, amount: i128) {
-    let topics = (symbol_short!("mint"), to);
-    e.events().publish(topics, amount)
 }

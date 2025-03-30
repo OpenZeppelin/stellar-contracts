@@ -5,8 +5,11 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::{
-    extensions::capped::{check_cap, query_cap, set_cap},
-    storage::{balance, mint, total_supply},
+    extensions::{
+        capped::{check_cap, query_cap, set_cap},
+        mintable::mint,
+    },
+    storage::{balance, total_supply},
 };
 
 #[contract]

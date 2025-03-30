@@ -14,9 +14,12 @@ use soroban_sdk::{
 use stellar_constants::{BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD};
 use stellar_event_assertion::EventAssertion;
 
-use crate::storage::{
-    allowance, approve, balance, mint, set_allowance, spend_allowance, total_supply, transfer,
-    transfer_from, update, StorageKey,
+use crate::{
+    extensions::mintable::mint,
+    storage::{
+        allowance, approve, balance, set_allowance, spend_allowance, total_supply, transfer,
+        transfer_from, update, StorageKey,
+    },
 };
 
 #[contract]
@@ -550,42 +553,80 @@ fn transfer_from_requires_auth() {
 }
 
 #[test]
-fn mint_works() {
+fn burn_requires_auth() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let account = Address::generate(&e);
-    e.as_contract(&address, || {
-        mint(&e, &account, 100);
-        assert_eq!(balance(&e, &account), 100);
-        assert_eq!(total_supply(&e), 100);
+    let from = Address::generate(&e);
+    let amount = 50;
 
-        let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
-        event_assert.assert_fungible_mint(&account, 100);
+    e.as_contract(&address, || {
+        mint(&e, &from, 100);
+        crate::extensions::burnable::burn(&e, &from, amount);
     });
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 1);
+    let (addr, _invocation) = &auths[0];
+    assert_eq!(addr, &from);
+    // assert_eq!(
+    //     invocation.function,
+    //     AuthorizedFunction::Contract((
+    //         address.clone(),
+    //         symbol_short!("burn"),
+    //         vec![&e, from.clone().into_val(&e), amount.into_val(&e)]
+    //     ))
+    // );
 }
 
-/// Test that confirms the base mint implementation does NOT require
-/// authorization
-///
-/// **IMPORTANT**: This test verifies the intentional design choice that the
-/// base mint implementation doesn't include authorization controls. This is NOT
-/// a security flaw but rather a design decision to give implementers
-/// flexibility in how they implement authorization.
-///
-/// When using this function in your contracts, you MUST add your own
-/// authorization controls to ensure only designated accounts can mint tokens.
 #[test]
-fn mint_base_implementation_has_no_auth() {
+fn burn_from_requires_auth() {
     let e = Env::default();
-    // Note: we're intentionally NOT mocking any auths
+    e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let account = Address::generate(&e);
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let amount = 50;
 
-    // This should NOT panic even without authorization
     e.as_contract(&address, || {
-        mint(&e, &account, 100);
-        assert_eq!(balance(&e, &account), 100);
+        mint(&e, &owner, 100);
+        approve(&e, &owner, &spender, amount, 1000);
+        crate::extensions::burnable::burn_from(&e, &spender, &owner, amount);
     });
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 2);
+    // Verify approve auth
+    let (addr, _invocation) = &auths[0];
+    assert_eq!(addr, &owner);
+    // assert_eq!(
+    //     invocation.function,
+    //     AuthorizedFunction::Contract((
+    //         address.clone(),
+    //         symbol_short!("approve"),
+    //         vec![
+    //             &e,
+    //             owner.clone().into_val(&e),
+    //             spender.clone().into_val(&e),
+    //             amount.into_val(&e),
+    //             1000.into_val(&e)
+    //         ]
+    //     ))
+    // );
+    // Verify burn_from auth
+    let (addr, _invocation) = &auths[1];
+    assert_eq!(addr, &spender);
+    // assert_eq!(
+    //     invocation.function,
+    //     AuthorizedFunction::Contract((
+    //         address.clone(),
+    //         symbol_short!("burn_from"),
+    //         vec![
+    //             &e,
+    //             spender.clone().into_val(&e),
+    //             owner.clone().into_val(&e),
+    //             amount.into_val(&e)
+    //         ]
+    //     ))
+    // );
 }
