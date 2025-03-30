@@ -1,0 +1,146 @@
+:source-highlighter: highlight.js
+:highlightjs-languages: rust
+:github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
+= Non-Fungible Token
+
+In the world of digital assets, not all tokens are alike. This becomes important in situations
+like *real estate*, *voting rights*, or *collectibles*, where some items are valued more than
+others due to their usefulness, rarity, etc.
+On Stellar, you can create non-fungible tokens (NFTs), where each token is unique and
+represents something distinct, with ownership tracked through Soroban smart contracts.
+
+== Overview
+
+The https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/non-fungible[non-fungible] module
+provides three different NFT variants that differ in how certain features like ownership tracking,
+token creation and destruction are handled:
+
+1. *Default base implementations* (`NonFungibleToken` and `NonFungibleBurnable`), suitable for most use cases. 
+2. *Consecutive extension* (`NonFungibleConsecutive`) that fits needs where batch minting is envisioned,
+the implementation is optimized for creation of large amounts of tokens.
+3. *Enumerable extension* (`NonFungibleEnumerable`), for cases where on-chain enumerability is required,
+enabling a smart contract to list all the NFTs an address owns.
+
+These three variants share core functionality and a common interface, exposing identical contract functions as
+entry-points. However, composing custom flows must be handled with extra caution. That is required because of the
+incompatible nature between the business logic of the different NFT variants or the need to wrap the base
+functionality with additional logic.
+
+== Usage
+
+We'll use an NFT to track game items, each having their own unique attributes. Whenever one is to be
+awarded to a player, it will be minted and sent to them. Players are free to keep their token or
+trade it with other people as they see fit. Please note any account can call `award_item`.
+We have to implement access control to restrict who can mint,
+
+Here's what a contract for tokenized items might look like:
+
+[source,rust]
+----
+use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use stellar_non_fungible::{
+    burnable::NonFungibleBurnable, Balance, Base, NonFungibleToken, TokenId,
+};
+
+#[contract]
+pub struct GameItem;
+
+#[contractimpl]
+impl GameItem {
+    pub fn __constructor(e: &Env) {
+        Base::set_metadata(
+            e,
+            String::from_str(e, "www.mygame.com"),
+            String::from_str(e, "My Game Items Collection"),
+            String::from_str(e, "MGMC"),
+        );
+    }
+
+    pub fn award_item(e: &Env, to: Address) -> TokenId {
+        // access control might be needed
+        Base::sequential_mint(e, &to)
+    }
+}
+
+#[contractimpl]
+impl NonFungibleToken for GameItem {
+    type ContractType = Base;
+
+    fn balance(e: &Env, owner: Address) -> Balance {
+        Base::balance(e, &owner)
+    }
+
+    fn owner_of(e: &Env, token_id: TokenId) -> Address {
+        Base::owner_of(e, token_id)
+    }
+
+    fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
+        Base::transfer(e, &from, &to, token_id);
+    }
+
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
+        Base::transfer_from(e, &spender, &from, &to, token_id);
+    }
+
+    fn approve(
+        e: &Env,
+        approver: Address,
+        approved: Address,
+        token_id: TokenId,
+        live_until_ledger: u32,
+    ) {
+        Base::approve(e, &approver, &approved, token_id, live_until_ledger);
+    }
+
+    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
+        Base::approve_for_all(e, &owner, &operator, live_until_ledger);
+    }
+
+    fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
+        Base::get_approved(e, token_id)
+    }
+
+    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
+        Base::is_approved_for_all(e, &owner, &operator)
+    }
+
+    fn name(e: &Env) -> String {
+        Base::name(e)
+    }
+
+    fn symbol(e: &Env) -> String {
+        Base::symbol(e)
+    }
+
+    fn token_uri(e: &Env, token_id: TokenId) -> String {
+        Base::token_uri(e, token_id)
+    }
+}
+
+#[contractimpl]
+impl NonFungibleBurnable for GameItem {
+    fn burn(e: &Env, from: Address, token_id: TokenId) {
+        Base::burn(e, &from, token_id);
+    }
+
+    fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId) {
+        Base::burn_from(e, &spender, &from, token_id);
+    }
+}
+----
+
+== Base and Extensions
+
+The default base variant is split into two parts:
+
+1. *Non-Fungible Token*: The base logic for NFT transfers, approvals, minting and metadata handling.
+2. *Non-Fungible Burnable*: Optional Extension with the base logic for token destruction by token holders.
+
+Separating the burn functionality from `NonFungibleToken` aims to accommodate flexibility and
+customization for various use cases.
+
+The following optional extensions are also provided:
+
+* xref:tokens/nft-consecutive.adoc[Non-Fungible Consecutive]: Extension for optimized minting of batches of tokens.
+
+* xref:tokens/nft-enumerable.adoc[Non-Fungible Enumerable]: Extension that allows enumerating the tokens on-chain.

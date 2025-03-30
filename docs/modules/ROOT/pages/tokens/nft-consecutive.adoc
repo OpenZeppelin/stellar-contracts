@@ -1,0 +1,10 @@
+:source-highlighter: highlight.js
+:highlightjs-languages: rust
+:github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
+= Non-Fungible Consecutive
+
+Consecutive extension for xref:tokens/non-fungible.adoc[Non-Fungible Token] is useful for efficiently minting multiple tokens in a single transaction. This can significantly reduce costs and improve performance when creating a large number of tokens at once.
+
+== Usage
+
+// TBD

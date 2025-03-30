@@ -1,5 +1,6 @@
 * Token Standards
 ** xref:tokens/fungible.adoc[Fungible Tokens]
+** xref:tokens/non-fungible.adoc[Non-Fungible Tokens]
 
 * Utilities
 ** xref:utils/pausable.adoc[Pausable]

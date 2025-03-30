@@ -1,0 +1,11 @@
+:source-highlighter: highlight.js
+:highlightjs-languages: rust
+:github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
+= Non-Fungible Enumerable
+
+Enumerable extension for xref:tokens/non-fungible.adoc[Non-Fungible Token] allows for enumeration of all the token IDs in the contract as well as all the token IDs owned by each account. This is useful for applications that need to list or iterate over tokens, such as marketplaces or wallets.
+
+== Usage
+
+// TBD
+
