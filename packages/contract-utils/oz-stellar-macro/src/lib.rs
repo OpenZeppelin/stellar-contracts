@@ -7,8 +7,8 @@ mod helper;
 /// Generates the missing default implementations for the `Trait`s provided by
 /// OpenZeppelin stellar library.
 ///
-/// `#[contractimpl]` macro requires all the default implementations to be provided
-/// under the code block:
+/// `#[contractimpl]` macro requires all the default implementations to be
+/// provided under the code block:
 ///
 /// ```ignore
 /// #[contractimpl]
