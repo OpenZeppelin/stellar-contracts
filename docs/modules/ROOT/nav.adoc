@@ -1,6 +1,7 @@
 * Token Standards
 ** xref:tokens/fungible.adoc[Fungible Tokens]
 ** xref:tokens/non-fungible.adoc[Non-Fungible Tokens]
+*** xref:tokens/non-fungible.adoc#base_and_extensions[Extensions]
 
 * Utilities
 ** xref:utils/pausable.adoc[Pausable]
