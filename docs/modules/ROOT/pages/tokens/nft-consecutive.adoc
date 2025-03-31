@@ -54,6 +54,6 @@ impl NonFungibleToken for GameItem {
     type ContractType = Consecutive;
 }
 
-// no entry-point funcions required, marker impl
+// no entry-point functions required, marker impl
 impl NonFungibleConsecutive for GameItem {}
 ----
