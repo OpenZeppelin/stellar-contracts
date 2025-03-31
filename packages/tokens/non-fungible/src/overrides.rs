@@ -31,20 +31,20 @@ use crate::{Balance, TokenId};
 /// impl NonFungibleToken for ExampleContract {
 ///     type ContractType = Consecutive;
 ///
-///     fn balance(e: &Env, owner: Address) -> Balance {
+///     fn balance(e: &Env, owner: &Address) -> Balance {
 ///         Self::ContractType::balance(e, owner)
 ///     }
 ///
-///     fn owner_of(e: &Env, token_id: TokenId) -> Address {
+///     fn owner_of(e: &Env, token_id: TokenId) -> &Address {
 ///         Self::ContractType::owner_of(e, token_id)
 ///     }
 ///
-///     fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
-///         Self::ContractType::transfer(e, &from, &to, token_id);
+///     fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+///         Self::ContractType::transfer(e, from, to, token_id);
 ///     }
 ///
-///     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
-///         Self::ContractType::transfer_from(e, &spender, &from, &to, token_id);
+///     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
+///         Self::ContractType::transfer_from(e, spender, from, to, token_id);
 ///     }
 ///
 ///     /* and so on */
@@ -59,27 +59,27 @@ use crate::{Balance, TokenId};
 /// impl NonFungibleToken for ExampleContract {
 ///     type ContractType = Consecutive;
 ///
-///     fn balance(e: &Env, owner: Address) -> Balance {
+///     fn balance(e: &Env, owner: &Address) -> Balance {
 ///         Consecutive::balance(e, owner)
 ///     }
 ///
-///     fn owner_of(e: &Env, token_id: TokenId) -> Address {
+///     fn owner_of(e: &Env, token_id: TokenId) -> &Address {
 ///         Consecutive::owner_of(e, token_id)
 ///     }
 ///
-///     fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
-///         Consecutive:transfer(e, &from, &to, token_id);
+///     fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+///         Consecutive:transfer(e, from, to, token_id);
 ///     }
 ///
-///     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
-///         Consecutive::transfer_from(e, &spender, &from, &to, token_id);
+///     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
+///         Consecutive::transfer_from(e, spender, from, to, token_id);
 ///     }
 ///
 ///     /* and so on */
 /// }
 /// ```
 pub trait ContractOverrides {
-    fn balance(e: &Env, owner: Address) -> Balance {
+    fn balance(e: &Env, owner: &Address) -> Balance {
         Base::balance(e, &owner)
     }
 
@@ -87,25 +87,25 @@ pub trait ContractOverrides {
         Base::owner_of(e, token_id)
     }
 
-    fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
-        Base::transfer(e, &from, &to, token_id);
+    fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+        Base::transfer(e, from, to, token_id);
     }
 
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
-        Base::transfer_from(e, &spender, &from, &to, token_id);
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
+        Base::transfer_from(e, spender, from, to, token_id);
     }
 
     fn approve(
         e: &Env,
-        approver: Address,
-        approved: Address,
+        approver: &Address,
+        approved: &Address,
         token_id: TokenId,
         live_until_ledger: u32,
     ) {
         Base::approve(e, &approver, &approved, token_id, live_until_ledger);
     }
 
-    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
+    fn approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
         Base::approve_for_all(e, &owner, &operator, live_until_ledger);
     }
 
@@ -113,7 +113,7 @@ pub trait ContractOverrides {
         Base::get_approved(e, token_id)
     }
 
-    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
+    fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool {
         Base::is_approved_for_all(e, &owner, &operator)
     }
 

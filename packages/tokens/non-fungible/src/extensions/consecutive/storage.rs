@@ -22,22 +22,22 @@ impl ContractOverrides for Consecutive {
         Consecutive::token_uri(e, token_id)
     }
 
-    fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
-        Consecutive::transfer(e, &from, &to, token_id);
+    fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+        Consecutive::transfer(e, from, to, token_id);
     }
 
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
-        Consecutive::transfer_from(e, &spender, &from, &to, token_id);
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
+        Consecutive::transfer_from(e, spender, from, to, token_id);
     }
 
     fn approve(
         e: &Env,
-        approver: Address,
-        approved: Address,
+        approver: &Address,
+        approved: &Address,
         token_id: TokenId,
         live_until_ledger: u32,
     ) {
-        Consecutive::approve(e, &approver, &approved, token_id, live_until_ledger);
+        Consecutive::approve(e, approver, approved, token_id, live_until_ledger);
     }
 }
 

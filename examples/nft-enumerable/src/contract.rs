@@ -33,18 +33,6 @@ impl ExampleContract {
 #[contractimpl]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Enumerable;
-
-    fn name(e: &Env) -> String {
-        Enumerable::name(e)
-    }
-
-    fn symbol(e: &Env) -> String {
-        Enumerable::symbol(e)
-    }
-
-    fn token_uri(e: &Env, token_id: TokenId) -> String {
-        Enumerable::token_uri(e, token_id)
-    }
 }
 
 #[default_impl]

@@ -36,7 +36,7 @@ impl NonFungibleToken for ExampleContract {
     type ContractType = Consecutive;
 
     fn balance(e: &Env, owner: Address) -> Balance {
-        Self::ContractType::balance(e, owner)
+        Self::ContractType::balance(e, &owner)
     }
 
     fn owner_of(e: &Env, token_id: TokenId) -> Address {
@@ -62,7 +62,7 @@ impl NonFungibleToken for ExampleContract {
     }
 
     fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
-        Self::ContractType::approve_for_all(e, owner, operator, live_until_ledger);
+        Self::ContractType::approve_for_all(e, &owner, &operator, live_until_ledger);
     }
 
     fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
@@ -70,7 +70,7 @@ impl NonFungibleToken for ExampleContract {
     }
 
     fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
-        Self::ContractType::is_approved_for_all(e, owner, operator)
+        Self::ContractType::is_approved_for_all(e, &owner, &operator)
     }
 
     fn name(e: &Env) -> String {
