@@ -3,33 +3,37 @@
 
 = Stellar Smart Contracts Suite
 
-A comprehensive collection of secure, scalable smart contracts and utilities for the Stellar network, supporting Fungible, Non-Fungible, and Multi-Token standards.
+A comprehensive collection of secure, scalable smart contracts and utilities for the Stellar network,
+supporting Fungible, Non-Fungible, and Multi-Token standards.
 
-== Token Standards
+== Tokens
 Explore our implementations for token standards on Stellar Soroban:
 
 - **xref:tokens/fungible.adoc[Fungible Tokens]**: Digital assets representing a fixed or dynamic supply of identical units.
-- **Non-Fungible Tokens**: Unique digital assets with verifiable ownership (work in progress).
+- **xref:tokens/non-fungible.adoc[Non-Fungible Tokens]**: Unique digital assets with verifiable ownership.
 - **Multi-Token**: Hybrid tokens enabling both fungible and non-fungible token functionalities (work in progress).
 
 == Utilities
 Discover our utility contracts for Stellar Soroban, applicable to all token standards mentioned above:
 
 - **xref:utils/pausable.adoc[Pausable]**
+- **xref:utils/upgradeable.adoc[Upgrades and Migrations]**
 
 == Error Codes
-In Stellar Soroban, each error variant is assigned an integer. To prevent duplication of error codes, we use the following convention:
-. Utilities: `1XX`
-.. Pausable: `10X`
-.. any future utilities will continue from `11X`, `12X`, and so on.
-. Fungible: `2XX`
-. Non-Fungible: `3XX`
-. Multi-Token: `4XX`
+In Stellar Soroban, each error variant is assigned an integer. To prevent duplication of error codes,
+we use the following convention:
 
-// == Audits
-// TODO: You can find our audit reports here.
-
-// == Get Started
-// TODO: link to the Wizard
+* Utilities: `1XX`
+** Pausable: `10X`
+** Upgradeable: `11X`
+** any future utilities will continue from `12X`, `13X`, and so on.
+* Fungible: `2XX`
+* Non-Fungible: `3XX`
+* Multi-Token: `4XX`
 
 
+== Audits
+You can find our audit reports https://github.com/OpenZeppelin/stellar-contracts/tree/main/audits[here].
+
+== Get Started
+Get started xref:get-started.adoc[here].

@@ -34,7 +34,7 @@ fn upgrade_flow_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #200)")]
+#[should_panic(expected = "Error(Contract, #110)")]
 fn upgrade_ensure_can_migrate_panics_if_not_initial() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -46,7 +46,7 @@ fn upgrade_ensure_can_migrate_panics_if_not_initial() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #201)")]
+#[should_panic(expected = "Error(Contract, #111)")]
 fn upgrade_ensure_can_rollback_panics_if_not_migrated() {
     let e = Env::default();
     let address = e.register(MockContract, ());
