@@ -5,6 +5,9 @@ members = [
     "examples/fungible-pausable",
     "examples/fungible-token-interface",
     "examples/upgradeable/*",
+    "examples/nft-enumerable",
+    "examples/nft-consecutive",
+    "examples/nft-sequential-minting",
     "packages/constants",
     "packages/contract-utils/*",
     "packages/test-utils/*",
@@ -27,7 +30,7 @@ syn = { version = "2.0", features = ["full"] }
 
 # members
 stellar-constants = { path = "packages/constants" }
-stellar-default-impl-macro = { path = "packages/contract-utils/stellar-default-impl-macro" }
+stellar-default-impl-macro = { path = "packages/contract-utils/default-impl-macro" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-fungible = { path = "packages/tokens/fungible" }
 stellar-non-fungible = { path = "packages/tokens/non-fungible" }
