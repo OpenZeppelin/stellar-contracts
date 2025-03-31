@@ -37,7 +37,7 @@ pub type Balance = TokenId;
 /// the function signature may change depending on the implementation.
 ///
 /// We do provide a function [`crate::Base::sequential_mint`] for sequential
-/// minting case.
+/// minting, and [`crate::Base::mint`] for non-sequential minting strategies.
 ///
 /// # Notes
 ///
@@ -50,7 +50,7 @@ pub type Balance = TokenId;
 /// you can follow the below example:
 ///
 /// ```ignore
-/// #[oz_stellar] // IMPORTANT: place this above `#[contractimpl]`
+/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
 /// #[contractimpl]
 /// impl NonFungibleToken for MyContract {
 ///     ContractType = {Your Contract Type Here};

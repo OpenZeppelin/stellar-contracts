@@ -39,18 +39,18 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
             syn::parse_quote! { fn get_token_id(e: &Env, index: TokenId) -> TokenId { Enumerable::get_token_id(e, index) } },
         ],
         not_supported => {
-            panic!("Trait {} is not supported by #[oz_stellar]", not_supported)
+            panic!("Trait {} is not supported by #[default_impl]", not_supported)
         }
     }
 }
 
-pub fn generate_default_impls(item: TokenStream) -> TokenStream {
+pub fn generate_default_impl(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemImpl);
 
     // Extract the trait name
     let trait_name = match &input.trait_ {
         Some((_, path, _)) => path.segments.last().unwrap().ident.to_string(),
-        None => panic!("#[oz_stellar] must be used on a trait implementation"),
+        None => panic!("#[default_impl] must be used on a trait implementation"),
     };
 
     let mut user_methods = std::collections::HashSet::new();

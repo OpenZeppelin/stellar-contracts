@@ -7,8 +7,8 @@
 //! **IMPORTANT**: this example is for demonstration purposes, and authorization
 //! is not taken into consideration
 
-use oz_stellar_macro::oz_stellar;
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{
     enumerable::{Enumerable, NonFungibleEnumerable},
     Balance, Base, ContractOverrides, NonFungibleToken, TokenId,
@@ -29,7 +29,7 @@ impl ExampleContract {
     }
 }
 
-#[oz_stellar]
+#[default_impl]
 #[contractimpl]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Enumerable;
@@ -47,7 +47,7 @@ impl NonFungibleToken for ExampleContract {
     }
 }
 
-#[oz_stellar]
+#[default_impl]
 #[contractimpl]
 impl NonFungibleEnumerable for ExampleContract {}
 

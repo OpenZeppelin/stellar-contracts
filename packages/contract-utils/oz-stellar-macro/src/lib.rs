@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 
-use crate::helper::generate_default_impls;
+use crate::helper::generate_default_impl;
 
 mod helper;
 
@@ -34,7 +34,7 @@ mod helper;
 /// # Example:
 ///
 /// ```ignore
-/// #[oz_stellar] // IMPORTANT: place this above `#[contractimpl]`
+/// #[default_impl] // IMPORTANT: place this above `#[contractimpl]`
 /// #[contractimpl]
 /// impl NonFungibleToken for MyContract {
 ///     /* your overrides here */
@@ -48,6 +48,6 @@ mod helper;
 /// - `NonFungibleBurnable`
 /// - `NonFungibleEnumerable`
 #[proc_macro_attribute]
-pub fn oz_stellar(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    generate_default_impls(item)
+pub fn default_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    generate_default_impl(item)
 }

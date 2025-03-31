@@ -27,7 +27,7 @@ use soroban_sdk::{symbol_short, Address, Env};
 /// you can follow the below example:
 ///
 /// ```ignore
-/// #[oz_stellar] // IMPORTANT: place this above `#[contractimpl]`
+/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
 /// #[contractimpl]
 /// impl NonFungibleBurnable for MyContract {
 ///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */

@@ -1,5 +1,5 @@
 [package]
-name = "oz-stellar-macro"
+name = "stellar-default-impl-macro"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

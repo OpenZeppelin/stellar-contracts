@@ -12,7 +12,7 @@
 //! or via the combination `#[derive(Upgradeable, Migratable)]` when custom
 //! migration or rollback logic is additionally needed.
 //!
-//! **Important**: While the framework structures the upgrade flow, it does NOT
+//! **IMPORTANT**: While the framework structures the upgrade flow, it does NOT
 //! perform deeper checks and verifications such as:
 //!
 //! - Ensuring that the new contract does not include a constructor, as it will

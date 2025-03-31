@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
-oz-stellar-macro = { workspace = true }
+stellar-default-impl-macro = { workspace = true }
 soroban-sdk = { workspace = true }
 stellar-non-fungible = { workspace = true }
 

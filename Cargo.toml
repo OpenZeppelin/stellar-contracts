@@ -26,8 +26,8 @@ quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 
 # members
-oz-stellar-macro = { path = "packages/contract-utils/oz-stellar-macro" }
 stellar-constants = { path = "packages/constants" }
+stellar-default-impl-macro = { path = "packages/contract-utils/stellar-default-impl-macro" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-fungible = { path = "packages/tokens/fungible" }
 stellar-non-fungible = { path = "packages/tokens/non-fungible" }
