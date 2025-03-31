@@ -17,7 +17,7 @@ Explore our implementations for token standards on Stellar Soroban:
 Discover our utility contracts for Stellar Soroban, applicable to all token standards mentioned above:
 
 - **xref:utils/pausable.adoc[Pausable]**
-- **xref:utils/upgradeable.adoc[Upgradeable]**
+- **xref:utils/upgradeable.adoc[Upgrades and Migrations]**
 
 == Error Codes
 In Stellar Soroban, each error variant is assigned an integer. To prevent duplication of error codes,
