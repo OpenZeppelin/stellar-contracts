@@ -31,6 +31,13 @@ pub type Balance = TokenId;
 /// The `NonFungibleToken` trait defines the core functionality for non-fungible
 /// tokens. It provides a standard interface for managing
 /// transfers and approvals associated with non-fungible tokens.
+///
+/// Event for `mint` is defined, but `mint` function itself is not included
+/// as a method in this trait because it is not a part of the standard,
+/// the function signature may change depending on the implementation.
+///
+/// We do provide a function [`crate::Base::sequential_mint`] for sequential
+/// minting case.
 pub trait NonFungibleToken {
     /// Helper type that allows us to override some of the functionality of the
     /// base trait based on the extensions implemented. You should use
@@ -45,7 +52,7 @@ pub trait NonFungibleToken {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     fn balance(e: &Env, owner: Address) -> Balance {
-        crate::balance(e, &owner)
+        Self::ContractType::balance(e, owner)
     }
 
     /// Returns the owner of the `token_id` token.
@@ -211,7 +218,7 @@ pub trait NonFungibleToken {
     /// * topics - `["approve_for_all", from: Address]`
     /// * data - `[operator: Address, live_until_ledger: u32]`
     fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
-        crate::approve_for_all(e, &owner, &operator, live_until_ledger);
+        Self::ContractType::approve_for_all(e, owner, operator, live_until_ledger);
     }
 
     /// Returns the account approved for `token_id` token.
@@ -226,7 +233,7 @@ pub trait NonFungibleToken {
     /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
     fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
-        crate::get_approved(e, token_id)
+        Self::ContractType::get_approved(e, token_id)
     }
 
     /// Returns whether the `operator` is allowed to manage all the assets of
@@ -238,7 +245,7 @@ pub trait NonFungibleToken {
     /// * `owner` - Account of the token's owner.
     /// * `operator` - Account to be checked.
     fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
-        crate::is_approved_for_all(e, &owner, &operator)
+        Self::ContractType::is_approved_for_all(e, owner, operator)
     }
 
     /// Returns the token collection name.
@@ -368,4 +375,21 @@ pub fn emit_approve(
 pub fn emit_approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
     let topics = (Symbol::new(e, "approve_for_all"), owner);
     e.events().publish(topics, (operator, live_until_ledger))
+}
+
+/// Emits an event indicating a mint of a token.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `to` - The address receiving the new token.
+/// * `token_id` - Token id as a number.
+///
+/// # Events
+///
+/// * topics - `["mint", to: Address]`
+/// * data - `[token_id: TokenId]`
+pub fn emit_mint(e: &Env, to: &Address, token_id: TokenId) {
+    let topics = (symbol_short!("mint"), to);
+    e.events().publish(topics, token_id)
 }
