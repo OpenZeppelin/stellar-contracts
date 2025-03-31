@@ -30,20 +30,20 @@
 //!
 //! - Transfers
 //! - Owner and Approval management
-//! - Basic metadata management (`name`, `symbol`, and `token_uri`)
+//! - Metadata management (`name`, `symbol`, and `token_uri`)
 //!
 //! The following optional extensions are available:
 //!
-//! - Metadata: Provides additional information about the token, such as name,
-//!   symbol, and tokenURI.
-//! - Mintable: Allows authorized entities to mint new non-fungible tokens.
-//! - Burnable: Enables token holders to destroy their non-fungible tokens.
+//! - *Burnable* enables token holders to destroy their non-fungible tokens.
+//! - *Enumerable* allows for enumeration of all the token IDs in the contract
+//!   as well as all the token IDs owned by each account.
+//! - *Consecutive* is useful for efficiently minting multiple tokens in a
+//!   single transaction.
 //!
 //! ## Compatibility and Compliance
 //!
-//! The ERC-721 interface is adapted to Stellar Ecosystem,
-//! facilitating cross-ecosystem familiarity and ease of use,
-//! with the following differences:
+//! The ERC-721 interface is adapted to Stellar Ecosystem, facilitating
+//! cross-ecosystem familiarity and ease of use, with the following differences:
 //!
 //! - `transfer()` function is made available due to consistency with Fungible
 //!   Token interface, and also it is a simpler (thus, cheaper and faster)
