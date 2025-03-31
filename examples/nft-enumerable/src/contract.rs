@@ -1,11 +1,11 @@
-//! Capped Example Contract.
+//! Non-Fungible Enumerable Example Contract.
 //!
-//! Demonstrates an example usage of `capped` module by
-//! implementing a capped mint mechanism, and setting the maximum supply
-//! at the constructor.
+//! Demonstrates an example usage of the Enumerable extension, allowing for
+//! enumeration of all the token IDs in the contract as well as all the token
+//! IDs owned by each account.
 //!
-//! **IMPORTANT**: this example is for demonstration purposes, and authorization
-//! is not taken into consideration
+//! **IMPORTANT**: This example is for demonstration purposes, and access
+//! control to sensitive operations is not taken into consideration!
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_non_fungible::{

@@ -1,11 +1,9 @@
-//! Capped Example Contract.
+//! Non-Fungible Vanilla Example Contract.
 //!
-//! Demonstrates an example usage of `capped` module by
-//! implementing a capped mint mechanism, and setting the maximum supply
-//! at the constructor.
+//! Demonstrates an example usage of the NFT default base implementation.
 //!
-//! **IMPORTANT**: this example is for demonstration purposes, and authorization
-//! is not taken into consideration
+//! **IMPORTANT**: This example is for demonstration purposes, and access
+//! control to sensitive operations is not taken into consideration!
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_non_fungible::{
