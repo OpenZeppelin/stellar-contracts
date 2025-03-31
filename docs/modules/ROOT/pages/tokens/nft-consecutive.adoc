@@ -3,6 +3,8 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Non-Fungible Consecutive
 
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/non-fungible/src/extensions/consecutive[Source Code]
+
 Consecutive extension for xref:tokens/non-fungible.adoc[Non-Fungible Token] is useful
 for efficiently minting multiple tokens in a single transaction. This can significantly
 reduce costs and improve performance when creating a large number of tokens at once.
@@ -21,7 +23,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{
     consecutive::{Consecutive, NonFungibleConsecutive},
-    Base, NonFungibleToken, TokenId,
+    Balance, Base, ContractOverrides, NonFungibleToken, TokenId,
 };
 
 #[contract]

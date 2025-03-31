@@ -3,6 +3,8 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Non-Fungible Token
 
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/non-fungible[Source Code]
+
 In the world of digital assets, not all tokens are alike. This becomes important in situations
 like *real estate*, *voting rights*, or *collectibles*, where some items are valued more than
 others due to their usefulness, rarity, etc.
@@ -40,7 +42,9 @@ Here's what a contract for tokenized items might look like:
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{
-    burnable::NonFungibleBurnable, Base, NonFungibleToken, TokenId,
+    burnable::NonFungibleBurnable,
+    Balance, Base, ContractOverrides, NonFungibleToken, TokenId,
+
 };
 
 #[contract]

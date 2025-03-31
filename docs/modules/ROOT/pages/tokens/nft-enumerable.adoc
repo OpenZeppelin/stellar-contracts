@@ -3,6 +3,8 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Non-Fungible Enumerable
 
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/non-fungible/src/extensions/enumerable[Source Code]
+
 Enumerable extension for xref:tokens/non-fungible.adoc[Non-Fungible Token] allows for enumeration
 of all the token IDs in the contract as well as all the token IDs owned by each account. This is
 useful for applications that need to list or iterate over tokens, such as marketplaces or wallets.
@@ -19,7 +21,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{
     enumerable::{Enumerable, NonFungibleEnumerable},
-    Base, NonFungibleToken, TokenId,
+    Balance, Base, ContractOverrides, NonFungibleToken, TokenId,
 };
 
 #[contract]
@@ -55,3 +57,13 @@ impl NonFungibleToken for GameItem {
 #[default_impl]
 #[contractimpl]
 impl NonFungibleEnumerable for GameItem {}
+----
+
+The extension exposes additionally the following entry-point funcitons, automatically implemented by `#[default_impl]`:
+
+[source,rust]
+----
+fn total_supply(e: &Env) -> Balance;
+fn get_owner_token_id(e: &Env, owner: Address, index: TokenId) -> TokenId;
+fn get_token_id(e: &Env, index: TokenId) -> TokenId;
+----
