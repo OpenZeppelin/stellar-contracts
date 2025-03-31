@@ -33,10 +33,10 @@ pub trait Pausable {
     ///
     /// # Security Warning
     ///
-    /// **IMPORTANT**: The base implementation of [`crate::pause()`] intentionally
-    /// lacks authorization controls. If you want to restrict who can
-    /// `pause` the contract, you MUST implement proper authorization in
-    /// your contract.
+    /// **IMPORTANT**: The base implementation of [`crate::pause()`]
+    /// intentionally lacks authorization controls. If you want to restrict
+    /// who can `pause` the contract, you MUST implement proper
+    /// authorization in your contract.
     fn pause(e: &Env, caller: Address);
 
     /// Triggers `Unpaused` state.
@@ -62,10 +62,10 @@ pub trait Pausable {
     ///
     /// # Security Warning
     ///
-    /// **IMPORTANT**: The base implementation of [`crate::unpause()`] intentionally
-    /// lacks authorization controls. If you want to restrict who can
-    /// `unpause` the contract, you MUST implement proper authorization in
-    /// your contract.
+    /// **IMPORTANT**: The base implementation of [`crate::unpause()`]
+    /// intentionally lacks authorization controls. If you want to restrict
+    /// who can `unpause` the contract, you MUST implement proper
+    /// authorization in your contract.
     fn unpause(e: &Env, caller: Address);
 }
 

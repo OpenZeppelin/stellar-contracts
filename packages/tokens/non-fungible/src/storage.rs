@@ -724,7 +724,7 @@ impl Base {
     /// uniqueness before passing it to this function. The strategy for
     /// generating `token_id`s varies by project and must be implemented
     /// accordingly.
-    pub fn sequential_mint(e: &Env, to: &Address, token_id: TokenId) {
+    pub fn mint(e: &Env, to: &Address, token_id: TokenId) {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
     }
