@@ -11,7 +11,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{
     enumerable::{Enumerable, NonFungibleEnumerable},
-    Balance, Base, ContractOverrides, NonFungibleToken, TokenId,
+    Balance, Base, NonFungibleToken, TokenId,
 };
 
 #[contract]

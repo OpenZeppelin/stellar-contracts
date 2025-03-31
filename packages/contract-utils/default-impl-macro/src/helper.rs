@@ -82,5 +82,15 @@ pub fn generate_default_impl(item: TokenStream) -> TokenStream {
     // `existing_items` now contains the merged items
     let new_impl = ItemImpl { items: existing_items, ..input };
 
-    TokenStream::from(quote! { #new_impl })
+    // Import the necessary trait if the trait is `NonFungibleToken`
+    let expanded = if trait_name == "NonFungibleToken" {
+        quote! {
+            use stellar_non_fungible::ContractOverrides;
+            #new_impl
+        }
+    } else {
+        quote! { #new_impl }
+    };
+
+    TokenStream::from(quote! { #expanded })
 }
