@@ -10,9 +10,7 @@ members = [
     "packages/test-utils/*",
     "packages/tokens/*",
 ]
-exclude = [
-    "examples/upgradeable/testdata"
-]
+exclude = ["examples/upgradeable/testdata"]
 
 [workspace.package]
 authors = ["OpenZeppelin"]
@@ -27,7 +25,8 @@ proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 
-oz-stellar-macro = { path = "packages/contract-utils/oz-stellar-macro" }       # members
+# members
+oz-stellar-macro = { path = "packages/contract-utils/oz-stellar-macro" }
 stellar-constants = { path = "packages/constants" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-fungible = { path = "packages/tokens/fungible" }
