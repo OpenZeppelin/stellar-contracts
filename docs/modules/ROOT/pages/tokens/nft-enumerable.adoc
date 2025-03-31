@@ -59,7 +59,7 @@ impl NonFungibleToken for GameItem {
 impl NonFungibleEnumerable for GameItem {}
 ----
 
-The extension exposes additionally the following entry-point funcitons, automatically implemented by `#[default_impl]`:
+The extension exposes additionally the following entry-point functions, automatically implemented by `#[default_impl]`:
 
 [source,rust]
 ----
