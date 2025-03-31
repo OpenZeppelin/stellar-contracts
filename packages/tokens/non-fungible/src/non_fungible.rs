@@ -38,6 +38,48 @@ pub type Balance = TokenId;
 ///
 /// We do provide a function [`crate::Base::sequential_mint`] for sequential
 /// minting case.
+///
+/// # Notes
+///
+/// `#[contractimpl]` macro requires even the default implementations to be
+/// present under its scope. To not confuse the developers, we did not provide
+/// the default implementations here, but we are providing a macro to generate
+/// the default implementations for you.
+///
+/// When implementing [`NonFungibleToken`] trait for your Smart Contract,
+/// you can follow the below example:
+///
+/// ```ignore
+/// #[oz_stellar] // IMPORTANT: place this above `#[contractimpl]`
+/// #[contractimpl]
+/// impl NonFungibleToken for MyContract {
+///     ContractType = {Your Contract Type Here};
+///
+///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
+///     /* and the macro will generate all the missing default implementations for you */
+/// }
+/// ```
+///
+/// This trait is implemented for the following Contract Types:
+/// * [`crate::Base`] (covering the vanilla case, and compatible with
+///   [`crate::extensions::burnable::NonFungibleBurnable`]) trait
+/// * [`crate::extensions::enumerable::Enumerable`] (enabling the compatibility
+///   and overrides for
+///   [`crate::extensions::enumerable::NonFungibleEnumerable`]) trait,
+///   incompatible with [`crate::extensions::burnable::NonFungibleBurnable`])
+///   and [`crate::extensions::consecutive::NonFungibleConsecutive`] trait.
+/// * [`crate::extensions::consecutive::Consecutive`] (enabling the
+///   compatibility and overrides for
+///   [`crate::extensions::consecutive::NonFungibleConsecutive`]) trait,
+///   incompatible with [`crate::extensions::burnable::NonFungibleBurnable`])
+///   and [`crate::extensions::enumerable::NonFungibleEnumerable`] trait.
+///
+/// You can find the default implementations of this trait for `Base`,
+/// `Enumerable`, and `Consecutive`, by navigating to:
+/// `ContractType::{method_name}`. For example, if you want to find how
+/// [`NonFungibleToken::transfer`] is implemented for the `Enumerable` Contract
+/// Type, you can find it using
+/// [`crate::extensions::enumerable::Enumerable::transfer`].
 pub trait NonFungibleToken {
     /// Helper type that allows us to override some of the functionality of the
     /// base trait based on the extensions implemented. You should use
@@ -51,9 +93,7 @@ pub trait NonFungibleToken {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
-    fn balance(e: &Env, owner: Address) -> Balance {
-        Self::ContractType::balance(e, owner)
-    }
+    fn balance(e: &Env, owner: Address) -> Balance;
 
     /// Returns the owner of the `token_id` token.
     ///
@@ -66,14 +106,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
-    ///
-    /// # Notes
-    ///
-    /// This function's behavior is shaped by the extensions implemented.
-    /// It should be configured via the `ContractBehavior` helper trait.
-    fn owner_of(e: &Env, token_id: TokenId) -> Address {
-        Self::ContractType::owner_of(e, token_id)
-    }
+    fn owner_of(e: &Env, token_id: TokenId) -> Address;
 
     /// Transfers `token_id` token from `from` to `to`.
     ///
@@ -99,14 +132,7 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[token_id: TokenId]`
-    ///
-    /// # Notes
-    ///
-    /// This function's behavior is shaped by the extensions implemented.
-    /// It should be configured via the `ContractBehavior` helper trait.
-    fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) {
-        Self::ContractType::transfer(e, from, to, token_id);
-    }
+    fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId);
 
     /// Transfers `token_id` token from `from` to `to` by using `spender`s
     /// approval.
@@ -141,14 +167,7 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[token_id: TokenId]`
-    ///
-    /// # Notes
-    ///
-    /// This function's behavior is shaped by the extensions implemented.
-    /// It should be configured via the `ContractBehavior` helper trait.
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) {
-        Self::ContractType::transfer_from(e, spender, from, to, token_id);
-    }
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId);
 
     /// Gives permission to `approved` to transfer `token_id` token to another
     /// account. The approval is cleared when the token is transferred.
@@ -180,20 +199,13 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["approve", from: Address, to: Address]`
     /// * data - `[token_id: TokenId, live_until_ledger: u32]`
-    ///
-    /// # Notes
-    ///
-    /// This function's behavior is shaped by the extensions implemented.
-    /// It should be configured via the `ContractBehavior` helper trait.
     fn approve(
         e: &Env,
         approver: Address,
         approved: Address,
         token_id: TokenId,
         live_until_ledger: u32,
-    ) {
-        Self::ContractType::approve(e, approver, approved, token_id, live_until_ledger);
-    }
+    );
 
     /// Approve or remove `operator` as an operator for the owner.
     ///
@@ -217,9 +229,7 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["approve_for_all", from: Address]`
     /// * data - `[operator: Address, live_until_ledger: u32]`
-    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
-        Self::ContractType::approve_for_all(e, owner, operator, live_until_ledger);
-    }
+    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32);
 
     /// Returns the account approved for `token_id` token.
     ///
@@ -232,9 +242,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
-    fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
-        Self::ContractType::get_approved(e, token_id)
-    }
+    fn get_approved(e: &Env, token_id: TokenId) -> Option<Address>;
 
     /// Returns whether the `operator` is allowed to manage all the assets of
     /// `owner`.
@@ -244,9 +252,7 @@ pub trait NonFungibleToken {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `operator` - Account to be checked.
-    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
-        Self::ContractType::is_approved_for_all(e, owner, operator)
-    }
+    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool;
 
     /// Returns the token collection name.
     ///

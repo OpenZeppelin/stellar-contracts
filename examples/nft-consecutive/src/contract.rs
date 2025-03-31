@@ -28,6 +28,9 @@ impl ExampleContract {
     }
 }
 
+// You don't have to provide the implementations for all the methods,
+// `#[oz_stellar]` macro does this for you. This example showcases
+// what is happening under the hood when you use `#[oz_stellar]` macro.
 #[contractimpl]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Consecutive;

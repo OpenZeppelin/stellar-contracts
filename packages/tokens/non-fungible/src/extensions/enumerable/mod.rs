@@ -43,15 +43,32 @@ use crate::{Balance, NonFungibleToken, TokenId};
 /// Note that, `Enumerable` trait can also be offloaded to off-chain services.
 /// This extension exists for the use-cases where the enumeration is required as
 /// an on-chain operation.
+///
+/// # Notes
+///
+/// `#[contractimpl]` macro requires even the default implementations to be
+/// present under its scope. To not confuse the developers, we did not provide
+/// the default implementations here, but we are providing a macro to generate
+/// the default implementations for you.
+///
+/// When implementing [`NonFungibleEnumerable`] trait for your Smart Contract,
+/// you can follow the below example:
+///
+/// ```ignore
+/// #[oz_stellar] // IMPORTANT: place this above `#[contractimpl]`
+/// #[contractimpl]
+/// impl NonFungibleEnumerable for MyContract {
+///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
+///     /* and the macro will generate all the missing default implementations for you */
+/// }
+/// ```
 pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// Returns the total amount of tokens stored by the contract.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn total_supply(e: &Env) -> Balance {
-        Enumerable::total_supply(e)
-    }
+    fn total_supply(e: &Env) -> Balance;
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
     /// owner's local list. Use along with
@@ -63,9 +80,7 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `index` - Index of the token in the owner's local list.
-    fn get_owner_token_id(e: &Env, owner: Address, index: TokenId) -> TokenId {
-        Enumerable::get_owner_token_id(e, &owner, index)
-    }
+    fn get_owner_token_id(e: &Env, owner: Address, index: TokenId) -> TokenId;
 
     /// Returns the `token_id` at a given `index` in the global token list.
     /// Use along with [`NonFungibleEnumerable::total_supply()`] to enumerate
@@ -80,7 +95,5 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// **IMPORTANT**: This function is only intended for non-sequential
     /// `token_id`s. For sequential `token_id`s, no need to call a function,
     /// the `token_id` itself acts as the global index.
-    fn get_token_id(e: &Env, index: TokenId) -> TokenId {
-        Enumerable::get_token_id(e, index)
-    }
+    fn get_token_id(e: &Env, index: TokenId) -> TokenId;
 }
