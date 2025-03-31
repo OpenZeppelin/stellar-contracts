@@ -43,7 +43,13 @@ use crate::{Balance, TokenId};
 ///         Self::ContractType::transfer(e, from, to, token_id);
 ///     }
 ///
-///     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
+///     fn transfer_from(
+///         e: &Env,
+///         spender: &Address,
+///         from: &Address,
+///         to: &Address,
+///         token_id: TokenId,
+///     ) {
 ///         Self::ContractType::transfer_from(e, spender, from, to, token_id);
 ///     }
 ///
@@ -80,7 +86,7 @@ use crate::{Balance, TokenId};
 /// ```
 pub trait ContractOverrides {
     fn balance(e: &Env, owner: &Address) -> Balance {
-        Base::balance(e, &owner)
+        Base::balance(e, owner)
     }
 
     fn owner_of(e: &Env, token_id: TokenId) -> Address {
@@ -102,11 +108,11 @@ pub trait ContractOverrides {
         token_id: TokenId,
         live_until_ledger: u32,
     ) {
-        Base::approve(e, &approver, &approved, token_id, live_until_ledger);
+        Base::approve(e, approver, approved, token_id, live_until_ledger);
     }
 
     fn approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
-        Base::approve_for_all(e, &owner, &operator, live_until_ledger);
+        Base::approve_for_all(e, owner, operator, live_until_ledger);
     }
 
     fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
@@ -114,7 +120,7 @@ pub trait ContractOverrides {
     }
 
     fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool {
-        Base::is_approved_for_all(e, &owner, &operator)
+        Base::is_approved_for_all(e, owner, operator)
     }
 
     fn name(e: &Env) -> String {
