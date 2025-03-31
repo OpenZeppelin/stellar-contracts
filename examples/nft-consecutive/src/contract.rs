@@ -90,7 +90,7 @@ impl NonFungibleConsecutive for ExampleContract {}
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn batch_mint(e: &Env, to: Address, amount: TokenId) -> TokenId {
+    pub fn batch_mint(e: &Env, to: Address, amount: Balance) -> TokenId {
         Consecutive::batch_mint(e, &to, amount)
     }
 

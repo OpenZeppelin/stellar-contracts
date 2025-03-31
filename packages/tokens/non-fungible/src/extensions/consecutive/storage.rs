@@ -8,7 +8,7 @@ use crate::{
     emit_transfer,
     extensions::consecutive::emit_consecutive_mint,
     sequential::{self as sequential},
-    Base, ContractOverrides, NonFungibleTokenError, TokenId,
+    Balance, Base, ContractOverrides, NonFungibleTokenError, TokenId,
 };
 
 pub struct Consecutive;
@@ -147,7 +147,7 @@ impl Consecutive {
     /// ```
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
-    pub fn batch_mint(e: &Env, to: &Address, amount: TokenId) -> TokenId {
+    pub fn batch_mint(e: &Env, to: &Address, amount: Balance) -> TokenId {
         let first_id = sequential::increment_token_id(e, amount);
 
         e.storage().persistent().set(&StorageKey::Owner(first_id), &to);
