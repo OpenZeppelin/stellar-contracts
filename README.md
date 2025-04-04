@@ -41,16 +41,30 @@ We provide a set of example contracts that demonstrate how to use the library. Y
 
 ## How To Use This Library As A Dependency
 
-The library has not been published yet to `crates.io`, and this will be the case until we reach a stable version. However, one can [specify a git dependency](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#specifying-dependencies-from-git-repositories) in a `Cargo.toml`, like so:
+The library has not been published yet to `crates.io`, and this will be the case until we reach a stable version. However, one can [specify a git dependency](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#specifying-dependencies-from-git-repositories) in a `Cargo.toml`. We also recommend pinning to a specific commit/tag, because rapid iterations are expected as the library is in an active development phase, like so for:
 
+- **v0.1.0 (audited)**
 ```toml
 [dependencies]
-stellar-pausable = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
-stellar-fungible = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+openzeppelin-pausable = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.1.0" }
+openzeppelin-pausable-macros = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.1.0" }
+openzeppelin-fungible-token = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.1.0" }
 ```
 
-We recommend pinning to a specific commit/tag, because rapid iterations are expected as the library is in an active development phase.
+- **latest**
+```toml
+[dependencies]
+stellar-constants = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+stellar-default-impl-macro = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+stellar-event-assertion = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+stellar-fungible = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+stellar-non-fungible = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+stellar-pausable = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+stellar-pausable-macros = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+stellar-upgradeable = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+stellar-upgradeable-macros = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
 
+```
 
 ## Security
 
