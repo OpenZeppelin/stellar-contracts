@@ -16,6 +16,7 @@ OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stel
 - `docs/`: Documentation
 - `audits/`: Audit reports
 
+
 ## Docs
 We have a [documentation website](https://docs.openzeppelin.com/stellar-contracts/) explaining the high-level concepts of the library. You can find code-specific inline documentation in the source code, or alternatively you can locally generate the documentation using the `cargo doc --no-deps --lib --open` command, which will generate the documentation and open it using your default browser.
 
@@ -25,7 +26,20 @@ We have a [documentation website](https://docs.openzeppelin.com/stellar-contract
 Stellar smart contracts are programs written in Rust leveraging the [Soroban SDK](https://crates.io/crates/soroban-sdk). Please, follow the setup process as outlined in the [Stellar documentation](https://developers.stellar.org/docs/build/smart-contracts/getting-started/setup).
 
 
-## Usage
+## How To Test/Play With Example Contracts
+The below section is based on [Official Stellar Docs](https://developers.stellar.org/docs/build/smart-contracts/getting-started/hello-world). If you are stuck on any of the steps below, or want to dive in deeper, please refer to the official documentation.
+
+We provide a set of example contracts that demonstrate how to use the library. You can find them in the `examples/` directory. If you want to deploy the example contracts to the testnet and play with them, you can follow the instructions below:
+1. `git clone https://github.com/OpenZeppelin/stellar-contracts.git`
+2. `cd stellar-contracts/examples`
+3. Take a look at the current folder, and select an example contract you are interested in. We will go with the `fungible-pausable` in this guide.
+4. `cd fungible-pausable`
+5. `cargo build --target wasm32-unknown-unknown --release`
+6. Now, the `target/wasm32-unknown-unknown/release/` directory will contain the compiled contracts. In this case, `target/wasm32-unknown-unknown/release/fungible_pausable_example.wasm` is the compiled wasm file.
+7. Deploying to the testnet is no different than any other contract. You can follow the instructions in the [Stellar documentation](https://developers.stellar.org/docs/build/smart-contracts/getting-started/deploy-to-testnet).
+
+
+## How To Use This Library As A Dependency
 
 The library has not been published yet to `crates.io`, and this will be the case until we reach a stable version. However, one can [specify a git dependency](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#specifying-dependencies-from-git-repositories) in a `Cargo.toml`, like so:
 
@@ -35,7 +49,7 @@ stellar-pausable = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
 stellar-fungible = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
 ```
 
-We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
+We recommend pinning to a specific commit/tag, because rapid iterations are expected as the library is in an active development phase.
 
 
 ## Security
