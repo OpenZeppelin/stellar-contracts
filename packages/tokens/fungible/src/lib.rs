@@ -82,3 +82,9 @@ pub use storage::{
 };
 
 mod test;
+
+#[cfg(test)]
+mod storage_test;
+
+#[cfg(test)]
+mod fungible_trait_test;
