@@ -2,20 +2,35 @@
 
 use soroban_sdk::{symbol_short, testutils::Events, Address, Env, IntoVal, Symbol, Val, Vec};
 use stellar_non_fungible::TokenId;
+use std::cell::RefCell;
 
 pub struct EventAssertion<'a> {
     env: &'a Env,
     contract: Address,
+    processed_events: RefCell<Vec<(u32, u32)>>,
+    event_cache: RefCell<Option<Vec<(Address, Vec<Val>, Val)>>>,
 }
 
 impl<'a> EventAssertion<'a> {
     pub fn new(env: &'a Env, contract: Address) -> Self {
-        Self { env, contract }
+        Self { 
+            env, 
+            contract,
+            processed_events: RefCell::new(Vec::new(env)),
+            event_cache: RefCell::new(None),
+        }
+    }
+
+    fn get_all_events(&self) -> Vec<(Address, Vec<Val>, Val)> {
+        let mut cache = self.event_cache.borrow_mut();
+        if cache.is_none() {
+            *cache = Some(self.env.events().all());
+        }
+        cache.clone().unwrap()
     }
 
     fn find_event_by_symbol(&self, symbol_name: &str) -> Option<(Address, Vec<Val>, Val)> {
-        let events = self.env.events().all();
-
+        let events = self.get_all_events();
         let target_symbol = match symbol_name {
             "transfer" => symbol_short!("transfer"),
             "mint" => symbol_short!("mint"),
@@ -24,11 +39,35 @@ impl<'a> EventAssertion<'a> {
             _ => Symbol::new(self.env, symbol_name),
         };
 
-        events.iter().find(|e| {
-            let topics: Vec<Val> = e.1.clone();
+        for (event_index, event) in events.iter().enumerate() {
+            let topics: Vec<Val> = event.1.clone();
+            if topics.is_empty() {
+                continue;
+            }
+            
             let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
-            topic_symbol == target_symbol
-        })
+            if topic_symbol == target_symbol {
+                let event_key = (event_index as u32, 0);
+                let mut processed_events = self.processed_events.borrow_mut();
+                if !processed_events.contains(&event_key) {
+                    processed_events.push_back(event_key);
+                    return Some(event.clone());
+                }
+            }
+        }
+        
+        None
+    }
+
+    pub fn assert_event_count(&self, expected: usize) {
+        let events = self.env.events().all();
+        assert_eq!(
+            events.len() as usize,
+            expected,
+            "Expected {} events, found {}",
+            expected,
+            events.len()
+        );
     }
 
     pub fn assert_fungible_transfer(&self, from: &Address, to: &Address, amount: i128) {
@@ -99,12 +138,7 @@ impl<'a> EventAssertion<'a> {
     }
 
     pub fn assert_non_fungible_mint(&self, to: &Address, token_id: TokenId) {
-        let events = self.env.events().all();
-        let mint_event = events.iter().find(|e| {
-            let topics: Vec<Val> = e.1.clone();
-            let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
-            topic_symbol == symbol_short!("mint")
-        });
+        let mint_event = self.find_event_by_symbol("mint");
 
         assert!(mint_event.is_some(), "Mint event not found in event log");
 
@@ -164,17 +198,6 @@ impl<'a> EventAssertion<'a> {
 
         assert_eq!(&event_from, from, "Burn event has wrong from address");
         assert_eq!(event_token_id, token_id, "Burn event has wrong token_id");
-    }
-
-    pub fn assert_event_count(&self, expected: usize) {
-        let events = self.env.events().all();
-        assert_eq!(
-            events.len() as usize,
-            expected,
-            "Expected {} events, found {}",
-            expected,
-            events.len()
-        );
     }
 
     pub fn assert_fungible_approve(
@@ -284,5 +307,22 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(&event_to, to, "ConsecutiveMint event has wrong to address");
         assert_eq!(event_data.0, from_id, "ConsecutiveMint event has wrong from_token_id");
         assert_eq!(event_data.1, to_id, "ConsecutiveMint event has wrong to_token_id");
+    }
+
+    pub fn refresh_events(&self) {
+        *self.event_cache.borrow_mut() = Some(self.env.events().all());
+        *self.processed_events.borrow_mut() = Vec::new(self.env);
+    }
+
+    pub fn assert_non_fungible_mints_ordered(&self, to: &Address, expected_ids: &[TokenId]) {
+        for expected_id in expected_ids {
+            self.assert_non_fungible_mint(to, *expected_id);
+        }
+    }
+
+    pub fn assert_non_fungible_transfers_ordered(&self, from: &Address, to: &Address, expected_ids: &[TokenId]) {
+        for expected_id in expected_ids {
+            self.assert_non_fungible_transfer(from, to, *expected_id);
+        }
     }
 }
