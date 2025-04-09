@@ -77,6 +77,7 @@ fn test_sequential_mint() {
     e.as_contract(&address, || {
         let token_id = Enumerable::sequential_mint(&e, &owner);
         assert_eq!(Enumerable::get_owner_token_id(&e, &owner, 0), token_id);
+        assert_eq!(Enumerable::get_token_id(&e, 0), token_id);
         assert_eq!(Enumerable::total_supply(&e), 1);
     });
 }
@@ -98,7 +99,7 @@ fn test_non_sequential_mint() {
 }
 
 #[test]
-fn test_sequential_burn() {
+fn test_burn() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -106,44 +107,13 @@ fn test_sequential_burn() {
 
     e.as_contract(&address, || {
         let token_id = Enumerable::sequential_mint(&e, &owner);
-        Enumerable::sequential_burn(&e, &owner, token_id);
+        Enumerable::burn(&e, &owner, token_id);
         assert_eq!(Enumerable::total_supply(&e), 0);
     });
 }
 
 #[test]
-fn test_non_sequential_burn() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let owner = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        let token_id = 42;
-        Enumerable::non_sequential_mint(&e, &owner, token_id);
-        Enumerable::non_sequential_burn(&e, &owner, token_id);
-        assert_eq!(Enumerable::total_supply(&e), 0);
-    });
-}
-
-#[test]
-fn test_sequential_burn_from() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let owner = Address::generate(&e);
-    let spender = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        let token_id = Enumerable::sequential_mint(&e, &owner);
-        Base::approve(&e, &owner, &spender, token_id, 1000);
-        Enumerable::sequential_burn_from(&e, &spender, &owner, token_id);
-        assert_eq!(Enumerable::total_supply(&e), 0);
-    });
-}
-
-#[test]
-fn test_non_sequential_burn_from() {
+fn test_burn_from() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -154,7 +124,7 @@ fn test_non_sequential_burn_from() {
         let token_id = 42;
         Enumerable::non_sequential_mint(&e, &owner, token_id);
         Base::approve(&e, &owner, &spender, token_id, 1000);
-        Enumerable::non_sequential_burn_from(&e, &spender, &owner, token_id);
+        Enumerable::burn_from(&e, &spender, &owner, token_id);
         assert_eq!(Enumerable::total_supply(&e), 0);
     });
 }
