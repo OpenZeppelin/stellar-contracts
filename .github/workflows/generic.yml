@@ -74,9 +74,3 @@ jobs:
           files: ./lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: OpenZeppelin/stellar-contracts
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          slug: OpenZeppelin/stellar-contracts
