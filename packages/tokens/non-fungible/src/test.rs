@@ -73,7 +73,7 @@ fn revoke_approve_for_all_works() {
         // set a pre-existing approve_for_all for the operator
         let key = StorageKey::ApprovalForAll(owner.clone(), operator.clone());
 
-        e.storage().temporary().set(&key, &(1000 as u32));
+        e.storage().temporary().set(&key, &(1000_u32));
 
         let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
         assert!(is_approved);
