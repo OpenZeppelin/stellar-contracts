@@ -50,22 +50,27 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable, nightly
-          components: clippy, rustfmt
+          components: clippy, rustfmt, llvm-tools-preview
           target: wasm32-unknown-unknown
 
-      - name: "Install nextest"
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-nextest
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov
 
       - name: Check format
         run: cargo +nightly fmt --all -- --check
-
-      - name: Run tests
-        run: cargo nextest run --release
 
       - name: Check clippy
         run: cargo clippy --release --locked --all-targets -- -D warnings
 
       - name: Check build
         run: cargo build --target wasm32-unknown-unknown --release
+
+      - name: Run tests with coverage
+        run: cargo llvm-cov --workspace --lcov --fail-under-lines 90 --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: OpenZeppelin/stellar-contracts

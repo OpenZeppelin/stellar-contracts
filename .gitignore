@@ -19,3 +19,8 @@ venv.bak/
 # Documentation
 docs/node_modules
 docs/build
+
+# Code Coverage
+htmlcov/
+lcov.info
+coverage/
