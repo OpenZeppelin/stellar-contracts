@@ -204,7 +204,7 @@ impl Enumerable {
 
         Enumerable::remove_from_owner_enumeration(e, from, token_id);
 
-        // We don't need the total supply, we just need to increment it.
+        // We don't need the total supply, we just need to decrement it.
         let _ = Enumerable::decrement_total_supply(e);
 
         // We don't need to update the global lists, `token_id`s act as the
@@ -278,7 +278,7 @@ impl Enumerable {
 
         Enumerable::remove_from_owner_enumeration(e, from, token_id);
 
-        // We don't need the total supply, we just need to increment it.
+        // We don't need the total supply, we just need to decrement it.
         let _ = Enumerable::decrement_total_supply(e);
 
         // We don't need to update the global lists, `token_id`s act as the

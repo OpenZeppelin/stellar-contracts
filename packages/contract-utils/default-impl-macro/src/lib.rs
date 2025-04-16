@@ -4,8 +4,8 @@ use crate::helper::generate_default_impl;
 
 mod helper;
 
-/// Generates the missing default implementations for the `Trait`s provided by
-/// OpenZeppelin stellar library.
+/// Generates the missing default implementations for the traits provided by
+/// OpenZeppelin Stellar library.
 ///
 /// `#[contractimpl]` macro requires all the default implementations to be
 /// provided under the code block:
@@ -20,11 +20,11 @@ mod helper;
 ///         `#[contractimpl]` macro won't have access to those methods.
 ///
 ///         This is due to how macro's work in Rust. They cannot access the default
-///         implementations of the methods of this Trait, since they are not in the
+///         implementations of the methods of this trait, since they are not in the
 ///         scope of the macro.
 ///
-///         To overcome this, we provide a macro for our Traits, that generates the
-///         missing default implementations for the methods of the Trait, so
+///         To overcome this, we provide a macro for our traits, that generates the
+///         missing default implementations for the methods of the trait, so
 ///         you can only focus on the overrides, and leave the default implementations
 ///         out as per usual.
 ///     */

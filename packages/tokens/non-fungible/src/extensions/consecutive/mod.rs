@@ -60,7 +60,7 @@ mod test;
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `to` - The address receiving the new token.
+/// * `to` - The address receiving the new tokens.
 /// * `from_token_id` - First token id in the batch.
 /// * `to_token_id` - Last token id of the batch.
 ///
