@@ -174,7 +174,8 @@ pub trait NonFungibleToken {
     ///
     /// Only a single account can be approved at a time for a `token_id`.
     /// To remove an approval, the approver can approve their own address,
-    /// effectively removing the previous approved address.
+    /// effectively removing the previous approved address. Alternatively,
+    /// setting the `live_until_ledger` to `0` will also revoke the approval.
     ///
     /// # Arguments
     ///
@@ -184,7 +185,7 @@ pub trait NonFungibleToken {
     /// * `approved` - The address receiving the approval.
     /// * `token_id` - Token id as a number.
     /// * `live_until_ledger` - The ledger number at which the allowance
-    ///   expires.
+    ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
     ///
     /// # Errors
     ///
