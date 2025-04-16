@@ -127,6 +127,22 @@ impl Enumerable {
     /// This is a wrapper around [`Base::sequential_mint()`], that
     /// also handles the storage updates for:
     /// * total supply
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// It is the responsibility of the implementer to establish appropriate
+    /// access controls to ensure that only authorized accounts can execute
+    /// minting operations. Failure to implement proper authorization could
+    /// lead to security vulnerabilities and unauthorized token creation.
+    ///
+    /// You probably want to do something like this (pseudo-code):
+    ///
+    /// ```ignore
+    /// let admin = read_administrator(e);
+    /// admin.require_auth();
+    /// ```
     pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
         let token_id = Base::sequential_mint(e, to);
 
@@ -164,6 +180,22 @@ impl Enumerable {
     /// * total supply
     /// * owner_tokens enumeration
     /// * global_tokens enumeration
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// It is the responsibility of the implementer to establish appropriate
+    /// access controls to ensure that only authorized accounts can execute
+    /// minting operations. Failure to implement proper authorization could
+    /// lead to security vulnerabilities and unauthorized token creation.
+    ///
+    /// You probably want to do something like this (pseudo-code):
+    ///
+    /// ```ignore
+    /// let admin = read_administrator(e);
+    /// admin.require_auth();
+    /// ```
     pub fn non_sequential_mint(e: &Env, to: &Address, token_id: TokenId) {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
