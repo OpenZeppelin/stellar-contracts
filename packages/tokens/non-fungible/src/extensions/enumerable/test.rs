@@ -19,17 +19,14 @@ fn test_total_supply() {
 
     e.as_contract(&address, || {
         let token_id1 = Enumerable::sequential_mint(&e, &owner);
-        let _token_id2 = Enumerable::sequential_mint(&e, &owner);
+        let token_id2 = Enumerable::sequential_mint(&e, &owner);
 
         assert_eq!(Enumerable::total_supply(&e), 2);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_non_fungible_mint(&owner, token_id1);
-
-        // TODO: below fails because the same event is read by the
-        // `event_assert`, not the next one. event_assert.
-        // assert_non_fungible_mint(&owner, token_id2);
+        event_assert.assert_non_fungible_mint(&owner, token_id2);
     });
 }
 
