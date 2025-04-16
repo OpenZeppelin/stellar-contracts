@@ -595,9 +595,9 @@ impl Base {
     ///
     /// # Notes
     ///
-    /// **IMPORTANT**: This function lacks authorization controls. You want to
-    /// invoke it most likely from a constructor or from another function with
-    /// admin-only authorization.
+    /// **IMPORTANT**: This function lacks authorization controls. Most likely,
+    /// you want to invoke it from a constructor or from another function
+    /// with admin-only authorization.
     pub fn set_metadata(e: &Env, base_uri: String, name: String, symbol: String) {
         if base_uri.len() as usize > MAX_BASE_URI_LEN {
             panic_with_error!(e, NonFungibleTokenError::BaseUriMaxLenExceeded)

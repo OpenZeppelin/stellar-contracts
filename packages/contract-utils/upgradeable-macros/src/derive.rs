@@ -53,7 +53,7 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
 ///   It is highly recommended to use this derive macro as a combination with
 ///   `Upgradeable`: `#[derive(Upgradeable, Migratable)]`. Otherwise, you need
 ///   to ensure the upgradeability state transitions as defined in the crate
-///   "stellar_upgradeable".
+///   `stellar_upgradeable`.
 ///
 /// # Behavior
 ///

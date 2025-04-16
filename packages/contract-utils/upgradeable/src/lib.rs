@@ -60,7 +60,7 @@
 //! }
 //! ```
 //! Check in the "/examples/upgradeable/" directory for the full example, where
-//! can also be found a helper `Upgrader` contract that performs upgrade+migrate
+//! you can also find a helper `Upgrader` contract that performs upgrade+migrate
 //! or rollback+downgrade in a single transaction.
 
 #![no_std]
