@@ -25,7 +25,7 @@ fn consecutive_batch_mint_works() {
     e.as_contract(&address, || {
         Consecutive::batch_mint(&e, &owner, amount);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
         event_assert.assert_consecutive_mint(&owner, 0, 99);
 
@@ -94,7 +94,7 @@ fn consecutive_transfer_works() {
         let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(51)).unwrap();
         assert_eq!(_owner, owner);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_consecutive_mint(&owner, 0, 99);
         event_assert.assert_non_fungible_transfer(&owner, &recipient, 50);
@@ -114,7 +114,7 @@ fn consecutive_transfer_edge_works() {
     e.as_contract(&address, || {
         Consecutive::batch_mint(&e, &owner, amount);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
         event_assert.assert_consecutive_mint(&owner, 0, 99);
 
@@ -154,7 +154,7 @@ fn consecutive_transfer_from_works() {
 
         assert_eq!(Consecutive::owner_of(&e, token_id + 1), owner);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
         event_assert.assert_consecutive_mint(&owner, 0, 99);
         event_assert.assert_non_fungible_approve(&owner, &spender, token_id, 100);
@@ -185,7 +185,7 @@ fn consecutive_burn_works() {
             e.storage().persistent().get::<_, Address>(&StorageKey::Owner(token_id + 1)).unwrap();
         assert_eq!(_owner, owner);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_consecutive_mint(&owner, 0, 99);
         event_assert.assert_non_fungible_burn(&owner, token_id);
@@ -214,7 +214,7 @@ fn consecutive_burn_from_works() {
         assert!(burned);
         assert_eq!(Consecutive::owner_of(&e, token_id + 1), owner);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
         event_assert.assert_consecutive_mint(&owner, 0, 99);
         event_assert.assert_non_fungible_approve(&owner, &spender, token_id, 100);
