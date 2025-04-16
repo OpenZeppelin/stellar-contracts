@@ -53,22 +53,22 @@ macro_rules! impl_token_interface {
 
             fn allowance(
                 env: soroban_sdk::Env,
-                owner: soroban_sdk::Address,
+                from: soroban_sdk::Address,
                 spender: soroban_sdk::Address,
             ) -> i128 {
-                <$contract as stellar_fungible::FungibleToken>::allowance(&env, owner, spender)
+                <$contract as stellar_fungible::FungibleToken>::allowance(&env, from, spender)
             }
 
             fn approve(
                 env: soroban_sdk::Env,
-                owner: soroban_sdk::Address,
+                from: soroban_sdk::Address,
                 spender: soroban_sdk::Address,
                 amount: i128,
                 live_until_ledger: u32,
             ) {
                 <$contract as stellar_fungible::FungibleToken>::approve(
                     &env,
-                    owner,
+                    from,
                     spender,
                     amount,
                     live_until_ledger,
