@@ -16,7 +16,7 @@ use soroban_sdk::{symbol_short, Address, Env};
 /// accommodate flexibility and customization for various smart contract use
 /// cases.
 pub trait FungibleMintable {
-    /// Creates `amount` of tokens and assigns them to `account`. Updates
+    /// Creates `amount` of tokens and assigns them to `to`. Updates
     /// the total supply accordingly.
     ///
     /// # Arguments

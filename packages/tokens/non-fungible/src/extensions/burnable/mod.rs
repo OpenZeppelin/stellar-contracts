@@ -35,7 +35,7 @@ use soroban_sdk::{symbol_short, Address, Env};
 /// }
 /// ```
 pub trait NonFungibleBurnable: NonFungibleToken<ContractType = Base> {
-    /// Destroys the `token_id` from `account`.
+    /// Destroys the token with `token_id` from `from`.
     ///
     /// # Arguments
     ///
@@ -56,7 +56,8 @@ pub trait NonFungibleBurnable: NonFungibleToken<ContractType = Base> {
     /// * data - `[token_id: TokenId]`
     fn burn(e: &Env, from: Address, token_id: TokenId);
 
-    /// Destroys the `token_id` from `account`, by using `spender`s approval.
+    /// Destroys the token with `token_id` from `from`, by using `spender`s
+    /// approval.
     ///
     /// # Arguments
     ///

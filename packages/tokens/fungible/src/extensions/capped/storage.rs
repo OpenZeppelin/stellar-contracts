@@ -45,7 +45,8 @@ pub fn query_cap(e: &Env) -> i128 {
         .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::CapNotSet))
 }
 
-/// Panics if new `amount` of tokens will exceed the maximum supply.
+/// Panics if new `amount` of tokens added to the current supply will exceed the
+/// maximum supply.
 ///
 /// # Arguments
 ///
