@@ -15,6 +15,8 @@ OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stel
 - `packages/`: Source code
   - `tokens/`: Various token types (fungible, non-fungible, etc.)
   - `contract-utils/`: Utilities for token types (pausable, etc.)
+  - `constants/`: Time-based constants
+  - `test-utils/`: Utilities for testing
 - `examples/`: Example contracts
 - `docs/`: Documentation
 - `audits/`: Audit reports
