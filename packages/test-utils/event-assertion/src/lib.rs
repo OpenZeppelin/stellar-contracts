@@ -14,6 +14,10 @@ impl<'a> EventAssertion<'a> {
     }
 
     fn find_event_by_symbol(&self, symbol_name: &str) -> Option<(Address, Vec<Val>, Val)> {
+        self.find_event_by_symbol_and_index(symbol_name, 0)
+    }
+
+    fn find_event_by_symbol_and_index(&self, symbol_name: &str, index: usize) -> Option<(Address, Vec<Val>, Val)> {
         let events = self.env.events().all();
 
         let target_symbol = match symbol_name {
@@ -24,11 +28,13 @@ impl<'a> EventAssertion<'a> {
             _ => Symbol::new(self.env, symbol_name),
         };
 
-        events.iter().find(|e| {
-            let topics: Vec<Val> = e.1.clone();
-            let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
-            topic_symbol == target_symbol
-        })
+        events.iter()
+            .filter(|e| {
+                let topics: Vec<Val> = e.1.clone();
+                let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
+                topic_symbol == target_symbol
+            })
+            .nth(index)
     }
 
     pub fn assert_fungible_transfer(&self, from: &Address, to: &Address, amount: i128) {
@@ -99,14 +105,13 @@ impl<'a> EventAssertion<'a> {
     }
 
     pub fn assert_non_fungible_mint(&self, to: &Address, token_id: TokenId) {
-        let events = self.env.events().all();
-        let mint_event = events.iter().find(|e| {
-            let topics: Vec<Val> = e.1.clone();
-            let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
-            topic_symbol == symbol_short!("mint")
-        });
+        self.assert_non_fungible_mint_at_index(to, token_id, 0);
+    }
 
-        assert!(mint_event.is_some(), "Mint event not found in event log");
+    pub fn assert_non_fungible_mint_at_index(&self, to: &Address, token_id: TokenId, index: usize) {
+        let mint_event = self.find_event_by_symbol_and_index("mint", index);
+
+        assert!(mint_event.is_some(), "Mint event not found in event log at index {}", index);
 
         let (contract, topics, data) = mint_event.unwrap();
         assert_eq!(contract, self.contract, "Event from wrong contract");
