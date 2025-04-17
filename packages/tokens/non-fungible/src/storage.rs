@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map, String};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use stellar_constants::{
     BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
 };
@@ -20,12 +20,6 @@ pub struct ApprovalData {
     pub live_until_ledger: u32,
 }
 
-/// Storage container for multiple operators and their expiration ledgers.
-#[contracttype]
-pub struct ApprovalForAllData {
-    pub operators: Map<Address /* operator */, u32 /* live_until_ledger */>,
-}
-
 /// Storage container for token metadata
 #[contracttype]
 pub struct Metadata {
@@ -40,7 +34,7 @@ pub enum StorageKey {
     Owner(TokenId),
     Balance(Address),
     Approval(TokenId),
-    ApprovalForAll(Address),
+    ApprovalForAll(Address /* owner */, Address /* operator */),
     Metadata,
 }
 
@@ -121,15 +115,13 @@ impl Base {
     /// * `owner` - The address that owns the tokens.
     /// * `operator` - The address to check for approval status.
     pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool {
-        let key = StorageKey::ApprovalForAll(owner.clone());
+        let key = StorageKey::ApprovalForAll(owner.clone(), operator.clone());
 
         // Retrieve the approval data for the owner
-        if let Some(approval_data) = e.storage().temporary().get::<_, ApprovalForAllData>(&key) {
-            // Check if the operator exists and if their approval is valid (non-expired)
-            if let Some(expiry) = approval_data.operators.get(operator.clone()) {
-                if expiry >= e.ledger().sequence() {
-                    return true;
-                }
+        if let Some(live_until_ledger) = e.storage().temporary().get::<_, u32>(&key) {
+            // Check if the operator's approval is valid (non-expired)
+            if live_until_ledger >= e.ledger().sequence() {
+                return true;
             }
         }
 
@@ -377,18 +369,11 @@ impl Base {
     pub fn approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
         owner.require_auth();
 
-        let key = StorageKey::ApprovalForAll(owner.clone());
+        let key = StorageKey::ApprovalForAll(owner.clone(), operator.clone());
 
         // If revoking approval (live_until_ledger == 0)
         if live_until_ledger == 0 {
-            if let Some(mut approval_data) =
-                e.storage().temporary().get::<_, ApprovalForAllData>(&key)
-            {
-                approval_data.operators.remove(operator.clone());
-                e.storage().temporary().set(&key, &approval_data);
-                let live_for = live_until_ledger - e.ledger().sequence();
-                e.storage().temporary().extend_ttl(&key, live_for, live_for);
-            }
+            e.storage().temporary().remove(&key);
             emit_approve_for_all(e, owner, operator, live_until_ledger);
             return;
         }
@@ -399,18 +384,8 @@ impl Base {
             panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
         }
 
-        // Retrieve or initialize the approval data
-        let mut approval_data = e
-            .storage()
-            .temporary()
-            .get::<_, ApprovalForAllData>(&key)
-            .unwrap_or_else(|| ApprovalForAllData { operators: Map::new(e) });
-
-        // Set the operator's expiration ledger
-        approval_data.operators.set(operator.clone(), live_until_ledger);
-
         // Update the storage
-        e.storage().temporary().set(&key, &approval_data);
+        e.storage().temporary().set(&key, &live_until_ledger);
 
         // Update the TTL based on the expiration ledger
         let live_for = live_until_ledger - e.ledger().sequence();
