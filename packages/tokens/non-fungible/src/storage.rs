@@ -613,7 +613,7 @@ impl Base {
     /// number of digits.
     fn token_id_to_string(e: &Env, value: TokenId) -> (String, usize) {
         if value == 0 {
-            return (String::from_str(e, "0"), 0);
+            return (String::from_str(e, "0"), 1);
         }
 
         let mut digits: usize = 0;
