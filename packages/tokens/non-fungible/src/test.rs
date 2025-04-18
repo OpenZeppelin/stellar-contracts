@@ -24,12 +24,7 @@ fn metadata_works() {
         let base_uri = String::from_str(&e, "https://smth.com/");
         let collection_name = String::from_str(&e, "My NFT collection");
         let collection_symbol = String::from_str(&e, "NFT");
-        Base::set_metadata(
-            &e,
-            base_uri.clone(),
-            collection_name.clone(),
-            collection_symbol.clone(),
-        );
+        Base::set_metadata(&e, base_uri, collection_name.clone(), collection_symbol.clone());
 
         let token_id = 4294967295;
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
@@ -39,11 +34,19 @@ fn metadata_works() {
         assert_eq!(collection_name, Base::name(&e));
         assert_eq!(collection_symbol, Base::symbol(&e));
 
+        // case token_id == 0
         let token_id = 0;
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
         let uri = Base::token_uri(&e, token_id);
 
         assert_eq!(uri, String::from_str(&e, "https://smth.com/0"));
+
+        // case empty string as base_uri
+        let empty_base_uri = String::from_str(&e, "");
+        Base::set_metadata(&e, empty_base_uri, collection_name, collection_symbol);
+        let empty_uri = Base::token_uri(&e, token_id);
+
+        assert_eq!(empty_uri, String::from_str(&e, ""));
     });
 }
 
