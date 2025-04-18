@@ -38,6 +38,12 @@ fn metadata_works() {
         assert_eq!(uri, String::from_str(&e, "https://smth.com/4294967295"));
         assert_eq!(collection_name, Base::name(&e));
         assert_eq!(collection_symbol, Base::symbol(&e));
+
+        let token_id = 0;
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        let uri = Base::token_uri(&e, token_id);
+
+        assert_eq!(uri, String::from_str(&e, "https://smth.com/0"));
     });
 }
 
