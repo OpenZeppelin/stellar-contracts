@@ -44,7 +44,7 @@ impl ContractOverrides for Consecutive {
 }
 
 /// Maximum number of vectors holding bitfields, which denote ids
-pub const BUCKETS: usize = 10; // 32,000 total ids if TokenId is u32 and 100 items in bcuket.
+pub const BUCKETS: usize = 10; // 32,000 total ids if TokenId is u32 and 100 items in bucket.
 /// Number of elements in a bucket
 pub const ITEMS_IN_BUCKET: usize = 100;
 /// Number of ids per item, which corresponds to the number of bits for a given
