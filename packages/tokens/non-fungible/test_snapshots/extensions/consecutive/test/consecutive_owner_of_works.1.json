@@ -1,38 +1,11 @@
 {
   "generators": {
-    "address": 3,
+    "address": 4,
     "nonce": 0
   },
   "auth": [
     [],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "",
-              "args": []
-            }
-          },
-          "sub_invocations": []
-        }
-      ],
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "",
-              "args": []
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ]
+    []
   ],
   "ledger": {
     "protocol_version": 22,
@@ -51,10 +24,10 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "Balance"
+                  "symbol": "Owner"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                  "u32": 0
                 }
               ]
             },
@@ -71,16 +44,16 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "Balance"
+                      "symbol": "Owner"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                      "u32": 0
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "u32": 99
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 }
               }
             },
@@ -96,55 +69,10 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "BurnedToken"
-                },
-                {
-                  "u32": 42
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "BurnedToken"
-                    },
-                    {
-                      "u32": 42
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "bool": true
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          4095
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
                   "symbol": "Owner"
                 },
                 {
-                  "u32": 41
+                  "u32": 1000
                 }
               ]
             },
@@ -164,19 +92,19 @@
                       "symbol": "Owner"
                     },
                     {
-                      "u32": 41
+                      "u32": 1000
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 }
               }
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ],
       [
@@ -189,7 +117,7 @@
                   "symbol": "Owner"
                 },
                 {
-                  "u32": 99
+                  "u32": 9600
                 }
               ]
             },
@@ -209,13 +137,13 @@
                       "symbol": "Owner"
                     },
                     {
-                      "u32": 99
+                      "u32": 9600
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 }
               }
             },
@@ -261,16 +189,332 @@
                         "val": {
                           "vec": [
                             {
-                              "u32": 0
-                            },
-                            {
-                              "u32": 4194304
+                              "u32": 2147483648
                             },
                             {
                               "u32": 0
                             },
                             {
-                              "u32": 268435456
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 8388608
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "OwnershipBucket"
+                            },
+                            {
+                              "u32": 3
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "u32": 2147483648
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
+                            },
+                            {
+                              "u32": 0
                             },
                             {
                               "u32": 0
@@ -572,7 +816,7 @@
                           ]
                         },
                         "val": {
-                          "u32": 100
+                          "u32": 9601
                         }
                       }
                     ]
@@ -583,72 +827,6 @@
             "ext": "v0"
           },
           4095
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 801925984706572462
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": 801925984706572462
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-            "key": {
-              "ledger_key_nonce": {
-                "nonce": 5541220902715666415
-              }
-            },
-            "durability": "temporary"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M",
-                "key": {
-                  "ledger_key_nonce": {
-                    "nonce": 5541220902715666415
-                  }
-                },
-                "durability": "temporary",
-                "val": "void"
-              }
-            },
-            "ext": "v0"
-          },
-          6311999
         ]
       ],
       [
@@ -674,92 +852,5 @@
       ]
     ]
   },
-  "events": [
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "consecutive_mint"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "u32": 0
-                },
-                {
-                  "u32": 99
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "approve"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-              },
-              {
-                "u32": 42
-              }
-            ],
-            "data": {
-              "vec": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                },
-                {
-                  "u32": 100
-                }
-              ]
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "burn"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-              }
-            ],
-            "data": {
-              "u32": 42
-            }
-          }
-        }
-      },
-      "failed_call": false
-    }
-  ]
+  "events": []
 }

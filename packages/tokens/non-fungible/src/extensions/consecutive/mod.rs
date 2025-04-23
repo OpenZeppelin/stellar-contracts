@@ -10,15 +10,35 @@
 //!
 //! ## Implementation Notes
 //!
-//! - **Minting**: `batch_mint` stores the owner only for the first token ID in
+//! - **Minting**: `batch_mint` stores the owner only for the last token ID in
 //!   the batch.
-//! - **owner_of**: Walks backwards from the token ID to find the closest
-//!   recorded owner.
+//!
+//!   Mint first 10 tokens to A
+//!   -------------------A
+//!   |0|1|2|3|4|5|6|7|8|9|
+//!
+//! - **owner_of**: Walks upwards from the token ID to find the closest recorded
+//!   owner.
+//!
+//!   `owner_of(4)`
+//!   --------->---------A
+//!   |0|1|2|3|4|5|6|7|8|9|
+//!
 //! - **Transfer**: Stores the new owner for the token ID and re-stores the old
-//!   owner at `token_id + 1` if needed, to preserve correct inference for later
+//!   owner at `token_id - 1` if needed, to preserve correct inference for later
 //!   tokens.
+//!
+//!   After transfer of token 5 to B
+//!   ---------A-B-------A
+//!   |0|1|2|3|4|5|6|7|8|9|
+//!
 //! - **Burn**: Removes the owner, marks the token as burnt, and (if needed)
-//!   stores the old owner at `token_id + 1`.
+//!   stores the old owner at `token_id - 1`.
+//!
+//!   Burn token 2
+//!   ---A-x---A-B-------A
+//!   |0|1|2|3|4|5|6|7|8|9|
+//!
 //!
 //! ## Caveats
 //!
