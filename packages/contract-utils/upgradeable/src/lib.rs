@@ -9,7 +9,7 @@
 //! migration), ensuring safe and predictable transitions.
 //!
 //! It is recommended to use this module via the `#[derive(Upgradeable)]` macro,
-//! or via the combination `#[derive(Upgradeable, Migratable)]` when custom
+//! or via the combination `#[derive(Upgradeable, UpgradeableMigratable)]` when custom
 //! migration or rollback logic is additionally needed.
 //!
 //! **IMPORTANT**: While the framework structures the upgrade flow, it does NOT
@@ -30,7 +30,7 @@
 //!     pub num2: u32,
 //! }
 //!
-//! #[derive(Upgradeable, Migratable)]
+//! #[derive(Upgradeable, UpgradeableMigratable)]
 //! #[contract]
 //! pub struct ExampleContract;
 //!
@@ -44,7 +44,7 @@
 //!     }
 //! }
 //!
-//! impl MigratableInternal for ExampleContract {
+//! impl UpgradeableMigratableInternal for ExampleContract {
 //!     type MigrationData = Data;
 //!     type RollbackData = ();
 //!
@@ -75,6 +75,7 @@ pub use crate::{
         ensure_can_rollback, start_migration,
     },
     upgradeable::{
-        Migratable, MigratableInternal, Upgradeable, UpgradeableClient, UpgradeableInternal,
+        Upgradeable, UpgradeableClient, UpgradeableInternal, UpgradeableMigratable,
+        UpgradeableMigratableInternal,
     },
 };

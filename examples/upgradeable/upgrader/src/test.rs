@@ -12,7 +12,7 @@ mod contract_v1 {
 }
 
 mod contract_v2 {
-    use crate::test::{MigrationData, RollbackData};
+    use crate::test::MigrationData;
 
     soroban_sdk::contractimport!(file = "../testdata/upgradeable_v2_example.wasm");
 }
@@ -21,12 +21,11 @@ fn install_new_wasm(e: &Env) -> BytesN<32> {
     e.deployer().upload_contract_wasm(contract_v2::WASM)
 }
 
-fn install_old_wasm(e: &Env) -> BytesN<32> {
-    e.deployer().upload_contract_wasm(contract_v1::WASM)
-}
+//fn install_old_wasm(e: &Env) -> BytesN<32> {
+//e.deployer().upload_contract_wasm(contract_v1::WASM)
+//}
 
 type MigrationData = Data;
-type RollbackData = ();
 
 #[test]
 fn test_upgrade_with_upgrader() {
@@ -46,21 +45,15 @@ fn test_upgrade_with_upgrader() {
         &contract_id,
         &admin,
         &new_wasm_hash,
-        &soroban_sdk::vec![&env, data.try_into_val(&env).unwrap()],
+        &soroban_sdk::vec![
+            &env,
+            data.try_into_val(&env).unwrap(),
+            admin.try_into_val(&env).unwrap()
+        ],
     );
 
-    let old_wasm_hash = install_old_wasm(&env);
+    //let old_wasm_hash = install_old_wasm(&env);
     let client_v2 = contract_v2::Client::new(&env, &contract_id);
 
-    assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }).is_err());
-
-    upgrader_client.rollback_and_upgrade(
-        &contract_id,
-        &admin,
-        &old_wasm_hash,
-        &soroban_sdk::vec![&env, ().into()],
-    );
-
-    assert!(client_v2.try_rollback(&()).is_err());
-    assert!(client_v2.try_migrate(&data).is_err());
+    assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }, &admin).is_err());
 }

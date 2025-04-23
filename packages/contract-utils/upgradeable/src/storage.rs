@@ -9,6 +9,7 @@ pub const UPGRADE_KEY: Symbol = symbol_short!("UPGRADE");
 #[contracttype]
 pub enum UpgradeState {
     Initial,
+    Migrating,
     Migrated,
     RolledBack,
 }
