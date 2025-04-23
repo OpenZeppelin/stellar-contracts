@@ -111,6 +111,4 @@ pub trait UpgradeableMigratableInternal {
 pub enum UpgradeableError {
     /// When migration is attempted but not allowed due to upgrade state.
     MigrationNotAllowed = 110,
-    /// When rollback is attempted but not allowed due to upgrade state.
-    RollbackNotAllowed = 111,
 }

@@ -70,10 +70,7 @@ mod test;
 mod upgradeable;
 
 pub use crate::{
-    storage::{
-        can_migrate, can_rollback, complete_migration, complete_rollback, ensure_can_migrate,
-        ensure_can_rollback, start_migration,
-    },
+    storage::{can_migrate, complete_migration, ensure_can_migrate, start_migration},
     upgradeable::{
         Upgradeable, UpgradeableClient, UpgradeableInternal, UpgradeableMigratable,
         UpgradeableMigratableInternal,
