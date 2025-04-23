@@ -205,6 +205,7 @@ impl Base {
     /// * refer to [`owner_of`] errors.
     /// * refer to [`base_uri`] errors.
     pub fn token_uri(e: &Env, token_id: TokenId) -> String {
+        // used to panic if non-existent token_id
         let _ = Base::owner_of(e, token_id);
         let base_uri = Base::base_uri(e);
         Base::compose_uri_for_token(e, base_uri, token_id)
@@ -630,6 +631,7 @@ impl Base {
 
         while temp > 0 {
             index -= 1;
+            // 48 is the '0' ASCII character
             slice[index] = (48 + temp % 10) as u8;
             temp /= 10;
         }
