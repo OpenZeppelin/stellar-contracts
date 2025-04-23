@@ -411,6 +411,7 @@ impl Consecutive {
                 OWNER_TTL_THRESHOLD,
                 OWNER_EXTEND_AMOUNT,
             );
+            return;
         }
 
         let burned_token_key = StorageKey::BurnedToken(token_id);
@@ -421,6 +422,7 @@ impl Consecutive {
                 TOKEN_TTL_THRESHOLD,
                 TOKEN_EXTEND_AMOUNT,
             );
+            return;
         }
 
         if token_id < max && !has_owner && !is_burned {
