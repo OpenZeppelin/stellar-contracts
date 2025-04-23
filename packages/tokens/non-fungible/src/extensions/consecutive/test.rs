@@ -434,3 +434,44 @@ fn consecutive_set_owner_for_works() {
         assert_eq!(owner, None);
     });
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #300)")]
+fn consecutive_token_uri_panics_for_more_than_max_id_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let _ = sequential::increment_token_id(&e, 100);
+        Consecutive::token_uri(&e, sequential::next_token_id(&e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #300)")]
+fn consecutive_token_uri_panics_for_more_than_total_ids_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let max = (IDS_IN_BUCKET * BUCKETS) as TokenId;
+        // increment sequential more than max
+        let _ = sequential::increment_token_id(&e, max + 100);
+        Consecutive::token_uri(&e, max);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #300)")]
+fn consecutive_token_uri_panics_for_burned_id_fails() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Consecutive::batch_mint(&e, &owner, 1);
+        Consecutive::burn(&e, &owner, 0);
+        Consecutive::token_uri(&e, 0);
+    });
+}
