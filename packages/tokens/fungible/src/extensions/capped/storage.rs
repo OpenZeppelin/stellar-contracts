@@ -62,7 +62,7 @@ pub fn query_cap(e: &Env) -> i128 {
 ///   will exceed the cap.
 pub fn check_cap(e: &Env, amount: i128) {
     let cap: i128 = query_cap(e);
-    let total_supply = e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0);
+    let total_supply: i128 = e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0);
     let Some(sum) = total_supply.checked_add(amount) else {
         panic_with_error!(e, FungibleTokenError::MathOverflow);
     };

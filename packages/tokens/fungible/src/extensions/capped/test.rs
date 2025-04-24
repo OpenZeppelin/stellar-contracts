@@ -2,8 +2,6 @@
 
 extern crate std;
 
-use core::i128;
-
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::{
