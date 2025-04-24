@@ -238,7 +238,7 @@ fn transfer_works() {
         assert_eq!(balance(&e, &from), 50);
         assert_eq!(balance(&e, &recipient), 50);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_fungible_mint(&from, 100);
         event_assert.assert_fungible_transfer(&from, &recipient, 50);
@@ -309,7 +309,7 @@ fn approve_and_transfer_from() {
         let updated_allowance = allowance(&e, &owner, &spender);
         assert_eq!(updated_allowance, 20);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
         event_assert.assert_fungible_mint(&owner, 100);
         event_assert.assert_fungible_approve(&owner, &spender, 50, 1000);

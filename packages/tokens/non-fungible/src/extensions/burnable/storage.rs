@@ -4,14 +4,14 @@ use crate::{extensions::burnable::emit_burn, Base, TokenId};
 
 // `Burnable` extension is build for the `Base` contract type.
 impl Base {
-    /// Destroys the `token_id` from `account`, ensuring ownership
+    /// Destroys the token with `token_id` from `from`, ensuring ownership
     /// checks, and emits a `burn` event.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///
@@ -31,7 +31,7 @@ impl Base {
         emit_burn(e, from, token_id);
     }
 
-    /// Destroys the `token_id` from `account`, ensuring ownership
+    /// Destroys the token with `token_id` from `from`, ensuring ownership
     /// and approval checks, and emits a `burn` event.
     ///
     /// # Arguments
@@ -40,7 +40,7 @@ impl Base {
     /// * `spender` - The account that is allowed to burn the token on behalf of
     ///   the owner.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///

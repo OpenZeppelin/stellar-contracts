@@ -55,7 +55,7 @@ fn approve_for_all_works() {
         let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
         assert!(is_approved);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
         event_assert.assert_approve_for_all(&owner, &operator, 1000);
     });
@@ -84,7 +84,7 @@ fn revoke_approve_for_all_works() {
         let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
         assert!(!is_approved);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
         event_assert.assert_approve_for_all(&owner, &operator, 0);
     });
@@ -107,7 +107,7 @@ fn approve_nft_works() {
         let approved_address = Base::get_approved(&e, token_id);
         assert_eq!(approved_address, Some(approved.clone()));
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
         event_assert.assert_non_fungible_approve(&owner, &approved, token_id, 1000);
     });
@@ -134,7 +134,7 @@ fn approve_with_operator_works() {
         let approved_address = Base::get_approved(&e, token_id);
         assert_eq!(approved_address, Some(approved.clone()));
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_approve_for_all(&owner, &operator, 1000);
         event_assert.assert_non_fungible_approve(&operator, &approved, token_id, 1000);
@@ -158,7 +158,7 @@ fn transfer_nft_works() {
         assert_eq!(Base::balance(&e, &recipient), 1);
         assert_eq!(Base::owner_of(&e, token_id), recipient);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_non_fungible_mint(&owner, token_id);
         event_assert.assert_non_fungible_transfer(&owner, &recipient, token_id);
@@ -187,7 +187,7 @@ fn transfer_from_nft_approved_works() {
         assert_eq!(Base::balance(&e, &recipient), 1);
         assert_eq!(Base::owner_of(&e, token_id), recipient);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
         event_assert.assert_non_fungible_mint(&owner, token_id);
         event_assert.assert_non_fungible_approve(&owner, &spender, token_id, 1000);
@@ -217,7 +217,7 @@ fn transfer_from_nft_operator_works() {
         assert_eq!(Base::balance(&e, &recipient), 1);
         assert_eq!(Base::owner_of(&e, token_id), recipient);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
         event_assert.assert_non_fungible_mint(&owner, token_id);
         event_assert.assert_approve_for_all(&owner, &spender, 1000);
@@ -243,7 +243,7 @@ fn transfer_from_nft_owner_works() {
         assert_eq!(Base::balance(&e, &recipient), 1);
         assert_eq!(Base::owner_of(&e, token_id), recipient);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_non_fungible_mint(&owner, token_id);
         event_assert.assert_non_fungible_transfer(&owner, &recipient, token_id);
@@ -419,7 +419,7 @@ fn mint_works() {
         let token_id = Base::sequential_mint(&e, &account);
         assert_eq!(Base::balance(&e, &account), 1);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
         event_assert.assert_non_fungible_mint(&account, token_id);
     });
@@ -434,15 +434,12 @@ fn test_counter_works() {
 
     e.as_contract(&address, || {
         let token_id1 = Base::sequential_mint(&e, &owner);
-        let _token_id2 = Base::sequential_mint(&e, &owner);
+        let token_id2 = Base::sequential_mint(&e, &owner);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_non_fungible_mint(&owner, token_id1);
-
-        // TODO: below fails because the same event is read by the
-        // `event_assert`, not the next one. event_assert.
-        // assert_non_fungible_mint(&owner, token_id2);
+        event_assert.assert_non_fungible_mint(&owner, token_id2);
     });
 }
 

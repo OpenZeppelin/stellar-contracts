@@ -24,7 +24,7 @@ fn burn_works() {
 
         assert!(Base::balance(&e, &owner) == 0);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_non_fungible_mint(&owner, token_id);
         event_assert.assert_non_fungible_burn(&owner, token_id);
@@ -47,7 +47,7 @@ fn burn_from_with_approve_works() {
 
         assert!(Base::balance(&e, &owner) == 0);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
         event_assert.assert_non_fungible_mint(&owner, token_id);
         event_assert.assert_non_fungible_approve(&owner, &spender, token_id, 1000);
@@ -72,7 +72,7 @@ fn burn_from_with_operator_works() {
 
         assert!(Base::balance(&e, &owner) == 0);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
         event_assert.assert_non_fungible_mint(&owner, token_id);
         event_assert.assert_approve_for_all(&owner, &operator, 1000);
@@ -94,7 +94,7 @@ fn burn_from_with_owner_works() {
 
         assert!(Base::balance(&e, &owner) == 0);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_non_fungible_mint(&owner, token_id);
         event_assert.assert_non_fungible_burn(&owner, token_id);

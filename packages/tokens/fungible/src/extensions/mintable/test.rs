@@ -24,7 +24,7 @@ fn mint_works() {
         assert_eq!(balance(&e, &account), 100);
         assert_eq!(total_supply(&e), 100);
 
-        let event_assert = EventAssertion::new(&e, address.clone());
+        let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
         event_assert.assert_fungible_mint(&account, 100);
     });
