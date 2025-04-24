@@ -404,7 +404,10 @@ impl Consecutive {
     ///
     /// # Notes
     ///
-    /// This function extends the persistent storage TTL even when it doesn't assign an owner. The intent is to fairly distribute storage costs among neighboring entries, since they collectively influence boundary calculations.
+    /// This function extends the persistent storage TTL even when it doesn't
+    /// assign an owner. The intent is to fairly distribute storage costs among
+    /// neighboring entries, since they collectively influence boundary
+    /// calculations.
     pub fn set_owner_for(e: &Env, to: &Address, token_id: TokenId) {
         let max = sequential::next_token_id(e);
         let owner_key = StorageKey::Owner(token_id);
