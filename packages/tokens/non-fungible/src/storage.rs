@@ -208,26 +208,20 @@ impl Base {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `base_uri` - The base URI.
+    /// * `base_uri` - The base URI. Assumes it's valid and ends by `/`.
     /// * `token_id` - The identifier of the token.
     pub fn compose_uri_for_token(e: &Env, base_uri: String, token_id: TokenId) -> String {
         let len = base_uri.len() as usize;
 
         if len > 0 {
-            // account for potentially the max num of digits of the TokenId type and a "/"
-            let uri = &mut [0u8; MAX_BASE_URI_LEN + MAX_NUM_DIGITS + 1];
+            // account for potentially the max num of digits of the TokenId type
+            let uri = &mut [0u8; MAX_BASE_URI_LEN + MAX_NUM_DIGITS];
 
             let (id, digits) = Base::token_id_to_string(e, token_id);
 
             base_uri.copy_into_slice(&mut uri[..len]);
-            // check for '/' at the end of the base uri and add if needed
-            let mut offset = 0usize;
-            if uri[len - 1] != b'/' {
-                uri[len] = b'/';
-                offset += 1;
-            }
-            let end = len + digits + offset;
-            id.copy_into_slice(&mut uri[(len + offset)..end]);
+            let end = len + digits;
+            id.copy_into_slice(&mut uri[len..end]);
 
             String::from_bytes(e, &uri[..end])
         } else {
@@ -353,6 +347,9 @@ impl Base {
     /// * `operator` - The address being granted or revoked approval.
     /// * `live_until_ledger` - The ledger number at which the allowance
     ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
+    ///   `live_until_ledger` argument is implicitly bounded by the maximum
+    ///   allowed TTL extension for a temporary storage entry and specifying a
+    ///   higher value will cause the code to panic.
     ///
     /// # Errors
     ///
@@ -454,6 +451,9 @@ impl Base {
     /// * `approved` - The address receiving the approval.
     /// * `token_id` - The identifier of the token to be approved.
     /// * `live_until_ledger` - The ledger number at which the approval expires.
+    ///   `live_until_ledger` argument is implicitly bounded by the maximum
+    ///   allowed TTL extension for a temporary storage entry and specifying a
+    ///   higher value will cause the code to panic.
     ///
     /// # Errors
     ///
@@ -567,7 +567,8 @@ impl Base {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `base_uri` - The base collection URI.
+    /// * `base_uri` - The base collection URI, assuming it's a valid URI and
+    ///   ends by `/`.
     /// * `name` - The token collection name.
     /// * `symbol` - The token collection symbol.
     ///
@@ -596,7 +597,7 @@ impl Base {
     /// number of digits.
     fn token_id_to_string(e: &Env, value: TokenId) -> (String, usize) {
         if value == 0 {
-            return (String::from_str(e, "0"), 0);
+            return (String::from_str(e, "0"), 1);
         }
 
         let mut digits: usize = 0;
