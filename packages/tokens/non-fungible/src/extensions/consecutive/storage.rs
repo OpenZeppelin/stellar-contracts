@@ -43,8 +43,23 @@ impl ContractOverrides for Consecutive {
     }
 }
 
+/// For 32,000 total ids with ITEM of type u32 and 100 items per bucket:
+///
+/// Bucket 0
+/// ├── Item 0 → bits for Token IDs 0..31
+/// ├── Item 1 → bits for Token IDs 32..63
+/// ├── ...
+/// ├── Item 99 → bits for Token IDs 3_168..3_199
+///
+/// Bucket 1...8
+///
+/// Bucket 9
+/// ├── Item 0 → bits for Token IDs 28_800..28_832
+/// ├── ...
+/// ├── Item 99 → bits for Token IDs 31_968..31_999
+///
 /// Maximum number of vectors holding bitfields, which denote ids
-pub const BUCKETS: usize = 10; // 32,000 total ids if TokenId is u32 and 100 items in bucket.
+pub const BUCKETS: usize = 10;
 /// Number of elements in a bucket
 pub const ITEMS_IN_BUCKET: usize = 100;
 /// Number of ids per item, which corresponds to the number of bits for a given
@@ -83,8 +98,9 @@ impl Consecutive {
         }
 
         let ids_in_bucket = IDS_IN_BUCKET as TokenId;
+        // idex of the bucket that contains token_id
         let bucket_index = token_id / ids_in_bucket;
-        // relative id in bucket
+        // position of the token_id within its bucket (0-based)
         let relative_id = token_id - (bucket_index * ids_in_bucket);
 
         (bucket_index..BUCKETS as TokenId)
@@ -93,7 +109,10 @@ impl Consecutive {
             })
             .filter(|(_, bucket)| bucket.is_some())
             .find_map(|(i, bucket)| {
+                // If we're in the starting bucket, begin search from the token's relative
+                // position; otherwise, start from the beginning of the bucket.
                 let from_id = if i == bucket_index { relative_id } else { 0 };
+                // unwrap is safe because of the filter above
                 find_bit_in_bucket(bucket.unwrap(), from_id)
                     .map(|pos_in_bucket| i * ids_in_bucket + pos_in_bucket)
             })
@@ -405,7 +424,9 @@ impl Consecutive {
             let approval_key = StorageKey::Approval(token_id);
             e.storage().temporary().remove(&approval_key);
 
-            // Set the previous token to prev owner, if there's a previous id.
+            // Set the token_id - 1 to previous owner to preserve the ownership inference.
+            // `set_owner_for` does this, but will skip it if the previous id doesn't exist,
+            // was burned or has already an owner.
             if token_id > 0 {
                 Consecutive::set_owner_for(e, from_address, token_id - 1);
             }
@@ -496,13 +517,15 @@ impl Consecutive {
         let mut bucket: Vec<TokenId> =
             if let Some(b) = bucket { b } else { Vec::from_slice(e, &[0; ITEMS_IN_BUCKET]) };
 
-        // token_id in bucket
+        // position of the token_id within its bucket (0-based)
         let relative_id = token_id - (bucket_index * ids_in_bucket);
+        // index of the item inside the bucket that contains token_id
         let item_index = relative_id / ids_in_item;
+        // index of the bit within the item that contains token_id
         let bit_index = relative_id % ids_in_item;
 
         let mask: TokenId = 1 << (ids_in_item - bit_index - 1);
-        let mut item = bucket.get(item_index).unwrap();
+        let mut item = bucket.get(item_index).expect("token_id out of allowed range");
         item |= mask;
         // no replace, so must remove and re-insert
         let _ = bucket.remove(item_index);
@@ -599,6 +622,8 @@ pub(crate) fn find_bit_in_bucket(bucket: Vec<TokenId>, start: TokenId) -> Option
     let relative_id = start - (item_index * ids_in_item);
 
     (item_index..bucket.len()).find_map(|i| {
+        // If we're in the starting item, begin search from the token's relative
+        // position; otherwise, start from the beginning of the item.
         let from_id = if i == item_index { relative_id } else { 0 };
 
         find_bit_in_item(bucket.get(i), from_id).map(|pos_in_item| i * ids_in_item + pos_in_item)
