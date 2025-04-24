@@ -8,7 +8,7 @@ use soroban_sdk::{testutils::Address as _, Address, BytesN, Env};
 use crate::contract::{ExampleContract, ExampleContractClient};
 
 mod contract_v2 {
-    use crate::test::{MigrationData, RollbackData};
+    use crate::test::MigrationData;
 
     soroban_sdk::contractimport!(file = "../testdata/upgradeable_v2_example.wasm");
 }
@@ -18,7 +18,6 @@ fn install_new_wasm(e: &Env) -> BytesN<32> {
 }
 
 type MigrationData = Data;
-type RollbackData = ();
 
 #[test]
 fn test_upgrade() {
@@ -37,15 +36,8 @@ fn test_upgrade() {
 
     // init the upgraded client and migrate
     let client_v2 = contract_v2::Client::new(&env, &address);
-    client_v2.migrate(&Data { num1: 12, num2: 34 });
+    client_v2.migrate(&Data { num1: 12, num2: 34 }, &admin);
 
     // ensure migrate can't be invoked again
-    assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }).is_err());
-
-    // rollback
-    client_v2.rollback(&());
-
-    // ensure migrate and rollback can't be invoked before another upgrade
-    assert!(client_v2.try_rollback(&()).is_err());
-    assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }).is_err());
+    assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }, &admin).is_err());
 }

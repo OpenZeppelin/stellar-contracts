@@ -215,14 +215,14 @@ impl Consecutive {
         last_id
     }
 
-    /// Destroys the `token_id` from `account`, ensuring ownership
+    /// Destroys the token with `token_id` from `from`, ensuring ownership
     /// checks, and emits a `burn` event.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///
@@ -243,7 +243,7 @@ impl Consecutive {
         emit_burn(e, from, token_id);
     }
 
-    /// Destroys the `token_id` from `account`, ensuring ownership
+    /// Destroys the token with `token_id` from `from`, ensuring ownership
     /// and approval checks, and emits a `burn` event.
     ///
     /// # Arguments
@@ -252,7 +252,7 @@ impl Consecutive {
     /// * `spender` - The account that is allowed to burn the token on behalf of
     ///   the owner.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///
@@ -471,6 +471,7 @@ impl Consecutive {
                 OWNER_TTL_THRESHOLD,
                 OWNER_EXTEND_AMOUNT,
             );
+            return;
         }
 
         let burned_token_key = StorageKey::BurnedToken(token_id);
@@ -481,6 +482,7 @@ impl Consecutive {
                 TOKEN_TTL_THRESHOLD,
                 TOKEN_EXTEND_AMOUNT,
             );
+            return;
         }
 
         if token_id < max && !has_owner && !is_burned {

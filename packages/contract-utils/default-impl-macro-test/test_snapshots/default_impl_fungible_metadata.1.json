@@ -4,6 +4,9 @@
     "nonce": 0
   },
   "auth": [
+    [],
+    [],
+    [],
     []
   ],
   "ledger": {
@@ -38,7 +41,41 @@
                     "executable": {
                       "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                     },
-                    "storage": null
+                    "storage": [
+                      {
+                        "key": {
+                          "symbol": "METADATA"
+                        },
+                        "val": {
+                          "map": [
+                            {
+                              "key": {
+                                "symbol": "decimals"
+                              },
+                              "val": {
+                                "u32": 7
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "name"
+                              },
+                              "val": {
+                                "string": "My Token"
+                              }
+                            },
+                            {
+                              "key": {
+                                "symbol": "symbol"
+                              },
+                              "val": {
+                                "string": "TKN"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
                   }
                 }
               }

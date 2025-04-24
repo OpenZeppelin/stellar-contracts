@@ -5,11 +5,11 @@ extern crate std;
 use soroban_sdk::{
     contract,
     testutils::{Address as _, Ledger as _},
-    Address, Env, Map, String,
+    Address, Env, String,
 };
 use stellar_event_assertion::EventAssertion;
 
-use crate::{non_fungible::Balance, ApprovalForAllData, Base, StorageKey};
+use crate::{non_fungible::Balance, Base, StorageKey};
 
 #[contract]
 struct MockContract;
@@ -24,12 +24,7 @@ fn metadata_works() {
         let base_uri = String::from_str(&e, "https://smth.com/");
         let collection_name = String::from_str(&e, "My NFT collection");
         let collection_symbol = String::from_str(&e, "NFT");
-        Base::set_metadata(
-            &e,
-            base_uri.clone(),
-            collection_name.clone(),
-            collection_symbol.clone(),
-        );
+        Base::set_metadata(&e, base_uri, collection_name.clone(), collection_symbol.clone());
 
         let token_id = 4294967295;
         e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
@@ -38,6 +33,20 @@ fn metadata_works() {
         assert_eq!(uri, String::from_str(&e, "https://smth.com/4294967295"));
         assert_eq!(collection_name, Base::name(&e));
         assert_eq!(collection_symbol, Base::symbol(&e));
+
+        // case token_id == 0
+        let token_id = 0;
+        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        let uri = Base::token_uri(&e, token_id);
+
+        assert_eq!(uri, String::from_str(&e, "https://smth.com/0"));
+
+        // case empty string as base_uri
+        let empty_base_uri = String::from_str(&e, "");
+        Base::set_metadata(&e, empty_base_uri, collection_name, collection_symbol);
+        let empty_uri = Base::token_uri(&e, token_id);
+
+        assert_eq!(empty_uri, String::from_str(&e, ""));
     });
 }
 
@@ -71,17 +80,16 @@ fn revoke_approve_for_all_works() {
 
     e.as_contract(&address, || {
         // set a pre-existing approve_for_all for the operator
-        let key = StorageKey::ApprovalForAll(owner.clone());
-        let mut approval_data = ApprovalForAllData { operators: Map::new(&e) };
-        approval_data.operators.set(operator.clone(), 1000);
+        let key = StorageKey::ApprovalForAll(owner.clone(), operator.clone());
 
-        e.storage().temporary().set(&key, &approval_data);
+        e.storage().temporary().set(&key, &(1000_u32));
 
         let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
         assert!(is_approved);
 
         // revoke approval
         Base::approve_for_all(&e, &owner, &operator, 0);
+
         let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
         assert!(!is_approved);
 

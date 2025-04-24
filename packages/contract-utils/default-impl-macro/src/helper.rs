@@ -20,7 +20,7 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
             syn::parse_quote! { fn burn_from(e: &Env, spender: Address, from: Address, amount: i128) { stellar_fungible::burnable::burn_from(e, &spender, &from, amount); } },
         ],
         "NonFungibleToken" => vec![
-            syn::parse_quote! { fn balance(e: &Env, owner: Address) -> Balance { Self::ContractType::balance(e, &owner) } },
+            syn::parse_quote! { fn balance(e: &Env, account: Address) -> Balance { Self::ContractType::balance(e, &account) } },
             syn::parse_quote! { fn owner_of(e: &Env, token_id: TokenId) -> Address { Self::ContractType::owner_of(e, token_id) } },
             syn::parse_quote! { fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId) { Self::ContractType::transfer(e, &from, &to, token_id); } },
             syn::parse_quote! { fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId) { Self::ContractType::transfer_from(e, &spender, &from, &to, token_id); } },
@@ -42,7 +42,7 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
             syn::parse_quote! { fn get_token_id(e: &Env, index: TokenId) -> TokenId { Enumerable::get_token_id(e, index) } },
         ],
         not_supported => {
-            panic!("Trait {} is not supported by #[default_impl]", not_supported)
+            panic!("Trait {not_supported} is not supported by #[default_impl]")
         }
     }
 }
