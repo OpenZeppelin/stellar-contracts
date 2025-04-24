@@ -2,7 +2,7 @@
 
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, Vec};
+use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, String, Vec};
 use stellar_event_assertion::EventAssertion;
 
 use super::storage::{find_bit_in_bucket, find_bit_in_item, BUCKETS, IDS_IN_BUCKET};
@@ -446,5 +446,71 @@ fn consecutive_set_owner_for_works() {
         Consecutive::set_owner_for(&e, &user2, 0);
         let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(0));
         assert_eq!(owner, None);
+    });
+}
+
+#[test]
+fn consecutive_token_uri_works() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let base_uri = String::from_str(&e, "https://smth.com/");
+        let collection_name = String::from_str(&e, "My NFT collection");
+        let collection_symbol = String::from_str(&e, "NFT");
+        Base::set_metadata(
+            &e,
+            base_uri.clone(),
+            collection_name.clone(),
+            collection_symbol.clone(),
+        );
+
+        let _ = sequential::increment_token_id(&e, 10);
+        let uri = Consecutive::token_uri(&e, 9);
+
+        assert_eq!(uri, String::from_str(&e, "https://smth.com/9"));
+        assert_eq!(collection_name, Base::name(&e));
+        assert_eq!(collection_symbol, Base::symbol(&e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #300)")]
+fn consecutive_token_uri_panics_for_more_than_max_id_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let _ = sequential::increment_token_id(&e, 100);
+        Consecutive::token_uri(&e, sequential::next_token_id(&e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #300)")]
+fn consecutive_token_uri_panics_for_more_than_total_ids_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let max = (IDS_IN_BUCKET * BUCKETS) as TokenId;
+        // increment sequential more than max
+        let _ = sequential::increment_token_id(&e, max + 100);
+        Consecutive::token_uri(&e, max);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #300)")]
+fn consecutive_token_uri_panics_for_burned_id_fails() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Consecutive::batch_mint(&e, &owner, 1);
+        Consecutive::burn(&e, &owner, 0);
+        Consecutive::token_uri(&e, 0);
     });
 }

@@ -120,10 +120,19 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * refer to [`owner_of`] errors.
-    /// * refer to [`base_uri`] errors.
+    /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
+    ///   `token_id` does not exist (burned or more than max allowed).
+    /// * refer to [`Base::base_uri`] errors.
     pub fn token_uri(e: &Env, token_id: TokenId) -> String {
-        let _ = Consecutive::owner_of(e, token_id);
+        let ids_in_bucket = IDS_IN_BUCKET as TokenId;
+        let total_ids = ids_in_bucket * BUCKETS as TokenId;
+
+        let is_burned =
+            e.storage().persistent().get(&StorageKey::BurnedToken(token_id)).unwrap_or(false);
+        if is_burned || token_id >= sequential::next_token_id(e) || token_id >= total_ids {
+            panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
+        }
+
         let base_uri = Base::base_uri(e);
         Base::compose_uri_for_token(e, base_uri, token_id)
     }
