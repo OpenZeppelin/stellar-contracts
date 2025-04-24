@@ -81,13 +81,6 @@ impl Enumerable {
     /// * `e` - Access to the Soroban environment.
     /// * `index` - Index of the token in the owner's local list.
     ///
-    /// # Notes
-    ///
-    /// **IMPORTANT**: This function is only intended for non-sequential
-    /// `token_id`s. For sequential `token_id`s, no need to call a function,
-    /// the `token_id` itself acts as the global index. Calling this function
-    /// while using sequential minting strategy will result in error.
-    ///
     /// # Errors
     ///
     /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
@@ -165,13 +158,13 @@ impl Enumerable {
         Enumerable::add_to_enumerations(e, to, token_id);
     }
 
-    /// Destroys the `token_id` from `account`.
+    /// Destroys the token with `token_id` from `from`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///
@@ -197,7 +190,8 @@ impl Enumerable {
         Enumerable::remove_from_enumerations(e, from, token_id);
     }
 
-    /// Destroys the `token_id` from `account`, by using `spender`s approval.
+    /// Destroys the token with `token_id` from `from`, by using `spender`s
+    /// approval.
     ///
     /// # Arguments
     ///
@@ -205,7 +199,7 @@ impl Enumerable {
     /// * `spender` - The account that is allowed to burn the token on behalf of
     ///   the owner.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///
