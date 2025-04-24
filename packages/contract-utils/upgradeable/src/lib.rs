@@ -22,7 +22,20 @@
 //! - Checking for storage consistency, ensuring that the new contract does not
 //!   inadvertently introduce storage mismatches.
 //!
-//! # Example
+//!
+//! Example for upgrade only:
+//! ```rust,ignore
+//! #[derive(Upgradeable)]
+//! #[contract]
+//! pub struct ExampleContract;
+//!
+//! impl UpgradeableInternal for ExampleContract {
+//!     fn _require_auth(e: &Env) {
+//!         e.storage().instance().get::<_, Address>(&OWNER).unwrap().require_auth();
+//!     }
+//! ```
+//!
+//! # Example for upgrade and migration:
 //! ```ignore,rust
 //! #[contracttype]
 //! pub struct Data {
@@ -35,6 +48,8 @@
 //! pub struct ExampleContract;
 //!
 //! impl UpgradeableInternal for ExampleContract {
+//!     type MigrationData = Data;
+//!
 //!     fn _require_auth(e: &Env, operator: &Address) {
 //!         operator.require_auth();
 //!         let owner = e.storage().instance().get::<_, Address>(&OWNER).unwrap();
@@ -49,7 +64,7 @@
 //! }
 //! ```
 //! Check in the "/examples/upgradeable/" directory for the full example, where
-//! can also be found a helper `Upgrader` contract that performs upgrade+migrate
+//! you can also find a helper `Upgrader` contract that performs upgrade+migrate
 //! in a single transaction.
 
 #![no_std]
