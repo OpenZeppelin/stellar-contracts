@@ -22,6 +22,13 @@ pub const CAP_KEY: Symbol = symbol_short!("CAP");
 ///   contract.
 /// * Cap functionality is designed to be used in conjunction with the
 ///   `mintable` extension.
+/// * This function DOES NOT enforce that the cap must be greater than or
+///   equal to the current total supply. While this may deviate from common
+///   assumptions (e.g., treating `supply_cap >= total_supply` as an invariant),
+///   it allows for more flexible use-cases. For instance, a contract owner
+///   might decide to permanently reduce the token supply by burning tokens
+///   later, and setting a lower cap ahead of time effectively prevents any
+///   further minting until the total supply falls below the new cap.
 pub fn set_cap(e: &Env, cap: i128) {
     if cap < 0 {
         panic_with_error!(e, FungibleTokenError::InvalidCap);
