@@ -459,6 +459,13 @@ impl Consecutive {
     /// * `e` - The environment reference.
     /// * `to` - The owner's address.
     /// * `token_id` - The identifier of the token next to the one being set.
+    ///
+    /// # Notes
+    ///
+    /// This function extends the persistent storage TTL even when it doesn't
+    /// assign an owner. The intent is to fairly distribute storage costs among
+    /// neighboring entries, since they collectively influence boundary
+    /// calculations.
     pub fn set_owner_for_previous_token(e: &Env, to: &Address, token_id: TokenId) {
         if token_id == 0 || token_id >= sequential::next_token_id(e) {
             return;
