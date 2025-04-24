@@ -46,7 +46,7 @@ impl ExampleContract {
     }
 
     pub fn burn(e: &Env, from: Address, token_id: TokenId) {
-        Enumerable::sequential_burn(e, &from, token_id);
+        Enumerable::burn(e, &from, token_id);
     }
 }
 

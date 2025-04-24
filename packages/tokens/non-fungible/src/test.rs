@@ -5,11 +5,11 @@ extern crate std;
 use soroban_sdk::{
     contract,
     testutils::{Address as _, Ledger as _},
-    Address, Env, Map, String,
+    Address, Env, String,
 };
 use stellar_event_assertion::EventAssertion;
 
-use crate::{non_fungible::Balance, ApprovalForAllData, Base, StorageKey};
+use crate::{non_fungible::Balance, Base, StorageKey};
 
 #[contract]
 struct MockContract;
@@ -80,17 +80,16 @@ fn revoke_approve_for_all_works() {
 
     e.as_contract(&address, || {
         // set a pre-existing approve_for_all for the operator
-        let key = StorageKey::ApprovalForAll(owner.clone());
-        let mut approval_data = ApprovalForAllData { operators: Map::new(&e) };
-        approval_data.operators.set(operator.clone(), 1000);
+        let key = StorageKey::ApprovalForAll(owner.clone(), operator.clone());
 
-        e.storage().temporary().set(&key, &approval_data);
+        e.storage().temporary().set(&key, &(1000_u32));
 
         let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
         assert!(is_approved);
 
         // revoke approval
         Base::approve_for_all(&e, &owner, &operator, 0);
+
         let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
         assert!(!is_approved);
 
