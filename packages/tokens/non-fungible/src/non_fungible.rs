@@ -77,8 +77,8 @@ pub type Balance = TokenId;
 /// You can find the default implementations of this trait for `Base`,
 /// `Enumerable`, and `Consecutive`, by navigating to:
 /// `ContractType::{method_name}`. For example, if you want to find how
-/// [`NonFungibleToken::transfer`] is implemented for the `Enumerable` Contract
-/// Type, you can find it using
+/// [`NonFungibleToken::transfer`] is implemented for the `Enumerable` contract
+/// type, you can find it using
 /// [`crate::extensions::enumerable::Enumerable::transfer`].
 pub trait NonFungibleToken {
     /// Helper type that allows us to override some of the functionality of the
@@ -284,6 +284,7 @@ pub trait NonFungibleToken {
 // ################## ERRORS ##################
 
 #[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum NonFungibleTokenError {
     /// Indicates a non-existent `token_id`.

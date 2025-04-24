@@ -86,6 +86,6 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `index` - Index of the token in the owner's local list.
+    /// * `index` - Index of the token in the global list.
     fn get_token_id(e: &Env, index: TokenId) -> TokenId;
 }
