@@ -88,6 +88,21 @@ fn test_mint_multiple_exceeds_cap() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #204)")]
+fn test_check_cap_overflows() {
+    let e = Env::default();
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        set_cap(&e, i128::MAX);
+        mint(&e, &user, i128::MAX);
+
+        check_cap(&e, 1); // should overflow
+    });
+}
+
+#[test]
 fn test_query_cap() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
