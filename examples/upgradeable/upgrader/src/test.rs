@@ -21,10 +21,6 @@ fn install_new_wasm(e: &Env) -> BytesN<32> {
     e.deployer().upload_contract_wasm(contract_v2::WASM)
 }
 
-//fn install_old_wasm(e: &Env) -> BytesN<32> {
-//e.deployer().upload_contract_wasm(contract_v1::WASM)
-//}
-
 type MigrationData = Data;
 
 #[test]
@@ -52,7 +48,6 @@ fn test_upgrade_with_upgrader() {
         ],
     );
 
-    //let old_wasm_hash = install_old_wasm(&env);
     let client_v2 = contract_v2::Client::new(&env, &contract_id);
 
     assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }, &admin).is_err());

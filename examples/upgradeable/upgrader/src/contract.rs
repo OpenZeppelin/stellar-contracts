@@ -1,5 +1,4 @@
-/// Helper contract to perform upgrade+migrate or rollback+downgrade in a single
-/// transaction.
+/// Helper contract to perform upgrade+migrate in a single transaction.
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol, Val};
 use stellar_upgradeable::UpgradeableClient;
 

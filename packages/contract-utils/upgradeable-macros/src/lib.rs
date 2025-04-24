@@ -1,32 +1,39 @@
 /// 1. Derives Upgradeable a) implements the interface; requires only the auth
 ///    to be defined b) sets wasm version by taking the version from Cargo.toml
 ///
-/// 2. Optionally derives UpgradeableMigratable when migration and rollback are defined.
+/// 2. Derives UpgradeableMigratable when both, an upgrade and a migration are
+///    needed a) implements the interface; requires the auth and the migration
+///    logic to be defined b) sets wasm version by taking the version from
+///    Cargo.toml
 ///
 ///
-/// Example:
+/// Example for upgrade only:
 /// ```rust,ignore
-/// #[derive(Upgradeable, UpgradeableMigratable)]
+/// #[derive(Upgradeable)]
 /// #[contract]
 /// pub struct ExampleContract;
 ///
-/// impl Upgrade for ExampleContract {
-///     fn upgrade_auth(e: &Env) {
+/// impl UpgradeableInternal for ExampleContract {
+///     fn _require_auth(e: &Env) {
 ///         e.storage().instance().get::<_, Address>(&OWNER).unwrap().require_auth();
 ///     }
-/// }
+/// ```
 ///
-/// impl Migration for ExampleContract {
+/// Example for upgrade and migration:
+/// ```rust,ignore
+/// #[derive(UpgradeableMigratable)]
+/// #[contract]
+/// pub struct ExampleContract;
+///
+/// impl UpgradeableMigratableInternal for ExampleContract {
 ///     type MigrationData = Data;
-///     type RollbackData = ();
+///
+///     fn _require_auth(e: &Env) {
+///         e.storage().instance().get::<_, Address>(&OWNER).unwrap().require_auth();
+///     }
 ///
 ///     fn _migrate(e: &Env, data: &Self::MigrationData) {
 ///         e.storage().instance().get::<_, Address>(&OWNER).unwrap().require_auth();
-///     }
-///
-///     fn _rollback(e: &Env, _data: &Self::RollbackData) {
-///         e.storage().instance().get::<_, Address>(&OWNER).unwrap().require_auth();
-///         e.storage().instance().remove(&DATA_KEY);
 ///     }
 /// }
 /// ```

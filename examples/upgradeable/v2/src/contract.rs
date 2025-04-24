@@ -1,8 +1,8 @@
-/// The contract in "v1" needs to be upgraded with this one. Again, we are
-/// demonstrating the usage of the `Upgradeable` macro, but this time we want to
-/// do a migration after the upgrade. That's why we derive `UpgradeableMigratable` as well.
-/// For it to work, we implement `UpgradeableMigratableInternal` with the custom migration
-/// and rollback logic.
+/// The contract in "v1" needs to be upgraded with this one. We are
+/// demonstrating the usage of the `UpgradeableMigratable` macro, because this
+/// time we want to do a migration after the upgrade. That's why we derive
+/// `UpgradeableMigratable`. For it to work, we implement
+/// `UpgradeableMigratableInternal` with the custom migration logic.
 use soroban_sdk::{
     contract, contracterror, contracttype, panic_with_error, symbol_short, Address, Env, Symbol,
 };

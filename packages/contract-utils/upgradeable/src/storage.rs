@@ -4,7 +4,7 @@ use crate::upgradeable::UpgradeableError;
 
 pub const MIGRATING: Symbol = symbol_short!("MIGRATING");
 
-/// Sets the upgrade state to `Initial`, indicating the beginning of a migration
+/// Sets the `MIGRATING` state to `true`, indicating the beginning of a migration
 /// process.
 ///
 /// # Arguments
@@ -14,8 +14,7 @@ pub fn start_migration(e: &Env) {
     e.storage().instance().set(&MIGRATING, &true);
 }
 
-/// Returns `true` if migration is allowed, which is only when the state is
-/// `Initial`.
+/// Returns `true` if migration is allowed.
 ///
 /// # Arguments
 ///
@@ -24,7 +23,7 @@ pub fn can_migrate(e: &Env) -> bool {
     e.storage().instance().get::<_, bool>(&MIGRATING).unwrap_or(false)
 }
 
-/// Sets the upgrade state to `Migrated`, completing the migration process.
+/// Sets the `MIGRATING` state to `true`, completing the migration process.
 ///
 /// # Arguments
 ///
@@ -41,7 +40,7 @@ pub fn complete_migration(e: &Env) {
 ///
 /// # Errors
 ///
-/// * [`UpgradeableError::MigrationNotAllowed`] - If state is not `Initial`.
+/// * [`UpgradeableError::MigrationNotAllowed`] - If `MIGRATING` is `false`.
 pub fn ensure_can_migrate(e: &Env) {
     if !can_migrate(e) {
         panic_with_error!(e, UpgradeableError::MigrationNotAllowed)
