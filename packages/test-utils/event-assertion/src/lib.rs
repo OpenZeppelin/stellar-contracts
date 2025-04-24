@@ -1,19 +1,22 @@
 #![cfg(not(target_arch = "wasm32"))]
 
+use std::collections::HashSet;
+
 use soroban_sdk::{symbol_short, testutils::Events, Address, Env, IntoVal, Symbol, Val, Vec};
 use stellar_non_fungible::TokenId;
 
 pub struct EventAssertion<'a> {
     env: &'a Env,
     contract: Address,
+    processed_events: HashSet<u32>,
 }
 
 impl<'a> EventAssertion<'a> {
     pub fn new(env: &'a Env, contract: Address) -> Self {
-        Self { env, contract }
+        Self { env, contract, processed_events: HashSet::new() }
     }
 
-    fn find_event_by_symbol(&self, symbol_name: &str) -> Option<(Address, Vec<Val>, Val)> {
+    fn find_event_by_symbol(&mut self, symbol_name: &str) -> Option<(Address, Vec<Val>, Val)> {
         let events = self.env.events().all();
 
         let target_symbol = match symbol_name {
@@ -24,14 +27,30 @@ impl<'a> EventAssertion<'a> {
             _ => Symbol::new(self.env, symbol_name),
         };
 
-        events.iter().find(|e| {
-            let topics: Vec<Val> = e.1.clone();
-            let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
-            topic_symbol == target_symbol
-        })
+        for (index, event) in events.iter().enumerate() {
+            let index_u32 = index as u32;
+
+            if self.processed_events.contains(&index_u32) {
+                continue;
+            }
+
+            let (contract, topics, data) = event;
+
+            let topics_clone = topics.clone();
+
+            if let Some(first_topic) = topics_clone.first() {
+                let topic_symbol: Symbol = first_topic.into_val(self.env);
+
+                if topic_symbol == target_symbol {
+                    self.processed_events.insert(index_u32);
+                    return Some((contract.clone(), topics_clone, data));
+                }
+            }
+        }
+        None
     }
 
-    pub fn assert_fungible_transfer(&self, from: &Address, to: &Address, amount: i128) {
+    pub fn assert_fungible_transfer(&mut self, from: &Address, to: &Address, amount: i128) {
         let transfer_event = self.find_event_by_symbol("transfer");
 
         assert!(transfer_event.is_some(), "Transfer event not found in event log");
@@ -54,7 +73,12 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(event_amount, amount, "Transfer event has wrong amount");
     }
 
-    pub fn assert_non_fungible_transfer(&self, from: &Address, to: &Address, token_id: TokenId) {
+    pub fn assert_non_fungible_transfer(
+        &mut self,
+        from: &Address,
+        to: &Address,
+        token_id: TokenId,
+    ) {
         let transfer_event = self.find_event_by_symbol("transfer");
 
         assert!(transfer_event.is_some(), "Transfer event not found in event log");
@@ -77,7 +101,7 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(event_token_id, token_id, "Transfer event has wrong amount");
     }
 
-    pub fn assert_fungible_mint(&self, to: &Address, amount: i128) {
+    pub fn assert_fungible_mint(&mut self, to: &Address, amount: i128) {
         let mint_event = self.find_event_by_symbol("mint");
 
         assert!(mint_event.is_some(), "Mint event not found in event log");
@@ -98,13 +122,8 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(event_amount, amount, "Mint event has wrong amount");
     }
 
-    pub fn assert_non_fungible_mint(&self, to: &Address, token_id: TokenId) {
-        let events = self.env.events().all();
-        let mint_event = events.iter().find(|e| {
-            let topics: Vec<Val> = e.1.clone();
-            let topic_symbol: Symbol = topics.first().unwrap().into_val(self.env);
-            topic_symbol == symbol_short!("mint")
-        });
+    pub fn assert_non_fungible_mint(&mut self, to: &Address, token_id: TokenId) {
+        let mint_event = self.find_event_by_symbol("mint");
 
         assert!(mint_event.is_some(), "Mint event not found in event log");
 
@@ -124,7 +143,7 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(event_token_id, token_id, "Mint event has wrong token_id");
     }
 
-    pub fn assert_fungible_burn(&self, from: &Address, amount: i128) {
+    pub fn assert_fungible_burn(&mut self, from: &Address, amount: i128) {
         let burn_event = self.find_event_by_symbol("burn");
 
         assert!(burn_event.is_some(), "Burn event not found in event log");
@@ -145,7 +164,7 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(event_amount, amount, "Burn event has wrong amount");
     }
 
-    pub fn assert_non_fungible_burn(&self, from: &Address, token_id: TokenId) {
+    pub fn assert_non_fungible_burn(&mut self, from: &Address, token_id: TokenId) {
         let burn_event = self.find_event_by_symbol("burn");
 
         assert!(burn_event.is_some(), "Burn event not found in event log");
@@ -178,7 +197,7 @@ impl<'a> EventAssertion<'a> {
     }
 
     pub fn assert_fungible_approve(
-        &self,
+        &mut self,
         owner: &Address,
         spender: &Address,
         amount: i128,
@@ -208,7 +227,7 @@ impl<'a> EventAssertion<'a> {
     }
 
     pub fn assert_non_fungible_approve(
-        &self,
+        &mut self,
         owner: &Address,
         spender: &Address,
         token_id: TokenId,
@@ -238,7 +257,7 @@ impl<'a> EventAssertion<'a> {
     }
 
     pub fn assert_approve_for_all(
-        &self,
+        &mut self,
         owner: &Address,
         operator: &Address,
         live_until_ledger: u32,
@@ -264,7 +283,7 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(event_data.1, live_until_ledger, "Approve event has wrong live_until_ledger");
     }
 
-    pub fn assert_consecutive_mint(&self, to: &Address, from_id: TokenId, to_id: TokenId) {
+    pub fn assert_consecutive_mint(&mut self, to: &Address, from_id: TokenId, to_id: TokenId) {
         let event = self.find_event_by_symbol("consecutive_mint");
 
         assert!(event.is_some(), "ConsecutiveMint event not found in event log");

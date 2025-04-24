@@ -2,7 +2,7 @@ use soroban_sdk::{Address, Env, String};
 
 use crate::{Balance, TokenId};
 
-/// Based on the Extension, some default behavior of [`crate::NonFungibleToken`]
+/// Based on the extension, some default behavior of [`crate::NonFungibleToken`]
 /// might have to be overridden. This is a helper trait that allows us this
 /// override mechanism that favors the DevX.
 ///
@@ -15,7 +15,7 @@ use crate::{Balance, TokenId};
 /// The problem is, `NonFungbileToken` trait has to be implemented for the smart
 /// contract (which is another struct) by the end-developer. So, we need a level
 /// of abstraction by introducing an associated type, which will grant
-/// `NonFungibleTrait` the ability to switch between different default
+/// `NonFungibleToken` trait the ability to switch between different default
 /// implementations by calling the methods on this associated type. And for
 /// this, we need another trait, which this associated type will implement.
 ///
@@ -23,7 +23,7 @@ use crate::{Balance, TokenId};
 /// every method of the `NonFungibleToken` trait using
 /// `Self::ContractType::{function_name}`, which will in turn use either the
 /// overridden or the base variant according to the extension, provided by the
-/// `ContractOverrides` trait implementation for the respective ContractType.
+/// `ContractOverrides` trait implementation for the respective `ContractType`.
 ///
 /// Example:
 ///
