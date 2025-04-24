@@ -425,11 +425,9 @@ impl Consecutive {
             e.storage().temporary().remove(&approval_key);
 
             // Set the token_id - 1 to previous owner to preserve the ownership inference.
-            // `set_owner_for` does this, but will skip it if the previous id doesn't exist,
+            // `set_owner_for_previous_token` does this, but will skip it if the previous id doesn't exist,
             // was burned or has already an owner.
-            if token_id > 0 {
-                Consecutive::set_owner_for(e, from_address, token_id - 1);
-            }
+            Consecutive::set_owner_for_previous_token(e, from_address, token_id);
         } else {
             // nothing to do for the `None` case, since we don't track
             // `total_supply`
@@ -449,7 +447,7 @@ impl Consecutive {
         }
     }
 
-    /// Low-level function that sets owner of `token_id` to `to`, without
+    /// Low-level function that sets owner of `token_id - 1` to `to`, without
     /// handling authorization. The function does not panic and sets the
     /// owner only if:
     /// - the token exists and
@@ -460,10 +458,14 @@ impl Consecutive {
     ///
     /// * `e` - The environment reference.
     /// * `to` - The owner's address.
-    /// * `token_id` - The identifier of the token being set.
-    pub fn set_owner_for(e: &Env, to: &Address, token_id: TokenId) {
-        let max = sequential::next_token_id(e);
-        let owner_key = StorageKey::Owner(token_id);
+    /// * `token_id` - The identifier of the token next to the one being set.
+    pub fn set_owner_for_previous_token(e: &Env, to: &Address, token_id: TokenId) {
+        if token_id == 0 || token_id >= sequential::next_token_id(e) {
+            return;
+        }
+        let previous_id = token_id - 1;
+
+        let owner_key = StorageKey::Owner(previous_id);
         let has_owner = e.storage().persistent().has(&owner_key);
         if has_owner {
             e.storage().persistent().extend_ttl(
@@ -474,7 +476,7 @@ impl Consecutive {
             return;
         }
 
-        let burned_token_key = StorageKey::BurnedToken(token_id);
+        let burned_token_key = StorageKey::BurnedToken(previous_id);
         let is_burned = e.storage().persistent().get(&burned_token_key).unwrap_or(false);
         if is_burned {
             e.storage().persistent().extend_ttl(
@@ -485,9 +487,9 @@ impl Consecutive {
             return;
         }
 
-        if token_id < max && !has_owner && !is_burned {
-            e.storage().persistent().set(&StorageKey::Owner(token_id), to);
-            Self::set_ownership_in_bucket(e, token_id);
+        if !has_owner && !is_burned {
+            e.storage().persistent().set(&StorageKey::Owner(previous_id), to);
+            Self::set_ownership_in_bucket(e, previous_id);
         }
     }
 

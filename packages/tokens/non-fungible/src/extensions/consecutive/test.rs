@@ -414,7 +414,7 @@ fn consecutive_burn_from_works() {
 }
 
 #[test]
-fn consecutive_set_owner_for_works() {
+fn consecutive_set_owner_for_previous_token_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -427,23 +427,29 @@ fn consecutive_set_owner_for_works() {
         Consecutive::batch_mint(&e, &user1, 5); // 0,1,2,3,4
 
         // existing id
-        Consecutive::set_owner_for(&e, &user2, 2);
+        Consecutive::set_owner_for_previous_token(&e, &user2, 3);
         assert_eq!(Consecutive::owner_of(&e, 2), user2);
 
+        // when 0 -> does nothing
+        Consecutive::set_owner_for_previous_token(&e, &user3, 0);
+        assert_eq!(Consecutive::owner_of(&e, 0), user2);
+        //let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(5));
+        //assert_eq!(owner, None);
+
         // when more than max -> does nothing
-        Consecutive::set_owner_for(&e, &user2, 5);
-        let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(5));
-        assert_eq!(owner, None);
+        Consecutive::set_owner_for_previous_token(&e, &user2, 5);
+        assert_eq!(Consecutive::owner_of(&e, 4), user1);
+        //let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(5));
 
         // when already has owner -> does nothing
         e.storage().persistent().set(&StorageKey::Owner(3), &user3);
-        Consecutive::set_owner_for(&e, &user2, 3);
+        Consecutive::set_owner_for_previous_token(&e, &user2, 4);
         let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(3)).unwrap();
         assert_eq!(owner, user3);
 
         // when is burned -> does nothing
-        e.storage().persistent().set(&StorageKey::BurnedToken(0), &true);
-        Consecutive::set_owner_for(&e, &user2, 0);
+        e.storage().persistent().set(&StorageKey::BurnedToken(1), &true);
+        Consecutive::set_owner_for_previous_token(&e, &user2, 2);
         let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(0));
         assert_eq!(owner, None);
     });
