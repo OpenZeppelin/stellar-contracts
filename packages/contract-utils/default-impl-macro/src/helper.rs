@@ -42,7 +42,7 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
             syn::parse_quote! { fn get_token_id(e: &Env, index: TokenId) -> TokenId { Enumerable::get_token_id(e, index) } },
         ],
         not_supported => {
-            panic!("Trait {} is not supported by #[default_impl]", not_supported)
+            panic!("Trait {not_supported} is not supported by #[default_impl]")
         }
     }
 }
