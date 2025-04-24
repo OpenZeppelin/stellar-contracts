@@ -150,6 +150,7 @@ impl Consecutive {
     ///
     /// # Errors
     ///
+    /// * [`NonFungibleTokenError::InvalidAmount`] - If try to mint `0`.
     /// * refer to [`Base::increase_balance`] errors.
     /// * refer to [`set_ownership_in_bucket`] errors.
     ///
@@ -177,6 +178,10 @@ impl Consecutive {
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
     pub fn batch_mint(e: &Env, to: &Address, amount: Balance) -> TokenId {
+        if amount == 0 {
+            panic_with_error!(&e, NonFungibleTokenError::InvalidAmount);
+        }
+
         let first_id = sequential::increment_token_id(e, amount);
 
         Base::increase_balance(e, to, amount);

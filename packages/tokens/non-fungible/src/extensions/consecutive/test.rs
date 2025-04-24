@@ -211,6 +211,20 @@ fn consecutive_batch_mint_works() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #312)")]
+fn consecutive_batch_mint_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    let owner = Address::generate(&e);
+    let amount = 0;
+
+    e.as_contract(&address, || {
+        Consecutive::batch_mint(&e, &owner, amount);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #300)")]
 fn consecutive_owner_of_on_nonexistent_token_fails() {
     let e = Env::default();
