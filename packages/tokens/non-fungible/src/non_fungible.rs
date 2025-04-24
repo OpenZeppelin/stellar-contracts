@@ -313,6 +313,8 @@ pub enum NonFungibleTokenError {
     UnsetMetadata = 310,
     /// Indicates the length of the base URI exceeds the maximum allowed
     BaseUriMaxLenExceeded = 311,
+    /// Indicates an invalid amount to batch mint in `consecutive` extension.
+    InvalidAmount = 312,
 }
 
 // ################## EVENTS ##################
