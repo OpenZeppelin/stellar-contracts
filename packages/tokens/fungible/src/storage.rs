@@ -147,6 +147,9 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 /// * `spender` - The address authorized to spend the tokens.
 /// * `amount` - The amount of tokens made available to `spender`.
 /// * `live_until_ledger` - The ledger number at which the allowance expires.
+///   `live_until_ledger`` argument is implicitly bounded by the maximum allowed
+///   TTL extension for a temporary storage entry and specifying a higher value
+///   will cause the code to panic.
 ///
 /// # Errors
 ///

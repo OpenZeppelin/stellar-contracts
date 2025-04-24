@@ -70,6 +70,6 @@ fn check_is_env(path: &syn::TypePath, fn_name: &syn::Ident) {
     let is_env = path.path.segments.last().map(|seg| seg.ident == "Env").unwrap_or(false);
 
     if !is_env {
-        panic!("first argument of function '{}' must be Env or &Env", fn_name);
+        panic!("first argument of function '{fn_name}' must be Env or &Env",);
     }
 }

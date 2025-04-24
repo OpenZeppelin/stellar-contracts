@@ -81,13 +81,6 @@ impl Enumerable {
     /// * `e` - Access to the Soroban environment.
     /// * `index` - Index of the token in the owner's local list.
     ///
-    /// # Notes
-    ///
-    /// **IMPORTANT**: This function is only intended for non-sequential
-    /// `token_id`s. For sequential `token_id`s, no need to call a function,
-    /// the `token_id` itself acts as the global index. Calling this function
-    /// while using sequential minting strategy will result in error.
-    ///
     /// # Errors
     ///
     /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
@@ -146,13 +139,7 @@ impl Enumerable {
     pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
         let token_id = Base::sequential_mint(e, to);
 
-        Enumerable::add_to_owner_enumeration(e, to, token_id);
-
-        // We don't need the total supply, we just need to increment it.
-        let _ = Enumerable::increment_total_supply(e);
-
-        // We don't need to update the global lists, `token_id`s act as the global index
-        // in sequential minting.
+        Enumerable::add_to_enumerations(e, to, token_id);
 
         token_id
     }
@@ -200,56 +187,16 @@ impl Enumerable {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
 
-        Enumerable::add_to_owner_enumeration(e, to, token_id);
-
-        let total_supply = Enumerable::increment_total_supply(e);
-
-        Enumerable::add_to_global_enumeration(e, token_id, total_supply);
+        Enumerable::add_to_enumerations(e, to, token_id);
     }
 
-    /// Destroys the `token_id` from `account`.
+    /// Destroys the token with `token_id` from `from`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`Base::burn`] errors.
-    /// * refer to [`remove_from_owner_enumeration`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: TokenId]`
-    ///
-    /// # Notes
-    ///
-    /// This is a wrapper around [`Base::burn()`], that also
-    /// handles the storage updates for:
-    /// * total supply
-    /// * owner_tokens enumeration
-    pub fn sequential_burn(e: &Env, from: &Address, token_id: TokenId) {
-        Base::burn(e, from, token_id);
-
-        Enumerable::remove_from_owner_enumeration(e, from, token_id);
-
-        // We don't need the total supply, we just need to increment it.
-        let _ = Enumerable::decrement_total_supply(e);
-
-        // We don't need to update the global lists, `token_id`s act as the
-        // global index in sequential minting.
-    }
-
-    /// Destroys the `token_id` from `account`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///
@@ -269,17 +216,14 @@ impl Enumerable {
     /// * total supply
     /// * owner_tokens enumeration
     /// * global_tokens enumeration
-    pub fn non_sequential_burn(e: &Env, from: &Address, token_id: TokenId) {
+    pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
         Base::burn(e, from, token_id);
 
-        Enumerable::remove_from_owner_enumeration(e, from, token_id);
-
-        let total_supply = Enumerable::decrement_total_supply(e);
-
-        Enumerable::remove_from_global_enumeration(e, token_id, total_supply);
+        Enumerable::remove_from_enumerations(e, from, token_id);
     }
 
-    /// Destroys the `token_id` from `account`, by using `spender`s approval.
+    /// Destroys the token with `token_id` from `from`, by using `spender`s
+    /// approval.
     ///
     /// # Arguments
     ///
@@ -287,45 +231,7 @@ impl Enumerable {
     /// * `spender` - The account that is allowed to burn the token on behalf of
     ///   the owner.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`Base::burn_from`] errors.
-    /// * refer to [`remove_from_owner_enumeration`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: TokenId]`
-    ///
-    /// # Notes
-    ///
-    /// This is a wrapper around [`Base::burn_from()`], that also
-    /// handles the storage updates for:
-    /// * total supply
-    /// * owner_tokens enumeration
-    pub fn sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
-        Base::burn_from(e, spender, from, token_id);
-
-        Enumerable::remove_from_owner_enumeration(e, from, token_id);
-
-        // We don't need the total supply, we just need to increment it.
-        let _ = Enumerable::decrement_total_supply(e);
-
-        // We don't need to update the global lists, `token_id`s act as the
-        // global index in sequential minting.
-    }
-
-    /// Destroys the `token_id` from `account`, by using `spender`s approval.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `spender` - The account that is allowed to burn the token on behalf of
-    ///   the owner.
-    /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///
@@ -345,14 +251,10 @@ impl Enumerable {
     /// * total supply
     /// * owner_tokens enumeration
     /// * global_tokens enumeration
-    pub fn non_sequential_burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
+    pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
         Base::burn_from(e, spender, from, token_id);
 
-        Enumerable::remove_from_owner_enumeration(e, from, token_id);
-
-        let total_supply = Enumerable::decrement_total_supply(e);
-
-        Enumerable::remove_from_global_enumeration(e, token_id, total_supply);
+        Enumerable::remove_from_enumerations(e, from, token_id);
     }
 
     /// Transfers a non-fungible token (NFT), ensuring ownership checks.
@@ -469,6 +371,41 @@ impl Enumerable {
         e.storage().instance().set(&StorageKey::TotalSupply, &new_total_supply);
 
         new_total_supply
+    }
+
+    /// Adds a token to user's enumeration and global enumeration.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`add_to_owner_enumeration`] errors.
+    /// * refer to [`increment_total_supply`] errors.
+    pub fn add_to_enumerations(e: &Env, owner: &Address, token_id: TokenId) {
+        Enumerable::add_to_owner_enumeration(e, owner, token_id);
+        let total_supply = Enumerable::increment_total_supply(e);
+        Enumerable::add_to_global_enumeration(e, token_id, total_supply);
+    }
+
+    /// Removes a token from user's enumeration and global enumeration.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `owner` - The address of the owner.
+    /// * `token_id` - The token ID to remove.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`remove_from_owner_enumeration`] errors.
+    /// * refer to [`decrement_total_supply`] errors.
+    /// * refer to [`remove_from_global_enumeration`] errors.
+    pub fn remove_from_enumerations(e: &Env, owner: &Address, token_id: TokenId) {
+        Enumerable::remove_from_owner_enumeration(e, owner, token_id);
+        let total_supply = Enumerable::decrement_total_supply(e);
+        Enumerable::remove_from_global_enumeration(e, token_id, total_supply);
     }
 
     /// Adds a token ID to the owner's enumeration.
