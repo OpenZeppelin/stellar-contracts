@@ -174,7 +174,7 @@ impl Enumerable {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///
@@ -210,7 +210,7 @@ impl Enumerable {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///
@@ -249,7 +249,7 @@ impl Enumerable {
     /// * `spender` - The account that is allowed to burn the token on behalf of
     ///   the owner.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///
@@ -288,7 +288,7 @@ impl Enumerable {
     /// * `spender` - The account that is allowed to burn the token on behalf of
     ///   the owner.
     /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The token to burn.
+    /// * `token_id` - The identifier of the token to burn.
     ///
     /// # Errors
     ///
