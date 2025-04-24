@@ -390,7 +390,7 @@ impl Consecutive {
     }
 
     /// Low-level function that sets owner of `token_id` to `to`, without
-    /// handling authorization. The function does not panic and sets the
+    /// handling authorization. The function does NOT panic and sets the
     /// owner only if:
     /// - the token exists and
     /// - the token has not been burned and
@@ -401,6 +401,13 @@ impl Consecutive {
     /// * `e` - The environment reference.
     /// * `to` - The owner's address.
     /// * `token_id` - The identifier of the token being set.
+    ///
+    /// # Notes
+    ///
+    /// This function extends the persistent storage TTL even when it doesn't
+    /// assign an owner. The intent is to fairly distribute storage costs among
+    /// neighboring entries, since they collectively influence boundary
+    /// calculations.
     pub fn set_owner_for(e: &Env, to: &Address, token_id: TokenId) {
         let max = sequential::next_token_id(e);
         let owner_key = StorageKey::Owner(token_id);

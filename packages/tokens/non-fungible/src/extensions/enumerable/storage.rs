@@ -120,6 +120,22 @@ impl Enumerable {
     /// This is a wrapper around [`Base::sequential_mint()`], that
     /// also handles the storage updates for:
     /// * total supply
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// It is the responsibility of the implementer to establish appropriate
+    /// access controls to ensure that only authorized accounts can execute
+    /// minting operations. Failure to implement proper authorization could
+    /// lead to security vulnerabilities and unauthorized token creation.
+    ///
+    /// You probably want to do something like this (pseudo-code):
+    ///
+    /// ```ignore
+    /// let admin = read_administrator(e);
+    /// admin.require_auth();
+    /// ```
     pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
         let token_id = Base::sequential_mint(e, to);
 
@@ -151,6 +167,22 @@ impl Enumerable {
     /// * total supply
     /// * owner_tokens enumeration
     /// * global_tokens enumeration
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// It is the responsibility of the implementer to establish appropriate
+    /// access controls to ensure that only authorized accounts can execute
+    /// minting operations. Failure to implement proper authorization could
+    /// lead to security vulnerabilities and unauthorized token creation.
+    ///
+    /// You probably want to do something like this (pseudo-code):
+    ///
+    /// ```ignore
+    /// let admin = read_administrator(e);
+    /// admin.require_auth();
+    /// ```
     pub fn non_sequential_mint(e: &Env, to: &Address, token_id: TokenId) {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
@@ -252,8 +284,10 @@ impl Enumerable {
     pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
         Base::transfer(e, from, to, token_id);
 
-        Enumerable::remove_from_owner_enumeration(e, from, token_id);
-        Enumerable::add_to_owner_enumeration(e, to, token_id);
+        if from != to {
+            Enumerable::remove_from_owner_enumeration(e, from, token_id);
+            Enumerable::add_to_owner_enumeration(e, to, token_id);
+        }
     }
 
     /// Transfers a non-fungible token (NFT), ensuring ownership and approval
@@ -291,8 +325,10 @@ impl Enumerable {
     ) {
         Base::transfer_from(e, spender, from, to, token_id);
 
-        Enumerable::remove_from_owner_enumeration(e, from, token_id);
-        Enumerable::add_to_owner_enumeration(e, to, token_id);
+        if from != to {
+            Enumerable::remove_from_owner_enumeration(e, from, token_id);
+            Enumerable::add_to_owner_enumeration(e, to, token_id);
+        }
     }
 
     // ################## LOW-LEVEL HELPERS ##################
@@ -385,9 +421,14 @@ impl Enumerable {
     /// * [`NonFungibleTokenError::MathOverflow`] - When owner has no tokens,
     ///   and this function is called BEFORE the owner's balance is manipulated,
     ///   the indexing logic will underflow.
+    ///
+    /// # Notes
+    ///
+    /// This function is expected to be called after the balance of the owner
+    /// is already manipulated (mint, transfer, etc.)
     pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: TokenId) {
-        // we decrease 1 from the balance, because this function is called after balance
-        // is manipulated (mint, transfer, etc.)
+        // balance is already incremented by 1, we need to subtract 1 from it
+        // to get the `last_index + 1` (the index of the new token)
         let Some(owner_balance) = Base::balance(e, owner).checked_sub(1) else {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);
         };
@@ -410,6 +451,11 @@ impl Enumerable {
     ///
     /// * [`NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token
     ///   ID is not found in the owner's enumeration.
+    ///
+    /// # Notes
+    ///
+    /// This function is expected to be called after the balance of the owner
+    /// is already manipulated (mint, transfer, etc.)
     pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id: TokenId) {
         let key = StorageKey::OwnerTokensIndex(to_be_removed_id);
         let Some(to_be_removed_index) = e.storage().persistent().get(&key) else {
@@ -417,8 +463,8 @@ impl Enumerable {
         };
         e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
 
-        // This function is called after balance is manipulated, so do not need to
-        // decrease 1 from the balance (burn, transfer, etc.).
+        // owner's balance is already decremented by 1, so it will be the index of the
+        // last token in the enumeration list.
         let last_token_index = Base::balance(e, owner);
 
         // Update the `OwnerTokens`.
