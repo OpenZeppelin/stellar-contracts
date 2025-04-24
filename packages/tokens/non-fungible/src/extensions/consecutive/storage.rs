@@ -161,7 +161,7 @@ impl Consecutive {
         last_id
     }
 
-    /// Destroys the `token_id` from `account`, ensuring ownership
+    /// Destroys the token with `token_id` from `from`, ensuring ownership
     /// checks, and emits a `burn` event.
     ///
     /// # Arguments
@@ -189,7 +189,7 @@ impl Consecutive {
         emit_burn(e, from, token_id);
     }
 
-    /// Destroys the `token_id` from `account`, ensuring ownership
+    /// Destroys the token with `token_id` from `from`, ensuring ownership
     /// and approval checks, and emits a `burn` event.
     ///
     /// # Arguments

@@ -19,7 +19,7 @@ use soroban_sdk::{symbol_short, Address, Env};
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
 pub trait FungibleBurnable {
-    /// Destroys `amount` of tokens from `account`. Updates the total
+    /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.
     ///
     /// # Arguments
@@ -42,7 +42,7 @@ pub trait FungibleBurnable {
         crate::burnable::burn(e, &from, amount);
     }
 
-    /// Destroys `amount` of tokens from `account`. Updates the total
+    /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.
     ///
     /// # Arguments

@@ -81,13 +81,6 @@ impl Enumerable {
     /// * `e` - Access to the Soroban environment.
     /// * `index` - Index of the token in the owner's local list.
     ///
-    /// # Notes
-    ///
-    /// **IMPORTANT**: This function is only intended for non-sequential
-    /// `token_id`s. For sequential `token_id`s, no need to call a function,
-    /// the `token_id` itself acts as the global index. Calling this function
-    /// while using sequential minting strategy will result in error.
-    ///
     /// # Errors
     ///
     /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
@@ -175,7 +168,7 @@ impl Enumerable {
         Enumerable::add_to_global_enumeration(e, token_id, total_supply);
     }
 
-    /// Destroys the `token_id` from `account`.
+    /// Destroys the token with `token_id` from `from`.
     ///
     /// # Arguments
     ///
@@ -204,14 +197,14 @@ impl Enumerable {
 
         Enumerable::remove_from_owner_enumeration(e, from, token_id);
 
-        // We don't need the total supply, we just need to increment it.
+        // We don't need the total supply, we just need to decrement it.
         let _ = Enumerable::decrement_total_supply(e);
 
         // We don't need to update the global lists, `token_id`s act as the
         // global index in sequential minting.
     }
 
-    /// Destroys the `token_id` from `account`.
+    /// Destroys the token with `token_id` from `from`.
     ///
     /// # Arguments
     ///
@@ -247,7 +240,8 @@ impl Enumerable {
         Enumerable::remove_from_global_enumeration(e, token_id, total_supply);
     }
 
-    /// Destroys the `token_id` from `account`, by using `spender`s approval.
+    /// Destroys the token with `token_id` from `from`, by using `spender`s
+    /// approval.
     ///
     /// # Arguments
     ///
@@ -278,14 +272,15 @@ impl Enumerable {
 
         Enumerable::remove_from_owner_enumeration(e, from, token_id);
 
-        // We don't need the total supply, we just need to increment it.
+        // We don't need the total supply, we just need to decrement it.
         let _ = Enumerable::decrement_total_supply(e);
 
         // We don't need to update the global lists, `token_id`s act as the
         // global index in sequential minting.
     }
 
-    /// Destroys the `token_id` from `account`, by using `spender`s approval.
+    /// Destroys the token with `token_id` from `from`, by using `spender`s
+    /// approval.
     ///
     /// # Arguments
     ///

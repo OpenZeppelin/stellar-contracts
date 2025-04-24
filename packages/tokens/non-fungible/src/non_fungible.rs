@@ -19,7 +19,7 @@ pub const MAX_NUM_DIGITS: usize = 20;
 
 #[cfg(feature = "token_u128")]
 pub type TokenId = u128;
-/// u128::MAX == 18446744073709551615
+/// u128::MAX == 340282366920938463463374607431768211455
 #[cfg(feature = "token_u128")]
 pub const MAX_NUM_DIGITS: usize = 39;
 
@@ -77,8 +77,8 @@ pub type Balance = TokenId;
 /// You can find the default implementations of this trait for `Base`,
 /// `Enumerable`, and `Consecutive`, by navigating to:
 /// `ContractType::{method_name}`. For example, if you want to find how
-/// [`NonFungibleToken::transfer`] is implemented for the `Enumerable` Contract
-/// Type, you can find it using
+/// [`NonFungibleToken::transfer`] is implemented for the `Enumerable` contract
+/// type, you can find it using
 /// [`crate::extensions::enumerable::Enumerable::transfer`].
 pub trait NonFungibleToken {
     /// Helper type that allows us to override some of the functionality of the
@@ -87,13 +87,13 @@ pub trait NonFungibleToken {
     /// `Consecutive` extensions.
     type ContractType: ContractOverrides;
 
-    /// Returns the number of tokens in `owner`'s account.
+    /// Returns the number of tokens owned by `account`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `owner` - Account of the token's owner.
-    fn balance(e: &Env, owner: Address) -> Balance;
+    /// * `account` - The address for which the balance is being queried.
+    fn balance(e: &Env, account: Address) -> Balance;
 
     /// Returns the owner of the `token_id` token.
     ///
@@ -284,6 +284,7 @@ pub trait NonFungibleToken {
 // ################## ERRORS ##################
 
 #[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum NonFungibleTokenError {
     /// Indicates a non-existent `token_id`.
