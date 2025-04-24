@@ -45,7 +45,8 @@ pub fn query_cap(e: &Env) -> i128 {
         .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::CapNotSet))
 }
 
-/// Panics if new `amount` of tokens will exceed the maximum supply.
+/// Panics if new `amount` of tokens added to the current supply will exceed the
+/// maximum supply.
 ///
 /// # Arguments
 ///
@@ -54,18 +55,14 @@ pub fn query_cap(e: &Env) -> i128 {
 ///
 /// # Errors
 ///
-/// * [`FungibleTokenError::CapNotSet`] - Occurs when the cap has not been set.
+/// * refer to [`query_cap`] errors.
 /// * [`FungibleTokenError::MathOverflow`] - Occurs when the sum of the new
 ///   amount and the current total supply will overflow.
 /// * [`FungibleTokenError::ExceededCap`] - Occurs when the new amount of tokens
 ///   will exceed the cap.
 pub fn check_cap(e: &Env, amount: i128) {
-    let cap: i128 = e
-        .storage()
-        .instance()
-        .get(&CAP_KEY)
-        .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::CapNotSet));
-    let total_supply: i128 = e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0);
+    let cap: i128 = query_cap(e);
+    let total_supply = e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0);
     let Some(sum) = total_supply.checked_add(amount) else {
         panic_with_error!(e, FungibleTokenError::MathOverflow);
     };
