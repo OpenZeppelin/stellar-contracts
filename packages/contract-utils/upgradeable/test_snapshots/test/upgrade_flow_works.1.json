@@ -42,14 +42,10 @@
                     "storage": [
                       {
                         "key": {
-                          "symbol": "UPGRADE"
+                          "symbol": "MIGRATING"
                         },
                         "val": {
-                          "vec": [
-                            {
-                              "symbol": "RolledBack"
-                            }
-                          ]
+                          "bool": false
                         }
                       }
                     ]

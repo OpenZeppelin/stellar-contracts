@@ -29,7 +29,7 @@ impl ExampleContract {
 }
 
 impl UpgradeableInternal for ExampleContract {
-    fn _upgrade_auth(e: &Env, operator: &Address) {
+    fn _require_auth(e: &Env, operator: &Address) {
         operator.require_auth();
         let owner = e.storage().instance().get::<_, Address>(&OWNER).unwrap();
         if *operator != owner {
