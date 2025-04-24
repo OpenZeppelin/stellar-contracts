@@ -148,7 +148,7 @@
                                 "symbol": "base_uri"
                               },
                               "val": {
-                                "string": "www.mytoken.com"
+                                "string": "www.mytoken.com/"
                               }
                             },
                             {

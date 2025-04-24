@@ -10,7 +10,7 @@ impl ExampleContract {
     pub fn __constructor(e: &Env) {
         Base::set_metadata(
             e,
-            String::from_str(e, "www.mytoken.com"),
+            String::from_str(e, "www.mytoken.com/"),
             String::from_str(e, "My Token"),
             String::from_str(e, "TKN"),
         );

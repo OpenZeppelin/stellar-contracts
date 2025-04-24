@@ -1,4 +1,6 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
+use core::mem;
+
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, String, Vec};
 use stellar_constants::{
     OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
@@ -41,11 +43,37 @@ impl ContractOverrides for Consecutive {
     }
 }
 
-/// Storage keys for the data associated with `FungibleToken`
+/// For 32,000 total ids with ITEM of type u32 and 100 items per bucket:
+///
+/// Bucket 0
+/// ├── Item 0 → bits for Token IDs 0..31
+/// ├── Item 1 → bits for Token IDs 32..63
+/// ├── ...
+/// ├── Item 99 → bits for Token IDs 3_168..3_199
+///
+/// Bucket 1...8
+///
+/// Bucket 9
+/// ├── Item 0 → bits for Token IDs 28_800..28_832
+/// ├── ...
+/// ├── Item 99 → bits for Token IDs 31_968..31_999
+///
+/// Maximum number of vectors holding bitfields, which denote ids
+pub const BUCKETS: usize = 10;
+/// Number of elements in a bucket
+pub const ITEMS_IN_BUCKET: usize = 100;
+/// Number of ids per item, which corresponds to the number of bits for a given
+/// value
+pub const IDS_IN_ITEM: usize = mem::size_of::<TokenId>() * 8; // 32 if TokenId is u32
+/// Total number of ids in the whole bucket
+pub const IDS_IN_BUCKET: usize = ITEMS_IN_BUCKET * IDS_IN_ITEM; // 3,200
+
+/// Storage keys for the data associated with `NonFungibleToken`
 #[contracttype]
 pub enum StorageKey {
     Approval(TokenId),
     Owner(TokenId),
+    OwnershipBucket(u32),
     BurnedToken(TokenId),
 }
 
@@ -64,23 +92,33 @@ impl Consecutive {
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
     ///   `token_id` does not exist.
     pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
-        let max = sequential::next_token_id(e);
         let key = StorageKey::BurnedToken(token_id);
-        let is_burned = e.storage().persistent().get(&key).unwrap_or(false);
-        if is_burned {
-            e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
-        }
-
-        if token_id >= max || is_burned {
+        if e.storage().persistent().get(&key).unwrap_or(false) {
             panic_with_error!(&e, NonFungibleTokenError::NonExistentToken);
         }
 
-        (0..=token_id)
-            .rev()
-            .map(StorageKey::Owner)
-            // after the Protocol 23 upgrade, storage read cost is marginal,
-            // making the consecutive storage reads justifiable
-            .find_map(|key| {
+        let ids_in_bucket = IDS_IN_BUCKET as TokenId;
+        // idex of the bucket that contains token_id
+        let bucket_index = token_id / ids_in_bucket;
+        // position of the token_id within its bucket (0-based)
+        let relative_id = token_id - (bucket_index * ids_in_bucket);
+
+        (bucket_index..BUCKETS as TokenId)
+            .map(|i| {
+                (i, e.storage().instance().get::<_, Vec<TokenId>>(&StorageKey::OwnershipBucket(i)))
+            })
+            .filter(|(_, bucket)| bucket.is_some())
+            .find_map(|(i, bucket)| {
+                // If we're in the starting bucket, begin search from the token's relative
+                // position; otherwise, start from the beginning of the bucket.
+                let from_id = if i == bucket_index { relative_id } else { 0 };
+                // expect is safe because of the filter above
+                find_bit_in_bucket(bucket.expect("bucket must be defined"), from_id)
+                    .map(|pos_in_bucket| i * ids_in_bucket + pos_in_bucket)
+            })
+            .iter()
+            .find_map(|id| {
+                let key = StorageKey::Owner(*id);
                 e.storage().persistent().get::<_, Address>(&key).inspect(|_| {
                     e.storage().persistent().extend_ttl(
                         &key,
@@ -101,10 +139,19 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * refer to [`owner_of`] errors.
-    /// * refer to [`base_uri`] errors.
+    /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
+    ///   `token_id` does not exist (burned or more than max allowed).
+    /// * refer to [`Base::base_uri`] errors.
     pub fn token_uri(e: &Env, token_id: TokenId) -> String {
-        let _ = Consecutive::owner_of(e, token_id);
+        let ids_in_bucket = IDS_IN_BUCKET as TokenId;
+        let total_ids = ids_in_bucket * BUCKETS as TokenId;
+
+        let is_burned =
+            e.storage().persistent().get(&StorageKey::BurnedToken(token_id)).unwrap_or(false);
+        if is_burned || token_id >= sequential::next_token_id(e) || token_id >= total_ids {
+            panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
+        }
+
         let base_uri = Base::base_uri(e);
         Base::compose_uri_for_token(e, base_uri, token_id)
     }
@@ -122,7 +169,9 @@ impl Consecutive {
     ///
     /// # Errors
     ///
+    /// * [`NonFungibleTokenError::InvalidAmount`] - If try to mint `0`.
     /// * refer to [`Base::increase_balance`] errors.
+    /// * refer to [`set_ownership_in_bucket`] errors.
     ///
     /// # Events
     ///
@@ -148,13 +197,18 @@ impl Consecutive {
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
     pub fn batch_mint(e: &Env, to: &Address, amount: Balance) -> TokenId {
+        if amount == 0 {
+            panic_with_error!(&e, NonFungibleTokenError::InvalidAmount);
+        }
+
         let first_id = sequential::increment_token_id(e, amount);
 
-        e.storage().persistent().set(&StorageKey::Owner(first_id), &to);
-
         Base::increase_balance(e, to, amount);
-
         let last_id = first_id + amount - 1;
+
+        Self::set_ownership_in_bucket(e, last_id);
+        e.storage().persistent().set(&StorageKey::Owner(last_id), &to);
+
         emit_consecutive_mint(e, to, first_id, last_id);
 
         // return the last minted id
@@ -354,6 +408,7 @@ impl Consecutive {
     /// * refer to [`owner_of`] errors.
     /// * refer to [`decrease_balance`] errors.
     /// * refer to [`increase_balance`] errors.
+    /// * refer to [`set_ownership_in_bucket`] errors.
     pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: TokenId) {
         if let Some(from_address) = from {
             let owner = Consecutive::owner_of(e, token_id);
@@ -369,8 +424,10 @@ impl Consecutive {
             let approval_key = StorageKey::Approval(token_id);
             e.storage().temporary().remove(&approval_key);
 
-            // Set the next token to prev owner
-            Consecutive::set_owner_for(e, from_address, token_id + 1);
+            // Set the token_id - 1 to previous owner to preserve the ownership inference.
+            // `set_owner_for_previous_token` does this, but will skip it if the previous id
+            // doesn't exist, was burned or has already an owner.
+            Consecutive::set_owner_for_previous_token(e, from_address, token_id);
         } else {
             // nothing to do for the `None` case, since we don't track
             // `total_supply`
@@ -381,6 +438,7 @@ impl Consecutive {
 
             // Set the new owner
             e.storage().persistent().set(&StorageKey::Owner(token_id), to_address);
+            Self::set_ownership_in_bucket(e, token_id);
         } else {
             // Burning: `to` is None
             e.storage().persistent().remove(&StorageKey::Owner(token_id));
@@ -389,8 +447,8 @@ impl Consecutive {
         }
     }
 
-    /// Low-level function that sets owner of `token_id` to `to`, without
-    /// handling authorization. The function does NOT panic and sets the
+    /// Low-level function that sets owner of `token_id - 1` to `to`, without
+    /// handling authorization. The function does not panic and sets the
     /// owner only if:
     /// - the token exists and
     /// - the token has not been burned and
@@ -400,7 +458,7 @@ impl Consecutive {
     ///
     /// * `e` - The environment reference.
     /// * `to` - The owner's address.
-    /// * `token_id` - The identifier of the token being set.
+    /// * `token_id` - The identifier of the token next to the one being set.
     ///
     /// # Notes
     ///
@@ -408,9 +466,13 @@ impl Consecutive {
     /// assign an owner. The intent is to fairly distribute storage costs among
     /// neighboring entries, since they collectively influence boundary
     /// calculations.
-    pub fn set_owner_for(e: &Env, to: &Address, token_id: TokenId) {
-        let max = sequential::next_token_id(e);
-        let owner_key = StorageKey::Owner(token_id);
+    pub fn set_owner_for_previous_token(e: &Env, to: &Address, token_id: TokenId) {
+        if token_id == 0 || token_id >= sequential::next_token_id(e) {
+            return;
+        }
+        let previous_id = token_id - 1;
+
+        let owner_key = StorageKey::Owner(previous_id);
         let has_owner = e.storage().persistent().has(&owner_key);
         if has_owner {
             e.storage().persistent().extend_ttl(
@@ -421,7 +483,7 @@ impl Consecutive {
             return;
         }
 
-        let burned_token_key = StorageKey::BurnedToken(token_id);
+        let burned_token_key = StorageKey::BurnedToken(previous_id);
         let is_burned = e.storage().persistent().get(&burned_token_key).unwrap_or(false);
         if is_burned {
             e.storage().persistent().extend_ttl(
@@ -432,8 +494,149 @@ impl Consecutive {
             return;
         }
 
-        if token_id < max && !has_owner && !is_burned {
-            e.storage().persistent().set(&StorageKey::Owner(token_id), to);
+        if !has_owner && !is_burned {
+            e.storage().persistent().set(&StorageKey::Owner(previous_id), to);
+            Self::set_ownership_in_bucket(e, previous_id);
         }
     }
+
+    /// Low-level function that marks `token_id` as being owned, i.e. sets the
+    /// corresponding bit in the ownership bucket.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The environment reference.
+    /// * `token_id` - The identifier of the token being set.
+    ///
+    /// # Errors
+    ///
+    /// * [`NonFungibleTokenError::TokenIDGreaterThanMax`] - If `token_id` is
+    ///   greater than max allowed (IDS_IN_BUCKET * BUCKETS - 1).
+    pub fn set_ownership_in_bucket(e: &Env, token_id: TokenId) {
+        let ids_in_bucket = IDS_IN_BUCKET as TokenId;
+        let ids_in_item = IDS_IN_ITEM as TokenId;
+        let total_ids = ids_in_bucket * BUCKETS as TokenId;
+
+        if token_id >= total_ids || token_id >= sequential::next_token_id(e) {
+            panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
+        }
+
+        let bucket_index = token_id / ids_in_bucket;
+
+        let key = StorageKey::OwnershipBucket(bucket_index);
+        let bucket = e.storage().instance().get::<_, Vec<TokenId>>(&key);
+        let mut bucket: Vec<TokenId> =
+            if let Some(b) = bucket { b } else { Vec::from_slice(e, &[0; ITEMS_IN_BUCKET]) };
+
+        // position of the token_id within its bucket (0-based)
+        let relative_id = token_id - (bucket_index * ids_in_bucket);
+        // index of the item inside the bucket that contains token_id
+        let item_index = relative_id / ids_in_item;
+        // index of the bit within the item that contains token_id
+        let bit_index = relative_id % ids_in_item;
+
+        let mask: TokenId = 1 << (ids_in_item - bit_index - 1);
+        let mut item = bucket.get(item_index).expect("token_id out of allowed range");
+        item |= mask;
+        // no replace, so must remove and re-insert
+        let _ = bucket.remove(item_index);
+        bucket.insert(item_index, item);
+
+        e.storage().instance().set(&StorageKey::OwnershipBucket(bucket_index), &bucket);
+    }
+}
+
+/// Searches for the first set bit (`1`) in a bitfield, scanning from left to
+/// right, starting at the specified bit position (relative to the most
+/// significant bit).
+///
+/// # Arguments
+///
+/// * `input` - An optional bitfield (`TokenId`) to search within.
+/// * `start` - Bit index to start the search from, counted from the MSB
+///   (0-based).
+///
+/// # Returns
+///
+/// * `Some(index)` - The index (relative to the MSB) of the first set bit
+///   found, starting from `start` toward the LSB.
+/// * `None` - If `input` is `None`, `start` is out of range, or no set bits are
+///   found.
+///
+/// # Example
+///
+/// If `TokenId::BITS = 8` and `input = Some(0b00101000)`:
+/// - `find_bit_in_item(input, 2)` returns `Some(3)` because the third set bit
+///   (from MSB) is at index 3 (counting from MSB = 0).
+pub(crate) fn find_bit_in_item(input: Option<TokenId>, start: TokenId) -> Option<TokenId> {
+    if let Some(num) = input {
+        let ids_in_item = TokenId::BITS;
+        // Invalid start position
+        if start >= ids_in_item {
+            return None;
+        }
+
+        let last = ids_in_item - 1;
+
+        for i in (0..=(last - start)).rev() {
+            if (num & (1 << i)) != 0 {
+                // i goes from MSB toward LSB relative to `start`, but we want to return
+                // MSB-relative index
+                return Some(last - i);
+            }
+        }
+    }
+
+    None
+}
+
+/// Searches for the first set bit (`1`) in a vector of bitfields ("bucket"),
+/// starting at a given bit index relative to the entire bucket (from MSB).
+///
+/// Internally, each element in the `bucket` represents a smaller bitfield (an
+/// "item"). This function locates which item to begin with, and then searches
+/// for a set bit across subsequent items using `find_bit_in_item`.
+///
+/// # Arguments
+///
+/// * `bucket` - A vector of `TokenId`s, where each value is treated as a
+///   bitfield.
+/// * `start` - The starting bit index to search from, relative to the MSB of
+///   the whole bucket.
+///
+/// # Returns
+///
+/// * `Some(index)` - The bit index (relative to the entire bucket) of the first
+///   set bit found.
+/// * `None` - If `start` is out of range, or no set bit is found from that
+///   position onwards.
+///
+/// # Example
+///
+/// If `IDS_IN_ITEM = 8`, `ITEMS_IN_BUCKET = 2`, and:
+/// ```
+/// bucket = vec![0b00000000, 0b00101000];
+/// ```
+/// then `find_bit_in_bucket(bucket, 8)` returns `Some(11)`, since bit 3 of the
+/// second item (index 11 in the overall bucket) is the first set bit.
+pub(crate) fn find_bit_in_bucket(bucket: Vec<TokenId>, start: TokenId) -> Option<TokenId> {
+    let ids_in_item = TokenId::BITS;
+    let ids_in_bucket = bucket.len() as TokenId * ids_in_item;
+
+    // Invalid start position
+    if start >= ids_in_bucket {
+        return None;
+    }
+
+    let item_index = start / ids_in_item;
+    // relative id in item
+    let relative_id = start - (item_index * ids_in_item);
+
+    (item_index..bucket.len()).find_map(|i| {
+        // If we're in the starting item, begin search from the token's relative
+        // position; otherwise, start from the beginning of the item.
+        let from_id = if i == item_index { relative_id } else { 0 };
+
+        find_bit_in_item(bucket.get(i), from_id).map(|pos_in_item| i * ids_in_item + pos_in_item)
+    })
 }
