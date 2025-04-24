@@ -2,6 +2,8 @@
 
 extern crate std;
 
+use core::i128;
+
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::{
@@ -95,8 +97,8 @@ fn test_check_cap_overflows() {
     let user = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        set_cap(&e, 170_141_183_460_469_231_731_687_303_715_884_105_727); // MAX value for i128;
-        mint(&e, &user, 170_141_183_460_469_231_731_687_303_715_884_105_727);
+        set_cap(&e, i128::MAX);
+        mint(&e, &user, i128::MAX);
 
         check_cap(&e, 1); // should overflow
     });
