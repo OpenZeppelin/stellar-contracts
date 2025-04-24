@@ -322,7 +322,8 @@ impl Base {
     ///   `operator`).
     /// * `approved` - The address receiving the approval.
     /// * `token_id` - The identifier of the token to be approved.
-    /// * `live_until_ledger` - The ledger number at which the approval expires.
+    /// * `live_until_ledger` - The ledger number at which the allowance
+    ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
     ///
     /// # Errors
     ///
@@ -497,11 +498,18 @@ impl Base {
             panic_with_error!(e, NonFungibleTokenError::InvalidApprover);
         }
 
+        let key = StorageKey::Approval(token_id);
+
+        if live_until_ledger == 0 {
+            e.storage().temporary().remove(&key);
+
+            emit_approve(e, approver, approved, token_id, live_until_ledger);
+            return;
+        }
+
         if live_until_ledger < e.ledger().sequence() {
             panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
         }
-
-        let key = StorageKey::Approval(token_id);
 
         let approval_data = ApprovalData { approved: approved.clone(), live_until_ledger };
 
