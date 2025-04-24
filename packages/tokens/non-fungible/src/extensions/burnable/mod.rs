@@ -23,7 +23,7 @@ use soroban_sdk::{symbol_short, Address, Env};
 /// the default implementations here, but we are providing a macro to generate
 /// the default implementations for you.
 ///
-/// When implementing [`NonFungibleBunrable`] trait for your Smart Contract,
+/// When implementing [`NonFungibleBurnable`] trait for your Smart Contract,
 /// you can follow the below example:
 ///
 /// ```ignore
