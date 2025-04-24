@@ -425,8 +425,8 @@ impl Consecutive {
             e.storage().temporary().remove(&approval_key);
 
             // Set the token_id - 1 to previous owner to preserve the ownership inference.
-            // `set_owner_for_previous_token` does this, but will skip it if the previous id doesn't exist,
-            // was burned or has already an owner.
+            // `set_owner_for_previous_token` does this, but will skip it if the previous id
+            // doesn't exist, was burned or has already an owner.
             Consecutive::set_owner_for_previous_token(e, from_address, token_id);
         } else {
             // nothing to do for the `None` case, since we don't track

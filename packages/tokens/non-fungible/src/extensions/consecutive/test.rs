@@ -433,13 +433,10 @@ fn consecutive_set_owner_for_previous_token_works() {
         // when 0 -> does nothing
         Consecutive::set_owner_for_previous_token(&e, &user3, 0);
         assert_eq!(Consecutive::owner_of(&e, 0), user2);
-        //let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(5));
-        //assert_eq!(owner, None);
 
         // when more than max -> does nothing
         Consecutive::set_owner_for_previous_token(&e, &user2, 5);
         assert_eq!(Consecutive::owner_of(&e, 4), user1);
-        //let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(5));
 
         // when already has owner -> does nothing
         e.storage().persistent().set(&StorageKey::Owner(3), &user3);
