@@ -112,8 +112,8 @@ impl Consecutive {
                 // If we're in the starting bucket, begin search from the token's relative
                 // position; otherwise, start from the beginning of the bucket.
                 let from_id = if i == bucket_index { relative_id } else { 0 };
-                // unwrap is safe because of the filter above
-                find_bit_in_bucket(bucket.unwrap(), from_id)
+                // expect is safe because of the filter above
+                find_bit_in_bucket(bucket.expect("bucket must be defined"), from_id)
                     .map(|pos_in_bucket| i * ids_in_bucket + pos_in_bucket)
             })
             .iter()
