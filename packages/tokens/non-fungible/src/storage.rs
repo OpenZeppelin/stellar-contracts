@@ -353,6 +353,9 @@ impl Base {
     /// * `operator` - The address being granted or revoked approval.
     /// * `live_until_ledger` - The ledger number at which the allowance
     ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
+    ///   `live_until_ledger` argument is implicitly bounded by the maximum
+    ///   allowed TTL extension for a temporary storage entry and specifying a
+    ///   higher value will cause the code to panic.
     ///
     /// # Errors
     ///
@@ -454,6 +457,9 @@ impl Base {
     /// * `approved` - The address receiving the approval.
     /// * `token_id` - The identifier of the token to be approved.
     /// * `live_until_ledger` - The ledger number at which the approval expires.
+    ///   `live_until_ledger` argument is implicitly bounded by the maximum
+    ///   allowed TTL extension for a temporary storage entry and specifying a
+    ///   higher value will cause the code to panic.
     ///
     /// # Errors
     ///
