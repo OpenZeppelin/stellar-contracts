@@ -104,7 +104,7 @@ impl Base {
             }
             Some(approval_data.approved)
         } else {
-            // if there is no ApprovalData Entry for this `token_id`
+            // if there is no `ApprovalData` entry for this `token_id`
             None
         }
     }
@@ -137,7 +137,7 @@ impl Base {
         false
     }
 
-    /// Returns the token metadata such as base_uri, name and symbol.
+    /// Returns the token metadata such as `base_uri`, `name` and `symbol`.
     ///
     /// # Arguments
     ///
@@ -210,7 +210,7 @@ impl Base {
         Base::compose_uri_for_token(e, base_uri, token_id)
     }
 
-    /// Composes and returns a the URI for a specific `token_id`, without
+    /// Composes and returns a URI for a specific `token_id`, without
     /// checking its ownership.
     ///
     /// # Arguments
@@ -527,7 +527,7 @@ impl Base {
     ///
     /// # Errors
     /// * [`NonFungibleTokenError::InsufficientApproval`] - If the `spender`
-    ///   don't enough approval.
+    ///   doesn't have enough approval.
     pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: TokenId) {
         // If `spender` is not the owner, they must have explicit approval.
         let is_spender_owner = spender == owner;
