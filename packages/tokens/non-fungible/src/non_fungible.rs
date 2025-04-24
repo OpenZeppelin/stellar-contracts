@@ -19,7 +19,7 @@ pub const MAX_NUM_DIGITS: usize = 20;
 
 #[cfg(feature = "token_u128")]
 pub type TokenId = u128;
-/// u128::MAX == 18446744073709551615
+/// u128::MAX == 340282366920938463463374607431768211455
 #[cfg(feature = "token_u128")]
 pub const MAX_NUM_DIGITS: usize = 39;
 
@@ -87,13 +87,13 @@ pub trait NonFungibleToken {
     /// `Consecutive` extensions.
     type ContractType: ContractOverrides;
 
-    /// Returns the number of tokens in `owner`'s account.
+    /// Returns the number of tokens owned by `account`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `owner` - Account of the token's owner.
-    fn balance(e: &Env, owner: Address) -> Balance;
+    /// * `account` - The address for which the balance is being queried.
+    fn balance(e: &Env, account: Address) -> Balance;
 
     /// Returns the owner of the `token_id` token.
     ///
