@@ -59,7 +59,8 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
 ///
 /// - Sets the current crate version (`CARGO_PKG_VERSION`) as `"binver"`
 ///   metadata using `contractmeta!`.
-/// - Implements `upgrade` and `migrate` functions with access control (`_require_auth`).
+/// - Implements `upgrade` and `migrate` functions with access control
+///   (`_require_auth`).
 /// - Throws a compile-time error if `UpgradeableMigratableInternal` is not
 ///   implemented.
 ///

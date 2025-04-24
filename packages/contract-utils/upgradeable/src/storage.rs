@@ -4,8 +4,8 @@ use crate::upgradeable::UpgradeableError;
 
 pub const MIGRATING: Symbol = symbol_short!("MIGRATING");
 
-/// Sets the `MIGRATING` state to `true`, indicating the beginning of a migration
-/// process.
+/// Sets the `MIGRATING` state to `true`, indicating the beginning of a
+/// migration process.
 ///
 /// # Arguments
 ///
