@@ -10,6 +10,7 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{
+    burnable::NonFungibleBurnable,
     enumerable::{Enumerable, NonFungibleEnumerable},
     Balance, Base, NonFungibleToken, TokenId,
 };
@@ -27,6 +28,10 @@ impl ExampleContract {
             String::from_str(e, "TKN"),
         );
     }
+
+    pub fn mint(e: &Env, to: Address) -> TokenId {
+        Enumerable::sequential_mint(e, &to)
+    }
 }
 
 #[default_impl]
@@ -39,31 +44,6 @@ impl NonFungibleToken for ExampleContract {
 #[contractimpl]
 impl NonFungibleEnumerable for ExampleContract {}
 
+#[default_impl]
 #[contractimpl]
-impl ExampleContract {
-    pub fn mint(e: &Env, to: Address) -> TokenId {
-        Enumerable::sequential_mint(e, &to)
-    }
-
-    pub fn burn(e: &Env, from: Address, token_id: TokenId) {
-        Enumerable::burn(e, &from, token_id);
-    }
-}
-
-/*
-  BELOW WILL CREATE A COMPILE ERROR,
-  SINCE ENUMERABLE IS NOT COMPATIBLE WITH THEM
-*/
-
-// ```rust
-// #[contractimpl]
-// impl NonFungibleBurnable for ExampleContract {
-//     fn burn(e: &Env, from: Address, token_id: TokenId) {
-//         Base::burn(e, &from, token_id);
-//     }
-//
-//     fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId) {
-//         Base::burn_from(e, &spender, &from, token_id);
-//     }
-// }
-// ```
+impl NonFungibleBurnable for ExampleContract {}

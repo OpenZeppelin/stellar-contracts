@@ -1,5 +1,5 @@
 mod storage;
-use crate::{Base, NonFungibleToken, TokenId};
+use crate::{NonFungibleToken, TokenId};
 
 mod test;
 
@@ -34,7 +34,7 @@ use soroban_sdk::{symbol_short, Address, Env};
 ///     /* and the macro will generate all the missing default implementations for you */
 /// }
 /// ```
-pub trait NonFungibleBurnable: NonFungibleToken<ContractType = Base> {
+pub trait NonFungibleBurnable: NonFungibleToken {
     /// Destroys the token with `token_id` from `from`.
     ///
     /// # Arguments
