@@ -33,8 +33,8 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
             syn::parse_quote! { fn symbol(e: &Env) -> String { Self::ContractType::symbol(e) } },
         ],
         "NonFungibleBurnable" => vec![
-            syn::parse_quote! { fn burn(e: &Env, from: Address, token_id: TokenId) { Base::burn(e, &from, token_id); } },
-            syn::parse_quote! { fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId) { Base::burn_from(e, &spender, &from, token_id); } },
+            syn::parse_quote! { fn burn(e: &Env, from: Address, token_id: TokenId) { Self::ContractType::burn(e, &from, token_id); } },
+            syn::parse_quote! { fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId) { Self::ContractType::burn_from(e, &spender, &from, token_id); } },
         ],
         "NonFungibleEnumerable" => vec![
             syn::parse_quote! { fn total_supply(e: &Env) -> Balance { Enumerable::total_supply(e) } },
