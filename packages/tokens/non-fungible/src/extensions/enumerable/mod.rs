@@ -34,8 +34,8 @@ use crate::{Balance, NonFungibleToken, TokenId};
 /// # Notes
 ///
 /// Enumerable trait has its own business logic for creating and destroying
-/// tokens. Therefore, this trait is INCOMPATIBLE with the `Mintable`,
-/// `Burnable`, and `Consecutive` extensions.
+/// tokens. Therefore, this trait is INCOMPATIBLE with the
+/// `Consecutive` extension.
 ///
 /// Note that, `Enumerable` trait can also be offloaded to off-chain services.
 /// This extension exists for the use-cases where the enumeration is required as
