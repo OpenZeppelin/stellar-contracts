@@ -8,6 +8,7 @@
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_non_fungible::{
+    burnable::NonFungibleBurnable,
     consecutive::{Consecutive, NonFungibleConsecutive},
     Balance, Base, ContractOverrides, NonFungibleToken, TokenId,
 };
@@ -24,6 +25,10 @@ impl ExampleContract {
             String::from_str(e, "My Token"),
             String::from_str(e, "TKN"),
         );
+    }
+
+    pub fn batch_mint(e: &Env, to: Address, amount: Balance) -> TokenId {
+        Consecutive::batch_mint(e, &to, amount)
     }
 }
 
@@ -88,30 +93,12 @@ impl NonFungibleToken for ExampleContract {
 impl NonFungibleConsecutive for ExampleContract {}
 
 #[contractimpl]
-impl ExampleContract {
-    pub fn batch_mint(e: &Env, to: Address, amount: Balance) -> TokenId {
-        Consecutive::batch_mint(e, &to, amount)
+impl NonFungibleBurnable for ExampleContract {
+    fn burn(e: &Env, from: Address, token_id: TokenId) {
+        Self::ContractType::burn(e, &from, token_id);
     }
 
-    pub fn burn(e: &Env, from: Address, token_id: TokenId) {
-        Consecutive::burn(e, &from, token_id);
+    fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId) {
+        Self::ContractType::burn_from(e, &spender, &from, token_id);
     }
 }
-
-/*
-  BELOW WILL CREATE A COMPILE ERROR,
-  SINCE CONSECUTIVE IS NOT COMPATIBLE WITH THEM
-*/
-
-// ```rust
-// #[contractimpl]
-// impl NonFungibleBurnable for ExampleContract {
-//     fn burn(e: &Env, from: Address, token_id: TokenId) {
-//         Base::burn(e, &from, token_id);
-//     }
-//
-//     fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId) {
-//         Base::burn_from(e, &spender, &from, token_id);
-//     }
-// }
-// ```
