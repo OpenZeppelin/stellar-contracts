@@ -625,7 +625,7 @@ pub(crate) fn find_bit_in_item(input: Option<u32>, start: u32) -> Option<u32> {
 /// second item (index 11 in the overall bucket) is the first set bit.
 pub(crate) fn find_bit_in_bucket(bucket: Vec<u32>, start: u32) -> Option<u32> {
     let ids_in_item = u32::BITS;
-    let ids_in_bucket = bucket.len() as u32 * ids_in_item;
+    let ids_in_bucket = bucket.len() * ids_in_item;
 
     // Invalid start position
     if start >= ids_in_bucket {
@@ -637,7 +637,7 @@ pub(crate) fn find_bit_in_bucket(bucket: Vec<u32>, start: u32) -> Option<u32> {
     let relative_id = start - (item_index * ids_in_item);
 
     (item_index..bucket.len()).find_map(|i| {
-        // If we're in the starting item, begin search from the token's relative
+        // If we're in te starting item, begin search from the token's relative
         // position; otherwise, start from the beginning of the item.
         let from_id = if i == item_index { relative_id } else { 0 };
 
