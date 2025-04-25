@@ -9,7 +9,7 @@ use soroban_sdk::{
 };
 use stellar_event_assertion::EventAssertion;
 
-use crate::{non_fungible::Balance, Base, StorageKey};
+use crate::{non_fungible::Balance, Base, NFTStorageKey};
 
 #[contract]
 struct MockContract;
@@ -27,7 +27,7 @@ fn metadata_works() {
         Base::set_metadata(&e, base_uri, collection_name.clone(), collection_symbol.clone());
 
         let token_id = 4294967295;
-        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
         let uri = Base::token_uri(&e, token_id);
 
         assert_eq!(uri, String::from_str(&e, "https://smth.com/4294967295"));
@@ -36,7 +36,7 @@ fn metadata_works() {
 
         // case token_id == 0
         let token_id = 0;
-        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
         let uri = Base::token_uri(&e, token_id);
 
         assert_eq!(uri, String::from_str(&e, "https://smth.com/0"));
@@ -80,7 +80,7 @@ fn revoke_approve_for_all_works() {
 
     e.as_contract(&address, || {
         // set a pre-existing approve_for_all for the operator
-        let key = StorageKey::ApprovalForAll(owner.clone(), operator.clone());
+        let key = NFTStorageKey::ApprovalForAll(owner.clone(), operator.clone());
 
         e.storage().temporary().set(&key, &(1000_u32));
 
@@ -109,7 +109,7 @@ fn approve_nft_works() {
     let token_id = 1;
 
     e.as_contract(&address, || {
-        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
 
         Base::approve(&e, &owner, &approved, token_id, 1000);
 
@@ -133,7 +133,7 @@ fn approve_with_operator_works() {
     let token_id = 1;
 
     e.as_contract(&address, || {
-        e.storage().persistent().set(&StorageKey::Owner(token_id), &owner);
+        e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
 
         Base::approve_for_all(&e, &owner, &operator, 1000);
 
@@ -357,7 +357,7 @@ fn update_with_math_overflow_fails() {
     e.as_contract(&address, || {
         let token_id = Base::sequential_mint(&e, &owner);
 
-        e.storage().persistent().set(&StorageKey::Balance(recipient.clone()), &Balance::MAX);
+        e.storage().persistent().set(&NFTStorageKey::Balance(recipient.clone()), &Balance::MAX);
 
         // Attempt to update which would cause a math overflow
         Base::update(&e, Some(&owner), Some(&recipient), token_id);

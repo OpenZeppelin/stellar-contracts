@@ -3,7 +3,7 @@ use soroban_sdk::{contracttype, panic_with_error, Env};
 use crate::{NonFungibleTokenError, TokenId};
 
 #[contracttype]
-pub enum StorageKey {
+pub enum NFTSequentialStorageKey {
     TokenIdCounter,
 }
 
@@ -14,7 +14,7 @@ pub enum StorageKey {
 ///
 /// * `e` - Access to the Soroban environment.
 pub fn next_token_id(e: &Env) -> TokenId {
-    e.storage().instance().get(&StorageKey::TokenIdCounter).unwrap_or(0)
+    e.storage().instance().get(&NFTSequentialStorageKey::TokenIdCounter).unwrap_or(0)
 }
 
 /// Return the next free token ID, then increment the counter.
@@ -33,6 +33,6 @@ pub fn increment_token_id(e: &Env, amount: TokenId) -> TokenId {
     let Some(next_id) = current_id.checked_add(amount) else {
         panic_with_error!(e, NonFungibleTokenError::MathOverflow);
     };
-    e.storage().instance().set(&StorageKey::TokenIdCounter, &next_id);
+    e.storage().instance().set(&NFTSequentialStorageKey::TokenIdCounter, &next_id);
     current_id
 }

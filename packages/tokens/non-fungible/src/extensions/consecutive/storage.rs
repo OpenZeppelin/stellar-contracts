@@ -68,9 +68,10 @@ pub const IDS_IN_ITEM: usize = mem::size_of::<TokenId>() * 8; // 32 if TokenId i
 /// Total number of ids in the whole bucket
 pub const IDS_IN_BUCKET: usize = ITEMS_IN_BUCKET * IDS_IN_ITEM; // 3,200
 
-/// Storage keys for the data associated with `NonFungibleToken`
+/// Storage keys for the data associated with the consecutive extension of
+/// `NonFungibleToken`
 #[contracttype]
-pub enum StorageKey {
+pub enum NFTConsecutiveStorageKey {
     Approval(TokenId),
     Owner(TokenId),
     OwnershipBucket(u32),
@@ -92,7 +93,7 @@ impl Consecutive {
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
     ///   `token_id` does not exist.
     pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
-        let key = StorageKey::BurnedToken(token_id);
+        let key = NFTConsecutiveStorageKey::BurnedToken(token_id);
         if e.storage().persistent().get(&key).unwrap_or(false) {
             panic_with_error!(&e, NonFungibleTokenError::NonExistentToken);
         }
@@ -105,7 +106,12 @@ impl Consecutive {
 
         (bucket_index..BUCKETS as TokenId)
             .map(|i| {
-                (i, e.storage().instance().get::<_, Vec<TokenId>>(&StorageKey::OwnershipBucket(i)))
+                (
+                    i,
+                    e.storage()
+                        .instance()
+                        .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(i)),
+                )
             })
             .filter(|(_, bucket)| bucket.is_some())
             .find_map(|(i, bucket)| {
@@ -118,7 +124,7 @@ impl Consecutive {
             })
             .iter()
             .find_map(|id| {
-                let key = StorageKey::Owner(*id);
+                let key = NFTConsecutiveStorageKey::Owner(*id);
                 e.storage().persistent().get::<_, Address>(&key).inspect(|_| {
                     e.storage().persistent().extend_ttl(
                         &key,
@@ -146,8 +152,11 @@ impl Consecutive {
         let ids_in_bucket = IDS_IN_BUCKET as TokenId;
         let total_ids = ids_in_bucket * BUCKETS as TokenId;
 
-        let is_burned =
-            e.storage().persistent().get(&StorageKey::BurnedToken(token_id)).unwrap_or(false);
+        let is_burned = e
+            .storage()
+            .persistent()
+            .get(&NFTConsecutiveStorageKey::BurnedToken(token_id))
+            .unwrap_or(false);
         if is_burned || token_id >= sequential::next_token_id(e) || token_id >= total_ids {
             panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
         }
@@ -207,7 +216,7 @@ impl Consecutive {
         let last_id = first_id + amount - 1;
 
         Self::set_ownership_in_bucket(e, last_id);
-        e.storage().persistent().set(&StorageKey::Owner(last_id), &to);
+        e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(last_id), &to);
 
         emit_consecutive_mint(e, to, first_id, last_id);
 
@@ -391,7 +400,7 @@ impl Consecutive {
     /// The difference with [`Base::update`] is that the
     /// current function:
     /// 1. explicitly adds burned tokens to storage in
-    ///    `StorageKey::BurnedToken`,
+    ///    `NFTConsecutiveStorageKey::BurnedToken`,
     /// 2. sets the next token (if any) to the previous owner.
     ///
     /// # Arguments
@@ -421,7 +430,7 @@ impl Consecutive {
             Base::decrease_balance(e, from_address, 1);
 
             // Clear any existing approval
-            let approval_key = StorageKey::Approval(token_id);
+            let approval_key = NFTConsecutiveStorageKey::Approval(token_id);
             e.storage().temporary().remove(&approval_key);
 
             // Set the token_id - 1 to previous owner to preserve the ownership inference.
@@ -437,13 +446,13 @@ impl Consecutive {
             Base::increase_balance(e, to_address, 1);
 
             // Set the new owner
-            e.storage().persistent().set(&StorageKey::Owner(token_id), to_address);
+            e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(token_id), to_address);
             Self::set_ownership_in_bucket(e, token_id);
         } else {
             // Burning: `to` is None
-            e.storage().persistent().remove(&StorageKey::Owner(token_id));
+            e.storage().persistent().remove(&NFTConsecutiveStorageKey::Owner(token_id));
 
-            e.storage().persistent().set(&StorageKey::BurnedToken(token_id), &true);
+            e.storage().persistent().set(&NFTConsecutiveStorageKey::BurnedToken(token_id), &true);
         }
     }
 
@@ -472,7 +481,7 @@ impl Consecutive {
         }
         let previous_id = token_id - 1;
 
-        let owner_key = StorageKey::Owner(previous_id);
+        let owner_key = NFTConsecutiveStorageKey::Owner(previous_id);
         let has_owner = e.storage().persistent().has(&owner_key);
         if has_owner {
             e.storage().persistent().extend_ttl(
@@ -483,7 +492,7 @@ impl Consecutive {
             return;
         }
 
-        let burned_token_key = StorageKey::BurnedToken(previous_id);
+        let burned_token_key = NFTConsecutiveStorageKey::BurnedToken(previous_id);
         let is_burned = e.storage().persistent().get(&burned_token_key).unwrap_or(false);
         if is_burned {
             e.storage().persistent().extend_ttl(
@@ -495,7 +504,7 @@ impl Consecutive {
         }
 
         if !has_owner && !is_burned {
-            e.storage().persistent().set(&StorageKey::Owner(previous_id), to);
+            e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(previous_id), to);
             Self::set_ownership_in_bucket(e, previous_id);
         }
     }
@@ -523,7 +532,7 @@ impl Consecutive {
 
         let bucket_index = token_id / ids_in_bucket;
 
-        let key = StorageKey::OwnershipBucket(bucket_index);
+        let key = NFTConsecutiveStorageKey::OwnershipBucket(bucket_index);
         let bucket = e.storage().instance().get::<_, Vec<TokenId>>(&key);
         let mut bucket: Vec<TokenId> =
             if let Some(b) = bucket { b } else { Vec::from_slice(e, &[0; ITEMS_IN_BUCKET]) };
@@ -542,7 +551,9 @@ impl Consecutive {
         let _ = bucket.remove(item_index);
         bucket.insert(item_index, item);
 
-        e.storage().instance().set(&StorageKey::OwnershipBucket(bucket_index), &bucket);
+        e.storage()
+            .instance()
+            .set(&NFTConsecutiveStorageKey::OwnershipBucket(bucket_index), &bucket);
     }
 }
 
