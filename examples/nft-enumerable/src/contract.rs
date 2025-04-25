@@ -12,7 +12,7 @@ use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{
     burnable::NonFungibleBurnable,
     enumerable::{Enumerable, NonFungibleEnumerable},
-    Balance, Base, NonFungibleToken, TokenId,
+    Base, NonFungibleToken,
 };
 
 #[contract]
@@ -29,7 +29,7 @@ impl ExampleContract {
         );
     }
 
-    pub fn mint(e: &Env, to: Address) -> TokenId {
+    pub fn mint(e: &Env, to: Address) -> u32 {
         Enumerable::sequential_mint(e, &to)
     }
 }

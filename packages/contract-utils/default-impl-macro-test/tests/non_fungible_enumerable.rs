@@ -2,7 +2,7 @@ use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env,
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{
     enumerable::{Enumerable, NonFungibleEnumerable},
-    Balance, Base, NonFungibleToken, TokenId,
+    Base, NonFungibleToken,
 };
 
 #[contract]
@@ -32,11 +32,11 @@ impl NonFungibleEnumerable for ExampleContract {}
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn mint(e: &Env, to: Address, token_id: TokenId) {
+    pub fn mint(e: &Env, to: Address, token_id: u32) {
         Enumerable::non_sequential_mint(e, &to, token_id);
     }
 
-    pub fn burn(e: &Env, from: Address, token_id: TokenId) {
+    pub fn burn(e: &Env, from: Address, token_id: u32) {
         Enumerable::burn(e, &from, token_id);
     }
 }

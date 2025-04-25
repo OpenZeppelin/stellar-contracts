@@ -1,6 +1,6 @@
 use soroban_sdk::{Address, Env};
 
-use crate::{extensions::burnable::emit_burn, Base, TokenId};
+use crate::{extensions::burnable::emit_burn, Base};
 
 // `Burnable` extension is build for the `Base` contract type.
 impl Base {
@@ -20,12 +20,12 @@ impl Base {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// Authorization for `from` is required.
-    pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
+    pub fn burn(e: &Env, from: &Address, token_id: u32) {
         from.require_auth();
         Base::update(e, Some(from), None, token_id);
         emit_burn(e, from, token_id);
@@ -50,12 +50,12 @@ impl Base {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// Authorization for `spender` is required.
-    pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
+    pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
         spender.require_auth();
         Base::check_spender_approval(e, spender, from, token_id);
         Base::update(e, Some(from), None, token_id);

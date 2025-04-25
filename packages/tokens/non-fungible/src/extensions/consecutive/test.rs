@@ -11,7 +11,7 @@ use crate::{
         storage::{NFTConsecutiveStorageKey, IDS_IN_ITEM},
         Consecutive,
     },
-    sequential, Base, TokenId,
+    sequential, Base,
 };
 
 #[contract]
@@ -37,7 +37,7 @@ fn consecutive_find_bit_in_item() {
 #[test]
 fn consecutive_find_bit_in_bucket() {
     let e = Env::default();
-    let ids = IDS_IN_ITEM as TokenId;
+    let ids = IDS_IN_ITEM as u32;
 
     assert_eq!(
         find_bit_in_bucket(
@@ -89,7 +89,7 @@ fn consecutive_set_ownership_works() {
         let bucket = e
             .storage()
             .instance()
-            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b10000000000000000000000000000000);
 
@@ -97,7 +97,7 @@ fn consecutive_set_ownership_works() {
         let bucket = e
             .storage()
             .instance()
-            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b11000000000000000000000000000000);
 
@@ -105,7 +105,7 @@ fn consecutive_set_ownership_works() {
         let bucket = e
             .storage()
             .instance()
-            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b11000000000000000000000000000001);
 
@@ -113,7 +113,7 @@ fn consecutive_set_ownership_works() {
         let bucket = e
             .storage()
             .instance()
-            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(1).unwrap(), 0b10000000000000000000000000000000);
 
@@ -121,7 +121,7 @@ fn consecutive_set_ownership_works() {
         let bucket = e
             .storage()
             .instance()
-            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b11000000000000000000000000000001);
         assert_eq!(bucket.get(1).unwrap(), 0b10000000000001000000000000000000);
@@ -131,7 +131,7 @@ fn consecutive_set_ownership_works() {
         let bucket = e
             .storage()
             .instance()
-            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(31).unwrap(), 0b00000000100000000000000000000000);
     });
@@ -156,7 +156,7 @@ fn consecutive_set_ownership_panics_for_max_allowed_fails() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let max = (IDS_IN_BUCKET * BUCKETS) as TokenId;
+        let max = (IDS_IN_BUCKET * BUCKETS) as u32;
         // increment sequential more than max
         let _ = sequential::increment_token_id(&e, max + 100);
         Consecutive::set_ownership_in_bucket(&e, max);
@@ -172,7 +172,7 @@ fn consecutive_owner_of_works() {
     let user3 = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let ids_in_bucket = IDS_IN_BUCKET as TokenId;
+        let ids_in_bucket = IDS_IN_BUCKET as u32;
         let max = 3 * ids_in_bucket + 1;
         let _ = sequential::increment_token_id(&e, max);
 
@@ -534,7 +534,7 @@ fn consecutive_token_uri_panics_for_more_than_total_ids_fails() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let max = (IDS_IN_BUCKET * BUCKETS) as TokenId;
+        let max = (IDS_IN_BUCKET * BUCKETS) as u32;
         // increment sequential more than max
         let _ = sequential::increment_token_id(&e, max + 100);
         Consecutive::token_uri(&e, max);

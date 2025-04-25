@@ -5,8 +5,8 @@ use stellar_constants::{
 
 use crate::{
     non_fungible::{
-        emit_approve, emit_approve_for_all, emit_mint, emit_transfer, Balance,
-        NonFungibleTokenError, TokenId, MAX_BASE_URI_LEN, MAX_NUM_DIGITS,
+        emit_approve, emit_approve_for_all, emit_mint, emit_transfer, NonFungibleTokenError,
+        MAX_BASE_URI_LEN, MAX_NUM_DIGITS,
     },
     sequential::increment_token_id,
     Base,
@@ -31,9 +31,9 @@ pub struct Metadata {
 /// Storage keys for the data associated with `NonFungibleToken`
 #[contracttype]
 pub enum NFTStorageKey {
-    Owner(TokenId),
+    Owner(u32),
     Balance(Address),
-    Approval(TokenId),
+    Approval(u32),
     ApprovalForAll(Address /* owner */, Address /* operator */),
     Metadata,
 }
@@ -48,9 +48,9 @@ impl Base {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address for which the balance is being queried.
-    pub fn balance(e: &Env, account: &Address) -> Balance {
+    pub fn balance(e: &Env, account: &Address) -> u32 {
         let key = NFTStorageKey::Balance(account.clone());
-        if let Some(balance) = e.storage().persistent().get::<_, Balance>(&key) {
+        if let Some(balance) = e.storage().persistent().get::<_, u32>(&key) {
             e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
             balance
         } else {
@@ -69,7 +69,7 @@ impl Base {
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
     ///   `token_id` does not exist.
-    pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
+    pub fn owner_of(e: &Env, token_id: u32) -> Address {
         let key = NFTStorageKey::Owner(token_id);
         if let Some(owner) = e.storage().persistent().get::<_, Address>(&key) {
             e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
@@ -89,7 +89,7 @@ impl Base {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token_id` - The identifier of the token to check approval for.
-    pub fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
+    pub fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
         let key = NFTStorageKey::Approval(token_id);
 
         if let Some(approval_data) = e.storage().temporary().get::<_, ApprovalData>(&key) {
@@ -196,7 +196,7 @@ impl Base {
     ///
     /// * refer to [`owner_of`] errors.
     /// * refer to [`base_uri`] errors.
-    pub fn token_uri(e: &Env, token_id: TokenId) -> String {
+    pub fn token_uri(e: &Env, token_id: u32) -> String {
         // used to panic if non-existent token_id
         let _ = Base::owner_of(e, token_id);
         let base_uri = Base::base_uri(e);
@@ -211,7 +211,7 @@ impl Base {
     /// * `e` - Access to the Soroban environment.
     /// * `base_uri` - The base URI. Assumes it's valid and ends by `/`.
     /// * `token_id` - The identifier of the token.
-    pub fn compose_uri_for_token(e: &Env, base_uri: String, token_id: TokenId) -> String {
+    pub fn compose_uri_for_token(e: &Env, base_uri: String, token_id: u32) -> String {
         let len = base_uri.len() as usize;
 
         if len > 0 {
@@ -248,14 +248,14 @@ impl Base {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// * Authorization for `from` is required.
     /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
     ///   lost.
-    pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+    pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
         from.require_auth();
         Base::update(e, Some(from), Some(to), token_id);
         emit_transfer(e, from, to, token_id);
@@ -280,20 +280,14 @@ impl Base {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// * Authorization for `spender` is required.
     /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
     ///   lost.
-    pub fn transfer_from(
-        e: &Env,
-        spender: &Address,
-        from: &Address,
-        to: &Address,
-        token_id: TokenId,
-    ) {
+    pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
         spender.require_auth();
         Base::check_spender_approval(e, spender, from, token_id);
         Base::update(e, Some(from), Some(to), token_id);
@@ -319,7 +313,7 @@ impl Base {
     ///
     /// # Events
     ///
-    /// * topics - `["approve", owner: Address, token_id: TokenId]`
+    /// * topics - `["approve", owner: Address, token_id: u32]`
     /// * data - `[approved: Address, live_until_ledger: u32]`
     ///
     /// # Notes
@@ -329,7 +323,7 @@ impl Base {
         e: &Env,
         approver: &Address,
         approved: &Address,
-        token_id: TokenId,
+        token_id: u32,
         live_until_ledger: u32,
     ) {
         approver.require_auth();
@@ -411,7 +405,7 @@ impl Base {
     /// * refer to [`owner_of`] errors.
     /// * refer to [`decrease_balance`] errors.
     /// * refer to [`increase_balance`] errors.
-    pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: TokenId) {
+    pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
         if let Some(from_address) = from {
             let owner = Base::owner_of(e, token_id);
 
@@ -467,7 +461,7 @@ impl Base {
         owner: &Address,
         approver: &Address,
         approved: &Address,
-        token_id: TokenId,
+        token_id: u32,
         live_until_ledger: u32,
     ) {
         if approver != owner && !Base::is_approved_for_all(e, owner, approver) {
@@ -512,7 +506,7 @@ impl Base {
     /// # Errors
     /// * [`NonFungibleTokenError::InsufficientApproval`] - If the `spender`
     ///   doesn't have enough approval.
-    pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: TokenId) {
+    pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: u32) {
         // If `spender` is not the owner, they must have explicit approval.
         let is_spender_owner = spender == owner;
         let is_spender_approved = Base::get_approved(e, token_id) == Some(spender.clone());
@@ -536,7 +530,7 @@ impl Base {
     ///
     /// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `to`
     ///   would overflow.
-    pub fn increase_balance(e: &Env, to: &Address, amount: TokenId) {
+    pub fn increase_balance(e: &Env, to: &Address, amount: u32) {
         let Some(balance) = Base::balance(e, to).checked_add(amount) else {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);
         };
@@ -556,7 +550,7 @@ impl Base {
     ///
     /// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `from`
     ///   would overflow.
-    pub fn decrease_balance(e: &Env, from: &Address, amount: TokenId) {
+    pub fn decrease_balance(e: &Env, from: &Address, amount: u32) {
         let Some(balance) = Base::balance(e, from).checked_sub(amount) else {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);
         };
@@ -594,15 +588,15 @@ impl Base {
 
     // ################## INTERNAL HELPERS ##################
 
-    /// Converts a numeric `TokenId` to `String` and returns it alongside the
+    /// Converts `u32` to `String` and returns it alongside the
     /// number of digits.
-    fn token_id_to_string(e: &Env, value: TokenId) -> (String, usize) {
+    fn token_id_to_string(e: &Env, value: u32) -> (String, usize) {
         if value == 0 {
             return (String::from_str(e, "0"), 1);
         }
 
         let mut digits: usize = 0;
-        let mut temp: TokenId = value;
+        let mut temp: u32 = value;
 
         while temp > 0 {
             digits += 1;
@@ -639,7 +633,7 @@ impl Base {
     /// # Events
     ///
     /// * topics - `["mint", to: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Security Warning
     ///
@@ -662,7 +656,7 @@ impl Base {
     /// already in use. If the developer has other means of minting tokens
     /// and generating `token_id`s, they should ensure that the token_id is
     /// unique and not already in use.
-    pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
+    pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
         let token_id = increment_token_id(e, 1);
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
@@ -686,7 +680,7 @@ impl Base {
     /// # Events
     ///
     /// * topics - `["mint", to: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Security Warning
     ///
@@ -710,7 +704,7 @@ impl Base {
     /// uniqueness before passing it to this function. The strategy for
     /// generating `token_id`s varies by project and must be implemented
     /// accordingly.
-    pub fn mint(e: &Env, to: &Address, token_id: TokenId) {
+    pub fn mint(e: &Env, to: &Address, token_id: u32) {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
     }

@@ -10,25 +10,25 @@ use crate::{
     emit_transfer,
     extensions::consecutive::emit_consecutive_mint,
     sequential::{self as sequential},
-    Balance, Base, ContractOverrides, NonFungibleTokenError, TokenId,
+    Base, ContractOverrides, NonFungibleTokenError,
 };
 
 pub struct Consecutive;
 
 impl ContractOverrides for Consecutive {
-    fn owner_of(e: &Env, token_id: TokenId) -> Address {
+    fn owner_of(e: &Env, token_id: u32) -> Address {
         Consecutive::owner_of(e, token_id)
     }
 
-    fn token_uri(e: &Env, token_id: TokenId) -> String {
+    fn token_uri(e: &Env, token_id: u32) -> String {
         Consecutive::token_uri(e, token_id)
     }
 
-    fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+    fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
         Consecutive::transfer(e, from, to, token_id);
     }
 
-    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
         Consecutive::transfer_from(e, spender, from, to, token_id);
     }
 
@@ -36,7 +36,7 @@ impl ContractOverrides for Consecutive {
         e: &Env,
         approver: &Address,
         approved: &Address,
-        token_id: TokenId,
+        token_id: u32,
         live_until_ledger: u32,
     ) {
         Consecutive::approve(e, approver, approved, token_id, live_until_ledger);
@@ -64,7 +64,7 @@ pub const BUCKETS: usize = 10;
 pub const ITEMS_IN_BUCKET: usize = 100;
 /// Number of ids per item, which corresponds to the number of bits for a given
 /// value
-pub const IDS_IN_ITEM: usize = mem::size_of::<TokenId>() * 8; // 32 if TokenId is u32
+pub const IDS_IN_ITEM: usize = mem::size_of::<u32>() * 8; // 32
 /// Total number of ids in the whole bucket
 pub const IDS_IN_BUCKET: usize = ITEMS_IN_BUCKET * IDS_IN_ITEM; // 3,200
 
@@ -72,10 +72,10 @@ pub const IDS_IN_BUCKET: usize = ITEMS_IN_BUCKET * IDS_IN_ITEM; // 3,200
 /// `NonFungibleToken`
 #[contracttype]
 pub enum NFTConsecutiveStorageKey {
-    Approval(TokenId),
-    Owner(TokenId),
+    Approval(u32),
+    Owner(u32),
     OwnershipBucket(u32),
-    BurnedToken(TokenId),
+    BurnedToken(u32),
 }
 
 impl Consecutive {
@@ -92,25 +92,25 @@ impl Consecutive {
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
     ///   `token_id` does not exist.
-    pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
+    pub fn owner_of(e: &Env, token_id: u32) -> Address {
         let key = NFTConsecutiveStorageKey::BurnedToken(token_id);
         if e.storage().persistent().get(&key).unwrap_or(false) {
             panic_with_error!(&e, NonFungibleTokenError::NonExistentToken);
         }
 
-        let ids_in_bucket = IDS_IN_BUCKET as TokenId;
+        let ids_in_bucket = IDS_IN_BUCKET as u32;
         // idex of the bucket that contains token_id
         let bucket_index = token_id / ids_in_bucket;
         // position of the token_id within its bucket (0-based)
         let relative_id = token_id - (bucket_index * ids_in_bucket);
 
-        (bucket_index..BUCKETS as TokenId)
+        (bucket_index..BUCKETS as u32)
             .map(|i| {
                 (
                     i,
                     e.storage()
                         .instance()
-                        .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(i)),
+                        .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(i)),
                 )
             })
             .filter(|(_, bucket)| bucket.is_some())
@@ -148,9 +148,9 @@ impl Consecutive {
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
     ///   `token_id` does not exist (burned or more than max allowed).
     /// * refer to [`Base::base_uri`] errors.
-    pub fn token_uri(e: &Env, token_id: TokenId) -> String {
-        let ids_in_bucket = IDS_IN_BUCKET as TokenId;
-        let total_ids = ids_in_bucket * BUCKETS as TokenId;
+    pub fn token_uri(e: &Env, token_id: u32) -> String {
+        let ids_in_bucket = IDS_IN_BUCKET as u32;
+        let total_ids = ids_in_bucket * BUCKETS as u32;
 
         let is_burned = e
             .storage()
@@ -185,7 +185,7 @@ impl Consecutive {
     /// # Events
     ///
     /// * topics - `["consecutive_mint", to: Address]`
-    /// * data - `[from_token_id: TokenId, to_token_id: TokenId]`
+    /// * data - `[from_token_id: u32, to_token_id: u32]`
     ///
     /// # Security Warning
     ///
@@ -194,7 +194,7 @@ impl Consecutive {
     /// authorization in the calling function. For example:
     ///
     /// ```ignore,rust
-    /// fn mint_batch(e: &Env, to: &Address, amount: TokenId) {
+    /// fn mint_batch(e: &Env, to: &Address, amount: u32) {
     ///     // 1. Verify admin has minting privileges (optional)
     ///     let admin = e.storage().instance().get(&ADMIN_KEY).unwrap();
     ///     admin.require_auth();
@@ -205,7 +205,7 @@ impl Consecutive {
     /// ```
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
-    pub fn batch_mint(e: &Env, to: &Address, amount: Balance) -> TokenId {
+    pub fn batch_mint(e: &Env, to: &Address, amount: u32) -> u32 {
         if amount == 0 {
             panic_with_error!(&e, NonFungibleTokenError::InvalidAmount);
         }
@@ -240,12 +240,12 @@ impl Consecutive {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// Authorization for `from` is required.
-    pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
+    pub fn burn(e: &Env, from: &Address, token_id: u32) {
         from.require_auth();
 
         Consecutive::update(e, Some(from), None, token_id);
@@ -271,12 +271,12 @@ impl Consecutive {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// Authorization for `spender` is required.
-    pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
+    pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
         spender.require_auth();
 
         Base::check_spender_approval(e, spender, from, token_id);
@@ -301,14 +301,14 @@ impl Consecutive {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// * Authorization for `from` is required.
     /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
     ///   lost.
-    pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+    pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
         from.require_auth();
 
         Consecutive::update(e, Some(from), Some(to), token_id);
@@ -334,20 +334,14 @@ impl Consecutive {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// * Authorization for `spender` is required.
     /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
     ///   lost.
-    pub fn transfer_from(
-        e: &Env,
-        spender: &Address,
-        from: &Address,
-        to: &Address,
-        token_id: TokenId,
-    ) {
+    pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
         spender.require_auth();
 
         Base::check_spender_approval(e, spender, from, token_id);
@@ -374,7 +368,7 @@ impl Consecutive {
     ///
     /// # Events
     ///
-    /// * topics - `["approve", owner: Address, token_id: TokenId]`
+    /// * topics - `["approve", owner: Address, token_id: u32]`
     /// * data - `[approved: Address, live_until_ledger: u32]`
     ///
     /// # Notes
@@ -384,7 +378,7 @@ impl Consecutive {
         e: &Env,
         approver: &Address,
         approved: &Address,
-        token_id: TokenId,
+        token_id: u32,
         live_until_ledger: u32,
     ) {
         approver.require_auth();
@@ -418,7 +412,7 @@ impl Consecutive {
     /// * refer to [`decrease_balance`] errors.
     /// * refer to [`increase_balance`] errors.
     /// * refer to [`set_ownership_in_bucket`] errors.
-    pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: TokenId) {
+    pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
         if let Some(from_address) = from {
             let owner = Consecutive::owner_of(e, token_id);
 
@@ -475,7 +469,7 @@ impl Consecutive {
     /// assign an owner. The intent is to fairly distribute storage costs among
     /// neighboring entries, since they collectively influence boundary
     /// calculations.
-    pub fn set_owner_for_previous_token(e: &Env, to: &Address, token_id: TokenId) {
+    pub fn set_owner_for_previous_token(e: &Env, to: &Address, token_id: u32) {
         if token_id == 0 || token_id >= sequential::next_token_id(e) {
             return;
         }
@@ -519,12 +513,12 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::TokenIDGreaterThanMax`] - If `token_id` is
+    /// * [`NonFungibleTokenError::TokenIDsAreDepleted`] - If `token_id` is
     ///   greater than max allowed (IDS_IN_BUCKET * BUCKETS - 1).
-    pub fn set_ownership_in_bucket(e: &Env, token_id: TokenId) {
-        let ids_in_bucket = IDS_IN_BUCKET as TokenId;
-        let ids_in_item = IDS_IN_ITEM as TokenId;
-        let total_ids = ids_in_bucket * BUCKETS as TokenId;
+    pub fn set_ownership_in_bucket(e: &Env, token_id: u32) {
+        let ids_in_bucket = IDS_IN_BUCKET as u32;
+        let ids_in_item = IDS_IN_ITEM as u32;
+        let total_ids = ids_in_bucket * BUCKETS as u32;
 
         if token_id >= total_ids || token_id >= sequential::next_token_id(e) {
             panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
@@ -533,8 +527,8 @@ impl Consecutive {
         let bucket_index = token_id / ids_in_bucket;
 
         let key = NFTConsecutiveStorageKey::OwnershipBucket(bucket_index);
-        let bucket = e.storage().instance().get::<_, Vec<TokenId>>(&key);
-        let mut bucket: Vec<TokenId> =
+        let bucket = e.storage().instance().get::<_, Vec<u32>>(&key);
+        let mut bucket: Vec<u32> =
             if let Some(b) = bucket { b } else { Vec::from_slice(e, &[0; ITEMS_IN_BUCKET]) };
 
         // position of the token_id within its bucket (0-based)
@@ -544,7 +538,7 @@ impl Consecutive {
         // index of the bit within the item that contains token_id
         let bit_index = relative_id % ids_in_item;
 
-        let mask: TokenId = 1 << (ids_in_item - bit_index - 1);
+        let mask: u32 = 1 << (ids_in_item - bit_index - 1);
         let mut item = bucket.get(item_index).expect("token_id out of allowed range");
         item |= mask;
         // no replace, so must remove and re-insert
@@ -563,7 +557,7 @@ impl Consecutive {
 ///
 /// # Arguments
 ///
-/// * `input` - An optional bitfield (`TokenId`) to search within.
+/// * `input` - An optional bitfield (`u32`) to search within.
 /// * `start` - Bit index to start the search from, counted from the MSB
 ///   (0-based).
 ///
@@ -576,12 +570,12 @@ impl Consecutive {
 ///
 /// # Example
 ///
-/// If `TokenId::BITS = 8` and `input = Some(0b00101000)`:
+/// If `u32::BITS = 8` and `input = Some(0b00101000)`:
 /// - `find_bit_in_item(input, 2)` returns `Some(3)` because the third set bit
 ///   (from MSB) is at index 3 (counting from MSB = 0).
-pub(crate) fn find_bit_in_item(input: Option<TokenId>, start: TokenId) -> Option<TokenId> {
+pub(crate) fn find_bit_in_item(input: Option<u32>, start: u32) -> Option<u32> {
     if let Some(num) = input {
-        let ids_in_item = TokenId::BITS;
+        let ids_in_item = u32::BITS;
         // Invalid start position
         if start >= ids_in_item {
             return None;
@@ -610,8 +604,7 @@ pub(crate) fn find_bit_in_item(input: Option<TokenId>, start: TokenId) -> Option
 ///
 /// # Arguments
 ///
-/// * `bucket` - A vector of `TokenId`s, where each value is treated as a
-///   bitfield.
+/// * `bucket` - A vector of `u32`s, where each value is treated as a bitfield.
 /// * `start` - The starting bit index to search from, relative to the MSB of
 ///   the whole bucket.
 ///
@@ -630,9 +623,9 @@ pub(crate) fn find_bit_in_item(input: Option<TokenId>, start: TokenId) -> Option
 /// ```
 /// then `find_bit_in_bucket(bucket, 8)` returns `Some(11)`, since bit 3 of the
 /// second item (index 11 in the overall bucket) is the first set bit.
-pub(crate) fn find_bit_in_bucket(bucket: Vec<TokenId>, start: TokenId) -> Option<TokenId> {
-    let ids_in_item = TokenId::BITS;
-    let ids_in_bucket = bucket.len() as TokenId * ids_in_item;
+pub(crate) fn find_bit_in_bucket(bucket: Vec<u32>, start: u32) -> Option<u32> {
+    let ids_in_item = u32::BITS;
+    let ids_in_bucket = bucket.len() as u32 * ids_in_item;
 
     // Invalid start position
     if start >= ids_in_bucket {

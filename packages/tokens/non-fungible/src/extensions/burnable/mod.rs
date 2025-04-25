@@ -1,5 +1,5 @@
 mod storage;
-use crate::{NonFungibleToken, TokenId};
+use crate::NonFungibleToken;
 
 mod test;
 
@@ -53,8 +53,8 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: TokenId]`
-    fn burn(e: &Env, from: Address, token_id: TokenId);
+    /// * data - `[token_id: u32]`
+    fn burn(e: &Env, from: Address, token_id: u32);
 
     /// Destroys the token with `token_id` from `from`, by using `spender`s
     /// approval.
@@ -79,8 +79,8 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: TokenId]`
-    fn burn_from(e: &Env, spender: Address, from: Address, token_id: TokenId);
+    /// * data - `[token_id: u32]`
+    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32);
 }
 
 // ################## EVENTS ##################
@@ -96,8 +96,8 @@ pub trait NonFungibleBurnable: NonFungibleToken {
 /// # Events
 ///
 /// * topics - `["burn", from: Address]`
-/// * data - `[token_id: TokenId]`
-pub fn emit_burn(e: &Env, from: &Address, token_id: TokenId) {
+/// * data - `[token_id: u32]`
+pub fn emit_burn(e: &Env, from: &Address, token_id: u32) {
     let topics = (symbol_short!("burn"), from);
     e.events().publish(topics, token_id)
 }

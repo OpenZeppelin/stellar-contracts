@@ -23,7 +23,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{
     consecutive::{Consecutive, NonFungibleConsecutive},
-    Balance, Base, ContractOverrides, NonFungibleToken, TokenId,
+    Base, ContractOverrides, NonFungibleToken,
 };
 
 #[contract]
@@ -40,12 +40,12 @@ impl GameItem {
         );
     }
 
-    pub fn award_items(e: &Env, to: Address, amount: TokenId) -> TokenId {
+    pub fn award_items(e: &Env, to: Address, amount: u32) -> u32 {
         // access control might be needed
         Consecutive::batch_mint(e, &to, amount)
     }
 
-    pub fn burn(e: &Env, from: Address, token_id: TokenId) {
+    pub fn burn(e: &Env, from: Address, token_id: u32) {
         Consecutive::burn(e, &from, token_id);
     }
 }

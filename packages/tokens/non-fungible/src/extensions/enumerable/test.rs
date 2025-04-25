@@ -5,7 +5,7 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
-use crate::{extensions::enumerable::Enumerable, Base, NFTStorageKey, TokenId};
+use crate::{extensions::enumerable::Enumerable, Base, NFTStorageKey};
 
 #[contract]
 struct MockContract;
@@ -163,7 +163,7 @@ fn test_add_to_owner_enumeration() {
 
     e.as_contract(&address, || {
         // simulating mint, transfer, etc. for increasing the balance
-        e.storage().persistent().set(&NFTStorageKey::Balance(owner.clone()), &(1 as TokenId));
+        e.storage().persistent().set(&NFTStorageKey::Balance(owner.clone()), &(1 as u32));
 
         Enumerable::add_to_owner_enumeration(&e, &owner, token_id);
         assert_eq!(Enumerable::get_owner_token_id(&e, &owner, 0), token_id);
@@ -179,7 +179,7 @@ fn test_remove_from_owner_enumeration() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        e.storage().persistent().set(&NFTStorageKey::Balance(owner.clone()), &(1 as TokenId));
+        e.storage().persistent().set(&NFTStorageKey::Balance(owner.clone()), &(1 as u32));
         let token_id = 42;
         Enumerable::add_to_owner_enumeration(&e, &owner, token_id);
         Enumerable::remove_from_owner_enumeration(&e, &owner, token_id);

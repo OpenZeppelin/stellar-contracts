@@ -3,18 +3,16 @@ use stellar_constants::{
     OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
 
-use crate::{
-    non_fungible::emit_mint, Balance, Base, ContractOverrides, NonFungibleTokenError, TokenId,
-};
+use crate::{non_fungible::emit_mint, Base, ContractOverrides, NonFungibleTokenError};
 
 pub struct Enumerable;
 
 impl ContractOverrides for Enumerable {
-    fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+    fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
         Enumerable::transfer(e, from, to, token_id);
     }
 
-    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
         Enumerable::transfer_from(e, spender, from, to, token_id);
     }
 }
@@ -22,7 +20,7 @@ impl ContractOverrides for Enumerable {
 #[contracttype]
 pub struct OwnerTokensKey {
     pub owner: Address,
-    pub index: TokenId,
+    pub index: u32,
 }
 
 /// Storage keys for the data associated with the enumerable extension of
@@ -31,9 +29,9 @@ pub struct OwnerTokensKey {
 pub enum NFTEnumerableStorageKey {
     TotalSupply,
     OwnerTokens(OwnerTokensKey),
-    OwnerTokensIndex(/* token_id */ TokenId),
-    GlobalTokens(/* index */ TokenId),
-    GlobalTokensIndex(/* token_id */ TokenId),
+    OwnerTokensIndex(/* token_id */ u32),
+    GlobalTokens(/* index */ u32),
+    GlobalTokensIndex(/* token_id */ u32),
 }
 
 impl Enumerable {
@@ -44,7 +42,7 @@ impl Enumerable {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    pub fn total_supply(e: &Env) -> Balance {
+    pub fn total_supply(e: &Env) -> u32 {
         e.storage().instance().get(&NFTEnumerableStorageKey::TotalSupply).unwrap_or(0)
     }
 
@@ -63,10 +61,10 @@ impl Enumerable {
     ///
     /// * [`NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token
     ///   ID is not found in the owner's enumeration.
-    pub fn get_owner_token_id(e: &Env, owner: &Address, index: TokenId) -> TokenId {
+    pub fn get_owner_token_id(e: &Env, owner: &Address, index: u32) -> u32 {
         let key =
             NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index });
-        let Some(token_id) = e.storage().persistent().get::<_, TokenId>(&key) else {
+        let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
         };
         e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
@@ -87,9 +85,9 @@ impl Enumerable {
     ///
     /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
     ///   ID is not found in the global enumeration.
-    pub fn get_token_id(e: &Env, index: TokenId) -> TokenId {
+    pub fn get_token_id(e: &Env, index: u32) -> u32 {
         let key = NFTEnumerableStorageKey::GlobalTokens(index);
-        let Some(token_id) = e.storage().persistent().get::<_, TokenId>(&key) else {
+        let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
         };
         e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
@@ -115,7 +113,7 @@ impl Enumerable {
     /// # Events
     ///
     /// * topics - `["mint", to: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
@@ -138,7 +136,7 @@ impl Enumerable {
     /// let admin = read_administrator(e);
     /// admin.require_auth();
     /// ```
-    pub fn sequential_mint(e: &Env, to: &Address) -> TokenId {
+    pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
         let token_id = Base::sequential_mint(e, to);
 
         Enumerable::add_to_enumerations(e, to, token_id);
@@ -162,7 +160,7 @@ impl Enumerable {
     /// # Events
     ///
     /// * topics - `["mint", to: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// This is a wrapper around [`Base::update()`], that also
     /// handles the storage updates for:
@@ -185,7 +183,7 @@ impl Enumerable {
     /// let admin = read_administrator(e);
     /// admin.require_auth();
     /// ```
-    pub fn non_sequential_mint(e: &Env, to: &Address, token_id: TokenId) {
+    pub fn non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
 
@@ -209,7 +207,7 @@ impl Enumerable {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
@@ -218,7 +216,7 @@ impl Enumerable {
     /// * total supply
     /// * owner_tokens enumeration
     /// * global_tokens enumeration
-    pub fn burn(e: &Env, from: &Address, token_id: TokenId) {
+    pub fn burn(e: &Env, from: &Address, token_id: u32) {
         Base::burn(e, from, token_id);
 
         Enumerable::remove_from_enumerations(e, from, token_id);
@@ -244,7 +242,7 @@ impl Enumerable {
     /// # Events
     ///
     /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
@@ -253,7 +251,7 @@ impl Enumerable {
     /// * total supply
     /// * owner_tokens enumeration
     /// * global_tokens enumeration
-    pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: TokenId) {
+    pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
         Base::burn_from(e, spender, from, token_id);
 
         Enumerable::remove_from_enumerations(e, from, token_id);
@@ -276,14 +274,14 @@ impl Enumerable {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// This is a wrapper around [`Base::transfer`], that also
     /// handles the storage updates for:
     /// * owner_tokens enumeration
-    pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+    pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
         Base::transfer(e, from, to, token_id);
 
         if from != to {
@@ -311,20 +309,14 @@ impl Enumerable {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: TokenId]`
+    /// * data - `[token_id: u32]`
     ///
     /// # Notes
     ///
     /// This is a wrapper around [`Base::transfer_from`], that also
     /// handles the storage updates for:
     /// * owner_tokens enumeration
-    pub fn transfer_from(
-        e: &Env,
-        spender: &Address,
-        from: &Address,
-        to: &Address,
-        token_id: TokenId,
-    ) {
+    pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
         Base::transfer_from(e, spender, from, to, token_id);
 
         if from != to {
@@ -345,7 +337,7 @@ impl Enumerable {
     ///
     /// * [`NonFungibleTokenError::TokenIDsAreDepleted`] - When attempting to
     ///   mint a new token ID, but all token IDs are already in use.
-    pub fn increment_total_supply(e: &Env) -> TokenId {
+    pub fn increment_total_supply(e: &Env) -> u32 {
         let total_supply = Enumerable::total_supply(e);
         let Some(new_total_supply) = total_supply.checked_add(1) else {
             panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
@@ -365,7 +357,7 @@ impl Enumerable {
     ///
     /// * [`NonFungibleTokenError::MathOverflow`] - If this function is called
     ///   when there are no tokens present.
-    pub fn decrement_total_supply(e: &Env) -> TokenId {
+    pub fn decrement_total_supply(e: &Env) -> u32 {
         let total_supply = Enumerable::total_supply(e);
         let Some(new_total_supply) = total_supply.checked_sub(1) else {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);
@@ -385,7 +377,7 @@ impl Enumerable {
     ///
     /// * refer to [`add_to_owner_enumeration`] errors.
     /// * refer to [`increment_total_supply`] errors.
-    pub fn add_to_enumerations(e: &Env, owner: &Address, token_id: TokenId) {
+    pub fn add_to_enumerations(e: &Env, owner: &Address, token_id: u32) {
         Enumerable::add_to_owner_enumeration(e, owner, token_id);
         let total_supply = Enumerable::increment_total_supply(e);
         Enumerable::add_to_global_enumeration(e, token_id, total_supply);
@@ -404,7 +396,7 @@ impl Enumerable {
     /// * refer to [`remove_from_owner_enumeration`] errors.
     /// * refer to [`decrement_total_supply`] errors.
     /// * refer to [`remove_from_global_enumeration`] errors.
-    pub fn remove_from_enumerations(e: &Env, owner: &Address, token_id: TokenId) {
+    pub fn remove_from_enumerations(e: &Env, owner: &Address, token_id: u32) {
         Enumerable::remove_from_owner_enumeration(e, owner, token_id);
         let total_supply = Enumerable::decrement_total_supply(e);
         Enumerable::remove_from_global_enumeration(e, token_id, total_supply);
@@ -428,7 +420,7 @@ impl Enumerable {
     ///
     /// This function is expected to be called after the balance of the owner
     /// is already manipulated (mint, transfer, etc.)
-    pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: TokenId) {
+    pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: u32) {
         // balance is already incremented by 1, we need to subtract 1 from it
         // to get the `last_index + 1` (the index of the new token)
         let Some(owner_balance) = Base::balance(e, owner).checked_sub(1) else {
@@ -463,7 +455,7 @@ impl Enumerable {
     ///
     /// This function is expected to be called after the balance of the owner
     /// is already manipulated (mint, transfer, etc.)
-    pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id: TokenId) {
+    pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id: u32) {
         let key = NFTEnumerableStorageKey::OwnerTokensIndex(to_be_removed_id);
         let Some(to_be_removed_index) = e.storage().persistent().get(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
@@ -512,7 +504,7 @@ impl Enumerable {
     /// * `e` - Access to the Soroban environment.
     /// * `token_id` - The token ID to add.
     /// * `total_supply` - The current total supply, acts as the index.
-    pub fn add_to_global_enumeration(e: &Env, token_id: TokenId, total_supply: TokenId) {
+    pub fn add_to_global_enumeration(e: &Env, token_id: u32, total_supply: u32) {
         e.storage()
             .persistent()
             .set(&NFTEnumerableStorageKey::GlobalTokens(total_supply), &token_id);
@@ -534,13 +526,9 @@ impl Enumerable {
     ///
     /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
     ///   ID is not found in the global enumeration.
-    pub fn remove_from_global_enumeration(
-        e: &Env,
-        to_be_removed_id: TokenId,
-        last_token_index: TokenId,
-    ) {
+    pub fn remove_from_global_enumeration(e: &Env, to_be_removed_id: u32, last_token_index: u32) {
         let key = NFTEnumerableStorageKey::GlobalTokensIndex(to_be_removed_id);
-        let Some(to_be_removed_index) = e.storage().persistent().get::<_, TokenId>(&key) else {
+        let Some(to_be_removed_index) = e.storage().persistent().get::<_, u32>(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
         };
         e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
