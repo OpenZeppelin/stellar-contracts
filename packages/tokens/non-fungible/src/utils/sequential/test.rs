@@ -5,7 +5,7 @@ extern crate std;
 use soroban_sdk::{contract, Env};
 
 use crate::{
-    sequential::{increment_token_id, next_token_id, StorageKey},
+    sequential::storage::{increment_token_id, next_token_id, NFTSequentialStorageKey},
     TokenId,
 };
 
@@ -37,7 +37,7 @@ fn sequential_increment_token_id_fails_on_overflow() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        e.storage().instance().set(&StorageKey::TokenIdCounter, &TokenId::MAX);
+        e.storage().instance().set(&NFTSequentialStorageKey::TokenIdCounter, &TokenId::MAX);
         let _ = increment_token_id(&e, 1);
     });
 }

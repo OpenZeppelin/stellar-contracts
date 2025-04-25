@@ -28,9 +28,9 @@ pub struct Metadata {
     pub symbol: String,
 }
 
-/// Storage keys for the data associated with `FungibleToken`
+/// Storage keys for the data associated with `NonFungibleToken`
 #[contracttype]
-pub enum StorageKey {
+pub enum NFTStorageKey {
     Owner(TokenId),
     Balance(Address),
     Approval(TokenId),
@@ -49,7 +49,7 @@ impl Base {
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address for which the balance is being queried.
     pub fn balance(e: &Env, account: &Address) -> Balance {
-        let key = StorageKey::Balance(account.clone());
+        let key = NFTStorageKey::Balance(account.clone());
         if let Some(balance) = e.storage().persistent().get::<_, Balance>(&key) {
             e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
             balance
@@ -70,7 +70,7 @@ impl Base {
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
     ///   `token_id` does not exist.
     pub fn owner_of(e: &Env, token_id: TokenId) -> Address {
-        let key = StorageKey::Owner(token_id);
+        let key = NFTStorageKey::Owner(token_id);
         if let Some(owner) = e.storage().persistent().get::<_, Address>(&key) {
             e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
             owner
@@ -90,7 +90,7 @@ impl Base {
     /// * `e` - Access to the Soroban environment.
     /// * `token_id` - The identifier of the token to check approval for.
     pub fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
-        let key = StorageKey::Approval(token_id);
+        let key = NFTStorageKey::Approval(token_id);
 
         if let Some(approval_data) = e.storage().temporary().get::<_, ApprovalData>(&key) {
             if approval_data.live_until_ledger < e.ledger().sequence() {
@@ -115,7 +115,7 @@ impl Base {
     /// * `owner` - The address that owns the tokens.
     /// * `operator` - The address to check for approval status.
     pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool {
-        let key = StorageKey::ApprovalForAll(owner.clone(), operator.clone());
+        let key = NFTStorageKey::ApprovalForAll(owner.clone(), operator.clone());
 
         // Retrieve the approval data for the owner
         if let Some(live_until_ledger) = e.storage().temporary().get::<_, u32>(&key) {
@@ -142,7 +142,7 @@ impl Base {
     pub fn get_metadata(e: &Env) -> Metadata {
         e.storage()
             .instance()
-            .get(&StorageKey::Metadata)
+            .get(&NFTStorageKey::Metadata)
             .unwrap_or_else(|| panic_with_error!(e, NonFungibleTokenError::UnsetMetadata))
     }
 
@@ -368,7 +368,7 @@ impl Base {
     pub fn approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
         owner.require_auth();
 
-        let key = StorageKey::ApprovalForAll(owner.clone(), operator.clone());
+        let key = NFTStorageKey::ApprovalForAll(owner.clone(), operator.clone());
 
         // If revoking approval (live_until_ledger == 0)
         if live_until_ledger == 0 {
@@ -423,7 +423,7 @@ impl Base {
             Base::decrease_balance(e, from_address, 1);
 
             // Clear any existing approval
-            let approval_key = StorageKey::Approval(token_id);
+            let approval_key = NFTStorageKey::Approval(token_id);
             e.storage().temporary().remove(&approval_key);
         } else {
             // nothing to do for the `None` case, since we don't track
@@ -434,10 +434,10 @@ impl Base {
             Base::increase_balance(e, to_address, 1);
 
             // Set the new owner
-            e.storage().persistent().set(&StorageKey::Owner(token_id), to_address);
+            e.storage().persistent().set(&NFTStorageKey::Owner(token_id), to_address);
         } else {
             // Burning: `to` is None
-            e.storage().persistent().remove(&StorageKey::Owner(token_id));
+            e.storage().persistent().remove(&NFTStorageKey::Owner(token_id));
         }
     }
 
@@ -474,7 +474,7 @@ impl Base {
             panic_with_error!(e, NonFungibleTokenError::InvalidApprover);
         }
 
-        let key = StorageKey::Approval(token_id);
+        let key = NFTStorageKey::Approval(token_id);
 
         if live_until_ledger == 0 {
             e.storage().temporary().remove(&key);
@@ -540,7 +540,7 @@ impl Base {
         let Some(balance) = Base::balance(e, to).checked_add(amount) else {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);
         };
-        e.storage().persistent().set(&StorageKey::Balance(to.clone()), &balance);
+        e.storage().persistent().set(&NFTStorageKey::Balance(to.clone()), &balance);
     }
 
     /// Low-level function for decreasing the balance of `to`, without handling
@@ -560,7 +560,7 @@ impl Base {
         let Some(balance) = Base::balance(e, from).checked_sub(amount) else {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);
         };
-        e.storage().persistent().set(&StorageKey::Balance(from.clone()), &balance);
+        e.storage().persistent().set(&NFTStorageKey::Balance(from.clone()), &balance);
     }
 
     /// Sets the token metadata such as token collection URI, name and symbol.
@@ -589,7 +589,7 @@ impl Base {
         }
 
         let metadata = Metadata { base_uri, name, symbol };
-        e.storage().instance().set(&StorageKey::Metadata, &metadata);
+        e.storage().instance().set(&NFTStorageKey::Metadata, &metadata);
     }
 
     // ################## INTERNAL HELPERS ##################

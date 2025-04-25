@@ -8,7 +8,7 @@ use stellar_event_assertion::EventAssertion;
 use super::storage::{find_bit_in_bucket, find_bit_in_item, BUCKETS, IDS_IN_BUCKET};
 use crate::{
     extensions::consecutive::{
-        storage::{StorageKey, IDS_IN_ITEM},
+        storage::{NFTConsecutiveStorageKey, IDS_IN_ITEM},
         Consecutive,
     },
     sequential, Base, TokenId,
@@ -86,35 +86,53 @@ fn consecutive_set_ownership_works() {
     e.as_contract(&address, || {
         let _ = sequential::increment_token_id(&e, 1001);
         Consecutive::set_ownership_in_bucket(&e, 0);
-        let bucket =
-            e.storage().instance().get::<_, Vec<TokenId>>(&StorageKey::OwnershipBucket(0)).unwrap();
+        let bucket = e
+            .storage()
+            .instance()
+            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b10000000000000000000000000000000);
 
         Consecutive::set_ownership_in_bucket(&e, 1);
-        let bucket =
-            e.storage().instance().get::<_, Vec<TokenId>>(&StorageKey::OwnershipBucket(0)).unwrap();
+        let bucket = e
+            .storage()
+            .instance()
+            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b11000000000000000000000000000000);
 
         Consecutive::set_ownership_in_bucket(&e, 31);
-        let bucket =
-            e.storage().instance().get::<_, Vec<TokenId>>(&StorageKey::OwnershipBucket(0)).unwrap();
+        let bucket = e
+            .storage()
+            .instance()
+            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b11000000000000000000000000000001);
 
         Consecutive::set_ownership_in_bucket(&e, 32);
-        let bucket =
-            e.storage().instance().get::<_, Vec<TokenId>>(&StorageKey::OwnershipBucket(0)).unwrap();
+        let bucket = e
+            .storage()
+            .instance()
+            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .unwrap();
         assert_eq!(bucket.get(1).unwrap(), 0b10000000000000000000000000000000);
 
         Consecutive::set_ownership_in_bucket(&e, 45);
-        let bucket =
-            e.storage().instance().get::<_, Vec<TokenId>>(&StorageKey::OwnershipBucket(0)).unwrap();
+        let bucket = e
+            .storage()
+            .instance()
+            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b11000000000000000000000000000001);
         assert_eq!(bucket.get(1).unwrap(), 0b10000000000001000000000000000000);
         assert_eq!(bucket.get(2).unwrap(), 0);
 
         Consecutive::set_ownership_in_bucket(&e, 1000);
-        let bucket =
-            e.storage().instance().get::<_, Vec<TokenId>>(&StorageKey::OwnershipBucket(0)).unwrap();
+        let bucket = e
+            .storage()
+            .instance()
+            .get::<_, Vec<TokenId>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
+            .unwrap();
         assert_eq!(bucket.get(31).unwrap(), 0b00000000100000000000000000000000);
     });
 }
@@ -159,18 +177,18 @@ fn consecutive_owner_of_works() {
         let _ = sequential::increment_token_id(&e, max);
 
         Consecutive::set_ownership_in_bucket(&e, 0);
-        e.storage().persistent().set(&StorageKey::Owner(0), &user1);
+        e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(0), &user1);
         assert_eq!(Consecutive::owner_of(&e, 0), user1);
 
         Consecutive::set_ownership_in_bucket(&e, 1_000);
-        e.storage().persistent().set(&StorageKey::Owner(1_000), &user2);
+        e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(1_000), &user2);
         assert_eq!(Consecutive::owner_of(&e, 0), user1);
         assert_eq!(Consecutive::owner_of(&e, 10), user2);
         assert_eq!(Consecutive::owner_of(&e, 1_000), user2);
 
         // skip one bucket
         Consecutive::set_ownership_in_bucket(&e, max - 1);
-        e.storage().persistent().set(&StorageKey::Owner(max - 1), &user3);
+        e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(max - 1), &user3);
         assert_eq!(Consecutive::owner_of(&e, max - 1000), user3);
         assert_eq!(Consecutive::owner_of(&e, max - ids_in_bucket), user3);
         assert_eq!(Consecutive::owner_of(&e, max - 2 * ids_in_bucket), user3);
@@ -196,7 +214,11 @@ fn consecutive_batch_mint_works() {
         assert_eq!(sequential::next_token_id(&e), amount);
         assert_eq!(Base::balance(&e, &owner), amount);
 
-        let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(99)).unwrap();
+        let _owner = e
+            .storage()
+            .persistent()
+            .get::<_, Address>(&NFTConsecutiveStorageKey::Owner(99))
+            .unwrap();
         assert_eq!(_owner, owner);
         assert_eq!(Consecutive::owner_of(&e, 0), owner);
         assert_eq!(Consecutive::owner_of(&e, 50), owner);
@@ -273,7 +295,11 @@ fn consecutive_transfer_works() {
 
         assert_eq!(Consecutive::owner_of(&e, 51), owner);
         assert_eq!(Consecutive::owner_of(&e, 49), owner);
-        let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(49)).unwrap();
+        let _owner = e
+            .storage()
+            .persistent()
+            .get::<_, Address>(&NFTConsecutiveStorageKey::Owner(49))
+            .unwrap();
         assert_eq!(_owner, owner);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
@@ -361,10 +387,14 @@ fn consecutive_burn_works() {
         Consecutive::burn(&e, &owner, token_id);
         assert_eq!(Base::balance(&e, &owner), amount - 1);
 
-        let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(token_id));
-        assert_eq!(_owner, None);
         let _owner =
-            e.storage().persistent().get::<_, Address>(&StorageKey::Owner(token_id - 1)).unwrap();
+            e.storage().persistent().get::<_, Address>(&NFTConsecutiveStorageKey::Owner(token_id));
+        assert_eq!(_owner, None);
+        let _owner = e
+            .storage()
+            .persistent()
+            .get::<_, Address>(&NFTConsecutiveStorageKey::Owner(token_id - 1))
+            .unwrap();
         assert_eq!(_owner, owner);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
@@ -377,7 +407,8 @@ fn consecutive_burn_works() {
         Consecutive::burn(&e, &owner, 0);
         assert_eq!(Base::balance(&e, &owner), amount - 2);
 
-        let _owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(token_id));
+        let _owner =
+            e.storage().persistent().get::<_, Address>(&NFTConsecutiveStorageKey::Owner(token_id));
         assert_eq!(_owner, None);
         assert_eq!(Consecutive::owner_of(&e, 1), owner);
     });
@@ -400,8 +431,11 @@ fn consecutive_burn_from_works() {
         Consecutive::burn_from(&e, &spender, &owner, token_id);
 
         assert_eq!(Base::balance(&e, &owner), amount - 1);
-        let burned =
-            e.storage().persistent().get::<_, bool>(&StorageKey::BurnedToken(token_id)).unwrap();
+        let burned = e
+            .storage()
+            .persistent()
+            .get::<_, bool>(&NFTConsecutiveStorageKey::BurnedToken(token_id))
+            .unwrap();
         assert!(burned);
         assert_eq!(Consecutive::owner_of(&e, token_id + 1), owner);
 
@@ -439,15 +473,19 @@ fn consecutive_set_owner_for_previous_token_works() {
         assert_eq!(Consecutive::owner_of(&e, 4), user1);
 
         // when already has owner -> does nothing
-        e.storage().persistent().set(&StorageKey::Owner(3), &user3);
+        e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(3), &user3);
         Consecutive::set_owner_for_previous_token(&e, &user2, 4);
-        let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(3)).unwrap();
+        let owner = e
+            .storage()
+            .persistent()
+            .get::<_, Address>(&NFTConsecutiveStorageKey::Owner(3))
+            .unwrap();
         assert_eq!(owner, user3);
 
         // when is burned -> does nothing
-        e.storage().persistent().set(&StorageKey::BurnedToken(1), &true);
+        e.storage().persistent().set(&NFTConsecutiveStorageKey::BurnedToken(1), &true);
         Consecutive::set_owner_for_previous_token(&e, &user2, 2);
-        let owner = e.storage().persistent().get::<_, Address>(&StorageKey::Owner(0));
+        let owner = e.storage().persistent().get::<_, Address>(&NFTConsecutiveStorageKey::Owner(0));
         assert_eq!(owner, None);
     });
 }

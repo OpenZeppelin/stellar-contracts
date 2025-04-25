@@ -77,7 +77,7 @@ pub use non_fungible::{
     NonFungibleTokenError, TokenId,
 };
 pub use overrides::*;
-pub use storage::{ApprovalData, StorageKey};
+pub use storage::{ApprovalData, NFTStorageKey};
 pub use utils::sequential;
 
 mod test;

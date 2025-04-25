@@ -25,9 +25,10 @@ pub struct OwnerTokensKey {
     pub index: TokenId,
 }
 
-/// Storage keys for the data associated with `FungibleToken`
+/// Storage keys for the data associated with the enumerable extension of
+/// `NonFungibleToken`
 #[contracttype]
-pub enum StorageKey {
+pub enum NFTEnumerableStorageKey {
     TotalSupply,
     OwnerTokens(OwnerTokensKey),
     OwnerTokensIndex(/* token_id */ TokenId),
@@ -44,7 +45,7 @@ impl Enumerable {
     ///
     /// * `e` - Access to the Soroban environment.
     pub fn total_supply(e: &Env) -> Balance {
-        e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0)
+        e.storage().instance().get(&NFTEnumerableStorageKey::TotalSupply).unwrap_or(0)
     }
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
@@ -63,7 +64,8 @@ impl Enumerable {
     /// * [`NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token
     ///   ID is not found in the owner's enumeration.
     pub fn get_owner_token_id(e: &Env, owner: &Address, index: TokenId) -> TokenId {
-        let key = StorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index });
+        let key =
+            NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index });
         let Some(token_id) = e.storage().persistent().get::<_, TokenId>(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
         };
@@ -86,7 +88,7 @@ impl Enumerable {
     /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
     ///   ID is not found in the global enumeration.
     pub fn get_token_id(e: &Env, index: TokenId) -> TokenId {
-        let key = StorageKey::GlobalTokens(index);
+        let key = NFTEnumerableStorageKey::GlobalTokens(index);
         let Some(token_id) = e.storage().persistent().get::<_, TokenId>(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
         };
@@ -348,7 +350,7 @@ impl Enumerable {
         let Some(new_total_supply) = total_supply.checked_add(1) else {
             panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
         };
-        e.storage().instance().set(&StorageKey::TotalSupply, &new_total_supply);
+        e.storage().instance().set(&NFTEnumerableStorageKey::TotalSupply, &new_total_supply);
 
         total_supply
     }
@@ -368,7 +370,7 @@ impl Enumerable {
         let Some(new_total_supply) = total_supply.checked_sub(1) else {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);
         };
-        e.storage().instance().set(&StorageKey::TotalSupply, &new_total_supply);
+        e.storage().instance().set(&NFTEnumerableStorageKey::TotalSupply, &new_total_supply);
 
         new_total_supply
     }
@@ -433,10 +435,15 @@ impl Enumerable {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);
         };
         e.storage().persistent().set(
-            &StorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index: owner_balance }),
+            &NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey {
+                owner: owner.clone(),
+                index: owner_balance,
+            }),
             &token_id,
         );
-        e.storage().persistent().set(&StorageKey::OwnerTokensIndex(token_id), &owner_balance);
+        e.storage()
+            .persistent()
+            .set(&NFTEnumerableStorageKey::OwnerTokensIndex(token_id), &owner_balance);
     }
 
     /// Removes a token ID from the owner's enumeration.
@@ -457,7 +464,7 @@ impl Enumerable {
     /// This function is expected to be called after the balance of the owner
     /// is already manipulated (mint, transfer, etc.)
     pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id: TokenId) {
-        let key = StorageKey::OwnerTokensIndex(to_be_removed_id);
+        let key = NFTEnumerableStorageKey::OwnerTokensIndex(to_be_removed_id);
         let Some(to_be_removed_index) = e.storage().persistent().get(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
         };
@@ -474,7 +481,7 @@ impl Enumerable {
             // After deletion: [A, D, C]  (last item is deleted, effectively removing `B`)
             let last_token_id = Enumerable::get_owner_token_id(e, owner, last_token_index);
             e.storage().persistent().set(
-                &StorageKey::OwnerTokens(OwnerTokensKey {
+                &NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey {
                     owner: owner.clone(),
                     index: to_be_removed_index,
                 }),
@@ -482,17 +489,20 @@ impl Enumerable {
             );
 
             // Update the moved token's index.
-            e.storage()
-                .persistent()
-                .set(&StorageKey::OwnerTokensIndex(last_token_id), &to_be_removed_index);
+            e.storage().persistent().set(
+                &NFTEnumerableStorageKey::OwnerTokensIndex(last_token_id),
+                &to_be_removed_index,
+            );
         }
 
         // Delete the last token from owner's local list.
-        e.storage().persistent().remove(&StorageKey::OwnerTokens(OwnerTokensKey {
+        e.storage().persistent().remove(&NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey {
             owner: owner.clone(),
             index: last_token_index,
         }));
-        e.storage().persistent().remove(&StorageKey::OwnerTokensIndex(to_be_removed_id));
+        e.storage()
+            .persistent()
+            .remove(&NFTEnumerableStorageKey::OwnerTokensIndex(to_be_removed_id));
     }
 
     /// Adds a token ID to the global enumeration.
@@ -503,8 +513,12 @@ impl Enumerable {
     /// * `token_id` - The token ID to add.
     /// * `total_supply` - The current total supply, acts as the index.
     pub fn add_to_global_enumeration(e: &Env, token_id: TokenId, total_supply: TokenId) {
-        e.storage().persistent().set(&StorageKey::GlobalTokens(total_supply), &token_id);
-        e.storage().persistent().set(&StorageKey::GlobalTokensIndex(token_id), &total_supply);
+        e.storage()
+            .persistent()
+            .set(&NFTEnumerableStorageKey::GlobalTokens(total_supply), &token_id);
+        e.storage()
+            .persistent()
+            .set(&NFTEnumerableStorageKey::GlobalTokensIndex(token_id), &total_supply);
     }
 
     /// Removes a token ID from the global enumeration.
@@ -525,7 +539,7 @@ impl Enumerable {
         to_be_removed_id: TokenId,
         last_token_index: TokenId,
     ) {
-        let key = StorageKey::GlobalTokensIndex(to_be_removed_id);
+        let key = NFTEnumerableStorageKey::GlobalTokensIndex(to_be_removed_id);
         let Some(to_be_removed_index) = e.storage().persistent().get::<_, TokenId>(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
         };
@@ -541,15 +555,17 @@ impl Enumerable {
         let last_token_id = Enumerable::get_token_id(e, last_token_index);
         e.storage()
             .persistent()
-            .set(&StorageKey::GlobalTokens(to_be_removed_index), &last_token_id);
+            .set(&NFTEnumerableStorageKey::GlobalTokens(to_be_removed_index), &last_token_id);
 
         // Update the moved token's index.
         e.storage()
             .persistent()
-            .set(&StorageKey::GlobalTokensIndex(last_token_id), &to_be_removed_index);
+            .set(&NFTEnumerableStorageKey::GlobalTokensIndex(last_token_id), &to_be_removed_index);
 
         // Delete the last token from the global lists.
-        e.storage().persistent().remove(&StorageKey::GlobalTokens(last_token_index));
-        e.storage().persistent().remove(&StorageKey::GlobalTokensIndex(to_be_removed_id));
+        e.storage().persistent().remove(&NFTEnumerableStorageKey::GlobalTokens(last_token_index));
+        e.storage()
+            .persistent()
+            .remove(&NFTEnumerableStorageKey::GlobalTokensIndex(to_be_removed_id));
     }
 }
