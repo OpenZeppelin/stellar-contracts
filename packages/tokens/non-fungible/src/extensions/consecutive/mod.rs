@@ -60,7 +60,7 @@ pub mod storage;
 use soroban_sdk::{Address, Env, Symbol};
 pub use storage::Consecutive;
 
-use crate::{NonFungibleToken, TokenId};
+use crate::NonFungibleToken;
 
 /// Consecutive Marker Trait for Non-Fungible Token
 ///
@@ -87,8 +87,8 @@ mod test;
 /// # Events
 ///
 /// * topics - `["consecutive_mint", to: Address]`
-/// * data - `[from_token_id: TokenId, to_token_id: TokenId]`
-pub fn emit_consecutive_mint(e: &Env, to: &Address, from_token_id: TokenId, to_token_id: TokenId) {
+/// * data - `[from_token_id: u32, to_token_id: u32]`
+pub fn emit_consecutive_mint(e: &Env, to: &Address, from_token_id: u32, to_token_id: u32) {
     let topics = (Symbol::new(e, "consecutive_mint"), to);
     e.events().publish(topics, (from_token_id, to_token_id))
 }

@@ -73,8 +73,7 @@ mod utils;
 
 pub use extensions::{burnable, consecutive, enumerable};
 pub use non_fungible::{
-    emit_approve, emit_approve_for_all, emit_transfer, Balance, NonFungibleToken,
-    NonFungibleTokenError, TokenId,
+    emit_approve, emit_approve_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenError,
 };
 pub use overrides::*;
 pub use storage::{ApprovalData, NFTStorageKey};

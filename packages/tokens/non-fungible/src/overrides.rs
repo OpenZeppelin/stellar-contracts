@@ -1,7 +1,5 @@
 use soroban_sdk::{Address, Env, String};
 
-use crate::{Balance, TokenId};
-
 /// Based on the extension, some default behavior of [`crate::NonFungibleToken`]
 /// might have to be overridden. This is a helper trait that allows us this
 /// override mechanism that favors the DevX.
@@ -31,25 +29,19 @@ use crate::{Balance, TokenId};
 /// impl NonFungibleToken for ExampleContract {
 ///     type ContractType = Consecutive;
 ///
-///     fn balance(e: &Env, owner: &Address) -> Balance {
+///     fn balance(e: &Env, owner: &Address) -> u32 {
 ///         Self::ContractType::balance(e, owner)
 ///     }
 ///
-///     fn owner_of(e: &Env, token_id: TokenId) -> &Address {
+///     fn owner_of(e: &Env, token_id: u32) -> &Address {
 ///         Self::ContractType::owner_of(e, token_id)
 ///     }
 ///
-///     fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+///     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
 ///         Self::ContractType::transfer(e, from, to, token_id);
 ///     }
 ///
-///     fn transfer_from(
-///         e: &Env,
-///         spender: &Address,
-///         from: &Address,
-///         to: &Address,
-///         token_id: TokenId,
-///     ) {
+///     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
 ///         Self::ContractType::transfer_from(e, spender, from, to, token_id);
 ///     }
 ///
@@ -65,19 +57,19 @@ use crate::{Balance, TokenId};
 /// impl NonFungibleToken for ExampleContract {
 ///     type ContractType = Consecutive;
 ///
-///     fn balance(e: &Env, owner: &Address) -> Balance {
+///     fn balance(e: &Env, owner: &Address) -> u32 {
 ///         Consecutive::balance(e, owner)
 ///     }
 ///
-///     fn owner_of(e: &Env, token_id: TokenId) -> &Address {
+///     fn owner_of(e: &Env, token_id: u32) -> &Address {
 ///         Consecutive::owner_of(e, token_id)
 ///     }
 ///
-///     fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+///     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
 ///         Consecutive:transfer(e, from, to, token_id);
 ///     }
 ///
-///     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
+///     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
 ///         Consecutive::transfer_from(e, spender, from, to, token_id);
 ///     }
 ///
@@ -85,19 +77,19 @@ use crate::{Balance, TokenId};
 /// }
 /// ```
 pub trait ContractOverrides {
-    fn balance(e: &Env, owner: &Address) -> Balance {
+    fn balance(e: &Env, owner: &Address) -> u32 {
         Base::balance(e, owner)
     }
 
-    fn owner_of(e: &Env, token_id: TokenId) -> Address {
+    fn owner_of(e: &Env, token_id: u32) -> Address {
         Base::owner_of(e, token_id)
     }
 
-    fn transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+    fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
         Base::transfer(e, from, to, token_id);
     }
 
-    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: TokenId) {
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
         Base::transfer_from(e, spender, from, to, token_id);
     }
 
@@ -105,7 +97,7 @@ pub trait ContractOverrides {
         e: &Env,
         approver: &Address,
         approved: &Address,
-        token_id: TokenId,
+        token_id: u32,
         live_until_ledger: u32,
     ) {
         Base::approve(e, approver, approved, token_id, live_until_ledger);
@@ -115,7 +107,7 @@ pub trait ContractOverrides {
         Base::approve_for_all(e, owner, operator, live_until_ledger);
     }
 
-    fn get_approved(e: &Env, token_id: TokenId) -> Option<Address> {
+    fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
         Base::get_approved(e, token_id)
     }
 
@@ -131,7 +123,7 @@ pub trait ContractOverrides {
         Base::symbol(e)
     }
 
-    fn token_uri(e: &Env, token_id: TokenId) -> String {
+    fn token_uri(e: &Env, token_id: u32) -> String {
         Base::token_uri(e, token_id)
     }
 }

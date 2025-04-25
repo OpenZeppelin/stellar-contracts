@@ -2,29 +2,11 @@ use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
 
 use crate::ContractOverrides;
 
-/// Max. allowed length for a base uri.
-pub const MAX_BASE_URI_LEN: usize = 200;
-
-#[cfg(feature = "token_u32")]
-pub type TokenId = u32;
-/// u32::MAX == 4294967295
-#[cfg(feature = "token_u32")]
+/// Max. number of digits in a token id (u32)
 pub const MAX_NUM_DIGITS: usize = 10;
 
-#[cfg(feature = "token_u64")]
-pub type TokenId = u64;
-/// u64::MAX == 18446744073709551615
-#[cfg(feature = "token_u64")]
-pub const MAX_NUM_DIGITS: usize = 20;
-
-#[cfg(feature = "token_u128")]
-pub type TokenId = u128;
-/// u128::MAX == 340282366920938463463374607431768211455
-#[cfg(feature = "token_u128")]
-pub const MAX_NUM_DIGITS: usize = 39;
-
-// one user can possess at most `TokenId` cap of tokens.
-pub type Balance = TokenId;
+/// Max. allowed length for a base uri.
+pub const MAX_BASE_URI_LEN: usize = 200;
 
 /// Vanilla NonFungible Token Trait
 ///
@@ -93,7 +75,7 @@ pub trait NonFungibleToken {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address for which the balance is being queried.
-    fn balance(e: &Env, account: Address) -> Balance;
+    fn balance(e: &Env, account: Address) -> u32;
 
     /// Returns the owner of the `token_id` token.
     ///
@@ -106,7 +88,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
-    fn owner_of(e: &Env, token_id: TokenId) -> Address;
+    fn owner_of(e: &Env, token_id: u32) -> Address;
 
     /// Transfers `token_id` token from `from` to `to`.
     ///
@@ -131,8 +113,8 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: TokenId]`
-    fn transfer(e: &Env, from: Address, to: Address, token_id: TokenId);
+    /// * data - `[token_id: u32]`
+    fn transfer(e: &Env, from: Address, to: Address, token_id: u32);
 
     /// Transfers `token_id` token from `from` to `to` by using `spender`s
     /// approval.
@@ -166,8 +148,8 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: TokenId]`
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: TokenId);
+    /// * data - `[token_id: u32]`
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32);
 
     /// Gives permission to `approved` to transfer `token_id` token to another
     /// account. The approval is cleared when the token is transferred.
@@ -199,12 +181,12 @@ pub trait NonFungibleToken {
     /// # Events
     ///
     /// * topics - `["approve", from: Address, to: Address]`
-    /// * data - `[token_id: TokenId, live_until_ledger: u32]`
+    /// * data - `[token_id: u32, live_until_ledger: u32]`
     fn approve(
         e: &Env,
         approver: Address,
         approved: Address,
-        token_id: TokenId,
+        token_id: u32,
         live_until_ledger: u32,
     );
 
@@ -243,7 +225,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
-    fn get_approved(e: &Env, token_id: TokenId) -> Option<Address>;
+    fn get_approved(e: &Env, token_id: u32) -> Option<Address>;
 
     /// Returns whether the `operator` is allowed to manage all the assets of
     /// `owner`.
@@ -279,7 +261,7 @@ pub trait NonFungibleToken {
     /// # Notes
     ///
     /// If the token does not exist, this function is expected to panic.
-    fn token_uri(e: &Env, token_id: TokenId) -> String;
+    fn token_uri(e: &Env, token_id: u32) -> String;
 }
 
 // ################## ERRORS ##################
@@ -333,8 +315,8 @@ pub enum NonFungibleTokenError {
 /// # Events
 ///
 /// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: TokenId]`
-pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
+/// * data - `[token_id: u32]`
+pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
     let topics = (symbol_short!("transfer"), from, to);
     e.events().publish(topics, token_id)
 }
@@ -353,13 +335,13 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: TokenId) {
 ///
 /// # Events
 ///
-/// * topics - `["approve", owner: Address, token_id: TokenId]`
+/// * topics - `["approve", owner: Address, token_id: u32]`
 /// * data - `[approved: Address, live_until_ledger: u32]`
 pub fn emit_approve(
     e: &Env,
     approver: &Address,
     approved: &Address,
-    token_id: TokenId,
+    token_id: u32,
     live_until_ledger: u32,
 ) {
     let topics = (symbol_short!("approve"), approver, token_id);
@@ -398,8 +380,8 @@ pub fn emit_approve_for_all(e: &Env, owner: &Address, operator: &Address, live_u
 /// # Events
 ///
 /// * topics - `["mint", to: Address]`
-/// * data - `[token_id: TokenId]`
-pub fn emit_mint(e: &Env, to: &Address, token_id: TokenId) {
+/// * data - `[token_id: u32]`
+pub fn emit_mint(e: &Env, to: &Address, token_id: u32) {
     let topics = (symbol_short!("mint"), to);
     e.events().publish(topics, token_id)
 }

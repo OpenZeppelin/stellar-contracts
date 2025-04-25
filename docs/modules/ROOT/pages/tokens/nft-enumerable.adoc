@@ -21,7 +21,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{
     enumerable::{Enumerable, NonFungibleEnumerable},
-    Balance, Base, ContractOverrides, NonFungibleToken, TokenId,
+    Base, ContractOverrides, NonFungibleToken,
 };
 
 #[contract]
@@ -38,12 +38,12 @@ impl GameItem {
         );
     }
 
-    pub fn award_item(e: &Env, to: Address) -> TokenId {
+    pub fn award_item(e: &Env, to: Address) -> u32 {
         // access control might be needed
         Enumerable::sequential_mint(e, &to)
     }
 
-    pub fn burn(e: &Env, from: Address, token_id: TokenId) {
+    pub fn burn(e: &Env, from: Address, token_id: u32) {
         Enumerable::sequential_burn(e, &from, token_id);
     }
 }
@@ -63,7 +63,7 @@ The extension exposes additionally the following entry-point functions, automati
 
 [source,rust]
 ----
-fn total_supply(e: &Env) -> Balance;
-fn get_owner_token_id(e: &Env, owner: Address, index: TokenId) -> TokenId;
-fn get_token_id(e: &Env, index: TokenId) -> TokenId;
+fn total_supply(e: &Env) -> u32;
+fn get_owner_token_id(e: &Env, owner: Address, index: u32) -> u32;
+fn get_token_id(e: &Env, index: u32) -> u32;
 ----

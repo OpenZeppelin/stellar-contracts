@@ -9,7 +9,7 @@ use soroban_sdk::{
 };
 use stellar_event_assertion::EventAssertion;
 
-use crate::{non_fungible::Balance, Base, NFTStorageKey};
+use crate::{Base, NFTStorageKey};
 
 #[contract]
 struct MockContract;
@@ -357,7 +357,7 @@ fn update_with_math_overflow_fails() {
     e.as_contract(&address, || {
         let token_id = Base::sequential_mint(&e, &owner);
 
-        e.storage().persistent().set(&NFTStorageKey::Balance(recipient.clone()), &Balance::MAX);
+        e.storage().persistent().set(&NFTStorageKey::Balance(recipient.clone()), &u32::MAX);
 
         // Attempt to update which would cause a math overflow
         Base::update(&e, Some(&owner), Some(&recipient), token_id);

@@ -7,9 +7,7 @@
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
-use stellar_non_fungible::{
-    burnable::NonFungibleBurnable, Balance, Base, NonFungibleToken, TokenId,
-};
+use stellar_non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
 
 #[contract]
 pub struct ExampleContract;
@@ -25,7 +23,7 @@ impl ExampleContract {
         );
     }
 
-    pub fn mint(e: &Env, to: Address) -> TokenId {
+    pub fn mint(e: &Env, to: Address) -> u32 {
         Base::sequential_mint(e, &to)
     }
 }

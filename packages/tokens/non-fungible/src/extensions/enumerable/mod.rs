@@ -5,7 +5,7 @@ mod test;
 use soroban_sdk::{Address, Env};
 pub use storage::Enumerable;
 
-use crate::{Balance, NonFungibleToken, TokenId};
+use crate::NonFungibleToken;
 
 /// Enumerable Trait for Non-Fungible Token
 ///
@@ -65,7 +65,7 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn total_supply(e: &Env) -> Balance;
+    fn total_supply(e: &Env) -> u32;
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
     /// owner's local list. Use along with
@@ -77,7 +77,7 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `index` - Index of the token in the owner's local list.
-    fn get_owner_token_id(e: &Env, owner: Address, index: TokenId) -> TokenId;
+    fn get_owner_token_id(e: &Env, owner: Address, index: u32) -> u32;
 
     /// Returns the `token_id` at a given `index` in the global token list.
     /// Use along with [`NonFungibleEnumerable::total_supply()`] to enumerate
@@ -87,5 +87,5 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `index` - Index of the token in the global list.
-    fn get_token_id(e: &Env, index: TokenId) -> TokenId;
+    fn get_token_id(e: &Env, index: u32) -> u32;
 }

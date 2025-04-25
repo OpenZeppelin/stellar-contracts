@@ -17,7 +17,7 @@ The https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/
 provides three different NFT variants that differ in how certain features like ownership tracking,
 token creation and destruction are handled:
 
-1. *Default base implementations* (`NonFungibleToken` and `NonFungibleBurnable`), suitable for most use cases. 
+1. *Default base implementations* (`NonFungibleToken` and `NonFungibleBurnable`), suitable for most use cases.
 2. *Consecutive extension* (`NonFungibleConsecutive`) that fits needs where batch minting is envisioned,
 the implementation is optimized for creation of large amounts of tokens.
 3. *Enumerable extension* (`NonFungibleEnumerable`), for cases where on-chain enumerability is required,
@@ -43,8 +43,7 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{
     burnable::NonFungibleBurnable,
-    Balance, Base, ContractOverrides, NonFungibleToken, TokenId,
-
+    Base, ContractOverrides, NonFungibleToken,
 };
 
 #[contract]
@@ -61,7 +60,7 @@ impl GameItem {
         );
     }
 
-    pub fn award_item(e: &Env, to: Address) -> TokenId {
+    pub fn award_item(e: &Env, to: Address) -> u32 {
         // access control might be needed
         Base::sequential_mint(e, &to)
     }
