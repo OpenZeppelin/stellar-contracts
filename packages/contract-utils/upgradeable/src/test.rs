@@ -2,7 +2,9 @@
 
 use soroban_sdk::{contract, Env};
 
-use crate::storage::{can_migrate, complete_migration, ensure_can_migrate, start_migration};
+use crate::storage::{
+    can_complete_migration, complete_migration, ensure_can_complete_migration, start_migration,
+};
 
 #[contract]
 struct MockContract;
@@ -13,24 +15,24 @@ fn upgrade_flow_works() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        assert!(!can_migrate(&e));
+        assert!(!can_complete_migration(&e));
 
         start_migration(&e);
-        assert!(can_migrate(&e));
+        assert!(can_complete_migration(&e));
 
         complete_migration(&e);
-        assert!(!can_migrate(&e));
+        assert!(!can_complete_migration(&e));
     });
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #110)")]
-fn upgrade_ensure_can_migrate_panics_if_not_migrating() {
+fn upgrade_ensure_can_complete_migration_panics_if_not_migrating() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
         complete_migration(&e);
-        ensure_can_migrate(&e);
+        ensure_can_complete_migration(&e);
     });
 }

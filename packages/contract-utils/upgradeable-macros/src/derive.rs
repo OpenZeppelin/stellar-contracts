@@ -47,13 +47,8 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
 ///
 /// This function generates the implementation of the `UpgradeableMigratable`
 /// trait for a given contract type, wiring up the migration and rollback logic
-/// based on the `UpgradeableMigratableInternal` trait provided by the user.
-///
-/// **IMPORTANT**
-///   It is highly recommended to use this derive macro as a combination with
-///   `Upgradeable`: `#[derive(UpgradeableMigratable)]`. Otherwise, you need
-///   to ensure the upgradeability state transitions as defined in the crate
-///   `stellar_upgradeable`.
+/// based on the `UpgradeableMigratableInternal` trait implementation provided
+/// by the user.
 ///
 /// # Behavior
 ///
@@ -69,7 +64,7 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
 /// #[derive(UpgradeableMigratable)]
 /// pub struct MyContract;
 /// ```
-pub fn derive_migratable(input: &DeriveInput) -> proc_macro2::TokenStream {
+pub fn derive_upgradeable_migratable(input: &DeriveInput) -> proc_macro2::TokenStream {
     let name = &input.ident;
 
     let version = env!("CARGO_PKG_VERSION");
@@ -97,7 +92,7 @@ pub fn derive_migratable(input: &DeriveInput) -> proc_macro2::TokenStream {
             fn migrate(e: &soroban_sdk::Env, migration_data: MigrationData, operator: soroban_sdk::Address) {
                 Self::_require_auth(e, &operator);
 
-                stellar_upgradeable::ensure_can_migrate(e);
+                stellar_upgradeable::ensure_can_complete_migration(e);
 
                 Self::_migrate(e, &migration_data);
 
