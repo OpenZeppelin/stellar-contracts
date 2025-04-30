@@ -138,7 +138,7 @@ fn consecutive_set_ownership_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #306)")]
+#[should_panic(expected = "Error(Contract, #300)")]
 fn consecutive_set_ownership_panics_for_max_sequential_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());

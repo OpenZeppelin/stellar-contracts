@@ -54,7 +54,7 @@ impl ContractOverrides for Consecutive {
 /// Bucket 1...8
 ///
 /// Bucket 9
-/// ├── Item 0 → bits for Token IDs 28_800..28_832
+/// ├── Item 0 → bits for Token IDs 28_800..28_831
 /// ├── ...
 /// ├── Item 99 → bits for Token IDs 31_968..31_999
 ///
@@ -93,16 +93,17 @@ impl Consecutive {
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
     ///   `token_id` does not exist.
     pub fn owner_of(e: &Env, token_id: u32) -> Address {
+        let next = sequential::next_token_id(e);
         let key = NFTConsecutiveStorageKey::BurnedToken(token_id);
-        if e.storage().persistent().get(&key).unwrap_or(false) {
+        if e.storage().persistent().get(&key).unwrap_or(false) || token_id >= next {
             panic_with_error!(&e, NonFungibleTokenError::NonExistentToken);
         }
 
         let ids_in_bucket = IDS_IN_BUCKET as u32;
-        // idex of the bucket that contains token_id
+        // index of the bucket that contains token_id
         let bucket_index = token_id / ids_in_bucket;
         // position of the token_id within its bucket (0-based)
-        let relative_id = token_id - (bucket_index * ids_in_bucket);
+        let relative_id = token_id % ids_in_bucket;
 
         (bucket_index..BUCKETS as u32)
             .map(|i| {
@@ -497,10 +498,8 @@ impl Consecutive {
             return;
         }
 
-        if !has_owner && !is_burned {
-            e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(previous_id), to);
-            Self::set_ownership_in_bucket(e, previous_id);
-        }
+        e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(previous_id), to);
+        Self::set_ownership_in_bucket(e, previous_id);
     }
 
     /// Low-level function that marks `token_id` as being owned, i.e. sets the
@@ -515,13 +514,19 @@ impl Consecutive {
     ///
     /// * [`NonFungibleTokenError::TokenIDsAreDepleted`] - If `token_id` is
     ///   greater than max allowed (IDS_IN_BUCKET * BUCKETS - 1).
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If `token_id` does not
+    ///   exist yet (has not been minted).
     pub fn set_ownership_in_bucket(e: &Env, token_id: u32) {
         let ids_in_bucket = IDS_IN_BUCKET as u32;
         let ids_in_item = IDS_IN_ITEM as u32;
         let total_ids = ids_in_bucket * BUCKETS as u32;
 
-        if token_id >= total_ids || token_id >= sequential::next_token_id(e) {
+        if token_id >= total_ids {
             panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
+        }
+
+        if token_id >= sequential::next_token_id(e) {
+            panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
         }
 
         let bucket_index = token_id / ids_in_bucket;
@@ -532,7 +537,7 @@ impl Consecutive {
             if let Some(b) = bucket { b } else { Vec::from_slice(e, &[0; ITEMS_IN_BUCKET]) };
 
         // position of the token_id within its bucket (0-based)
-        let relative_id = token_id - (bucket_index * ids_in_bucket);
+        let relative_id = token_id % ids_in_bucket;
         // index of the item inside the bucket that contains token_id
         let item_index = relative_id / ids_in_item;
         // index of the bit within the item that contains token_id
@@ -540,10 +545,15 @@ impl Consecutive {
 
         let mask: u32 = 1 << (ids_in_item - bit_index - 1);
         let mut item = bucket.get(item_index).expect("token_id out of allowed range");
+
+        // return early the bit was already set in a previous action (transfer, burn or
+        // batch_mint)
+        if item & mask != 0 {
+            return;
+        }
+
         item |= mask;
-        // no replace, so must remove and re-insert
-        let _ = bucket.remove(item_index);
-        bucket.insert(item_index, item);
+        bucket.set(item_index, item);
 
         e.storage()
             .instance()
@@ -570,11 +580,16 @@ impl Consecutive {
 ///
 /// # Example
 ///
-/// If `u32::BITS = 8` and `input = Some(0b00101000)`:
-/// - `find_bit_in_item(input, 2)` returns `Some(3)` because the third set bit
+/// If `u8::BITS = 8` and `input = Some(0b00010100)`:
+/// - `find_bit_in_item(input, 2)` returns `Some(3)` because the 4th set bit
 ///   (from MSB) is at index 3 (counting from MSB = 0).
 pub(crate) fn find_bit_in_item(input: Option<u32>, start: u32) -> Option<u32> {
     if let Some(num) = input {
+        // return early if 0 (no bits are set)
+        if num == 0 {
+            return None;
+        }
+
         let ids_in_item = u32::BITS;
         // Invalid start position
         if start >= ids_in_item {
@@ -621,8 +636,8 @@ pub(crate) fn find_bit_in_item(input: Option<u32>, start: u32) -> Option<u32> {
 /// ```
 /// bucket = vec![0b00000000, 0b00101000];
 /// ```
-/// then `find_bit_in_bucket(bucket, 8)` returns `Some(11)`, since bit 3 of the
-/// second item (index 11 in the overall bucket) is the first set bit.
+/// then `find_bit_in_bucket(bucket, 8)` returns `Some(10)`, since bit 3 of the
+/// second item (index 10 in the overall bucket) is the first set bit.
 pub(crate) fn find_bit_in_bucket(bucket: Vec<u32>, start: u32) -> Option<u32> {
     let ids_in_item = u32::BITS;
     let ids_in_bucket = bucket.len() * ids_in_item;
@@ -634,7 +649,7 @@ pub(crate) fn find_bit_in_bucket(bucket: Vec<u32>, start: u32) -> Option<u32> {
 
     let item_index = start / ids_in_item;
     // relative id in item
-    let relative_id = start - (item_index * ids_in_item);
+    let relative_id = start % ids_in_item;
 
     (item_index..bucket.len()).find_map(|i| {
         // If we're in te starting item, begin search from the token's relative
