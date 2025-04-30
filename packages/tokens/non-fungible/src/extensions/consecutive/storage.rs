@@ -547,11 +547,11 @@ impl Consecutive {
         key: &NFTConsecutiveStorageKey,
     ) -> Option<T> {
         e.storage().persistent().get::<_, T>(key).inspect(|_| {
+            use NFTConsecutiveStorageKey::*;
+
             let const_vals = match key {
                 // Approval is temporary
-                NFTConsecutiveStorageKey::BurnedToken(_) => {
-                    [TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT]
-                }
+                BurnedToken(_) => [TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT],
                 _ => [OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT],
             };
             e.storage().persistent().extend_ttl(key, const_vals[0], const_vals[1]);
