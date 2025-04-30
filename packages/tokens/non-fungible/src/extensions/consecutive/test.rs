@@ -88,7 +88,7 @@ fn consecutive_set_ownership_works() {
         Consecutive::set_ownership_in_bucket(&e, 0);
         let bucket = e
             .storage()
-            .instance()
+            .persistent()
             .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b10000000000000000000000000000000);
@@ -96,7 +96,7 @@ fn consecutive_set_ownership_works() {
         Consecutive::set_ownership_in_bucket(&e, 1);
         let bucket = e
             .storage()
-            .instance()
+            .persistent()
             .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b11000000000000000000000000000000);
@@ -104,7 +104,7 @@ fn consecutive_set_ownership_works() {
         Consecutive::set_ownership_in_bucket(&e, 31);
         let bucket = e
             .storage()
-            .instance()
+            .persistent()
             .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b11000000000000000000000000000001);
@@ -112,7 +112,7 @@ fn consecutive_set_ownership_works() {
         Consecutive::set_ownership_in_bucket(&e, 32);
         let bucket = e
             .storage()
-            .instance()
+            .persistent()
             .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(1).unwrap(), 0b10000000000000000000000000000000);
@@ -120,7 +120,7 @@ fn consecutive_set_ownership_works() {
         Consecutive::set_ownership_in_bucket(&e, 45);
         let bucket = e
             .storage()
-            .instance()
+            .persistent()
             .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(0).unwrap(), 0b11000000000000000000000000000001);
@@ -130,7 +130,7 @@ fn consecutive_set_ownership_works() {
         Consecutive::set_ownership_in_bucket(&e, 1000);
         let bucket = e
             .storage()
-            .instance()
+            .persistent()
             .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(0))
             .unwrap();
         assert_eq!(bucket.get(31).unwrap(), 0b00000000100000000000000000000000);
