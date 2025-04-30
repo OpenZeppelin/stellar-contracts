@@ -5,7 +5,7 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, String, Vec};
 use stellar_event_assertion::EventAssertion;
 
-use super::storage::{find_bit_in_bucket, find_bit_in_item, BUCKETS, IDS_IN_BUCKET};
+use super::storage::{find_bit_in_bucket, find_bit_in_item, IDS_IN_BUCKET, MAX_TOKENS_IN_BATCH};
 use crate::{
     extensions::consecutive::{
         storage::{NFTConsecutiveStorageKey, IDS_IN_ITEM},
@@ -150,20 +150,6 @@ fn consecutive_set_ownership_panics_for_max_sequential_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #306)")]
-fn consecutive_set_ownership_panics_for_max_allowed_fails() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let max = (IDS_IN_BUCKET * BUCKETS) as u32;
-        // increment sequential more than max
-        let _ = sequential::increment_token_id(&e, max + 100);
-        Consecutive::set_ownership_in_bucket(&e, max);
-    });
-}
-
-#[test]
 fn consecutive_owner_of_works() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -202,14 +188,14 @@ fn consecutive_batch_mint_works() {
     let address = e.register(MockContract, ());
 
     let owner = Address::generate(&e);
-    let amount = 100;
+    let amount = MAX_TOKENS_IN_BATCH as u32;
 
     e.as_contract(&address, || {
         Consecutive::batch_mint(&e, &owner, amount);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
-        event_assert.assert_consecutive_mint(&owner, 0, 99);
+        event_assert.assert_consecutive_mint(&owner, 0, 31_999);
 
         assert_eq!(sequential::next_token_id(&e), amount);
         assert_eq!(Base::balance(&e, &owner), amount);
@@ -217,12 +203,12 @@ fn consecutive_batch_mint_works() {
         let _owner = e
             .storage()
             .persistent()
-            .get::<_, Address>(&NFTConsecutiveStorageKey::Owner(99))
+            .get::<_, Address>(&NFTConsecutiveStorageKey::Owner(31_999))
             .unwrap();
         assert_eq!(_owner, owner);
         assert_eq!(Consecutive::owner_of(&e, 0), owner);
-        assert_eq!(Consecutive::owner_of(&e, 50), owner);
-        assert_eq!(Consecutive::owner_of(&e, 99), owner);
+        assert_eq!(Consecutive::owner_of(&e, 3_200), owner);
+        assert_eq!(Consecutive::owner_of(&e, 31_999), owner);
 
         // new mint
         let last_id = Consecutive::batch_mint(&e, &owner, amount);
@@ -234,12 +220,26 @@ fn consecutive_batch_mint_works() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #312)")]
-fn consecutive_batch_mint_fails() {
+fn consecutive_batch_mint_amount_0_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     let owner = Address::generate(&e);
     let amount = 0;
+
+    e.as_contract(&address, || {
+        Consecutive::batch_mint(&e, &owner, amount);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #312)")]
+fn consecutive_batch_mint_amount_max_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    let owner = Address::generate(&e);
+    let amount = MAX_TOKENS_IN_BATCH as u32 + 1;
 
     e.as_contract(&address, || {
         Consecutive::batch_mint(&e, &owner, amount);
@@ -524,20 +524,6 @@ fn consecutive_token_uri_panics_for_more_than_max_id_fails() {
     e.as_contract(&address, || {
         let _ = sequential::increment_token_id(&e, 100);
         Consecutive::token_uri(&e, sequential::next_token_id(&e));
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #300)")]
-fn consecutive_token_uri_panics_for_more_than_total_ids_fails() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let max = (IDS_IN_BUCKET * BUCKETS) as u32;
-        // increment sequential more than max
-        let _ = sequential::increment_token_id(&e, max + 100);
-        Consecutive::token_uri(&e, max);
     });
 }
 

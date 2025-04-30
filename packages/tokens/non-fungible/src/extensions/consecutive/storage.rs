@@ -58,8 +58,6 @@ impl ContractOverrides for Consecutive {
 /// ├── ...
 /// ├── Item 99 → bits for Token IDs 31_968..31_999
 ///
-/// Maximum number of vectors holding bitfields, which denote ids
-pub const BUCKETS: usize = 10;
 /// Number of elements in a bucket
 pub const ITEMS_IN_BUCKET: usize = 100;
 /// Number of ids per item, which corresponds to the number of bits for a given
@@ -67,6 +65,9 @@ pub const ITEMS_IN_BUCKET: usize = 100;
 pub const IDS_IN_ITEM: usize = mem::size_of::<u32>() * 8; // 32
 /// Total number of ids in the whole bucket
 pub const IDS_IN_BUCKET: usize = ITEMS_IN_BUCKET * IDS_IN_ITEM; // 3,200
+/// Max. amount of tokens allowed to be minted at once in
+/// [`Consecutive::batch_mint`]
+pub const MAX_TOKENS_IN_BATCH: usize = 32_000; // 10 buckets * 100 items * 32
 
 /// Storage keys for the data associated with the consecutive extension of
 /// `NonFungibleToken`
@@ -93,9 +94,9 @@ impl Consecutive {
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
     ///   `token_id` does not exist.
     pub fn owner_of(e: &Env, token_id: u32) -> Address {
-        let next = sequential::next_token_id(e);
+        let last_token_id = sequential::next_token_id(e) - 1;
         let key = NFTConsecutiveStorageKey::BurnedToken(token_id);
-        if e.storage().persistent().get(&key).unwrap_or(false) || token_id >= next {
+        if e.storage().persistent().get(&key).unwrap_or(false) || token_id > last_token_id {
             panic_with_error!(&e, NonFungibleTokenError::NonExistentToken);
         }
 
@@ -104,8 +105,10 @@ impl Consecutive {
         let bucket_index = token_id / ids_in_bucket;
         // position of the token_id within its bucket (0-based)
         let relative_id = token_id % ids_in_bucket;
+        // index of the bucket that contains the last token_id
+        let last_bucket_index = last_token_id / ids_in_bucket;
 
-        (bucket_index..BUCKETS as u32)
+        (bucket_index..=last_bucket_index)
             .map(|i| {
                 (
                     i,
@@ -147,18 +150,15 @@ impl Consecutive {
     /// # Errors
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
-    ///   `token_id` does not exist (burned or more than max allowed).
+    ///   `token_id` does not exist (burned or more than max).
     /// * refer to [`Base::base_uri`] errors.
     pub fn token_uri(e: &Env, token_id: u32) -> String {
-        let ids_in_bucket = IDS_IN_BUCKET as u32;
-        let total_ids = ids_in_bucket * BUCKETS as u32;
-
         let is_burned = e
             .storage()
             .persistent()
             .get(&NFTConsecutiveStorageKey::BurnedToken(token_id))
             .unwrap_or(false);
-        if is_burned || token_id >= sequential::next_token_id(e) || token_id >= total_ids {
+        if is_burned || token_id >= sequential::next_token_id(e) {
             panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
         }
 
@@ -179,7 +179,8 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::InvalidAmount`] - If try to mint `0`.
+    /// * [`NonFungibleTokenError::InvalidAmount`] - If try to mint `0` or more
+    ///   than `MAX_TOKENS_IN_BATCH`.
     /// * refer to [`Base::increase_balance`] errors.
     /// * refer to [`set_ownership_in_bucket`] errors.
     ///
@@ -207,7 +208,7 @@ impl Consecutive {
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
     pub fn batch_mint(e: &Env, to: &Address, amount: u32) -> u32 {
-        if amount == 0 {
+        if amount == 0 || amount > MAX_TOKENS_IN_BATCH as u32 {
             panic_with_error!(&e, NonFungibleTokenError::InvalidAmount);
         }
 
@@ -512,18 +513,11 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::TokenIDsAreDepleted`] - If `token_id` is
-    ///   greater than max allowed (IDS_IN_BUCKET * BUCKETS - 1).
     /// * [`NonFungibleTokenError::NonExistentToken`] - If `token_id` does not
     ///   exist yet (has not been minted).
     pub fn set_ownership_in_bucket(e: &Env, token_id: u32) {
         let ids_in_bucket = IDS_IN_BUCKET as u32;
         let ids_in_item = IDS_IN_ITEM as u32;
-        let total_ids = ids_in_bucket * BUCKETS as u32;
-
-        if token_id >= total_ids {
-            panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
-        }
 
         if token_id >= sequential::next_token_id(e) {
             panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
