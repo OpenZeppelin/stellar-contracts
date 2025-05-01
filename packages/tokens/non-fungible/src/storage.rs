@@ -63,7 +63,7 @@ impl Base {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `token_id` - Token id as a number.
+    /// * `token_id` - Token ID as a number.
     ///
     /// # Errors
     ///
@@ -305,6 +305,9 @@ impl Base {
     /// * `token_id` - The identifier of the token to be approved.
     /// * `live_until_ledger` - The ledger number at which the allowance
     ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
+    ///   `live_until_ledger` argument is implicitly bounded by the maximum
+    ///   allowed TTL extension for a temporary storage entry and specifying a
+    ///   higher value will cause the code to panic.
     ///
     /// # Errors
     ///
@@ -563,7 +566,7 @@ impl Base {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `base_uri` - The base collection URI, assuming it's a valid URI and
-    ///   ends by `/`.
+    ///   ends with `/`.
     /// * `name` - The token collection name.
     /// * `symbol` - The token collection symbol.
     ///
@@ -651,11 +654,11 @@ impl Base {
     /// admin.require_auth();
     /// ```
     ///
-    /// This function utilizes [`increment_token_id()`] to keep determine the
-    /// next `token_id`, but it does NOT check if the provided `token_id` is
-    /// already in use. If the developer has other means of minting tokens
-    /// and generating `token_id`s, they should ensure that the token_id is
-    /// unique and not already in use.
+    /// **IMPORTANT**: This function utilizes [`increment_token_id()`] to
+    /// determine the next `token_id`, but it does NOT check if that
+    /// `token_id` is already in use. If the developer has other means of
+    /// minting tokens and generating `token_id`s, they should ensure that
+    /// the `token_id` is unique and not already in use.
     pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
         let token_id = increment_token_id(e, 1);
         Base::update(e, None, Some(to), token_id);
@@ -698,12 +701,11 @@ impl Base {
     /// admin.require_auth();
     /// ```
     ///
-    /// **IMPORTANT**:
-    /// This function does NOT verify whether the provided `token_id` already
-    /// exists. It is the developer's responsibility to ensure `token_id`
-    /// uniqueness before passing it to this function. The strategy for
-    /// generating `token_id`s varies by project and must be implemented
-    /// accordingly.
+    /// **IMPORTANT**: This function does NOT verify whether the provided
+    /// `token_id` already exists. It is the developer's responsibility to
+    /// ensure `token_id` uniqueness before passing it to this function. The
+    /// strategy for generating `token_id`s varies by project and must be
+    /// implemented accordingly.
     pub fn mint(e: &Env, to: &Address, token_id: u32) {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);

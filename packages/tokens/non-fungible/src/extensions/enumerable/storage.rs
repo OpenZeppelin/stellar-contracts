@@ -120,6 +120,8 @@ impl Enumerable {
     /// This is a wrapper around [`Base::sequential_mint()`], that
     /// also handles the storage updates for:
     /// * total supply
+    /// * global token list
+    /// * owner token list
     ///
     /// # Security Warning
     ///
@@ -136,6 +138,12 @@ impl Enumerable {
     /// let admin = read_administrator(e);
     /// admin.require_auth();
     /// ```
+    ///
+    /// **IMPORTANT**: This function utilizes [`increment_token_id()`] to
+    /// determine the next `token_id`, but it does NOT check if that
+    /// `token_id` is already in use. If the developer has other means of
+    /// minting tokens and generating `token_id`s, they should ensure that
+    /// the `token_id` is unique and not already in use.
     pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
         let token_id = Base::sequential_mint(e, to);
 
@@ -183,6 +191,12 @@ impl Enumerable {
     /// let admin = read_administrator(e);
     /// admin.require_auth();
     /// ```
+    ///
+    /// **IMPORTANT**: This function does NOT verify whether the provided
+    /// `token_id` already exists. It is the developer's responsibility to
+    /// ensure `token_id` uniqueness before passing it to this function. The
+    /// strategy for generating `token_id`s varies by project and must be
+    /// implemented accordingly.
     pub fn non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);

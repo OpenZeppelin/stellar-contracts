@@ -43,7 +43,7 @@ impl ContractOverrides for Consecutive {
     }
 }
 
-/// For 32,000 total ids with ITEM of type u32 and 100 items per bucket:
+/// For 32,000 total IDs with ITEM of type u32 and 100 items per bucket:
 ///
 /// Bucket 0
 /// ├── Item 0 → bits for Token IDs 0..31
@@ -60,10 +60,10 @@ impl ContractOverrides for Consecutive {
 ///
 /// Number of elements in a bucket
 pub const ITEMS_IN_BUCKET: usize = 100;
-/// Number of ids per item, which corresponds to the number of bits for a given
+/// Number of IDs per item, which corresponds to the number of bits for a given
 /// value
 pub const IDS_IN_ITEM: usize = mem::size_of::<u32>() * 8; // 32
-/// Total number of ids in the whole bucket
+/// Total number of IDs in the whole bucket
 pub const IDS_IN_BUCKET: usize = ITEMS_IN_BUCKET * IDS_IN_ITEM; // 3,200
 /// Max. amount of tokens allowed to be minted at once in
 /// [`Consecutive::batch_mint`]
@@ -87,7 +87,7 @@ impl Consecutive {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `token_id` - Token id as a number.
+    /// * `token_id` - Token ID as a number.
     ///
     /// # Errors
     ///
@@ -157,7 +157,7 @@ impl Consecutive {
 
     // ################## CHANGE STATE ##################
 
-    /// Mints a batch of tokens with consecutive ids and attributes them to
+    /// Mints a batch of tokens with consecutive IDs and attributes them to
     /// `to`. This function does NOT handle authorization.
     ///
     /// # Arguments
@@ -646,7 +646,7 @@ pub(crate) fn find_bit_in_bucket(bucket: Vec<u32>, start: u32) -> Option<u32> {
     }
 
     let item_index = start / ids_in_item;
-    // relative id in item
+    // relative ID in item
     let relative_id = start % ids_in_item;
 
     (item_index..bucket.len()).find_map(|i| {

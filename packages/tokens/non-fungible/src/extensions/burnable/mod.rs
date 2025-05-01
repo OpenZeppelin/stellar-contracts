@@ -91,7 +91,7 @@ pub trait NonFungibleBurnable: NonFungibleToken {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `from` - The address holding the tokens.
-/// * `token_id` - The burned token.
+/// * `token_id` - The token ID of the burned token.
 ///
 /// # Events
 ///

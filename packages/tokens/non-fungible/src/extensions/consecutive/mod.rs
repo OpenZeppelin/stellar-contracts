@@ -58,7 +58,7 @@
 //! - It is not recommended to use this model if each token is expected to be
 //!   minted separately. It is rather best suited for NFTs where minting happens
 //!   in large batches.
-//! - **IMPORTANT** - For minting tokens ONLY the function `batch_mint` provided
+//! - **IMPORTANT**: For minting tokens ONLY the function `batch_mint` provided
 //!   in this extension must be used. Using other minting functions will break
 //!   the logic of tracking ownership.
 pub mod storage;
@@ -86,8 +86,8 @@ mod test;
 ///
 /// * `e` - Access to Soroban environment.
 /// * `to` - The address receiving the new tokens.
-/// * `from_token_id` - First token id in the batch.
-/// * `to_token_id` - Last token id of the batch.
+/// * `from_token_id` - First token ID in the batch.
+/// * `to_token_id` - Last token ID of the batch.
 ///
 /// # Events
 ///

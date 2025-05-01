@@ -2,7 +2,7 @@ use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
 
 use crate::ContractOverrides;
 
-/// Max. number of digits in a token id (u32)
+/// Max. number of digits in a token ID (u32)
 pub const MAX_NUM_DIGITS: usize = 10;
 
 /// Max. allowed length for a base uri.
@@ -77,12 +77,12 @@ pub trait NonFungibleToken {
     /// * `account` - The address for which the balance is being queried.
     fn balance(e: &Env, account: Address) -> u32;
 
-    /// Returns the owner of the `token_id` token.
+    /// Returns the owner of the token with `token_id`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `token_id` - Token id as a number.
+    /// * `token_id` - Token ID as a number.
     ///
     /// # Errors
     ///
@@ -90,7 +90,7 @@ pub trait NonFungibleToken {
     ///   exist.
     fn owner_of(e: &Env, token_id: u32) -> Address;
 
-    /// Transfers `token_id` token from `from` to `to`.
+    /// Transfers the token with `token_id` from `from` to `to`.
     ///
     /// WARNING: Note that the caller is responsible to confirm that the
     /// recipient is capable of receiving the `Non-Fungible` or else the NFT
@@ -101,7 +101,7 @@ pub trait NonFungibleToken {
     /// * `e` - Access to the Soroban environment.
     /// * `from` - Account of the sender.
     /// * `to` - Account of the recipient.
-    /// * `token_id` - Token id as a number.
+    /// * `token_id` - Token ID as a number.
     ///
     /// # Errors
     ///
@@ -116,8 +116,8 @@ pub trait NonFungibleToken {
     /// * data - `[token_id: u32]`
     fn transfer(e: &Env, from: Address, to: Address, token_id: u32);
 
-    /// Transfers `token_id` token from `from` to `to` by using `spender`s
-    /// approval.
+    /// Transfers the token with `token_id` from `from` to `to` by using
+    /// `spender`s approval.
     ///
     /// Unlike `transfer()`, which is used when the token owner initiates the
     /// transfer, `transfer_from()` allows an approved third party
@@ -134,7 +134,7 @@ pub trait NonFungibleToken {
     /// * `spender` - The address authorizing the transfer.
     /// * `from` - Account of the sender.
     /// * `to` - Account of the recipient.
-    /// * `token_id` - Token id as a number.
+    /// * `token_id` - Token ID as a number.
     ///
     /// # Errors
     ///
@@ -151,8 +151,9 @@ pub trait NonFungibleToken {
     /// * data - `[token_id: u32]`
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32);
 
-    /// Gives permission to `approved` to transfer `token_id` token to another
-    /// account. The approval is cleared when the token is transferred.
+    /// Gives permission to `approved` to transfer the token with `token_id` to
+    /// another account. The approval is cleared when the token is
+    /// transferred.
     ///
     /// Only a single account can be approved at a time for a `token_id`.
     /// To remove an approval, the approver can approve their own address,
@@ -165,7 +166,7 @@ pub trait NonFungibleToken {
     /// * `approver` - The address of the approver (should be `owner` or
     ///   `operator`).
     /// * `approved` - The address receiving the approval.
-    /// * `token_id` - Token id as a number.
+    /// * `token_id` - Token ID as a number.
     /// * `live_until_ledger` - The ledger number at which the allowance
     ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
     ///
@@ -214,12 +215,12 @@ pub trait NonFungibleToken {
     /// * data - `[operator: Address, live_until_ledger: u32]`
     fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32);
 
-    /// Returns the account approved for `token_id` token.
+    /// Returns the account approved for the token with `token_id`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `token_id` - Token id as a number.
+    /// * `token_id` - Token ID as a number.
     ///
     /// # Errors
     ///
@@ -251,12 +252,13 @@ pub trait NonFungibleToken {
     /// * `e` - Access to the Soroban environment.
     fn symbol(e: &Env) -> String;
 
-    /// Returns the Uniform Resource Identifier (URI) for `token_id` token.
+    /// Returns the Uniform Resource Identifier (URI) for the token with
+    /// `token_id`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `token_id` - Token id as a number.
+    /// * `token_id` - Token ID as a number.
     ///
     /// # Notes
     ///
@@ -321,8 +323,8 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
     e.events().publish(topics, token_id)
 }
 
-/// Emits an event when `approver` enables `approved` to manage the `token_id`
-/// token.
+/// Emits an event when `approver` enables `approved` to manage the the token
+/// with `token_id`.
 ///
 /// # Arguments
 ///
@@ -348,8 +350,8 @@ pub fn emit_approve(
     e.events().publish(topics, (approved, live_until_ledger))
 }
 
-/// Emits an event when `owner` enables `operator` to manage the `token_id`
-/// token.
+/// Emits an event when `owner` enables `operator` to manage the the token with
+/// `token_id`.
 ///
 /// # Arguments
 ///
@@ -375,7 +377,7 @@ pub fn emit_approve_for_all(e: &Env, owner: &Address, operator: &Address, live_u
 ///
 /// * `e` - Access to Soroban environment.
 /// * `to` - The address receiving the new token.
-/// * `token_id` - Token id as a number.
+/// * `token_id` - Token ID as a number.
 ///
 /// # Events
 ///
