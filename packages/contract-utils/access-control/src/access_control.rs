@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Env, Symbol};
+use soroban_sdk::{symbol_short, Address, Env, Symbol};
 
 pub trait AccessControl {
     /// Returns `Some(index)` if the account has the specified role,
@@ -70,6 +70,11 @@ pub trait AccessControl {
     ///
     /// * `AccessControlError::Unauthorized` - If the caller does not have enough privileges.
     ///
+    /// # Events
+    ///
+    /// * topics - `["role_granted", role: Symbol, account: Address]`
+    /// * data - `[sender: Address]`
+    ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: You MUST implement proper authorization in your contract.
@@ -91,6 +96,11 @@ pub trait AccessControl {
     /// * `AccessControlError::Unauthorized` - If the `caller` does not have enough privileges.
     /// * `AccessControlError::AccountNotFound` - If the `account` doesn't have the role.
     ///
+    /// # Events
+    ///
+    /// * topics - `["role_revoked", role: Symbol, account: Address]`
+    /// * data - `[sender: Address]`
+    ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: You MUST implement proper authorization in your contract.
@@ -109,6 +119,11 @@ pub trait AccessControl {
     /// # Errors
     ///
     /// * `AccessControlError::AccountNotFound` - If the `caller` doesn't have the role.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["role_revoked", role: Symbol, account: Address]`
+    /// * data - `[sender: Address]`
     fn renounce_role(e: &Env, caller: &Address, role: &Symbol);
 
     /// Initiates the admin role transfer.
@@ -126,6 +141,11 @@ pub trait AccessControl {
     ///
     /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
     ///
+    /// # Events
+    ///
+    /// * topics - `["admin_transfer_started", current_admin: Address]`
+    /// * data - `[new_admin: Address]`
+    ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: You MUST implement proper authorization in your contract.
@@ -141,6 +161,11 @@ pub trait AccessControl {
     /// # Errors
     ///
     /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["admin_transfer_cancelled", admin: Address]`
+    /// * data - `[]` (empty data)
     ///
     /// # Security Warning
     ///
@@ -158,6 +183,11 @@ pub trait AccessControl {
     ///
     /// * `AccessControlError::NoPendingAdminTransfer` - If no pending admin transfer is set.
     /// * `AccessControlError::Unauthorized` - If the `caller` is not the pending admin.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["admin_transfer_completed", new_admin: Address]`
+    /// * data - `[previous_admin: Address]`
     fn accept_admin_transfer(e: &Env, caller: &Address);
 
     /// Sets `admin_role` as the admin role of `role`.
@@ -172,6 +202,11 @@ pub trait AccessControl {
     /// # Errors
     ///
     /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["role_admin_changed", role: Symbol]`
+    /// * data - `[previous_admin_role: Symbol, new_admin_role: Symbol]`
     ///
     /// # Security Warning
     ///
@@ -190,4 +225,113 @@ pub enum AccessControlError {
     OutOfBounds = 124,
 }
 
-// TODO: events
+// ################## EVENTS ##################
+
+/// Emits an event when a role is granted to an account.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `role` - The role that was granted.
+/// * `account` - The account that received the role.
+/// * `sender` - The account that granted the role.
+///
+/// # Events
+///
+/// * topics - `["role_granted", role: Symbol, account: Address]`
+/// * data - `[sender: Address]`
+pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, sender: &Address) {
+    let topics = (Symbol::new(e, "role_granted"), role, account);
+    e.events().publish(topics, sender);
+}
+
+/// Emits an event when a role is revoked from an account.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `role` - The role that was revoked.
+/// * `account` - The account that lost the role.
+/// * `sender` - The account that revoked the role (either the admin or the account itself).
+///
+/// # Events
+///
+/// * topics - `["role_revoked", role: Symbol, account: Address]`
+/// * data - `[sender: Address]`
+pub fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, sender: &Address) {
+    let topics = (Symbol::new(e, "role_revoked"), role, account);
+    e.events().publish(topics, sender);
+}
+
+/// Emits an event when the admin role for a role changes.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `role` - The role whose admin is changing.
+/// * `previous_admin_role` - The previous admin role.
+/// * `new_admin_role` - The new admin role.
+///
+/// # Events
+///
+/// * topics - `["role_admin_changed", role: Symbol]`
+/// * data - `[previous_admin_role: Symbol, new_admin_role: Symbol]`
+pub fn emit_role_admin_changed(
+    e: &Env,
+    role: &Symbol,
+    previous_admin_role: &Symbol,
+    new_admin_role: &Symbol,
+) {
+    let topics = (Symbol::new(e, "role_admin_changed"), role);
+    e.events().publish(topics, (previous_admin_role, new_admin_role));
+}
+
+/// Emits an event when an admin transfer is initiated.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `current_admin` - The current admin initiating the transfer.
+/// * `new_admin` - The proposed new admin.
+///
+/// # Events
+///
+/// * topics - `["admin_transfer_started", current_admin: Address]`
+/// * data - `[new_admin: Address]`
+pub fn emit_admin_transfer_started(e: &Env, current_admin: &Address, new_admin: &Address) {
+    let topics = (Symbol::new(e, "admin_transfer_started"), current_admin);
+    e.events().publish(topics, new_admin);
+}
+
+/// Emits an event when an admin transfer is cancelled.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `admin` - The admin who cancelled the transfer.
+///
+/// # Events
+///
+/// * topics - `["admin_transfer_cancelled", admin: Address]`
+/// * data - `[]` (empty data)
+pub fn emit_admin_transfer_cancelled(e: &Env, admin: &Address) {
+    let topics = (Symbol::new(e, "admin_transfer_cancelled"), admin);
+    e.events().publish(topics, ());
+}
+
+/// Emits an event when an admin transfer is completed.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `previous_admin` - The previous admin.
+/// * `new_admin` - The new admin who accepted the transfer.
+///
+/// # Events
+///
+/// * topics - `["admin_transfer_completed", new_admin: Address]`
+/// * data - `[previous_admin: Address]`
+pub fn emit_admin_transfer_completed(e: &Env, previous_admin: &Address, new_admin: &Address) {
+    let topics = (Symbol::new(e, "admin_transfer_completed"), new_admin);
+    e.events().publish(topics, previous_admin);
+}

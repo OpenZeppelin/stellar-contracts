@@ -31,7 +31,11 @@ mod storage;
 use soroban_sdk::{contracttype, Address, Env, Symbol};
 
 pub use crate::{
-    access_control::{AccessControl, AccessControlError},
+    access_control::{
+        emit_admin_transfer_cancelled, emit_admin_transfer_completed, emit_admin_transfer_started,
+        emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControl,
+        AccessControlError,
+    },
     storage::{
         accept_admin_transfer, add_to_role_enumeration, cancel_transfer_admin_role, get_admin,
         get_role_admin, get_role_member, get_role_member_count, grant_role, has_role,

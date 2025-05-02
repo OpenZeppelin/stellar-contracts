@@ -1,7 +1,11 @@
 use soroban_sdk::{panic_with_error, Address, Env, Symbol};
 use stellar_constants::{DAY_IN_LEDGERS, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
 
-use crate::{AccessControlError, AccessControlStorageKey, RoleAccountKey};
+use crate::{
+    emit_admin_transfer_cancelled, emit_admin_transfer_completed, emit_admin_transfer_started,
+    emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControlError,
+    AccessControlStorageKey, RoleAccountKey,
+};
 
 // Time limit for the admin transfer in ledgers
 pub const ADMIN_TRANSFER_TTL: u32 = 2 * DAY_IN_LEDGERS;
@@ -118,6 +122,11 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 /// # Errors
 ///
 /// * `AccessControlError::Unauthorized` - If the caller does not have enough privileges.
+///
+/// # Events
+///
+/// * topics - `["role_granted", role: Symbol, account: Address]`
+/// * data - `[sender: Address]`
 pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     let admin_role = get_role_admin(e, role);
 
@@ -136,6 +145,8 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     let key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
     e.storage().persistent().set(&key, &true);
     e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
+
+    emit_role_granted(e, role, account, caller);
 }
 
 /// Revokes a role from an account.
@@ -152,6 +163,11 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 /// * `AccessControlError::Unauthorized` - If the `caller` does not have enough privileges.
 /// * `AccessControlError::AccountNotFound` - If the `account` doesn't have the role.
 /// * refer to [`remove_from_role_enumeration()`] errors.
+///
+/// # Events
+///
+/// * topics - `["role_revoked", role: Symbol, account: Address]`
+/// * data - `[sender: Address]`
 pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     let admin_role = get_role_admin(e, role);
 
@@ -169,6 +185,8 @@ pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) 
 
     let key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
     e.storage().persistent().remove(&key);
+
+    emit_role_revoked(e, role, account, caller);
 }
 
 /// Allows an account to renounce a role assigned to itself.
@@ -184,6 +202,11 @@ pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) 
 ///
 /// * `AccessControlError::AccountNotFound` - If the `caller` doesn't have the role.
 /// * refer to [`remove_from_role_enumeration()`] errors.
+///
+/// # Events
+///
+/// * topics - `["role_revoked", role: Symbol, account: Address]`
+/// * data - `[sender: Address]`
 pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
     if !has_role(e, caller, role) {
         panic_with_error!(e, AccessControlError::AccountNotFound);
@@ -193,6 +216,8 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 
     let key = AccessControlStorageKey::HasRole(caller.clone(), role.clone());
     e.storage().persistent().remove(&key);
+
+    emit_role_revoked(e, role, caller, caller);
 }
 
 /// Initiates admin role transfer.
@@ -209,6 +234,11 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 /// # Errors
 ///
 /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
+///
+/// # Events
+///
+/// * topics - `["admin_transfer_started", current_admin: Address]`
+/// * data - `[new_admin: Address]`
 pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address) {
     if caller != &get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);
@@ -221,6 +251,8 @@ pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address) {
         ADMIN_TRANSFER_THRESHOLD,
         ADMIN_TRANSFER_TTL,
     );
+
+    emit_admin_transfer_started(e, caller, new_admin);
 }
 
 /// Cancels a pending admin role transfer if it is not accepted yet.
@@ -234,12 +266,19 @@ pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address) {
 /// # Errors
 ///
 /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
+///
+/// # Events
+///
+/// * topics - `["admin_transfer_cancelled", admin: Address]`
+/// * data - `[]` (empty data)
 pub fn cancel_transfer_admin_role(e: &Env, caller: &Address) {
     if caller != &get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
 
     e.storage().temporary().remove(&AccessControlStorageKey::PendingAdmin);
+
+    emit_admin_transfer_cancelled(e, caller);
 }
 
 /// Completes the 2-step admin transfer.
@@ -253,6 +292,11 @@ pub fn cancel_transfer_admin_role(e: &Env, caller: &Address) {
 ///
 /// * `AccessControlError::NoPendingAdminTransfer` - If no pending admin transfer is set.
 /// * `AccessControlError::Unauthorized` - If the `caller` is not the pending admin.
+///
+/// # Events
+///
+/// * topics - `["admin_transfer_completed", new_admin: Address]`
+/// * data - `[previous_admin: Address]`
 pub fn accept_admin_transfer(e: &Env, caller: &Address) {
     let pending_admin = e
         .storage()
@@ -264,9 +308,12 @@ pub fn accept_admin_transfer(e: &Env, caller: &Address) {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
 
-    e.storage().temporary().remove(&AccessControlStorageKey::PendingAdmin);
+    let previous_admin = get_admin(e);
 
+    e.storage().temporary().remove(&AccessControlStorageKey::PendingAdmin);
     e.storage().instance().set(&AccessControlStorageKey::Admin, caller);
+
+    emit_admin_transfer_completed(e, &previous_admin, caller);
 }
 
 /// Sets `admin_role` as the admin role for `role`.
@@ -282,14 +329,26 @@ pub fn accept_admin_transfer(e: &Env, caller: &Address) {
 /// # Errors
 ///
 /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
+///
+/// # Events
+///
+/// * topics - `["role_admin_changed", role: Symbol]`
+/// * data - `[previous_admin_role: Symbol, new_admin_role: Symbol]`
 pub fn set_role_admin(e: &Env, caller: &Address, role: &Symbol, admin_role: &Symbol) {
     if caller != &get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
 
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
+
+    // Get previous admin role if exists
+    let previous_admin_role =
+        e.storage().persistent().get::<_, Symbol>(&key).unwrap_or_else(|| Symbol::new(e, ""));
+
     e.storage().persistent().set(&key, admin_role);
     e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
+
+    emit_role_admin_changed(e, role, &previous_admin_role, admin_role);
 }
 
 // ################## LOW-LEVEL HELPERS ##################
