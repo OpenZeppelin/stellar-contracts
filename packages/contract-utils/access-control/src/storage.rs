@@ -208,7 +208,7 @@ pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) 
 /// * topics - `["role_revoked", role: Symbol, account: Address]`
 /// * data - `[sender: Address]`
 pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
-    if !has_role(e, caller, role) {
+    if has_role(e, caller, role).is_none() {
         panic_with_error!(e, AccessControlError::AccountNotFound);
     }
 
