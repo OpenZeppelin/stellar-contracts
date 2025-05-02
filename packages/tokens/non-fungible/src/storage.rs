@@ -215,7 +215,8 @@ impl Base {
         let len = base_uri.len() as usize;
 
         if len > 0 {
-            // account for potentially the max num of digits of the TokenId type
+            // account for potentially the max num of digits of the type representing
+            // `token_id`` (currently `u32`)
             let uri = &mut [0u8; MAX_BASE_URI_LEN + MAX_NUM_DIGITS];
 
             let (id, digits) = Base::token_id_to_string(e, token_id);
