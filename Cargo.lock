@@ -1334,6 +1334,8 @@ name = "stellar-access-control"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-constants",
+ "stellar-event-assertion",
 ]
 
 [[package]]
