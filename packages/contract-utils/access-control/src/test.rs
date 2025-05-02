@@ -2,20 +2,21 @@
 
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env, Symbol};
+use soroban_sdk::{contract, symbol_short, testutils::Address as _, Address, Env, Symbol};
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    add_to_role_enumeration, grant_role, has_role, remove_from_role_enumeration, revoke_role,
-    set_role_admin, AccessControl, AccessControlError,
+    accept_admin_transfer, add_to_role_enumeration, cancel_transfer_admin_role, get_admin,
+    get_role_admin, get_role_member, get_role_member_count, grant_role, has_role,
+    remove_from_role_enumeration, renounce_role, revoke_role, set_role_admin, transfer_admin_role,
 };
 
 #[contract]
 struct MockContract;
 
-const ADMIN_ROLE: Symbol = Symbol::short("admin");
-const USER_ROLE: Symbol = Symbol::short("user");
-const MANAGER_ROLE: Symbol = Symbol::short("manager");
+const ADMIN_ROLE: Symbol = symbol_short!("admin");
+const USER_ROLE: Symbol = symbol_short!("user");
+const MANAGER_ROLE: Symbol = symbol_short!("manager");
 
 #[test]
 fn admin_functions_work() {
@@ -38,7 +39,7 @@ fn admin_functions_work() {
         assert!(has_role(&e, &user, &USER_ROLE).is_none());
 
         // Test events
-        let mut event_assert = EventAssertion::new(&e, address.clone());
+        let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
     });
 }
@@ -208,7 +209,7 @@ fn admin_transfer_works() {
         assert_eq!(get_admin(&e), new_admin);
 
         // Verify events
-        let mut event_assert = EventAssertion::new(&e, address.clone());
+        let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
     });
 }
@@ -235,7 +236,7 @@ fn admin_transfer_cancel_works() {
         assert_eq!(get_admin(&e), admin);
 
         // Verify events
-        let mut event_assert = EventAssertion::new(&e, address.clone());
+        let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
     });
 }
@@ -542,7 +543,7 @@ fn remove_from_role_enumeration_with_nonexistent_role_panics() {
     e.mock_all_auths();
     let address = e.register(MockContract, ());
     let account = Address::generate(&e);
-    let nonexistent_role = Symbol::short("nonexistent");
+    let nonexistent_role = Symbol::new(&e, "nonexistent");
 
     e.as_contract(&address, || {
         // Attempt to remove account from a role that doesn't exist

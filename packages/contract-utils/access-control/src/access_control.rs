@@ -1,4 +1,4 @@
-use soroban_sdk::{symbol_short, Address, Env, Symbol};
+use soroban_sdk::{contracterror, Address, Env, Symbol};
 
 pub trait AccessControl {
     /// Returns `Some(index)` if the account has the specified role,
@@ -11,7 +11,7 @@ pub trait AccessControl {
     /// * `e` - Access to Soroban environment.
     /// * `account` - The account to check.
     /// * `role` - The role to check for.
-    fn has_role(e: &Env, account: &Address, role: &Symbol) -> Option<u32> {}
+    fn has_role(e: &Env, account: &Address, role: &Symbol) -> Option<u32>;
 
     /// Returns the total number of accounts that have the specified role.
     /// If the role does not exist, returns 0.
@@ -20,7 +20,7 @@ pub trait AccessControl {
     ///
     /// * `e` - Access to Soroban environment.
     /// * `role` - The role to get the count for.
-    fn get_role_member_count(e: &Env, role: &Symbol) -> u32 {}
+    fn get_role_member_count(e: &Env, role: &Symbol) -> u32;
 
     /// Returns the account at the specified index for a given role.
     ///
@@ -33,7 +33,7 @@ pub trait AccessControl {
     /// # Errors
     ///
     /// * `AccessControlError::OutOfBounds` - If the indexing is out of bounds.
-    fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {}
+    fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address;
 
     /// Returns the admin role for a specific role.
     /// If no admin role is explicitly set, returns `None`.
@@ -42,7 +42,7 @@ pub trait AccessControl {
     ///
     /// * `e` - Access to Soroban environment.
     /// * `role` - The role to query the admin role for.
-    fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {}
+    fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol>;
 
     /// Returns the admin account.
     ///
@@ -53,7 +53,7 @@ pub trait AccessControl {
     /// # Errors
     ///
     /// * `AccessControlError::AccountNotFound` - If no admin account is set.
-    fn get_admin(e: &Env) -> Address {}
+    fn get_admin(e: &Env) -> Address;
 
     /// Grants a role to an account.
     /// Creates the role if it does not exist.

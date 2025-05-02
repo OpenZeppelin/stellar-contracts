@@ -1,10 +1,9 @@
-use soroban_sdk::{panic_with_error, Address, Env, Symbol};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
 use stellar_constants::{DAY_IN_LEDGERS, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
 
 use crate::{
     emit_admin_transfer_cancelled, emit_admin_transfer_completed, emit_admin_transfer_started,
     emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControlError,
-    AccessControlStorageKey, RoleAccountKey,
 };
 
 // Time limit for the admin transfer in ledgers
@@ -128,15 +127,10 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 /// * topics - `["role_granted", role: Symbol, account: Address]`
 /// * data - `[sender: Address]`
 pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
-    let admin_role = get_role_admin(e, role);
-
-    // If caller is not the contract admin and does not have the admin role for this role
-    if caller != &get_admin(e) && !has_role(e, caller, &admin_role) {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
+    ensure_if_admin_or_admin_role(e, caller, role);
 
     // Return early if account already has the role
-    if has_role(e, account, role) {
+    if has_role(e, account, role).is_some() {
         return;
     }
 
@@ -169,15 +163,10 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 /// * topics - `["role_revoked", role: Symbol, account: Address]`
 /// * data - `[sender: Address]`
 pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
-    let admin_role = get_role_admin(e, role);
-
-    // If caller is not the contract admin and does not have the admin role for this role
-    if caller != &get_admin(e) && !has_role(e, caller, &admin_role) {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
+    ensure_if_admin_or_admin_role(e, caller, role);
 
     // Check if account has the role
-    if !has_role(e, account, role) {
+    if has_role(e, account, role).is_none() {
         panic_with_error!(e, AccessControlError::AccountNotFound);
     }
 
@@ -301,7 +290,7 @@ pub fn accept_admin_transfer(e: &Env, caller: &Address) {
     let pending_admin = e
         .storage()
         .temporary()
-        .get(&AccessControlStorageKey::PendingAdmin)
+        .get::<_, Address>(&AccessControlStorageKey::PendingAdmin)
         .unwrap_or_else(|| panic_with_error!(e, AccessControlError::NoPendingAdminTransfer));
 
     if &pending_admin != caller {
@@ -437,4 +426,18 @@ pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     // Update the count
     e.storage().persistent().set(&count_key, &last_index);
     e.storage().persistent().extend_ttl(&count_key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
+}
+
+// TODO: inline docs
+pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
+    let is_admin = caller == &get_admin(e);
+    let is_admin_role = match get_role_admin(e, role) {
+        Some(admin_role) => has_role(e, caller, &admin_role).is_some(),
+        None => false,
+    };
+
+    // If caller is not the contract admin and does not have the admin role for this role
+    if !is_admin && !is_admin_role {
+        panic_with_error!(e, AccessControlError::Unauthorized);
+    }
 }
