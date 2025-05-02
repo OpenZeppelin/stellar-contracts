@@ -3,9 +3,9 @@ use stellar_constants::{DAY_IN_LEDGERS, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
 
 use crate::{AccessControlError, AccessControlStorageKey, RoleAccountKey};
 
-// Time limit for admin transfer in ledgers
+// Time limit for the admin transfer in ledgers
 pub const ADMIN_TRANSFER_TTL: u32 = 2 * DAY_IN_LEDGERS;
-// Threshold for admin transfer TTL extension (should be less than ADMIN_TRANSFER_TTL)
+// Threshold for the admin transfer TTL extension (should be less than ADMIN_TRANSFER_TTL)
 pub const ADMIN_TRANSFER_THRESHOLD: u32 = DAY_IN_LEDGERS;
 
 #[contracttype]
@@ -20,23 +20,26 @@ pub enum AccessControlStorageKey {
     RoleAccounts(RoleAccountKey), // (role, index) -> Address
     HasRole(Address, Symbol),     // (account, role) -> index
     RoleAccountsCount(Symbol),    // role -> count
-    RoleAdmin(Symbol),            // role -> admin role
+    RoleAdmin(Symbol),            // role -> the admin role
     Admin,
     PendingAdmin,
 }
 
 // ################## QUERY STATE ##################
 
-/// Returns true if the account has the specified role.
+/// Returns `Some(index)` if the account has the specified role,
+/// where `index` is the position of the account for that role,
+/// and can be used to query [`get_role_member()`].
+/// Returns `None` if the account does not have the specified role.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `account` - The account to check.
 /// * `role` - The role to check for.
-pub fn has_role(e: &Env, account: &Address, role: &Symbol) -> bool {
+pub fn has_role(e: &Env, account: &Address, role: &Symbol) -> Option<u32> {
     let key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
-    e.storage().persistent().has(&key)
+    e.storage().persistent().get(&key)
 }
 
 /// Returns the admin account.
@@ -77,20 +80,14 @@ pub fn get_role_member_count(e: &Env, role: &Symbol) -> u32 {
 ///
 /// # Errors
 ///
-/// * `AccessControlError::AccountNotFound` - If the index is out of bounds or the account doesn't exist.
+/// * `AccessControlError::OutOfBounds` - If the indexing is out of bounds.
 pub fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {
-    let count = get_role_member_count(e, role);
-
-    if index >= count {
-        panic_with_error!(e, AccessControlError::AccountNotFound);
-    }
-
     let key = AccessControlStorageKey::RoleAccounts(RoleAccountKey { role: role.clone(), index });
 
     e.storage()
         .persistent()
         .get(&key)
-        .unwrap_or_else(|| panic_with_error!(e, AccessControlError::AccountNotFound))
+        .unwrap_or_else(|| panic_with_error!(e, AccessControlError::OutOfBounds))
 }
 
 /// Returns the admin role for a specific role.
@@ -99,7 +96,7 @@ pub fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `role` - The role to query the admin for.
+/// * `role` - The role to query the admin role for.
 pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
     e.storage().persistent().get(&key)
@@ -114,13 +111,13 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be admin.
+/// * `caller` - The address of the caller, must be the admin or has the `AdminRole` privileges for this role.
 /// * `account` - The account to grant the role to.
 /// * `role` - The role to grant.
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the caller is not admin.
+/// * `AccessControlError::Unauthorized` - If the caller does not have enough privileges.
 pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     let admin_role = get_role_admin(e, role);
 
@@ -146,14 +143,15 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be admin.
+/// * `caller` - The address of the caller, must be the admin or has the `AdminRole` privileges for this role.
 /// * `account` - The account to revoke the role from.
 /// * `role` - The role to revoke.
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the caller is not admin.
-/// * `AccessControlError::AccountNotFound` - If the account doesn't have the role.
+/// * `AccessControlError::Unauthorized` - If the `caller` does not have enough privileges.
+/// * `AccessControlError::AccountNotFound` - If the `account` doesn't have the role.
+/// * refer to [`remove_from_role_enumeration()`] errors.
 pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     let admin_role = get_role_admin(e, role);
 
@@ -173,19 +171,44 @@ pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) 
     e.storage().persistent().remove(&key);
 }
 
-/// Initiates admin role transfer.
-/// Admin privileges for the current admin are not revoked until the
-/// recipient accepts the transfer.
+/// Allows an account to renounce a role assigned to itself.
+/// Users can only renounce roles for their own account.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be admin.
-/// * `new_admin` - The account to transfer admin privileges to.
+/// * `caller` - The address of the caller, must be the account that has the role.
+/// * `role` - The role to renounce.
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the caller is not admin.
+/// * `AccessControlError::AccountNotFound` - If the `caller` doesn't have the role.
+/// * refer to [`remove_from_role_enumeration()`] errors.
+pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
+    if !has_role(e, caller, role) {
+        panic_with_error!(e, AccessControlError::AccountNotFound);
+    }
+
+    remove_from_role_enumeration(e, caller, role);
+
+    let key = AccessControlStorageKey::HasRole(caller.clone(), role.clone());
+    e.storage().persistent().remove(&key);
+}
+
+/// Initiates admin role transfer.
+/// Admin privileges for the current admin are not revoked until the
+/// recipient accepts the transfer.
+/// Overrides the previous pending transfer if there is one.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller, must be the admin.
+/// * `new_admin` - The account to transfer the admin privileges to.
+///
+/// # Errors
+///
+/// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
 pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address) {
     if caller != &get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);
@@ -206,11 +229,11 @@ pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be admin.
+/// * `caller` - The address of the caller, must be the admin.
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the caller is not admin.
+/// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
 pub fn cancel_transfer_admin_role(e: &Env, caller: &Address) {
     if caller != &get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);
@@ -229,7 +252,7 @@ pub fn cancel_transfer_admin_role(e: &Env, caller: &Address) {
 /// # Errors
 ///
 /// * `AccessControlError::NoPendingAdminTransfer` - If no pending admin transfer is set.
-/// * `AccessControlError::Unauthorized` - If the caller is not the pending admin.
+/// * `AccessControlError::Unauthorized` - If the `caller` is not the pending admin.
 pub fn accept_admin_transfer(e: &Env, caller: &Address) {
     let pending_admin = e
         .storage()
@@ -252,13 +275,13 @@ pub fn accept_admin_transfer(e: &Env, caller: &Address) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be admin.
+/// * `caller` - The address of the caller, must be the admin.
 /// * `role` - The role to set the admin for.
 /// * `admin_role` - The role that will be the admin.
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the caller is not admin.
+/// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
 pub fn set_role_admin(e: &Env, caller: &Address, role: &Symbol, admin_role: &Symbol) {
     if caller != &get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);
@@ -309,7 +332,7 @@ pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
 ///
 /// # Errors
 ///
-/// * `AccessControlError::AccountNotFound` - If the role has no members or the account doesn't have the role.
+/// * `AccessControlError::AccountNotFound` - If the role has no members or the `account` doesn't have the role.
 pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     // Get the current count of accounts with this role
     let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());
