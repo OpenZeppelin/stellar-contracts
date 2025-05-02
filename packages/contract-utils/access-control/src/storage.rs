@@ -134,10 +134,10 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
         return;
     }
 
-    add_to_role_enumeration(e, account, role);
+    let index = add_to_role_enumeration(e, account, role);
 
     let key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
-    e.storage().persistent().set(&key, &true);
+    e.storage().persistent().set(&key, &index);
     e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
 
     emit_role_granted(e, role, account, caller);
@@ -342,14 +342,14 @@ pub fn set_role_admin(e: &Env, caller: &Address, role: &Symbol, admin_role: &Sym
 
 // ################## LOW-LEVEL HELPERS ##################
 
-/// Adds an account to role enumeration.
+/// Adds an account to role enumeration. Returns the previous count.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `account` - The account to add to the role.
 /// * `role` - The role to add the account to.
-pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
+pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) -> u32 {
     // Get the current count of accounts with this role
     let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());
     let count = e.storage().persistent().get(&count_key).unwrap_or(0);
@@ -368,6 +368,8 @@ pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     // Update the count
     e.storage().persistent().set(&count_key, &(count + 1));
     e.storage().persistent().extend_ttl(&count_key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
+
+    count
 }
 
 /// Removes an account from role enumeration.
@@ -392,8 +394,11 @@ pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     // Get the index of the account to remove
     let to_be_removed_has_role_key =
         AccessControlStorageKey::HasRole(account.clone(), role.clone());
-    let to_be_removed_index =
-        e.storage().persistent().get::<_, u32>(&to_be_removed_has_role_key).unwrap();
+    let to_be_removed_index = e
+        .storage()
+        .persistent()
+        .get::<_, u32>(&to_be_removed_has_role_key)
+        .unwrap_or_else(|| panic_with_error!(e, AccessControlError::AccountNotFound));
 
     // Get the index of the last account for that role
     let last_index = count - 1;
@@ -404,7 +409,11 @@ pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
 
     // Swap the to be removed account with the last account, then delete the last account
     if to_be_removed_index != last_index {
-        let last_account = e.storage().persistent().get::<_, Address>(&last_key).unwrap();
+        let last_account = e
+            .storage()
+            .persistent()
+            .get::<_, Address>(&last_key)
+            .expect("we ensured count to be 1 at this point");
 
         // Swap
         let to_be_removed_key = AccessControlStorageKey::RoleAccounts(RoleAccountKey {
