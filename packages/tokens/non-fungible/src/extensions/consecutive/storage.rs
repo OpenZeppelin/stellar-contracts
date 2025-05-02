@@ -535,7 +535,7 @@ impl Consecutive {
             .set(&NFTConsecutiveStorageKey::OwnershipBucket(bucket_index), &bucket);
     }
 
-    /// Low-level function that tries to retrieve a perisitent storage value and
+    /// Low-level function that tries to retrieve a persistent storage value and
     /// extend its TTL if the entry exists.
     ///
     /// # Arguments
