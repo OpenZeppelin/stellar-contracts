@@ -113,6 +113,35 @@ pub trait AccessControl {
     ///
     /// We recommend using [`crate::accept_admin_transfer()`] when implementing this function.
     fn accept_admin_transfer(e: &Env, caller: &Address);
+
+    /// Returns the admin role that controls `role`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `role` - The role to query the admin for.
+    fn get_role_admin(e: &Env, role: &Symbol) -> Symbol {
+        crate::get_role_admin(e, role)
+    }
+
+    /// Sets `admin_role` as the admin role of `role`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `caller` - The address of the caller, must be admin.
+    /// * `role` - The role to set the admin for.
+    /// * `admin_role` - The new admin role.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::set_role_admin()`] when implementing this function.
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: You MUST implement proper authorization in your contract.
+    /// The caller must be the admin or have the appropriate admin role.
+    fn set_role_admin(e: &Env, caller: &Address, role: &Symbol, admin_role: &Symbol);
 }
 
 #[contracterror]
