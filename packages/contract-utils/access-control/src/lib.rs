@@ -33,9 +33,9 @@ use soroban_sdk::{contracttype, Address, Env, Symbol};
 pub use crate::{
     access_control::{AccessControl, AccessControlError},
     storage::{
-        accept_admin_transfer, add_to_role_enumeration, get_admin, get_role_admin, get_role_member,
-        get_role_member_count, grant_role, has_role, remove_from_role_enumeration, revoke_role,
-        set_role_admin, transfer_admin_role,
+        accept_admin_transfer, add_to_role_enumeration, cancel_transfer_admin_role, get_admin,
+        get_role_admin, get_role_member, get_role_member_count, grant_role, has_role,
+        remove_from_role_enumeration, revoke_role, set_role_admin, transfer_admin_role,
     },
 };
 

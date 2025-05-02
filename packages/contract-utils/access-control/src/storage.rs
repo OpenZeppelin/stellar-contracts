@@ -93,10 +93,16 @@ pub fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {
         .unwrap_or_else(|| panic_with_error!(e, AccessControlError::AccountNotFound))
 }
 
-// Add a function to get the admin role for a role
-pub fn get_role_admin(e: &Env, role: &Symbol) -> Symbol {
+/// Returns the admin role for a specific role.
+/// If no admin role is explicitly set, returns `None`.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `role` - The role to query the admin for.
+pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
-    e.storage().persistent().get(&key).unwrap_or_else(|| DEFAULT_ADMIN_ROLE.clone())
+    e.storage().persistent().get(&key)
 }
 
 // ################## CHANGE STATE ##################
@@ -194,6 +200,17 @@ pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address) {
     );
 }
 
+/// Cancels a pending admin role transfer if it is not accepted yet.
+/// This can only be called by the current admin.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller, must be admin.
+///
+/// # Errors
+///
+/// * `AccessControlError::Unauthorized` - If the caller is not admin.
 pub fn cancel_transfer_admin_role(e: &Env, caller: &Address) {
     if caller != &get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);

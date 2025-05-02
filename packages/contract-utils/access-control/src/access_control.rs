@@ -102,6 +102,23 @@ pub trait AccessControl {
     /// The caller must be the admin.
     fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address);
 
+    /// Cancels a pending admin role transfer.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `caller` - The address of the caller, must be admin.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::cancel_transfer_admin_role()`] when implementing this function.
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: You MUST implement proper authorization in your contract.
+    /// The caller must be the admin.
+    fn cancel_transfer_admin_role(e: &Env, caller: &Address);
+
     /// Completes the 2-step admin transfer.
     ///
     /// # Arguments
@@ -114,13 +131,14 @@ pub trait AccessControl {
     /// We recommend using [`crate::accept_admin_transfer()`] when implementing this function.
     fn accept_admin_transfer(e: &Env, caller: &Address);
 
-    /// Returns the admin role that controls `role`.
+    /// Returns the admin role for a specific role.
+    /// If no admin role is explicitly set, returns `None`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
     /// * `role` - The role to query the admin for.
-    fn get_role_admin(e: &Env, role: &Symbol) -> Symbol {
+    fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
         crate::get_role_admin(e, role)
     }
 
