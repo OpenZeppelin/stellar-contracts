@@ -2,7 +2,6 @@ use soroban_sdk::{Address, Env};
 
 use crate::{extensions::burnable::emit_burn, Base};
 
-// `Burnable` extension is build for the `Base` contract type.
 impl Base {
     /// Destroys the token with `token_id` from `from`, ensuring ownership
     /// checks, and emits a `burn` event.

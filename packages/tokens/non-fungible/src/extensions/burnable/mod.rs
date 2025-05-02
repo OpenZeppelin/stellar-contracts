@@ -16,6 +16,27 @@ use soroban_sdk::{symbol_short, Address, Env};
 /// choice to accommodate flexibility and customization for various smart
 /// contract use cases.
 ///
+/// `storage.rs` file of this module provides the `NonFungibelBurnable` trait
+/// implementation for the `Base` contract type. For other contract types (eg.
+/// `Enumerable`, `Consecutive`), the overrides of the `NonFungibleBurnable`
+/// trait methods can be found in their respective `storage.rs` file.
+///
+/// This approach lets us to implement the `NonFungibleBurnable` trait in a very
+/// flexible way based on the `ContractType` associated type from
+/// `NonFungibleToken`:
+///
+/// ```ignore
+/// impl NonFungibleBurnable for ExampleContract {
+///     fn burn(e: &Env, from: Address, token_id: u32) {
+///         Self::ContractType::burn(e, &from, token_id);
+///     }
+///
+///     fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32) {
+///         Self::ContractType::burn_from(e, &spender, &from, token_id);
+///     }
+/// }
+/// ```
+///
 /// # Notes
 ///
 /// `#[contractimpl]` macro requires even the default implementations to be
