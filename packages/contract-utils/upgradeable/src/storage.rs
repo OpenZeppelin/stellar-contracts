@@ -14,16 +14,16 @@ pub fn start_migration(e: &Env) {
     e.storage().instance().set(&MIGRATING, &true);
 }
 
-/// Returns `true` if migration is allowed.
+/// Returns `true` if completing migration is allowed.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-pub fn can_migrate(e: &Env) -> bool {
+pub fn can_complete_migration(e: &Env) -> bool {
     e.storage().instance().get::<_, bool>(&MIGRATING).unwrap_or(false)
 }
 
-/// Sets the `MIGRATING` state to `true`, completing the migration process.
+/// Sets the `MIGRATING` state to `false`, completing the migration process.
 ///
 /// # Arguments
 ///
@@ -32,7 +32,7 @@ pub fn complete_migration(e: &Env) {
     e.storage().instance().set(&MIGRATING, &false);
 }
 
-/// Ensures that migration is allowed, otherwise panics.
+/// Ensures that completing migration is allowed, otherwise panics.
 ///
 /// # Arguments
 ///
@@ -41,8 +41,8 @@ pub fn complete_migration(e: &Env) {
 /// # Errors
 ///
 /// * [`UpgradeableError::MigrationNotAllowed`] - If `MIGRATING` is `false`.
-pub fn ensure_can_migrate(e: &Env) {
-    if !can_migrate(e) {
+pub fn ensure_can_complete_migration(e: &Env) {
+    if !can_complete_migration(e) {
         panic_with_error!(e, UpgradeableError::MigrationNotAllowed)
     }
 }

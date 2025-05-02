@@ -30,8 +30,12 @@
 //! pub struct ExampleContract;
 //!
 //! impl UpgradeableInternal for ExampleContract {
-//!     fn _require_auth(e: &Env) {
-//!         e.storage().instance().get::<_, Address>(&OWNER).unwrap().require_auth();
+//!     fn _require_auth(e: &Env, operator: &Address) {
+//!         operator.require_auth();
+//!         let owner = e.storage().instance().get::<_, Address>(&OWNER).unwrap();
+//!         if *operator != owner {
+//!             panic_with_error!(e, ExampleContractError::Unauthorized)
+//!         }
 //!     }
 //! ```
 //!
@@ -47,7 +51,7 @@
 //! #[contract]
 //! pub struct ExampleContract;
 //!
-//! impl UpgradeableInternal for ExampleContract {
+//! impl UpgradeableMigratableInternal for ExampleContract {
 //!     type MigrationData = Data;
 //!
 //!     fn _require_auth(e: &Env, operator: &Address) {
@@ -74,7 +78,9 @@ mod test;
 mod upgradeable;
 
 pub use crate::{
-    storage::{can_migrate, complete_migration, ensure_can_migrate, start_migration},
+    storage::{
+        can_complete_migration, complete_migration, ensure_can_complete_migration, start_migration,
+    },
     upgradeable::{
         Upgradeable, UpgradeableClient, UpgradeableInternal, UpgradeableMigratable,
         UpgradeableMigratableInternal,
