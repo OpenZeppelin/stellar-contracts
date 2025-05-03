@@ -2,8 +2,8 @@ use core::mem;
 
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, String, TryFromVal, Val, Vec};
 use stellar_constants::{
-    OWNERSHIP_BUCKET_EXTEND_AMOUNT, OWNERSHIP_BUCKET_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT,
-    OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
+    OWNERSHIP_EXTEND_AMOUNT, OWNERSHIP_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
+    TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
 
 use crate::{
@@ -557,9 +557,7 @@ impl Consecutive {
             let const_vals = match key {
                 BurnedToken(_) => [TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT],
                 Owner(_) => [OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT],
-                OwnershipBucket(_) => {
-                    [OWNERSHIP_BUCKET_TTL_THRESHOLD, OWNERSHIP_BUCKET_EXTEND_AMOUNT]
-                }
+                OwnershipBucket(_) => [OWNERSHIP_TTL_THRESHOLD, OWNERSHIP_EXTEND_AMOUNT],
                 Approval(_) => panic!("Approval is in temporary storage"),
             };
             e.storage().persistent().extend_ttl(key, const_vals[0], const_vals[1]);
