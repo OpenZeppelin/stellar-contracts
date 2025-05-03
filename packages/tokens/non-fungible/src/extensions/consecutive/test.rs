@@ -248,6 +248,17 @@ fn consecutive_batch_mint_amount_max_fails() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #300)")]
+fn consecutive_owner_of_on_zero_token_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        Consecutive::owner_of(&e, 0);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #300)")]
 fn consecutive_owner_of_on_nonexistent_token_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());

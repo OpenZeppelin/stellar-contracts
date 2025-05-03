@@ -2,7 +2,8 @@ use core::mem;
 
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, String, TryFromVal, Val, Vec};
 use stellar_constants::{
-    OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
+    OWNERSHIP_BUCKET_EXTEND_AMOUNT, OWNERSHIP_BUCKET_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT,
+    OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
 
 use crate::{
@@ -94,7 +95,12 @@ impl Consecutive {
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
     ///   `token_id` does not exist.
     pub fn owner_of(e: &Env, token_id: u32) -> Address {
-        let last_token_id = sequential::next_token_id(e) - 1;
+        let next_id = sequential::next_token_id(e);
+        if next_id == 0 {
+            panic_with_error!(&e, NonFungibleTokenError::NonExistentToken);
+        }
+
+        let last_token_id = next_id - 1;
         let key = NFTConsecutiveStorageKey::BurnedToken(token_id);
         let is_burned = Consecutive::get_persistent_entry(e, &key).unwrap_or(false);
         if is_burned || token_id > last_token_id {
@@ -120,7 +126,6 @@ impl Consecutive {
                 // If we're in the starting bucket, begin search from the token's relative
                 // position; otherwise, start from the beginning of the bucket.
                 let from_id = if i == bucket_index { relative_id } else { 0 };
-                // expect is safe because of the filter above
                 find_bit_in_bucket(bucket, from_id)
                     .map(|pos_in_bucket| i * ids_in_bucket + pos_in_bucket)
             })
@@ -521,8 +526,8 @@ impl Consecutive {
         let mask: u32 = 1 << (ids_in_item - bit_index - 1);
         let mut item = bucket.get(item_index).expect("token_id out of allowed range");
 
-        // return early the bit was already set in a previous action (transfer, burn or
-        // batch_mint)
+        // return early if the bit was already set in a previous action (transfer, burn
+        // or batch_mint)
         if item & mask != 0 {
             return;
         }
@@ -550,9 +555,12 @@ impl Consecutive {
             use NFTConsecutiveStorageKey::*;
 
             let const_vals = match key {
-                // Approval is temporary
                 BurnedToken(_) => [TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT],
-                _ => [OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT],
+                Owner(_) => [OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT],
+                OwnershipBucket(_) => {
+                    [OWNERSHIP_BUCKET_TTL_THRESHOLD, OWNERSHIP_BUCKET_EXTEND_AMOUNT]
+                }
+                Approval(_) => panic!("Approval is in temporary storage"),
             };
             e.storage().persistent().extend_ttl(key, const_vals[0], const_vals[1]);
         })
@@ -650,7 +658,7 @@ pub(crate) fn find_bit_in_bucket(bucket: Vec<u32>, start: u32) -> Option<u32> {
     let relative_id = start % ids_in_item;
 
     (item_index..bucket.len()).find_map(|i| {
-        // If we're in te starting item, begin search from the token's relative
+        // If we're in the starting item, begin search from the token's relative
         // position; otherwise, start from the beginning of the item.
         let from_id = if i == item_index { relative_id } else { 0 };
 
