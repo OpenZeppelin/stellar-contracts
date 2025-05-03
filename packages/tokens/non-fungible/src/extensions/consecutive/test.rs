@@ -460,7 +460,7 @@ fn consecutive_set_owner_for_previous_token_works() {
     e.as_contract(&address, || {
         Consecutive::batch_mint(&e, &user1, 5); // 0,1,2,3,4
 
-        // existing id
+        // existing ID
         Consecutive::set_owner_for_previous_token(&e, &user2, 3);
         assert_eq!(Consecutive::owner_of(&e, 2), user2);
 
