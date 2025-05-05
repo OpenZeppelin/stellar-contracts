@@ -2,6 +2,7 @@ use soroban_sdk::{
     auth::{Context, CustomAccountInterface},
     contract, contracterror, contractimpl, contracttype,
     crypto::Hash,
+    xdr::{FromXdr, ToXdr},
     Address, BytesN, Env, Symbol, Vec,
 };
 
@@ -81,8 +82,8 @@ impl CustomAccountInterface for SacAdmin {
                 }
                 //ensure_has_role("minter", caller)
 
-                //let amount_bytes = contract_context.args.get(1).unwrap().to_xdr(&e);
-                //let amount = i128::from_xdr(&e, &amount_bytes).unwrap();
+                let amount_bytes = contract_context.args.get(2).unwrap().to_xdr(&e);
+                let _amount = i128::from_xdr(&e, &amount_bytes).unwrap();
                 //ensure_has_limit(amount, pub_key)
             } else if contract_context.fn_name == Symbol::new(&e, "clawback") {
                 // ensure_has_role("clawback", caller)
