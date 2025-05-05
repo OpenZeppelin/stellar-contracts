@@ -2,7 +2,6 @@ use soroban_sdk::{
     auth::{Context, CustomAccountInterface},
     contract, contracterror, contractimpl, contracttype,
     crypto::Hash,
-    token::StellarAssetClient,
     Address, BytesN, Env, Symbol, Vec,
 };
 
@@ -34,32 +33,11 @@ pub struct SacAdmin;
 
 #[contractimpl]
 impl SacAdmin {
-    pub fn __constructor(e: Env, sac: Address, owner: Address) {
+    pub fn __constructor(e: Env, sac: Address, owner: BytesN<32>) {
         e.storage().instance().set(&SacDataKey::SAC, &sac);
+
+        // for the sake of the example, using owner instead of roles
         e.storage().instance().set(&SacDataKey::Owner, &owner);
-    }
-
-    pub fn mint(e: Env, to: Address, amount: i128) {
-        // access control: only owner can call mint
-        let owner: Address = e.storage().instance().get(&SacDataKey::Owner).unwrap();
-        owner.require_auth();
-
-        // mint on sac
-        let sac_address: Address = e.storage().instance().get(&SacDataKey::SAC).unwrap();
-        let token_client = StellarAssetClient::new(&e, &sac_address);
-        token_client.mint(&to, &amount);
-    }
-
-    pub fn set_admin(_e: Env, _new_admin: Address) {
-        todo!()
-    }
-
-    pub fn set_authorized(_e: Env, _id: Address, _authorize: bool) {
-        todo!()
-    }
-
-    pub fn clawback(_e: Env, _from: Address, _amount: i128) {
-        todo!()
     }
 }
 
@@ -68,19 +46,20 @@ impl CustomAccountInterface for SacAdmin {
     type Signature = Signature;
     type Error = Error;
 
-    // This is the 'entry point' of the account contract and every account
-    // contract has to implement it. `require_auth` calls for the Address of
-    // this contract will result in calling this `__check_auth` function with
-    // the appropriate arguments.
-    #[allow(non_snake_case)]
     fn __check_auth(
         e: Env,
-        _signature_payload: Hash<32>,
-        _signature: Self::Signature,
+        payload: Hash<32>,
+        signature: Self::Signature,
         auth_context: Vec<Context>,
     ) -> Result<(), Error> {
-        // TODO: authenticate
+        // authenticate
+        e.crypto().ed25519_verify(
+            &signature.public_key,
+            &payload.clone().into(),
+            &signature.signature,
+        );
 
+        // extract from context and check roles for every function
         for context in auth_context.iter() {
             let contract_context = match context {
                 Context::Contract(c) => c,
@@ -92,15 +71,23 @@ impl CustomAccountInterface for SacAdmin {
                 return Err(Error::InvalidContext);
             }
 
+            let caller = signature.public_key.clone();
+
             if contract_context.fn_name == Symbol::new(&e, "mint") {
-                // pub_key is BytesN !
-                // ensure_has_role("minter", sig.pub_key)
-                let _amount = contract_context.args.get(1).unwrap();
-                // ensure_has_limit(amount, sig.pub_key)
+                // for the sake of the example, checking against owner only
+                let owner: BytesN<32> = e.storage().instance().get(&SacDataKey::Owner).unwrap();
+                if caller != owner {
+                    return Err(Error::Unauthorized);
+                }
+                //ensure_has_role("minter", caller)
+
+                //let amount_bytes = contract_context.args.get(1).unwrap().to_xdr(&e);
+                //let amount = i128::from_xdr(&e, &amount_bytes).unwrap();
+                //ensure_has_limit(amount, pub_key)
             } else if contract_context.fn_name == Symbol::new(&e, "clawback") {
-                // ensure_has_role("clawback", signature.pub_key)
+                // ensure_has_role("clawback", caller)
             } else {
-                return Err(Error::Unauthorized);
+                return Err(Error::InvalidFn);
             }
         }
 
