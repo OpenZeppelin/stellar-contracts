@@ -11,7 +11,7 @@ pub trait AccessControl {
     /// * `e` - Access to Soroban environment.
     /// * `account` - The account to check.
     /// * `role` - The role to check for.
-    fn has_role(e: &Env, account: &Address, role: &Symbol) -> Option<u32>;
+    fn has_role(e: &Env, account: Address, role: Symbol) -> Option<u32>;
 
     /// Returns the total number of accounts that have the specified role.
     /// If the role does not exist, returns 0.
@@ -20,7 +20,7 @@ pub trait AccessControl {
     ///
     /// * `e` - Access to Soroban environment.
     /// * `role` - The role to get the count for.
-    fn get_role_member_count(e: &Env, role: &Symbol) -> u32;
+    fn get_role_member_count(e: &Env, role: Symbol) -> u32;
 
     /// Returns the account at the specified index for a given role.
     ///
@@ -33,7 +33,7 @@ pub trait AccessControl {
     /// # Errors
     ///
     /// * `AccessControlError::OutOfBounds` - If the indexing is out of bounds.
-    fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address;
+    fn get_role_member(e: &Env, role: Symbol, index: u32) -> Address;
 
     /// Returns the admin role for a specific role.
     /// If no admin role is explicitly set, returns `None`.
@@ -42,7 +42,7 @@ pub trait AccessControl {
     ///
     /// * `e` - Access to Soroban environment.
     /// * `role` - The role to query the admin role for.
-    fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol>;
+    fn get_role_admin(e: &Env, role: Symbol) -> Option<Symbol>;
 
     /// Returns the admin account.
     ///
@@ -81,7 +81,7 @@ pub trait AccessControl {
     ///
     /// **IMPORTANT**: You MUST implement proper authorization in your contract.
     /// The caller must be the admin or has the `RoleAdmin` for the `role`.
-    fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol);
+    fn grant_role(e: &Env, caller: Address, account: Address, role: Symbol);
 
     /// Revokes a role from an account.
     /// To revoke your own role, please use [`AccessControl::renounce_role()`]
@@ -111,7 +111,7 @@ pub trait AccessControl {
     ///
     /// **IMPORTANT**: You MUST implement proper authorization in your contract.
     /// The caller must be the admin or has the `RoleAdmin` for the `role`.
-    fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol);
+    fn revoke_role(e: &Env, caller: Address, account: Address, role: Symbol);
 
     /// Allows an account to renounce a role assigned to itself.
     /// Users can only renounce roles for their own account.
@@ -132,7 +132,7 @@ pub trait AccessControl {
     ///
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
     /// * data - `[sender: Address]`
-    fn renounce_role(e: &Env, caller: &Address, role: &Symbol);
+    fn renounce_role(e: &Env, caller: Address, role: Symbol);
 
     /// Initiates the admin role transfer.
     /// Admin privileges for the current admin are not revoked until the
@@ -157,7 +157,7 @@ pub trait AccessControl {
     /// # Security Warning
     ///
     /// **IMPORTANT**: You MUST implement proper authorization in your contract.
-    fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address);
+    fn transfer_admin_role(e: &Env, caller: Address, new_admin: Address);
 
     /// Cancels a pending admin role transfer.
     ///
@@ -178,7 +178,7 @@ pub trait AccessControl {
     /// # Security Warning
     ///
     /// **IMPORTANT**: You MUST implement proper authorization in your contract.
-    fn cancel_transfer_admin_role(e: &Env, caller: &Address);
+    fn cancel_transfer_admin_role(e: &Env, caller: Address);
 
     /// Completes the 2-step admin transfer.
     ///
@@ -198,7 +198,7 @@ pub trait AccessControl {
     ///
     /// * topics - `["admin_transfer_completed", new_admin: Address]`
     /// * data - `[previous_admin: Address]`
-    fn accept_admin_transfer(e: &Env, caller: &Address);
+    fn accept_admin_transfer(e: &Env, caller: Address);
 
     /// Sets `admin_role` as the admin role of `role`.
     ///
@@ -221,7 +221,7 @@ pub trait AccessControl {
     /// # Security Warning
     ///
     /// **IMPORTANT**: You MUST implement proper authorization in your contract.
-    fn set_role_admin(e: &Env, caller: &Address, role: &Symbol, admin_role: &Symbol);
+    fn set_role_admin(e: &Env, caller: Address, role: Symbol, admin_role: Symbol);
 }
 
 #[contracterror]

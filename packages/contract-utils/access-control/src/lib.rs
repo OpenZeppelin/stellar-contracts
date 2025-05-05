@@ -5,27 +5,29 @@
 //!
 //! # Usage
 //!
-//! One can create new methods for their contract and specify which roles can do
-//! what. For example, one could create a role `mint_admins` and specify a 2nd
-//! level administration. This group (mint_admins) may have access to
-//! `revoke_mint_role` and `grant_mint_role` methods.
+//! There is a single overarching admin, and the admin has enough privileges to call
+//! any function given in the [`AccessControl`] trait.
 //!
-//! In order to do that:
-//! 1. the admin will create the `minter_admin` role and specify the accounts
-//!    for that with [`grant_role()`] function.
+//! Each role can have an `admin role` specified for it. For example, if you create 2 roles:
+//! - minter
+//! - mint_admins
 //!
-//! Then, the new methods can be implemented for the contract may look like
-//! this:
+//! You can assign the role `mint_admins` as the admin role of the `minter` role group.
+//! And this will allow accounts with `mint_admins` role, to grant and revoke the roles of
+//! `minter` roles.
+//!
+//! One can create as many roles as they want, and create a chain of command structure if
+//! they want to with this approach.
+//!
+//! If you need even more granular control over which roles can do what, you can introduce
+//! your own business logic, and annotate it with our macro:
 //!
 //! ```rust
 //! #[has_role(caller, "minter_admin")]
-//! pub fn grant_mint_role(e: &Env, caller: Address) {
+//! pub fn do_very_specific_stuff_that_is_probably_not_needed_but_we_decided_to_overkill_it_nevertheless(e: &Env, caller: Address) {
 //!     ...
 //! }
 //! ```
-//!
-//! If multi-admin setup is wanted, it can be achieved in a similar way by
-//! creating a new admin role and assigning accounts to it.
 
 #![no_std]
 
@@ -39,8 +41,8 @@ pub use crate::{
         AccessControlError,
     },
     storage::{
-        accept_admin_transfer, add_to_role_enumeration, cancel_transfer_admin_role, get_admin,
-        get_role_admin, get_role_member, get_role_member_count, grant_role, has_role,
+        accept_admin_transfer, add_to_role_enumeration, cancel_transfer_admin_role, ensure_role,
+        get_admin, get_role_admin, get_role_member, get_role_member_count, grant_role, has_role,
         remove_from_role_enumeration, renounce_role, revoke_role, set_role_admin,
         transfer_admin_role, AccessControlStorageKey,
     },

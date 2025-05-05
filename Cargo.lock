@@ -3,15 +3,6 @@
 version = 4
 
 [[package]]
-name = "access-control-macro"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
-]
-
-[[package]]
 name = "ahash"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -786,6 +777,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
 
 [[package]]
+name = "nft-access-control-example"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access-control",
+ "stellar-access-control-macro",
+ "stellar-default-impl-macro",
+ "stellar-non-fungible",
+]
+
+[[package]]
 name = "nft-consecutive-example"
 version = "0.1.0"
 dependencies = [
@@ -1345,6 +1347,15 @@ dependencies = [
  "soroban-sdk",
  "stellar-constants",
  "stellar-event-assertion",
+]
+
+[[package]]
+name = "stellar-access-control-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
 ]
 
 [[package]]
