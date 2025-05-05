@@ -1,21 +1,25 @@
-//! Non-Fungible Vanilla Example Contract.
+//! Non-Fungible with Access Control Example Contract.
 //!
-//! Demonstrates an example usage of the NFT default base implementation.
-//!
-//! **IMPORTANT**: This example is for demonstration purposes, and access
-//! control to sensitive operations is not taken into consideration!
+//! Demonstrates how can Access Control be utilized.
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, String};
 use stellar_access_control::AccessControl;
+use stellar_access_control_macro::has_role;
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
+
+#[contracttype]
+pub enum DataKey {
+    Owner,
+}
 
 #[contract]
 pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env) {
+    pub fn __constructor(e: &Env, owner: Address) {
+        e.storage().instance().set(&DataKey::Owner, &owner);
         Base::set_metadata(
             e,
             String::from_str(e, "www.mytoken.com"),
@@ -24,8 +28,9 @@ impl ExampleContract {
         );
     }
 
-    pub fn mint(e: &Env, to: Address) -> u32 {
-        Base::sequential_mint(e, &to)
+    #[has_role(caller, "minter")]
+    pub fn mint(e: &Env, caller: Address, to: Address, token_id: u32) -> u32 {
+        Base::mint(e, &to, token_id)
     }
 }
 
@@ -35,9 +40,18 @@ impl NonFungibleToken for ExampleContract {
     type ContractType = Base;
 }
 
-#[default_impl]
 #[contractimpl]
-impl NonFungibleBurnable for ExampleContract {}
+impl NonFungibleBurnable for ExampleContract {
+    #[has_role(from, "burner")]
+    fn burn(e: &Env, from: Address, token_id: u32) {
+        Base::burn(e, &from, token_id);
+    }
+
+    #[has_role(spender, "burner")]
+    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32) {
+        Base::burn_from(e, &spender, &from, token_id);
+    }
+}
 
 #[default_impl]
 #[contractimpl]
