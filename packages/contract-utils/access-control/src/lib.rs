@@ -1,17 +1,21 @@
 //! Access control module for Soroban contracts
 //!
-//! This module provides functionality to manage role-based access control in Soroban contracts.
+//! This module provides functionality to manage role-based access control in
+//! Soroban contracts.
 //!
 //! # Usage
 //!
-//! One can create new methods for their contract and specify which roles can do what.
-//! For example, one could create a role `mint_admins` and specify a 2nd level administration.
-//! This group (mint_admins) may have access to `revoke_mint_role` and `grant_mint_role` methods.
+//! One can create new methods for their contract and specify which roles can do
+//! what. For example, one could create a role `mint_admins` and specify a 2nd
+//! level administration. This group (mint_admins) may have access to
+//! `revoke_mint_role` and `grant_mint_role` methods.
 //!
 //! In order to do that:
-//! 1. the admin will create the `minter_admin` role and specify the accounts for that with [`grant_role()`] function.
+//! 1. the admin will create the `minter_admin` role and specify the accounts
+//!    for that with [`grant_role()`] function.
 //!
-//! Then, the new methods can be implemented for the contract may look like this:
+//! Then, the new methods can be implemented for the contract may look like
+//! this:
 //!
 //! ```rust
 //! #[has_role(caller, "minter_admin")]
@@ -20,8 +24,8 @@
 //! }
 //! ```
 //!
-//! If multi-admin setup is wanted, it can be achieved in a similar way by creating a new admin role
-//! and assigning accounts to it.
+//! If multi-admin setup is wanted, it can be achieved in a similar way by
+//! creating a new admin role and assigning accounts to it.
 
 #![no_std]
 

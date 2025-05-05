@@ -62,13 +62,15 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the admin or has the `RoleAdmin` for the `role`.
+    /// * `caller` - The address of the caller, must be the admin or has the
+    ///   `RoleAdmin` for the `role`.
     /// * `account` - The account to grant the role to.
     /// * `role` - The role to grant.
     ///
     /// # Errors
     ///
-    /// * `AccessControlError::Unauthorized` - If the caller does not have enough privileges.
+    /// * `AccessControlError::Unauthorized` - If the caller does not have
+    ///   enough privileges.
     ///
     /// # Events
     ///
@@ -82,19 +84,23 @@ pub trait AccessControl {
     fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol);
 
     /// Revokes a role from an account.
-    /// To revoke your own role, please use [`AccessControl::renounce_role()`] instead.
+    /// To revoke your own role, please use [`AccessControl::renounce_role()`]
+    /// instead.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the admin or has the `RoleAdmin` for the `role`.
+    /// * `caller` - The address of the caller, must be the admin or has the
+    ///   `RoleAdmin` for the `role`.
     /// * `account` - The account to revoke the role from.
     /// * `role` - The role to revoke.
     ///
     /// # Errors
     ///
-    /// * `AccessControlError::Unauthorized` - If the `caller` does not have enough privileges.
-    /// * `AccessControlError::AccountNotFound` - If the `account` doesn't have the role.
+    /// * `AccessControlError::Unauthorized` - If the `caller` does not have
+    ///   enough privileges.
+    /// * `AccessControlError::AccountNotFound` - If the `account` doesn't have
+    ///   the role.
     ///
     /// # Events
     ///
@@ -113,12 +119,14 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the account that has the role.
+    /// * `caller` - The address of the caller, must be the account that has the
+    ///   role.
     /// * `role` - The role to renounce.
     ///
     /// # Errors
     ///
-    /// * `AccessControlError::AccountNotFound` - If the `caller` doesn't have the role.
+    /// * `AccessControlError::AccountNotFound` - If the `caller` doesn't have
+    ///   the role.
     ///
     /// # Events
     ///
@@ -181,8 +189,10 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * `AccessControlError::NoPendingAdminTransfer` - If no pending admin transfer is set.
-    /// * `AccessControlError::Unauthorized` - If the `caller` is not the pending admin.
+    /// * `AccessControlError::NoPendingAdminTransfer` - If no pending admin
+    ///   transfer is set.
+    /// * `AccessControlError::Unauthorized` - If the `caller` is not the
+    ///   pending admin.
     ///
     /// # Events
     ///
@@ -252,7 +262,8 @@ pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, sender: &Add
 /// * `e` - Access to Soroban environment.
 /// * `role` - The role that was revoked.
 /// * `account` - The account that lost the role.
-/// * `sender` - The account that revoked the role (either the admin or the account itself).
+/// * `sender` - The account that revoked the role (either the admin or the
+///   account itself).
 ///
 /// # Events
 ///

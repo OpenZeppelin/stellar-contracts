@@ -30,6 +30,7 @@ syn = { version = "2.0", features = ["full"] }
 
 # members
 stellar-access-control = { path = "packages/contract-utils/access-control" }
+stellar-access-control-macro = { path = "packages/contract-utils/access-control-macro" }
 stellar-constants = { path = "packages/constants" }
 stellar-default-impl-macro = { path = "packages/contract-utils/default-impl-macro" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }

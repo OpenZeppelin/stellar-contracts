@@ -8,7 +8,8 @@ use crate::{
 
 // Time limit for the admin transfer in ledgers
 pub const ADMIN_TRANSFER_TTL: u32 = 2 * DAY_IN_LEDGERS;
-// Threshold for the admin transfer TTL extension (should be less than ADMIN_TRANSFER_TTL)
+// Threshold for the admin transfer TTL extension (should be less than
+// ADMIN_TRANSFER_TTL)
 pub const ADMIN_TRANSFER_THRESHOLD: u32 = DAY_IN_LEDGERS;
 
 #[contracttype]
@@ -114,13 +115,15 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be the admin or has the `AdminRole` privileges for this role.
+/// * `caller` - The address of the caller, must be the admin or has the
+///   `AdminRole` privileges for this role.
 /// * `account` - The account to grant the role to.
 /// * `role` - The role to grant.
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the caller does not have enough privileges.
+/// * `AccessControlError::Unauthorized` - If the caller does not have enough
+///   privileges.
 ///
 /// # Events
 ///
@@ -148,14 +151,17 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be the admin or has the `AdminRole` privileges for this role.
+/// * `caller` - The address of the caller, must be the admin or has the
+///   `AdminRole` privileges for this role.
 /// * `account` - The account to revoke the role from.
 /// * `role` - The role to revoke.
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the `caller` does not have enough privileges.
-/// * `AccessControlError::AccountNotFound` - If the `account` doesn't have the role.
+/// * `AccessControlError::Unauthorized` - If the `caller` does not have enough
+///   privileges.
+/// * `AccessControlError::AccountNotFound` - If the `account` doesn't have the
+///   role.
 /// * refer to [`remove_from_role_enumeration()`] errors.
 ///
 /// # Events
@@ -184,12 +190,14 @@ pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) 
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be the account that has the role.
+/// * `caller` - The address of the caller, must be the account that has the
+///   role.
 /// * `role` - The role to renounce.
 ///
 /// # Errors
 ///
-/// * `AccessControlError::AccountNotFound` - If the `caller` doesn't have the role.
+/// * `AccessControlError::AccountNotFound` - If the `caller` doesn't have the
+///   role.
 /// * refer to [`remove_from_role_enumeration()`] errors.
 ///
 /// # Events
@@ -279,8 +287,10 @@ pub fn cancel_transfer_admin_role(e: &Env, caller: &Address) {
 ///
 /// # Errors
 ///
-/// * `AccessControlError::NoPendingAdminTransfer` - If no pending admin transfer is set.
-/// * `AccessControlError::Unauthorized` - If the `caller` is not the pending admin.
+/// * `AccessControlError::NoPendingAdminTransfer` - If no pending admin
+///   transfer is set.
+/// * `AccessControlError::Unauthorized` - If the `caller` is not the pending
+///   admin.
 ///
 /// # Events
 ///
@@ -382,7 +392,8 @@ pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) -> u32
 ///
 /// # Errors
 ///
-/// * `AccessControlError::AccountNotFound` - If the role has no members or the `account` doesn't have the role.
+/// * `AccessControlError::AccountNotFound` - If the role has no members or the
+///   `account` doesn't have the role.
 pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     // Get the current count of accounts with this role
     let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());
@@ -407,7 +418,8 @@ pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
         index: last_index,
     });
 
-    // Swap the to be removed account with the last account, then delete the last account
+    // Swap the to be removed account with the last account, then delete the last
+    // account
     if to_be_removed_index != last_index {
         let last_account = e
             .storage()
@@ -437,7 +449,19 @@ pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     e.storage().persistent().extend_ttl(&count_key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
 }
 
-// TODO: inline docs
+/// Ensures that the caller is either the contract admin or has the admin role
+/// for the specified role.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller to check permissions for.
+/// * `role` - The role to check admin privileges for.
+///
+/// # Errors
+///
+/// * `AccessControlError::Unauthorized` - If the caller is neither the contract
+///   admin nor has the admin role.
 pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
     let is_admin = caller == &get_admin(e);
     let is_admin_role = match get_role_admin(e, role) {
@@ -445,8 +469,28 @@ pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
         None => false,
     };
 
-    // If caller is not the contract admin and does not have the admin role for this role
     if !is_admin && !is_admin_role {
+        panic_with_error!(e, AccessControlError::Unauthorized);
+    }
+}
+
+/// Ensures that the caller has the specified role.
+/// This function is used to check if an account has a specific role.
+/// The main purpose of this function is to act as a helper for the
+/// `#[has_role]` macro.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller to check the role for.
+/// * `role` - The role to check for.
+///
+/// # Errors
+///
+/// * `AccessControlError::Unauthorized` - If the caller does not have the
+///   specified role.
+pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
+    if !has_role(e, caller, role).is_some() {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
 }
