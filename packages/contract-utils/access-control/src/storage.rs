@@ -1,16 +1,12 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
-use stellar_constants::{DAY_IN_LEDGERS, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
+use stellar_constants::{
+    ADMIN_TRANSFER_THRESHOLD, ADMIN_TRANSFER_TTL, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
+};
 
 use crate::{
     emit_admin_transfer_cancelled, emit_admin_transfer_completed, emit_admin_transfer_started,
     emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControlError,
 };
-
-// Time limit for the admin transfer in ledgers
-pub const ADMIN_TRANSFER_TTL: u32 = 2 * DAY_IN_LEDGERS;
-// Threshold for the admin transfer TTL extension (should be less than
-// ADMIN_TRANSFER_TTL)
-pub const ADMIN_TRANSFER_THRESHOLD: u32 = DAY_IN_LEDGERS;
 
 #[contracttype]
 pub struct RoleAccountKey {
@@ -268,7 +264,7 @@ pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address) {
 ///
 /// * topics - `["admin_transfer_cancelled", admin: Address]`
 /// * data - `[]` (empty data)
-pub fn cancel_transfer_admin_role(e: &Env, caller: &Address) {
+pub fn cancel_admin_transfer(e: &Env, caller: &Address) {
     if caller != &get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }

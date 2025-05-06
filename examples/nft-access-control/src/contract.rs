@@ -2,7 +2,7 @@
 //!
 //! Demonstrates how can Access Control be utilized.
 
-use soroban_sdk::{contract, contractimpl, contracttype, token, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
 use stellar_access_control::AccessControl;
 use stellar_access_control_macro::has_role;
 use stellar_default_impl_macro::default_impl;
@@ -10,7 +10,7 @@ use stellar_non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken
 
 #[contracttype]
 pub enum DataKey {
-    Owner,
+    Admin,
 }
 
 #[contract]
@@ -19,7 +19,7 @@ pub struct ExampleContract;
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        e.storage().instance().set(&DataKey::Owner, &owner);
+        e.storage().instance().set(&DataKey::Admin, &owner);
         Base::set_metadata(
             e,
             String::from_str(e, "www.mytoken.com"),
@@ -29,9 +29,17 @@ impl ExampleContract {
     }
 
     #[has_role(caller, "minter")]
-    pub fn mint(e: &Env, caller: Address, to: Address, token_id: u32) -> u32 {
+    pub fn mint(e: &Env, caller: Address, to: Address, token_id: u32) {
         Base::mint(e, &to, token_id)
     }
+
+    // ### IMPORTANT ###
+    /*
+       The setup for the roles and accounts are not done in the constructor
+       to keep the smart contract size as small as possible. We are going to
+       set the roles by invoking the relevant smart contract functions in
+       the `test.rs` file of this example.
+    */
 }
 
 #[default_impl]

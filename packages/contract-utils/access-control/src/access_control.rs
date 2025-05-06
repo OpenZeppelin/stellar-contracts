@@ -178,7 +178,7 @@ pub trait AccessControl {
     /// # Security Warning
     ///
     /// **IMPORTANT**: You MUST implement proper authorization in your contract.
-    fn cancel_transfer_admin_role(e: &Env, caller: Address);
+    fn cancel_admin_transfer(e: &Env, caller: Address);
 
     /// Completes the 2-step admin transfer.
     ///

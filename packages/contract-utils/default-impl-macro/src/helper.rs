@@ -51,8 +51,8 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
-                fn cancel_transfer_admin_role(e: &soroban_sdk::Env, caller: soroban_sdk::Address) {
-                    stellar_access_control::cancel_transfer_admin_role(e, &caller);
+                fn cancel_admin_transfer(e: &soroban_sdk::Env, caller: soroban_sdk::Address) {
+                    stellar_access_control::cancel_admin_transfer(e, &caller);
                 }
             },
             syn::parse_quote! {

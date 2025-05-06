@@ -6,7 +6,7 @@ use soroban_sdk::{contract, symbol_short, testutils::Address as _, Address, Env,
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    accept_admin_transfer, add_to_role_enumeration, cancel_transfer_admin_role, get_admin,
+    accept_admin_transfer, add_to_role_enumeration, cancel_admin_transfer, get_admin,
     get_role_admin, get_role_member, get_role_member_count, grant_role, has_role,
     remove_from_role_enumeration, renounce_role, revoke_role, set_role_admin, transfer_admin_role,
 };
@@ -230,7 +230,7 @@ fn admin_transfer_cancel_works() {
         transfer_admin_role(&e, &admin, &new_admin);
 
         // Cancel admin transfer
-        cancel_transfer_admin_role(&e, &admin);
+        cancel_admin_transfer(&e, &admin);
 
         // Verify admin hasn't changed
         assert_eq!(get_admin(&e), admin);
@@ -418,7 +418,7 @@ fn cancel_transfer_admin_role_from_non_admin_panics() {
 
         // Non-admin attempts to cancel the admin transfer
         // This should panic with AccessControlError::Unauthorized (code 120)
-        cancel_transfer_admin_role(&e, &non_admin);
+        cancel_admin_transfer(&e, &non_admin);
     });
 }
 

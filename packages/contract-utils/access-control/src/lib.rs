@@ -8,6 +8,9 @@
 //! There is a single overarching admin, and the admin has enough privileges to call
 //! any function given in the [`AccessControl`] trait.
 //!
+//! This `admin` must be set in the constructor of the contract. Else, none of the methods
+//! exposed by this module will work. You can follow the `nft-access-control` example.
+//!
 //! Each role can have an `admin role` specified for it. For example, if you create 2 roles:
 //! - minter
 //! - mint_admins
@@ -41,7 +44,7 @@ pub use crate::{
         AccessControlError,
     },
     storage::{
-        accept_admin_transfer, add_to_role_enumeration, cancel_transfer_admin_role, ensure_role,
+        accept_admin_transfer, add_to_role_enumeration, cancel_admin_transfer, ensure_role,
         get_admin, get_role_admin, get_role_member, get_role_member_count, grant_role, has_role,
         remove_from_role_enumeration, renounce_role, revoke_role, set_role_admin,
         transfer_admin_role, AccessControlStorageKey,
