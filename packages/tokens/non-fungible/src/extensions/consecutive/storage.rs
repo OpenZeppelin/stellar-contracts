@@ -1,6 +1,6 @@
 use core::mem;
 
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, String, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, String, TryFromVal, Val, Vec};
 use stellar_constants::{
     OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
@@ -43,7 +43,7 @@ impl ContractOverrides for Consecutive {
     }
 }
 
-/// For 32,000 total ids with ITEM of type u32 and 100 items per bucket:
+/// For 32,000 total IDs with ITEM of type u32 and 100 items per bucket:
 ///
 /// Bucket 0
 /// ├── Item 0 → bits for Token IDs 0..31
@@ -54,19 +54,20 @@ impl ContractOverrides for Consecutive {
 /// Bucket 1...8
 ///
 /// Bucket 9
-/// ├── Item 0 → bits for Token IDs 28_800..28_832
+/// ├── Item 0 → bits for Token IDs 28_800..28_831
 /// ├── ...
 /// ├── Item 99 → bits for Token IDs 31_968..31_999
 ///
-/// Maximum number of vectors holding bitfields, which denote ids
-pub const BUCKETS: usize = 10;
 /// Number of elements in a bucket
 pub const ITEMS_IN_BUCKET: usize = 100;
-/// Number of ids per item, which corresponds to the number of bits for a given
+/// Number of IDs per item, which corresponds to the number of bits for a given
 /// value
 pub const IDS_IN_ITEM: usize = mem::size_of::<u32>() * 8; // 32
-/// Total number of ids in the whole bucket
+/// Total number of IDs in the whole bucket
 pub const IDS_IN_BUCKET: usize = ITEMS_IN_BUCKET * IDS_IN_ITEM; // 3,200
+/// Max. amount of tokens allowed to be minted at once in
+/// [`Consecutive::batch_mint`]
+pub const MAX_TOKENS_IN_BATCH: usize = 32_000; // 10 buckets * 100 items * 32
 
 /// Storage keys for the data associated with the consecutive extension of
 /// `NonFungibleToken`
@@ -86,52 +87,46 @@ impl Consecutive {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `token_id` - Token id as a number.
+    /// * `token_id` - Token ID as a number.
     ///
     /// # Errors
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
     ///   `token_id` does not exist.
     pub fn owner_of(e: &Env, token_id: u32) -> Address {
+        let last_token_id = sequential::next_token_id(e) - 1;
         let key = NFTConsecutiveStorageKey::BurnedToken(token_id);
-        if e.storage().persistent().get(&key).unwrap_or(false) {
+        let is_burned = Consecutive::get_persistent_entry(e, &key).unwrap_or(false);
+        if is_burned || token_id > last_token_id {
             panic_with_error!(&e, NonFungibleTokenError::NonExistentToken);
         }
 
         let ids_in_bucket = IDS_IN_BUCKET as u32;
-        // idex of the bucket that contains token_id
+        // index of the bucket that contains token_id
         let bucket_index = token_id / ids_in_bucket;
         // position of the token_id within its bucket (0-based)
-        let relative_id = token_id - (bucket_index * ids_in_bucket);
+        let relative_id = token_id % ids_in_bucket;
+        // index of the bucket that contains the last token_id
+        let last_bucket_index = last_token_id / ids_in_bucket;
 
-        (bucket_index..BUCKETS as u32)
-            .map(|i| {
-                (
-                    i,
-                    e.storage()
-                        .instance()
-                        .get::<_, Vec<u32>>(&NFTConsecutiveStorageKey::OwnershipBucket(i)),
-                )
+        (bucket_index..=last_bucket_index)
+            // filter only existing buckets and return with their corresponding indexes
+            .filter_map(|i| {
+                Consecutive::get_persistent_entry(e, &NFTConsecutiveStorageKey::OwnershipBucket(i))
+                    .map(|bucket| (i, bucket))
             })
-            .filter(|(_, bucket)| bucket.is_some())
+            // scan for a set bit and maps it to an ID
             .find_map(|(i, bucket)| {
                 // If we're in the starting bucket, begin search from the token's relative
                 // position; otherwise, start from the beginning of the bucket.
                 let from_id = if i == bucket_index { relative_id } else { 0 };
                 // expect is safe because of the filter above
-                find_bit_in_bucket(bucket.expect("bucket must be defined"), from_id)
+                find_bit_in_bucket(bucket, from_id)
                     .map(|pos_in_bucket| i * ids_in_bucket + pos_in_bucket)
             })
             .iter()
             .find_map(|id| {
-                let key = NFTConsecutiveStorageKey::Owner(*id);
-                e.storage().persistent().get::<_, Address>(&key).inspect(|_| {
-                    e.storage().persistent().extend_ttl(
-                        &key,
-                        OWNER_TTL_THRESHOLD,
-                        OWNER_EXTEND_AMOUNT,
-                    );
-                })
+                Consecutive::get_persistent_entry(e, &NFTConsecutiveStorageKey::Owner(*id))
             })
             .unwrap_or_else(|| panic_with_error!(&e, NonFungibleTokenError::NonExistentToken))
     }
@@ -146,18 +141,13 @@ impl Consecutive {
     /// # Errors
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
-    ///   `token_id` does not exist (burned or more than max allowed).
+    ///   `token_id` does not exist (burned or more than max).
     /// * refer to [`Base::base_uri`] errors.
     pub fn token_uri(e: &Env, token_id: u32) -> String {
-        let ids_in_bucket = IDS_IN_BUCKET as u32;
-        let total_ids = ids_in_bucket * BUCKETS as u32;
-
-        let is_burned = e
-            .storage()
-            .persistent()
-            .get(&NFTConsecutiveStorageKey::BurnedToken(token_id))
-            .unwrap_or(false);
-        if is_burned || token_id >= sequential::next_token_id(e) || token_id >= total_ids {
+        let is_burned =
+            Consecutive::get_persistent_entry(e, &NFTConsecutiveStorageKey::BurnedToken(token_id))
+                .unwrap_or(false);
+        if is_burned || token_id >= sequential::next_token_id(e) {
             panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
         }
 
@@ -167,7 +157,7 @@ impl Consecutive {
 
     // ################## CHANGE STATE ##################
 
-    /// Mints a batch of tokens with consecutive ids and attributes them to
+    /// Mints a batch of tokens with consecutive IDs and attributes them to
     /// `to`. This function does NOT handle authorization.
     ///
     /// # Arguments
@@ -178,7 +168,8 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::InvalidAmount`] - If try to mint `0`.
+    /// * [`NonFungibleTokenError::InvalidAmount`] - If try to mint `0` or more
+    ///   than `MAX_TOKENS_IN_BATCH`.
     /// * refer to [`Base::increase_balance`] errors.
     /// * refer to [`set_ownership_in_bucket`] errors.
     ///
@@ -206,7 +197,7 @@ impl Consecutive {
     ///
     /// Failing to add proper authorization could allow anyone to mint tokens!
     pub fn batch_mint(e: &Env, to: &Address, amount: u32) -> u32 {
-        if amount == 0 {
+        if amount == 0 || amount > MAX_TOKENS_IN_BATCH as u32 {
             panic_with_error!(&e, NonFungibleTokenError::InvalidAmount);
         }
 
@@ -475,32 +466,20 @@ impl Consecutive {
         }
         let previous_id = token_id - 1;
 
-        let owner_key = NFTConsecutiveStorageKey::Owner(previous_id);
-        let has_owner = e.storage().persistent().has(&owner_key);
+        let key = NFTConsecutiveStorageKey::Owner(previous_id);
+        let has_owner = Consecutive::get_persistent_entry::<Address>(e, &key).is_some();
         if has_owner {
-            e.storage().persistent().extend_ttl(
-                &owner_key,
-                OWNER_TTL_THRESHOLD,
-                OWNER_EXTEND_AMOUNT,
-            );
             return;
         }
 
-        let burned_token_key = NFTConsecutiveStorageKey::BurnedToken(previous_id);
-        let is_burned = e.storage().persistent().get(&burned_token_key).unwrap_or(false);
+        let key = NFTConsecutiveStorageKey::BurnedToken(previous_id);
+        let is_burned = Consecutive::get_persistent_entry::<bool>(e, &key).unwrap_or(false);
         if is_burned {
-            e.storage().persistent().extend_ttl(
-                &burned_token_key,
-                TOKEN_TTL_THRESHOLD,
-                TOKEN_EXTEND_AMOUNT,
-            );
             return;
         }
 
-        if !has_owner && !is_burned {
-            e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(previous_id), to);
-            Self::set_ownership_in_bucket(e, previous_id);
-        }
+        e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(previous_id), to);
+        Self::set_ownership_in_bucket(e, previous_id);
     }
 
     /// Low-level function that marks `token_id` as being owned, i.e. sets the
@@ -513,26 +492,27 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::TokenIDsAreDepleted`] - If `token_id` is
-    ///   greater than max allowed (IDS_IN_BUCKET * BUCKETS - 1).
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If `token_id` does not
+    ///   exist yet (has not been minted).
     pub fn set_ownership_in_bucket(e: &Env, token_id: u32) {
         let ids_in_bucket = IDS_IN_BUCKET as u32;
         let ids_in_item = IDS_IN_ITEM as u32;
-        let total_ids = ids_in_bucket * BUCKETS as u32;
 
-        if token_id >= total_ids || token_id >= sequential::next_token_id(e) {
-            panic_with_error!(e, NonFungibleTokenError::TokenIDsAreDepleted);
+        if token_id >= sequential::next_token_id(e) {
+            panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
         }
 
         let bucket_index = token_id / ids_in_bucket;
 
         let key = NFTConsecutiveStorageKey::OwnershipBucket(bucket_index);
-        let bucket = e.storage().instance().get::<_, Vec<u32>>(&key);
-        let mut bucket: Vec<u32> =
-            if let Some(b) = bucket { b } else { Vec::from_slice(e, &[0; ITEMS_IN_BUCKET]) };
+        let mut bucket: Vec<u32> = if let Some(b) = Consecutive::get_persistent_entry(e, &key) {
+            b
+        } else {
+            Vec::from_slice(e, &[0; ITEMS_IN_BUCKET])
+        };
 
         // position of the token_id within its bucket (0-based)
-        let relative_id = token_id - (bucket_index * ids_in_bucket);
+        let relative_id = token_id % ids_in_bucket;
         // index of the item inside the bucket that contains token_id
         let item_index = relative_id / ids_in_item;
         // index of the bit within the item that contains token_id
@@ -540,14 +520,42 @@ impl Consecutive {
 
         let mask: u32 = 1 << (ids_in_item - bit_index - 1);
         let mut item = bucket.get(item_index).expect("token_id out of allowed range");
+
+        // return early the bit was already set in a previous action (transfer, burn or
+        // batch_mint)
+        if item & mask != 0 {
+            return;
+        }
+
         item |= mask;
-        // no replace, so must remove and re-insert
-        let _ = bucket.remove(item_index);
-        bucket.insert(item_index, item);
+        bucket.set(item_index, item);
 
         e.storage()
-            .instance()
+            .persistent()
             .set(&NFTConsecutiveStorageKey::OwnershipBucket(bucket_index), &bucket);
+    }
+
+    /// Low-level function that tries to retrieve a persistent storage value and
+    /// extend its TTL if the entry exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The environment reference.
+    /// * `key` - The key required to retrieve the underlying storage.
+    fn get_persistent_entry<T: TryFromVal<Env, Val>>(
+        e: &Env,
+        key: &NFTConsecutiveStorageKey,
+    ) -> Option<T> {
+        e.storage().persistent().get::<_, T>(key).inspect(|_| {
+            use NFTConsecutiveStorageKey::*;
+
+            let const_vals = match key {
+                // Approval is temporary
+                BurnedToken(_) => [TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT],
+                _ => [OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT],
+            };
+            e.storage().persistent().extend_ttl(key, const_vals[0], const_vals[1]);
+        })
     }
 }
 
@@ -570,11 +578,16 @@ impl Consecutive {
 ///
 /// # Example
 ///
-/// If `u32::BITS = 8` and `input = Some(0b00101000)`:
-/// - `find_bit_in_item(input, 2)` returns `Some(3)` because the third set bit
+/// If `u8::BITS = 8` and `input = Some(0b00010100)`:
+/// - `find_bit_in_item(input, 2)` returns `Some(3)` because the 4th set bit
 ///   (from MSB) is at index 3 (counting from MSB = 0).
 pub(crate) fn find_bit_in_item(input: Option<u32>, start: u32) -> Option<u32> {
     if let Some(num) = input {
+        // return early if 0 (no bits are set)
+        if num == 0 {
+            return None;
+        }
+
         let ids_in_item = u32::BITS;
         // Invalid start position
         if start >= ids_in_item {
@@ -621,8 +634,8 @@ pub(crate) fn find_bit_in_item(input: Option<u32>, start: u32) -> Option<u32> {
 /// ```
 /// bucket = vec![0b00000000, 0b00101000];
 /// ```
-/// then `find_bit_in_bucket(bucket, 8)` returns `Some(11)`, since bit 3 of the
-/// second item (index 11 in the overall bucket) is the first set bit.
+/// then `find_bit_in_bucket(bucket, 8)` returns `Some(10)`, since bit 3 of the
+/// second item (index 10 in the overall bucket) is the first set bit.
 pub(crate) fn find_bit_in_bucket(bucket: Vec<u32>, start: u32) -> Option<u32> {
     let ids_in_item = u32::BITS;
     let ids_in_bucket = bucket.len() * ids_in_item;
@@ -633,8 +646,8 @@ pub(crate) fn find_bit_in_bucket(bucket: Vec<u32>, start: u32) -> Option<u32> {
     }
 
     let item_index = start / ids_in_item;
-    // relative id in item
-    let relative_id = start - (item_index * ids_in_item);
+    // relative ID in item
+    let relative_id = start % ids_in_item;
 
     (item_index..bucket.len()).find_map(|i| {
         // If we're in te starting item, begin search from the token's relative

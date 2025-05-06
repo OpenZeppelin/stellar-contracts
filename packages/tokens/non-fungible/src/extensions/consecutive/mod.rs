@@ -20,13 +20,13 @@
 //! - **owner_of**: Walks upwards from the token ID to find the closest recorded
 //!   owner.
 //!
-//!   `owner_of(4)`
+//!   `owner_of(4) == A`
 //!   --------->---------A
 //!   |0|1|2|3|4|5|6|7|8|9|
 //!
 //! - **Transfer**: Stores the new owner for the token ID and re-stores the old
-//!   owner at `token_id - 1` if needed, to preserve correct inference for later
-//!   tokens.
+//!   owner at `token_id - 1` if needed, to preserve correct inference for
+//!   previous tokens.
 //!
 //!   After transfer of token 5 to B
 //!   ---------A-B-------A
@@ -47,13 +47,18 @@
 //!   the overhead of this approach will be minimal.
 //! - Requires extra logic to preserve ownership inference when transferring or
 //!   burning tokens.
+//! - To avoid exceeding resource read limits per transaction (especially during
+//!   `owner_of` calls), a maximum number of tokens is enforced per
+//!   `batch_mint`. The rationale is that the gaps between set bits within
+//!   buckets can only shrink over time, ensuring that future lookups remain
+//!   within the bounds defined by `batch_mint`.
 //!
 //! ## Usage
 //!
 //! - It is not recommended to use this model if each token is expected to be
 //!   minted separately. It is rather best suited for NFTs where minting happens
 //!   in large batches.
-//! - **IMPORTANT** - For minting tokens ONLY the function `batch_mint` provided
+//! - **IMPORTANT**: For minting tokens ONLY the function `batch_mint` provided
 //!   in this extension must be used. Using other minting functions will break
 //!   the logic of tracking ownership.
 pub mod storage;
@@ -81,8 +86,8 @@ mod test;
 ///
 /// * `e` - Access to Soroban environment.
 /// * `to` - The address receiving the new tokens.
-/// * `from_token_id` - First token id in the batch.
-/// * `to_token_id` - Last token id of the batch.
+/// * `from_token_id` - First token ID in the batch.
+/// * `to_token_id` - Last token ID of the batch.
 ///
 /// # Events
 ///
