@@ -18,19 +18,19 @@ pub fn get_sac_address(e: &Env) -> Address {
         .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::SACNotSet))
 }
 
-pub fn get_sac_client(e: &Env) -> StellarAssetClient {
+pub fn get_sac_client<'a>(e: &Env) -> StellarAssetClient<'a> {
     let sac_address = get_sac_address(e);
     StellarAssetClient::new(e, &sac_address)
-}
-
-pub fn mint(e: &Env, to: &Address, amount: i128) {
-    let client = get_sac_client(e);
-    client.mint(to, &amount);
 }
 
 pub fn set_admin(e: &Env, new_admin: &Address) {
     let client = get_sac_client(e);
     client.set_admin(new_admin);
+}
+
+pub fn mint(e: &Env, to: &Address, amount: i128) {
+    let client = get_sac_client(e);
+    client.mint(to, &amount);
 }
 
 pub fn set_authorized(e: &Env, id: &Address, authorize: bool) {
