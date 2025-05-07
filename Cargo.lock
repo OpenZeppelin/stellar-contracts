@@ -1295,6 +1295,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "soroban-test-helpers"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b21ea049bdfcfce7de5aa17f1a52ecab5f2bd599d40bd805747ef75b110ee5d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "soroban-wasmi"
 version = "0.31.1-soroban.20.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1369,6 +1380,7 @@ name = "stellar-fungible"
 version = "0.1.0"
 dependencies = [
  "soroban-sdk",
+ "soroban-test-helpers",
  "stellar-constants",
  "stellar-event-assertion",
 ]

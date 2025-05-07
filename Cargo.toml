@@ -27,6 +27,7 @@ soroban-sdk = "22.0.6"
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
+soroban-test-helpers = "0.2.3"
 
 # members
 stellar-constants = { path = "packages/constants" }
