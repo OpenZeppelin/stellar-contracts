@@ -304,14 +304,14 @@ pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_u
 ///
 /// * Authorization for `caller` is required.
 pub fn accept_admin_transfer(e: &Env, caller: &Address) {
+    let previous_admin = get_admin(e);
+
     accept_transfer(
         e,
         caller,
         &AccessControlStorageKey::Admin,
         &AccessControlStorageKey::PendingAdmin,
     );
-
-    let previous_admin = get_admin(e);
 
     emit_admin_transfer_completed(e, &previous_admin, caller);
 }
