@@ -1347,6 +1347,7 @@ dependencies = [
  "soroban-sdk",
  "stellar-constants",
  "stellar-event-assertion",
+ "stellar-role-transfer",
 ]
 
 [[package]]
