@@ -123,7 +123,12 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 ///
 /// * topics - `["role_granted", role: Symbol, account: Address]`
 /// * data - `[sender: Address]`
+///
+/// # Notes
+///
+/// * Authorization for `caller` is required.
 pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
+    caller.require_auth();
     ensure_if_admin_or_admin_role(e, caller, role);
 
     // Return early if account already has the role
@@ -162,7 +167,12 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 ///
 /// * topics - `["role_revoked", role: Symbol, account: Address]`
 /// * data - `[sender: Address]`
+///
+/// # Notes
+///
+/// * Authorization for `caller` is required.
 pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
+    caller.require_auth();
     ensure_if_admin_or_admin_role(e, caller, role);
 
     // Check if account has the role
@@ -198,7 +208,12 @@ pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) 
 ///
 /// * topics - `["role_revoked", role: Symbol, account: Address]`
 /// * data - `[sender: Address]`
+///
+/// # Notes
+///
+/// * Authorization for `caller` is required.
 pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
+    caller.require_auth();
     if has_role(e, caller, role).is_none() {
         panic_with_error!(e, AccessControlError::AccountNotFound);
     }
@@ -219,7 +234,7 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be the admin.
+/// * `admin` - The address of the admin.
 /// * `new_admin` - The account to transfer the admin privileges to.
 /// * `live_until_ledger` - The ledger number at which the pending transfer
 ///   expires. If `live_until_ledger` is `0`, the pending transfer is cancelled.
@@ -229,7 +244,7 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
+/// * `AccessControlError::Unauthorized` - If the `admin` is not actually the admin.
 /// * `AccessControlError::NoPendingAdminTransfer` - If tried to cancel the
 ///   pending admin transfer when there is no pending admin transfer.
 ///
@@ -237,8 +252,13 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// * topics - `["admin_transfer_started", current_admin: Address]`
 /// * data - `[new_admin: Address, live_until_ledger: u32]`
-pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address, live_until_ledger: u32) {
-    if caller != &get_admin(e) {
+///
+/// # Notes
+///
+/// * Authorization for `admin` is required.
+pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_until_ledger: u32) {
+    admin.require_auth();
+    if admin != &get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
 
@@ -250,7 +270,7 @@ pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address, live_
         };
         e.storage().temporary().remove(&key);
 
-        emit_admin_transfer(e, caller, &pending_new_admin, live_until_ledger);
+        emit_admin_transfer(e, admin, &pending_new_admin, live_until_ledger);
         return;
     }
 
@@ -266,9 +286,8 @@ pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address, live_
     e.storage().temporary().set(&key, new_admin);
     e.storage().temporary().extend_ttl(&key, live_for, live_for);
 
-    emit_admin_transfer(e, caller, new_admin, live_until_ledger);
+    emit_admin_transfer(e, admin, new_admin, live_until_ledger);
 }
-// TODO: test for live_until_ledger = 0 when there is no pending admin
 
 /// Completes the 2-step admin transfer.
 ///
@@ -288,7 +307,12 @@ pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address, live_
 ///
 /// * topics - `["admin_transfer_completed", new_admin: Address]`
 /// * data - `[previous_admin: Address]`
+///
+/// # Notes
+///
+/// * Authorization for `caller` is required.
 pub fn accept_admin_transfer(e: &Env, caller: &Address) {
+    caller.require_auth();
     let pending_admin = e
         .storage()
         .temporary()
@@ -313,20 +337,25 @@ pub fn accept_admin_transfer(e: &Env, caller: &Address) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be the admin.
+/// * `admin` - The address of the admin.
 /// * `role` - The role to set the admin for.
 /// * `admin_role` - The role that will be the admin.
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
+/// * `AccessControlError::Unauthorized` - If the `admin` is not actually the admin.
 ///
 /// # Events
 ///
 /// * topics - `["role_admin_changed", role: Symbol]`
 /// * data - `[previous_admin_role: Symbol, new_admin_role: Symbol]`
-pub fn set_role_admin(e: &Env, caller: &Address, role: &Symbol, admin_role: &Symbol) {
-    if caller != &get_admin(e) {
+///
+/// # Notes
+///
+/// * Authorization for `admin` is required.
+pub fn set_role_admin(e: &Env, admin: &Address, role: &Symbol, admin_role: &Symbol) {
+    admin.require_auth();
+    if admin != &get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
 
