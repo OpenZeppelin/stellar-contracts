@@ -1347,6 +1347,7 @@ dependencies = [
  "soroban-sdk",
  "stellar-constants",
  "stellar-event-assertion",
+ "stellar-role-transfer",
 ]
 
 [[package]]
@@ -1415,7 +1416,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-ownable"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
 ]
@@ -1438,7 +1439,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-role-transfer"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
 ]

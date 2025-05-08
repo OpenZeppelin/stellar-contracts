@@ -2,11 +2,7 @@
 
 extern crate std;
 
-use soroban_sdk::{
-    contract, symbol_short,
-    testutils::{Address as _, Ledger},
-    Address, Env, Symbol,
-};
+use soroban_sdk::{contract, symbol_short, testutils::Address as _, Address, Env, Symbol};
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
@@ -297,7 +293,7 @@ fn unauthorized_role_revoke_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #122)")]
+#[should_panic(expected = "Error(Contract, #121)")]
 fn renounce_nonexistent_role_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -314,80 +310,7 @@ fn renounce_nonexistent_role_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #123)")]
-fn accept_transfer_with_no_pending_transfer_panics() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
-    let new_admin = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        set_admin(&e, &admin);
-
-        // Attempt to accept transfer with no pending transfer
-        accept_admin_transfer(&e, &new_admin);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #124)")]
-fn transfer_with_invalid_live_until_ledger_panics() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
-    let new_admin = Address::generate(&e);
-    e.ledger().set_sequence_number(1000);
-
-    e.as_contract(&address, || {
-        set_admin(&e, &admin);
-
-        // Start admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 3);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #123)")]
-fn cancel_transfer_when_there_is_no_pending_transfer_panics() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
-    let new_admin = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        set_admin(&e, &admin);
-
-        // Cancel admin transfer when there is no pending transfer
-        transfer_admin_role(&e, &admin, &new_admin, 0);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #120)")]
-fn wrong_pending_admin_accept_panics() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
-    let new_admin = Address::generate(&e);
-    let wrong_admin = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        set_admin(&e, &admin);
-
-        // Start admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 1000);
-
-        // Wrong account attempts to accept transfer
-        accept_admin_transfer(&e, &wrong_admin);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #122)")]
+#[should_panic(expected = "Error(Contract, #121)")]
 fn get_admin_with_no_admin_set_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -423,7 +346,7 @@ fn get_role_member_with_out_of_bounds_index_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #140)")]
 fn transfer_admin_role_from_non_admin_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -441,7 +364,7 @@ fn transfer_admin_role_from_non_admin_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #140)")]
 fn cancel_transfer_admin_role_from_non_admin_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -574,7 +497,7 @@ fn remove_from_role_enumeration_for_last_account_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #122)")]
+#[should_panic(expected = "Error(Contract, #121)")]
 fn remove_from_role_enumeration_with_nonexistent_role_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -589,7 +512,7 @@ fn remove_from_role_enumeration_with_nonexistent_role_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #122)")]
+#[should_panic(expected = "Error(Contract, #121)")]
 fn remove_from_role_enumeration_with_account_not_in_role_panics() {
     let e = Env::default();
     e.mock_all_auths();
