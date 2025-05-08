@@ -2,13 +2,17 @@
 
 extern crate std;
 
-use soroban_sdk::{contract, symbol_short, testutils::Address as _, Address, Env, Symbol};
+use soroban_sdk::{
+    contract, symbol_short,
+    testutils::{Address as _, Ledger},
+    Address, Env, Symbol,
+};
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    accept_admin_transfer, add_to_role_enumeration, cancel_admin_transfer, get_admin,
-    get_role_admin, get_role_member, get_role_member_count, grant_role, has_role,
-    remove_from_role_enumeration, renounce_role, revoke_role, set_role_admin, transfer_admin_role,
+    accept_admin_transfer, add_to_role_enumeration, get_admin, get_role_admin, get_role_member,
+    get_role_member_count, grant_role, has_role, remove_from_role_enumeration, renounce_role,
+    revoke_role, set_role_admin, transfer_admin_role,
 };
 
 #[contract]
@@ -200,7 +204,7 @@ fn admin_transfer_works() {
         e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
 
         // Start admin transfer
-        transfer_admin_role(&e, &admin, &new_admin);
+        transfer_admin_role(&e, &admin, &new_admin, 1000);
 
         // Accept admin transfer
         accept_admin_transfer(&e, &new_admin);
@@ -227,10 +231,10 @@ fn admin_transfer_cancel_works() {
         e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
 
         // Start admin transfer
-        transfer_admin_role(&e, &admin, &new_admin);
+        transfer_admin_role(&e, &admin, &new_admin, 1000);
 
         // Cancel admin transfer
-        cancel_admin_transfer(&e, &admin);
+        transfer_admin_role(&e, &admin, &new_admin, 0);
 
         // Verify admin hasn't changed
         assert_eq!(get_admin(&e), admin);
@@ -319,6 +323,43 @@ fn accept_transfer_with_no_pending_transfer_panics() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #125)")]
+fn transfer_with_invalid_live_until_ledger_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let new_admin = Address::generate(&e);
+    e.ledger().set_sequence_number(1000);
+
+    e.as_contract(&address, || {
+        // Initialize admin
+        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+
+        // Start admin transfer
+        transfer_admin_role(&e, &admin, &new_admin, 3);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #123)")]
+fn cancel_transfer_when_there_is_no_pending_transfer_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let new_admin = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Initialize admin
+        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+
+        // Cancel admin transfer when there is no pending transfer
+        transfer_admin_role(&e, &admin, &new_admin, 0);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #120)")]
 fn wrong_pending_admin_accept_panics() {
     let e = Env::default();
@@ -333,7 +374,7 @@ fn wrong_pending_admin_accept_panics() {
         e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
 
         // Start admin transfer
-        transfer_admin_role(&e, &admin, &new_admin);
+        transfer_admin_role(&e, &admin, &new_admin, 1000);
 
         // Wrong account attempts to accept transfer
         accept_admin_transfer(&e, &wrong_admin);
@@ -349,7 +390,6 @@ fn get_admin_with_no_admin_set_panics() {
 
     e.as_contract(&address, || {
         // No admin is set in storage
-        // This should panic with AccessControlError::AccountNotFound (code 122)
         get_admin(&e);
     });
 }
@@ -374,7 +414,6 @@ fn get_role_member_with_out_of_bounds_index_panics() {
         assert_eq!(get_role_member_count(&e, &USER_ROLE), 1);
 
         // Try to access index that is out of bounds (only index 0 exists)
-        // This should panic with AccessControlError::OutOfBounds (code 124)
         get_role_member(&e, &USER_ROLE, 1);
     });
 }
@@ -394,8 +433,7 @@ fn transfer_admin_role_from_non_admin_panics() {
         e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
 
         // Non-admin attempts to transfer admin role
-        // This should panic with AccessControlError::Unauthorized (code 120)
-        transfer_admin_role(&e, &non_admin, &new_admin);
+        transfer_admin_role(&e, &non_admin, &new_admin, 1000);
     });
 }
 
@@ -414,11 +452,10 @@ fn cancel_transfer_admin_role_from_non_admin_panics() {
         e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
 
         // Start a valid admin transfer
-        transfer_admin_role(&e, &admin, &new_admin);
+        transfer_admin_role(&e, &admin, &new_admin, 1000);
 
         // Non-admin attempts to cancel the admin transfer
-        // This should panic with AccessControlError::Unauthorized (code 120)
-        cancel_admin_transfer(&e, &non_admin);
+        transfer_admin_role(&e, &non_admin, &new_admin, 0);
     });
 }
 
@@ -436,7 +473,6 @@ fn set_role_admin_from_non_admin_panics() {
         e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
 
         // Non-admin attempts to set a role admin
-        // This should panic with AccessControlError::Unauthorized (code 120)
         set_role_admin(&e, &non_admin, &USER_ROLE, &MANAGER_ROLE);
     });
 }
@@ -547,7 +583,6 @@ fn remove_from_role_enumeration_with_nonexistent_role_panics() {
 
     e.as_contract(&address, || {
         // Attempt to remove account from a role that doesn't exist
-        // This should panic with AccessControlError::AccountNotFound (code 122)
         remove_from_role_enumeration(&e, &account, &nonexistent_role);
     });
 }
@@ -566,7 +601,6 @@ fn remove_from_role_enumeration_with_account_not_in_role_panics() {
         add_to_role_enumeration(&e, &account1, &USER_ROLE);
 
         // Attempt to remove a different account that doesn't have the role
-        // This should panic with AccessControlError::AccountNotFound (code 122)
         remove_from_role_enumeration(&e, &account2, &USER_ROLE);
     });
 }

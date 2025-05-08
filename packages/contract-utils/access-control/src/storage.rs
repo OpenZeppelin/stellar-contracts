@@ -1,11 +1,9 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
-use stellar_constants::{
-    ADMIN_TRANSFER_THRESHOLD, ADMIN_TRANSFER_TTL, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
-};
+use stellar_constants::{ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
 
 use crate::{
-    emit_admin_transfer_cancelled, emit_admin_transfer_completed, emit_admin_transfer_started,
-    emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControlError,
+    emit_admin_transfer, emit_admin_transfer_completed, emit_role_admin_changed, emit_role_granted,
+    emit_role_revoked, AccessControlError,
 };
 
 #[contracttype]
@@ -223,56 +221,54 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 /// * `e` - Access to Soroban environment.
 /// * `caller` - The address of the caller, must be the admin.
 /// * `new_admin` - The account to transfer the admin privileges to.
+/// * `live_until_ledger` - The ledger number at which the pending transfer
+///   expires. If `live_until_ledger` is `0`, the pending transfer is cancelled.
+///   `live_until_ledger` argument is implicitly bounded by the maximum allowed
+///   TTL extension for a temporary storage entry and specifying a higher value
+///   will cause the code to panic.
 ///
 /// # Errors
 ///
 /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
+/// * `AccessControlError::NoPendingAdminTransfer` - If tried to cancel the
+///   pending admin transfer when there is no pending admin transfer.
 ///
 /// # Events
 ///
 /// * topics - `["admin_transfer_started", current_admin: Address]`
-/// * data - `[new_admin: Address]`
-pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address) {
+/// * data - `[new_admin: Address, live_until_ledger: u32]`
+pub fn transfer_admin_role(e: &Env, caller: &Address, new_admin: &Address, live_until_ledger: u32) {
     if caller != &get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
+
+    let key = AccessControlStorageKey::PendingAdmin;
+
+    if live_until_ledger == 0 {
+        let Some(pending_new_admin) = e.storage().temporary().get::<_, Address>(&key) else {
+            panic_with_error!(e, AccessControlError::NoPendingAdminTransfer)
+        };
+        e.storage().temporary().remove(&key);
+
+        emit_admin_transfer(e, caller, &pending_new_admin, live_until_ledger);
+        return;
+    }
+
+    let current_ledger = e.ledger().sequence();
+
+    if live_until_ledger < current_ledger {
+        panic_with_error!(e, AccessControlError::InvalidLiveUntilLedger);
+    }
+
+    let live_for = live_until_ledger - current_ledger;
 
     // Store the new admin address in temporary storage
-    e.storage().temporary().set(&AccessControlStorageKey::PendingAdmin, new_admin);
-    e.storage().temporary().extend_ttl(
-        &AccessControlStorageKey::PendingAdmin,
-        ADMIN_TRANSFER_THRESHOLD,
-        ADMIN_TRANSFER_TTL,
-    );
+    e.storage().temporary().set(&key, new_admin);
+    e.storage().temporary().extend_ttl(&key, live_for, live_for);
 
-    emit_admin_transfer_started(e, caller, new_admin);
+    emit_admin_transfer(e, caller, new_admin, live_until_ledger);
 }
-
-/// Cancels a pending admin role transfer if it is not accepted yet.
-/// This can only be called by the current admin.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be the admin.
-///
-/// # Errors
-///
-/// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
-///
-/// # Events
-///
-/// * topics - `["admin_transfer_cancelled", admin: Address]`
-/// * data - `[]` (empty data)
-pub fn cancel_admin_transfer(e: &Env, caller: &Address) {
-    if caller != &get_admin(e) {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
-
-    e.storage().temporary().remove(&AccessControlStorageKey::PendingAdmin);
-
-    emit_admin_transfer_cancelled(e, caller);
-}
+// TODO: test for live_until_ledger = 0 when there is no pending admin
 
 /// Completes the 2-step admin transfer.
 ///

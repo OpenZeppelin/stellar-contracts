@@ -52,7 +52,7 @@
             },
             "ext": "v0"
           },
-          34560
+          1000
         ]
       ],
       [
@@ -120,14 +120,21 @@
           "v0": {
             "topics": [
               {
-                "symbol": "admin_transfer_started"
+                "symbol": "admin_transfer"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
               }
             ],
             "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+              "vec": [
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                },
+                {
+                  "u32": 1000
+                }
+              ]
             }
           }
         }

@@ -214,7 +214,7 @@ fn admin_transfer_works() {
     e.mock_all_auths();
 
     // Owner (current admin) initiates the transfer
-    client.transfer_admin_role(&owner, &new_admin);
+    client.transfer_admin_role(&owner, &new_admin, &1000);
 
     // New admin accepts
     client.accept_admin_transfer(&new_admin);
@@ -234,10 +234,10 @@ fn admin_transfer_cancelled() {
 
     e.mock_all_auths();
 
-    client.transfer_admin_role(&owner, &new_admin);
+    client.transfer_admin_role(&owner, &new_admin, &1000);
 
     // Now cancel
-    client.cancel_admin_transfer(&owner);
+    client.transfer_admin_role(&owner, &new_admin, &0);
 
     // New admin tries to accept—should panic
     client.accept_admin_transfer(&new_admin);
@@ -254,7 +254,7 @@ fn non_admin_cannot_initiate_transfer() {
 
     e.mock_all_auths();
 
-    client.transfer_admin_role(&intruder, &new_admin);
+    client.transfer_admin_role(&intruder, &new_admin, &1000);
 }
 
 #[test]
@@ -268,7 +268,7 @@ fn non_recipient_cannot_accept_transfer() {
 
     e.mock_all_auths();
 
-    client.transfer_admin_role(&owner, &new_admin);
+    client.transfer_admin_role(&owner, &new_admin, &1000);
 
     // Imposter tries to accept
     client.accept_admin_transfer(&imposter);

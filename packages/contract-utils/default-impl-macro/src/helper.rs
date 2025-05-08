@@ -46,13 +46,8 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
-                fn transfer_admin_role(e: &soroban_sdk::Env, caller: soroban_sdk::Address, new_admin: soroban_sdk::Address) {
-                    stellar_access_control::transfer_admin_role(e, &caller, &new_admin);
-                }
-            },
-            syn::parse_quote! {
-                fn cancel_admin_transfer(e: &soroban_sdk::Env, caller: soroban_sdk::Address) {
-                    stellar_access_control::cancel_admin_transfer(e, &caller);
+                fn transfer_admin_role(e: &soroban_sdk::Env, caller: soroban_sdk::Address, new_admin: soroban_sdk::Address, live_until_ledger: u32) {
+                    stellar_access_control::transfer_admin_role(e, &caller, &new_admin, live_until_ledger);
                 }
             },
             syn::parse_quote! {

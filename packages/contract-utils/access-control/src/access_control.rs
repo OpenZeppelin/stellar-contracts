@@ -144,41 +144,27 @@ pub trait AccessControl {
     /// * `e` - Access to Soroban environment.
     /// * `caller` - The address of the caller, must be the admin.
     /// * `new_admin` - The account to transfer the admin privileges to.
+    /// * `live_until_ledger` - The ledger number at which the pending transfer
+    ///   expires. If `live_until_ledger` is `0`, the pending transfer is cancelled.
+    ///   `live_until_ledger` argument is implicitly bounded by the maximum allowed
+    ///   TTL extension for a temporary storage entry and specifying a higher value
+    ///   will cause the code to panic.
     ///
     /// # Errors
     ///
     /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
+    /// * `AccessControlError::NoPendingAdminTransfer` - If tried to cancel the
+    ///   pending admin transfer when there is no pending admin transfer.
     ///
     /// # Events
     ///
     /// * topics - `["admin_transfer_started", current_admin: Address]`
-    /// * data - `[new_admin: Address]`
+    /// * data - `[new_admin: Address, live_until_ledger: u32]`
     ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: You MUST implement proper authorization in your contract.
-    fn transfer_admin_role(e: &Env, caller: Address, new_admin: Address);
-
-    /// Cancels a pending admin role transfer.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the admin.
-    ///
-    /// # Errors
-    ///
-    /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["admin_transfer_cancelled", admin: Address]`
-    /// * data - `[]` (empty data)
-    ///
-    /// # Security Warning
-    ///
-    /// **IMPORTANT**: You MUST implement proper authorization in your contract.
-    fn cancel_admin_transfer(e: &Env, caller: Address);
+    fn transfer_admin_role(e: &Env, caller: Address, new_admin: Address, live_until_ledger: u32);
 
     /// Completes the 2-step admin transfer.
     ///
@@ -233,6 +219,7 @@ pub enum AccessControlError {
     AccountNotFound = 122,
     NoPendingAdminTransfer = 123,
     OutOfBounds = 124,
+    InvalidLiveUntilLedger = 125,
 }
 
 // ################## EVENTS ##################
@@ -304,30 +291,21 @@ pub fn emit_role_admin_changed(
 /// * `e` - Access to Soroban environment.
 /// * `current_admin` - The current admin initiating the transfer.
 /// * `new_admin` - The proposed new admin.
+/// * `live_until_ledger` - The ledger number at which the pending transfer will
+///   expire. If this value is `0`, it means the pending transfer is cancelled.
 ///
 /// # Events
 ///
-/// * topics - `["admin_transfer_started", current_admin: Address]`
-/// * data - `[new_admin: Address]`
-pub fn emit_admin_transfer_started(e: &Env, current_admin: &Address, new_admin: &Address) {
-    let topics = (Symbol::new(e, "admin_transfer_started"), current_admin);
-    e.events().publish(topics, new_admin);
-}
-
-/// Emits an event when an admin transfer is cancelled.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `admin` - The admin who cancelled the transfer.
-///
-/// # Events
-///
-/// * topics - `["admin_transfer_cancelled", admin: Address]`
-/// * data - `[]` (empty data)
-pub fn emit_admin_transfer_cancelled(e: &Env, admin: &Address) {
-    let topics = (Symbol::new(e, "admin_transfer_cancelled"), admin);
-    e.events().publish(topics, ());
+/// * topics - `["admin_transfer", current_admin: Address]`
+/// * data - `[new_admin: Address, live_until_ledger: u32]`
+pub fn emit_admin_transfer(
+    e: &Env,
+    current_admin: &Address,
+    new_admin: &Address,
+    live_until_ledger: u32,
+) {
+    let topics = (Symbol::new(e, "admin_transfer"), current_admin);
+    e.events().publish(topics, (new_admin, live_until_ledger));
 }
 
 /// Emits an event when an admin transfer is completed.
