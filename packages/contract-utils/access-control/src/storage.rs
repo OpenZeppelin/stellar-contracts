@@ -1,5 +1,6 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
 use stellar_constants::{ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
+use stellar_role_transfer::{accept_transfer, transfer_role};
 
 use crate::{
     emit_admin_transfer_completed, emit_admin_transfer_initiated, emit_role_admin_changed,
@@ -259,10 +260,7 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the `admin` is not actually the
-///   admin.
-/// * `AccessControlError::NoPendingAdminTransfer` - If tried to cancel the
-///   pending admin transfer when there is no pending admin transfer.
+/// * refer to [`transfer_role()`] errors.
 ///
 /// # Events
 ///
@@ -273,36 +271,17 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// * Authorization for `admin` is required.
 pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_until_ledger: u32) {
-    admin.require_auth();
-    if *admin != get_admin(e) {
-        panic_with_error!(e, AccessControlError::Unauthorized);
+    match transfer_role(
+        e,
+        admin,
+        new_admin,
+        &AccessControlStorageKey::Admin,
+        &AccessControlStorageKey::PendingAdmin,
+        live_until_ledger,
+    ) {
+        Some(pending) => emit_admin_transfer(e, admin, &pending, live_until_ledger),
+        None => emit_admin_transfer(e, admin, new_admin, live_until_ledger),
     }
-
-    let key = AccessControlStorageKey::PendingAdmin;
-
-    if live_until_ledger == 0 {
-        let Some(pending_new_admin) = e.storage().temporary().get::<_, Address>(&key) else {
-            panic_with_error!(e, AccessControlError::NoPendingAdminTransfer)
-        };
-        e.storage().temporary().remove(&key);
-
-        emit_admin_transfer_initiated(e, admin, &pending_new_admin, live_until_ledger);
-        return;
-    }
-
-    let current_ledger = e.ledger().sequence();
-
-    if live_until_ledger < current_ledger {
-        panic_with_error!(e, AccessControlError::InvalidLiveUntilLedger);
-    }
-
-    let live_for = live_until_ledger - current_ledger;
-
-    // Store the new admin address in temporary storage
-    e.storage().temporary().set(&key, new_admin);
-    e.storage().temporary().extend_ttl(&key, live_for, live_for);
-
-    emit_admin_transfer_initiated(e, admin, new_admin, live_until_ledger);
 }
 
 /// Completes the 2-step admin transfer.
@@ -314,10 +293,7 @@ pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_u
 ///
 /// # Errors
 ///
-/// * `AccessControlError::NoPendingAdminTransfer` - If no pending admin
-///   transfer is set.
-/// * `AccessControlError::Unauthorized` - If the `caller` is not the pending
-///   admin.
+/// * refer to [`accept_transfer()`] errors.
 ///
 /// # Events
 ///
@@ -328,21 +304,14 @@ pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_u
 ///
 /// * Authorization for `caller` is required.
 pub fn accept_admin_transfer(e: &Env, caller: &Address) {
-    caller.require_auth();
-    let pending_admin = e
-        .storage()
-        .temporary()
-        .get::<_, Address>(&AccessControlStorageKey::PendingAdmin)
-        .unwrap_or_else(|| panic_with_error!(e, AccessControlError::NoPendingAdminTransfer));
-
-    if &pending_admin != caller {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
+    accept_transfer(
+        e,
+        caller,
+        &AccessControlStorageKey::Admin,
+        &AccessControlStorageKey::PendingAdmin,
+    );
 
     let previous_admin = get_admin(e);
-
-    e.storage().temporary().remove(&AccessControlStorageKey::PendingAdmin);
-    e.storage().instance().set(&AccessControlStorageKey::Admin, caller);
 
     emit_admin_transfer_completed(e, &previous_admin, caller);
 }

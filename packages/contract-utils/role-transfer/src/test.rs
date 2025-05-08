@@ -3,24 +3,21 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, symbol_short,
+    contract, contracttype,
     testutils::{Address as _, Ledger},
-    Address, Env, Symbol,
+    Address, Env,
 };
-use stellar_event_assertion::EventAssertion;
 
-use crate::{
-    accept_admin_transfer, add_to_role_enumeration, get_admin, get_role_admin, get_role_member,
-    get_role_member_count, grant_role, has_role, remove_from_role_enumeration, renounce_role,
-    revoke_role, set_role_admin, transfer_admin_role,
-};
+use crate::{accept_transfer, transfer_role};
 
 #[contract]
 struct MockContract;
 
-const ADMIN_ROLE: Symbol = symbol_short!("admin");
-const USER_ROLE: Symbol = symbol_short!("user");
-const MANAGER_ROLE: Symbol = symbol_short!("manager");
+#[contracttype]
+pub enum MockRole {
+    Admin,
+    PendingAdmin,
+}
 
 #[test]
 fn admin_transfer_works() {
@@ -29,23 +26,21 @@ fn admin_transfer_works() {
     let address = e.register(MockContract, ());
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
+    let active_key = MockRole::Admin;
+    let pending_key = MockRole::PendingAdmin;
 
     e.as_contract(&address, || {
         // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        e.storage().instance().set(&active_key, &admin);
 
-        // Start admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 1000);
+        // Start transfer
+        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 1000);
 
         // Accept admin transfer
-        accept_admin_transfer(&e, &new_admin);
+        accept_transfer(&e, &new_admin, &active_key, &pending_key);
 
         // Verify new admin
-        assert_eq!(get_admin(&e), new_admin);
-
-        // Verify events
-        let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
+        assert_eq!(e.storage().instance().get::<_, Address>(&MockRole::Admin), Some(new_admin));
     });
 }
 
@@ -56,89 +51,107 @@ fn admin_transfer_cancel_works() {
     let address = e.register(MockContract, ());
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
+    let active_key = MockRole::Admin;
+    let pending_key = MockRole::PendingAdmin;
 
     e.as_contract(&address, || {
         // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        e.storage().instance().set(&MockRole::Admin, &admin);
 
         // Start admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 1000);
-
-        // Verify events
-        let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
+        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 1000);
     });
 
     e.as_contract(&address, || {
         // Cancel admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 0);
+        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 0);
 
         // Verify admin hasn't changed
-        assert_eq!(get_admin(&e), admin);
-
-        // Verify events
-        let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(1);
+        assert_eq!(e.storage().instance().get::<_, Address>(&MockRole::Admin), Some(admin));
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #123)")]
+#[should_panic(expected = "Error(Contract, #143)")]
+fn error_when_no_admin_set() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let new_admin = Address::generate(&e);
+    let active_key = MockRole::Admin;
+    let pending_key = MockRole::PendingAdmin;
+
+    e.as_contract(&address, || {
+        // Attempt to accept transfer with no pending transfer
+        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 3);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #141)")]
 fn accept_transfer_with_no_pending_transfer_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
+    let active_key = MockRole::Admin;
+    let pending_key = MockRole::PendingAdmin;
 
     e.as_contract(&address, || {
         // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        e.storage().instance().set(&MockRole::Admin, &admin);
 
         // Attempt to accept transfer with no pending transfer
-        accept_admin_transfer(&e, &new_admin);
+        accept_transfer(&e, &new_admin, &active_key, &pending_key);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #125)")]
+#[should_panic(expected = "Error(Contract, #142)")]
 fn transfer_with_invalid_live_until_ledger_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
+    let active_key = MockRole::Admin;
+    let pending_key = MockRole::PendingAdmin;
+
     e.ledger().set_sequence_number(1000);
 
     e.as_contract(&address, || {
         // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        e.storage().instance().set(&MockRole::Admin, &admin);
 
         // Start admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 3);
+        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 3);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #123)")]
+#[should_panic(expected = "Error(Contract, #141)")]
 fn cancel_transfer_when_there_is_no_pending_transfer_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
+    let active_key = MockRole::Admin;
+    let pending_key = MockRole::PendingAdmin;
 
     e.as_contract(&address, || {
         // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        e.storage().instance().set(&MockRole::Admin, &admin);
 
         // Cancel admin transfer when there is no pending transfer
-        transfer_admin_role(&e, &admin, &new_admin, 0);
+        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 0);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #140)")]
 fn wrong_pending_admin_accept_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -146,15 +159,17 @@ fn wrong_pending_admin_accept_panics() {
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
     let wrong_admin = Address::generate(&e);
+    let active_key = MockRole::Admin;
+    let pending_key = MockRole::PendingAdmin;
 
     e.as_contract(&address, || {
         // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        e.storage().instance().set(&MockRole::Admin, &admin);
 
         // Start admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 1000);
+        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 1000);
 
         // Wrong account attempts to accept transfer
-        accept_admin_transfer(&e, &wrong_admin);
+        accept_transfer(&e, &wrong_admin, &active_key, &pending_key);
     });
 }
