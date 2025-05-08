@@ -145,10 +145,10 @@ pub trait AccessControl {
     /// * `caller` - The address of the caller, must be the admin.
     /// * `new_admin` - The account to transfer the admin privileges to.
     /// * `live_until_ledger` - The ledger number at which the pending transfer
-    ///   expires. If `live_until_ledger` is `0`, the pending transfer is cancelled.
-    ///   `live_until_ledger` argument is implicitly bounded by the maximum allowed
-    ///   TTL extension for a temporary storage entry and specifying a higher value
-    ///   will cause the code to panic.
+    ///   expires. If `live_until_ledger` is `0`, the pending transfer is
+    ///   cancelled. `live_until_ledger` argument is implicitly bounded by the
+    ///   maximum allowed TTL extension for a temporary storage entry and
+    ///   specifying a higher value will cause the code to panic.
     ///
     /// # Errors
     ///

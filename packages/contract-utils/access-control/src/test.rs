@@ -38,13 +38,19 @@ fn admin_functions_work() {
         grant_role(&e, &admin, &user, &USER_ROLE);
         assert!(has_role(&e, &user, &USER_ROLE).is_some());
 
+        // Test events
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+    });
+
+    e.as_contract(&address, || {
         // Admin can revoke roles
         revoke_role(&e, &admin, &user, &USER_ROLE);
         assert!(has_role(&e, &user, &USER_ROLE).is_none());
 
         // Test events
         let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
+        event_assert.assert_event_count(1);
     });
 }
 
@@ -63,6 +69,9 @@ fn role_management_works() {
 
         // Grant roles to multiple users
         grant_role(&e, &admin, &user1, &USER_ROLE);
+    });
+
+    e.as_contract(&address, || {
         grant_role(&e, &admin, &user2, &USER_ROLE);
 
         // Check role count
@@ -71,7 +80,9 @@ fn role_management_works() {
         // Check role members
         assert_eq!(get_role_member(&e, &USER_ROLE, 0), user1);
         assert_eq!(get_role_member(&e, &USER_ROLE, 1), user2);
+    });
 
+    e.as_contract(&address, || {
         // Revoke role from first user
         revoke_role(&e, &admin, &user1, &USER_ROLE);
 
@@ -96,14 +107,18 @@ fn role_admin_management_works() {
 
         // Set MANAGER_ROLE as admin for USER_ROLE
         set_role_admin(&e, &admin, &USER_ROLE, &MANAGER_ROLE);
+    });
 
+    e.as_contract(&address, || {
         // Grant MANAGER_ROLE to manager
         grant_role(&e, &admin, &manager, &MANAGER_ROLE);
 
         // Manager can now grant USER_ROLE
         grant_role(&e, &manager, &user, &USER_ROLE);
         assert!(has_role(&e, &user, &USER_ROLE).is_some());
+    });
 
+    e.as_contract(&address, || {
         // Manager can revoke USER_ROLE
         revoke_role(&e, &manager, &user, &USER_ROLE);
         assert!(has_role(&e, &user, &USER_ROLE).is_none());
@@ -233,6 +248,12 @@ fn admin_transfer_cancel_works() {
         // Start admin transfer
         transfer_admin_role(&e, &admin, &new_admin, 1000);
 
+        // Verify events
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+    });
+
+    e.as_contract(&address, || {
         // Cancel admin transfer
         transfer_admin_role(&e, &admin, &new_admin, 0);
 
@@ -241,7 +262,7 @@ fn admin_transfer_cancel_works() {
 
         // Verify events
         let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
+        event_assert.assert_event_count(1);
     });
 }
 

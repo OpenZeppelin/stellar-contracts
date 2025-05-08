@@ -83,8 +83,8 @@ fn validate_param_type(func: &ItemFn, param_name: &Ident) -> bool {
     panic!("Parameter `{}` not found in function signature", param_name);
 }
 
-fn match_address_type(ty: &Box<Type>, param_name: &Ident) -> bool {
-    match &**ty {
+fn match_address_type(ty: &Type, param_name: &Ident) -> bool {
+    match ty {
         Type::Reference(type_ref) => match_path_is_address(&type_ref.elem, param_name, true),
         Type::Path(_) => match_path_is_address(ty, param_name, false),
         _ => panic_type(param_name),

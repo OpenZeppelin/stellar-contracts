@@ -31,12 +31,12 @@ fn setup_roles(e: &Env, client: &ExampleContractClient, owner: &Address) -> Test
     let outsider = Address::generate(e);
 
     // Set role admins
-    client.set_role_admin(&owner, &Symbol::new(e, "minter"), &Symbol::new(e, "minter_admin"));
-    client.set_role_admin(&owner, &Symbol::new(e, "burner"), &Symbol::new(e, "burner_admin"));
+    client.set_role_admin(owner, &Symbol::new(e, "minter"), &Symbol::new(e, "minter_admin"));
+    client.set_role_admin(owner, &Symbol::new(e, "burner"), &Symbol::new(e, "burner_admin"));
 
     // Grant admin roles
-    client.grant_role(&owner, &minter_admin, &Symbol::new(e, "minter_admin"));
-    client.grant_role(&owner, &burner_admin, &Symbol::new(e, "burner_admin"));
+    client.grant_role(owner, &minter_admin, &Symbol::new(e, "minter_admin"));
+    client.grant_role(owner, &burner_admin, &Symbol::new(e, "burner_admin"));
 
     // Admins grant operational roles
     client.grant_role(&minter_admin, &minter1, &Symbol::new(e, "minter"));

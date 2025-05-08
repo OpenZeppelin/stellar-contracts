@@ -46,13 +46,12 @@ fn create_client<'a>(e: &Env, owner: &Address) -> ExampleContractClient<'a> {
 }
 
 #[test]
-fn default_impl_fungible_mint() {
+fn default_impl_fungible_grant_role() {
     let e = Env::default();
     let owner = Address::generate(&e);
     let client = create_client(&e, &owner);
 
-    client.grant_role(&owner, &owner, &Symbol::new(&e, "minter"));
-
     e.mock_all_auths();
-    client.mint(&owner, &owner, &100);
+
+    client.grant_role(&owner, &owner, &Symbol::new(&e, "minter"));
 }

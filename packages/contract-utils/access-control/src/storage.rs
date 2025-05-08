@@ -244,7 +244,8 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the `admin` is not actually the admin.
+/// * `AccessControlError::Unauthorized` - If the `admin` is not actually the
+///   admin.
 /// * `AccessControlError::NoPendingAdminTransfer` - If tried to cancel the
 ///   pending admin transfer when there is no pending admin transfer.
 ///
@@ -343,7 +344,8 @@ pub fn accept_admin_transfer(e: &Env, caller: &Address) {
 ///
 /// # Errors
 ///
-/// * `AccessControlError::Unauthorized` - If the `admin` is not actually the admin.
+/// * `AccessControlError::Unauthorized` - If the `admin` is not actually the
+///   admin.
 ///
 /// # Events
 ///
@@ -511,7 +513,7 @@ pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
 /// * `AccessControlError::Unauthorized` - If the caller does not have the
 ///   specified role.
 pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
-    if !has_role(e, caller, role).is_some() {
+    if has_role(e, caller, role).is_none() {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
 }
