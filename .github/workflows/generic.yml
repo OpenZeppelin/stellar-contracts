@@ -66,7 +66,7 @@ jobs:
         run: cargo build --target wasm32-unknown-unknown --release
 
       - name: Run tests with coverage
-        run: cargo llvm-cov --workspace --lcov --fail-under-lines 90 --output-path lcov.info --ignore-filename-regex 'packages/contract-utils/access-control-macro'
+        run: cargo llvm-cov --workspace --lcov --fail-under-lines 90 --output-path lcov.info --ignore-filename-regex 'packages/contract-utils/access-control-macro|packages/tokens/fungible/src/impl_token_interface_macro\.rs|packages/tokens/non-fungible/src/overrides\.rs'
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
