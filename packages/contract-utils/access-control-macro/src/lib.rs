@@ -80,7 +80,7 @@ fn validate_param_type(func: &ItemFn, param_name: &Ident) -> bool {
             }
         }
     }
-    panic!("Parameter `{}` not found in function signature", param_name);
+    panic!("Parameter `{param_name}` not found in function signature");
 }
 
 fn match_address_type(ty: &Type, param_name: &Ident) -> bool {
@@ -101,5 +101,5 @@ fn match_path_is_address(ty: &Type, param_name: &Ident, is_ref: bool) -> bool {
 }
 
 fn panic_type(param_name: &Ident) -> ! {
-    panic!("Parameter `{}` must be of type `Address` or `&Address`", param_name);
+    panic!("Parameter `{param_name}` must be of type `Address` or `&Address`");
 }
