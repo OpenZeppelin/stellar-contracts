@@ -8,6 +8,8 @@ pub enum SacDataKey {
     Sac,
 }
 
+// ################## QUERY STATE ##################
+
 /// Stores the SAC address, typically called from the constructor.
 ///
 /// # Arguments
@@ -48,6 +50,8 @@ pub fn get_sac_client<'a>(e: &Env) -> StellarAssetClient<'a> {
     let sac_address = get_sac_address(e);
     StellarAssetClient::new(e, &sac_address)
 }
+
+// ################## CHANGE STATE ##################
 
 /// Sets the administrator to the specified address `new_admin`.
 ///

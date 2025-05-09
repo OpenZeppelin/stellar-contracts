@@ -45,7 +45,10 @@
 //! This module implements **the wrapper version** for an Admin contract,
 //! defining the interface and functions necessary to interact with a SAC.
 
-pub mod storage;
+mod storage;
+pub use storage::{
+    clawback, get_sac_address, get_sac_client, mint, set_admin, set_authorized, set_sac_address,
+};
 
 mod test;
 
