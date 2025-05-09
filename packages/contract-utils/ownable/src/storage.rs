@@ -1,7 +1,10 @@
-use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 use stellar_role_transfer::{accept_transfer, transfer_role};
 
-use crate::ownable::{emit_ownership_renounced, emit_ownership_transferred, OwnableError};
+use crate::ownable::{
+    emit_ownership_renounced, emit_ownership_transfer, emit_ownership_transfer_completed,
+    OwnableError,
+};
 
 #[contracttype]
 pub enum OwnableStorageKey {
@@ -62,8 +65,8 @@ pub fn ensure_is_owner(e: &Env, caller: &Address) {
 pub fn transfer_ownership(e: &Env, caller: &Address, new_owner: &Address, live_until_ledger: u32) {
     match transfer_role(
         e,
-        admin,
-        new_admin,
+        caller,
+        new_owner,
         &OwnableStorageKey::Owner,
         &OwnableStorageKey::PendingOwner,
         live_until_ledger,
