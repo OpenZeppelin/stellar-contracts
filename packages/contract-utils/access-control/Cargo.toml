@@ -1,5 +1,5 @@
 [package]
-name = "stellar-default-impl-macro-test"
+name = "stellar-access-control"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -10,12 +10,10 @@ version.workspace = true
 crate-type = ["lib", "cdylib"]
 doctest = false
 
+[dependencies]
+soroban-sdk = { workspace = true }
+stellar-constants = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-stellar-access-control = { workspace = true }
-stellar-access-control-macro = { workspace = true }
 stellar-event-assertion = { workspace = true }
-stellar-default-impl-macro = { workspace = true }
-stellar-fungible = { workspace = true }
-stellar-non-fungible = { workspace = true }
