@@ -27,7 +27,6 @@ pub trait Ownable {
     /// # Errors
     ///
     /// * [`OwnableError::NotAuthorized`] - If `caller` is not the current owner.
-    /// * [`OwnableError::InvalidNewOwner`] - If `new_owner` is the zero address.
     fn transfer_ownership(e: &Env, caller: Address, new_owner: Address);
 
     /// Renounces ownership of the contract.
@@ -50,8 +49,7 @@ pub trait Ownable {
 #[repr(u32)]
 pub enum OwnableError {
     NotAuthorized = 200,
-    InvalidNewOwner = 201,
-    CannotRenounceWhilePendingTransfer = 202,
+    CannotRenounceWhilePendingTransfer = 201,
 }
 
 // ################## EVENTS ##################

@@ -25,8 +25,14 @@ mod ownable;
 mod storage;
 
 pub use crate::{
-    ownable::{emit_ownership_renounced, emit_ownership_transferred, Ownable, OwnableError},
-    storage::{ensure_is_owner, get_owner, renounce_ownership, transfer_ownership},
+    ownable::{
+        emit_ownership_renounced, emit_ownership_transfer, emit_ownership_transfer_completed,
+        Ownable, OwnableError,
+    },
+    storage::{
+        accept_ownership, ensure_is_owner, get_owner, renounce_ownership, transfer_ownership,
+        OwnableStorageKey,
+    },
 };
 
 mod test;
