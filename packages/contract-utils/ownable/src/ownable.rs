@@ -1,25 +1,47 @@
 use soroban_sdk::{contracterror, Address, Env, Symbol};
 
-/// Trait for ownership-based access control.
+/// A trait for managing contract ownership using a 2-step transfer pattern.
+///
+/// Provides functions to query ownership, initiate a transfer, or renounce ownership.
 pub trait Ownable {
-    /// Returns the current owner of the contract (if any).
+    /// Returns `Some(Address)` if ownership is set, or `None` if ownership has been renounced.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
     fn owner(e: &Env) -> Option<Address> {
         crate::get_owner(e)
     }
 
-    /// Transfers ownership to a new address.
+    /// Initiates a 2-step ownership transfer to a new address.
+    ///
+    /// Requires authorization from the current owner. The new owner must later call
+    /// `accept_ownership()` to complete the transfer.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `caller` - The current owner initiating the transfer.
+    /// * `new_owner` - The proposed new owner.
     ///
     /// # Errors
     ///
-    /// * [`OwnableError::NotAuthorized`] if caller is not the current owner.
-    /// * [`OwnableError::InvalidNewOwner`] if new owner is the zero address.
+    /// * [`OwnableError::NotAuthorized`] - If `caller` is not the current owner.
+    /// * [`OwnableError::InvalidNewOwner`] - If `new_owner` is the zero address.
     fn transfer_ownership(e: &Env, caller: Address, new_owner: Address);
 
-    /// Renounces ownership. Leaves the contract without an owner.
+    /// Renounces ownership of the contract.
+    ///
+    /// Permanently removes the owner, disabling all functions gated by `#[only_owner]`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `caller` - The current owner.
     ///
     /// # Errors
     ///
-    /// * [`OwnableError::NotAuthorized`] if caller is not the current owner.
+    /// * [`OwnableError::NotAuthorized`] - If `caller` is not the current owner.
     fn renounce_ownership(e: &Env, caller: Address);
 }
 
@@ -29,17 +51,56 @@ pub trait Ownable {
 pub enum OwnableError {
     NotAuthorized = 200,
     InvalidNewOwner = 201,
+    CannotRenounceWhilePendingTransfer = 202,
 }
 
 // ################## EVENTS ##################
 
-/// Emits `ownership_transferred` event.
-pub fn emit_ownership_transferred(e: &Env, old_owner: &Address, new_owner: &Address) {
-    let topics = (Symbol::new(e, "ownership_transferred"),);
+/// Emits an event when an ownership transfer is initiated.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `old_owner` - The current owner initiating the transfer.
+/// * `new_owner` - The proposed new owner.
+///
+/// # Events
+///
+/// * topics - `["ownership_transfer"]`
+/// * data - `[old_owner: Address, new_owner: Address]`
+pub fn emit_ownership_transfer(e: &Env, old_owner: &Address, new_owner: &Address) {
+    let topics = (Symbol::new(e, "ownership_transfer"),);
     e.events().publish(topics, (old_owner, new_owner));
 }
 
-/// Emits `ownership_renounced` event.
+/// Emits an event when an ownership transfer is completed.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `old_owner` - The previous owner.
+/// * `new_owner` - The new owner who accepted the transfer.
+///
+/// # Events
+///
+/// * topics - `["ownership_transfer_completed"]`
+/// * data - `[old_owner: Address, new_owner: Address]`
+pub fn emit_ownership_transfer_completed(e: &Env, old_owner: &Address, new_owner: &Address) {
+    let topics = (Symbol::new(e, "ownership_transfer_completed"),);
+    e.events().publish(topics, (old_owner, new_owner));
+}
+
+/// Emits an event when ownership is renounced.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `old_owner` - The address of the owner who renounced ownership.
+///
+/// # Events
+///
+/// * topics - `["ownership_renounced"]`
+/// * data - `[old_owner: Address]`
 pub fn emit_ownership_renounced(e: &Env, old_owner: &Address) {
     let topics = (Symbol::new(e, "ownership_renounced"),);
     e.events().publish(topics, old_owner);
