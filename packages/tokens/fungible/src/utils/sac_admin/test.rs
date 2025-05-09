@@ -71,7 +71,6 @@ fn test_sac_set_admin(e: Env, issuer: Address) {
     let sac_client = create_sac_client(&e, &issuer);
 
     mock_issuer_sets_new_admin(&e, &issuer, &sac_client.address, &new_admin);
-    // TODO: check event
     assert_eq!(sac_client.admin(), new_admin);
 }
 
@@ -83,7 +82,6 @@ fn test_sac_mint(e: Env, issuer: Address, user: Address) {
     mock_issuer_sets_new_admin(&e, &issuer, &sac_client.address, &new_admin);
     let token_client = TokenClient::new(&e, &sac_client.address);
     e.as_contract(&new_admin, || {
-        // TODO: check event
         mint(&e, &user, 100);
         assert_eq!(token_client.balance(&user), 100);
     });
