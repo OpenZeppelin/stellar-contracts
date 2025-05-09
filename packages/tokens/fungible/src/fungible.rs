@@ -179,6 +179,8 @@ pub enum FungibleTokenError {
     InvalidCap = 207,
     /// Indicates the Cap was not set.
     CapNotSet = 208,
+    /// Indicates the SAC address was not set.
+    SACNotSet = 209,
 }
 
 // ################## EVENTS ##################
