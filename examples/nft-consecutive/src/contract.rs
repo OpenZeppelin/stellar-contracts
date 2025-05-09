@@ -2,23 +2,26 @@
 //!
 //! Demonstrates an example usage of the Consecutive extension, enabling
 //! efficient batch minting in a single transaction.
-//!
-//! **IMPORTANT**: This example is for demonstration purposes, and access
-//! control to sensitive operations is not taken into consideration!
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
 use stellar_non_fungible::{
     burnable::NonFungibleBurnable,
     consecutive::{Consecutive, NonFungibleConsecutive},
     Base, ContractOverrides, NonFungibleToken,
 };
 
+#[contracttype]
+pub enum DataKey {
+    Owner,
+}
+
 #[contract]
 pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env) {
+    pub fn __constructor(e: &Env, owner: Address) {
+        e.storage().instance().set(&DataKey::Owner, &owner);
         Base::set_metadata(
             e,
             String::from_str(e, "www.mytoken.com"),
@@ -28,6 +31,9 @@ impl ExampleContract {
     }
 
     pub fn batch_mint(e: &Env, to: Address, amount: u32) -> u32 {
+        let owner: Address =
+            e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
+        owner.require_auth();
         Consecutive::batch_mint(e, &to, amount)
     }
 }
