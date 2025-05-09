@@ -104,8 +104,8 @@ pub fn set_authorized(e: &Env, id: &Address, authorize: bool) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `from` - The address holding the balance from which the clawback will
-///   take tokens.
+/// * `from` - The address holding the balance from which the clawback will take
+///   tokens.
 /// * `amount` - The amount of tokens to be clawed back.
 ///
 /// # Errors
