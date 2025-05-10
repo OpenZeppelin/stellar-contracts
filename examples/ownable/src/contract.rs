@@ -1,11 +1,7 @@
-//! Pausable Example Contract.
+//! Ownable Example Contract.
 //!
-//! Demonstrates an example usage of `stellar_pausable` moddule by
-//! implementing an emergency stop mechanism that can be triggered only by the
-//! owner account.
-//!
-//! Counter can be incremented only when `unpaused` and reset only when
-//! `paused`.
+//! Demonstrates an example usage of `ownable` module by
+//! implementing `#[only_owner]` macro on a sensitive function.
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
 use stellar_default_impl_macro::default_impl;
