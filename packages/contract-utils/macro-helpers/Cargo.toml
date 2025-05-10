@@ -1,5 +1,5 @@
 [package]
-name = "stellar-pausable-macros"
+name = "stellar-macro-helpers"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -7,11 +7,10 @@ publish = false
 version.workspace = true
 
 [lib]
-proc-macro = true
+crate-type = ["lib", "cdylib"]
 doctest = false
 
 [dependencies]
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }
-stellar-macro-helpers = { workspace = true }

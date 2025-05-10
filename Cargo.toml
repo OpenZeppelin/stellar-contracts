@@ -36,6 +36,7 @@ stellar-constants = { path = "packages/constants" }
 stellar-default-impl-macro = { path = "packages/contract-utils/default-impl-macro" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-fungible = { path = "packages/tokens/fungible" }
+stellar-macro-helpers = { path = "packages/contract-utils/macro-helpers" }
 stellar-non-fungible = { path = "packages/tokens/non-fungible" }
 stellar-pausable = { path = "packages/contract-utils/pausable" }
 stellar-pausable-macros = { path = "packages/contract-utils/pausable-macros" }

@@ -1406,6 +1406,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-macro-helpers"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "stellar-non-fungible"
 version = "0.2.0"
 dependencies = [
@@ -1424,6 +1433,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-ownable-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "stellar-macro-helpers",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "stellar-pausable"
 version = "0.2.0"
 dependencies = [
@@ -1436,6 +1455,7 @@ version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "stellar-macro-helpers",
  "syn 2.0.96",
 ]
 
