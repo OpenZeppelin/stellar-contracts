@@ -3,10 +3,11 @@ use quote::quote;
 use stellar_macro_helpers::{find_address_param, parse_env_arg};
 use syn::{parse_macro_input, ItemFn};
 
-/// A procedural macro that ensures the caller is the owner before executing the function.
+/// A procedural macro that ensures the caller is the owner before executing the
+/// function.
 ///
-/// This macro finds the first parameter of type `Address` or `&Address` and uses it
-/// as the caller parameter for the `ensure_is_owner` check.
+/// This macro finds the first parameter of type `Address` or `&Address` and
+/// uses it as the caller parameter for the `ensure_is_owner` check.
 ///
 /// # Usage
 ///
@@ -36,7 +37,8 @@ pub fn only_owner(_attrs: TokenStream, input: TokenStream) -> TokenStream {
     let (address_param, is_ref) = find_address_param(&input_fn)
         .expect("No parameter of type Address or &Address found in function signature");
 
-    // Create the appropriate reference expression based on whether the parameter is already a reference
+    // Create the appropriate reference expression based on whether the parameter is
+    // already a reference
     let address_expr = if is_ref {
         quote! { #address_param }
     } else {

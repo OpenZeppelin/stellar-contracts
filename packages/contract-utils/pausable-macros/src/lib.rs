@@ -1,8 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, ItemFn};
-
 use stellar_macro_helpers::parse_env_arg;
+use syn::{parse_macro_input, ItemFn};
 
 /// Adds a pause check at the beginning of the function that ensures the
 /// contract is not paused.

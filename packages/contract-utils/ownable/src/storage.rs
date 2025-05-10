@@ -12,7 +12,8 @@ pub enum OwnableStorageKey {
     PendingOwner,
 }
 
-/// Returns `Some(Address)` if ownership is set, or `None` if ownership has been renounced.
+/// Returns `Some(Address)` if ownership is set, or `None` if ownership has been
+/// renounced.
 ///
 /// # Arguments
 ///
@@ -23,7 +24,8 @@ pub fn get_owner(e: &Env) -> Option<Address> {
 
 /// Ensures that the caller is the current owner. Panics if not.
 ///
-/// This is used internally by the `#[only_owner]` macro expansion to gate access.
+/// This is used internally by the `#[only_owner]` macro expansion to gate
+/// access.
 ///
 /// # Arguments
 ///
@@ -39,7 +41,8 @@ pub fn ensure_is_owner(e: &Env, caller: &Address) {
             panic_with_error!(e, OwnableError::NotAuthorized);
         }
     } else {
-        // No owner means ownership has been renounced — no one can call restricted functions
+        // No owner means ownership has been renounced — no one can call restricted
+        // functions
         panic_with_error!(e, OwnableError::NotAuthorized);
     }
 }
@@ -111,7 +114,8 @@ pub fn accept_ownership(e: &Env, caller: &Address) {
 ///
 /// # Errors
 ///
-/// * [`OwnableError::CannotRenounceWhilePendingTransfer`] - If there is a pending ownership transfer.
+/// * [`OwnableError::CannotRenounceWhilePendingTransfer`] - If there is a
+///   pending ownership transfer.
 /// * refer to [`ensure_is_owner()`].
 ///
 /// # Events

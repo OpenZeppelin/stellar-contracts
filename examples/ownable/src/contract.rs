@@ -8,7 +8,6 @@
 //! `paused`.
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
-
 use stellar_default_impl_macro::default_impl;
 use stellar_ownable::Ownable;
 use stellar_ownable_macro::only_owner;
