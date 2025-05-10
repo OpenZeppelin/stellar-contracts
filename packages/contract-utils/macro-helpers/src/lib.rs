@@ -1,5 +1,6 @@
 //! This crate is a collection of utility functions for stellar related macros.
-//! It is not intended to be used directly, but rather imported into other macros.
+//! It is not intended to be used directly, but rather imported into other
+//! macros.
 
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -7,7 +8,7 @@ use syn::{FnArg, Ident, ItemFn, Pat, PatIdent, PatType, Type, TypePath, TypeRefe
 
 /// Parses the environment argument from the function signature
 pub fn parse_env_arg(input_fn: &ItemFn) -> TokenStream {
-    let (env_ident, is_ref) = check_env_arg(&input_fn);
+    let (env_ident, is_ref) = check_env_arg(input_fn);
 
     if is_ref {
         quote! { #env_ident }

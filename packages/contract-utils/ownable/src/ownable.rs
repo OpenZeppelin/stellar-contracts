@@ -2,9 +2,11 @@ use soroban_sdk::{contracterror, Address, Env, Symbol};
 
 /// A trait for managing contract ownership using a 2-step transfer pattern.
 ///
-/// Provides functions to query ownership, initiate a transfer, or renounce ownership.
+/// Provides functions to query ownership, initiate a transfer, or renounce
+/// ownership.
 pub trait Ownable {
-    /// Returns `Some(Address)` if ownership is set, or `None` if ownership has been renounced.
+    /// Returns `Some(Address)` if ownership is set, or `None` if ownership has
+    /// been renounced.
     ///
     /// # Arguments
     ///
@@ -15,25 +17,27 @@ pub trait Ownable {
 
     /// Initiates a 2-step ownership transfer to a new address.
     ///
-    /// Requires authorization from the current owner. The new owner must later call
-    /// `accept_ownership()` to complete the transfer.
+    /// Requires authorization from the current owner. The new owner must later
+    /// call `accept_ownership()` to complete the transfer.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `caller` - The current owner initiating the transfer.
     /// * `new_owner` - The proposed new owner.
-    /// * `live_until_ledger` - Ledger number until which the new owner can accept.
-    ///   A value of `0` cancels any pending transfer.
+    /// * `live_until_ledger` - Ledger number until which the new owner can
+    ///   accept. A value of `0` cancels any pending transfer.
     ///
     /// # Errors
     ///
-    /// * [`OwnableError::NotAuthorized`] - If `caller` is not the current owner.
+    /// * [`OwnableError::NotAuthorized`] - If `caller` is not the current
+    ///   owner.
     fn transfer_ownership(e: &Env, caller: Address, new_owner: Address, live_until_ledger: u32);
 
     /// Renounces ownership of the contract.
     ///
-    /// Permanently removes the owner, disabling all functions gated by `#[only_owner]`.
+    /// Permanently removes the owner, disabling all functions gated by
+    /// `#[only_owner]`.
     ///
     /// # Arguments
     ///
@@ -42,7 +46,8 @@ pub trait Ownable {
     ///
     /// # Errors
     ///
-    /// * [`OwnableError::NotAuthorized`] - If `caller` is not the current owner.
+    /// * [`OwnableError::NotAuthorized`] - If `caller` is not the current
+    ///   owner.
     fn renounce_ownership(e: &Env, caller: Address);
 }
 

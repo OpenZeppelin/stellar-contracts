@@ -7,7 +7,9 @@ use crate::RoleTransferError;
 ///
 /// Does not emit any events.
 ///
-/// Returns None if the transfer was initiated, Some(Address) where the Address is the new candidate for the pending role in the storage if the pending transfer is revoked.
+/// Returns None if the transfer was initiated, Some(Address) where the Address
+/// is the new candidate for the pending role in the storage if the pending
+/// transfer is revoked.
 pub fn transfer_role<T, U>(
     e: &Env,
     current: &Address,
