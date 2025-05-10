@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "examples/fungible-capped",
     "examples/fungible-pausable",
@@ -15,7 +16,6 @@ members = [
     "packages/test-utils/*",
     "packages/tokens/*",
 ]
-resolver = "2"
 exclude = ["examples/upgradeable/testdata"]
 
 [workspace.package]
