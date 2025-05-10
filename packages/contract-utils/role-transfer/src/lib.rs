@@ -1,6 +1,8 @@
 //! This module only acts as a utility crate for `Access Control` and `Ownable`.
 //! It is not intended to be used directly.
 
+#![no_std]
+
 use soroban_sdk::contracterror;
 
 mod storage;
