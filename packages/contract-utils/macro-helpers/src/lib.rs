@@ -68,17 +68,15 @@ pub fn find_address_param(func: &ItemFn) -> Option<(proc_macro2::TokenStream, bo
             if let Pat::Ident(PatIdent { ident, .. }) = &**pat {
                 match &**ty {
                     // Check for &Address
-                    Type::Reference(TypeReference { elem, .. }) => {
+                    Type::Reference(TypeReference { elem, .. }) =>
                         if is_address_type(elem) {
                             return Some((quote! { #ident }, true));
-                        }
-                    }
+                        },
                     // Check for Address
-                    Type::Path(_) => {
+                    Type::Path(_) =>
                         if is_address_type(ty) {
                             return Some((quote! { #ident }, false));
-                        }
-                    }
+                        },
                     _ => {}
                 }
             }
