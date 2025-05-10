@@ -150,12 +150,6 @@ pub trait AccessControl {
     ///   maximum allowed TTL extension for a temporary storage entry and
     ///   specifying a higher value will cause the code to panic.
     ///
-    /// # Errors
-    ///
-    /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
-    /// * `AccessControlError::NoPendingAdminTransfer` - If tried to cancel the
-    ///   pending admin transfer when there is no pending admin transfer.
-    ///
     /// # Events
     ///
     /// * topics - `["admin_transfer_started", current_admin: Address]`
@@ -172,13 +166,6 @@ pub trait AccessControl {
     ///
     /// * `e` - Access to Soroban environment.
     /// * `caller` - The address of the caller, must be the pending admin.
-    ///
-    /// # Errors
-    ///
-    /// * `AccessControlError::NoPendingAdminTransfer` - If no pending admin
-    ///   transfer is set.
-    /// * `AccessControlError::Unauthorized` - If the `caller` is not the
-    ///   pending admin.
     ///
     /// # Events
     ///
@@ -215,11 +202,8 @@ pub trait AccessControl {
 #[repr(u32)]
 pub enum AccessControlError {
     Unauthorized = 120,
-    RoleNotFound = 121,
-    AccountNotFound = 122,
-    NoPendingAdminTransfer = 123,
-    OutOfBounds = 124,
-    InvalidLiveUntilLedger = 125,
+    AccountNotFound = 121,
+    OutOfBounds = 122,
 }
 
 // ################## EVENTS ##################

@@ -8,6 +8,7 @@ members = [
     "examples/nft-consecutive",
     "examples/nft-enumerable",
     "examples/nft-sequential-minting",
+    "examples/ownable",
     "examples/upgradeable/*",
     "packages/constants",
     "packages/contract-utils/*",
@@ -36,9 +37,13 @@ stellar-constants = { path = "packages/constants" }
 stellar-default-impl-macro = { path = "packages/contract-utils/default-impl-macro" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-fungible = { path = "packages/tokens/fungible" }
+stellar-macro-helpers = { path = "packages/contract-utils/macro-helpers" }
 stellar-non-fungible = { path = "packages/tokens/non-fungible" }
+stellar-ownable = { path = "packages/contract-utils/ownable" }
+stellar-ownable-macro = { path = "packages/contract-utils/ownable-macro" }
 stellar-pausable = { path = "packages/contract-utils/pausable" }
 stellar-pausable-macros = { path = "packages/contract-utils/pausable-macros" }
+stellar-role-transfer = { path = "packages/contract-utils/role-transfer" }
 stellar-upgradeable = { path = "packages/contract-utils/upgradeable" }
 stellar-upgradeable-macros = { path = "packages/contract-utils/upgradeable-macros" }
 
