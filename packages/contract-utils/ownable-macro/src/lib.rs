@@ -52,7 +52,7 @@ pub fn only_owner(_attrs: TokenStream, input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #(#fn_attrs)*
         #fn_vis #fn_sig {
-            ensure_is_owner(#env_param, #address_expr);
+            stellar_ownable::ensure_is_owner(#env_param, #address_expr);
             #fn_block
         }
     };
