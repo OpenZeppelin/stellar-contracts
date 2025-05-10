@@ -865,6 +865,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
+name = "ownable-example"
+version = "0.2.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-default-impl-macro",
+ "stellar-ownable",
+ "stellar-ownable-macro",
+]
+
+[[package]]
 name = "p256"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1386,6 +1396,8 @@ dependencies = [
  "stellar-event-assertion",
  "stellar-fungible",
  "stellar-non-fungible",
+ "stellar-ownable",
+ "stellar-ownable-macro",
 ]
 
 [[package]]
@@ -1407,7 +1419,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-macro-helpers"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1433,8 +1445,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "stellar-ownable-macros"
-version = "0.1.0"
+name = "stellar-ownable-macro"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",

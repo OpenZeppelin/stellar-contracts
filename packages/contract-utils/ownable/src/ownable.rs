@@ -9,7 +9,7 @@ pub trait Ownable {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn owner(e: &Env) -> Option<Address> {
+    fn get_owner(e: &Env) -> Option<Address> {
         crate::get_owner(e)
     }
 
@@ -23,11 +23,13 @@ pub trait Ownable {
     /// * `e` - Access to the Soroban environment.
     /// * `caller` - The current owner initiating the transfer.
     /// * `new_owner` - The proposed new owner.
+    /// * `live_until_ledger` - Ledger number until which the new owner can accept.
+    ///   A value of `0` cancels any pending transfer.
     ///
     /// # Errors
     ///
     /// * [`OwnableError::NotAuthorized`] - If `caller` is not the current owner.
-    fn transfer_ownership(e: &Env, caller: Address, new_owner: Address);
+    fn transfer_ownership(e: &Env, caller: Address, new_owner: Address, live_until_ledger: u32);
 
     /// Renounces ownership of the contract.
     ///
