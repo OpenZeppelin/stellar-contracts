@@ -1,5 +1,5 @@
 [package]
-name = "stellar-ownable-macros"
+name = "stellar-ownable-macro"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

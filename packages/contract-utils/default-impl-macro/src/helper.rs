@@ -206,6 +206,23 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
         ],
+        "Ownable" => vec![
+            syn::parse_quote! {
+                fn get_owner(e: &soroban_sdk::Env) -> Option<soroban_sdk::Address> {
+                    stellar_ownable::get_owner(e)
+                }
+            },
+            syn::parse_quote! {
+                fn transfer_ownership(e: &soroban_sdk::Env, caller: soroban_sdk::Address, new_owner: soroban_sdk::Address, live_until_ledger: u32) {
+                    stellar_ownable::transfer_ownership(e, &caller, &new_owner, live_until_ledger);
+                }
+            },
+            syn::parse_quote! {
+                fn renounce_ownership(e: &soroban_sdk::Env, caller: soroban_sdk::Address) {
+                    stellar_ownable::renounce_ownership(e, &caller);
+                }
+            },
+        ],
 
         not_supported => {
             panic!("Trait {not_supported} is not supported by #[default_impl]")
