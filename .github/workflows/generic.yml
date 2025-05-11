@@ -66,12 +66,7 @@ jobs:
         run: cargo build --target wasm32-unknown-unknown --release
 
       - name: Run tests with coverage
-        run: cargo llvm-cov --workspace --lcov --fail-under-lines 90 --output-path lcov.info --ignore-filename-regex \
-          'packages/contract-utils/access-control-macro/*|\
-          packages/contract-utils/ownable-macro/*|\
-          packages/contract-utils/macro-helpers/*|\
-          packages/tokens/fungible/src/impl_token_interface_macro\.rs|\
-          packages/tokens/non-fungible/src/overrides\.rs'
+        run: cargo llvm-cov --workspace --lcov --fail-under-lines 90 --output-path lcov.info
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -79,3 +74,4 @@ jobs:
           files: ./lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: OpenZeppelin/stellar-contracts
+          verbose: true
