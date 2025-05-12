@@ -2,8 +2,11 @@
 ** xref:tokens/fungible.adoc[Fungible Tokens]
 ** xref:tokens/non-fungible.adoc[Non-Fungible Tokens]
 *** xref:tokens/non-fungible.adoc#base_and_extensions[Extensions]
+**** xref:tokens/nft-consecutive.adoc[Consecutive]
+**** xref:tokens/nft-enumerable.adoc[Enumerable]
 
 * Utilities
 ** xref:utils/pausable.adoc[Pausable]
+** xref:utils/upgradeable.adoc[Upgradeable]
 
 * xref:get-started.adoc[Get Started]
