@@ -18,7 +18,7 @@
 //! - Ensuring that the new contract does not include a constructor, as it will
 //!   not be invoked.
 //! - Verifying that the new contract includes an upgradability mechanism,
-//!   preventing an unintended loss of upgradability.
+//!   preventing an unintended loss of further upgradability capacity.
 //! - Checking for storage consistency, ensuring that the new contract does not
 //!   inadvertently introduce storage mismatches.
 //!
@@ -37,6 +37,7 @@
 //!             panic_with_error!(e, ExampleContractError::Unauthorized)
 //!         }
 //!     }
+//! }
 //! ```
 //!
 //! # Example for upgrade and migration:
