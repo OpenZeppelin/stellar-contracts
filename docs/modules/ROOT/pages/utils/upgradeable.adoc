@@ -24,9 +24,9 @@ provides a lightweight upgradeability framework with additional support for stru
 
 It consists of two main components:
 
-1. *Upgradeable* for cases where only the WASM binary needs to be updated.
+1. **xref:utils/upgradeable.adoc#upgrade_only[`Upgradeable`]** for cases where only the WASM binary needs to be updated.
 
-2. *UpgradeableMigratable* for more advanced scenarios where, in addition to the WASM binary, specific storage entries
+2. **xref:utils/upgradeable.adoc#upgrade_and_migrate[`UpgradeableMigratable`]** for more advanced scenarios where, in addition to the WASM binary, specific storage entries
 must be modified (migrated) during the upgrade process.
 
 The recommended way to use this module is through the `\#[derive(Upgradeable)]` and `#[derive(UpgradeableMigratable)]`
@@ -50,6 +50,7 @@ While the framework structures the upgrade flow, it does NOT perform deeper chec
 == Usage
 
 === Upgrade Only
+==== `Upgradeable`
 
 When only the WASM binary needs to be upgraded and no additional migration logic is required, developers should implement
 the `UpgradeableInternal` trait. This trait is where authorization and custom access control logic are defined,
@@ -96,6 +97,7 @@ impl UpgradeableInternal for ExampleContract {
 ----
 
 === Upgrade and Migrate
+==== `UpgradeableMigratable`
 
 When both the WASM binary and specific storage entries need to be modified as part of the upgrade process, the
 `UpgradeableMigratableInternal` trait should be implemented. In addition to defining access control and migration
