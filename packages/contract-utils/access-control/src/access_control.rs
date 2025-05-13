@@ -77,11 +77,6 @@ pub trait AccessControl {
     ///
     /// * topics - `["role_granted", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
-    ///
-    /// # Security Warning
-    ///
-    /// **IMPORTANT**: You MUST implement proper authorization in your contract.
-    /// The caller must be the admin or have the `RoleAdmin` for the `role`.
     fn grant_role(e: &Env, caller: Address, account: Address, role: Symbol);
 
     /// Revokes a role from an account.
@@ -107,11 +102,6 @@ pub trait AccessControl {
     ///
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
-    ///
-    /// # Security Warning
-    ///
-    /// **IMPORTANT**: You MUST implement proper authorization in your contract.
-    /// The caller must be the admin or have the `RoleAdmin` for the `role`.
     fn revoke_role(e: &Env, caller: Address, account: Address, role: Symbol);
 
     /// Allows an account to renounce a role assigned to itself.
@@ -161,10 +151,6 @@ pub trait AccessControl {
     ///
     /// * topics - `["admin_transfer_initiated", current_admin: Address]`
     /// * data - `[new_admin: Address, live_until_ledger: u32]`
-    ///
-    /// # Security Warning
-    ///
-    /// **IMPORTANT**: You MUST implement proper authorization in your contract.
     fn transfer_admin_role(e: &Env, caller: Address, new_admin: Address, live_until_ledger: u32);
 
     /// Completes the 2-step admin transfer.
@@ -199,15 +185,6 @@ pub trait AccessControl {
     /// # Errors
     ///
     /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["role_admin_changed", role: Symbol]`
-    /// * data - `[previous_admin_role: Symbol, new_admin_role: Symbol]`
-    ///
-    /// # Security Warning
-    ///
-    /// **IMPORTANT**: You MUST implement proper authorization in your contract.
     fn set_role_admin(e: &Env, caller: Address, role: Symbol, admin_role: Symbol);
 }
 

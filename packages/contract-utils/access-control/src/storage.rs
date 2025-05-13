@@ -103,6 +103,20 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 
 // ################## CHANGE STATE ##################
 
+/// Sets the overarching admin role.
+///
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `admin` - The account to grant the admin privilege.
+///
+/// **IMPORTANT**: this function lacks authorization checks.
+/// It is expected to call this function only in the constructor!
+pub fn set_admin(e: &Env, admin: &Address) {
+    e.storage().instance().set(&AccessControlStorageKey::Admin, &admin);
+}
+
 /// Grants a role to an account.
 /// Creates the role if it does not exist.
 /// Returns early if the account already has the role.

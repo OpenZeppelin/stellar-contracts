@@ -69,7 +69,8 @@ pub use crate::{
     storage::{
         accept_admin_transfer, add_to_role_enumeration, ensure_role, get_admin, get_role_admin,
         get_role_member, get_role_member_count, grant_role, has_role, remove_from_role_enumeration,
-        renounce_role, revoke_role, set_role_admin, transfer_admin_role, AccessControlStorageKey,
+        renounce_role, revoke_role, set_admin, set_role_admin, transfer_admin_role,
+        AccessControlStorageKey,
     },
 };
 
