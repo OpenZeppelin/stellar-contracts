@@ -259,7 +259,7 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 /// * Authorization for `admin` is required.
 pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_until_ledger: u32) {
     admin.require_auth();
-    if admin != &get_admin(e) {
+    if *admin != get_admin(e) {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
 
