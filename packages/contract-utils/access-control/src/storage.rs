@@ -259,16 +259,9 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// * Authorization for `admin` is required.
 pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_until_ledger: u32) {
-    match transfer_role(
-        e,
-        admin,
-        new_admin,
-        &AccessControlStorageKey::Admin,
-        &AccessControlStorageKey::PendingAdmin,
-        live_until_ledger,
-    ) {
-        Some(pending) => emit_admin_transfer_initiated(e, admin, &pending, live_until_ledger),
-        None => emit_admin_transfer_initiated(e, admin, new_admin, live_until_ledger),
+    admin.require_auth();
+    if *admin != get_admin(e) {
+        panic_with_error!(e, AccessControlError::Unauthorized);
     }
 
     let key = AccessControlStorageKey::PendingAdmin;
@@ -279,7 +272,7 @@ pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_u
         };
         e.storage().temporary().remove(&key);
 
-        emit_admin_transfer(e, admin, &pending_new_admin, live_until_ledger);
+        emit_admin_transfer_initiated(e, admin, &pending_new_admin, live_until_ledger);
         return;
     }
 
@@ -295,7 +288,7 @@ pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_u
     e.storage().temporary().set(&key, new_admin);
     e.storage().temporary().extend_ttl(&key, live_for, live_for);
 
-    emit_admin_transfer(e, admin, new_admin, live_until_ledger);
+    emit_admin_transfer_initiated(e, admin, new_admin, live_until_ledger);
 }
 
 /// Completes the 2-step admin transfer.
