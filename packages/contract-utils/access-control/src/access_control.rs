@@ -80,7 +80,7 @@ pub trait AccessControl {
     /// # Security Warning
     ///
     /// **IMPORTANT**: You MUST implement proper authorization in your contract.
-    /// The caller must be the admin or has the `RoleAdmin` for the `role`.
+    /// The caller must be the admin or have the `RoleAdmin` for the `role`.
     fn grant_role(e: &Env, caller: Address, account: Address, role: Symbol);
 
     /// Revokes a role from an account.
