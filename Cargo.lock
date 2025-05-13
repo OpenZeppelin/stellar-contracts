@@ -543,7 +543,7 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
 name = "fungible-capped-example"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-fungible",
@@ -551,7 +551,7 @@ dependencies = [
 
 [[package]]
 name = "fungible-pausable-example"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-fungible",
@@ -561,7 +561,7 @@ dependencies = [
 
 [[package]]
 name = "fungible-token-interface-example"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-fungible",
@@ -789,7 +789,7 @@ dependencies = [
 
 [[package]]
 name = "nft-consecutive-example"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-non-fungible",
@@ -797,7 +797,7 @@ dependencies = [
 
 [[package]]
 name = "nft-enumerable-example"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-default-impl-macro",
@@ -806,7 +806,7 @@ dependencies = [
 
 [[package]]
 name = "nft-sequential-minting-example"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-default-impl-macro",
@@ -1360,14 +1360,14 @@ dependencies = [
 
 [[package]]
 name = "stellar-constants"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
 ]
 
 [[package]]
 name = "stellar-default-impl-macro"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1376,7 +1376,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-default-impl-macro-test"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access-control",
@@ -1389,7 +1389,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-event-assertion"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-non-fungible",
@@ -1397,7 +1397,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-fungible"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-constants",
@@ -1406,7 +1406,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-non-fungible"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-constants",
@@ -1415,14 +1415,14 @@ dependencies = [
 
 [[package]]
 name = "stellar-pausable"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
 ]
 
 [[package]]
 name = "stellar-pausable-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1442,14 +1442,14 @@ dependencies = [
 
 [[package]]
 name = "stellar-upgradeable"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
 ]
 
 [[package]]
 name = "stellar-upgradeable-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1589,7 +1589,7 @@ dependencies = [
 
 [[package]]
 name = "upgrader-example"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-upgradeable",
