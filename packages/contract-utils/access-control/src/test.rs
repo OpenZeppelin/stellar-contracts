@@ -12,7 +12,7 @@ use stellar_event_assertion::EventAssertion;
 use crate::{
     accept_admin_transfer, add_to_role_enumeration, get_admin, get_role_admin, get_role_member,
     get_role_member_count, grant_role, has_role, remove_from_role_enumeration, renounce_role,
-    revoke_role, set_role_admin, transfer_admin_role,
+    revoke_role, set_admin, set_role_admin, transfer_admin_role,
 };
 
 #[contract]
@@ -31,8 +31,7 @@ fn admin_functions_work() {
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Admin can grant roles
         grant_role(&e, &admin, &user, &USER_ROLE);
@@ -64,8 +63,7 @@ fn role_management_works() {
     let user2 = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Grant roles to multiple users
         grant_role(&e, &admin, &user1, &USER_ROLE);
@@ -102,8 +100,7 @@ fn role_admin_management_works() {
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Set MANAGER_ROLE as admin for USER_ROLE
         set_role_admin(&e, &admin, &USER_ROLE, &MANAGER_ROLE);
@@ -134,8 +131,7 @@ fn get_role_member_count_for_nonexistent_role_returns_zero() {
     let nonexistent_role = Symbol::new(&e, "nonexistent");
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Get count for a role that doesn't exist
         let count = get_role_member_count(&e, &nonexistent_role);
@@ -153,8 +149,7 @@ fn get_role_admin_returns_some_when_set() {
     let admin = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Set ADMIN_ROLE as the admin for USER_ROLE
         set_role_admin(&e, &admin, &USER_ROLE, &ADMIN_ROLE);
@@ -173,8 +168,7 @@ fn get_role_admin_returns_none_when_not_set() {
     let admin = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // No admin role has been set for USER_ROLE
 
@@ -193,8 +187,7 @@ fn renounce_role_works() {
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Grant role to user
         grant_role(&e, &admin, &user, &USER_ROLE);
@@ -215,8 +208,7 @@ fn admin_transfer_works() {
     let new_admin = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Start admin transfer
         transfer_admin_role(&e, &admin, &new_admin, 1000);
@@ -242,8 +234,7 @@ fn admin_transfer_cancel_works() {
     let new_admin = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Start admin transfer
         transfer_admin_role(&e, &admin, &new_admin, 1000);
@@ -277,8 +268,7 @@ fn unauthorized_role_grant_panics() {
     let other = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Unauthorized user attempts to grant role
         grant_role(&e, &other, &user, &USER_ROLE);
@@ -296,8 +286,7 @@ fn unauthorized_role_revoke_panics() {
     let other = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Grant role to user
         grant_role(&e, &admin, &user, &USER_ROLE);
@@ -317,8 +306,7 @@ fn renounce_nonexistent_role_panics() {
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // User attempts to renounce role they don't have
         renounce_role(&e, &user, &USER_ROLE);
@@ -335,8 +323,7 @@ fn accept_transfer_with_no_pending_transfer_panics() {
     let new_admin = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Attempt to accept transfer with no pending transfer
         accept_admin_transfer(&e, &new_admin);
@@ -354,8 +341,7 @@ fn transfer_with_invalid_live_until_ledger_panics() {
     e.ledger().set_sequence_number(1000);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Start admin transfer
         transfer_admin_role(&e, &admin, &new_admin, 3);
@@ -372,8 +358,7 @@ fn cancel_transfer_when_there_is_no_pending_transfer_panics() {
     let new_admin = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Cancel admin transfer when there is no pending transfer
         transfer_admin_role(&e, &admin, &new_admin, 0);
@@ -391,8 +376,7 @@ fn wrong_pending_admin_accept_panics() {
     let wrong_admin = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Start admin transfer
         transfer_admin_role(&e, &admin, &new_admin, 1000);
@@ -425,8 +409,7 @@ fn get_role_member_with_out_of_bounds_index_panics() {
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Grant role to create one member
         grant_role(&e, &admin, &user, &USER_ROLE);
@@ -450,8 +433,7 @@ fn transfer_admin_role_from_non_admin_panics() {
     let new_admin = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Non-admin attempts to transfer admin role
         transfer_admin_role(&e, &non_admin, &new_admin, 1000);
@@ -469,8 +451,7 @@ fn cancel_transfer_admin_role_from_non_admin_panics() {
     let new_admin = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Start a valid admin transfer
         transfer_admin_role(&e, &admin, &new_admin, 1000);
@@ -490,8 +471,7 @@ fn set_role_admin_from_non_admin_panics() {
     let non_admin = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Initialize admin
-        e.storage().instance().set(&crate::AccessControlStorageKey::Admin, &admin);
+        set_admin(&e, &admin);
 
         // Non-admin attempts to set a role admin
         set_role_admin(&e, &non_admin, &USER_ROLE, &MANAGER_ROLE);
