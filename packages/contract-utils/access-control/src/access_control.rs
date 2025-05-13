@@ -32,7 +32,7 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * `AccessControlError::OutOfBounds` - If the indexing is out of bounds.
+    /// * [`AccessControlError::OutOfBounds`] - If the indexing is out of bounds.
     fn get_role_member(e: &Env, role: Symbol, index: u32) -> Address;
 
     /// Returns the admin role for a specific role.
