@@ -75,7 +75,7 @@ pub trait AccessControl {
     /// # Events
     ///
     /// * topics - `["role_granted", role: Symbol, account: Address]`
-    /// * data - `[sender: Address]`
+    /// * data - `[caller: Address]`
     ///
     /// # Security Warning
     ///
@@ -105,7 +105,7 @@ pub trait AccessControl {
     /// # Events
     ///
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
-    /// * data - `[sender: Address]`
+    /// * data - `[caller: Address]`
     ///
     /// # Security Warning
     ///
@@ -131,7 +131,7 @@ pub trait AccessControl {
     /// # Events
     ///
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
-    /// * data - `[sender: Address]`
+    /// * data - `[caller: Address]`
     fn renounce_role(e: &Env, caller: Address, role: Symbol);
 
     /// Initiates the admin role transfer.
@@ -158,7 +158,7 @@ pub trait AccessControl {
     ///
     /// # Events
     ///
-    /// * topics - `["admin_transfer_started", current_admin: Address]`
+    /// * topics - `["admin_transfer_initiated", current_admin: Address]`
     /// * data - `[new_admin: Address, live_until_ledger: u32]`
     ///
     /// # Security Warning
@@ -231,15 +231,15 @@ pub enum AccessControlError {
 /// * `e` - Access to Soroban environment.
 /// * `role` - The role that was granted.
 /// * `account` - The account that received the role.
-/// * `sender` - The account that granted the role.
+/// * `caller` - The account that granted the role.
 ///
 /// # Events
 ///
 /// * topics - `["role_granted", role: Symbol, account: Address]`
-/// * data - `[sender: Address]`
-pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, sender: &Address) {
+/// * data - `[caller: Address]`
+pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
     let topics = (Symbol::new(e, "role_granted"), role, account);
-    e.events().publish(topics, sender);
+    e.events().publish(topics, caller);
 }
 
 /// Emits an event when a role is revoked from an account.
@@ -249,16 +249,16 @@ pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, sender: &Add
 /// * `e` - Access to Soroban environment.
 /// * `role` - The role that was revoked.
 /// * `account` - The account that lost the role.
-/// * `sender` - The account that revoked the role (either the admin or the
+/// * `caller` - The account that revoked the role (either the admin or the
 ///   account itself).
 ///
 /// # Events
 ///
 /// * topics - `["role_revoked", role: Symbol, account: Address]`
-/// * data - `[sender: Address]`
-pub fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, sender: &Address) {
+/// * data - `[caller: Address]`
+pub fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
     let topics = (Symbol::new(e, "role_revoked"), role, account);
-    e.events().publish(topics, sender);
+    e.events().publish(topics, caller);
 }
 
 /// Emits an event when the admin role for a role changes.
@@ -296,15 +296,15 @@ pub fn emit_role_admin_changed(
 ///
 /// # Events
 ///
-/// * topics - `["admin_transfer", current_admin: Address]`
+/// * topics - `["admin_transfer_initiated", current_admin: Address]`
 /// * data - `[new_admin: Address, live_until_ledger: u32]`
-pub fn emit_admin_transfer(
+pub fn emit_admin_transfer_initiated(
     e: &Env,
     current_admin: &Address,
     new_admin: &Address,
     live_until_ledger: u32,
 ) {
-    let topics = (Symbol::new(e, "admin_transfer"), current_admin);
+    let topics = (Symbol::new(e, "admin_transfer_initiated"), current_admin);
     e.events().publish(topics, (new_admin, live_until_ledger));
 }
 

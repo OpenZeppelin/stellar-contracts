@@ -12,6 +12,24 @@
 //! the methods exposed by this module will work. You can follow the
 //! `nft-access-control` example.
 //!
+//! ## Admin Transfers
+//!
+//! Transferring the top-level admin is a critical action, and as such, it is
+//! implemented as a **two-step process** to prevent accidental or malicious takeovers:
+//!
+//! 1. The current admin **initiates** the transfer by specifying the `new_admin` and
+//!    a `live_until_ledger`, which defines the expiration time for the offer.
+//! 2. The designated `new_admin` must **explicitly accept** the transfer to complete it.
+//!
+//! Until the transfer is accepted, the original admin retains full control, and the
+//! transfer can be overridden or canceled by initiating a new one or using a
+//! `live_until_ledger` of `0`.
+//!
+//! This handshake mechanism ensures that the recipient is aware and willing to
+//! assume responsibility, providing a robust safeguard in governance-sensitive deployments.
+//!
+//! ## Role Hierarchy
+//!
 //! Each role can have an `admin role` specified for it. For example, if you
 //! create 2 roles:
 //! - minter
@@ -29,7 +47,7 @@
 //!
 //! ```rust
 //! #[has_role(caller, "minter_admin")]
-//! pub fn do_very_specific_stuff_that_is_probably_not_needed_but_we_decided_to_overkill_it_nevertheless(e: &Env, caller: Address) {
+//! pub fn custom_sensitive_logic(e: &Env, caller: Address) {
 //!     ...
 //! }
 //! ```
@@ -41,7 +59,7 @@ mod storage;
 
 pub use crate::{
     access_control::{
-        emit_admin_transfer, emit_admin_transfer_completed, emit_role_admin_changed,
+        emit_admin_transfer_completed, emit_admin_transfer_initiated, emit_role_admin_changed,
         emit_role_granted, emit_role_revoked, AccessControl, AccessControlError,
     },
     storage::{

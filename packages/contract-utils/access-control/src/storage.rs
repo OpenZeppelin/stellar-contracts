@@ -2,8 +2,8 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
 use stellar_constants::{ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
 
 use crate::{
-    emit_admin_transfer, emit_admin_transfer_completed, emit_role_admin_changed, emit_role_granted,
-    emit_role_revoked, AccessControlError,
+    emit_admin_transfer_completed, emit_admin_transfer_initiated, emit_role_admin_changed,
+    emit_role_granted, emit_role_revoked, AccessControlError,
 };
 
 #[contracttype]
@@ -122,7 +122,7 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 /// # Events
 ///
 /// * topics - `["role_granted", role: Symbol, account: Address]`
-/// * data - `[sender: Address]`
+/// * data - `[caller: Address]`
 ///
 /// # Notes
 ///
@@ -166,7 +166,7 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 /// # Events
 ///
 /// * topics - `["role_revoked", role: Symbol, account: Address]`
-/// * data - `[sender: Address]`
+/// * data - `[caller: Address]`
 ///
 /// # Notes
 ///
@@ -207,7 +207,7 @@ pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) 
 /// # Events
 ///
 /// * topics - `["role_revoked", role: Symbol, account: Address]`
-/// * data - `[sender: Address]`
+/// * data - `[caller: Address]`
 ///
 /// # Notes
 ///
@@ -251,16 +251,23 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// # Events
 ///
-/// * topics - `["admin_transfer_started", current_admin: Address]`
+/// * topics - `["admin_transfer_initiated", current_admin: Address]`
 /// * data - `[new_admin: Address, live_until_ledger: u32]`
 ///
 /// # Notes
 ///
 /// * Authorization for `admin` is required.
 pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_until_ledger: u32) {
-    admin.require_auth();
-    if *admin != get_admin(e) {
-        panic_with_error!(e, AccessControlError::Unauthorized);
+    match transfer_role(
+        e,
+        admin,
+        new_admin,
+        &AccessControlStorageKey::Admin,
+        &AccessControlStorageKey::PendingAdmin,
+        live_until_ledger,
+    ) {
+        Some(pending) => emit_admin_transfer_initiated(e, admin, &pending, live_until_ledger),
+        None => emit_admin_transfer_initiated(e, admin, new_admin, live_until_ledger),
     }
 
     let key = AccessControlStorageKey::PendingAdmin;
