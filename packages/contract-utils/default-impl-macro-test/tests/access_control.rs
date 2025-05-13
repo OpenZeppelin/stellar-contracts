@@ -17,7 +17,7 @@ pub struct ExampleContract;
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        e.storage().instance().set(&DataKey::Admin, &owner);
+        set_admin(&e, &owner);
         stellar_fungible::metadata::set_metadata(
             e,
             7,
