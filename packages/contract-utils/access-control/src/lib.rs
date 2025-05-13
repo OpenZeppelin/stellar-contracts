@@ -15,18 +15,22 @@
 //! ## Admin Transfers
 //!
 //! Transferring the top-level admin is a critical action, and as such, it is
-//! implemented as a **two-step process** to prevent accidental or malicious takeovers:
+//! implemented as a **two-step process** to prevent accidental or malicious
+//! takeovers:
 //!
-//! 1. The current admin **initiates** the transfer by specifying the `new_admin` and
-//!    a `live_until_ledger`, which defines the expiration time for the offer.
-//! 2. The designated `new_admin` must **explicitly accept** the transfer to complete it.
+//! 1. The current admin **initiates** the transfer by specifying the
+//!    `new_admin` and a `live_until_ledger`, which defines the expiration time
+//!    for the offer.
+//! 2. The designated `new_admin` must **explicitly accept** the transfer to
+//!    complete it.
 //!
-//! Until the transfer is accepted, the original admin retains full control, and the
-//! transfer can be overridden or canceled by initiating a new one or using a
-//! `live_until_ledger` of `0`.
+//! Until the transfer is accepted, the original admin retains full control, and
+//! the transfer can be overridden or canceled by initiating a new one or using
+//! a `live_until_ledger` of `0`.
 //!
 //! This handshake mechanism ensures that the recipient is aware and willing to
-//! assume responsibility, providing a robust safeguard in governance-sensitive deployments.
+//! assume responsibility, providing a robust safeguard in governance-sensitive
+//! deployments.
 //!
 //! ## Role Hierarchy
 //!

@@ -6,6 +6,7 @@ use crate::{
     emit_role_granted, emit_role_revoked, AccessControlError,
 };
 
+/// Storage key for enumeration of accounts per role.
 #[contracttype]
 pub struct RoleAccountKey {
     pub role: Symbol,

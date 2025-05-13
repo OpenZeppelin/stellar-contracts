@@ -32,14 +32,6 @@ impl ExampleContract {
     pub fn mint(e: &Env, caller: Address, to: Address, token_id: u32) {
         Base::mint(e, &to, token_id)
     }
-
-    // ### IMPORTANT ###
-    /*
-       The setup for the roles and accounts are not done in the constructor
-       to keep the smart contract size as small as possible. We are going to
-       set the roles by invoking the relevant smart contract functions in
-       the `test.rs` file of this example.
-    */
 }
 
 #[default_impl]
