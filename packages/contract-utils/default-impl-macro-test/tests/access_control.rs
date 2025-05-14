@@ -1,7 +1,7 @@
 use soroban_sdk::{
     contract, contractimpl, contracttype, testutils::Address as _, Address, Env, String, Symbol,
 };
-use stellar_access_control::AccessControl;
+use stellar_access_control::{set_admin, AccessControl};
 use stellar_access_control_macro::has_role;
 use stellar_default_impl_macro::default_impl;
 use stellar_fungible::FungibleToken;
@@ -17,7 +17,7 @@ pub struct ExampleContract;
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        set_admin(&e, &owner);
+        set_admin(e, &owner);
         stellar_fungible::metadata::set_metadata(
             e,
             7,
