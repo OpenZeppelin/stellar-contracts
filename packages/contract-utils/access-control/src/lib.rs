@@ -34,14 +34,11 @@
 //!
 //! ## Role Hierarchy
 //!
-//! Each role can have an `admin role` specified for it. For example, if you
-//! create 2 roles:
-//! - minter
-//! - mint_admins
-//!
-//! You can assign the role `mint_admins` as the admin role of the `minter` role
-//! group. And this will allow accounts with `mint_admins` role, to grant and
-//! revoke the roles of `minter` roles.
+//! Each role can have an "admin role" specified for it. For example, if you
+//! create two roles: `minter` and `minter_admin`, you can assign 
+//! `minter_admin` as the admin role for the `minter` role. This will allow
+//! to accounts with `minter_admin` role to grant/revoke the `minter` role
+//! to other accounts.
 //!
 //! One can create as many roles as they want, and create a chain of command
 //! structure if they want to with this approach.
