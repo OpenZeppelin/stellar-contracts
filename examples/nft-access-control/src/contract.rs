@@ -35,6 +35,7 @@ impl NonFungibleToken for ExampleContract {
     type ContractType = Base;
 }
 
+// for this contract, the `burn*` functions are only meant to be called by specific people with the `burner` role
 #[contractimpl]
 impl NonFungibleBurnable for ExampleContract {
     #[has_role(from, "burner")]
