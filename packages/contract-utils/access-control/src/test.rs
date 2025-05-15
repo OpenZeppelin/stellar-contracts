@@ -331,7 +331,7 @@ fn accept_transfer_with_no_pending_transfer_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #125)")]
+#[should_panic(expected = "Error(Contract, #124)")]
 fn transfer_with_invalid_live_until_ledger_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -400,7 +400,7 @@ fn get_admin_with_no_admin_set_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #124)")]
+#[should_panic(expected = "Error(Contract, #122)")]
 fn get_role_member_with_out_of_bounds_index_panics() {
     let e = Env::default();
     e.mock_all_auths();

@@ -35,7 +35,7 @@
 //! ## Role Hierarchy
 //!
 //! Each role can have an "admin role" specified for it. For example, if you
-//! create two roles: `minter` and `minter_admin`, you can assign 
+//! create two roles: `minter` and `minter_admin`, you can assign
 //! `minter_admin` as the admin role for the `minter` role. This will allow
 //! to accounts with `minter_admin` role to grant/revoke the `minter` role
 //! to other accounts.
@@ -52,6 +52,27 @@
 //!     ...
 //! }
 //! ```
+//!
+//! ## Enumeration of Roles
+//!
+//! In this access control system, roles don't exist as standalone entities.
+//! Instead, the system stores account-role pairs in storage with additional
+//! enumeration logic:
+//!
+//! - When a role is granted to an account, the account-role pair is stored and
+//!   added to enumeration storage (RoleAccountsCount and RoleAccounts).
+//! - When a role is revoked from an account, the account-role pair is removed
+//!   from storage and from enumeration.
+//! - If all accounts are removed from a role, the helper storage items for that
+//!   role become empty or 0, but the entries themselves remain.
+//!
+//! This means that the question of whether a role can "exist" with 0 accounts
+//! is technically invalid, because roles only exist through their relationships
+//! with accounts. When checking if a role has any accounts via
+//! `get_role_member_count`, it returns 0 in two cases:
+//!
+//! 1. When accounts were assigned to a role but later all were removed.
+//! 2. When a role never existed in the first place.
 
 #![no_std]
 

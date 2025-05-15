@@ -79,14 +79,14 @@ pub fn get_role_member_count(e: &Env, role: &Symbol) -> u32 {
 ///
 /// # Errors
 ///
-/// * `AccessControlError::OutOfBounds` - If the indexing is out of bounds.
+/// * `AccessControlError::AccountNotFound` - If the indexing is out of bounds.
 pub fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {
     let key = AccessControlStorageKey::RoleAccounts(RoleAccountKey { role: role.clone(), index });
 
     e.storage()
         .persistent()
         .get(&key)
-        .unwrap_or_else(|| panic_with_error!(e, AccessControlError::OutOfBounds))
+        .unwrap_or_else(|| panic_with_error!(e, AccessControlError::AccountNotFound))
 }
 
 /// Returns the admin role for a specific role.
@@ -388,6 +388,52 @@ pub fn set_role_admin(e: &Env, admin: &Address, role: &Symbol, admin_role: &Symb
     emit_role_admin_changed(e, role, &previous_admin_role, admin_role);
 }
 
+/// Ensures that the caller is either the contract admin or has the admin role
+/// for the specified role.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller to check permissions for.
+/// * `role` - The role to check admin privileges for.
+///
+/// # Errors
+///
+/// * `AccessControlError::Unauthorized` - If the caller is neither the contract
+///   admin nor has the admin role.
+pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
+    let is_admin = caller == &get_admin(e);
+    let is_admin_role = match get_role_admin(e, role) {
+        Some(admin_role) => has_role(e, caller, &admin_role).is_some(),
+        None => false,
+    };
+
+    if !is_admin && !is_admin_role {
+        panic_with_error!(e, AccessControlError::Unauthorized);
+    }
+}
+
+/// Ensures that the caller has the specified role.
+/// This function is used to check if an account has a specific role.
+/// The main purpose of this function is to act as a helper for the
+/// `#[has_role]` macro.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller to check the role for.
+/// * `role` - The role to check for.
+///
+/// # Errors
+///
+/// * `AccessControlError::Unauthorized` - If the caller does not have the
+///   specified role.
+pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
+    if has_role(e, caller, role).is_none() {
+        panic_with_error!(e, AccessControlError::Unauthorized);
+    }
+}
+
 // ################## LOW-LEVEL HELPERS ##################
 
 /// Adds an account to role enumeration. Returns the previous count.
@@ -485,50 +531,4 @@ pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     // Update the count
     e.storage().persistent().set(&count_key, &last_index);
     e.storage().persistent().extend_ttl(&count_key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
-}
-
-/// Ensures that the caller is either the contract admin or has the admin role
-/// for the specified role.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller to check permissions for.
-/// * `role` - The role to check admin privileges for.
-///
-/// # Errors
-///
-/// * `AccessControlError::Unauthorized` - If the caller is neither the contract
-///   admin nor has the admin role.
-pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
-    let is_admin = caller == &get_admin(e);
-    let is_admin_role = match get_role_admin(e, role) {
-        Some(admin_role) => has_role(e, caller, &admin_role).is_some(),
-        None => false,
-    };
-
-    if !is_admin && !is_admin_role {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
-}
-
-/// Ensures that the caller has the specified role.
-/// This function is used to check if an account has a specific role.
-/// The main purpose of this function is to act as a helper for the
-/// `#[has_role]` macro.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller to check the role for.
-/// * `role` - The role to check for.
-///
-/// # Errors
-///
-/// * `AccessControlError::Unauthorized` - If the caller does not have the
-///   specified role.
-pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
-    if has_role(e, caller, role).is_none() {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
 }

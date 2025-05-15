@@ -186,7 +186,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "admin_transfer"
+                "symbol": "admin_transfer_initiated"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"

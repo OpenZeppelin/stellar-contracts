@@ -32,7 +32,7 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::OutOfBounds`] - If the indexing is out of
+    /// * [`AccessControlError::AccountNotFound`] - If the indexing is out of
     ///   bounds.
     fn get_role_member(e: &Env, role: Symbol, index: u32) -> Address;
 
@@ -57,8 +57,6 @@ pub trait AccessControl {
     fn get_admin(e: &Env) -> Address;
 
     /// Grants a role to an account.
-    /// Creates the role if it does not exist.
-    /// Returns early if the account already has the role.
     ///
     /// # Arguments
     ///
@@ -196,8 +194,7 @@ pub enum AccessControlError {
     RoleNotFound = 121,
     AccountNotFound = 122,
     NoPendingAdminTransfer = 123,
-    OutOfBounds = 124,
-    InvalidLiveUntilLedger = 125,
+    InvalidLiveUntilLedger = 124,
 }
 
 // ################## EVENTS ##################
