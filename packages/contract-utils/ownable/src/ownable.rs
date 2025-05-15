@@ -55,8 +55,8 @@ pub trait Ownable {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum OwnableError {
-    NotAuthorized = 200,
-    CannotRenounceWhilePendingTransfer = 201,
+    NotAuthorized = 130,
+    TransferInProgress = 131,
 }
 
 // ################## EVENTS ##################
