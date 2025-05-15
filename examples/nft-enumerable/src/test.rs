@@ -6,8 +6,8 @@ use soroban_sdk::{testutils::Address as _, Address, Env};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
-fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {
-    let address = e.register(ExampleContract, ());
+fn create_client<'a>(e: &Env, owner: &Address) -> ExampleContractClient<'a> {
+    let address = e.register(ExampleContract, (owner,));
     ExampleContractClient::new(e, &address)
 }
 
@@ -19,7 +19,7 @@ fn enumerable_transfer_override_works() {
 
     let recipient = Address::generate(&e);
 
-    let client = create_client(&e);
+    let client = create_client(&e, &owner);
 
     e.mock_all_auths();
     client.mint(&owner);
@@ -32,8 +32,8 @@ fn enumerable_transfer_override_works() {
 #[test]
 fn enumerable_burn_works() {
     let e = Env::default();
-    let client = create_client(&e);
     let owner = Address::generate(&e);
+    let client = create_client(&e, &owner);
     e.mock_all_auths();
     client.mint(&owner);
     client.burn(&owner, &0);
