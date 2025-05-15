@@ -27,7 +27,7 @@ where
     let current_in_storage = e
         .storage()
         .instance()
-        .get::<_, Address>(active_key)
+        .get::<T, Address>(active_key)
         .unwrap_or_else(|| panic_with_error!(e, RoleTransferError::AccountNotFound));
 
     if current != &current_in_storage {
@@ -35,7 +35,7 @@ where
     }
 
     if live_until_ledger == 0 {
-        let Some(pending) = e.storage().temporary().get::<_, Address>(pending_key) else {
+        let Some(pending) = e.storage().temporary().get::<U, Address>(pending_key) else {
             panic_with_error!(e, RoleTransferError::NoPendingTransfer);
         };
         e.storage().temporary().remove(pending_key);

@@ -6,6 +6,7 @@ use crate::ownable::{
     OwnableError,
 };
 
+/// Storage keys for `Ownable` utility.
 #[contracttype]
 pub enum OwnableStorageKey {
     Owner,
@@ -114,7 +115,7 @@ pub fn accept_ownership(e: &Env, caller: &Address) {
 ///
 /// # Errors
 ///
-/// * [`OwnableError::CannotRenounceWhilePendingTransfer`] - If there is a
+/// * [`OwnableError::TransferInProgress`] - If there is a
 ///   pending ownership transfer.
 /// * refer to [`ensure_is_owner()`].
 ///
@@ -127,7 +128,7 @@ pub fn renounce_ownership(e: &Env, caller: &Address) {
     caller.require_auth();
 
     if e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner).is_some() {
-        panic_with_error!(e, OwnableError::CannotRenounceWhilePendingTransfer);
+        panic_with_error!(e, OwnableError::TransferInProgress);
     }
 
     e.storage().instance().remove(&OwnableStorageKey::Owner);
