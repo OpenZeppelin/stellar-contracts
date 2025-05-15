@@ -11,8 +11,9 @@ use soroban_sdk::{
 };
 use soroban_test_helpers;
 
-use super::storage::{clawback, set_admin, set_authorized};
-use crate::sac_admin::storage::{get_sac_address, mint, set_sac_address};
+use crate::sac_admin::storage::{
+    clawback, get_sac_address, mint, set_admin, set_authorized, set_sac_address, SACAdminDataKey,
+};
 
 fn create_sac_client<'a>(e: &Env, issuer: &Address) -> StellarAssetClient<'a> {
     let sac: StellarAssetContract = e.register_stellar_asset_contract_v2(issuer.clone());
@@ -52,7 +53,9 @@ fn test_sac_set_address(e: Env, sac: Address) {
 
     e.as_contract(&new_admin, || {
         set_sac_address(&e, &sac);
+        let sac_addr: Address = e.storage().instance().get(&SACAdminDataKey::Sac).unwrap();
         assert_eq!(get_sac_address(&e), sac);
+        assert_eq!(sac_addr, sac);
     });
 }
 

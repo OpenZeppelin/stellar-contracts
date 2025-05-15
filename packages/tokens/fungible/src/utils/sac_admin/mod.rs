@@ -44,6 +44,18 @@
 //!
 //! This module implements **the wrapper version** for an Admin contract,
 //! defining the interface and functions necessary to interact with a SAC.
+//!
+//! **NOTE**
+//!
+//! All functions, exposed in the `SACAdmin` trait, include an additional
+//! parameter `operator: Address`. This account is the one authorizing the
+//! invocation. Having it as a parameter is particularly useful when
+//! implementing role-based access controls, in which case there can be mulitple
+//! accounts per role.
+//!
+//! However, this parameter is omitted from the module functions, defined in
+//! "storage.rs", because the authorizations are to be handled in the access
+//! control helpers or directly implemented.
 
 mod storage;
 pub use storage::{
