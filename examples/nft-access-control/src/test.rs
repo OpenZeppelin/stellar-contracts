@@ -6,8 +6,8 @@ use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
-fn create_client<'a>(e: &Env, owner: &Address) -> ExampleContractClient<'a> {
-    let address = e.register(ExampleContract, (owner,));
+fn create_client<'a>(e: &Env, admin: &Address) -> ExampleContractClient<'a> {
+    let address = e.register(ExampleContract, (admin,));
     ExampleContractClient::new(e, &address)
 }
 
@@ -21,7 +21,7 @@ pub struct TestAccounts {
     pub outsider: Address,
 }
 
-fn setup_roles(e: &Env, client: &ExampleContractClient, owner: &Address) -> TestAccounts {
+fn setup_roles(e: &Env, client: &ExampleContractClient, admin: &Address) -> TestAccounts {
     let minter_admin = Address::generate(e);
     let burner_admin = Address::generate(e);
     let minter1 = Address::generate(e);
@@ -31,12 +31,12 @@ fn setup_roles(e: &Env, client: &ExampleContractClient, owner: &Address) -> Test
     let outsider = Address::generate(e);
 
     // Set role admins
-    client.set_role_admin(owner, &Symbol::new(e, "minter"), &Symbol::new(e, "minter_admin"));
-    client.set_role_admin(owner, &Symbol::new(e, "burner"), &Symbol::new(e, "burner_admin"));
+    client.set_role_admin(admin, &Symbol::new(e, "minter"), &Symbol::new(e, "minter_admin"));
+    client.set_role_admin(admin, &Symbol::new(e, "burner"), &Symbol::new(e, "burner_admin"));
 
     // Grant admin roles
-    client.grant_role(owner, &minter_admin, &Symbol::new(e, "minter_admin"));
-    client.grant_role(owner, &burner_admin, &Symbol::new(e, "burner_admin"));
+    client.grant_role(admin, &minter_admin, &Symbol::new(e, "minter_admin"));
+    client.grant_role(admin, &burner_admin, &Symbol::new(e, "burner_admin"));
 
     // Admins grant operational roles
     client.grant_role(&minter_admin, &minter1, &Symbol::new(e, "minter"));
@@ -50,12 +50,12 @@ fn setup_roles(e: &Env, client: &ExampleContractClient, owner: &Address) -> Test
 #[test]
 fn minters_can_mint() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
 
     e.mock_all_auths();
 
-    let accounts = setup_roles(&e, &client, &owner);
+    let accounts = setup_roles(&e, &client, &admin);
 
     client.mint(&accounts.minter1, &accounts.minter1, &1);
     client.mint(&accounts.minter2, &accounts.minter2, &2);
@@ -65,12 +65,12 @@ fn minters_can_mint() {
 #[should_panic(expected = "Error(Contract, #120)")]
 fn non_minters_cannot_mint() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
 
     e.mock_all_auths();
 
-    let accounts = setup_roles(&e, &client, &owner);
+    let accounts = setup_roles(&e, &client, &admin);
 
     client.mint(&accounts.outsider, &accounts.outsider, &3);
 }
@@ -78,12 +78,12 @@ fn non_minters_cannot_mint() {
 #[test]
 fn burners_can_burn() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
 
     e.mock_all_auths();
 
-    let accounts = setup_roles(&e, &client, &owner);
+    let accounts = setup_roles(&e, &client, &admin);
 
     client.mint(&accounts.minter1, &accounts.burner1, &10);
     client.burn(&accounts.burner1, &10);
@@ -93,12 +93,12 @@ fn burners_can_burn() {
 #[should_panic(expected = "Error(Contract, #120)")]
 fn non_burners_cannot_burn() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
 
     e.mock_all_auths();
 
-    let accounts = setup_roles(&e, &client, &owner);
+    let accounts = setup_roles(&e, &client, &admin);
 
     client.mint(&accounts.minter1, &accounts.outsider, &11);
     client.burn(&accounts.outsider, &11);
@@ -107,12 +107,12 @@ fn non_burners_cannot_burn() {
 #[test]
 fn burners_can_burn_from() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
 
     e.mock_all_auths();
 
-    let accounts = setup_roles(&e, &client, &owner);
+    let accounts = setup_roles(&e, &client, &admin);
 
     // Mint to someone else
     client.mint(&accounts.minter1, &accounts.outsider, &20);
@@ -126,12 +126,12 @@ fn burners_can_burn_from() {
 #[should_panic(expected = "Error(Contract, #120)")]
 fn non_burners_cannot_burn_from() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
 
     e.mock_all_auths();
 
-    let accounts = setup_roles(&e, &client, &owner);
+    let accounts = setup_roles(&e, &client, &admin);
 
     // Mint to burner1
     client.mint(&accounts.minter1, &accounts.burner1, &21);
@@ -143,12 +143,12 @@ fn non_burners_cannot_burn_from() {
 #[test]
 fn minter_admin_can_grant_role() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
 
     e.mock_all_auths();
 
-    let accounts = setup_roles(&e, &client, &owner);
+    let accounts = setup_roles(&e, &client, &admin);
 
     let new_minter = Address::generate(&e);
     client.grant_role(&accounts.minter_admin, &new_minter, &symbol_short!("minter"));
@@ -161,12 +161,12 @@ fn minter_admin_can_grant_role() {
 #[should_panic(expected = "Error(Contract, #120)")]
 fn burner_admin_can_revoke_role() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
 
     e.mock_all_auths();
 
-    let accounts = setup_roles(&e, &client, &owner);
+    let accounts = setup_roles(&e, &client, &admin);
 
     // Revoke burner's role
     client.revoke_role(&accounts.burner_admin, &accounts.burner1, &symbol_short!("burner"));
@@ -179,12 +179,12 @@ fn burner_admin_can_revoke_role() {
 #[should_panic(expected = "Error(Contract, #120)")]
 fn non_admin_cannot_grant_role() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
 
     e.mock_all_auths();
 
-    let accounts = setup_roles(&e, &client, &owner);
+    let accounts = setup_roles(&e, &client, &admin);
 
     let new_minter = Address::generate(&e);
     client.grant_role(&accounts.outsider, &new_minter, &symbol_short!("minter"));
@@ -194,12 +194,12 @@ fn non_admin_cannot_grant_role() {
 #[should_panic(expected = "Error(Contract, #120)")]
 fn non_admin_cannot_revoke_role() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
 
     e.mock_all_auths();
 
-    let accounts = setup_roles(&e, &client, &owner);
+    let accounts = setup_roles(&e, &client, &admin);
 
     client.revoke_role(&accounts.outsider, &accounts.burner1, &symbol_short!("burner"));
 }
@@ -207,14 +207,14 @@ fn non_admin_cannot_revoke_role() {
 #[test]
 fn admin_transfer_works() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
     let new_admin = Address::generate(&e);
 
     e.mock_all_auths();
 
-    // Owner (current admin) initiates the transfer
-    client.transfer_admin_role(&owner, &new_admin, &1000);
+    // Current admin initiates the transfer
+    client.transfer_admin_role(&admin, &new_admin, &1000);
 
     // New admin accepts
     client.accept_admin_transfer(&new_admin);
@@ -228,16 +228,16 @@ fn admin_transfer_works() {
 #[should_panic(expected = "Error(Contract, #123)")]
 fn admin_transfer_cancelled() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
     let new_admin = Address::generate(&e);
 
     e.mock_all_auths();
 
-    client.transfer_admin_role(&owner, &new_admin, &1000);
+    client.transfer_admin_role(&admin, &new_admin, &1000);
 
     // Now cancel
-    client.transfer_admin_role(&owner, &new_admin, &0);
+    client.transfer_admin_role(&admin, &new_admin, &0);
 
     // New admin tries to accept—should panic
     client.accept_admin_transfer(&new_admin);
@@ -247,8 +247,8 @@ fn admin_transfer_cancelled() {
 #[should_panic(expected = "Error(Contract, #120)")]
 fn non_admin_cannot_initiate_transfer() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
     let intruder = Address::generate(&e);
     let new_admin = Address::generate(&e);
 
@@ -261,14 +261,14 @@ fn non_admin_cannot_initiate_transfer() {
 #[should_panic(expected = "Error(Contract, #120)")]
 fn non_recipient_cannot_accept_transfer() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
     let new_admin = Address::generate(&e);
     let imposter = Address::generate(&e);
 
     e.mock_all_auths();
 
-    client.transfer_admin_role(&owner, &new_admin, &1000);
+    client.transfer_admin_role(&admin, &new_admin, &1000);
 
     // Imposter tries to accept
     client.accept_admin_transfer(&imposter);
@@ -279,8 +279,8 @@ fn non_recipient_cannot_accept_transfer() {
 // #[should_panic(expected = "Error(Contract, #120)")]
 // fn expired_admin_transfer_panics() {
 //     let e = Env::default();
-//     let owner = Address::generate(&e);
-//     let client = create_client(&e, &owner);
+//     let admin = Address::generate(&e);
+//     let client = create_client(&e, &admin);
 //     let new_admin = Address::generate(&e);
 
 //     e.mock_all_auths();
@@ -288,7 +288,7 @@ fn non_recipient_cannot_accept_transfer() {
 //     // Start at t = 1000
 //     e.ledger().set_sequence_number(1000);
 
-//     client.transfer_admin_role(&owner, &new_admin);
+//     client.transfer_admin_role(&admin, &new_admin);
 
 //     // Move past the TTL for the admin transfer
 //     // ADMIN_TRANSFER_TTL = 2 * DAY_IN_LEDGERS = 2 * 17280 = 34560
