@@ -333,7 +333,8 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
 ///   `operator`).
 /// * `approved` - Address of the approved.
 /// * `token_id` - The identifier of the transferred token.
-/// * `live_until_ledger` - The ledger number at which the approval expires.
+/// * `live_until_ledger` - The ledger number at which the approval expires. If
+///   `live_until_ledger` is `0`, the approval is revoked.
 ///
 /// # Events
 ///
