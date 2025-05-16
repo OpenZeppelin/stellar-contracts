@@ -5,7 +5,7 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
 use stellar_default_impl_macro::default_impl;
-use stellar_ownable::Ownable;
+use stellar_ownable::{set_owner, Ownable};
 use stellar_ownable_macro::only_owner;
 
 #[contracttype]
@@ -20,7 +20,7 @@ pub struct ExampleContract;
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        e.storage().instance().set(&DataKey::Owner, &owner);
+        set_owner(e, &owner);
         e.storage().instance().set(&DataKey::Counter, &0);
     }
 

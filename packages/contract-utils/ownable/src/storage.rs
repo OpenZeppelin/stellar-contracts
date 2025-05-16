@@ -13,6 +13,8 @@ pub enum OwnableStorageKey {
     PendingOwner,
 }
 
+// ################## QUERY STATE ##################
+
 /// Returns `Some(Address)` if ownership is set, or `None` if ownership has been
 /// renounced.
 ///
@@ -46,6 +48,22 @@ pub fn ensure_is_owner(e: &Env, caller: &Address) {
         // functions
         panic_with_error!(e, OwnableError::NotAuthorized);
     }
+}
+
+// ################## CHANGE STATE ##################
+
+/// Sets owner role.
+///
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `owner` - The account to grant the owner privilege.
+///
+/// **IMPORTANT**: this function lacks authorization checks.
+/// It is expected to call this function only in the constructor!
+pub fn set_owner(e: &Env, owner: &Address) {
+    e.storage().instance().set(&OwnableStorageKey::Owner, &owner);
 }
 
 /// Initiates a 2-step ownership transfer to a new owner.
@@ -115,8 +133,8 @@ pub fn accept_ownership(e: &Env, caller: &Address) {
 ///
 /// # Errors
 ///
-/// * [`OwnableError::TransferInProgress`] - If there is a
-///   pending ownership transfer.
+/// * [`OwnableError::TransferInProgress`] - If there is a pending ownership
+///   transfer.
 /// * refer to [`ensure_is_owner()`].
 ///
 /// # Events

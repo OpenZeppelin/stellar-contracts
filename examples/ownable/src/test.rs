@@ -21,7 +21,7 @@ fn initial_state() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #200)")]
+#[should_panic(expected = "Error(Contract, #130)")]
 fn non_owner_cannot_increment() {
     let e = Env::default();
     let owner = Address::generate(&e);

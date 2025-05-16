@@ -279,8 +279,8 @@ pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_u
         &AccessControlStorageKey::PendingAdmin,
         live_until_ledger,
     ) {
-        Some(pending) => emit_admin_transfer(e, admin, &pending, live_until_ledger),
-        None => emit_admin_transfer(e, admin, new_admin, live_until_ledger),
+        Some(pending) => emit_admin_transfer_initiated(e, admin, &pending, live_until_ledger),
+        None => emit_admin_transfer_initiated(e, admin, new_admin, live_until_ledger),
     }
 }
 

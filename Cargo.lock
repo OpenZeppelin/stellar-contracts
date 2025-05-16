@@ -866,7 +866,7 @@ checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
 name = "ownable-example"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-default-impl-macro",
@@ -1419,7 +1419,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-macro-helpers"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1446,7 +1446,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-ownable-macro"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",

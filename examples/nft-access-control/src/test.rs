@@ -279,7 +279,7 @@ fn non_recipient_cannot_accept_transfer() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #123)")]
+#[should_panic(expected = "Error(Contract, #141)")]
 fn expired_admin_transfer_panics() {
     let e = Env::default();
     let admin = Address::generate(&e);
