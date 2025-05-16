@@ -1,5 +1,5 @@
 [package]
-name = "stellar-access-control"
+name = "stellar-role-transfer"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -12,9 +12,6 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-stellar-constants = { workspace = true }
-stellar-role-transfer = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-stellar-event-assertion = { workspace = true }

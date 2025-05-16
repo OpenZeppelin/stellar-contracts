@@ -229,8 +229,8 @@ fn admin_transfer_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #123)")]
-fn admin_transfer_cancelled() {
+#[should_panic(expected = "Error(Contract, #141)")]
+fn cannot_accept_after_admin_transfer_cancelled() {
     let e = Env::default();
     let admin = Address::generate(&e);
     let client = create_client(&e, &admin);
@@ -248,7 +248,7 @@ fn admin_transfer_cancelled() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #140)")]
 fn non_admin_cannot_initiate_transfer() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -262,7 +262,7 @@ fn non_admin_cannot_initiate_transfer() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #140)")]
 fn non_recipient_cannot_accept_transfer() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -279,7 +279,7 @@ fn non_recipient_cannot_accept_transfer() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #123)")]
+#[should_panic(expected = "Error(Contract, #141)")]
 fn expired_admin_transfer_panics() {
     let e = Env::default();
     let admin = Address::generate(&e);

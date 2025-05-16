@@ -19,3 +19,5 @@ stellar-event-assertion = { workspace = true }
 stellar-default-impl-macro = { workspace = true }
 stellar-fungible = { workspace = true }
 stellar-non-fungible = { workspace = true }
+stellar-ownable = { workspace = true }
+stellar-ownable-macro = { workspace = true }
