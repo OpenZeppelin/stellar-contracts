@@ -85,17 +85,16 @@ pub fn set_owner(e: &Env, owner: &Address) {
 /// * topics - `["ownership_transfer"]`
 /// * data - `[old_owner: Address, new_owner: Address]`
 pub fn transfer_ownership(e: &Env, caller: &Address, new_owner: &Address, live_until_ledger: u32) {
-    match transfer_role(
+    transfer_role(
         e,
         caller,
         new_owner,
         &OwnableStorageKey::Owner,
         &OwnableStorageKey::PendingOwner,
         live_until_ledger,
-    ) {
-        Some(pending) => emit_ownership_transfer(e, caller, &pending),
-        None => emit_ownership_transfer(e, caller, new_owner),
-    }
+    );
+
+    emit_ownership_transfer(e, caller, new_owner, live_until_ledger);
 }
 
 /// Completes the 2-step ownership transfer process.
