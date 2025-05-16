@@ -90,16 +90,15 @@ pub fn emit_ownership_transfer(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `old_owner` - The previous owner.
 /// * `new_owner` - The new owner who accepted the transfer.
 ///
 /// # Events
 ///
 /// * topics - `["ownership_transfer_completed"]`
-/// * data - `[old_owner: Address, new_owner: Address]`
-pub fn emit_ownership_transfer_completed(e: &Env, old_owner: &Address, new_owner: &Address) {
+/// * data - `[new_owner: Address]`
+pub fn emit_ownership_transfer_completed(e: &Env, new_owner: &Address) {
     let topics = (Symbol::new(e, "ownership_transfer_completed"),);
-    e.events().publish(topics, (old_owner, new_owner));
+    e.events().publish(topics, new_owner);
 }
 
 /// Emits an event when ownership is renounced.
