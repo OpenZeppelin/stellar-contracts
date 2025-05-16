@@ -8,6 +8,7 @@ members = [
     "examples/nft-consecutive",
     "examples/nft-enumerable",
     "examples/nft-sequential-minting",
+    "examples/sac-admin-wrapper",
     "examples/upgradeable/*",
     "packages/constants",
     "packages/contract-utils/*",
@@ -28,6 +29,7 @@ soroban-sdk = "22.0.6"
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
+soroban-test-helpers = "0.2.3"
 
 # members
 stellar-access-control = { path = "packages/contract-utils/access-control" }
