@@ -3,7 +3,7 @@ use soroban_sdk::{
 };
 use stellar_default_impl_macro::default_impl;
 use stellar_fungible::FungibleToken;
-use stellar_ownable::Ownable;
+use stellar_ownable::{set_owner, Ownable};
 use stellar_ownable_macro::only_owner;
 
 #[contracttype]
@@ -17,7 +17,7 @@ pub struct ExampleContract;
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        e.storage().instance().set(&DataKey::Owner, &owner);
+        set_owner(e, &owner);
         stellar_fungible::metadata::set_metadata(
             e,
             7,

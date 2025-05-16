@@ -31,8 +31,8 @@ pub use crate::{
         Ownable, OwnableError,
     },
     storage::{
-        accept_ownership, ensure_is_owner, get_owner, renounce_ownership, transfer_ownership,
-        OwnableStorageKey,
+        accept_ownership, ensure_is_owner, get_owner, renounce_ownership, set_owner,
+        transfer_ownership, OwnableStorageKey,
     },
 };
 

@@ -6,8 +6,8 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    accept_ownership, ensure_is_owner, get_owner, renounce_ownership, transfer_ownership,
-    OwnableStorageKey,
+    accept_ownership, ensure_is_owner, get_owner, renounce_ownership, set_owner,
+    transfer_ownership, OwnableStorageKey,
 };
 
 #[contract]
@@ -22,7 +22,7 @@ fn transfer_ownership_sets_pending() {
     let contract = e.register(MockContract, ());
 
     e.as_contract(&contract, || {
-        e.storage().instance().set(&OwnableStorageKey::Owner, &owner);
+        set_owner(&e, &owner);
 
         transfer_ownership(&e, &owner, &new_owner, 1000);
 
@@ -44,7 +44,7 @@ fn accept_ownership_completes_transfer() {
     let contract = e.register(MockContract, ());
 
     e.as_contract(&contract, || {
-        e.storage().instance().set(&OwnableStorageKey::Owner, &old_owner);
+        set_owner(&e, &old_owner);
         e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &new_owner);
 
         accept_ownership(&e, &new_owner);
@@ -65,7 +65,7 @@ fn renounce_ownership_removes_owner() {
     let contract = e.register(MockContract, ());
 
     e.as_contract(&contract, || {
-        e.storage().instance().set(&OwnableStorageKey::Owner, &owner);
+        set_owner(&e, &owner);
 
         renounce_ownership(&e, &owner);
 
@@ -83,30 +83,29 @@ fn ensure_is_owner_works() {
     let contract = e.register(MockContract, ());
 
     e.as_contract(&contract, || {
-        e.storage().instance().set(&OwnableStorageKey::Owner, &owner);
+        set_owner(&e, &owner);
 
-        // Should not panic
         ensure_is_owner(&e, &owner);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #200)")]
+#[should_panic(expected = "Error(Contract, #130)")]
 fn ensure_is_owner_panics_if_not_owner() {
     let e = Env::default();
-    let real_owner = Address::generate(&e);
+    let owner = Address::generate(&e);
     let caller = Address::generate(&e);
     let contract = e.register(MockContract, ());
 
     e.as_contract(&contract, || {
-        e.storage().instance().set(&OwnableStorageKey::Owner, &real_owner);
+        set_owner(&e, &owner);
 
-        ensure_is_owner(&e, &caller); // should panic
+        ensure_is_owner(&e, &caller);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #200)")]
+#[should_panic(expected = "Error(Contract, #130)")]
 fn ensure_is_owner_panics_if_renounced() {
     let e = Env::default();
     let caller = Address::generate(&e);
@@ -114,12 +113,12 @@ fn ensure_is_owner_panics_if_renounced() {
 
     e.as_contract(&contract, || {
         // No owner is set — simulates renounced ownership
-        ensure_is_owner(&e, &caller); // should panic
+        ensure_is_owner(&e, &caller);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #201)")]
+#[should_panic(expected = "Error(Contract, #131)")]
 fn renounce_fails_if_pending_transfer_exists() {
     let e = Env::default();
     e.mock_all_auths();
@@ -128,7 +127,7 @@ fn renounce_fails_if_pending_transfer_exists() {
     let contract = e.register(MockContract, ());
 
     e.as_contract(&contract, || {
-        e.storage().instance().set(&OwnableStorageKey::Owner, &owner);
+        set_owner(&e, &owner);
         e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &pending);
 
         renounce_ownership(&e, &owner);
