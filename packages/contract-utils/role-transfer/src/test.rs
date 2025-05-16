@@ -109,6 +109,32 @@ fn accept_transfer_with_no_pending_transfer_panics() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #144)")]
+fn cannot_cancel_with_invalid_pending_address() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let new_admin = Address::generate(&e);
+    let invalid_new_admin = Address::generate(&e);
+    let active_key = MockRole::Admin;
+    let pending_key = MockRole::PendingAdmin;
+
+    e.as_contract(&address, || {
+        // Initialize admin
+        e.storage().instance().set(&MockRole::Admin, &admin);
+
+        // Start admin transfer
+        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 1000);
+    });
+
+    e.as_contract(&address, || {
+        // Cancel the transfer with an invalid pending address
+        transfer_role(&e, &admin, &invalid_new_admin, &active_key, &pending_key, 0);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #142)")]
 fn transfer_with_invalid_live_until_ledger_panics() {
     let e = Env::default();

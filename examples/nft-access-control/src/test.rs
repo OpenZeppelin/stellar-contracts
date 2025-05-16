@@ -230,7 +230,7 @@ fn admin_transfer_works() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #141)")]
-fn admin_transfer_cancelled() {
+fn cannot_accept_after_admin_transfer_cancelled() {
     let e = Env::default();
     let admin = Address::generate(&e);
     let client = create_client(&e, &admin);

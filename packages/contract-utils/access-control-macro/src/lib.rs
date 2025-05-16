@@ -1,5 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
+use stellar_macro_helpers::parse_env_arg;
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
@@ -45,10 +46,12 @@ pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
     let fn_sig = &input_fn.sig;
     let fn_block = &input_fn.block;
 
+    let env_arg = parse_env_arg(&input_fn);
+
     let expanded = quote! {
         #(#fn_attrs)*
         #fn_vis #fn_sig {
-            stellar_access_control::ensure_role(e, #param_reference, &soroban_sdk::Symbol::new(e, #role_str));
+            stellar_access_control::ensure_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, #role_str));
             #fn_block
         }
     };

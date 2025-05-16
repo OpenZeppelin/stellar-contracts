@@ -68,14 +68,21 @@ pub enum OwnableError {
 /// * `e` - Access to the Soroban environment.
 /// * `old_owner` - The current owner initiating the transfer.
 /// * `new_owner` - The proposed new owner.
+/// * `live_until_ledger` - The ledger number at which the pending transfer will
+///   expire. If this value is `0`, it means the pending transfer is cancelled.
 ///
 /// # Events
 ///
 /// * topics - `["ownership_transfer"]`
 /// * data - `[old_owner: Address, new_owner: Address]`
-pub fn emit_ownership_transfer(e: &Env, old_owner: &Address, new_owner: &Address) {
+pub fn emit_ownership_transfer(
+    e: &Env,
+    old_owner: &Address,
+    new_owner: &Address,
+    live_until_ledger: u32,
+) {
     let topics = (Symbol::new(e, "ownership_transfer"),);
-    e.events().publish(topics, (old_owner, new_owner));
+    e.events().publish(topics, (old_owner, new_owner, live_until_ledger));
 }
 
 /// Emits an event when an ownership transfer is completed.

@@ -271,17 +271,16 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// * Authorization for `admin` is required.
 pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_until_ledger: u32) {
-    match transfer_role(
+    transfer_role(
         e,
         admin,
         new_admin,
         &AccessControlStorageKey::Admin,
         &AccessControlStorageKey::PendingAdmin,
         live_until_ledger,
-    ) {
-        Some(pending) => emit_admin_transfer_initiated(e, admin, &pending, live_until_ledger),
-        None => emit_admin_transfer_initiated(e, admin, new_admin, live_until_ledger),
-    }
+    );
+
+    emit_admin_transfer_initiated(e, admin, new_admin, live_until_ledger);
 }
 
 /// Completes the 2-step admin transfer.
