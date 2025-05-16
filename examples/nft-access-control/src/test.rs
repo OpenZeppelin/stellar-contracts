@@ -2,7 +2,11 @@
 
 extern crate std;
 
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env, Symbol};
+use soroban_sdk::{
+    symbol_short,
+    testutils::{Address as _, Ledger},
+    Address, Env, Symbol,
+};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
@@ -274,26 +278,23 @@ fn non_recipient_cannot_accept_transfer() {
     client.accept_admin_transfer(&imposter);
 }
 
-// TODO: is there a way to test for expired entries?
-// #[test]
-// #[should_panic(expected = "Error(Contract, #120)")]
-// fn expired_admin_transfer_panics() {
-//     let e = Env::default();
-//     let admin = Address::generate(&e);
-//     let client = create_client(&e, &admin);
-//     let new_admin = Address::generate(&e);
+#[test]
+#[should_panic(expected = "Error(Contract, #123)")]
+fn expired_admin_transfer_panics() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+    let new_admin = Address::generate(&e);
 
-//     e.mock_all_auths();
+    e.mock_all_auths();
 
-//     // Start at t = 1000
-//     e.ledger().set_sequence_number(1000);
+    // Start at t = 1000
+    e.ledger().set_sequence_number(1000);
 
-//     client.transfer_admin_role(&admin, &new_admin);
+    client.transfer_admin_role(&admin, &new_admin, &2000);
 
-//     // Move past the TTL for the admin transfer
-//     // ADMIN_TRANSFER_TTL = 2 * DAY_IN_LEDGERS = 2 * 17280 = 34560
-//     // So we need to move at least this amount forward
-//     e.ledger().set_sequence_number(1000 + 34560 + 1);
+    // Move past the TTL for the admin transfer
+    e.ledger().set_sequence_number(3000);
 
-//     client.accept_admin_transfer(&new_admin);
-// }
+    client.accept_admin_transfer(&new_admin);
+}
