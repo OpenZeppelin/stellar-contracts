@@ -111,14 +111,11 @@ pub fn transfer_ownership(e: &Env, caller: &Address, new_owner: &Address, live_u
 /// # Events
 ///
 /// * topics - `["ownership_transfer_completed"]`
-/// * data - `[old_owner: Address, new_owner: Address]`
+/// * data - `[new_owner: Address]`
 pub fn accept_ownership(e: &Env, caller: &Address) {
-    let previous_owner =
-        get_owner(e).expect("One cannot renounce ownership while there is a pending transfer.");
-
     accept_transfer(e, caller, &OwnableStorageKey::Owner, &OwnableStorageKey::PendingOwner);
 
-    emit_ownership_transfer_completed(e, &previous_owner, caller);
+    emit_ownership_transfer_completed(e, caller);
 }
 
 /// Renounces ownership of the contract.
