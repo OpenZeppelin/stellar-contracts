@@ -250,7 +250,6 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `admin` - The address of the admin.
 /// * `new_admin` - The account to transfer the admin privileges to.
 /// * `live_until_ledger` - The ledger number at which the pending transfer
 ///   expires. If `live_until_ledger` is `0`, the pending transfer is cancelled.
@@ -270,17 +269,13 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 /// # Notes
 ///
 /// * Authorization for `admin` is required.
-pub fn transfer_admin_role(e: &Env, admin: &Address, new_admin: &Address, live_until_ledger: u32) {
-    transfer_role(
-        e,
-        admin,
-        new_admin,
-        &AccessControlStorageKey::Admin,
-        &AccessControlStorageKey::PendingAdmin,
-        live_until_ledger,
-    );
+pub fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32) {
+    let admin = get_admin(e);
+    admin.require_auth();
 
-    emit_admin_transfer_initiated(e, admin, new_admin, live_until_ledger);
+    transfer_role(e, new_admin, &AccessControlStorageKey::PendingAdmin, live_until_ledger);
+
+    emit_admin_transfer_initiated(e, &admin, new_admin, live_until_ledger);
 }
 
 /// Completes the 2-step admin transfer.

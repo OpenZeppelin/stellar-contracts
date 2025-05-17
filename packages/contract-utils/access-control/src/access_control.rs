@@ -131,7 +131,6 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the admin.
     /// * `new_admin` - The account to transfer the admin privileges to.
     /// * `live_until_ledger` - The ledger number at which the pending transfer
     ///   expires. If `live_until_ledger` is `0`, the pending transfer is
@@ -143,7 +142,7 @@ pub trait AccessControl {
     ///
     /// * topics - `["admin_transfer_initiated", current_admin: Address]`
     /// * data - `[new_admin: Address, live_until_ledger: u32]`
-    fn transfer_admin_role(e: &Env, caller: Address, new_admin: Address, live_until_ledger: u32);
+    fn transfer_admin_role(e: &Env, new_admin: Address, live_until_ledger: u32);
 
     /// Completes the 2-step admin transfer.
     ///

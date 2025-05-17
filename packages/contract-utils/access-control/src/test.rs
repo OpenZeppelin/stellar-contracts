@@ -359,7 +359,7 @@ fn transfer_admin_role_from_non_admin_panics() {
         set_admin(&e, &admin);
 
         // Non-admin attempts to transfer admin role
-        transfer_admin_role(&e, &non_admin, &new_admin, 1000);
+        transfer_admin_role(&e, &new_admin, 1000);
     });
 }
 
@@ -377,10 +377,10 @@ fn cancel_transfer_admin_role_from_non_admin_panics() {
         set_admin(&e, &admin);
 
         // Start a valid admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 1000);
+        transfer_admin_role(&e, &new_admin, 1000);
 
         // Non-admin attempts to cancel the admin transfer
-        transfer_admin_role(&e, &non_admin, &new_admin, 0);
+        transfer_admin_role(&e, &new_admin, 0);
     });
 }
 
@@ -398,6 +398,20 @@ fn set_role_admin_from_non_admin_panics() {
 
         // Non-admin attempts to set a role admin
         set_role_admin(&e, &non_admin, &USER_ROLE, &MANAGER_ROLE);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #143)")]
+fn admin_transfer_fails_when_no_admin_set() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let new_admin = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Attempt to accept transfer with no admin set
+        transfer_admin_role(&e, &new_admin, 1000);
     });
 }
 

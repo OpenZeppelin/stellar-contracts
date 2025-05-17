@@ -9,7 +9,7 @@
 //! - Transferring ownership
 //! - Renouncing ownership
 //!
-//! The helper `ensure_is_owner()` is available to restrict access to only the
+//! The helper `enforce_owner_auth()` is available to restrict access to only the
 //! owner. You can also use the `#[only_owner]` macro (provided elsewhere) to
 //! simplify this.
 //!
@@ -31,7 +31,7 @@ pub use crate::{
         Ownable, OwnableError,
     },
     storage::{
-        accept_ownership, ensure_is_owner, get_owner, renounce_ownership, set_owner,
+        accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
         transfer_ownership, OwnableStorageKey,
     },
 };

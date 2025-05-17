@@ -72,23 +72,6 @@ fn admin_transfer_cancel_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #143)")]
-fn error_when_no_admin_set() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
-    let new_admin = Address::generate(&e);
-    let active_key = MockRole::Admin;
-    let pending_key = MockRole::PendingAdmin;
-
-    e.as_contract(&address, || {
-        // Attempt to accept transfer with no pending transfer
-        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 3);
-    });
-}
-
-#[test]
 #[should_panic(expected = "Error(Contract, #141)")]
 fn accept_transfer_with_no_pending_transfer_panics() {
     let e = Env::default();
@@ -109,7 +92,7 @@ fn accept_transfer_with_no_pending_transfer_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #144)")]
+#[should_panic(expected = "Error(Contract, #143)")]
 fn cannot_cancel_with_invalid_pending_address() {
     let e = Env::default();
     e.mock_all_auths();
