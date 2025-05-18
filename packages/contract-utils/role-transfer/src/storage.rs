@@ -10,50 +10,25 @@ use crate::RoleTransferError;
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `current` - The current role holder initiating the transfer.
 /// * `new` - The proposed new role holder.
-/// * `active_key` - Storage key for the current role holder.
 /// * `pending_key` - Storage key for the pending role holder.
 /// * `live_until_ledger` - Ledger number until which the new role holder can
 ///   accept. A value of `0` cancels the pending transfer.
 ///
 /// # Errors
 ///
-/// * [`RoleTransferError::AccountNotFound`] - If the current role holder is not
-///   found in storage.
-/// * [`RoleTransferError::Unauthorized`] - If the caller is not the current
-///   role holder.
 /// * [`RoleTransferError::NoPendingTransfer`] - If trying to cancel a transfer
 ///   that doesn't exist.
 /// * [`RoleTransferError::InvalidLiveUntilLedger`] - If the specified ledger is
 ///   in the past.
 /// * [`RoleTransferError::InvalidPendingAccount`] - If the specified pending
 ///   account is not the same as the provided `new` address.
-pub fn transfer_role<T, U>(
-    e: &Env,
-    current: &Address,
-    new: &Address,
-    active_key: &T,
-    pending_key: &U,
-    live_until_ledger: u32,
-) where
+pub fn transfer_role<T>(e: &Env, new: &Address, pending_key: &T, live_until_ledger: u32)
+where
     T: IntoVal<Env, Val>,
-    U: IntoVal<Env, Val>,
 {
-    current.require_auth();
-
-    let current_in_storage = e
-        .storage()
-        .instance()
-        .get::<T, Address>(active_key)
-        .unwrap_or_else(|| panic_with_error!(e, RoleTransferError::AccountNotFound));
-
-    if current != &current_in_storage {
-        panic_with_error!(e, RoleTransferError::Unauthorized);
-    }
-
     if live_until_ledger == 0 {
-        let Some(pending) = e.storage().temporary().get::<U, Address>(pending_key) else {
+        let Some(pending) = e.storage().temporary().get::<T, Address>(pending_key) else {
             panic_with_error!(e, RoleTransferError::NoPendingTransfer);
         };
         if pending != *new {

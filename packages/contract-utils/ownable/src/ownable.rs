@@ -23,16 +23,45 @@ pub trait Ownable {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `caller` - The current owner initiating the transfer.
     /// * `new_owner` - The proposed new owner.
     /// * `live_until_ledger` - Ledger number until which the new owner can
     ///   accept. A value of `0` cancels any pending transfer.
     ///
     /// # Errors
     ///
-    /// * [`OwnableError::NotAuthorized`] - If `caller` is not the current
-    ///   owner.
-    fn transfer_ownership(e: &Env, caller: Address, new_owner: Address, live_until_ledger: u32);
+    /// * [`OwnableError::NotAuthorized`] - If the authorization from the current
+    ///   owner is missing.
+    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If trying to cancel a transfer
+    ///   that doesn't exist.
+    /// * [`stellar_role_transfer::RoleTransferError::InvalidLiveUntilLedger`] - If the specified ledger is
+    ///   in the past.
+    /// * [`stellar_role_transfer::RoleTransferError::InvalidPendingAccount`] - If the specified pending
+    ///   account is not the same as the provided `new` address.
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for the current owner is required.
+    fn transfer_ownership(e: &Env, new_owner: Address, live_until_ledger: u32);
+
+    /// Accepts a pending ownership transfer.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `caller` - The address of the pending owner accepting ownership.
+    ///
+    /// # Errors
+    ///
+    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If there is no pending transfer
+    ///   to accept.
+    /// * [`stellar_role_transfer::RoleTransferError::Unauthorized`] - If the caller is not the pending
+    ///   role holder.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["ownership_transfer_completed"]`
+    /// * data - `[new_owner: Address]`
+    fn accept_ownership(e: &Env, caller: Address);
 
     /// Renounces ownership of the contract.
     ///
@@ -46,8 +75,13 @@ pub trait Ownable {
     ///
     /// # Errors
     ///
-    /// * [`OwnableError::NotAuthorized`] - If `caller` is not the current
-    ///   owner.
+    /// * [`OwnableError::TransferInProgress`] - If there is a pending ownership
+    ///   transfer.
+    /// * [`OwnableError::NotAuthorized`] - If the authorization from the current owner is missing.
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for the current owner is required.
     fn renounce_ownership(e: &Env, caller: Address);
 }
 

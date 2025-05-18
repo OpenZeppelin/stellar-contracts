@@ -16,8 +16,7 @@ enum RoleTransferError {
     Unauthorized = 140,
     NoPendingTransfer = 141,
     InvalidLiveUntilLedger = 142,
-    AccountNotFound = 143,
-    InvalidPendingAccount = 144,
+    InvalidPendingAccount = 143,
 }
 
 mod test;

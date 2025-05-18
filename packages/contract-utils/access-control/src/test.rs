@@ -99,7 +99,7 @@ fn role_admin_management_works() {
         set_admin(&e, &admin);
 
         // Set MANAGER_ROLE as admin for USER_ROLE
-        set_role_admin(&e, &admin, &USER_ROLE, &MANAGER_ROLE);
+        set_role_admin(&e, &USER_ROLE, &MANAGER_ROLE);
     });
 
     e.as_contract(&address, || {
@@ -148,7 +148,7 @@ fn get_role_admin_returns_some_when_set() {
         set_admin(&e, &admin);
 
         // Set ADMIN_ROLE as the admin for USER_ROLE
-        set_role_admin(&e, &admin, &USER_ROLE, &ADMIN_ROLE);
+        set_role_admin(&e, &USER_ROLE, &ADMIN_ROLE);
 
         // Check that get_role_admin returns the correct admin role
         let admin_role = get_role_admin(&e, &USER_ROLE);
@@ -207,7 +207,7 @@ fn admin_transfer_works() {
         set_admin(&e, &admin);
 
         // Start admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 1000);
+        transfer_admin_role(&e, &new_admin, 1000);
 
         // Accept admin transfer
         accept_admin_transfer(&e, &new_admin);
@@ -233,7 +233,7 @@ fn admin_transfer_cancel_works() {
         set_admin(&e, &admin);
 
         // Start admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 1000);
+        transfer_admin_role(&e, &new_admin, 1000);
 
         // Verify events
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -242,7 +242,7 @@ fn admin_transfer_cancel_works() {
 
     e.as_contract(&address, || {
         // Cancel admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 0);
+        transfer_admin_role(&e, &new_admin, 0);
 
         // Verify admin hasn't changed
         assert_eq!(get_admin(&e), admin);
@@ -359,7 +359,7 @@ fn transfer_admin_role_from_non_admin_panics() {
         set_admin(&e, &admin);
 
         // Non-admin attempts to transfer admin role
-        transfer_admin_role(&e, &non_admin, &new_admin, 1000);
+        transfer_admin_role(&e, &new_admin, 1000);
     });
 }
 
@@ -377,10 +377,10 @@ fn cancel_transfer_admin_role_from_non_admin_panics() {
         set_admin(&e, &admin);
 
         // Start a valid admin transfer
-        transfer_admin_role(&e, &admin, &new_admin, 1000);
+        transfer_admin_role(&e, &new_admin, 1000);
 
         // Non-admin attempts to cancel the admin transfer
-        transfer_admin_role(&e, &non_admin, &new_admin, 0);
+        transfer_admin_role(&e, &new_admin, 0);
     });
 }
 
@@ -397,7 +397,21 @@ fn set_role_admin_from_non_admin_panics() {
         set_admin(&e, &admin);
 
         // Non-admin attempts to set a role admin
-        set_role_admin(&e, &non_admin, &USER_ROLE, &MANAGER_ROLE);
+        set_role_admin(&e, &USER_ROLE, &MANAGER_ROLE);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #143)")]
+fn admin_transfer_fails_when_no_admin_set() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let new_admin = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Attempt to accept transfer with no admin set
+        transfer_admin_role(&e, &new_admin, 1000);
     });
 }
 

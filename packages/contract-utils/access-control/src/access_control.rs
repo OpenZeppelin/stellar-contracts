@@ -32,8 +32,7 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::AccountNotFound`] - If the indexing is out of
-    ///   bounds.
+    /// * [`AccessControlError::AccountNotFound`] - If the account is not found at the given index.
     fn get_role_member(e: &Env, role: Symbol, index: u32) -> Address;
 
     /// Returns the admin role for a specific role.
@@ -53,7 +52,7 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * `AccessControlError::AccountNotFound` - If no admin account is set.
+    /// * [`AccessControlError::AccountNotFound`] - If no admin account is set.
     fn get_admin(e: &Env) -> Address;
 
     /// Grants a role to an account.
@@ -68,8 +67,9 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * `AccessControlError::Unauthorized` - If the caller does not have
+    /// * [`AccessControlError::Unauthorized`] - If the caller does not have
     ///   enough privileges.
+    /// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
     ///
     /// # Events
     ///
@@ -91,10 +91,11 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * `AccessControlError::Unauthorized` - If the `caller` does not have
+    /// * [`AccessControlError::Unauthorized`] - If the `caller` does not have
     ///   enough privileges.
-    /// * `AccessControlError::AccountNotFound` - If the `account` doesn't have
+    /// * [`AccessControlError::AccountNotFound`] - If the `account` doesn't have
     ///   the role.
+    /// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
     ///
     /// # Events
     ///
@@ -114,7 +115,7 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * `AccessControlError::AccountNotFound` - If the `caller` doesn't have
+    /// * [`AccessControlError::AccountNotFound`] - If the `caller` doesn't have
     ///   the role.
     ///
     /// # Events
@@ -131,7 +132,6 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the admin.
     /// * `new_admin` - The account to transfer the admin privileges to.
     /// * `live_until_ledger` - The ledger number at which the pending transfer
     ///   expires. If `live_until_ledger` is `0`, the pending transfer is
@@ -139,11 +139,23 @@ pub trait AccessControl {
     ///   maximum allowed TTL extension for a temporary storage entry and
     ///   specifying a higher value will cause the code to panic.
     ///
+    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If trying to cancel a transfer
+    ///   that doesn't exist.
+    /// * [`stellar_role_transfer::RoleTransferError::InvalidLiveUntilLedger`] - If the specified ledger is
+    ///   in the past.
+    /// * [`stellar_role_transfer::RoleTransferError::InvalidPendingAccount`] - If the specified pending
+    ///   account is not the same as the provided `new` address.
+    /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+    ///
     /// # Events
     ///
     /// * topics - `["admin_transfer_initiated", current_admin: Address]`
     /// * data - `[new_admin: Address, live_until_ledger: u32]`
-    fn transfer_admin_role(e: &Env, caller: Address, new_admin: Address, live_until_ledger: u32);
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for the current admin is required.
+    fn transfer_admin_role(e: &Env, new_admin: Address, live_until_ledger: u32);
 
     /// Completes the 2-step admin transfer.
     ///
@@ -156,6 +168,14 @@ pub trait AccessControl {
     ///
     /// * topics - `["admin_transfer_completed", new_admin: Address]`
     /// * data - `[previous_admin: Address]`
+    ///
+    /// # Errors
+    ///
+    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If there is no pending transfer
+    ///   to accept.
+    /// * [`stellar_role_transfer::RoleTransferError::Unauthorized`] - If the caller is not the pending
+    ///   role holder.
+    /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
     fn accept_admin_transfer(e: &Env, caller: Address);
 
     /// Sets `admin_role` as the admin role of `role`.
@@ -163,14 +183,22 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the admin.
     /// * `role` - The role to set the admin for.
     /// * `admin_role` - The new admin role.
     ///
+    /// # Events
+    ///
+    /// * topics - `["role_admin_changed", role: Symbol]`
+    /// * data - `[previous_admin_role: Symbol, new_admin_role: Symbol]`
+    ///
     /// # Errors
     ///
-    /// * `AccessControlError::Unauthorized` - If the `caller` is not the admin.
-    fn set_role_admin(e: &Env, caller: Address, role: Symbol, admin_role: Symbol);
+    /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for the current admin is required.
+    fn set_role_admin(e: &Env, role: Symbol, admin_role: Symbol);
 }
 
 #[contracterror]
@@ -179,7 +207,7 @@ pub trait AccessControl {
 pub enum AccessControlError {
     Unauthorized = 120,
     AccountNotFound = 121,
-    OutOfBounds = 122,
+    AdminNotSet = 122,
 }
 
 // ################## EVENTS ##################
