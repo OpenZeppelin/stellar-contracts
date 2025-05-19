@@ -71,7 +71,7 @@ mod overrides;
 mod storage;
 mod utils;
 
-pub use extensions::{burnable, consecutive, enumerable};
+pub use extensions::{burnable, consecutive, enumerable, royalties};
 pub use non_fungible::{
     emit_approve, emit_approve_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenError,
 };
