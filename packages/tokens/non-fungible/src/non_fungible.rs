@@ -303,7 +303,8 @@ pub enum NonFungibleTokenError {
     InvalidAmount = 312,
     /// Indicates royalty percentage exceeds maximum allowed value
     RoyaltyTooHigh = 313,
-    /// Indicates attempting to set royalties for a token that already has royalty information
+    /// Indicates attempting to set royalties for a token that already has
+    /// royalty information
     RoyaltyAlreadySet = 314,
 }
 

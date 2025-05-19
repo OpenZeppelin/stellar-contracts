@@ -2,9 +2,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 use stellar_constants::{OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD};
 
 use crate::{
-    extensions::royalties::MAX_ROYALTY_BASIS_POINTS,
-    non_fungible::NonFungibleTokenError,
-    Base,
+    extensions::royalties::MAX_ROYALTY_BASIS_POINTS, non_fungible::NonFungibleTokenError, Base,
 };
 
 /// Storage container for royalty information
@@ -23,18 +21,20 @@ pub enum RoyaltyStorageKey {
 
 impl Base {
     /// Sets the global default royalty information for the entire collection.
-    /// This will be used for all tokens that don't have specific royalty information.
+    /// This will be used for all tokens that don't have specific royalty
+    /// information.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that should receive royalty payments.
-    /// * `basis_points` - The royalty percentage in basis points (100 = 1%, 10000 = 100%).
+    /// * `basis_points` - The royalty percentage in basis points (100 = 1%,
+    ///   10000 = 100%).
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::RoyaltyTooHigh`] - If the royalty percentage exceeds
-    ///   the maximum allowed value.
+    /// * [`NonFungibleTokenError::RoyaltyTooHigh`] - If the royalty percentage
+    ///   exceeds the maximum allowed value.
     ///
     /// # Events
     ///
@@ -59,22 +59,25 @@ impl Base {
     }
 
     /// Sets the royalty information for a specific token.
-    /// This must be called during minting, as royalties are immutable after minting.
+    /// This must be called during minting, as royalties are immutable after
+    /// minting.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token_id` - The identifier of the token.
     /// * `receiver` - The address that should receive royalty payments.
-    /// * `basis_points` - The royalty percentage in basis points (100 = 1%, 10000 = 100%).
+    /// * `basis_points` - The royalty percentage in basis points (100 = 1%,
+    ///   10000 = 100%).
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not exist.
-    /// * [`NonFungibleTokenError::RoyaltyTooHigh`] - If the royalty percentage exceeds
-    ///   the maximum allowed value.
-    /// * [`NonFungibleTokenError::RoyaltyAlreadySet`] - If attempting to set royalties
-    ///   for a token that already has royalty information.
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
+    ///   exist.
+    /// * [`NonFungibleTokenError::RoyaltyTooHigh`] - If the royalty percentage
+    ///   exceeds the maximum allowed value.
+    /// * [`NonFungibleTokenError::RoyaltyAlreadySet`] - If attempting to set
+    ///   royalties for a token that already has royalty information.
     ///
     /// # Events
     ///
@@ -113,15 +116,18 @@ impl Base {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token_id` - The identifier of the token.
-    /// * `sale_price` - The sale price for which royalties are being calculated.
+    /// * `sale_price` - The sale price for which royalties are being
+    ///   calculated.
     ///
     /// # Returns
     ///
-    /// * `(Address, u32)` - A tuple containing the receiver address and the royalty amount.
+    /// * `(Address, u32)` - A tuple containing the receiver address and the
+    ///   royalty amount.
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not exist.
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
+    ///   exist.
     pub fn royalty_info(e: &Env, token_id: u32, sale_price: u32) -> (Address, u32) {
         // Verify token exists by checking owner
         let _ = Base::owner_of(e, token_id);

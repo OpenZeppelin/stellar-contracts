@@ -5,7 +5,8 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::{
-    extensions::enumerable::Enumerable, extensions::royalties::MAX_ROYALTY_BASIS_POINTS, Base,
+    extensions::{enumerable::Enumerable, royalties::MAX_ROYALTY_BASIS_POINTS},
+    Base,
 };
 
 #[contract]
