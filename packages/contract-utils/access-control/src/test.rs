@@ -206,6 +206,7 @@ fn admin_transfer_works_with_admin_auth() {
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
 
+    e.mock_all_auths();
     e.as_contract(&address, || {
         set_admin(&e, &admin);
     });
@@ -222,6 +223,7 @@ fn admin_transfer_works_with_admin_auth() {
             sub_invokes: &[],
         },
     }]);
+
     e.as_contract(&address, || {
         transfer_admin_role(&e, &new_admin, 1000);
     });

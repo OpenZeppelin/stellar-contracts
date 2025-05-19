@@ -272,7 +272,7 @@ pub fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32)
     log!(e, "admin inside transfer_admin_role: {}", admin);
     admin.require_auth();
 
-    transfer_role(e, new_admin, &AccessControlStorageKey::PendingAdmin, live_until_ledger);
+    // transfer_role(e, new_admin, &AccessControlStorageKey::PendingAdmin, live_until_ledger);
 
     emit_admin_transfer_initiated(e, &admin, new_admin, live_until_ledger);
 }
