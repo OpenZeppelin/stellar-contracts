@@ -78,17 +78,13 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///   for a token that already has royalty information.
     fn set_token_royalty(e: &Env, token_id: u32, receiver: Address, basis_points: u32);
 
-    /// Returns the royalty information for a token.
+    /// Returns `(Address, u32)` - A tuple containing the receiver address and the royalty amount.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token_id` - The identifier of the token.
     /// * `sale_price` - The sale price for which royalties are being calculated.
-    ///
-    /// # Returns
-    ///
-    /// * `(Address, u32)` - A tuple containing the receiver address and the royalty amount.
     ///
     /// # Errors
     ///
