@@ -34,7 +34,7 @@ fn admin_transfer_works() {
         e.storage().instance().set(&active_key, &admin);
 
         // Start transfer
-        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 1000);
+        transfer_role(&e, &new_admin, &pending_key, 1000);
 
         // Accept admin transfer
         accept_transfer(&e, &new_admin, &active_key, &pending_key);
@@ -51,7 +51,6 @@ fn admin_transfer_cancel_works() {
     let address = e.register(MockContract, ());
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
-    let active_key = MockRole::Admin;
     let pending_key = MockRole::PendingAdmin;
 
     e.as_contract(&address, || {
@@ -59,12 +58,12 @@ fn admin_transfer_cancel_works() {
         e.storage().instance().set(&MockRole::Admin, &admin);
 
         // Start admin transfer
-        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 1000);
+        transfer_role(&e, &new_admin, &pending_key, 1000);
     });
 
     e.as_contract(&address, || {
         // Cancel admin transfer
-        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 0);
+        transfer_role(&e, &new_admin, &pending_key, 0);
 
         // Verify admin hasn't changed
         assert_eq!(e.storage().instance().get::<_, Address>(&MockRole::Admin), Some(admin));
@@ -99,8 +98,6 @@ fn cannot_cancel_with_invalid_pending_address() {
     let address = e.register(MockContract, ());
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
-    let invalid_new_admin = Address::generate(&e);
-    let active_key = MockRole::Admin;
     let pending_key = MockRole::PendingAdmin;
 
     e.as_contract(&address, || {
@@ -108,12 +105,12 @@ fn cannot_cancel_with_invalid_pending_address() {
         e.storage().instance().set(&MockRole::Admin, &admin);
 
         // Start admin transfer
-        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 1000);
+        transfer_role(&e, &new_admin, &pending_key, 1000);
     });
 
     e.as_contract(&address, || {
         // Cancel the transfer with an invalid pending address
-        transfer_role(&e, &admin, &invalid_new_admin, &active_key, &pending_key, 0);
+        transfer_role(&e, &new_admin, &pending_key, 0);
     });
 }
 
@@ -125,7 +122,6 @@ fn transfer_with_invalid_live_until_ledger_panics() {
     let address = e.register(MockContract, ());
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
-    let active_key = MockRole::Admin;
     let pending_key = MockRole::PendingAdmin;
 
     e.ledger().set_sequence_number(1000);
@@ -135,7 +131,7 @@ fn transfer_with_invalid_live_until_ledger_panics() {
         e.storage().instance().set(&MockRole::Admin, &admin);
 
         // Start admin transfer
-        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 3);
+        transfer_role(&e, &new_admin, &pending_key, 3);
     });
 }
 
@@ -147,7 +143,6 @@ fn cancel_transfer_when_there_is_no_pending_transfer_panics() {
     let address = e.register(MockContract, ());
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
-    let active_key = MockRole::Admin;
     let pending_key = MockRole::PendingAdmin;
 
     e.as_contract(&address, || {
@@ -155,7 +150,7 @@ fn cancel_transfer_when_there_is_no_pending_transfer_panics() {
         e.storage().instance().set(&MockRole::Admin, &admin);
 
         // Cancel admin transfer when there is no pending transfer
-        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 0);
+        transfer_role(&e, &new_admin, &pending_key, 0);
     });
 }
 
@@ -176,7 +171,7 @@ fn wrong_pending_admin_accept_panics() {
         e.storage().instance().set(&MockRole::Admin, &admin);
 
         // Start admin transfer
-        transfer_role(&e, &admin, &new_admin, &active_key, &pending_key, 1000);
+        transfer_role(&e, &new_admin, &pending_key, 1000);
 
         // Wrong account attempts to accept transfer
         accept_transfer(&e, &wrong_admin, &active_key, &pending_key);

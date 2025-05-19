@@ -25,7 +25,7 @@ impl ExampleContract {
     }
 
     #[only_owner]
-    pub fn increment(e: &Env, caller: Address) -> i32 {
+    pub fn increment(e: &Env) -> i32 {
         let mut counter: i32 =
             e.storage().instance().get(&DataKey::Counter).expect("counter should be set");
 

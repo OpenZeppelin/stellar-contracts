@@ -71,7 +71,6 @@ pub trait Ownable {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `caller` - The current owner.
     ///
     /// # Errors
     ///
@@ -82,7 +81,7 @@ pub trait Ownable {
     /// # Notes
     ///
     /// * Authorization for the current owner is required.
-    fn renounce_ownership(e: &Env, caller: Address);
+    fn renounce_ownership(e: &Env);
 }
 
 #[contracterror]

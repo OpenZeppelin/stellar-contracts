@@ -46,8 +46,8 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
-                fn transfer_admin_role(e: &soroban_sdk::Env, caller: soroban_sdk::Address, new_admin: soroban_sdk::Address, live_until_ledger: u32) {
-                    stellar_access_control::transfer_admin_role(e, &caller, &new_admin, live_until_ledger);
+                fn transfer_admin_role(e: &soroban_sdk::Env, new_admin: soroban_sdk::Address, live_until_ledger: u32) {
+                    stellar_access_control::transfer_admin_role(e, &new_admin, live_until_ledger);
                 }
             },
             syn::parse_quote! {
@@ -56,8 +56,8 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
-                fn set_role_admin(e: &soroban_sdk::Env, caller: soroban_sdk::Address, role: soroban_sdk::Symbol, admin_role: soroban_sdk::Symbol) {
-                    stellar_access_control::set_role_admin(e, &caller, &role, &admin_role);
+                fn set_role_admin(e: &soroban_sdk::Env, role: soroban_sdk::Symbol, admin_role: soroban_sdk::Symbol) {
+                    stellar_access_control::set_role_admin(e, &role, &admin_role);
                 }
             },
         ],
@@ -213,13 +213,18 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
-                fn transfer_ownership(e: &soroban_sdk::Env, caller: soroban_sdk::Address, new_owner: soroban_sdk::Address, live_until_ledger: u32) {
-                    stellar_ownable::transfer_ownership(e, &caller, &new_owner, live_until_ledger);
+                fn transfer_ownership(e: &soroban_sdk::Env, new_owner: soroban_sdk::Address, live_until_ledger: u32) {
+                    stellar_ownable::transfer_ownership(e, &new_owner, live_until_ledger);
                 }
             },
             syn::parse_quote! {
-                fn renounce_ownership(e: &soroban_sdk::Env, caller: soroban_sdk::Address) {
-                    stellar_ownable::renounce_ownership(e, &caller);
+                fn accept_ownership(e: &soroban_sdk::Env, caller: soroban_sdk::Address) {
+                    stellar_ownable::accept_ownership(e, &caller);
+                }
+            },
+            syn::parse_quote! {
+                fn renounce_ownership(e: &soroban_sdk::Env) {
+                    stellar_ownable::renounce_ownership(e);
                 }
             },
         ],

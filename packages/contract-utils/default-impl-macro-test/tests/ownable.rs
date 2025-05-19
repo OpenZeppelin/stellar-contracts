@@ -27,7 +27,7 @@ impl ExampleContract {
     }
 
     #[only_owner]
-    pub fn mint(e: &Env, caller: Address, to: Address, amount: i128) {
+    pub fn mint(e: &Env, to: Address, amount: i128) {
         stellar_fungible::mintable::mint(e, &to, amount);
     }
 }
@@ -53,5 +53,5 @@ fn default_impl_ownable() {
 
     e.mock_all_auths();
 
-    client.mint(&owner, &owner, &100);
+    client.mint(&owner, &100);
 }

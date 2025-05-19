@@ -17,7 +17,7 @@ fn initial_state() {
     let owner = Address::generate(&e);
     let client = create_client(&e, &owner);
 
-    assert_eq!(client.increment(&owner), 1);
+    assert_eq!(client.increment(), 1);
 }
 
 #[test]
@@ -25,9 +25,8 @@ fn initial_state() {
 fn non_owner_cannot_increment() {
     let e = Env::default();
     let owner = Address::generate(&e);
-    let user = Address::generate(&e);
     let client = create_client(&e, &owner);
 
     e.mock_all_auths();
-    client.increment(&user);
+    client.increment();
 }
