@@ -4,6 +4,7 @@ members = [
     "examples/fungible-capped",
     "examples/fungible-pausable",
     "examples/fungible-token-interface",
+    "examples/nft-access-control",
     "examples/nft-consecutive",
     "examples/nft-enumerable",
     "examples/nft-sequential-minting",
@@ -31,6 +32,8 @@ syn = { version = "2.0", features = ["full"] }
 soroban-test-helpers = "0.2.3"
 
 # members
+stellar-access-control = { path = "packages/contract-utils/access-control" }
+stellar-access-control-macro = { path = "packages/contract-utils/access-control-macro" }
 stellar-constants = { path = "packages/constants" }
 stellar-default-impl-macro = { path = "packages/contract-utils/default-impl-macro" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }

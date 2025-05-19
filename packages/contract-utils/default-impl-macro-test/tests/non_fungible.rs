@@ -15,19 +15,16 @@ impl ExampleContract {
             String::from_str(e, "TKN"),
         );
     }
+
+    pub fn mint(e: &Env, to: Address, token_id: u32) {
+        Base::mint(e, &to, token_id);
+    }
 }
 
 #[default_impl]
 #[contractimpl]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Base;
-}
-
-#[contractimpl]
-impl ExampleContract {
-    pub fn mint(e: &Env, to: Address, token_id: u32) {
-        Base::mint(e, &to, token_id);
-    }
 }
 
 fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {
