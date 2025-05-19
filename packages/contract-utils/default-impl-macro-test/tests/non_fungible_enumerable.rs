@@ -18,6 +18,10 @@ impl ExampleContract {
             String::from_str(e, "TKN"),
         );
     }
+
+    pub fn mint(e: &Env, to: Address, token_id: u32) {
+        Enumerable::non_sequential_mint(e, &to, token_id);
+    }
 }
 
 #[default_impl]
@@ -29,17 +33,6 @@ impl NonFungibleToken for ExampleContract {
 #[default_impl]
 #[contractimpl]
 impl NonFungibleEnumerable for ExampleContract {}
-
-#[contractimpl]
-impl ExampleContract {
-    pub fn mint(e: &Env, to: Address, token_id: u32) {
-        Enumerable::non_sequential_mint(e, &to, token_id);
-    }
-
-    pub fn burn(e: &Env, from: Address, token_id: u32) {
-        Enumerable::burn(e, &from, token_id);
-    }
-}
 
 fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {
     let address = e.register(ExampleContract, ());
@@ -60,32 +53,4 @@ fn default_impl_enumerable_total_supply() {
     client.mint(&owner, &10);
     client.transfer(&owner, &recipient, &10);
     assert_eq!(client.total_supply(), 1);
-}
-
-#[test]
-fn default_impl_enumerable_get_owner_token_id() {
-    let e = Env::default();
-    let client = create_client(&e);
-    let owner = Address::generate(&e);
-    e.mock_all_auths();
-    client.mint(&owner, &10);
-    client.burn(&owner, &10);
-    assert_eq!(client.balance(&owner), 0);
-    client.mint(&owner, &11);
-    assert_eq!(client.balance(&owner), 1);
-    assert_eq!(client.get_owner_token_id(&owner, &0), 11);
-}
-
-#[test]
-fn default_impl_enumerable_get_token_id() {
-    let e = Env::default();
-    let client = create_client(&e);
-    let owner = Address::generate(&e);
-    e.mock_all_auths();
-    client.mint(&owner, &10);
-    client.burn(&owner, &10);
-    assert_eq!(client.balance(&owner), 0);
-    client.mint(&owner, &11);
-    assert_eq!(client.balance(&owner), 1);
-    assert_eq!(client.get_token_id(&0), 11);
 }

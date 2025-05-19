@@ -15,6 +15,10 @@ impl ExampleContract {
             String::from_str(e, "TKN"),
         );
     }
+
+    pub fn mint(e: &Env, to: Address, amount: i128) {
+        stellar_fungible::mintable::mint(e, &to, amount);
+    }
 }
 
 #[default_impl]
@@ -24,13 +28,6 @@ impl FungibleToken for ExampleContract {}
 #[default_impl]
 #[contractimpl]
 impl FungibleBurnable for ExampleContract {}
-
-#[contractimpl]
-impl ExampleContract {
-    pub fn mint(e: &Env, to: Address, amount: i128) {
-        stellar_fungible::mintable::mint(e, &to, amount);
-    }
-}
 
 fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {
     let address = e.register(ExampleContract, ());
