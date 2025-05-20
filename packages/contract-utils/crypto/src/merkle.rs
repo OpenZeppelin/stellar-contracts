@@ -13,7 +13,7 @@
 //! that are safe against this attack out of the box.
 use core::marker::PhantomData;
 
-use openzeppelin_crypto::hash::{BuildHasher, Hasher};
+use crate::hash::{BuildHasher, Hasher};
 use soroban_sdk::{BytesN, Env, Vec};
 
 use crate::keccak::KeccakBuilder;
@@ -110,8 +110,8 @@ mod tests {
 
     use std::format;
 
+    use crate::hash::BuildHasher;
     use hex_literal::hex;
-    use openzeppelin_crypto::hash::BuildHasher;
     use proptest::{prelude::*, prop_compose};
     use soroban_sdk::Env;
 

@@ -301,12 +301,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "crunchy"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43da5946c66ffcc7745f48db692ffbb10a83bfe0afd96235c5c2a4fb23994929"
-
-[[package]]
 name = "crypto-bigint"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -932,15 +926,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
-name = "openzeppelin-crypto"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b09793f9006c9edb8dc13015ba6ad3ecfec15eff75b117f9fd2ad2e46d89c202"
-dependencies = [
- "tiny-keccak",
-]
-
-[[package]]
 name = "p256"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1514,6 +1499,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-crypto"
+version = "0.2.0"
+dependencies = [
+ "hex-literal",
+ "proptest",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "stellar-default-impl-macro"
 version = "0.2.0"
 dependencies = [
@@ -1550,16 +1544,6 @@ dependencies = [
  "soroban-sdk",
  "stellar-constants",
  "stellar-event-assertion",
-]
-
-[[package]]
-name = "stellar-merkle-proofs"
-version = "0.2.0"
-dependencies = [
- "hex-literal",
- "openzeppelin-crypto",
- "proptest",
- "soroban-sdk",
 ]
 
 [[package]]
@@ -1726,15 +1710,6 @@ checksum = "2834e6017e3e5e4b9834939793b282bc03b37a3336245fa820e35e233e2a85de"
 dependencies = [
  "num-conv",
  "time-core",
-]
-
-[[package]]
-name = "tiny-keccak"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237"
-dependencies = [
- "crunchy",
 ]
 
 [[package]]
