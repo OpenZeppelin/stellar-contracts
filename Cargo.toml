@@ -25,9 +25,12 @@ version = "0.2.0"
 
 [workspace.dependencies]
 soroban-sdk = "22.0.6"
+openzeppelin-crypto = "=0.1.2"
 proc-macro2 = "1.0"
+proptest = "1"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
+hex-literal = "0.4.1"
 
 # members
 stellar-access-control = { path = "packages/contract-utils/access-control" }
