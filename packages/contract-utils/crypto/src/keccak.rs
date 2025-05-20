@@ -1,5 +1,6 @@
-use crate::hash::{BuildHasher, Hashable, Hasher};
 use soroban_sdk::{Bytes, BytesN, Env};
+
+use crate::hash::{BuildHasher, Hashable, Hasher};
 
 pub struct KeccakBuilder {
     env: Env,

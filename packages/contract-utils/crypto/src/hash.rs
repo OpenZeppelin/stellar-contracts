@@ -56,8 +56,9 @@ pub trait BuildHasher {
     ///
     /// This must not be used in any code which *creates* hashes, such as in an
     /// implementation of [`Hashable`].  The way to create a combined hash of
-    /// multiple values is to call [`Hashable::hash`] multiple times using the same
-    /// [`Hasher`], not to call this method repeatedly and combine the results.
+    /// multiple values is to call [`Hashable::hash`] multiple times using the
+    /// same [`Hasher`], not to call this method repeatedly and combine the
+    /// results.
     fn hash_one<H>(&self, h: H) -> <Self::Hasher as Hasher>::Output
     where
         H: Hashable,
@@ -117,7 +118,8 @@ mod tests {
     //use soroban_sdk::{Env, Vec};
 
     //fn non_empty_u8_vec_strategy() -> impl Strategy<Value = Vec<u8>> {
-    //prop::collection::vec(any::<u8>(), 1..ProptestConfig::default().max_default_size_range)
+    //prop::collection::vec(any::<u8>(),
+    // 1..ProptestConfig::default().max_default_size_range)
     //}
 
     //#[test]

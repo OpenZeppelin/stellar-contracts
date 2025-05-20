@@ -13,10 +13,12 @@
 //! that are safe against this attack out of the box.
 use core::marker::PhantomData;
 
-use crate::hash::{commutative_hash_pair, BuildHasher, Hasher};
 use soroban_sdk::{BytesN, Env, Vec};
 
-use crate::keccak::KeccakBuilder;
+use crate::{
+    hash::{commutative_hash_pair, BuildHasher, Hasher},
+    keccak::KeccakBuilder,
+};
 
 type Bytes32 = BytesN<32>;
 
@@ -86,12 +88,12 @@ mod tests {
 
     use std::format;
 
-    use crate::hash::BuildHasher;
     use hex_literal::hex;
     use proptest::{prelude::*, prop_compose};
     use soroban_sdk::Env;
 
     use super::{commutative_hash_pair, Bytes32, KeccakBuilder, Verifier};
+    use crate::hash::BuildHasher;
 
     macro_rules! to_bytes {
         ($env:tt, $lit:literal) => {
