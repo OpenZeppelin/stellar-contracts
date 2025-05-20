@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, log, panic_with_error, Address, Env, Symbol};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
 use stellar_constants::{ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
 use stellar_role_transfer::{accept_transfer, transfer_role};
 
@@ -269,10 +269,9 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 /// * Authorization for the current admin is required.
 pub fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32) {
     let admin = get_admin(e);
-    log!(e, "admin inside transfer_admin_role: {}", admin);
     admin.require_auth();
 
-    // transfer_role(e, new_admin, &AccessControlStorageKey::PendingAdmin, live_until_ledger);
+    transfer_role(e, new_admin, &AccessControlStorageKey::PendingAdmin, live_until_ledger);
 
     emit_admin_transfer_initiated(e, &admin, new_admin, live_until_ledger);
 }

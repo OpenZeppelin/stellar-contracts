@@ -3,7 +3,7 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, log, symbol_short,
+    contract, symbol_short,
     testutils::{Address as _, MockAuth, MockAuthInvoke},
     Address, Env, IntoVal, Symbol,
 };
@@ -211,44 +211,21 @@ fn admin_transfer_works_with_admin_auth() {
         set_admin(&e, &admin);
     });
 
-    log!(&e, "admin: {}", admin);
-
-    // Mock admin authorization for transfer
-    e.mock_auths(&[MockAuth {
-        address: &admin,
-        invoke: &MockAuthInvoke {
-            contract: &address,
-            fn_name: "transfer_admin_role",
-            args: (&new_admin, 1000_u32).into_val(&e),
-            sub_invokes: &[],
-        },
-    }]);
-
     e.as_contract(&address, || {
         transfer_admin_role(&e, &new_admin, 1000);
     });
 
-    // // Mock new admin authorization for accepting transfer
-    // e.mock_auths(&[MockAuth {
-    //     address: &new_admin,
-    //     invoke: &MockAuthInvoke {
-    //         contract: &address,
-    //         fn_name: "accept_admin_transfer",
-    //         args: (&new_admin,).into_val(&e),
-    //         sub_invokes: &[],
-    //     },
-    // }]);
-    // e.as_contract(&address, || {
-    //     // Accept admin transfer
-    //     accept_admin_transfer(&e, &new_admin);
+    e.as_contract(&address, || {
+        // Accept admin transfer
+        accept_admin_transfer(&e, &new_admin);
 
-    //     // Verify new admin
-    //     assert_eq!(get_admin(&e), new_admin);
+        // Verify new admin
+        assert_eq!(get_admin(&e), new_admin);
 
-    //     // Verify events
-    //     let event_assert = EventAssertion::new(&e, address.clone());
-    //     event_assert.assert_event_count(2);
-    // });
+        // Verify events
+        let event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+    });
 }
 
 #[test]

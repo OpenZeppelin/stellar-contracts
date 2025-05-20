@@ -20,7 +20,7 @@ pub enum MockRole {
 }
 
 #[test]
-fn admin_transfer_works() {
+fn role_transfer_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -45,7 +45,7 @@ fn admin_transfer_works() {
 }
 
 #[test]
-fn admin_transfer_cancel_works() {
+fn role_transfer_cancel_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -156,7 +156,7 @@ fn cancel_transfer_when_there_is_no_pending_transfer_panics() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #140)")]
-fn wrong_pending_admin_accept_panics() {
+fn wrong_pending_role_accept_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());

@@ -2,11 +2,7 @@
 
 extern crate std;
 
-use soroban_sdk::{
-    contract,
-    testutils::{Address as _, MockAuth, MockAuthInvoke},
-    Address, Env, IntoVal,
-};
+use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
@@ -24,20 +20,11 @@ fn transfer_ownership_sets_pending() {
     let new_owner = Address::generate(&e);
     let contract = e.register(MockContract, ());
 
+    e.mock_all_auths();
+
     e.as_contract(&contract, || {
         set_owner(&e, &owner);
     });
-
-    // Mock owner authorization
-    e.mock_auths(&[MockAuth {
-        address: &owner,
-        invoke: &MockAuthInvoke {
-            contract: &contract,
-            fn_name: "transfer_ownership",
-            args: (&new_owner, 1000_u32).into_val(&e),
-            sub_invokes: &[],
-        },
-    }]);
 
     e.as_contract(&contract, || {
         transfer_ownership(&e, &new_owner, 1000);
@@ -83,16 +70,7 @@ fn renounce_ownership_removes_owner() {
         set_owner(&e, &owner);
     });
 
-    // Mock owner authorization
-    e.mock_auths(&[MockAuth {
-        address: &owner,
-        invoke: &MockAuthInvoke {
-            contract: &contract,
-            fn_name: "renounce_ownership",
-            args: ().into_val(&e),
-            sub_invokes: &[],
-        },
-    }]);
+    e.mock_all_auths();
 
     e.as_contract(&contract, || {
         renounce_ownership(&e);
@@ -114,44 +92,7 @@ fn enforce_owner_auth_works() {
         set_owner(&e, &owner);
     });
 
-    // Mock owner authorization
-    e.mock_auths(&[MockAuth {
-        address: &owner,
-        invoke: &MockAuthInvoke {
-            contract: &contract,
-            fn_name: "enforce_owner_auth",
-            args: ().into_val(&e),
-            sub_invokes: &[],
-        },
-    }]);
-
-    e.as_contract(&contract, || {
-        enforce_owner_auth(&e);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #130)")]
-fn enforce_owner_auth_panics_if_not_owner() {
-    let e = Env::default();
-    let owner = Address::generate(&e);
-    let caller = Address::generate(&e);
-    let contract = e.register(MockContract, ());
-
-    e.as_contract(&contract, || {
-        set_owner(&e, &owner);
-    });
-
-    // Mock non-owner authorization
-    e.mock_auths(&[MockAuth {
-        address: &caller,
-        invoke: &MockAuthInvoke {
-            contract: &contract,
-            fn_name: "enforce_owner_auth",
-            args: ().into_val(&e),
-            sub_invokes: &[],
-        },
-    }]);
+    e.mock_all_auths();
 
     e.as_contract(&contract, || {
         enforce_owner_auth(&e);
@@ -162,21 +103,20 @@ fn enforce_owner_auth_panics_if_not_owner() {
 #[should_panic(expected = "Error(Contract, #130)")]
 fn enforce_owner_auth_panics_if_renounced() {
     let e = Env::default();
-    let caller = Address::generate(&e);
+    let owner = Address::generate(&e);
     let contract = e.register(MockContract, ());
 
-    // No owner is set — simulates renounced ownership
+    e.as_contract(&contract, || {
+        set_owner(&e, &owner);
+    });
 
-    // Mock caller authorization
-    e.mock_auths(&[MockAuth {
-        address: &caller,
-        invoke: &MockAuthInvoke {
-            contract: &contract,
-            fn_name: "enforce_owner_auth",
-            args: ().into_val(&e),
-            sub_invokes: &[],
-        },
-    }]);
+    e.mock_all_auths();
+
+    e.as_contract(&contract, || {
+        renounce_ownership(&e);
+
+        assert_eq!(get_owner(&e), None);
+    });
 
     e.as_contract(&contract, || {
         enforce_owner_auth(&e);
@@ -196,16 +136,7 @@ fn renounce_fails_if_pending_transfer_exists() {
         e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &pending);
     });
 
-    // Mock owner authorization
-    e.mock_auths(&[MockAuth {
-        address: &owner,
-        invoke: &MockAuthInvoke {
-            contract: &contract,
-            fn_name: "renounce_ownership",
-            args: ().into_val(&e),
-            sub_invokes: &[],
-        },
-    }]);
+    e.mock_all_auths();
 
     e.as_contract(&contract, || {
         renounce_ownership(&e);

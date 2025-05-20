@@ -211,31 +211,50 @@ fn non_admin_cannot_revoke_role() {
 #[test]
 fn admin_transfer_works() {
     let e = Env::default();
+
     let admin = Address::generate(&e);
     let client = create_client(&e, &admin);
     let new_admin = Address::generate(&e);
+    let random_user = Address::generate(&e);
 
     e.mock_auths(&[MockAuth {
         address: &admin,
         invoke: &MockAuthInvoke {
             contract: &client.address,
             fn_name: "transfer_admin_role",
-            args: (new_admin.clone(), 1000_i128).into_val(&e),
+            args: (new_admin.clone(), 1000_u32).into_val(&e),
             sub_invokes: &[],
         },
     }]);
 
-    // e.mock_all_auths();
-
     // Current admin initiates the transfer
     client.transfer_admin_role(&new_admin, &1000);
 
-    // // New admin accepts
-    // client.accept_admin_transfer(&new_admin);
+    e.mock_auths(&[MockAuth {
+        address: &new_admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "accept_admin_transfer",
+            args: (new_admin.clone(),).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
 
-    // // Sanity check: new admin can now grant a role
-    // let random_user = Address::generate(&e);
-    // client.grant_role(&new_admin, &random_user, &symbol_short!("minter"));
+    // New admin accepts
+    client.accept_admin_transfer(&new_admin);
+
+    e.mock_auths(&[MockAuth {
+        address: &new_admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "grant_role",
+            args: (new_admin.clone(), random_user.clone(), symbol_short!("minter")).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    // Sanity check: new admin can now grant a role
+    client.grant_role(&new_admin, &random_user, &symbol_short!("minter"));
 }
 
 #[test]
