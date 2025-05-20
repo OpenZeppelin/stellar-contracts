@@ -142,3 +142,21 @@ fn test_royalty_info_non_existent_token() {
         Base::royalty_info(&e, 999, 1000);
     });
 }
+
+#[test]
+fn test_no_royalty_set() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Mint a token
+        let token_id = Enumerable::sequential_mint(&e, &owner);
+
+        // Check royalty info
+        let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id, 1000);
+        assert_eq!(royalty_receiver, e.current_contract_address());
+        assert_eq!(royalty_amount, 0);
+    });
+}
