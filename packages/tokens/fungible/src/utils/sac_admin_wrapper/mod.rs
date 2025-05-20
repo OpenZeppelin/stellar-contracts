@@ -66,6 +66,8 @@ mod test;
 
 use soroban_sdk::{Address, Env};
 
+/// A trait to be implemented on a wrapper contract, serving as an administrator
+/// for a SAC.
 pub trait SACAdminWrapper {
     /// Sets the administrator to the specified address `new_admin`.
     ///
@@ -75,6 +77,13 @@ pub trait SACAdminWrapper {
     /// * `new_admin` - The address which will henceforth be the administrator
     ///   of the token contract.
     /// * `operator` - The address authorizing the invocation.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::sac_admin_wrapper::set_admin()`] when
+    /// implementing this function in conjuction with `stellar_ownable` or
+    /// `stellar_access_control` crates. Otherwise, authorizations MUST be
+    /// diligently checked.
     fn set_admin(e: Env, new_admin: Address, operator: Address);
 
     /// Sets whether the account is authorized to use its balance. If
@@ -86,6 +95,13 @@ pub trait SACAdminWrapper {
     /// * `id` - The address being (de-)authorized.
     /// * `authorize` - Whether or not `id` can use its balance.
     /// * `operator` - The address authorizing the invocation.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::sac_admin_wrapper::set_authorized()`] when
+    /// implementing this function in conjuction with `stellar_ownable` or
+    /// `stellar_access_control` crates. Otherwise, authorizations MUST be
+    /// diligently checked.
     fn set_authorized(e: Env, id: Address, authorize: bool, operator: Address);
 
     /// Mints `amount` to `to`.
@@ -96,6 +112,13 @@ pub trait SACAdminWrapper {
     /// * `to` - The address which will receive the minted tokens.
     /// * `amount` - The amount of tokens to be minted.
     /// * `operator` - The address authorizing the invocation.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::sac_admin_wrapper::mint()`] when
+    /// implementing this function in conjuction with `stellar_ownable` or
+    /// `stellar_access_control` crates. Otherwise, authorizations MUST be
+    /// diligently checked.
     fn mint(e: Env, to: Address, amount: i128, operator: Address);
 
     /// Clawback `amount` from `from` account. `amount` is burned in the
@@ -108,5 +131,12 @@ pub trait SACAdminWrapper {
     ///   take tokens.
     /// * `amount` - The amount of tokens to be clawed back.
     /// * `operator` - The address authorizing the invocation.
+    ///
+    /// # Notes
+    ///
+    /// We recommend using [`crate::sac_admin_wrapper::clawback()`] when
+    /// implementing this function in conjuction with `stellar_ownable` or
+    /// `stellar_access_control` crates. Otherwise, authorizations MUST be
+    /// diligently checked.
     fn clawback(e: Env, from: Address, amount: i128, operator: Address);
 }

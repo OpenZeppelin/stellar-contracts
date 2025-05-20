@@ -49,6 +49,11 @@ pub fn get_sac_client<'a>(e: &Env) -> StellarAssetClient<'a> {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `sac` - The address the SAC contract.
+///
+/// # Security Warning
+///
+/// This function lacks authorization checks. The implementer MUST assure proper
+/// access control and authorization.
 pub fn set_sac_address(e: &Env, sac: &Address) {
     e.storage().instance().set(&SACAdminWrapperDataKey::Sac, &sac);
 }
@@ -64,6 +69,11 @@ pub fn set_sac_address(e: &Env, sac: &Address) {
 /// # Errors
 ///
 /// * refer to [`get_sac_client`] errors.
+///
+/// # Security Warning
+///
+/// This function lacks authorization checks. The implementer MUST assure proper
+/// access control and authorization.
 pub fn set_admin(e: &Env, new_admin: &Address) {
     let client = get_sac_client(e);
     client.set_admin(new_admin);
@@ -80,6 +90,11 @@ pub fn set_admin(e: &Env, new_admin: &Address) {
 /// # Errors
 ///
 /// * refer to [`get_sac_client`] errors.
+///
+/// # Security Warning
+///
+/// This function lacks authorization checks. The implementer MUST assure proper
+/// access control and authorization.
 pub fn mint(e: &Env, to: &Address, amount: i128) {
     let client = get_sac_client(e);
     client.mint(to, &amount);
@@ -97,6 +112,11 @@ pub fn mint(e: &Env, to: &Address, amount: i128) {
 /// # Errors
 ///
 /// * refer to [`get_sac_client`] errors.
+///
+/// # Security Warning
+///
+/// This function lacks authorization checks. The implementer MUST assure proper
+/// access control and authorization.
 pub fn set_authorized(e: &Env, id: &Address, authorize: bool) {
     let client = get_sac_client(e);
     client.set_authorized(id, &authorize);
@@ -115,6 +135,11 @@ pub fn set_authorized(e: &Env, id: &Address, authorize: bool) {
 /// # Errors
 ///
 /// * refer to [`get_sac_client`] errors.
+///
+/// # Security Warning
+///
+/// This function lacks authorization checks. The implementer MUST assure proper
+/// access control and authorization.
 pub fn clawback(e: &Env, from: &Address, amount: i128) {
     let client = get_sac_client(e);
     client.clawback(from, &amount);
