@@ -4,7 +4,7 @@ An example flow when a `SACAdminWrapper` contract is set as a new administrator 
 sequenceDiagram
     actor Issuer
     actor Minter
-    participant AdminWrapper
+    participant AdminWrapper<br/>Contract
     participant AdminSigner
     participant SAC as Stellar<br/>Asset<br/>Contract
     actor User as Asset Holder
