@@ -109,7 +109,7 @@ where
 mod tests {
     extern crate std;
 
-    use std::{format, vec::Vec as RustVec};
+    use std::{format, vec::Vec};
 
     use proptest::prelude::*;
     use soroban_sdk::Env;
@@ -118,20 +118,20 @@ mod tests {
     use crate::keccak::KeccakBuilder;
 
     // Helper impl for testing
-    impl Hashable for RustVec<u8> {
+    impl Hashable for Vec<u8> {
         fn hash<H: Hasher>(&self, state: &mut H) {
             state.update(self.as_slice());
         }
     }
 
-    fn non_empty_u8_vec_strategy() -> impl Strategy<Value = RustVec<u8>> {
+    fn non_empty_u8_vec_strategy() -> impl Strategy<Value = Vec<u8>> {
         prop::collection::vec(any::<u8>(), 1..ProptestConfig::default().max_default_size_range)
     }
 
     #[test]
     fn commutative_hash_is_order_independent() {
         let e = Env::default();
-        proptest!(|(a: RustVec<u8>, b: RustVec<u8>)| {
+        proptest!(|(a: Vec<u8>, b: Vec<u8>)| {
             let builder = KeccakBuilder::new(&e);
             let hash1 = commutative_hash_pair(&a, &b, builder.build_hasher());
             let hash2 = commutative_hash_pair(&b, &a, builder.build_hasher());
@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn hash_pair_deterministic() {
         let e = Env::default();
-        proptest!(|(a: RustVec<u8>, b: RustVec<u8>)| {
+        proptest!(|(a: Vec<u8>, b: Vec<u8>)| {
             let builder = KeccakBuilder::new(&e);
             let hash1 = hash_pair(&a, &b, builder.build_hasher());
             let hash2 = hash_pair(&a, &b, builder.build_hasher());
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn commutative_hash_pair_deterministic() {
         let e = Env::default();
-        proptest!(|(a: RustVec<u8>, b: RustVec<u8>)| {
+        proptest!(|(a: Vec<u8>, b: Vec<u8>)| {
             let builder = KeccakBuilder::new(&e);
             let hash1 = commutative_hash_pair(&a, &b, builder.build_hasher());
             let hash2 = commutative_hash_pair(&a, &b, builder.build_hasher());
@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn identical_pairs_hash() {
         let e = Env::default();
-        proptest!(|(a: RustVec<u8>)| {
+        proptest!(|(a: Vec<u8>)| {
             let builder = KeccakBuilder::new(&e);
             let hash1 = hash_pair(&a, &a, builder.build_hasher());
             let hash2 = commutative_hash_pair(&a, &a, builder.build_hasher());
