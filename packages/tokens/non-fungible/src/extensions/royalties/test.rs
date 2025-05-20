@@ -4,10 +4,7 @@ extern crate std;
 
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
-use crate::{
-    extensions::{enumerable::Enumerable, royalties::MAX_ROYALTY_BASIS_POINTS},
-    Base,
-};
+use crate::{extensions::enumerable::Enumerable, Base};
 
 #[contract]
 struct MockContract;
@@ -30,20 +27,6 @@ fn test_set_default_royalty() {
         let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id, 1000);
         assert_eq!(royalty_receiver, receiver);
         assert_eq!(royalty_amount, 100); // 10% of 1000
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #313)")]
-fn test_set_default_royalty_too_high() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let receiver = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        // Try to set royalty higher than maximum
-        Base::set_default_royalty(&e, &receiver, MAX_ROYALTY_BASIS_POINTS + 1);
     });
 }
 
@@ -71,24 +54,6 @@ fn test_set_token_royalty() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #313)")]
-fn test_set_token_royalty_too_high() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let owner = Address::generate(&e);
-    let receiver = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        // Mint a token
-        let token_id = Enumerable::sequential_mint(&e, &owner);
-
-        // Try to set royalty higher than maximum
-        Base::set_token_royalty(&e, token_id, &receiver, MAX_ROYALTY_BASIS_POINTS + 1);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #314)")]
 fn test_set_token_royalty_already_set() {
     let e = Env::default();
     e.mock_all_auths();

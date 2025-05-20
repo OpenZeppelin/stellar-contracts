@@ -1,9 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 use stellar_constants::{OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD};
 
-use crate::{
-    extensions::royalties::MAX_ROYALTY_BASIS_POINTS, non_fungible::NonFungibleTokenError, Base,
-};
+use crate::{non_fungible::NonFungibleTokenError, Base};
 
 /// Storage container for royalty information
 #[contracttype]
@@ -47,11 +45,6 @@ impl Base {
     /// you want to invoke it from a constructor or from another function
     /// with admin-only authorization.
     pub fn set_default_royalty(e: &Env, receiver: &Address, basis_points: u32) {
-        // Validate the royalty percentage
-        if basis_points > MAX_ROYALTY_BASIS_POINTS {
-            panic_with_error!(e, NonFungibleTokenError::RoyaltyTooHigh);
-        }
-
         // Store the default royalty information
         let key = RoyaltyStorageKey::DefaultRoyalty;
         let royalty_info = RoyaltyInfo { receiver: receiver.clone(), basis_points };
@@ -92,11 +85,6 @@ impl Base {
     pub fn set_token_royalty(e: &Env, token_id: u32, receiver: &Address, basis_points: u32) {
         // Verify token exists by checking owner
         let _ = Base::owner_of(e, token_id);
-
-        // Validate the royalty percentage
-        if basis_points > MAX_ROYALTY_BASIS_POINTS {
-            panic_with_error!(e, NonFungibleTokenError::RoyaltyTooHigh);
-        }
 
         // Check if royalty is already set for this token
         let key = RoyaltyStorageKey::TokenRoyalty(token_id);

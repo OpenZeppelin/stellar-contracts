@@ -5,9 +5,6 @@ mod test;
 
 use soroban_sdk::{Address, Env};
 
-/// Maximum allowed royalty percentage (5000 basis points = 50%)
-pub const MAX_ROYALTY_BASIS_POINTS: u32 = 5000;
-
 /// Royalties Trait for Non-Fungible Token (ERC2981)
 ///
 /// The `NonFungibleRoyalties` trait extends the `NonFungibleToken` trait to
