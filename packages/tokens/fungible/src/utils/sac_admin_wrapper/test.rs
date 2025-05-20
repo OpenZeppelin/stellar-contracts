@@ -91,7 +91,7 @@ fn test_sac_mint(e: Env, issuer: Address, user: Address) {
 }
 
 #[soroban_test_helpers::test]
-// This error is emitted by the host environement and
+// This error is emitted by the host environment and
 // is only indirectly related to this module.
 //
 // For a reference, the following is part of its trace:
