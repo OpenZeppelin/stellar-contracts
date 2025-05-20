@@ -81,6 +81,6 @@ pub use storage::{
     allowance, allowance_data, approve, balance, set_allowance, spend_allowance, total_supply,
     transfer, transfer_from, update, AllowanceData, AllowanceKey, StorageKey,
 };
-pub use utils::sac_admin;
+pub use utils::sac_admin_wrapper;
 
 mod test;

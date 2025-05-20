@@ -1,4 +1,4 @@
-//! # Stellar Asset Contract (SAC) Admin Module
+//! # Stellar Asset Contract (SAC) Admin Wrapper Module
 //!
 //! The Stellar Asset Contract (SAC) serves as a bridge between traditional
 //! Stellar network assets and the Soroban smart contract environment.
@@ -47,7 +47,7 @@
 //!
 //! **NOTE**
 //!
-//! All functions, exposed in the `SACAdmin` trait, include an additional
+//! All functions, exposed in the `SACAdminWrapper` trait, include an additional
 //! parameter `operator: Address`. This account is the one authorizing the
 //! invocation. Having it as a parameter is particularly useful when
 //! implementing role-based access controls, in which case there can be multiple
@@ -66,7 +66,7 @@ mod test;
 
 use soroban_sdk::{Address, Env};
 
-pub trait SACAdmin {
+pub trait SACAdminWrapper {
     /// Sets the administrator to the specified address `new_admin`.
     ///
     /// # Arguments

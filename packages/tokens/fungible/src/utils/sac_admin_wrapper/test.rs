@@ -11,8 +11,9 @@ use soroban_sdk::{
 };
 use soroban_test_helpers;
 
-use crate::sac_admin::storage::{
-    clawback, get_sac_address, mint, set_admin, set_authorized, set_sac_address, SACAdminDataKey,
+use crate::sac_admin_wrapper::storage::{
+    clawback, get_sac_address, mint, set_admin, set_authorized, set_sac_address,
+    SACAdminWrapperDataKey,
 };
 
 fn create_sac_client<'a>(e: &Env, issuer: &Address) -> StellarAssetClient<'a> {
@@ -53,7 +54,7 @@ fn test_sac_set_address(e: Env, sac: Address) {
 
     e.as_contract(&new_admin, || {
         set_sac_address(&e, &sac);
-        let sac_addr: Address = e.storage().instance().get(&SACAdminDataKey::Sac).unwrap();
+        let sac_addr: Address = e.storage().instance().get(&SACAdminWrapperDataKey::Sac).unwrap();
         assert_eq!(get_sac_address(&e), sac);
         assert_eq!(sac_addr, sac);
     });
@@ -90,8 +91,12 @@ fn test_sac_mint(e: Env, issuer: Address, user: Address) {
 }
 
 #[soroban_test_helpers::test]
-#[should_panic(expected = "Error(Contract, #11)")]
+// This error is emitted by the host environement and
+// is only indirectly related to this module.
+//
+// For a reference, the following is part of its trace:
 // topics:[error, Error(Contract, #11)], data:"balance is deauthorized"
+#[should_panic(expected = "Error(Contract, #11)")]
 fn test_sac_set_authorized(e: Env, issuer: Address, user: Address, other: Address) {
     let new_admin = e.register(MockContract, ());
     let sac_client = create_sac_client(&e, &issuer);

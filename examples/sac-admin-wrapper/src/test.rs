@@ -7,7 +7,7 @@ use soroban_sdk::{
     Address, Env, IntoVal,
 };
 
-use crate::contract::{ExampleSACAdminContract, ExampleSACAdminContractClient};
+use crate::contract::{ExampleSACAdminWrapperContract, ExampleSACAdminWrapperContractClient};
 
 #[test]
 fn test_sac_transfer() {
@@ -42,8 +42,8 @@ fn test_sac_transfer() {
 
     // Deploy the New Admin
     let new_admin =
-        e.register(ExampleSACAdminContract, (owner.clone(), sac_client.address.clone()));
-    let new_admin_client = ExampleSACAdminContractClient::new(&e, &new_admin);
+        e.register(ExampleSACAdminWrapperContract, (owner.clone(), sac_client.address.clone()));
+    let new_admin_client = ExampleSACAdminWrapperContractClient::new(&e, &new_admin);
 
     // Set the New Admin
     e.mock_auths(&[MockAuth {

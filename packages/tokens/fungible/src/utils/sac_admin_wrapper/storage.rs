@@ -4,7 +4,7 @@ use crate::FungibleTokenError;
 
 /// Storage key for accessing the SAC address
 #[contracttype]
-pub enum SACAdminDataKey {
+pub enum SACAdminWrapperDataKey {
     Sac,
 }
 
@@ -23,7 +23,7 @@ pub enum SACAdminDataKey {
 pub fn get_sac_address(e: &Env) -> Address {
     e.storage()
         .instance()
-        .get(&SACAdminDataKey::Sac)
+        .get(&SACAdminWrapperDataKey::Sac)
         .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::SACNotSet))
 }
 
@@ -50,7 +50,7 @@ pub fn get_sac_client<'a>(e: &Env) -> StellarAssetClient<'a> {
 /// * `e` - Access to Soroban environment.
 /// * `sac` - The address the SAC contract.
 pub fn set_sac_address(e: &Env, sac: &Address) {
-    e.storage().instance().set(&SACAdminDataKey::Sac, &sac);
+    e.storage().instance().set(&SACAdminWrapperDataKey::Sac, &sac);
 }
 
 /// Sets the administrator to the specified address `new_admin`.
