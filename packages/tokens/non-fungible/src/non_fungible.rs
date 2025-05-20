@@ -299,10 +299,8 @@ pub enum NonFungibleTokenError {
     UnsetMetadata = 210,
     /// Indicates the length of the base URI exceeds the maximum allowed
     BaseUriMaxLenExceeded = 211,
-    /// Indicates royalty percentage exceeds maximum allowed value
-    RoyaltyTooHigh = 212,
     /// Indicates attempting to set royalties for a token that already has royalty information
-    RoyaltyAlreadySet = 213,
+    RoyaltyAlreadySet = 212,
 }
 
 // ################## EVENTS ##################
