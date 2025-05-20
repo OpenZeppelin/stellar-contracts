@@ -13,36 +13,12 @@
 //! that are safe against this attack out of the box.
 use core::marker::PhantomData;
 
-use crate::hash::{BuildHasher, Hasher};
+use crate::hash::{commutative_hash_pair, BuildHasher, Hasher};
 use soroban_sdk::{BytesN, Env, Vec};
 
 use crate::keccak::KeccakBuilder;
 
 type Bytes32 = BytesN<32>;
-
-#[inline]
-pub fn hash_pair<S>(a: &Bytes32, b: &Bytes32, mut state: S) -> S::Output
-where
-    S: Hasher,
-{
-    state.update(a.to_array());
-    state.update(b.to_array());
-    state.finalize()
-}
-
-/// Sort the pair `(a, b)` and hash the result with `state`. Frequently used
-/// when working with merkle proofs.
-#[inline]
-pub fn commutative_hash_pair<S>(a: &Bytes32, b: &Bytes32, state: S) -> S::Output
-where
-    S: Hasher,
-{
-    if a > b {
-        hash_pair(b, a, state)
-    } else {
-        hash_pair(a, b, state)
-    }
-}
 
 /// Verify merkle proofs.
 pub struct Verifier<B = KeccakBuilder>(PhantomData<B>)
