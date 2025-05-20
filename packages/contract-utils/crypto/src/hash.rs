@@ -107,71 +107,81 @@ where
 
 #[cfg(test)]
 mod tests {
-    //extern crate std;
+    extern crate std;
 
-    //use std::format;
+    use std::{format, vec::Vec as RustVec};
 
-    //use proptest::prelude::*;
+    use proptest::prelude::*;
+    use soroban_sdk::Env;
 
-    //use super::*;
-    //use crate::keccak::KeccakBuilder;
-    //use soroban_sdk::{Env, Vec};
+    use super::*;
+    use crate::keccak::KeccakBuilder;
 
-    //fn non_empty_u8_vec_strategy() -> impl Strategy<Value = Vec<u8>> {
-    //prop::collection::vec(any::<u8>(),
-    // 1..ProptestConfig::default().max_default_size_range)
-    //}
+    // Helper impl for testing
+    impl Hashable for RustVec<u8> {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            state.update(self.as_slice());
+        }
+    }
 
-    //#[test]
-    //fn commutative_hash_is_order_independent() {
-    //let e = Env::default();
-    //proptest!(|(a: Vec<u8>, b: Vec<u8>)| {
-    //let builder = KeccakBuilder::new(&e);
-    //let hash1 = commutative_hash_pair(&a, &b, builder.build_hasher());
-    //let hash2 = commutative_hash_pair(&b, &a, builder.build_hasher());
-    //prop_assert_eq!(hash1, hash2);
-    //})
-    //}
+    fn non_empty_u8_vec_strategy() -> impl Strategy<Value = RustVec<u8>> {
+        prop::collection::vec(any::<u8>(), 1..ProptestConfig::default().max_default_size_range)
+    }
 
-    //#[test]
-    //fn regular_hash_is_order_dependent() {
-    //proptest!(|(a in non_empty_u8_vec_strategy(),
-    //b in non_empty_u8_vec_strategy())| {
-    //prop_assume!(a != b);
-    //let builder = KeccakBuilder;
-    //let hash1 = hash_pair(&a, &b, builder.build_hasher());
-    //let hash2 = hash_pair(&b, &a, builder.build_hasher());
-    //prop_assert_ne!(hash1, hash2);
-    //})
-    //}
+    #[test]
+    fn commutative_hash_is_order_independent() {
+        let e = Env::default();
+        proptest!(|(a: RustVec<u8>, b: RustVec<u8>)| {
+            let builder = KeccakBuilder::new(&e);
+            let hash1 = commutative_hash_pair(&a, &b, builder.build_hasher());
+            let hash2 = commutative_hash_pair(&b, &a, builder.build_hasher());
+            prop_assert_eq!(hash1, hash2);
+        })
+    }
 
-    //#[test]
-    //fn hash_pair_deterministic() {
-    //proptest!(|(a: Vec<u8>, b: Vec<u8>)| {
-    //let builder = KeccakBuilder;
-    //let hash1 = hash_pair(&a, &b, builder.build_hasher());
-    //let hash2 = hash_pair(&a, &b, builder.build_hasher());
-    //prop_assert_eq!(hash1, hash2);
-    //})
-    //}
+    #[test]
+    fn regular_hash_is_order_dependent() {
+        let e = Env::default();
+        proptest!(|(a in non_empty_u8_vec_strategy(),
+        b in non_empty_u8_vec_strategy())| {
+            prop_assume!(a != b);
+            let builder = KeccakBuilder::new(&e);
+            let hash1 = hash_pair(&a, &b, builder.build_hasher());
+            let hash2 = hash_pair(&b, &a, builder.build_hasher());
+            prop_assert_ne!(hash1, hash2);
+        })
+    }
 
-    //#[test]
-    //fn commutative_hash_pair_deterministic() {
-    //proptest!(|(a: Vec<u8>, b: Vec<u8>)| {
-    //let builder = KeccakBuilder;
-    //let hash1 = commutative_hash_pair(&a, &b, builder.build_hasher());
-    //let hash2 = commutative_hash_pair(&a, &b, builder.build_hasher());
-    //prop_assert_eq!(hash1, hash2);
-    //})
-    //}
+    #[test]
+    fn hash_pair_deterministic() {
+        let e = Env::default();
+        proptest!(|(a: RustVec<u8>, b: RustVec<u8>)| {
+            let builder = KeccakBuilder::new(&e);
+            let hash1 = hash_pair(&a, &b, builder.build_hasher());
+            let hash2 = hash_pair(&a, &b, builder.build_hasher());
+            prop_assert_eq!(hash1, hash2);
+        })
+    }
 
-    //#[test]
-    //fn identical_pairs_hash() {
-    //proptest!(|(a: Vec<u8>)| {
-    //let builder = KeccakBuilder;
-    //let hash1 = hash_pair(&a, &a, builder.build_hasher());
-    //let hash2 = commutative_hash_pair(&a, &a, builder.build_hasher());
-    //assert_eq!(hash1, hash2);
-    //})
-    //}
+    #[test]
+    fn commutative_hash_pair_deterministic() {
+        let e = Env::default();
+        proptest!(|(a: RustVec<u8>, b: RustVec<u8>)| {
+            let builder = KeccakBuilder::new(&e);
+            let hash1 = commutative_hash_pair(&a, &b, builder.build_hasher());
+            let hash2 = commutative_hash_pair(&a, &b, builder.build_hasher());
+            prop_assert_eq!(hash1, hash2);
+        })
+    }
+
+    #[test]
+    fn identical_pairs_hash() {
+        let e = Env::default();
+        proptest!(|(a: RustVec<u8>)| {
+            let builder = KeccakBuilder::new(&e);
+            let hash1 = hash_pair(&a, &a, builder.build_hasher());
+            let hash2 = commutative_hash_pair(&a, &a, builder.build_hasher());
+            assert_eq!(hash1, hash2);
+        })
+    }
 }
