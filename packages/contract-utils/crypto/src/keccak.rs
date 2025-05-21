@@ -1,6 +1,6 @@
 use soroban_sdk::{Bytes, BytesN, Env};
 
-use crate::hashable::{BuildHasher, Hashable, Hasher};
+use crate::hashable::{BuildHasher, Hasher};
 
 pub struct KeccakBuilder {
     env: Env,
@@ -42,13 +42,6 @@ impl Hasher for Keccak256 {
             None => unimplemented!(),
             Some(b) => self.env.crypto().keccak256(b).to_bytes(),
         }
-    }
-}
-
-impl Hashable for BytesN<32> {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.update(self.to_array());
     }
 }
 

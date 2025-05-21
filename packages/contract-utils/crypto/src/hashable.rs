@@ -1,5 +1,7 @@
 //! Generic hashing support.
 
+use soroban_sdk::BytesN;
+
 /// A hashable type.
 ///
 /// Types implementing `Hash` are able to be [`Hash::hash`]ed with an instance
@@ -67,6 +69,13 @@ pub trait BuildHasher {
         let mut hasher = self.build_hasher();
         h.hash(&mut hasher);
         hasher.finalize()
+    }
+}
+
+impl Hashable for BytesN<32> {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.update(self.to_array());
     }
 }
 
