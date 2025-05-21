@@ -1,5 +1,7 @@
 use soroban_sdk::{contracterror, symbol_short, Address, Env, String};
 
+use crate::ContractOverrides;
+
 /// Vanilla Fungible Token Trait
 ///
 /// The `FungibleToken` trait defines the core functionality for fungible
@@ -12,13 +14,18 @@ use soroban_sdk::{contracterror, symbol_short, Address, Env, String};
 /// `FungibleBurnable` trait in addition to this one. SEP-41 mandates support
 /// for token burning to be considered compliant.
 pub trait FungibleToken {
+    /// Helper type that allows us to override some of the functionality of the
+    /// base trait based on the extensions implemented. You should use
+    /// `Base` as the type if you are not using `AllowList` or
+    /// `BlockList` extensions.
+    type ContractType: ContractOverrides;
     /// Returns the total amount of tokens in circulation.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     fn total_supply(e: &Env) -> i128 {
-        crate::total_supply(e)
+        Self::ContractType::total_supply(e)
     }
 
     /// Returns the amount of tokens held by `account`.
@@ -28,7 +35,7 @@ pub trait FungibleToken {
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address for which the balance is being queried.
     fn balance(e: &Env, account: Address) -> i128 {
-        crate::balance(e, &account)
+        Self::ContractType::balance(e, &account)
     }
 
     /// Returns the amount of tokens a `spender` is allowed to spend on behalf
@@ -40,7 +47,7 @@ pub trait FungibleToken {
     /// * `owner` - The address holding the tokens.
     /// * `spender` - The address authorized to spend the tokens.
     fn allowance(e: &Env, owner: Address, spender: Address) -> i128 {
-        crate::allowance(e, &owner, &spender)
+        Self::ContractType::allowance(e, &owner, &spender)
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
@@ -63,7 +70,7 @@ pub trait FungibleToken {
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
     fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
-        crate::transfer(e, &from, &to, amount);
+        Self::ContractType::transfer(e, &from, &to, amount);
     }
 
     /// Transfers `amount` of tokens from `from` to `to` using the
@@ -92,7 +99,7 @@ pub trait FungibleToken {
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128) {
-        crate::transfer_from(e, &spender, &from, &to, amount);
+        Self::ContractType::transfer_from(e, &spender, &from, &to, amount);
     }
 
     /// Sets the amount of tokens a `spender` is allowed to spend on behalf of
@@ -120,7 +127,7 @@ pub trait FungibleToken {
     /// * topics - `["approve", from: Address, spender: Address]`
     /// * data - `[amount: i128, live_until_ledger: u32]`
     fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32) {
-        crate::approve(e, &owner, &spender, amount, live_until_ledger);
+        Self::ContractType::approve(e, &owner, &spender, amount, live_until_ledger);
     }
 
     /// Returns the number of decimals used to represent amounts of this token.
@@ -129,7 +136,7 @@ pub trait FungibleToken {
     ///
     /// * `e` - Access to Soroban environment.
     fn decimals(e: &Env) -> u32 {
-        crate::metadata::decimals(e)
+        Self::ContractType::decimals(e)
     }
 
     /// Returns the name for this token.
@@ -138,7 +145,7 @@ pub trait FungibleToken {
     ///
     /// * `e` - Access to Soroban environment.
     fn name(e: &Env) -> String {
-        crate::metadata::name(e)
+        Self::ContractType::name(e)
     }
 
     /// Returns the symbol for this token.
@@ -147,7 +154,7 @@ pub trait FungibleToken {
     ///
     /// * `e` - Access to Soroban environment.
     fn symbol(e: &Env) -> String {
-        crate::metadata::symbol(e)
+        Self::ContractType::symbol(e)
     }
 }
 
