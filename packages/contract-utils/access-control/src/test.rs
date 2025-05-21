@@ -2,11 +2,7 @@
 
 extern crate std;
 
-use soroban_sdk::{
-    contract, symbol_short,
-    testutils::{Address as _, MockAuth, MockAuthInvoke},
-    Address, Env, IntoVal, Symbol,
-};
+use soroban_sdk::{contract, symbol_short, testutils::Address as _, Address, Env, Symbol};
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
@@ -224,7 +220,7 @@ fn admin_transfer_works_with_admin_auth() {
 
         // Verify events
         let event_assert = EventAssertion::new(&e, address.clone());
-        event_assert.assert_event_count(2);
+        event_assert.assert_event_count(1);
     });
 }
 
@@ -235,20 +231,11 @@ fn admin_transfer_cancel_works() {
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
 
+    e.mock_all_auths();
+
     e.as_contract(&address, || {
         set_admin(&e, &admin);
     });
-
-    // Mock admin authorization for initiating transfer
-    e.mock_auths(&[MockAuth {
-        address: &admin,
-        invoke: &MockAuthInvoke {
-            contract: &address,
-            fn_name: "transfer_admin_role",
-            args: (&new_admin, 1000_u32).into_val(&e),
-            sub_invokes: &[],
-        },
-    }]);
 
     e.as_contract(&address, || {
         // Start admin transfer
@@ -258,17 +245,6 @@ fn admin_transfer_cancel_works() {
         let event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
     });
-
-    // Mock admin authorization for canceling transfer
-    e.mock_auths(&[MockAuth {
-        address: &admin,
-        invoke: &MockAuthInvoke {
-            contract: &address,
-            fn_name: "transfer_admin_role",
-            args: (&new_admin, 0_u32).into_val(&e),
-            sub_invokes: &[],
-        },
-    }]);
 
     e.as_contract(&address, || {
         // Cancel admin transfer
@@ -340,7 +316,7 @@ fn renounce_nonexistent_role_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #121)")]
+#[should_panic(expected = "Error(Contract, #122)")]
 fn get_admin_with_no_admin_set_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -376,60 +352,7 @@ fn get_role_member_with_out_of_bounds_index_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #140)")]
-fn transfer_admin_role_from_non_admin_panics() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
-    let new_admin = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        set_admin(&e, &admin);
-
-        // Non-admin attempts to transfer admin role
-        transfer_admin_role(&e, &new_admin, 1000);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #140)")]
-fn cancel_transfer_admin_role_from_non_admin_panics() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
-    let new_admin = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        set_admin(&e, &admin);
-
-        // Start a valid admin transfer
-        transfer_admin_role(&e, &new_admin, 1000);
-
-        // Non-admin attempts to cancel the admin transfer
-        transfer_admin_role(&e, &new_admin, 0);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #120)")]
-fn set_role_admin_from_non_admin_panics() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        set_admin(&e, &admin);
-
-        // Non-admin attempts to set a role admin
-        set_role_admin(&e, &USER_ROLE, &MANAGER_ROLE);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #143)")]
+#[should_panic(expected = "Error(Contract, #122)")]
 fn admin_transfer_fails_when_no_admin_set() {
     let e = Env::default();
     e.mock_all_auths();

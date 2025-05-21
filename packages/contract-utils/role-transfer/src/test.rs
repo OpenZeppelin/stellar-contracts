@@ -98,6 +98,7 @@ fn cannot_cancel_with_invalid_pending_address() {
     let address = e.register(MockContract, ());
     let admin = Address::generate(&e);
     let new_admin = Address::generate(&e);
+    let wrong_new_admin = Address::generate(&e);
     let pending_key = MockRole::PendingAdmin;
 
     e.as_contract(&address, || {
@@ -110,7 +111,7 @@ fn cannot_cancel_with_invalid_pending_address() {
 
     e.as_contract(&address, || {
         // Cancel the transfer with an invalid pending address
-        transfer_role(&e, &new_admin, &pending_key, 0);
+        transfer_role(&e, &wrong_new_admin, &pending_key, 0);
     });
 }
 
