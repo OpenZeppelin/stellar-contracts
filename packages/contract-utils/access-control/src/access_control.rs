@@ -32,7 +32,8 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::AccountNotFound`] - If the account is not found at the given index.
+    /// * [`AccessControlError::AccountNotFound`] - If the account is not found
+    ///   at the given index.
     fn get_role_member(e: &Env, role: Symbol, index: u32) -> Address;
 
     /// Returns the admin role for a specific role.
@@ -93,8 +94,8 @@ pub trait AccessControl {
     ///
     /// * [`AccessControlError::Unauthorized`] - If the `caller` does not have
     ///   enough privileges.
-    /// * [`AccessControlError::AccountNotFound`] - If the `account` doesn't have
-    ///   the role.
+    /// * [`AccessControlError::AccountNotFound`] - If the `account` doesn't
+    ///   have the role.
     /// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
     ///
     /// # Events
@@ -139,12 +140,13 @@ pub trait AccessControl {
     ///   maximum allowed TTL extension for a temporary storage entry and
     ///   specifying a higher value will cause the code to panic.
     ///
-    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If trying to cancel a transfer
-    ///   that doesn't exist.
-    /// * [`stellar_role_transfer::RoleTransferError::InvalidLiveUntilLedger`] - If the specified ledger is
-    ///   in the past.
-    /// * [`stellar_role_transfer::RoleTransferError::InvalidPendingAccount`] - If the specified pending
-    ///   account is not the same as the provided `new` address.
+    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If
+    ///   trying to cancel a transfer that doesn't exist.
+    /// * [`stellar_role_transfer::RoleTransferError::InvalidLiveUntilLedger`] -
+    ///   If the specified ledger is in the past.
+    /// * [`stellar_role_transfer::RoleTransferError::InvalidPendingAccount`] -
+    ///   If the specified pending account is not the same as the provided `new`
+    ///   address.
     /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
     ///
     /// # Events
@@ -171,10 +173,10 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If there is no pending transfer
-    ///   to accept.
-    /// * [`stellar_role_transfer::RoleTransferError::Unauthorized`] - If the caller is not the pending
-    ///   role holder.
+    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If
+    ///   there is no pending transfer to accept.
+    /// * [`stellar_role_transfer::RoleTransferError::Unauthorized`] - If the
+    ///   caller is not the pending role holder.
     /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
     fn accept_admin_transfer(e: &Env, caller: Address);
 

@@ -80,7 +80,8 @@ pub fn get_role_member_count(e: &Env, role: &Symbol) -> u32 {
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::AccountNotFound`] - If the indexing is out of bounds.
+/// * [`AccessControlError::AccountNotFound`] - If the indexing is out of
+///   bounds.
 pub fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {
     let key = AccessControlStorageKey::RoleAccounts(RoleAccountKey { role: role.clone(), index });
 
@@ -172,8 +173,8 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::AccountNotFound`] - If the `account` doesn't have the
-///   role.
+/// * [`AccessControlError::AccountNotFound`] - If the `account` doesn't have
+///   the role.
 /// * refer to [`ensure_if_admin_or_admin_role`] errors.
 /// * refer to [`remove_from_role_enumeration`] errors.
 ///
@@ -357,8 +358,8 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
 /// # Errors
 ///
 /// * refer to [`get_admin`] errors.
-/// * [`AccessControlError::Unauthorized`] - If the caller is neither the contract
-///   admin nor has the admin role.
+/// * [`AccessControlError::Unauthorized`] - If the caller is neither the
+///   contract admin nor has the admin role.
 pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
     let is_admin = caller == &get_admin(e);
     let is_admin_role = match get_role_admin(e, role) {
@@ -434,8 +435,8 @@ pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) -> u32
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::AccountNotFound`] - If the role has no members or the
-///   `account` doesn't have the role.
+/// * [`AccessControlError::AccountNotFound`] - If the role has no members or
+///   the `account` doesn't have the role.
 pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     // Get the current count of accounts with this role
     let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());

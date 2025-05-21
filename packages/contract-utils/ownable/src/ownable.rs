@@ -29,14 +29,15 @@ pub trait Ownable {
     ///
     /// # Errors
     ///
-    /// * [`OwnableError::NotAuthorized`] - If the authorization from the current
-    ///   owner is missing.
-    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If trying to cancel a transfer
-    ///   that doesn't exist.
-    /// * [`stellar_role_transfer::RoleTransferError::InvalidLiveUntilLedger`] - If the specified ledger is
-    ///   in the past.
-    /// * [`stellar_role_transfer::RoleTransferError::InvalidPendingAccount`] - If the specified pending
-    ///   account is not the same as the provided `new` address.
+    /// * [`OwnableError::NotAuthorized`] - If the authorization from the
+    ///   current owner is missing.
+    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If
+    ///   trying to cancel a transfer that doesn't exist.
+    /// * [`stellar_role_transfer::RoleTransferError::InvalidLiveUntilLedger`] -
+    ///   If the specified ledger is in the past.
+    /// * [`stellar_role_transfer::RoleTransferError::InvalidPendingAccount`] -
+    ///   If the specified pending account is not the same as the provided `new`
+    ///   address.
     ///
     /// # Notes
     ///
@@ -52,10 +53,10 @@ pub trait Ownable {
     ///
     /// # Errors
     ///
-    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If there is no pending transfer
-    ///   to accept.
-    /// * [`stellar_role_transfer::RoleTransferError::Unauthorized`] - If the caller is not the pending
-    ///   role holder.
+    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If
+    ///   there is no pending transfer to accept.
+    /// * [`stellar_role_transfer::RoleTransferError::Unauthorized`] - If the
+    ///   caller is not the pending role holder.
     ///
     /// # Events
     ///
@@ -76,7 +77,8 @@ pub trait Ownable {
     ///
     /// * [`OwnableError::TransferInProgress`] - If there is a pending ownership
     ///   transfer.
-    /// * [`OwnableError::NotAuthorized`] - If the authorization from the current owner is missing.
+    /// * [`OwnableError::NotAuthorized`] - If the authorization from the
+    ///   current owner is missing.
     ///
     /// # Notes
     ///

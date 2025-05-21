@@ -9,9 +9,9 @@
 //! - Transferring ownership
 //! - Renouncing ownership
 //!
-//! The helper `enforce_owner_auth()` is available to restrict access to only the
-//! owner. You can also use the `#[only_owner]` macro (provided elsewhere) to
-//! simplify this.
+//! The helper `enforce_owner_auth()` is available to restrict access to only
+//! the owner. You can also use the `#[only_owner]` macro (provided elsewhere)
+//! to simplify this.
 //!
 //! ```ignore
 //! #[only_owner]

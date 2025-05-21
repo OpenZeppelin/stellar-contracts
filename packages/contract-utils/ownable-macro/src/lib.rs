@@ -6,8 +6,8 @@ use syn::{parse_macro_input, ItemFn};
 /// A procedural macro that ensures the caller is the owner before executing the
 /// function.
 ///
-/// This macro retrieves the owner from storage and requires authorization from the owner
-/// before executing the function body.
+/// This macro retrieves the owner from storage and requires authorization from
+/// the owner before executing the function body.
 ///
 /// # Usage
 ///
@@ -22,7 +22,8 @@ use syn::{parse_macro_input, ItemFn};
 ///
 /// ```rust
 /// pub fn restricted_function(e: &Env, other_param: u32) {
-///     let owner: soroban_sdk::Address = e.storage().instance().get(&stellar_ownable::OwnableStorageKey::Owner).unwrap();
+///     let owner: soroban_sdk::Address =
+///         e.storage().instance().get(&stellar_ownable::OwnableStorageKey::Owner).unwrap();
 ///     owner.require_auth();
 ///     // Function body
 /// }
