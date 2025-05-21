@@ -8,7 +8,6 @@ members = [
     "examples/nft-consecutive",
     "examples/nft-enumerable",
     "examples/nft-sequential-minting",
-    "examples/sac-admin-wrapper",
     "examples/ownable",
     "examples/upgradeable/*",
     "packages/constants",
