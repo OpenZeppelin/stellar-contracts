@@ -16,7 +16,7 @@ use core::marker::PhantomData;
 use soroban_sdk::{BytesN, Env, Vec};
 
 use crate::{
-    hash::{commutative_hash_pair, BuildHasher, Hasher},
+    hashable::{commutative_hash_pair, BuildHasher, Hasher},
     keccak::KeccakBuilder,
 };
 
@@ -93,7 +93,7 @@ mod tests {
     use soroban_sdk::Env;
 
     use super::{commutative_hash_pair, Bytes32, KeccakBuilder, Verifier};
-    use crate::hash::BuildHasher;
+    use crate::hashable::BuildHasher;
 
     macro_rules! to_bytes {
         ($env:tt, $lit:literal) => {
