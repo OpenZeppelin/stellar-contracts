@@ -62,25 +62,21 @@ where
 ///
 /// * [`RoleTransferError::NoPendingTransfer`] - If there is no pending transfer
 ///   to accept.
-/// * [`RoleTransferError::Unauthorized`] - If the caller is not the pending
-///   role holder.
-pub fn accept_transfer<T, U>(e: &Env, caller: &Address, active_key: &T, pending_key: &U)
+pub fn accept_transfer<T, U>(e: &Env, active_key: &T, pending_key: &U) -> Address
 where
     T: IntoVal<Env, Val>,
     U: IntoVal<Env, Val>,
 {
-    caller.require_auth();
-
     let pending = e
         .storage()
         .temporary()
         .get::<U, Address>(pending_key)
         .unwrap_or_else(|| panic_with_error!(e, RoleTransferError::NoPendingTransfer));
 
-    if caller != &pending {
-        panic_with_error!(e, RoleTransferError::Unauthorized);
-    }
+    pending.require_auth();
 
     e.storage().temporary().remove(pending_key);
-    e.storage().instance().set(active_key, caller);
+    e.storage().instance().set(active_key, &pending);
+
+    pending
 }

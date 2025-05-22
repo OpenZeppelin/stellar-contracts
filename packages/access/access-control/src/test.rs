@@ -213,7 +213,7 @@ fn admin_transfer_works_with_admin_auth() {
 
     e.as_contract(&address, || {
         // Accept admin transfer
-        accept_admin_transfer(&e, &new_admin);
+        accept_admin_transfer(&e);
 
         // Verify new admin
         assert_eq!(get_admin(&e), new_admin);

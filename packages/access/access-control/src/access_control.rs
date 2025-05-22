@@ -166,7 +166,6 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the pending admin.
     ///
     /// # Events
     ///
@@ -177,10 +176,8 @@ pub trait AccessControl {
     ///
     /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If
     ///   there is no pending transfer to accept.
-    /// * [`stellar_role_transfer::RoleTransferError::Unauthorized`] - If the
-    ///   caller is not the pending role holder.
     /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
-    fn accept_admin_transfer(e: &Env, caller: Address);
+    fn accept_admin_transfer(e: &Env);
 
     /// Sets `admin_role` as the admin role of `role`.
     ///

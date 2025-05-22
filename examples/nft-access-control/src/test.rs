@@ -235,13 +235,13 @@ fn admin_transfer_works() {
         invoke: &MockAuthInvoke {
             contract: &client.address,
             fn_name: "accept_admin_transfer",
-            args: (new_admin.clone(),).into_val(&e),
+            args: ().into_val(&e),
             sub_invokes: &[],
         },
     }]);
 
     // New admin accepts
-    client.accept_admin_transfer(&new_admin);
+    client.accept_admin_transfer();
 
     e.mock_auths(&[MockAuth {
         address: &new_admin,
@@ -258,7 +258,7 @@ fn admin_transfer_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #141)")]
+#[should_panic(expected = "Error(Contract, #140)")]
 fn cannot_accept_after_admin_transfer_cancelled() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -273,7 +273,7 @@ fn cannot_accept_after_admin_transfer_cancelled() {
     client.transfer_admin_role(&new_admin, &0);
 
     // New admin tries to accept—should panic
-    client.accept_admin_transfer(&new_admin);
+    client.accept_admin_transfer();
 }
 
 #[test]
@@ -329,11 +329,11 @@ fn non_recipient_cannot_accept_transfer() {
     client.transfer_admin_role(&new_admin, &1000);
 
     // Imposter tries to accept
-    client.accept_admin_transfer(&imposter);
+    client.accept_admin_transfer();
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #141)")]
+#[should_panic(expected = "Error(Contract, #140)")]
 fn expired_admin_transfer_panics() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -347,7 +347,7 @@ fn expired_admin_transfer_panics() {
     // Move past the TTL for the admin transfer
     e.ledger().set_sequence_number(3000);
 
-    client.accept_admin_transfer(&new_admin);
+    client.accept_admin_transfer();
 }
 
 #[test]

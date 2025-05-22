@@ -91,10 +91,10 @@ pub fn transfer_ownership(e: &Env, new_owner: &Address, live_until_ledger: u32) 
 /// # Notes
 ///
 /// * Authorization for the pending owner is required.
-pub fn accept_ownership(e: &Env, caller: &Address) {
-    accept_transfer(e, caller, &OwnableStorageKey::Owner, &OwnableStorageKey::PendingOwner);
+pub fn accept_ownership(e: &Env) {
+    let new_owner = accept_transfer(e, &OwnableStorageKey::Owner, &OwnableStorageKey::PendingOwner);
 
-    emit_ownership_transfer_completed(e, caller);
+    emit_ownership_transfer_completed(e, &new_owner);
 }
 
 /// Renounces ownership of the contract.

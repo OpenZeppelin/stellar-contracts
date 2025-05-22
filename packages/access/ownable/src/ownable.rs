@@ -49,20 +49,17 @@ pub trait Ownable {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `caller` - The address of the pending owner accepting ownership.
     ///
     /// # Errors
     ///
     /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If
     ///   there is no pending transfer to accept.
-    /// * [`stellar_role_transfer::RoleTransferError::Unauthorized`] - If the
-    ///   caller is not the pending role holder.
     ///
     /// # Events
     ///
     /// * topics - `["ownership_transfer_completed"]`
     /// * data - `[new_owner: Address]`
-    fn accept_ownership(e: &Env, caller: Address);
+    fn accept_ownership(e: &Env);
 
     /// Renounces ownership of the contract.
     ///

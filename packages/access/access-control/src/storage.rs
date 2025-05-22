@@ -282,7 +282,6 @@ pub fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32)
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be the pending admin.
 ///
 /// # Errors
 ///
@@ -295,18 +294,14 @@ pub fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32)
 ///
 /// # Notes
 ///
-/// * Authorization for `caller` is required.
-pub fn accept_admin_transfer(e: &Env, caller: &Address) {
+/// * Authorization for the pending admin is required.
+pub fn accept_admin_transfer(e: &Env) {
     let previous_admin = get_admin(e);
 
-    accept_transfer(
-        e,
-        caller,
-        &AccessControlStorageKey::Admin,
-        &AccessControlStorageKey::PendingAdmin,
-    );
+    let new_admin =
+        accept_transfer(e, &AccessControlStorageKey::Admin, &AccessControlStorageKey::PendingAdmin);
 
-    emit_admin_transfer_completed(e, &previous_admin, caller);
+    emit_admin_transfer_completed(e, &previous_admin, &new_admin);
 }
 
 /// Sets `admin_role` as the admin role for `role`.

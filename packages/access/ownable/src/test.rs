@@ -50,7 +50,7 @@ fn accept_ownership_completes_transfer() {
         set_owner(&e, &old_owner);
         e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &new_owner);
 
-        accept_ownership(&e, &new_owner);
+        accept_ownership(&e);
 
         let stored_owner = get_owner(&e);
         assert_eq!(stored_owner, Some(new_owner));

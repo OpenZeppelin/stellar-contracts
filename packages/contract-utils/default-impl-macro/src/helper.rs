@@ -51,8 +51,8 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
-                fn accept_admin_transfer(e: &soroban_sdk::Env, caller: soroban_sdk::Address) {
-                    stellar_access_control::accept_admin_transfer(e, &caller);
+                fn accept_admin_transfer(e: &soroban_sdk::Env) {
+                    stellar_access_control::accept_admin_transfer(e);
                 }
             },
             syn::parse_quote! {
@@ -218,8 +218,8 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
-                fn accept_ownership(e: &soroban_sdk::Env, caller: soroban_sdk::Address) {
-                    stellar_ownable::accept_ownership(e, &caller);
+                fn accept_ownership(e: &soroban_sdk::Env) {
+                    stellar_ownable::accept_ownership(e);
                 }
             },
             syn::parse_quote! {
