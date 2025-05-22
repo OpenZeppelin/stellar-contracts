@@ -2,6 +2,8 @@
 
 use soroban_sdk::BytesN;
 
+use crate::hasher::Hasher;
+
 /// A hashable type.
 ///
 /// Types implementing `Hash` are able to be [`Hash::hash`]ed with an instance
@@ -9,67 +11,6 @@ use soroban_sdk::BytesN;
 pub trait Hashable {
     /// Feeds this value into the given [`Hasher`].
     fn hash<H: Hasher>(&self, state: &mut H);
-}
-
-/// A trait for hashing an arbitrary stream of bytes.
-///
-/// Instances of `Hasher` usually represent state that is changed while hashing
-/// data.
-///
-/// `Hasher` provides a fairly basic interface for retrieving the generated hash
-/// (with [`Hasher::finalize`]), and absorbing an arbitrary number of bytes
-/// (with [`Hasher::update`]). Most of the time, [`Hasher`] instances are used
-/// in conjunction with the [`Hash`] trait.
-pub trait Hasher {
-    /// The output type of this hasher.
-    type Output;
-
-    /// Absorb additional input. Can be called multiple times.
-    fn update(&mut self, input: impl AsRef<[u8]>);
-
-    /// Output the hashing algorithm state.
-    fn finalize(self) -> Self::Output;
-}
-
-/// A trait for creating instances of [`Hasher`].
-///
-/// A `BuildHasher` is typically used (e.g., by [`HashMap`]) to create
-/// [`Hasher`]s for each key such that they are hashed independently of one
-/// another, since [`Hasher`]s contain state.
-///
-/// For each instance of `BuildHasher`, the [`Hasher`]s created by
-/// [`build_hasher`] should be identical. That is, if the same stream of bytes
-/// is fed into each hasher, the same output will also be generated.
-pub trait BuildHasher {
-    /// Type of the hasher that will be created.
-    type Hasher: Hasher;
-
-    /// Creates a new hasher.
-    ///
-    /// Each call to `build_hasher` on the same instance should produce
-    /// identical [`Hasher`]s.
-    fn build_hasher(&self) -> Self::Hasher;
-
-    /// Calculates the hash of a single value.
-    ///
-    /// This is intended as a convenience for code which *consumes* hashes, such
-    /// as the implementation of a hash table or in unit tests that check
-    /// whether a custom [`Hashable`] implementation behaves as expected.
-    ///
-    /// This must not be used in any code which *creates* hashes, such as in an
-    /// implementation of [`Hashable`].  The way to create a combined hash of
-    /// multiple values is to call [`Hashable::hash`] multiple times using the
-    /// same [`Hasher`], not to call this method repeatedly and combine the
-    /// results.
-    fn hash_one<H>(&self, h: H) -> <Self::Hasher as Hasher>::Output
-    where
-        H: Hashable,
-        Self::Hasher: Hasher,
-    {
-        let mut hasher = self.build_hasher();
-        h.hash(&mut hasher);
-        hasher.finalize()
-    }
 }
 
 impl Hashable for BytesN<32> {
@@ -124,7 +65,7 @@ mod tests {
     use soroban_sdk::Env;
 
     use super::*;
-    use crate::keccak::KeccakBuilder;
+    use crate::{hasher::BuildHasher, keccak::KeccakBuilder};
 
     // Helper impl for testing
     impl Hashable for Vec<u8> {

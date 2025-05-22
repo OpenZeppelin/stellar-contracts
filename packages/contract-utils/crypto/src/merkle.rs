@@ -16,18 +16,17 @@ use core::marker::PhantomData;
 use soroban_sdk::{BytesN, Env, Vec};
 
 use crate::{
-    hashable::{commutative_hash_pair, BuildHasher, Hasher},
-    keccak::KeccakBuilder,
+    hashable::commutative_hash_pair,
+    hasher::{BuildHasher, Hasher},
+    keccak::{Keccak256, KeccakBuilder},
 };
 
 type Bytes32 = BytesN<32>;
 
 /// Verify merkle proofs.
-pub struct Verifier<B = KeccakBuilder>(PhantomData<B>)
-where
-    B: BuildHasher;
+pub struct Verifier<H: Hasher>(PhantomData<H>);
 
-impl Verifier<KeccakBuilder> {
+impl Verifier<Keccak256> {
     /// Verify that `leaf` is part of a Merkle tree defined by `root` by using
     /// `proof` and the default `keccak256` hashing algorithm.
     ///
@@ -50,10 +49,9 @@ impl Verifier<KeccakBuilder> {
     }
 }
 
-impl<B> Verifier<B>
+impl<H> Verifier<H>
 where
-    B: BuildHasher,
-    B::Hasher: Hasher<Output = Bytes32>,
+    H: Hasher<Output = Bytes32>,
 {
     /// Verify that `leaf` is part of a Merkle tree defined by `root` by using
     /// `proof` and a custom hashing algorithm defined by `builder`. See
@@ -65,7 +63,7 @@ where
     /// * `root` - The root of the merkle tree, in bytes.
     /// * `leaf` - The leaf of the merkle tree to proof, in bytes.
     /// * `builder` - A [`BuildHasher`] that represents a hashing algorithm.
-    pub fn verify_with_builder(
+    pub fn verify_with_builder<B: BuildHasher<H>>(
         proof: Vec<Bytes32>,
         root: Bytes32,
         mut leaf: Bytes32,
@@ -93,7 +91,7 @@ mod tests {
     use soroban_sdk::Env;
 
     use super::{commutative_hash_pair, Bytes32, KeccakBuilder, Verifier};
-    use crate::hashable::BuildHasher;
+    use crate::hasher::BuildHasher;
 
     macro_rules! to_bytes {
         ($env:tt, $lit:literal) => {
@@ -286,33 +284,4 @@ mod tests {
         // invalid if root != leaf
         assert!(!Verifier::verify(&e, proof, root, leaf));
     }
-
-    //#[test]
-    //fn verifies_valid_multi_proof() {
-    //// ```js
-    //// const merkleTree = StandardMerkleTree.of(toElements('abcdef'), ['string']);
-    ////
-    //// const root = merkleTree.root;
-    //// const { proof, proofFlags, leaves } = merkleTree.getMultiProof(toElements('bdf'));
-    //// const hashes = leaves.map(e => merkleTree.leafHash(e));
-    //// ```
-    //let e = Env::default();
-    //let root = to_bytes!(e,
-    // "6deb52b5da8fd108f79fab00341f38d2587896634c646ee52e49f845680a70c8");
-    // let leaves = to_bytes_array!(
-    //e,
-    //"19ba6c6333e0e9a15bf67523e0676e2f23eb8e574092552d5e888c64a4bb3681",
-    //"c62a8cfa41edc0ef6f6ae27a2985b7d39c7fea770787d7e104696c6e81f64848",
-    //"eba909cf4bb90c6922771d7f126ad0fd11dfde93f3937a196274e1ac20fd2f5b"
-    //);
-    //let proof = to_bytes_array!(
-    //e,
-    //"9a4f64e953595df82d1b4f570d34c4f4f0cfaf729a61e9d60e83e579e1aa283e",
-    //"8076923e76cf01a7c048400a2304c9a9c23bbbdac3a98ea3946340fdafbba34f"
-    //);
-
-    //let proof_flags = [false, true, false, true];
-    //let verification = Verifier::verify_multi_proof(&proof, &proof_flags,
-    // root, &leaves); assert!(verification.unwrap());
-    //}
 }

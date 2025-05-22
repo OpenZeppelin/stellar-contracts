@@ -1,24 +1,8 @@
 use soroban_sdk::{Bytes, BytesN, Env};
 
-use crate::hashable::{BuildHasher, Hasher};
+use crate::hasher::{Hasher, HasherBuilder};
 
-pub struct Sha256Builder {
-    env: Env,
-}
-
-impl Sha256Builder {
-    pub fn new(e: &Env) -> Self {
-        Sha256Builder { env: e.clone() }
-    }
-}
-
-impl BuildHasher for Sha256Builder {
-    type Hasher = Sha256;
-
-    fn build_hasher(&self) -> Self::Hasher {
-        Sha256 { buffer: None, env: self.env.clone() }
-    }
-}
+pub type Sha256Builder = HasherBuilder<Sha256>;
 
 pub struct Sha256 {
     buffer: Option<Bytes>,
@@ -27,6 +11,10 @@ pub struct Sha256 {
 
 impl Hasher for Sha256 {
     type Output = BytesN<32>;
+
+    fn new(e: &Env) -> Self {
+        Sha256 { buffer: None, env: e.clone() }
+    }
 
     fn update(&mut self, input: impl AsRef<[u8]>) {
         let bytes = Bytes::from_slice(&self.env, input.as_ref());
@@ -37,11 +25,8 @@ impl Hasher for Sha256 {
     }
 
     fn finalize(self) -> Self::Output {
-        match &self.buffer {
-            // panic ??
-            None => unimplemented!(),
-            Some(b) => self.env.crypto().sha256(b).to_bytes(),
-        }
+        let data = self.buffer.expect("No data to hash: buffer empty!");
+        self.env.crypto().sha256(&data).to_bytes()
     }
 }
 
@@ -53,6 +38,8 @@ mod test {
     use std::{format, vec, vec::Vec};
 
     use proptest::prelude::*;
+
+    use crate::hasher::BuildHasher;
 
     use super::*;
 
@@ -265,9 +252,7 @@ mod test {
     fn sha256_empty_input() {
         let e = Env::default();
         let builder = Sha256Builder::new(&e);
-        let mut hasher = builder.build_hasher();
-        hasher.update([]);
-        let result = hasher.finalize();
+        let result = builder.hash_one(vec![]);
         let expected: [u8; 32] = [
             0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f,
             0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b,

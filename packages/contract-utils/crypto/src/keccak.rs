@@ -1,24 +1,8 @@
 use soroban_sdk::{Bytes, BytesN, Env};
 
-use crate::hashable::{BuildHasher, Hasher};
+use crate::hasher::{Hasher, HasherBuilder};
 
-pub struct KeccakBuilder {
-    env: Env,
-}
-
-impl KeccakBuilder {
-    pub fn new(e: &Env) -> Self {
-        KeccakBuilder { env: e.clone() }
-    }
-}
-
-impl BuildHasher for KeccakBuilder {
-    type Hasher = Keccak256;
-
-    fn build_hasher(&self) -> Self::Hasher {
-        Keccak256 { buffer: None, env: self.env.clone() }
-    }
-}
+pub type KeccakBuilder = HasherBuilder<Keccak256>;
 
 pub struct Keccak256 {
     buffer: Option<Bytes>,
@@ -27,6 +11,10 @@ pub struct Keccak256 {
 
 impl Hasher for Keccak256 {
     type Output = BytesN<32>;
+
+    fn new(e: &Env) -> Self {
+        Keccak256 { buffer: None, env: e.clone() }
+    }
 
     fn update(&mut self, input: impl AsRef<[u8]>) {
         let bytes = Bytes::from_slice(&self.env, input.as_ref());
@@ -37,11 +25,8 @@ impl Hasher for Keccak256 {
     }
 
     fn finalize(self) -> Self::Output {
-        match &self.buffer {
-            // panic ??
-            None => unimplemented!(),
-            Some(b) => self.env.crypto().keccak256(b).to_bytes(),
-        }
+        let data = self.buffer.expect("No data to hash: buffer empty!");
+        self.env.crypto().keccak256(&data).to_bytes()
     }
 }
 
@@ -53,6 +38,8 @@ mod test {
     use std::{format, vec, vec::Vec};
 
     use proptest::prelude::*;
+
+    use crate::hasher::BuildHasher;
 
     use super::*;
 
@@ -265,9 +252,7 @@ mod test {
     fn empty_input() {
         let e = Env::default();
         let builder = KeccakBuilder::new(&e);
-        let mut hasher = builder.build_hasher();
-        hasher.update([]);
-        let result = hasher.finalize();
+        let result = builder.hash_one(vec![]);
         let expected: [u8; 32] = [
             0xc5, 0xd2, 0x46, 0x01, 0x86, 0xf7, 0x23, 0x3c, 0x92, 0x7e, 0x7d, 0xb2, 0xdc, 0xc7,
             0x03, 0xc0, 0xe5, 0x00, 0xb6, 0x53, 0xca, 0x82, 0x27, 0x3b, 0x7b, 0xfa, 0xd8, 0x04,
