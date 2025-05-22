@@ -51,7 +51,7 @@ impl BlockList {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    pub fn admin(e: &Env) -> Address {
+    pub fn get_admin(e: &Env) -> Address {
         e.storage().instance().get(&BlockListStorageKey::Admin).unwrap()
     }
 
@@ -63,6 +63,9 @@ impl BlockList {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `admin` - The address to set as admin.
+    ///
+    /// **IMPORTANT**: this function lacks authorization checks.
+    /// It is expected to call this function only in the constructor!
     pub fn set_admin(e: &Env, admin: &Address) {
         e.storage().instance().set(&BlockListStorageKey::Admin, admin);
     }
@@ -72,26 +75,16 @@ impl BlockList {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `admin` - The address of the admin performing the operation.
     /// * `user` - The address to block.
-    ///
-    /// # Errors
-    ///
-    /// * Panics if `admin` is not the admin.
     ///
     /// # Events
     ///
     /// * topics - `["user_blocked", user: Address]`
     /// * data - `[]`
-    pub fn block_user(e: &Env, admin: &Address, user: &Address) {
+    pub fn block_user(e: &Env, user: &Address) {
         // Verify admin authorization
+        let admin = BlockList::get_admin(e);
         admin.require_auth();
-
-        // Check if the caller is the admin
-        let stored_admin = BlockList::admin(e);
-        if *admin != stored_admin {
-            panic!("only admin can block users");
-        }
 
         // Set the user as blocked
         let key = BlockListStorageKey::Blocked(user.clone());
@@ -107,26 +100,16 @@ impl BlockList {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `admin` - The address of the admin performing the operation.
     /// * `user` - The address to unblock.
-    ///
-    /// # Errors
-    ///
-    /// * Panics if `admin` is not the admin.
     ///
     /// # Events
     ///
     /// * topics - `["user_unblocked", user: Address]`
     /// * data - `[]`
-    pub fn unblock_user(e: &Env, admin: &Address, user: &Address) {
+    pub fn unblock_user(e: &Env, user: &Address) {
         // Verify admin authorization
+        let admin = BlockList::get_admin(e);
         admin.require_auth();
-
-        // Check if the caller is the admin
-        let stored_admin = BlockList::admin(e);
-        if *admin != stored_admin {
-            panic!("only admin can unblock users");
-        }
 
         // Set the user as not blocked
         let key = BlockListStorageKey::Blocked(user.clone());

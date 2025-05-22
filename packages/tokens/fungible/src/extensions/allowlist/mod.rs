@@ -35,14 +35,13 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `admin` - The address of the admin performing the operation.
     /// * `user` - The address to allow.
     ///
     /// # Events
     ///
     /// * topics - `["user_allowed", user: Address]`
     /// * data - `[]`
-    fn allow_user(e: &Env, admin: Address, user: Address);
+    fn allow_user(e: &Env, user: Address);
 
     /// Disallows a user from receiving and transferring tokens.
     ///
@@ -56,7 +55,7 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * topics - `["user_disallowed", user: Address]`
     /// * data - `[]`
-    fn disallow_user(e: &Env, admin: Address, user: Address);
+    fn disallow_user(e: &Env, user: Address);
 }
 
 // ################## EVENTS ##################

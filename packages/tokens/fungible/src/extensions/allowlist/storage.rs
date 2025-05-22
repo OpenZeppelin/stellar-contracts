@@ -51,7 +51,7 @@ impl AllowList {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    pub fn admin(e: &Env) -> Address {
+    pub fn get_admin(e: &Env) -> Address {
         e.storage().instance().get(&AllowListStorageKey::Admin).unwrap()
     }
 
@@ -63,6 +63,9 @@ impl AllowList {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `admin` - The address to set as admin.
+    ///
+    /// **IMPORTANT**: this function lacks authorization checks.
+    /// It is expected to call this function only in the constructor!
     pub fn set_admin(e: &Env, admin: &Address) {
         e.storage().instance().set(&AllowListStorageKey::Admin, admin);
     }
@@ -72,26 +75,16 @@ impl AllowList {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `admin` - The address of the admin performing the operation.
     /// * `user` - The address to allow.
-    ///
-    /// # Errors
-    ///
-    /// * Panics if `admin` is not the admin.
     ///
     /// # Events
     ///
     /// * topics - `["user_allowed", user: Address]`
     /// * data - `[]`
-    pub fn allow_user(e: &Env, admin: &Address, user: &Address) {
+    pub fn allow_user(e: &Env, user: &Address) {
         // Verify admin authorization
+        let admin = AllowList::get_admin(e);
         admin.require_auth();
-
-        // Check if the caller is the admin
-        let stored_admin = AllowList::admin(e);
-        if *admin != stored_admin {
-            panic!("only admin can allow users");
-        }
 
         // Set the user as allowed
         let key = AllowListStorageKey::Allowed(user.clone());
@@ -107,26 +100,16 @@ impl AllowList {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `admin` - The address of the admin performing the operation.
     /// * `user` - The address to disallow.
-    ///
-    /// # Errors
-    ///
-    /// * Panics if `admin` is not the admin.
     ///
     /// # Events
     ///
     /// * topics - `["user_disallowed", user: Address]`
     /// * data - `[]`
-    pub fn disallow_user(e: &Env, admin: &Address, user: &Address) {
+    pub fn disallow_user(e: &Env, user: &Address) {
         // Verify admin authorization
+        let admin = AllowList::get_admin(e);
         admin.require_auth();
-
-        // Check if the caller is the admin
-        let stored_admin = AllowList::admin(e);
-        if *admin != stored_admin {
-            panic!("only admin can disallow users");
-        }
 
         // Set the user as not allowed
         let key = AllowListStorageKey::Allowed(user.clone());
