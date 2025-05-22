@@ -357,9 +357,9 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
 ///
 /// # Errors
 ///
-/// * refer to [`get_admin`] errors.
 /// * [`AccessControlError::Unauthorized`] - If the caller is neither the
 ///   contract admin nor has the admin role.
+/// * refer to [`get_admin`] errors.
 pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
     let is_admin = caller == &get_admin(e);
     let is_admin_role = match get_role_admin(e, role) {
