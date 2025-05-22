@@ -34,28 +34,26 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `admin` - The address of the admin performing the operation.
     /// * `user` - The address to block.
     ///
     /// # Events
     ///
     /// * topics - `["user_blocked", user: Address]`
     /// * data - `[]`
-    fn block_user(e: &Env, admin: Address, user: Address);
+    fn block_user(e: &Env, user: Address);
 
     /// Unblocks a user, allowing them to receive and transfer tokens.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `admin` - The address of the admin performing the operation.
     /// * `user` - The address to unblock.
     ///
     /// # Events
     ///
     /// * topics - `["user_unblocked", user: Address]`
     /// * data - `[]`
-    fn unblock_user(e: &Env, admin: Address, user: Address);
+    fn unblock_user(e: &Env, user: Address);
 }
 
 // ################## EVENTS ##################

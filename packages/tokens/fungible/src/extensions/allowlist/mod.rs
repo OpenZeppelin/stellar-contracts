@@ -48,7 +48,6 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `admin` - The address of the admin performing the operation.
     /// * `user` - The address to disallow.
     ///
     /// # Events
