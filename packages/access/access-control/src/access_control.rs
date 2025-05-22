@@ -140,6 +140,8 @@ pub trait AccessControl {
     ///   maximum allowed TTL extension for a temporary storage entry and
     ///   specifying a higher value will cause the code to panic.
     ///
+    /// # Errors
+    ///
     /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If
     ///   trying to cancel a transfer that doesn't exist.
     /// * [`stellar_role_transfer::RoleTransferError::InvalidLiveUntilLedger`] -
