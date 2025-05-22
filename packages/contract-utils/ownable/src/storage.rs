@@ -87,6 +87,10 @@ pub fn transfer_ownership(e: &Env, new_owner: &Address, live_until_ledger: u32) 
 ///
 /// * topics - `["ownership_transfer_completed"]`
 /// * data - `[new_owner: Address]`
+///
+/// # Notes
+///
+/// * Authorization for the pending owner is required.
 pub fn accept_ownership(e: &Env, caller: &Address) {
     accept_transfer(e, caller, &OwnableStorageKey::Owner, &OwnableStorageKey::PendingOwner);
 
