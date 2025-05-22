@@ -16,7 +16,7 @@ pub enum OwnableStorageKey {
 // ################## QUERY STATE ##################
 
 /// Returns `Some(Address)` if ownership is set, or `None` if ownership has been
-/// renounced.
+/// renounced or has never been set.
 ///
 /// # Arguments
 ///
