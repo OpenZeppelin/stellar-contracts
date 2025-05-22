@@ -15,9 +15,6 @@
               "function_name": "transfer_admin_role",
               "args": [
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
-                },
-                {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 },
                 {
@@ -72,7 +69,7 @@
             },
             "ext": "v0"
           },
-          6312999
+          6311999
         ]
       ],
       [
