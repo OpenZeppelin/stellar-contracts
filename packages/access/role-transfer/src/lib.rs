@@ -13,9 +13,9 @@ pub use storage::{accept_transfer, transfer_role};
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 enum RoleTransferError {
-    NoPendingTransfer = 140,
-    InvalidLiveUntilLedger = 141,
-    InvalidPendingAccount = 142,
+    NoPendingTransfer = 400,
+    InvalidLiveUntilLedger = 401,
+    InvalidPendingAccount = 402,
 }
 
 mod test;

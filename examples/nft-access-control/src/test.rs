@@ -66,7 +66,7 @@ fn minters_can_mint() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #410)")]
 fn non_minters_cannot_mint() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -94,7 +94,7 @@ fn burners_can_burn() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #410)")]
 fn non_burners_cannot_burn() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -127,7 +127,7 @@ fn burners_can_burn_from() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #410)")]
 fn non_burners_cannot_burn_from() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -162,7 +162,7 @@ fn minter_admin_can_grant_role() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #410)")]
 fn burner_admin_can_revoke_role() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -180,7 +180,7 @@ fn burner_admin_can_revoke_role() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #410)")]
 fn non_admin_cannot_grant_role() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -195,7 +195,7 @@ fn non_admin_cannot_grant_role() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #410)")]
 fn non_admin_cannot_revoke_role() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -258,7 +258,7 @@ fn admin_transfer_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #140)")]
+#[should_panic(expected = "Error(Contract, #400)")]
 fn cannot_accept_after_admin_transfer_cancelled() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -333,7 +333,7 @@ fn non_recipient_cannot_accept_transfer() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #140)")]
+#[should_panic(expected = "Error(Contract, #400)")]
 fn expired_admin_transfer_panics() {
     let e = Env::default();
     let admin = Address::generate(&e);

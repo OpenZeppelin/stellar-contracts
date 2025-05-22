@@ -206,9 +206,9 @@ pub trait AccessControl {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum AccessControlError {
-    Unauthorized = 120,
-    AccountNotFound = 121,
-    AdminNotSet = 122,
+    Unauthorized = 410,
+    AccountNotFound = 411,
+    AdminNotSet = 412,
 }
 
 // ################## EVENTS ##################
