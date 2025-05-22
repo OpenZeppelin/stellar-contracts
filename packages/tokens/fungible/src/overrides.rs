@@ -90,7 +90,13 @@ impl Base {
         crate::transfer_from(e, spender, from, to, amount);
     }
 
-    pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+    pub fn approve(
+        e: &Env,
+        owner: &Address,
+        spender: &Address,
+        amount: i128,
+        live_until_ledger: u32,
+    ) {
         crate::approve(e, owner, spender, amount, live_until_ledger);
     }
 

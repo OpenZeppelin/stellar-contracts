@@ -15,7 +15,7 @@ use soroban_sdk::{
 };
 use stellar_fungible::{
     self as fungible, burnable::FungibleBurnable, impl_token_interface, mintable::FungibleMintable,
-    FungibleToken,
+    Base, FungibleToken,
 };
 use stellar_pausable::{self as pausable, Pausable};
 use stellar_pausable_macros::when_not_paused;
@@ -79,6 +79,8 @@ impl Pausable for ExampleContract {
 
 #[contractimpl]
 impl FungibleToken for ExampleContract {
+    type ContractType = Base;
+
     fn total_supply(e: &Env) -> i128 {
         fungible::total_supply(e)
     }

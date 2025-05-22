@@ -4,7 +4,7 @@ use soroban_sdk::{
 use stellar_access_control::{set_admin, AccessControl};
 use stellar_access_control_macro::has_role;
 use stellar_default_impl_macro::default_impl;
-use stellar_fungible::FungibleToken;
+use stellar_fungible::{Base, FungibleToken};
 
 #[contracttype]
 pub enum DataKey {
@@ -34,7 +34,9 @@ impl ExampleContract {
 
 #[default_impl]
 #[contractimpl]
-impl FungibleToken for ExampleContract {}
+impl FungibleToken for ExampleContract {
+    type ContractType = Base;
+}
 
 #[default_impl]
 #[contractimpl]

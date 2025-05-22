@@ -1,9 +1,10 @@
-use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 use stellar_constants::{BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD};
 
 use crate::{
-    fungible::FungibleTokenError,
+    extensions::blocklist::{emit_user_blocked, emit_user_unblocked},
     overrides::{Base, ContractOverrides},
+    FungibleTokenError,
 };
 
 pub struct BlockList;
@@ -20,14 +21,6 @@ impl ContractOverrides for BlockList {
     fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
         BlockList::approve(e, owner, spender, amount, live_until_ledger);
     }
-}
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum BlockListError {
-    /// The user is blocked and cannot perform this operation
-    UserBlocked = 400,
 }
 
 /// Storage keys for the data associated with the blocklist extension
@@ -93,7 +86,7 @@ impl BlockList {
     pub fn block_user(e: &Env, admin: &Address, user: &Address) {
         // Verify admin authorization
         admin.require_auth();
-        
+
         // Check if the caller is the admin
         let stored_admin = BlockList::admin(e);
         if *admin != stored_admin {
@@ -106,8 +99,7 @@ impl BlockList {
         e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
 
         // Emit event
-        let topics = (symbol_short!("user_blocked"), user);
-        e.events().publish(topics, ());
+        emit_user_blocked(e, user);
     }
 
     /// Unblocks a user, allowing them to receive and transfer tokens.
@@ -129,7 +121,7 @@ impl BlockList {
     pub fn unblock_user(e: &Env, admin: &Address, user: &Address) {
         // Verify admin authorization
         admin.require_auth();
-        
+
         // Check if the caller is the admin
         let stored_admin = BlockList::admin(e);
         if *admin != stored_admin {
@@ -142,8 +134,7 @@ impl BlockList {
         e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
 
         // Emit event
-        let topics = (symbol_short!("user_unblocked"), user);
-        e.events().publish(topics, ());
+        emit_user_unblocked(e, user);
     }
 
     // ################## OVERRIDDEN FUNCTIONS ##################
@@ -159,15 +150,16 @@ impl BlockList {
     ///
     /// # Errors
     ///
-    /// * [`BlockListError::UserBlocked`] - When either `from` or `to` is blocked.
+    /// * [`FungibleTokenError::UserBlocked`] - When either `from` or `to` is
+    ///   blocked.
     /// * Also refer to [`Base::transfer`] errors.
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         // Check if either address is blocked
         if BlockList::blocked(e, from) {
-            panic_with_error!(e, BlockListError::UserBlocked);
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
         if BlockList::blocked(e, to) {
-            panic_with_error!(e, BlockListError::UserBlocked);
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
 
         // Call the base implementation
@@ -175,39 +167,42 @@ impl BlockList {
     }
 
     /// Transfers `amount` of tokens from `from` to `to` using the
-    /// allowance mechanism. `amount` is then deducted from `spender`s allowance.
+    /// allowance mechanism. `amount` is then deducted from `spender`s
+    /// allowance.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `spender` - The address authorizing the transfer, and having its allowance
-    ///   consumed during the transfer.
+    /// * `spender` - The address authorizing the transfer, and having its
+    ///   allowance consumed during the transfer.
     /// * `from` - The address holding the tokens which will be transferred.
     /// * `to` - The address receiving the transferred tokens.
     /// * `amount` - The amount of tokens to be transferred.
     ///
     /// # Errors
     ///
-    /// * [`BlockListError::UserBlocked`] - When either `from`, `to`, or `spender` is blocked.
+    /// * [`FungibleTokenError::UserBlocked`] - When either `from`, `to`, or
+    ///   `spender` is blocked.
     /// * Also refer to [`Base::transfer_from`] errors.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         // Check if any address is blocked
         if BlockList::blocked(e, spender) {
-            panic_with_error!(e, BlockListError::UserBlocked);
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
         if BlockList::blocked(e, from) {
-            panic_with_error!(e, BlockListError::UserBlocked);
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
         if BlockList::blocked(e, to) {
-            panic_with_error!(e, BlockListError::UserBlocked);
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
 
         // Call the base implementation
         Base::transfer_from(e, spender, from, to, amount);
     }
 
-    /// Sets the amount of tokens a `spender` is allowed to spend on behalf of an
-    /// `owner`. Overrides any existing allowance set between `spender` and `owner`.
+    /// Sets the amount of tokens a `spender` is allowed to spend on behalf of
+    /// an `owner`. Overrides any existing allowance set between `spender`
+    /// and `owner`.
     ///
     /// # Arguments
     ///
@@ -215,19 +210,27 @@ impl BlockList {
     /// * `owner` - The address holding the tokens.
     /// * `spender` - The address authorized to spend the tokens.
     /// * `amount` - The amount of tokens made available to `spender`.
-    /// * `live_until_ledger` - The ledger number at which the allowance expires.
+    /// * `live_until_ledger` - The ledger number at which the allowance
+    ///   expires.
     ///
     /// # Errors
     ///
-    /// * [`BlockListError::UserBlocked`] - When either `owner` or `spender` is blocked.
+    /// * [`FungibleTokenError::UserBlocked`] - When either `owner` or `spender`
+    ///   is blocked.
     /// * Also refer to [`Base::approve`] errors.
-    pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+    pub fn approve(
+        e: &Env,
+        owner: &Address,
+        spender: &Address,
+        amount: i128,
+        live_until_ledger: u32,
+    ) {
         // Check if either address is blocked
         if BlockList::blocked(e, owner) {
-            panic_with_error!(e, BlockListError::UserBlocked);
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
         if BlockList::blocked(e, spender) {
-            panic_with_error!(e, BlockListError::UserBlocked);
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
 
         // Call the base implementation

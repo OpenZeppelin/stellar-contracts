@@ -186,6 +186,10 @@ pub enum FungibleTokenError {
     InvalidCap = 207,
     /// Indicates the Cap was not set.
     CapNotSet = 208,
+    /// The user is not allowed to perform this operation
+    UserNotAllowed = 209,
+    /// The user is blocked and cannot perform this operation
+    UserBlocked = 210,
 }
 
 // ################## EVENTS ##################
