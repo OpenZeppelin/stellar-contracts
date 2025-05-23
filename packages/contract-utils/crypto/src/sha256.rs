@@ -2,8 +2,9 @@ use soroban_sdk::{Bytes, BytesN, Env};
 
 use crate::hasher::Hasher;
 
+/// Struct to store bytes that will be consumed by the sha256 [`Hasher`] implementaton.
 pub struct Sha256 {
-    buffer: Option<Bytes>,
+    state: Option<Bytes>,
     env: Env,
 }
 
@@ -11,19 +12,19 @@ impl Hasher for Sha256 {
     type Output = BytesN<32>;
 
     fn new(e: &Env) -> Self {
-        Sha256 { buffer: None, env: e.clone() }
+        Sha256 { state: None, env: e.clone() }
     }
 
     fn update(&mut self, input: impl AsRef<[u8]>) {
         let bytes = Bytes::from_slice(&self.env, input.as_ref());
-        match &mut self.buffer {
-            None => self.buffer = Some(bytes),
-            Some(buffer) => buffer.append(&bytes),
+        match &mut self.state {
+            None => self.state = Some(bytes),
+            Some(state) => state.append(&bytes),
         }
     }
 
     fn finalize(self) -> Self::Output {
-        let data = self.buffer.expect("No data to hash: buffer empty!");
+        let data = self.state.expect("No data to hash: state empty!");
         self.env.crypto().sha256(&data).to_bytes()
     }
 }

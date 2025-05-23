@@ -27,11 +27,19 @@ where
     H: Hasher<Output = Bytes32>,
 {
     /// Verify that `leaf` is part of a Merkle tree defined by `root` by using
-    /// `proof` and a custom hashing algorithm defined by `builder`. See
-    /// [`BuildHasher`] for more information on how to construct a builder.
+    /// `proof` and a custom hashing algorithm defined by `Hasher`.
+    ///
+    /// A new root is rebuilt by traversing up the Merkle tree. The `proof`
+    /// provided must contain sibling hashes on the branch starting from the
+    /// leaf to the root of the tree. Each pair of leaves and each pair of
+    /// pre-images are assumed to be sorted.
+    ///
+    /// A `proof` is valid if and only if the rebuilt hash matches the root
+    /// of the tree.
     ///
     /// # Arguments
     ///
+    /// * `e` - Access to the Soroban environment.
     /// * `proof` - A slice of hashes that constitute the merkle proof.
     /// * `root` - The root of the merkle tree, in bytes.
     /// * `leaf` - The leaf of the merkle tree to proof, in bytes.
