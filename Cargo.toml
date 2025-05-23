@@ -49,6 +49,7 @@ stellar-pausable-macros = { path = "packages/contract-utils/pausable-macros" }
 stellar-role-transfer = { path = "packages/access/role-transfer" }
 stellar-upgradeable = { path = "packages/contract-utils/upgradeable" }
 stellar-upgradeable-macros = { path = "packages/contract-utils/upgradeable-macros" }
+stellar-crypto = { path = "packages/contract-utils/crypto" }
 
 [profile.release]
 opt-level = "z"
