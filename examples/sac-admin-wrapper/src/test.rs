@@ -7,14 +7,15 @@ use soroban_sdk::{
     Address, Env, IntoVal,
 };
 
-use crate::contract::{ExampleSACAdminWrapperContract, ExampleSACAdminWrapperContractClient};
+use crate::contract::{ExampleContract, ExampleContractClient};
 
 #[test]
 fn test_sac_transfer() {
     let e = Env::default();
 
     let issuer = Address::generate(&e);
-    let owner = Address::generate(&e);
+    let default_admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
 
@@ -41,9 +42,11 @@ fn test_sac_transfer() {
     assert_eq!(balance1, 1000);
 
     // Deploy the New Admin
-    let new_admin =
-        e.register(ExampleSACAdminWrapperContract, (owner.clone(), sac_client.address.clone()));
-    let new_admin_client = ExampleSACAdminWrapperContractClient::new(&e, &new_admin);
+    let new_admin = e.register(
+        ExampleContract,
+        (default_admin.clone(), manager.clone(), sac_client.address.clone()),
+    );
+    let new_admin_client = ExampleContractClient::new(&e, &new_admin);
 
     // Set the New Admin
     e.mock_auths(&[MockAuth {
@@ -61,8 +64,8 @@ fn test_sac_transfer() {
 
     // Mint 1000 tokens to user2 from the New Admin
     e.mock_auths(&[MockAuth {
-        // owner authorizes
-        address: &owner,
+        // default_admin authorizes
+        address: &manager,
         invoke: &MockAuthInvoke {
             contract: &new_admin,
             fn_name: "mint",
@@ -70,7 +73,7 @@ fn test_sac_transfer() {
             sub_invokes: &[],
         },
     }]);
-    new_admin_client.mint(&user2, &1000, &owner);
+    new_admin_client.mint(&user2, &1000, &default_admin);
 
     let balance2 = token_client.balance(&user2);
     assert_eq!(balance2, 1000);

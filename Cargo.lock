@@ -1020,6 +1020,9 @@ name = "sac-admin-wrapper-example"
 version = "0.2.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-access-control",
+ "stellar-access-control-macro",
+ "stellar-default-impl-macro",
  "stellar-fungible",
 ]
 
