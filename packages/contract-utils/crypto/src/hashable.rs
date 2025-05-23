@@ -6,21 +6,21 @@ use crate::hasher::Hasher;
 
 /// A hashable type.
 ///
-/// Types implementing `Hash` are able to be [`Hash::hash`]ed with an instance
-/// of [`Hasher`].
+/// Types implementing `Hashable` are able to be [`Hashable::hash`]ed with an
+/// instance of [`Hasher`].
 pub trait Hashable {
     /// Feeds this value into the given [`Hasher`].
-    fn hash<H: Hasher>(&self, state: &mut H);
+    fn hash<H: Hasher>(&self, hasher: &mut H);
 }
 
 impl Hashable for BytesN<32> {
     #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.update(self.to_array());
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        hasher.update(self.to_array());
     }
 }
 
-/// Hash the pair `(a, b)` with `state`.
+/// Hash the pair `(a, b)` with `hasher`.
 ///
 /// Returns the finalized hash output from the hasher.
 ///
@@ -28,30 +28,38 @@ impl Hashable for BytesN<32> {
 ///
 /// * `a` - The first value to hash.
 /// * `b` - The second value to hash.
-/// * `state` - The hasher state to use.
+/// * `hasher` - The hasher to use.
 #[inline]
-pub fn hash_pair<S, H>(a: &H, b: &H, mut state: S) -> S::Output
+pub fn hash_pair<S, H>(a: &H, b: &H, mut hasher: S) -> S::Output
 where
     H: Hashable + ?Sized,
     S: Hasher,
 {
-    a.hash(&mut state);
-    b.hash(&mut state);
-    state.finalize()
+    a.hash(&mut hasher);
+    b.hash(&mut hasher);
+    hasher.finalize()
 }
 
-/// Sort the pair `(a, b)` and hash the result with `state`. Frequently used
+/// Sort the pair `(a, b)` and hash the result with `hasher`. Frequently used
 /// when working with merkle proofs.
+///
+/// Returns the finalized hash output from the hasher.
+///
+/// # Arguments
+///
+/// * `a` - The first value to hash.
+/// * `b` - The second value to hash.
+/// * `hasher` - The hasher to use.
 #[inline]
-pub fn commutative_hash_pair<S, H>(a: &H, b: &H, state: S) -> S::Output
+pub fn commutative_hash_pair<S, H>(a: &H, b: &H, hasher: S) -> S::Output
 where
     H: Hashable + PartialOrd,
     S: Hasher,
 {
     if a > b {
-        hash_pair(b, a, state)
+        hash_pair(b, a, hasher)
     } else {
-        hash_pair(a, b, state)
+        hash_pair(a, b, hasher)
     }
 }
 
@@ -64,13 +72,14 @@ mod tests {
     use proptest::prelude::*;
     use soroban_sdk::Env;
 
+    use crate::keccak::Keccak256;
+
     use super::*;
-    use crate::{hasher::BuildHasher, keccak::KeccakBuilder};
 
     // Helper impl for testing
     impl Hashable for Vec<u8> {
-        fn hash<H: Hasher>(&self, state: &mut H) {
-            state.update(self.as_slice());
+        fn hash<H: Hasher>(&self, hasher: &mut H) {
+            hasher.update(self.as_slice());
         }
     }
 
@@ -82,9 +91,8 @@ mod tests {
     fn commutative_hash_is_order_independent() {
         let e = Env::default();
         proptest!(|(a: Vec<u8>, b: Vec<u8>)| {
-            let builder = KeccakBuilder::new(&e);
-            let hash1 = commutative_hash_pair(&a, &b, builder.build_hasher());
-            let hash2 = commutative_hash_pair(&b, &a, builder.build_hasher());
+            let hash1 = commutative_hash_pair(&a, &b, Keccak256::new(&e));
+            let hash2 = commutative_hash_pair(&b, &a, Keccak256::new(&e));
             prop_assert_eq!(hash1, hash2);
         })
     }
@@ -95,9 +103,8 @@ mod tests {
         proptest!(|(a in non_empty_u8_vec_strategy(),
         b in non_empty_u8_vec_strategy())| {
             prop_assume!(a != b);
-            let builder = KeccakBuilder::new(&e);
-            let hash1 = hash_pair(&a, &b, builder.build_hasher());
-            let hash2 = hash_pair(&b, &a, builder.build_hasher());
+            let hash1 = hash_pair(&a, &b, Keccak256::new(&e));
+            let hash2 = hash_pair(&b, &a, Keccak256::new(&e));
             prop_assert_ne!(hash1, hash2);
         })
     }
@@ -106,9 +113,8 @@ mod tests {
     fn hash_pair_deterministic() {
         let e = Env::default();
         proptest!(|(a: Vec<u8>, b: Vec<u8>)| {
-            let builder = KeccakBuilder::new(&e);
-            let hash1 = hash_pair(&a, &b, builder.build_hasher());
-            let hash2 = hash_pair(&a, &b, builder.build_hasher());
+            let hash1 = hash_pair(&a, &b, Keccak256::new(&e));
+            let hash2 = hash_pair(&a, &b, Keccak256::new(&e));
             prop_assert_eq!(hash1, hash2);
         })
     }
@@ -117,9 +123,8 @@ mod tests {
     fn commutative_hash_pair_deterministic() {
         let e = Env::default();
         proptest!(|(a: Vec<u8>, b: Vec<u8>)| {
-            let builder = KeccakBuilder::new(&e);
-            let hash1 = commutative_hash_pair(&a, &b, builder.build_hasher());
-            let hash2 = commutative_hash_pair(&a, &b, builder.build_hasher());
+            let hash1 = commutative_hash_pair(&a, &b, Keccak256::new(&e));
+            let hash2 = commutative_hash_pair(&a, &b, Keccak256::new(&e));
             prop_assert_eq!(hash1, hash2);
         })
     }
@@ -128,9 +133,8 @@ mod tests {
     fn identical_pairs_hash() {
         let e = Env::default();
         proptest!(|(a: Vec<u8>)| {
-            let builder = KeccakBuilder::new(&e);
-            let hash1 = hash_pair(&a, &a, builder.build_hasher());
-            let hash2 = commutative_hash_pair(&a, &a, builder.build_hasher());
+            let hash1 = hash_pair(&a, &a, Keccak256::new(&e));
+            let hash2 = commutative_hash_pair(&a, &a, Keccak256::new(&e));
             assert_eq!(hash1, hash2);
         })
     }

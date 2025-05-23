@@ -15,39 +15,12 @@ use core::marker::PhantomData;
 
 use soroban_sdk::{BytesN, Env, Vec};
 
-use crate::{
-    hashable::commutative_hash_pair,
-    hasher::{BuildHasher, Hasher},
-    keccak::{Keccak256, KeccakBuilder},
-};
+use crate::{hashable::commutative_hash_pair, hasher::Hasher};
 
 type Bytes32 = BytesN<32>;
 
 /// Verify merkle proofs.
 pub struct Verifier<H: Hasher>(PhantomData<H>);
-
-impl Verifier<Keccak256> {
-    /// Verify that `leaf` is part of a Merkle tree defined by `root` by using
-    /// `proof` and the default `keccak256` hashing algorithm.
-    ///
-    /// A new root is rebuilt by traversing up the Merkle tree. The `proof`
-    /// provided must contain sibling hashes on the branch starting from the
-    /// leaf to the root of the tree. Each pair of leaves and each pair of
-    /// pre-images are assumed to be sorted.
-    ///
-    /// A `proof` is valid if and only if the rebuilt hash matches the root
-    /// of the tree.
-    ///
-    /// # Arguments
-    ///
-    /// * `proof` - A slice of hashes that constitute the merkle proof.
-    /// * `root` - The root of the merkle tree, in bytes.
-    /// * `leaf` - The leaf of the merkle tree to proof, in bytes.
-    #[must_use]
-    pub fn verify(e: &Env, proof: Vec<Bytes32>, root: Bytes32, leaf: Bytes32) -> bool {
-        Verifier::verify_with_builder(proof, root, leaf, &KeccakBuilder::new(e))
-    }
-}
 
 impl<H> Verifier<H>
 where
@@ -62,15 +35,10 @@ where
     /// * `proof` - A slice of hashes that constitute the merkle proof.
     /// * `root` - The root of the merkle tree, in bytes.
     /// * `leaf` - The leaf of the merkle tree to proof, in bytes.
-    /// * `builder` - A [`BuildHasher`] that represents a hashing algorithm.
-    pub fn verify_with_builder<B: BuildHasher<H>>(
-        proof: Vec<Bytes32>,
-        root: Bytes32,
-        mut leaf: Bytes32,
-        builder: &B,
-    ) -> bool {
+    #[must_use]
+    pub fn verify(e: &Env, proof: Vec<Bytes32>, root: Bytes32, mut leaf: Bytes32) -> bool {
         for hash in proof {
-            leaf = commutative_hash_pair(&leaf, &hash, builder.build_hasher());
+            leaf = commutative_hash_pair(&leaf, &hash, H::new(e));
         }
 
         leaf == root
@@ -90,8 +58,8 @@ mod tests {
     use proptest::{prelude::*, prop_compose};
     use soroban_sdk::Env;
 
-    use super::{commutative_hash_pair, Bytes32, KeccakBuilder, Verifier};
-    use crate::hasher::BuildHasher;
+    use super::{commutative_hash_pair, Bytes32, Verifier};
+    use crate::{hasher::Hasher, keccak::Keccak256};
 
     macro_rules! to_bytes {
         ($env:tt, $lit:literal) => {
@@ -122,7 +90,7 @@ mod tests {
                 current = commutative_hash_pair(
                     &current,
                     &hash,
-                    KeccakBuilder::new(&e).build_hasher(),
+                    Keccak256::new(&e),
                 );
             }
             let root = current;
@@ -147,7 +115,7 @@ mod tests {
                         tampered_element[tamper_idx].wrapping_add(1);
                     tampered_proof.set(0, Bytes32::from_array(&e, &tampered_element));
 
-                    prop_assert!(!Verifier::verify(&e, tampered_proof, root, leaf));
+                    prop_assert!(!Verifier::<Keccak256>::verify(&e, tampered_proof, root, leaf));
                 }
             }
         )
@@ -164,13 +132,13 @@ mod tests {
                 let extra_hash = Bytes32::from_array(&e, &extra_hash);
                 let mut longer_proof = proof.clone();
                 longer_proof.push_back(extra_hash);
-                prop_assert!(!Verifier::verify(&e, longer_proof, root.clone(), leaf.clone()));
+                prop_assert!(!Verifier::<Keccak256>::verify(&e, longer_proof, root.clone(), leaf.clone()));
 
                 if !proof.is_empty() {
                     let shorter_proof = &proof.slice(1..);
-                    prop_assert!(!Verifier::verify(&e, shorter_proof.clone(), root.clone(), leaf.clone()));
+                    prop_assert!(!Verifier::<Keccak256>::verify(&e, shorter_proof.clone(), root.clone(), leaf.clone()));
                     let shorter_proof = &proof.slice(..proof.len() - 1);
-                    prop_assert!(!Verifier::verify(&e, shorter_proof.clone(), root, leaf));
+                    prop_assert!(!Verifier::<Keccak256>::verify(&e, shorter_proof.clone(), root, leaf));
                 }
             }
         )
@@ -182,7 +150,7 @@ mod tests {
 
         let root = Bytes32::from_array(&e, &[0u8; 32]);
         let leaf = root.clone();
-        assert!(Verifier::verify(&e, soroban_sdk::Vec::new(&e), root, leaf));
+        assert!(Verifier::<Keccak256>::verify(&e, soroban_sdk::Vec::new(&e), root, leaf));
     }
 
     #[test]
@@ -213,12 +181,12 @@ mod tests {
             "276141cd72b9b81c67f7182ff8a550b76eb96de9248a3ec027ac048c79649115"
         );
 
-        let verification = Verifier::verify(&e, proof.clone(), root.clone(), leaf_a.clone());
+        let verification =
+            Verifier::<Keccak256>::verify(&e, proof.clone(), root.clone(), leaf_a.clone());
         assert!(verification);
 
-        let builder = KeccakBuilder::new(&e).build_hasher();
-        let no_such_leaf = commutative_hash_pair(&leaf_a, &leaf_b, builder);
-        let verification = Verifier::verify(&e, proof.slice(1..), root, no_such_leaf);
+        let no_such_leaf = commutative_hash_pair(&leaf_a, &leaf_b, Keccak256::new(&e));
+        let verification = Verifier::<Keccak256>::verify(&e, proof.slice(1..), root, no_such_leaf);
         assert!(verification);
     }
 
@@ -238,7 +206,8 @@ mod tests {
         let proof =
             to_bytes!(e, "7b0c6cd04b82bfc0e250030a5d2690c52585e0cc6a4f3bc7909d7723b0236ece");
 
-        let verification = Verifier::verify(&e, soroban_sdk::vec![&e, proof], root, leaf);
+        let verification =
+            Verifier::<Keccak256>::verify(&e, soroban_sdk::vec![&e, proof], root, leaf);
         assert!(!verification);
     }
 
@@ -260,7 +229,7 @@ mod tests {
             "9cf5a63718145ba968a01c1d557020181c5b252f665cf7386d370eddb176517b"
         );
 
-        let verification = Verifier::verify(&e, proof.slice(..1), root, leaf);
+        let verification = Verifier::<Keccak256>::verify(&e, proof.slice(..1), root, leaf);
         assert!(!verification);
     }
 
@@ -279,9 +248,9 @@ mod tests {
         let proof = soroban_sdk::vec![&e];
 
         // valid if root == leaf
-        assert!(Verifier::verify(&e, proof.clone(), root.clone(), root.clone()));
+        assert!(Verifier::<Keccak256>::verify(&e, proof.clone(), root.clone(), root.clone()));
 
         // invalid if root != leaf
-        assert!(!Verifier::verify(&e, proof, root, leaf));
+        assert!(!Verifier::<Keccak256>::verify(&e, proof, root, leaf));
     }
 }
