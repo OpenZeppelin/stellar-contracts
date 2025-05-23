@@ -26,9 +26,9 @@ use soroban_sdk::{Address, Env};
 /// # Notes
 ///
 /// `#[contractimpl]` macro requires even the default implementations to be
-/// present under its scope. To not confuse the developers, we did not provide
-/// the default implementations here, but we are providing a macro to generate
-/// the default implementations for you.
+/// present under its scope. To avoid confusion, we do not provide the default
+/// implementations here, but we are providing a macro that generates them
+///  for you.
 ///
 /// When implementing [`NonFungibleRoyalties`] trait for your Smart Contract,
 /// you can follow the below example:
