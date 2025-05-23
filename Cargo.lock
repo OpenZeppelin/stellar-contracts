@@ -865,6 +865,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
+name = "ownable-example"
+version = "0.2.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-default-impl-macro",
+ "stellar-ownable",
+ "stellar-ownable-macro",
+]
+
+[[package]]
 name = "p256"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1366,6 +1376,7 @@ dependencies = [
  "soroban-sdk",
  "stellar-constants",
  "stellar-event-assertion",
+ "stellar-role-transfer",
 ]
 
 [[package]]
@@ -1374,6 +1385,7 @@ version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "stellar-macro-helpers",
  "syn 2.0.96",
 ]
 
@@ -1404,6 +1416,8 @@ dependencies = [
  "stellar-event-assertion",
  "stellar-fungible",
  "stellar-non-fungible",
+ "stellar-ownable",
+ "stellar-ownable-macro",
 ]
 
 [[package]]
@@ -1425,12 +1439,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-macro-helpers"
+version = "0.2.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "stellar-non-fungible"
 version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-constants",
  "stellar-event-assertion",
+]
+
+[[package]]
+name = "stellar-ownable"
+version = "0.2.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-event-assertion",
+ "stellar-role-transfer",
+]
+
+[[package]]
+name = "stellar-ownable-macro"
+version = "0.2.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "stellar-macro-helpers",
+ "syn 2.0.96",
 ]
 
 [[package]]
@@ -1446,7 +1488,15 @@ version = "0.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "stellar-macro-helpers",
  "syn 2.0.96",
+]
+
+[[package]]
+name = "stellar-role-transfer"
+version = "0.2.0"
+dependencies = [
+ "soroban-sdk",
 ]
 
 [[package]]
