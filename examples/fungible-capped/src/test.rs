@@ -38,7 +38,7 @@ fn mint_exact_cap() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #206)")]
+#[should_panic(expected = "Error(Contract, #106)")]
 fn mint_exceeds_cap() {
     let e = Env::default();
     let cap = 1000;
@@ -50,7 +50,7 @@ fn mint_exceeds_cap() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #206)")]
+#[should_panic(expected = "Error(Contract, #106)")]
 fn mint_multiple_exceeds_cap() {
     let e = Env::default();
     let cap = 1000;

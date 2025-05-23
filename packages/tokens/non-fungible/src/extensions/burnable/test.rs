@@ -102,7 +102,7 @@ fn burn_from_with_owner_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #301)")]
+#[should_panic(expected = "Error(Contract, #201)")]
 fn burn_with_not_owner_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -118,7 +118,7 @@ fn burn_with_not_owner_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #302)")]
+#[should_panic(expected = "Error(Contract, #202)")]
 fn burn_from_with_insufficient_approval_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -134,7 +134,7 @@ fn burn_from_with_insufficient_approval_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #300)")]
+#[should_panic(expected = "Error(Contract, #200)")]
 fn burn_with_non_existent_token_panics() {
     let e = Env::default();
     e.mock_all_auths();

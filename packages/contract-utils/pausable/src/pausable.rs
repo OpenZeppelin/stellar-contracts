@@ -76,9 +76,9 @@ pub trait Pausable {
 #[repr(u32)]
 pub enum PausableError {
     /// The operation failed because the contract is paused.
-    EnforcedPause = 100,
+    EnforcedPause = 1000,
     /// The operation failed because the contract is not paused.
-    ExpectedPause = 101,
+    ExpectedPause = 1001,
 }
 
 // ################## EVENTS ##################

@@ -39,7 +39,7 @@ fn transfer_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #100)")]
+#[should_panic(expected = "Error(Contract, #1000)")]
 fn transfer_fails_when_paused() {
     let e = Env::default();
     let owner = Address::generate(&e);
@@ -67,7 +67,7 @@ fn transfer_from_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #100)")]
+#[should_panic(expected = "Error(Contract, #1000)")]
 fn transfer_from_fails_when_paused() {
     let e = Env::default();
     let owner = Address::generate(&e);
@@ -93,7 +93,7 @@ fn mint_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #100)")]
+#[should_panic(expected = "Error(Contract, #1000)")]
 fn mint_fails_when_paused() {
     let e = Env::default();
     let owner = Address::generate(&e);
@@ -117,7 +117,7 @@ fn burn_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #100)")]
+#[should_panic(expected = "Error(Contract, #1000)")]
 fn burn_fails_when_paused() {
     let e = Env::default();
     let owner = Address::generate(&e);

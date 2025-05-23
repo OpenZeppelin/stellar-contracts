@@ -171,7 +171,7 @@ fn test_add_to_owner_enumeration() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #308)")]
+#[should_panic(expected = "Error(Contract, #208)")]
 fn test_remove_from_owner_enumeration() {
     let e = Env::default();
     e.mock_all_auths();
@@ -203,7 +203,7 @@ fn test_add_to_global_enumeration() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #309)")]
+#[should_panic(expected = "Error(Contract, #209)")]
 fn test_remove_from_global_enumeration() {
     let e = Env::default();
     e.mock_all_auths();
