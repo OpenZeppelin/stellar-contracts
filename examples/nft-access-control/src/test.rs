@@ -4,8 +4,8 @@ extern crate std;
 
 use soroban_sdk::{
     symbol_short,
-    testutils::{Address as _, Ledger},
-    Address, Env, Symbol,
+    testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
+    Address, Env, IntoVal, Symbol,
 };
 
 use crate::contract::{ExampleContract, ExampleContractClient};
@@ -35,8 +35,8 @@ fn setup_roles(e: &Env, client: &ExampleContractClient, admin: &Address) -> Test
     let outsider = Address::generate(e);
 
     // Set role admins
-    client.set_role_admin(admin, &Symbol::new(e, "minter"), &Symbol::new(e, "minter_admin"));
-    client.set_role_admin(admin, &Symbol::new(e, "burner"), &Symbol::new(e, "burner_admin"));
+    client.set_role_admin(&Symbol::new(e, "minter"), &Symbol::new(e, "minter_admin"));
+    client.set_role_admin(&Symbol::new(e, "burner"), &Symbol::new(e, "burner_admin"));
 
     // Grant admin roles
     client.grant_role(admin, &minter_admin, &Symbol::new(e, "minter_admin"));
@@ -211,26 +211,55 @@ fn non_admin_cannot_revoke_role() {
 #[test]
 fn admin_transfer_works() {
     let e = Env::default();
+
     let admin = Address::generate(&e);
     let client = create_client(&e, &admin);
     let new_admin = Address::generate(&e);
+    let random_user = Address::generate(&e);
 
-    e.mock_all_auths();
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "transfer_admin_role",
+            args: (new_admin.clone(), 1000_u32).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
 
     // Current admin initiates the transfer
-    client.transfer_admin_role(&admin, &new_admin, &1000);
+    client.transfer_admin_role(&new_admin, &1000);
+
+    e.mock_auths(&[MockAuth {
+        address: &new_admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "accept_admin_transfer",
+            args: ().into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
 
     // New admin accepts
-    client.accept_admin_transfer(&new_admin);
+    client.accept_admin_transfer();
+
+    e.mock_auths(&[MockAuth {
+        address: &new_admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "grant_role",
+            args: (new_admin.clone(), random_user.clone(), symbol_short!("minter")).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
 
     // Sanity check: new admin can now grant a role
-    let random_user = Address::generate(&e);
     client.grant_role(&new_admin, &random_user, &symbol_short!("minter"));
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #123)")]
-fn admin_transfer_cancelled() {
+#[should_panic(expected = "Error(Contract, #140)")]
+fn cannot_accept_after_admin_transfer_cancelled() {
     let e = Env::default();
     let admin = Address::generate(&e);
     let client = create_client(&e, &admin);
@@ -238,31 +267,38 @@ fn admin_transfer_cancelled() {
 
     e.mock_all_auths();
 
-    client.transfer_admin_role(&admin, &new_admin, &1000);
+    client.transfer_admin_role(&new_admin, &1000);
 
     // Now cancel
-    client.transfer_admin_role(&admin, &new_admin, &0);
+    client.transfer_admin_role(&new_admin, &0);
 
     // New admin tries to accept—should panic
-    client.accept_admin_transfer(&new_admin);
+    client.accept_admin_transfer();
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
 fn non_admin_cannot_initiate_transfer() {
     let e = Env::default();
     let admin = Address::generate(&e);
     let client = create_client(&e, &admin);
-    let intruder = Address::generate(&e);
     let new_admin = Address::generate(&e);
 
-    e.mock_all_auths();
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "transfer_admin_role",
+            args: (new_admin.clone(), 1000_i128).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
 
-    client.transfer_admin_role(&intruder, &new_admin, &1000);
+    client.transfer_admin_role(&new_admin, &1000);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "HostError: Error(Auth, InvalidAction)")]
 fn non_recipient_cannot_accept_transfer() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -270,16 +306,34 @@ fn non_recipient_cannot_accept_transfer() {
     let new_admin = Address::generate(&e);
     let imposter = Address::generate(&e);
 
-    e.mock_all_auths();
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "transfer_admin_role",
+            args: (new_admin.clone(), 1000_i128).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
 
-    client.transfer_admin_role(&admin, &new_admin, &1000);
+    e.mock_auths(&[MockAuth {
+        address: &imposter,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "accept_admin_transfer",
+            args: (imposter.clone(),).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    client.transfer_admin_role(&new_admin, &1000);
 
     // Imposter tries to accept
-    client.accept_admin_transfer(&imposter);
+    client.accept_admin_transfer();
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #123)")]
+#[should_panic(expected = "Error(Contract, #140)")]
 fn expired_admin_transfer_panics() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -288,13 +342,67 @@ fn expired_admin_transfer_panics() {
 
     e.mock_all_auths();
 
-    // Start at t = 1000
-    e.ledger().set_sequence_number(1000);
-
-    client.transfer_admin_role(&admin, &new_admin, &2000);
+    client.transfer_admin_role(&new_admin, &2000);
 
     // Move past the TTL for the admin transfer
     e.ledger().set_sequence_number(3000);
 
-    client.accept_admin_transfer(&new_admin);
+    client.accept_admin_transfer();
+}
+
+#[test]
+#[should_panic(expected = "HostError: Error(Auth, InvalidAction)")]
+fn non_admin_cannot_cancel_transfer_admin_role() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+    let new_admin = Address::generate(&e);
+
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "transfer_admin_role",
+            args: (new_admin.clone(), 1000_i128).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    // Start a valid admin transfer
+    client.transfer_admin_role(&new_admin, &1000);
+
+    e.mock_auths(&[MockAuth {
+        address: &new_admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "transfer_admin_role",
+            args: (new_admin.clone(), 0_i128).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    // Non-admin attempts to cancel the admin transfer
+    client.transfer_admin_role(&new_admin, &0);
+}
+
+#[test]
+#[should_panic(expected = "HostError: Error(Auth, InvalidAction)")]
+fn non_admin_cannot_set_role_admin() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+    let non_admin = Address::generate(&e);
+
+    e.mock_auths(&[MockAuth {
+        address: &non_admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "set_role_admin",
+            args: (Symbol::new(&e, "minter"), Symbol::new(&e, "minter_admin")).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    // Non-admin attempts to set a role admin
+    client.set_role_admin(&Symbol::new(&e, "minter"), &Symbol::new(&e, "minter_admin"));
 }
