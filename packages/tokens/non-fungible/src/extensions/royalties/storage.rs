@@ -12,7 +12,7 @@ pub struct RoyaltyInfo {
 
 /// Storage keys for royalty data
 #[contracttype]
-pub enum RoyaltyStorageKey {
+pub enum NFTRoyaltiesStorageKey {
     DefaultRoyalty,
     TokenRoyalty(u32),
 }
@@ -34,11 +34,6 @@ impl Base {
     /// * [`NonFungibleTokenError::RoyaltyTooHigh`] - If the royalty percentage
     ///   exceeds the maximum allowed value.
     ///
-    /// # Events
-    ///
-    /// * topics - `["royalty", receiver: Address]`
-    /// * data - `[basis_points: u32]`
-    ///
     /// # Notes
     ///
     /// **IMPORTANT**: This function lacks authorization controls. Most likely,
@@ -46,7 +41,7 @@ impl Base {
     /// with admin-only authorization.
     pub fn set_default_royalty(e: &Env, receiver: &Address, basis_points: u32) {
         // Store the default royalty information
-        let key = RoyaltyStorageKey::DefaultRoyalty;
+        let key = NFTRoyaltiesStorageKey::DefaultRoyalty;
         let royalty_info = RoyaltyInfo { receiver: receiver.clone(), basis_points };
         e.storage().instance().set(&key, &royalty_info);
     }
@@ -72,11 +67,6 @@ impl Base {
     /// * [`NonFungibleTokenError::RoyaltyAlreadySet`] - If attempting to set
     ///   royalties for a token that already has royalty information.
     ///
-    /// # Events
-    ///
-    /// * topics - `["tokroyal", token_id: u32]`
-    /// * data - `[receiver: Address, basis_points: u32]`
-    ///
     /// # Notes
     ///
     /// **IMPORTANT**: This function lacks authorization controls. Most likely,
@@ -87,7 +77,7 @@ impl Base {
         let _ = Base::owner_of(e, token_id);
 
         // Check if royalty is already set for this token
-        let key = RoyaltyStorageKey::TokenRoyalty(token_id);
+        let key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
         if e.storage().persistent().has(&key) {
             panic_with_error!(e, NonFungibleTokenError::RoyaltyAlreadySet);
         }
@@ -110,7 +100,9 @@ impl Base {
     /// # Returns
     ///
     /// * `(Address, u32)` - A tuple containing the receiver address and the
-    ///   royalty amount.
+    ///   royalty amount. If there is no token-specific royalty set, it returns
+    ///   the default royalty. If there is no default royalty set, it returns
+    ///   the contract address and zero royalty.
     ///
     /// # Errors
     ///
@@ -121,7 +113,7 @@ impl Base {
         let _ = Base::owner_of(e, token_id);
 
         // Check if there's a specific royalty for this token
-        let token_key = RoyaltyStorageKey::TokenRoyalty(token_id);
+        let token_key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
         if let Some(royalty_info) = e.storage().persistent().get::<_, RoyaltyInfo>(&token_key) {
             e.storage().persistent().extend_ttl(
                 &token_key,
@@ -134,7 +126,7 @@ impl Base {
         }
 
         // Fall back to default royalty if no token-specific royalty is set
-        let default_key = RoyaltyStorageKey::DefaultRoyalty;
+        let default_key = NFTRoyaltiesStorageKey::DefaultRoyalty;
         if let Some(royalty_info) = e.storage().instance().get::<_, RoyaltyInfo>(&default_key) {
             let royalty_amount =
                 (sale_price as u64 * royalty_info.basis_points as u64 / 10000) as u32;

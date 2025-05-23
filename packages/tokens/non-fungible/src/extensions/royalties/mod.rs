@@ -19,9 +19,7 @@ use soroban_sdk::{Address, Env};
 /// - Making royalties immutable after minting
 ///
 /// `storage.rs` file of this module provides the `NonFungibleRoyalties` trait
-/// implementation for the `Base` contract type. For other contract types (eg.
-/// `Enumerable`, `Consecutive`), the overrides of the `NonFungibleRoyalties`
-/// trait methods can be found in their respective `storage.rs` file.
+/// implementation.
 ///
 /// # Notes
 ///
