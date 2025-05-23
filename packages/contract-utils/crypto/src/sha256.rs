@@ -2,7 +2,8 @@ use soroban_sdk::{Bytes, BytesN, Env};
 
 use crate::hasher::Hasher;
 
-/// Struct to store bytes that will be consumed by the sha256 [`Hasher`] implementaton.
+/// Struct to store bytes that will be consumed by the sha256 [`Hasher`]
+/// implementation.
 pub struct Sha256 {
     state: Option<Bytes>,
     env: Env,

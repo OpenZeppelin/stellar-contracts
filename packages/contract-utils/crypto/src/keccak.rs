@@ -3,7 +3,7 @@ use soroban_sdk::{Bytes, BytesN, Env};
 use crate::hasher::Hasher;
 
 /// Struct to store bytes that will be consumed by the keccak256 [`Hasher`]
-/// implementaton.
+/// implementation.
 pub struct Keccak256 {
     state: Option<Bytes>,
     env: Env,

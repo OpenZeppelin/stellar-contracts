@@ -72,9 +72,8 @@ mod tests {
     use proptest::prelude::*;
     use soroban_sdk::Env;
 
-    use crate::keccak::Keccak256;
-
     use super::*;
+    use crate::keccak::Keccak256;
 
     // Helper impl for testing
     impl Hashable for Vec<u8> {
