@@ -67,7 +67,7 @@ mod tests {
     use soroban_sdk::Env;
 
     use super::{commutative_hash_pair, Bytes32, Verifier};
-    use crate::{hasher::Hasher, keccak::Keccak256};
+    use crate::{hasher::Hasher, keccak::Keccak256, sha256::Sha256};
 
     macro_rules! to_bytes {
         ($env:tt, $lit:literal) => {
@@ -199,6 +199,34 @@ mod tests {
     }
 
     #[test]
+    fn sha256_verifies_valid_proofs() {
+        // generated with the same data as above but using sha256 as a hashing function
+        let e = Env::default();
+        let root = to_bytes!(e, "b0d388be1fe96067c100c6731770b70f87fa1287c4d6ddf9e107bdd015ae445c");
+        let leaf_a =
+            to_bytes!(e, "9c707ca1d6e1963a6a974a40f20c51f899cc96c9a7edef911953f424186641bf");
+        let leaf_b =
+            to_bytes!(e, "a2e125b5cc0b89c38c9030830083dc6d194e4d38d6d19aba7340d5a34767ddd2");
+
+        let proof = to_bytes_array!(
+            e,
+            "a2e125b5cc0b89c38c9030830083dc6d194e4d38d6d19aba7340d5a34767ddd2",
+            "074b68e00644cab3861ec0d5d4ff7deb3c65b2f12ac6025a18649331fcf50a8a",
+            "f4c5a235a25aa2c56909fda65ece8f61b191ecf13a5aaaccff43bcbde3ec0821",
+            "61a0ecbe2ce82a83da2e66315362fc300b63cdb922895a022c2842bd73d5f162",
+            "c05b8b50e47b1583b14272de489eaadfeaf264e3a1b868be1f290f219549fc83",
+            "ae9abdff40bea69fda504681175ffe68c109866f37e1eab183365d73c49c9939"
+        );
+        let verification =
+            Verifier::<Sha256>::verify(&e, proof.clone(), root.clone(), leaf_a.clone());
+        assert!(verification);
+
+        let no_such_leaf = commutative_hash_pair(&leaf_a, &leaf_b, Sha256::new(&e));
+        let verification = Verifier::<Sha256>::verify(&e, proof.slice(1..), root, no_such_leaf);
+        assert!(verification);
+    }
+
+    #[test]
     fn rejects_invalid_proofs() {
         // ```js
         // const correctMerkleTree = StandardMerkleTree.of(toElements('abc'), ['string']);
@@ -216,6 +244,22 @@ mod tests {
 
         let verification =
             Verifier::<Keccak256>::verify(&e, soroban_sdk::vec![&e, proof], root, leaf);
+        assert!(!verification);
+    }
+
+    #[test]
+    fn sha256_rejects_invalid_proofs() {
+        // generated with the same data as above but using sha256 as a hashing function
+        let e = Env::default();
+        let root = to_bytes!(e, "d132af2ab11889f767680c257c81620b4678f10c014eec1c4711991ab7a02ab4");
+        let leaf = to_bytes!(e, "b9e9db137d987ce376feabe4acc5ee8b23a2d460699cc8bd7e1fe001cbd99df0");
+        let proof = to_bytes_array!(
+            e,
+            "0b623bf3b3a650a8072bc8b3001b2b74d7e63b43bf81beb332e536207b4a58e7",
+            "ef53964d3736e523a79fe02137c6dba7d2b151fea57aa43c6f637514f2303f72"
+        );
+
+        let verification = Verifier::<Sha256>::verify(&e, proof, root, leaf);
         assert!(!verification);
     }
 
@@ -242,6 +286,22 @@ mod tests {
     }
 
     #[test]
+    fn sha256_rejects_proofs_with_invalid_length() {
+        // generated with the same data as above but using sha256 as a hashing function
+        let e = Env::default();
+        let root = to_bytes!(e, "d132af2ab11889f767680c257c81620b4678f10c014eec1c4711991ab7a02ab4");
+        let leaf = to_bytes!(e, "b9e9db137d987ce376feabe4acc5ee8b23a2d460699cc8bd7e1fe001cbd99df0");
+        let proof = to_bytes_array!(
+            e,
+            "9a81c362fd809d46eb23f6920461ce343f9384bae29e11d005990fd2fbfb78c2",
+            "ee8476cf31e3608c6ef618451476c5513ceef7f6d9f4af12df9fd4e4501210c3"
+        );
+
+        let verification = Verifier::<Sha256>::verify(&e, proof.slice(..1), root, leaf);
+        assert!(!verification);
+    }
+
+    #[test]
     fn verify_empty_proof_should_mean_leaf_equal_to_root() {
         // ```js
         // const merkleTree = StandardMerkleTree.of(toElements('abc'), ['string']);
@@ -253,6 +313,21 @@ mod tests {
         let e = Env::default();
         let root = to_bytes!(e, "f2129b5a697531ef818f644564a6552b35c549722385bc52aa7fe46c0b5f46b1");
         let leaf = to_bytes!(e, "9c15a6a0eaeed500fd9eed4cbeab71f797cefcc67bfd46683e4d2e6ff7f06d1c");
+        let proof = soroban_sdk::vec![&e];
+
+        // valid if root == leaf
+        assert!(Verifier::<Keccak256>::verify(&e, proof.clone(), root.clone(), root.clone()));
+
+        // invalid if root != leaf
+        assert!(!Verifier::<Keccak256>::verify(&e, proof, root, leaf));
+    }
+
+    #[test]
+    fn sha256_verify_empty_proof_should_mean_leaf_equal_to_root() {
+        // generated with the same data as above but using sha256 as a hashing function
+        let e = Env::default();
+        let root = to_bytes!(e, "d132af2ab11889f767680c257c81620b4678f10c014eec1c4711991ab7a02ab4");
+        let leaf = to_bytes!(e, "b9e9db137d987ce376feabe4acc5ee8b23a2d460699cc8bd7e1fe001cbd99df0");
         let proof = soroban_sdk::vec![&e];
 
         // valid if root == leaf
