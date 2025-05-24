@@ -2,9 +2,9 @@
 //!
 //! Demonstrates how can Access Control be utilized.
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, vec, Address, Env, String, Vec};
 use stellar_access_control::{set_admin, AccessControl};
-use stellar_access_control_macro::has_role;
+use stellar_access_control_macros::{has_role, only_admin};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
 
@@ -21,6 +21,11 @@ impl ExampleContract {
             String::from_str(e, "My Token"),
             String::from_str(e, "TKN"),
         );
+    }
+
+    #[only_admin]
+    pub fn admin_restricted_function(e: &Env) -> Vec<String> {
+        vec![&e, String::from_str(e, "seems sus")]
     }
 
     #[has_role(caller, "minter")]

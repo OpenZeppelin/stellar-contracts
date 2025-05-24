@@ -1,10 +1,44 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use stellar_macro_helpers::parse_env_arg;
+use stellar_macro_helpers::{generate_auth_check, parse_env_arg};
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
 };
+
+/// A procedural macro that ensures the caller is the admin before executing the
+/// function.
+///
+/// This macro retrieves the admin from storage and requires authorization from
+/// the admin before executing the function body.
+///
+/// # Usage
+///
+/// ```rust
+/// #[only_admin]
+/// pub fn restricted_function(e: &Env, other_param: u32) {
+///     // Function body
+/// }
+/// ```
+///
+/// This will expand to:
+///
+/// ```rust
+/// pub fn restricted_function(e: &Env, other_param: u32) {
+///     stellar_access_control::enforce_admin_auth(e);
+///     // Function body
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn only_admin(_attrs: TokenStream, input: TokenStream) -> TokenStream {
+    let input_fn = parse_macro_input!(input as ItemFn);
+
+    // Generate the function with the admin authorization check
+    let auth_check_path = quote! { stellar_access_control::enforce_admin_auth };
+    let expanded = generate_auth_check(&input_fn, auth_check_path);
+
+    TokenStream::from(expanded)
+}
 
 /// A procedural macro that ensures the parameter has the specified role.
 ///
