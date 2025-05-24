@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use stellar_macro_helpers::parse_env_arg;
+use stellar_macro_helpers::{generate_auth_check, parse_env_arg};
 use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
@@ -53,22 +53,9 @@ use syn::{
 pub fn only_admin(_attrs: TokenStream, input: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(input as ItemFn);
 
-    // Use the utility function to get the environment parameter
-    let env_param = parse_env_arg(&input_fn);
-
-    // Generate the function with the admin retrieval and authorization check
-    let fn_attrs = &input_fn.attrs;
-    let fn_vis = &input_fn.vis;
-    let fn_sig = &input_fn.sig;
-    let fn_block = &input_fn.block;
-
-    let expanded = quote! {
-        #(#fn_attrs)*
-        #fn_vis #fn_sig {
-            stellar_access_control::enforce_admin_auth(#env_param);
-            #fn_block
-        }
-    };
+    // Generate the function with the admin authorization check
+    let auth_check_path = quote! { stellar_access_control::enforce_admin_auth };
+    let expanded = generate_auth_check(&input_fn, auth_check_path);
 
     TokenStream::from(expanded)
 }

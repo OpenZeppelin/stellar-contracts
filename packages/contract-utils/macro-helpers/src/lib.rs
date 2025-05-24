@@ -68,15 +68,17 @@ pub fn find_address_param(func: &ItemFn) -> Option<(proc_macro2::TokenStream, bo
             if let Pat::Ident(PatIdent { ident, .. }) = &**pat {
                 match &**ty {
                     // Check for &Address
-                    Type::Reference(TypeReference { elem, .. }) =>
+                    Type::Reference(TypeReference { elem, .. }) => {
                         if is_address_type(elem) {
                             return Some((quote! { #ident }, true));
-                        },
+                        }
+                    }
                     // Check for Address
-                    Type::Path(_) =>
+                    Type::Path(_) => {
                         if is_address_type(ty) {
                             return Some((quote! { #ident }, false));
-                        },
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -92,4 +94,37 @@ fn is_address_type(ty: &Type) -> bool {
         }
     }
     false
+}
+
+/// Generates a function that enforces authorization for a specific role
+///
+/// This function is used by macros like `only_owner` and `only_admin` to generate
+/// code that checks authorization before executing the function body.
+///
+/// # Arguments
+///
+/// * `input_fn` - The function to wrap with authorization check
+/// * `auth_check_func` - The function to be called to enforce authorization (e.g., `stellar_ownable::enforce_owner_auth`)
+///
+/// # Returns
+///
+/// A TokenStream containing the function with authorization check added
+pub fn generate_auth_check(input_fn: &ItemFn, auth_check_func: TokenStream) -> TokenStream {
+    // Get the environment parameter
+    let env_param = parse_env_arg(input_fn);
+
+    // Extract function components
+    let fn_attrs = &input_fn.attrs;
+    let fn_vis = &input_fn.vis;
+    let fn_sig = &input_fn.sig;
+    let fn_block = &input_fn.block;
+
+    // Generate the expanded function with authorization check
+    quote! {
+        #(#fn_attrs)*
+        #fn_vis #fn_sig {
+            #auth_check_func(#env_param);
+            #fn_block
+        }
+    }
 }
