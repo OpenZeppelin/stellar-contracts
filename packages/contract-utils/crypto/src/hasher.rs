@@ -1,4 +1,4 @@
-use soroban_sdk::Env;
+use soroban_sdk::{Bytes, Env};
 
 /// A trait for hashing an arbitrary stream of bytes.
 ///
@@ -16,7 +16,7 @@ pub trait Hasher {
     fn new(e: &Env) -> Self;
 
     /// Absorbs additional input. Can be called multiple times.
-    fn update(&mut self, input: impl AsRef<[u8]>);
+    fn update(&mut self, input: Bytes);
 
     /// Outputs the hashing algorithm state.
     fn finalize(self) -> Self::Output;
