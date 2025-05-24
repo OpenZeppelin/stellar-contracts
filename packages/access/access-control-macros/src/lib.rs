@@ -6,26 +6,6 @@ use syn::{
     parse_macro_input, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
 };
 
-/// A procedural macro that ensures the parameter has the specified role.
-///
-/// # Usage
-///
-/// ```rust
-/// #[has_role(account, "minter")]
-/// pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
-///     // Function body
-/// }
-/// ```
-///
-/// This will expand to:
-///
-/// ```rust
-/// pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
-///     stellar_access_control::ensure_role(e, &account, &soroban_sdk::Symbol::new(e, "minter"));
-///     // Function body
-/// }
-/// ```
-
 /// A procedural macro that ensures the caller is the admin before executing the
 /// function.
 ///
@@ -60,6 +40,25 @@ pub fn only_admin(_attrs: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
+/// A procedural macro that ensures the parameter has the specified role.
+///
+/// # Usage
+///
+/// ```rust
+/// #[has_role(account, "minter")]
+/// pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
+///     // Function body
+/// }
+/// ```
+///
+/// This will expand to:
+///
+/// ```rust
+/// pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
+///     stellar_access_control::ensure_role(e, &account, &soroban_sdk::Symbol::new(e, "minter"));
+///     // Function body
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as HasRoleArgs);

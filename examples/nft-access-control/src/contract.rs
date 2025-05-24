@@ -25,7 +25,7 @@ impl ExampleContract {
 
     #[only_admin]
     pub fn admin_restricted_function(e: &Env) -> Vec<String> {
-        vec![&e, String::from_str(&e, "seems sus")]
+        vec![&e, String::from_str(e, "seems sus")]
     }
 
     #[has_role(caller, "minter")]

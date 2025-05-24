@@ -235,12 +235,13 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 ///
 /// # Security Warning
 ///
-/// **IMPORTANT**: This function bypasses authorization checks and should only be used:
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
 /// - During contract initialization/construction
 /// - In admin functions that implement their own authorization logic
 ///
-/// Using this function in public-facing methods creates significant security risks
-/// as it could allow unauthorized role assignments.
+/// Using this function in public-facing methods creates significant security
+/// risks as it could allow unauthorized role assignments.
 pub fn grant_role_without_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     // Return early if account already has the role
     if has_role(e, account, role).is_some() {
@@ -427,7 +428,8 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
     set_role_admin_without_auth(e, role, admin_role);
 }
 
-/// Sets the admin role for a specified role without performing authorization checks.
+/// Sets the admin role for a specified role without performing authorization
+/// checks.
 ///
 /// # Arguments
 ///
@@ -442,12 +444,13 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
 ///
 /// # Security Warning
 ///
-/// **IMPORTANT**: This function bypasses authorization checks and should only be used:
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
 /// - During contract initialization/construction
 /// - In admin functions that implement their own authorization logic
 ///
-/// Using this function in public-facing methods creates significant security risks
-/// as it could allow unauthorized admin role assignments.
+/// Using this function in public-facing methods creates significant security
+/// risks as it could allow unauthorized admin role assignments.
 pub fn set_role_admin_without_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
 
