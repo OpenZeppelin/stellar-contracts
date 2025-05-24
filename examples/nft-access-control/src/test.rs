@@ -5,7 +5,7 @@ extern crate std;
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
-    Address, Env, IntoVal, Symbol,
+    vec, Address, Env, IntoVal, String, Symbol,
 };
 
 use crate::contract::{ExampleContract, ExampleContractClient};
@@ -405,4 +405,45 @@ fn non_admin_cannot_set_role_admin() {
 
     // Non-admin attempts to set a role admin
     client.set_role_admin(&Symbol::new(&e, "minter"), &Symbol::new(&e, "minter_admin"));
+}
+
+#[test]
+fn admin_can_call_admin_restricted_function() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "admin_restricted_function",
+            args: ().into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    let secret = client.admin_restricted_function();
+    assert_eq!(secret, vec![&e, String::from_str(&e, "seems sus")]);
+}
+
+#[test]
+#[should_panic(expected = "HostError: Error(Auth, InvalidAction)")]
+fn non_admin_cannot_call_admin_restricted_function() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let non_admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    e.mock_auths(&[MockAuth {
+        address: &non_admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "admin_restricted_function",
+            args: ().into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    let _ = client.admin_restricted_function();
 }
