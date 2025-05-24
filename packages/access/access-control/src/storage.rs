@@ -27,6 +27,27 @@ pub enum AccessControlStorageKey {
 
 // ################## QUERY STATE ##################
 
+/// Enforces that the caller is the admin and returns the admin address.
+/// This function retrieves the admin from storage, requires authorization,
+/// and returns the admin address.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+///
+/// # Returns
+///
+/// The admin address if authorization is successful.
+///
+/// # Errors
+///
+/// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
+pub fn enforce_admin_auth(e: &Env) -> Address {
+    let admin = get_admin(e);
+    admin.require_auth();
+    admin
+}
+
 /// Returns `Some(index)` if the account has the specified role,
 /// where `index` is the position of the account for that role,
 /// and can be used to query [`get_role_member`].

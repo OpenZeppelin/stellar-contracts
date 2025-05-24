@@ -25,6 +25,54 @@ use syn::{
 ///     // Function body
 /// }
 /// ```
+
+/// A procedural macro that ensures the caller is the admin before executing the
+/// function.
+///
+/// This macro retrieves the admin from storage and requires authorization from
+/// the admin before executing the function body.
+///
+/// # Usage
+///
+/// ```rust
+/// #[only_admin]
+/// pub fn restricted_function(e: &Env, other_param: u32) {
+///     // Function body
+/// }
+/// ```
+///
+/// This will expand to:
+///
+/// ```rust
+/// pub fn restricted_function(e: &Env, other_param: u32) {
+///     stellar_access_control::enforce_admin_auth(e);
+///     // Function body
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn only_admin(_attrs: TokenStream, input: TokenStream) -> TokenStream {
+    let input_fn = parse_macro_input!(input as ItemFn);
+
+    // Use the utility function to get the environment parameter
+    let env_param = parse_env_arg(&input_fn);
+
+    // Generate the function with the admin retrieval and authorization check
+    let fn_attrs = &input_fn.attrs;
+    let fn_vis = &input_fn.vis;
+    let fn_sig = &input_fn.sig;
+    let fn_block = &input_fn.block;
+
+    let expanded = quote! {
+        #(#fn_attrs)*
+        #fn_vis #fn_sig {
+            stellar_access_control::enforce_admin_auth(#env_param);
+            #fn_block
+        }
+    };
+
+    TokenStream::from(expanded)
+}
+
 #[proc_macro_attribute]
 pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
     let args = parse_macro_input!(args as HasRoleArgs);
