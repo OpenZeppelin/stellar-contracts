@@ -103,6 +103,53 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
     e.storage().persistent().get(&key)
 }
 
+/// Ensures that the caller is either the contract admin or has the admin role
+/// for the specified role.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller to check permissions for.
+/// * `role` - The role to check admin privileges for.
+///
+/// # Errors
+///
+/// * [`AccessControlError::Unauthorized`] - If the caller is neither the
+///   contract admin nor has the admin role.
+/// * refer to [`get_admin`] errors.
+pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
+    let is_admin = caller == &get_admin(e);
+    let is_admin_role = match get_role_admin(e, role) {
+        Some(admin_role) => has_role(e, caller, &admin_role).is_some(),
+        None => false,
+    };
+
+    if !is_admin && !is_admin_role {
+        panic_with_error!(e, AccessControlError::Unauthorized);
+    }
+}
+
+/// Ensures that the caller has the specified role.
+/// This function is used to check if an account has a specific role.
+/// The main purpose of this function is to act as a helper for the
+/// `#[has_role]` macro.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller to check the role for.
+/// * `role` - The role to check for.
+///
+/// # Errors
+///
+/// * [`AccessControlError::Unauthorized`] - If the caller does not have the
+///   specified role.
+pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
+    if has_role(e, caller, role).is_none() {
+        panic_with_error!(e, AccessControlError::Unauthorized);
+    }
+}
+
 // ################## CHANGE STATE ##################
 
 /// Sets the overarching admin role.
@@ -146,7 +193,34 @@ pub fn set_admin(e: &Env, admin: &Address) {
 pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     caller.require_auth();
     ensure_if_admin_or_admin_role(e, caller, role);
+    grant_role_without_auth(e, caller, account, role);
+}
 
+/// Grants a role to an account.
+/// Creates the role if it does not exist.
+/// Returns early if the account already has the role.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller.
+/// * `account` - The account to grant the role to.
+/// * `role` - The role to grant.
+///
+/// # Events
+///
+/// * topics - `["role_granted", role: Symbol, account: Address]`
+/// * data - `[caller: Address]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods creates significant security risks
+/// as it could allow unauthorized role assignments.
+pub fn grant_role_without_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     // Return early if account already has the role
     if has_role(e, account, role).is_some() {
         return;
@@ -329,6 +403,31 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
     let admin = get_admin(e);
     admin.require_auth();
 
+    set_role_admin_without_auth(e, role, admin_role);
+}
+
+/// Sets the admin role for a specified role without performing authorization checks.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `role` - The role to set the admin for.
+/// * `admin_role` - The new admin role to set.
+///
+/// # Events
+///
+/// * topics - `["role_admin_changed", role: Symbol]`
+/// * data - `[previous_admin_role: Symbol, new_admin_role: Symbol]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods creates significant security risks
+/// as it could allow unauthorized admin role assignments.
+pub fn set_role_admin_without_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
 
     // Get previous admin role if exists
@@ -339,53 +438,6 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
     e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
 
     emit_role_admin_changed(e, role, &previous_admin_role, admin_role);
-}
-
-/// Ensures that the caller is either the contract admin or has the admin role
-/// for the specified role.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller to check permissions for.
-/// * `role` - The role to check admin privileges for.
-///
-/// # Errors
-///
-/// * [`AccessControlError::Unauthorized`] - If the caller is neither the
-///   contract admin nor has the admin role.
-/// * refer to [`get_admin`] errors.
-pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
-    let is_admin = caller == &get_admin(e);
-    let is_admin_role = match get_role_admin(e, role) {
-        Some(admin_role) => has_role(e, caller, &admin_role).is_some(),
-        None => false,
-    };
-
-    if !is_admin && !is_admin_role {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
-}
-
-/// Ensures that the caller has the specified role.
-/// This function is used to check if an account has a specific role.
-/// The main purpose of this function is to act as a helper for the
-/// `#[has_role]` macro.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller to check the role for.
-/// * `role` - The role to check for.
-///
-/// # Errors
-///
-/// * [`AccessControlError::Unauthorized`] - If the caller does not have the
-///   specified role.
-pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
-    if has_role(e, caller, role).is_none() {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
 }
 
 // ################## LOW-LEVEL HELPERS ##################
