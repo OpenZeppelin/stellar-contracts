@@ -1577,6 +1577,7 @@ dependencies = [
  "soroban-sdk",
  "stellar-constants",
  "stellar-crypto",
+ "stellar-event-assertion",
 ]
 
 [[package]]
