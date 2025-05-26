@@ -277,7 +277,7 @@ pub enum NonFungibleTokenError {
     /// Indicates an error related to the ownership over a particular token.
     /// Used in transfers.
     IncorrectOwner = 201,
-    /// Indicates a failure with the `operator`’s approval. Used in transfers.
+    /// Indicates a failure with the `operator`s approval. Used in transfers.
     InsufficientApproval = 202,
     /// Indicates a failure with the `approver` of a token to be approved. Used
     /// in approvals.

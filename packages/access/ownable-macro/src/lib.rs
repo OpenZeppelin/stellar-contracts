@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use stellar_macro_helpers::parse_env_arg;
+use stellar_macro_helpers::generate_auth_check;
 use syn::{parse_macro_input, ItemFn};
 
 /// A procedural macro that ensures the caller is the owner before executing the
@@ -32,22 +32,9 @@ use syn::{parse_macro_input, ItemFn};
 pub fn only_owner(_attrs: TokenStream, input: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(input as ItemFn);
 
-    // Use the utility function to get the environment parameter
-    let env_param = parse_env_arg(&input_fn);
-
-    // Generate the function with the owner retrieval and authorization check
-    let fn_attrs = &input_fn.attrs;
-    let fn_vis = &input_fn.vis;
-    let fn_sig = &input_fn.sig;
-    let fn_block = &input_fn.block;
-
-    let expanded = quote! {
-        #(#fn_attrs)*
-        #fn_vis #fn_sig {
-            stellar_ownable::enforce_owner_auth(#env_param);
-            #fn_block
-        }
-    };
+    // Generate the function with the owner authorization check
+    let auth_check_path = quote! { stellar_ownable::enforce_owner_auth };
+    let expanded = generate_auth_check(&input_fn, auth_check_path);
 
     TokenStream::from(expanded)
 }
