@@ -15,7 +15,8 @@ fn test_sac_transfer() {
 
     let issuer = Address::generate(&e);
     let default_admin = Address::generate(&e);
-    let manager = Address::generate(&e);
+    let manager1 = Address::generate(&e);
+    let manager2 = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
 
@@ -44,7 +45,7 @@ fn test_sac_transfer() {
     // Deploy the New Admin
     let new_admin = e.register(
         ExampleContract,
-        (default_admin.clone(), manager.clone(), sac_client.address.clone()),
+        (default_admin.clone(), manager1.clone(), manager2, sac_client.address.clone()),
     );
     let new_admin_client = ExampleContractClient::new(&e, &new_admin);
 
@@ -65,7 +66,7 @@ fn test_sac_transfer() {
     // Mint 1000 tokens to user2 from the New Admin
     e.mock_auths(&[MockAuth {
         // default_admin authorizes
-        address: &manager,
+        address: &manager1,
         invoke: &MockAuthInvoke {
             contract: &new_admin,
             fn_name: "mint",
@@ -73,7 +74,7 @@ fn test_sac_transfer() {
             sub_invokes: &[],
         },
     }]);
-    new_admin_client.mint(&user2, &1000, &default_admin);
+    new_admin_client.mint(&user2, &1000, &manager1);
 
     let balance2 = token_client.balance(&user2);
     assert_eq!(balance2, 1000);

@@ -1154,7 +1154,7 @@ version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access-control",
- "stellar-access-control-macro",
+ "stellar-access-control-macros",
  "stellar-default-impl-macro",
  "stellar-fungible",
 ]
