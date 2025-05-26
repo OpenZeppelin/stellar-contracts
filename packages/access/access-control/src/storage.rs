@@ -41,7 +41,7 @@ pub enum AccessControlStorageKey {
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
+/// * refer to [`get_admin`] errors.
 pub fn enforce_admin_auth(e: &Env) -> Address {
     let admin = get_admin(e);
     admin.require_auth();
