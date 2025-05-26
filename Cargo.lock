@@ -1557,6 +1557,7 @@ version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-constants",
+ "stellar-crypto",
  "stellar-event-assertion",
 ]
 
@@ -1567,6 +1568,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.96",
+]
+
+[[package]]
+name = "stellar-merkle-distributor"
+version = "0.2.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-crypto",
 ]
 
 [[package]]
