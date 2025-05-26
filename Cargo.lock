@@ -1593,6 +1593,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-merkle-distributor"
+version = "0.2.0"
+dependencies = [
+ "hex-literal",
+ "soroban-sdk",
+ "stellar-constants",
+ "stellar-crypto",
+ "stellar-event-assertion",
+]
+
+[[package]]
 name = "stellar-non-fungible"
 version = "0.2.0"
 dependencies = [
