@@ -1,5 +1,5 @@
 [package]
-name = "stellar-fungible"
+name = "sac-admin-wrapper-example"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -7,14 +7,15 @@ publish = false
 version.workspace = true
 
 [lib]
-crate-type = ["lib", "cdylib"]
+crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
-stellar-constants = { workspace = true }
 soroban-sdk = { workspace = true }
+stellar-fungible = { workspace = true }
+stellar-access-control = { workspace = true }
+stellar-access-control-macros = { workspace = true }
+stellar-default-impl-macro = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-soroban-test-helpers = { workspace = true }
-stellar-event-assertion = { workspace = true }

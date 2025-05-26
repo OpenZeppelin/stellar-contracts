@@ -1149,6 +1149,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ea1a2d0a644769cc99faa24c3ad26b379b786fe7c36fd3c546254801650e6dd"
 
 [[package]]
+name = "sac-admin-wrapper-example"
+version = "0.2.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access-control",
+ "stellar-access-control-macros",
+ "stellar-default-impl-macro",
+ "stellar-fungible",
+]
+
+[[package]]
 name = "sec1"
 version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1449,6 +1460,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "soroban-test-helpers"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b21ea049bdfcfce7de5aa17f1a52ecab5f2bd599d40bd805747ef75b110ee5d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.96",
+]
+
+[[package]]
 name = "soroban-wasmi"
 version = "0.31.1-soroban.20.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1556,6 +1578,7 @@ name = "stellar-fungible"
 version = "0.2.0"
 dependencies = [
  "soroban-sdk",
+ "soroban-test-helpers",
  "stellar-constants",
  "stellar-event-assertion",
 ]
