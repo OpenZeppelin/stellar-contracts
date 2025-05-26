@@ -61,7 +61,7 @@ fn test_sac_set_address(e: Env, sac: Address) {
 }
 
 #[soroban_test_helpers::test]
-#[should_panic(expected = "Error(Contract, #209)")]
+#[should_panic(expected = "Error(Contract, #109)")]
 fn test_sac_get_address_fails(e: Env) {
     let new_admin = e.register(MockContract, ());
 
