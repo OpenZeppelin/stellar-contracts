@@ -59,7 +59,7 @@ fn test_valid_merkle_proof_succeeds() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1200)")]
+#[should_panic(expected = "Error(Contract, #1300)")]
 fn test_root_not_set_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -70,7 +70,7 @@ fn test_root_not_set_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1201)")]
+#[should_panic(expected = "Error(Contract, #1301)")]
 fn test_set_root_twice_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -83,7 +83,7 @@ fn test_set_root_twice_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1202)")]
+#[should_panic(expected = "Error(Contract, #1302)")]
 fn test_claim_already_claimed_leaf_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -99,7 +99,7 @@ fn test_claim_already_claimed_leaf_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1203)")]
+#[should_panic(expected = "Error(Contract, #1303)")]
 fn test_verify_with_invalid_proof_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
