@@ -1,2 +1,12 @@
 #![no_std]
-pub mod storage;
+
+mod merkle_distributor;
+mod storage;
+mod test;
+
+pub use crate::{
+    merkle_distributor::{
+        emit_set_claimed, emit_set_root, MerkleDistributor, MerkleDistributorError,
+    },
+    storage::MerkleDistributorStorageKey,
+};

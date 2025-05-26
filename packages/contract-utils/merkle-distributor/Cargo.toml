@@ -16,4 +16,4 @@ stellar-crypto = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-
+hex-literal = { workspace = true }

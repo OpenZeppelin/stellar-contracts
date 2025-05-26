@@ -1557,7 +1557,6 @@ version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-constants",
- "stellar-crypto",
  "stellar-event-assertion",
 ]
 
@@ -1574,6 +1573,7 @@ dependencies = [
 name = "stellar-merkle-distributor"
 version = "0.2.0"
 dependencies = [
+ "hex-literal",
  "soroban-sdk",
  "stellar-crypto",
 ]
