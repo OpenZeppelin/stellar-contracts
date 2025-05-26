@@ -587,6 +587,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "fungible-merkle-airdrop"
+version = "0.2.0"
+dependencies = [
+ "hex-literal",
+ "soroban-sdk",
+ "stellar-crypto",
+ "stellar-default-impl-macro",
+ "stellar-fungible",
+ "stellar-merkle-distributor",
+ "stellar-ownable",
+]
+
+[[package]]
 name = "fungible-pausable-example"
 version = "0.2.0"
 dependencies = [
