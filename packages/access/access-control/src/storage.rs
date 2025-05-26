@@ -429,8 +429,8 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
     set_role_admin_without_auth(e, role, admin_role);
 }
 
-/// Sets the admin role for a specified role without performing authorization
-/// checks.
+/// Low-level function to set the admin role for a specified role without
+/// performing authorization checks.
 ///
 /// # Arguments
 ///
