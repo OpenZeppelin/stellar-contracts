@@ -35,7 +35,7 @@ hex-literal = "0.4.1"
 
 # members
 stellar-access-control = { path = "packages/access/access-control" }
-stellar-access-control-macro = { path = "packages/access/access-control-macro" }
+stellar-access-control-macros = { path = "packages/access/access-control-macros" }
 stellar-constants = { path = "packages/constants" }
 stellar-default-impl-macro = { path = "packages/contract-utils/default-impl-macro" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }

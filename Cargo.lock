@@ -843,7 +843,7 @@ version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access-control",
- "stellar-access-control-macro",
+ "stellar-access-control-macros",
  "stellar-default-impl-macro",
  "stellar-non-fungible",
 ]
@@ -1494,7 +1494,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "stellar-access-control-macro"
+name = "stellar-access-control-macros"
 version = "0.2.0"
 dependencies = [
  "proc-macro2",
@@ -1534,7 +1534,7 @@ version = "0.2.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access-control",
- "stellar-access-control-macro",
+ "stellar-access-control-macros",
  "stellar-default-impl-macro",
  "stellar-event-assertion",
  "stellar-fungible",
