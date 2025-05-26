@@ -1,4 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, BytesN, Env, Vec};
+use stellar_constants::{MERKLE_CLAIMED_EXTEND_AMOUNT, MERKLE_CLAIMED_TTL_THRESHOLD};
 use stellar_crypto::{hasher::Hasher, merkle::Verifier};
 
 use crate::{
@@ -26,8 +27,16 @@ where
 
     pub fn is_claimed(e: &Env, leaf: H::Output) -> bool {
         let key = MerkleDistributorStorageKey::Claimed(leaf);
-        // TODO: extend
-        e.storage().persistent().get(&key).unwrap_or_default()
+        if let Some(claimed) = e.storage().persistent().get(&key) {
+            e.storage().persistent().extend_ttl(
+                &key,
+                MERKLE_CLAIMED_TTL_THRESHOLD,
+                MERKLE_CLAIMED_EXTEND_AMOUNT,
+            );
+            claimed
+        } else {
+            false
+        }
     }
 
     pub fn set_root(e: &Env, root: H::Output) {
@@ -42,7 +51,6 @@ where
 
     pub fn set_claimed(e: &Env, leaf: H::Output) {
         let key = MerkleDistributorStorageKey::Claimed(leaf.clone());
-        // TODO: extend
         e.storage().persistent().set(&key, &true);
         emit_set_claimed(e, leaf.into());
     }

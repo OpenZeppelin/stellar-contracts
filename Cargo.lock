@@ -1575,6 +1575,7 @@ version = "0.2.0"
 dependencies = [
  "hex-literal",
  "soroban-sdk",
+ "stellar-constants",
  "stellar-crypto",
 ]
 
