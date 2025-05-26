@@ -50,7 +50,7 @@ fn test_mint_exact_cap() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #206)")]
+#[should_panic(expected = "Error(Contract, #106)")]
 fn test_mint_exceeds_cap() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
@@ -65,7 +65,7 @@ fn test_mint_exceeds_cap() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #206)")]
+#[should_panic(expected = "Error(Contract, #106)")]
 fn test_mint_multiple_exceeds_cap() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
@@ -88,7 +88,7 @@ fn test_mint_multiple_exceeds_cap() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #204)")]
+#[should_panic(expected = "Error(Contract, #104)")]
 fn test_check_cap_overflows() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
@@ -112,5 +112,30 @@ fn test_query_cap() {
 
         let cap = query_cap(&e);
         assert_eq!(cap, 1000);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #107)")]
+fn test_invalid_cap() {
+    let e = Env::default();
+    let contract_address = e.register(MockContract, ());
+
+    e.as_contract(&contract_address, || {
+        // Attempt to set a negative cap value, which should trigger InvalidCap error
+        set_cap(&e, -100);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #108)")]
+fn test_cap_not_set() {
+    let e = Env::default();
+    let contract_address = e.register(MockContract, ());
+
+    e.as_contract(&contract_address, || {
+        // Try to query cap without setting it first, which should trigger CapNotSet
+        // error
+        let _ = query_cap(&e);
     });
 }

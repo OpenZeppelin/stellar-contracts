@@ -28,7 +28,7 @@ fn sequential_token_id_counter_increments() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #306)")]
+#[should_panic(expected = "Error(Contract, #206)")]
 fn sequential_increment_token_id_fails_on_overflow() {
     let e = Env::default();
     let address = e.register(MockContract, ());

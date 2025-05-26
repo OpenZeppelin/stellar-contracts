@@ -26,7 +26,7 @@ fn upgrade_flow_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #110)")]
+#[should_panic(expected = "Error(Contract, #1100)")]
 fn upgrade_ensure_can_complete_migration_panics_if_not_migrating() {
     let e = Env::default();
     let address = e.register(MockContract, ());
