@@ -28,8 +28,8 @@ where
     ///
     /// # Errors
     ///
-    /// * [`MerkleDistributorError::RootNotSet`] - When attempting to get the root
-    ///   before it has been set.
+    /// * [`MerkleDistributorError::RootNotSet`] - When attempting to get the
+    ///   root before it has been set.
     pub fn get_root(e: &Env) -> H::Output {
         e.storage()
             .instance()
@@ -66,8 +66,8 @@ where
     ///
     /// # Errors
     ///
-    /// * [`MerkleDistributorError::RootAlreadySet`] - When attempting to set the
-    ///   root after it has already been set.
+    /// * [`MerkleDistributorError::RootAlreadySet`] - When attempting to set
+    ///   the root after it has already been set.
     ///
     /// # Events
     ///
@@ -93,10 +93,10 @@ where
     ///
     /// # Errors
     ///
-    /// * [`MerkleDistributorError::LeafAlreadyClaimed`] - When attempting to claim
-    ///   a leaf that has already been claimed.
-    /// * [`MerkleDistributorError::InvalidProof`] - When the provided Merkle proof
-    ///   is invalid.
+    /// * [`MerkleDistributorError::LeafAlreadyClaimed`] - When attempting to
+    ///   claim a leaf that has already been claimed.
+    /// * [`MerkleDistributorError::InvalidProof`] - When the provided Merkle
+    ///   proof is invalid.
     /// * refer to [`Self::get_root`] errors.
     pub fn verify_and_set_claimed(e: &Env, leaf: H::Output, proof: Vec<H::Output>) {
         if Self::is_claimed(e, leaf.clone()) {
