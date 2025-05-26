@@ -13,10 +13,12 @@ pub struct MerkleDistributor<H: Hasher>(PhantomData<H>);
 pub enum MerkleDistributorError {
     /// The merkle root is not set.
     RootNotSet = 1200,
+    /// The merkle root is aleasy set.
+    RootAlreadySet = 1201,
     /// The provided leaf was already claimed.
-    LeafIsClaimed = 1201,
+    LeafAlreadyClaimed = 1202,
     /// The proof is invalid.
-    InvalidProof = 1202,
+    InvalidProof = 1203,
 }
 
 // ################## EVENTS ##################

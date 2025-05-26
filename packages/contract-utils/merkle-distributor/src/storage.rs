@@ -18,11 +18,10 @@ where
     H: Hasher<Output = BytesN<32>>,
 {
     pub fn get_root(e: &Env) -> H::Output {
-        if let Some(root) = e.storage().instance().get(&MerkleDistributorStorageKey::Root) {
-            root
-        } else {
-            panic_with_error!(e, MerkleDistributorError::RootNotSet);
-        }
+        e.storage()
+            .instance()
+            .get(&MerkleDistributorStorageKey::Root)
+            .unwrap_or_else(|| panic_with_error!(e, MerkleDistributorError::RootNotSet))
     }
 
     pub fn is_claimed(e: &Env, leaf: H::Output) -> bool {
@@ -32,8 +31,13 @@ where
     }
 
     pub fn set_root(e: &Env, root: H::Output) {
-        e.storage().instance().set(&MerkleDistributorStorageKey::Root, &root);
-        emit_set_root(e, root.into());
+        let key = MerkleDistributorStorageKey::Root;
+        if e.storage().instance().has(&key) {
+            panic_with_error!(&e, MerkleDistributorError::RootAlreadySet);
+        } else {
+            e.storage().instance().set(&key, &root);
+            emit_set_root(e, root.into());
+        }
     }
 
     pub fn set_claimed(e: &Env, leaf: H::Output) {
@@ -45,7 +49,7 @@ where
 
     pub fn verify_and_set_claimed(e: &Env, leaf: H::Output, proof: Vec<H::Output>) {
         if Self::is_claimed(e, leaf.clone()) {
-            panic_with_error!(e, MerkleDistributorError::LeafIsClaimed);
+            panic_with_error!(e, MerkleDistributorError::LeafAlreadyClaimed);
         }
 
         let root = Self::get_root(e);
