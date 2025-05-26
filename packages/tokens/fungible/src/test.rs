@@ -135,7 +135,7 @@ fn spend_allowance_reduces_amount() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #201)")]
+#[should_panic(expected = "Error(Contract, #101)")]
 fn spend_allowance_insufficient_allowance_fails() {
     let e = Env::default();
     e.mock_all_auths();
@@ -150,7 +150,7 @@ fn spend_allowance_insufficient_allowance_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #203)")]
+#[should_panic(expected = "Error(Contract, #103)")]
 fn spend_allowance_invalid_amount_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -163,7 +163,7 @@ fn spend_allowance_invalid_amount_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #202)")]
+#[should_panic(expected = "Error(Contract, #102)")]
 fn set_allowance_with_expired_ledger_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -177,7 +177,7 @@ fn set_allowance_with_expired_ledger_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #202)")]
+#[should_panic(expected = "Error(Contract, #102)")]
 fn set_allowance_with_greater_than_max_ledger_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -191,7 +191,7 @@ fn set_allowance_with_greater_than_max_ledger_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #203)")]
+#[should_panic(expected = "Error(Contract, #103)")]
 fn set_allowance_with_neg_amount_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -318,7 +318,7 @@ fn approve_and_transfer_from() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #200)")]
+#[should_panic(expected = "Error(Contract, #100)")]
 fn transfer_insufficient_balance_fails() {
     let e = Env::default();
     e.mock_all_auths();
@@ -333,7 +333,7 @@ fn transfer_insufficient_balance_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #201)")]
+#[should_panic(expected = "Error(Contract, #101)")]
 fn transfer_from_insufficient_allowance_fails() {
     let e = Env::default();
     e.mock_all_auths();
@@ -392,7 +392,7 @@ fn update_burns_tokens() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #203)")]
+#[should_panic(expected = "Error(Contract, #103)")]
 fn update_with_invalid_amount_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -405,7 +405,7 @@ fn update_with_invalid_amount_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #204)")]
+#[should_panic(expected = "Error(Contract, #104)")]
 fn update_overflow_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -418,7 +418,7 @@ fn update_overflow_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #200)")]
+#[should_panic(expected = "Error(Contract, #100)")]
 fn update_with_insufficient_balance_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());
