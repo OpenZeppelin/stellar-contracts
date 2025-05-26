@@ -53,7 +53,7 @@ fn test_set_token_royalty() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #313)")]
+#[should_panic(expected = "Error(Contract, #212)")]
 fn test_set_token_royalty_already_set() {
     let e = Env::default();
     e.mock_all_auths();
@@ -131,7 +131,7 @@ fn test_zero_royalty() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #300)")]
+#[should_panic(expected = "Error(Contract, #200)")]
 fn test_royalty_info_non_existent_token() {
     let e = Env::default();
     e.mock_all_auths();
