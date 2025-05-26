@@ -29,13 +29,15 @@ version = "0.2.0"
 [workspace.dependencies]
 soroban-sdk = "22.0.6"
 proc-macro2 = "1.0"
+proptest = "1"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 soroban-test-helpers = "0.2.3"
+hex-literal = "0.4.1"
 
 # members
 stellar-access-control = { path = "packages/access/access-control" }
-stellar-access-control-macro = { path = "packages/access/access-control-macro" }
+stellar-access-control-macros = { path = "packages/access/access-control-macros" }
 stellar-constants = { path = "packages/constants" }
 stellar-default-impl-macro = { path = "packages/contract-utils/default-impl-macro" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
@@ -49,6 +51,7 @@ stellar-pausable-macros = { path = "packages/contract-utils/pausable-macros" }
 stellar-role-transfer = { path = "packages/access/role-transfer" }
 stellar-upgradeable = { path = "packages/contract-utils/upgradeable" }
 stellar-upgradeable-macros = { path = "packages/contract-utils/upgradeable-macros" }
+stellar-crypto = { path = "packages/contract-utils/crypto" }
 
 [profile.release]
 opt-level = "z"

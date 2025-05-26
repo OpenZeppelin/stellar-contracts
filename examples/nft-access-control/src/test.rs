@@ -5,7 +5,7 @@ extern crate std;
 use soroban_sdk::{
     symbol_short,
     testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
-    Address, Env, IntoVal, Symbol,
+    vec, Address, Env, IntoVal, String, Symbol,
 };
 
 use crate::contract::{ExampleContract, ExampleContractClient};
@@ -66,7 +66,7 @@ fn minters_can_mint() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #1210)")]
 fn non_minters_cannot_mint() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -94,7 +94,7 @@ fn burners_can_burn() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #1210)")]
 fn non_burners_cannot_burn() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -127,7 +127,7 @@ fn burners_can_burn_from() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #1210)")]
 fn non_burners_cannot_burn_from() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -162,7 +162,7 @@ fn minter_admin_can_grant_role() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #1210)")]
 fn burner_admin_can_revoke_role() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -180,7 +180,7 @@ fn burner_admin_can_revoke_role() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #1210)")]
 fn non_admin_cannot_grant_role() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -195,7 +195,7 @@ fn non_admin_cannot_grant_role() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #120)")]
+#[should_panic(expected = "Error(Contract, #1210)")]
 fn non_admin_cannot_revoke_role() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -258,7 +258,7 @@ fn admin_transfer_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #140)")]
+#[should_panic(expected = "Error(Contract, #1200)")]
 fn cannot_accept_after_admin_transfer_cancelled() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -333,7 +333,7 @@ fn non_recipient_cannot_accept_transfer() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #140)")]
+#[should_panic(expected = "Error(Contract, #1200)")]
 fn expired_admin_transfer_panics() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -405,4 +405,45 @@ fn non_admin_cannot_set_role_admin() {
 
     // Non-admin attempts to set a role admin
     client.set_role_admin(&Symbol::new(&e, "minter"), &Symbol::new(&e, "minter_admin"));
+}
+
+#[test]
+fn admin_can_call_admin_restricted_function() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    e.mock_auths(&[MockAuth {
+        address: &admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "admin_restricted_function",
+            args: ().into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    let secret = client.admin_restricted_function();
+    assert_eq!(secret, vec![&e, String::from_str(&e, "seems sus")]);
+}
+
+#[test]
+#[should_panic(expected = "HostError: Error(Auth, InvalidAction)")]
+fn non_admin_cannot_call_admin_restricted_function() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let non_admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    e.mock_auths(&[MockAuth {
+        address: &non_admin,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "admin_restricted_function",
+            args: ().into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    let _ = client.admin_restricted_function();
 }

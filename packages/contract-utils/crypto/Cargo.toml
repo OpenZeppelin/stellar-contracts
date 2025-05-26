@@ -1,5 +1,5 @@
 [package]
-name = "nft-access-control-example"
+name = "stellar-crypto"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -7,15 +7,13 @@ publish = false
 version.workspace = true
 
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["lib", "cdylib"]
 doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-stellar-access-control = { workspace = true }
-stellar-access-control-macros = { workspace = true }
-stellar-default-impl-macro = { workspace = true }
-stellar-non-fungible = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+proptest = { workspace = true }
+hex-literal = { workspace = true }
