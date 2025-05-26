@@ -217,7 +217,8 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     grant_role_without_auth(e, caller, account, role);
 }
 
-/// Grants a role to an account.
+/// Low-level function to grant a role to an account without performing
+// authorization checks.
 /// Creates the role if it does not exist.
 /// Returns early if the account already has the role.
 ///
