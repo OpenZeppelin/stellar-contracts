@@ -27,27 +27,6 @@ pub enum AccessControlStorageKey {
 
 // ################## QUERY STATE ##################
 
-/// Enforces that the caller is the admin and returns the admin address.
-/// This function retrieves the admin from storage, requires authorization,
-/// and returns the admin address.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-///
-/// # Returns
-///
-/// The admin address if authorization is successful.
-///
-/// # Errors
-///
-/// * refer to [`get_admin`] errors.
-pub fn enforce_admin_auth(e: &Env) -> Address {
-    let admin = get_admin(e);
-    admin.require_auth();
-    admin
-}
-
 /// Returns `Some(index)` if the account has the specified role,
 /// where `index` is the position of the account for that role,
 /// and can be used to query [`get_role_member`].
@@ -124,53 +103,6 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
     e.storage().persistent().get(&key)
 }
 
-/// Ensures that the caller is either the contract admin or has the admin role
-/// for the specified role.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller to check permissions for.
-/// * `role` - The role to check admin privileges for.
-///
-/// # Errors
-///
-/// * [`AccessControlError::Unauthorized`] - If the caller is neither the
-///   contract admin nor has the admin role.
-/// * refer to [`get_admin`] errors.
-pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
-    let is_admin = caller == &get_admin(e);
-    let is_admin_role = match get_role_admin(e, role) {
-        Some(admin_role) => has_role(e, caller, &admin_role).is_some(),
-        None => false,
-    };
-
-    if !is_admin && !is_admin_role {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
-}
-
-/// Ensures that the caller has the specified role.
-/// This function is used to check if an account has a specific role.
-/// The main purpose of this function is to act as a helper for the
-/// `#[has_role]` macro.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller to check the role for.
-/// * `role` - The role to check for.
-///
-/// # Errors
-///
-/// * [`AccessControlError::Unauthorized`] - If the caller does not have the
-///   specified role.
-pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
-    if has_role(e, caller, role).is_none() {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
-}
-
 // ################## CHANGE STATE ##################
 
 /// Sets the overarching admin role.
@@ -214,7 +146,7 @@ pub fn set_admin(e: &Env, admin: &Address) {
 pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     caller.require_auth();
     ensure_if_admin_or_admin_role(e, caller, role);
-    grant_role_without_auth(e, caller, account, role);
+    grant_role_no_auth(e, caller, account, role);
 }
 
 /// Low-level function to grant a role to an account without performing
@@ -243,7 +175,7 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 ///
 /// Using this function in public-facing methods creates significant security
 /// risks as it could allow unauthorized role assignments.
-pub fn grant_role_without_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
+pub fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     // Return early if account already has the role
     if has_role(e, account, role).is_some() {
         return;
@@ -270,10 +202,8 @@ pub fn grant_role_without_auth(e: &Env, caller: &Address, account: &Address, rol
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::AccountNotFound`] - If the `account` doesn't have
-///   the role.
 /// * refer to [`ensure_if_admin_or_admin_role`] errors.
-/// * refer to [`remove_from_role_enumeration`] errors.
+/// * refer to [`revoke_role_no_auth`] errors.
 ///
 /// # Events
 ///
@@ -286,7 +216,40 @@ pub fn grant_role_without_auth(e: &Env, caller: &Address, account: &Address, rol
 pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     caller.require_auth();
     ensure_if_admin_or_admin_role(e, caller, role);
+    revoke_role_no_auth(e, caller, account, role);
+}
 
+/// Low-level function to revoke a role from an account without performing
+/// authorization checks.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller.
+/// * `account` - The account to revoke the role from.
+/// * `role` - The role to revoke.
+///
+/// # Errors
+///
+/// * [`AccessControlError::AccountNotFound`] - If the `account` doesn't have
+///   the role.
+/// * refer to [`remove_from_role_enumeration`] errors.
+///
+/// # Events
+///
+/// * topics - `["role_revoked", role: Symbol, account: Address]`
+/// * data - `[caller: Address]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods creates significant security
+/// risks as it could allow unauthorized role revocations.
+pub fn revoke_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     // Check if account has the role
     if has_role(e, account, role).is_none() {
         panic_with_error!(e, AccessControlError::AccountNotFound);
@@ -426,7 +389,7 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
     let admin = get_admin(e);
     admin.require_auth();
 
-    set_role_admin_without_auth(e, role, admin_role);
+    set_role_admin_no_auth(e, role, admin_role);
 }
 
 /// Low-level function to set the admin role for a specified role without
@@ -452,7 +415,7 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
 ///
 /// Using this function in public-facing methods creates significant security
 /// risks as it could allow unauthorized admin role assignments.
-pub fn set_role_admin_without_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
+pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
 
     // Get previous admin role if exists
@@ -466,6 +429,74 @@ pub fn set_role_admin_without_auth(e: &Env, role: &Symbol, admin_role: &Symbol) 
 }
 
 // ################## LOW-LEVEL HELPERS ##################
+
+/// Ensures that the caller is either the contract admin or has the admin role
+/// for the specified role.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller to check permissions for.
+/// * `role` - The role to check admin privileges for.
+///
+/// # Errors
+///
+/// * [`AccessControlError::Unauthorized`] - If the caller is neither the
+///   contract admin nor has the admin role.
+/// * refer to [`get_admin`] errors.
+pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
+    let is_admin = caller == &get_admin(e);
+    let is_admin_role = match get_role_admin(e, role) {
+        Some(admin_role) => has_role(e, caller, &admin_role).is_some(),
+        None => false,
+    };
+
+    if !is_admin && !is_admin_role {
+        panic_with_error!(e, AccessControlError::Unauthorized);
+    }
+}
+
+/// Ensures that the caller has the specified role.
+/// This function is used to check if an account has a specific role.
+/// The main purpose of this function is to act as a helper for the
+/// `#[has_role]` macro.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `caller` - The address of the caller to check the role for.
+/// * `role` - The role to check for.
+///
+/// # Errors
+///
+/// * [`AccessControlError::Unauthorized`] - If the caller does not have the
+///   specified role.
+pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
+    if has_role(e, caller, role).is_none() {
+        panic_with_error!(e, AccessControlError::Unauthorized);
+    }
+}
+
+/// Enforces that the caller is the admin and returns the admin address.
+/// This function retrieves the admin from storage, requires authorization,
+/// and returns the admin address.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+///
+/// # Returns
+///
+/// The admin address if authorization is successful.
+///
+/// # Errors
+///
+/// * refer to [`get_admin`] errors.
+pub fn enforce_admin_auth(e: &Env) -> Address {
+    let admin = get_admin(e);
+    admin.require_auth();
+    admin
+}
 
 /// Adds an account to role enumeration. Returns the previous count.
 ///
