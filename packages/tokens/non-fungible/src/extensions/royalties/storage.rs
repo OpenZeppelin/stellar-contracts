@@ -1,7 +1,7 @@
-use soroban_sdk::{contracttype, Address, Env};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 use stellar_constants::{OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD};
 
-use crate::Base;
+use crate::{Base, NonFungibleTokenError};
 
 /// Storage container for royalty information
 #[contracttype]
@@ -29,12 +29,22 @@ impl Base {
     /// * `basis_points` - The royalty percentage in basis points (100 = 1%,
     ///   10000 = 100%).
     ///
+    /// # Errors
+    ///
+    /// * [`NonFungibleTokenError::InvalidRoyaltyAmount`] - If the royalty
+    ///   amount is higher than 10_000 (100%) basis points.
+    ///
     /// # Notes
     ///
     /// **IMPORTANT**: This function lacks authorization controls. Most likely,
     /// you want to invoke it from a constructor or from another function
     /// with admin-only authorization.
     pub fn set_default_royalty(e: &Env, receiver: &Address, basis_points: u32) {
+        // check if basis points is valid
+        if basis_points > 10000 {
+            panic_with_error!(e, NonFungibleTokenError::InvalidRoyaltyAmount);
+        }
+
         // Store the default royalty information
         let key = NFTRoyaltiesStorageKey::DefaultRoyalty;
         let royalty_info = RoyaltyInfo { receiver: receiver.clone(), basis_points };
@@ -55,6 +65,8 @@ impl Base {
     ///
     /// # Errors
     ///
+    /// * [`NonFungibleTokenError::InvalidRoyaltyAmount`] - If the royalty
+    ///   amount is higher than 10_000 (100%) basis points.
     /// * refer to [`Base::owner_of`] errors.
     ///
     /// # Notes
@@ -63,6 +75,11 @@ impl Base {
     /// you want to invoke it from a constructor or from another function
     /// with admin-only authorization.
     pub fn set_token_royalty(e: &Env, token_id: u32, receiver: &Address, basis_points: u32) {
+        // check if basis points is valid
+        if basis_points > 10000 {
+            panic_with_error!(e, NonFungibleTokenError::InvalidRoyaltyAmount);
+        }
+
         // Verify token exists by checking owner
         let _ = Base::owner_of(e, token_id);
 
@@ -73,11 +90,10 @@ impl Base {
         e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
     }
 
-    /// Returns the royalty information for a token in `(Address, u32)` format:
-    /// a tuple containing the receiver address and the royalty amount. If there
-    /// is no token-specific royalty set, it returns the default royalty. If
-    /// there is no default royalty set, it returns the contract address and
-    /// zero royalty.
+    /// Returns `(Address, u32)` - A tuple containing the receiver address and
+    /// the royalty amount. If there is no token-specific royalty set, it
+    /// returns the default royalty. If there is no default royalty set, it
+    /// returns the contract address and zero royalty.
     ///
     /// # Arguments
     ///

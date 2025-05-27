@@ -48,6 +48,11 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// * `receiver` - The address that should receive royalty payments.
     /// * `basis_points` - The royalty percentage in basis points (100 = 1%,
     ///   10000 = 100%).
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::NonFungibleTokenError::InvalidRoyaltyAmount`] - If the
+    ///   royalty amount is higher than 10_000 (100%) basis points.
     fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32);
 
     /// Sets the royalty information for a specific token.
@@ -62,6 +67,8 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// # Errors
     ///
+    /// * [`crate::NonFungibleTokenError::InvalidRoyaltyAmount`] - If the
+    ///   royalty amount is higher than 10_000 (100%) basis points.
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
     ///   not exist.
     fn set_token_royalty(e: &Env, token_id: u32, receiver: Address, basis_points: u32);

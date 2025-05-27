@@ -139,3 +139,20 @@ fn test_no_royalty_set() {
         assert_eq!(royalty_amount, 0);
     });
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #212)")]
+fn test_invalid_royalty_amount() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Mint a token
+        let token_id = Enumerable::sequential_mint(&e, &owner);
+
+        // Set invalid royalty amount
+        Base::set_token_royalty(&e, token_id, &Address::generate(&e), 10001);
+    });
+}
