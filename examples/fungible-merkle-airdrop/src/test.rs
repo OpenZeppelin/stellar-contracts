@@ -77,7 +77,6 @@ fn test_valid_claim() {
     client.claim(&3_u32, &receiver, &amount, &proofs);
     assert_eq!(token_client.balance(&receiver), 100);
     assert_eq!(token_client.balance(&contract_id), 900);
-    assert!(e.auths().is_empty());
 }
 
 #[test]

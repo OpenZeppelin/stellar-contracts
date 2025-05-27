@@ -282,7 +282,7 @@
                   "symbol": "Claimed"
                 },
                 {
-                  "bytes": "e354c52475f392edd92ad579eb33d73b2eda7bdafeab0cda7e651edc106153cd"
+                  "u32": 3
                 }
               ]
             },
@@ -302,7 +302,7 @@
                       "symbol": "Claimed"
                     },
                     {
-                      "bytes": "e354c52475f392edd92ad579eb33d73b2eda7bdafeab0cda7e651edc106153cd"
+                      "u32": 3
                     }
                   ]
                 },

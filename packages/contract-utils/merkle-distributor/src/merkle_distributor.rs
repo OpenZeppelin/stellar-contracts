@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use soroban_sdk::{contracterror, symbol_short, Bytes, Env, Symbol};
+use soroban_sdk::{contracterror, symbol_short, Bytes, Env, Symbol, Val};
 use stellar_crypto::hasher::Hasher;
 
 pub struct MerkleDistributor<H: Hasher>(PhantomData<H>);
@@ -13,12 +13,14 @@ pub struct MerkleDistributor<H: Hasher>(PhantomData<H>);
 pub enum MerkleDistributorError {
     /// The merkle root is not set.
     RootNotSet = 1300,
-    /// The merkle root is aleasy set.
+    /// The merkle root is already set.
     RootAlreadySet = 1301,
-    /// The provided leaf was already claimed.
-    LeafAlreadyClaimed = 1302,
+    /// The provided index was already claimed.
+    IndexAlreadyClaimed = 1302,
     /// The proof is invalid.
     InvalidProof = 1303,
+    // The node does not contain an `index` field
+    InvalidNodeStructure = 1304,
 }
 
 // ################## EVENTS ##################
@@ -39,18 +41,18 @@ pub fn emit_set_root(e: &Env, root: Bytes) {
     e.events().publish(topics, root)
 }
 
-/// Emits an event when a leaf is claimed.
+/// Emits an event when an index is claimed.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `leaf` - The leaf to be claimed.
+/// * `index` - The index that was claimed.
 ///
 /// # Events
 ///
 /// * topics - `["set_claimed"]`
-/// * data - `[leaf: Bytes]`
-pub fn emit_set_claimed(e: &Env, leaf: Bytes) {
+/// * data - `[index: u32]`
+pub fn emit_set_claimed(e: &Env, index: Val) {
     let topics = (Symbol::new(e, "set_claimed"),);
-    e.events().publish(topics, leaf)
+    e.events().publish(topics, index)
 }
