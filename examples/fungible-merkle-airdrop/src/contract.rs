@@ -1,3 +1,22 @@
+//! # Airdrop Distributor for a Fungible Token
+//!
+//! This contract implements a Merkle-proof-based distribution mechanism for
+//! fungible token airdrops.
+//!
+//! Participants can claim their airdrop by providing a valid Merkle proof
+//! corresponding to a pre-generated Merkle tree. The claim is verified against
+//! the Merkle root stored in the contract.
+//!
+//! Each leaf of the Merkle tree must be structured as a `Receiver` struct,
+//! which includes:
+//!
+//! - `index: u32` — a unique index for identifying the claim.
+//! - `address: Address` — the Stellar address eligible to claim.
+//! - `amount: i128` — the amount of tokens allocated to the address.
+//!
+//! The contract and test logic were adapted from
+//! [philipliu/soroban-merkle-airdrop](https://github.com/philipliu/soroban-merkle-airdrop).
+
 use soroban_sdk::{contract, contractimpl, contracttype, token, Address, BytesN, Env, Vec};
 use stellar_crypto::sha256::Sha256;
 use stellar_merkle_distributor::MerkleDistributor;
