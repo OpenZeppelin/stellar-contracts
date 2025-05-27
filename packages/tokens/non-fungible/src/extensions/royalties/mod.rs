@@ -15,8 +15,6 @@ use soroban_sdk::{Address, Env};
 /// This implementation follows the ERC2981 standard for royalties, allowing:
 /// - Setting global royalties for the entire collection
 /// - Setting per-token royalties that override the global setting
-/// - Enforcing a maximum royalty percentage to prevent scams
-/// - Making royalties immutable after minting
 ///
 /// `storage.rs` file of this module provides the `NonFungibleRoyalties` trait
 /// implementation.
@@ -50,16 +48,9 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// * `receiver` - The address that should receive royalty payments.
     /// * `basis_points` - The royalty percentage in basis points (100 = 1%,
     ///   10000 = 100%).
-    ///
-    /// # Errors
-    ///
-    /// * [`crate::NonFungibleTokenError::RoyaltyTooHigh`] - If the royalty
-    ///   percentage exceeds the maximum allowed value.
     fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32);
 
     /// Sets the royalty information for a specific token.
-    /// This must be called during minting, as royalties are immutable after
-    /// minting.
     ///
     /// # Arguments
     ///
@@ -73,10 +64,6 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
     ///   not exist.
-    /// * [`crate::NonFungibleTokenError::RoyaltyTooHigh`] - If the royalty
-    ///   percentage exceeds the maximum allowed value.
-    /// * [`crate::NonFungibleTokenError::RoyaltyAlreadySet`] - If attempting to
-    ///   set royalties for a token that already has royalty information.
     fn set_token_royalty(e: &Env, token_id: u32, receiver: Address, basis_points: u32);
 
     /// Returns `(Address, u32)` - A tuple containing the receiver address and

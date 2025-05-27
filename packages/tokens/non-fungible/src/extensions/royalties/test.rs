@@ -53,27 +53,6 @@ fn test_set_token_royalty() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #212)")]
-fn test_set_token_royalty_already_set() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockContract, ());
-    let owner = Address::generate(&e);
-    let receiver = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        // Mint a token
-        let token_id = Enumerable::sequential_mint(&e, &owner);
-
-        // Set token royalty
-        Base::set_token_royalty(&e, token_id, &receiver, 500);
-
-        // Try to set it again (should fail)
-        Base::set_token_royalty(&e, token_id, &receiver, 300);
-    });
-}
-
-#[test]
 fn test_token_royalty_overrides_default() {
     let e = Env::default();
     e.mock_all_auths();
