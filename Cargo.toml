@@ -8,6 +8,7 @@ members = [
     "examples/nft-consecutive",
     "examples/nft-enumerable",
     "examples/nft-sequential-minting",
+    "examples/sac-admin-wrapper",
     "examples/ownable",
     "examples/upgradeable/*",
     "packages/constants",
@@ -31,6 +32,7 @@ proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
+soroban-test-helpers = "0.2.3"
 hex-literal = "0.4.1"
 
 # members
@@ -50,6 +52,7 @@ stellar-role-transfer = { path = "packages/access/role-transfer" }
 stellar-upgradeable = { path = "packages/contract-utils/upgradeable" }
 stellar-upgradeable-macros = { path = "packages/contract-utils/upgradeable-macros" }
 stellar-crypto = { path = "packages/contract-utils/crypto" }
+stellar-merkle-distributor = { path = "packages/contract-utils/merkle-distributor" }
 
 [profile.release]
 opt-level = "z"

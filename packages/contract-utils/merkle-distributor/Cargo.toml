@@ -1,5 +1,5 @@
 [package]
-name = "stellar-fungible"
+name = "stellar-merkle-distributor"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -11,10 +11,11 @@ crate-type = ["lib", "cdylib"]
 doctest = false
 
 [dependencies]
-stellar-constants = { workspace = true }
 soroban-sdk = { workspace = true }
+stellar-crypto = { workspace = true }
+stellar-constants = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-soroban-test-helpers = { workspace = true }
+hex-literal = { workspace = true }
 stellar-event-assertion = { workspace = true }
