@@ -132,3 +132,21 @@ fn set_binver_from_env() -> proc_macro2::TokenStream {
         _ => quote! {},
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn test_set_binver_from_env_zero_version() {
+        // Set version to 0.0.0
+        env::set_var("CARGO_PKG_VERSION", "0.0.0");
+
+        let result = set_binver_from_env();
+        let result_str = result.to_string();
+
+        // Should return empty tokens
+        assert_eq!(result_str.trim(), "");
+    }
+}
