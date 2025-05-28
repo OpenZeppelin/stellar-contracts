@@ -138,7 +138,7 @@ fn consecutive_set_ownership_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #300)")]
+#[should_panic(expected = "Error(Contract, #200)")]
 fn consecutive_set_ownership_panics_for_max_sequential_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -219,7 +219,7 @@ fn consecutive_batch_mint_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #312)")]
+#[should_panic(expected = "Error(Contract, #207)")]
 fn consecutive_batch_mint_amount_0_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -233,7 +233,7 @@ fn consecutive_batch_mint_amount_0_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #312)")]
+#[should_panic(expected = "Error(Contract, #207)")]
 fn consecutive_batch_mint_amount_max_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -247,7 +247,7 @@ fn consecutive_batch_mint_amount_max_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #300)")]
+#[should_panic(expected = "Error(Contract, #200)")]
 fn consecutive_owner_of_on_zero_token_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -258,7 +258,7 @@ fn consecutive_owner_of_on_zero_token_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #300)")]
+#[should_panic(expected = "Error(Contract, #200)")]
 fn consecutive_owner_of_on_nonexistent_token_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -272,7 +272,7 @@ fn consecutive_owner_of_on_nonexistent_token_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #300)")]
+#[should_panic(expected = "Error(Contract, #200)")]
 fn consecutive_owner_of_panics_on_burnt_token_fails() {
     let e = Env::default();
     e.mock_all_auths();
@@ -527,7 +527,7 @@ fn consecutive_token_uri_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #300)")]
+#[should_panic(expected = "Error(Contract, #200)")]
 fn consecutive_token_uri_panics_for_more_than_max_id_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -539,7 +539,7 @@ fn consecutive_token_uri_panics_for_more_than_max_id_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #300)")]
+#[should_panic(expected = "Error(Contract, #200)")]
 fn consecutive_token_uri_panics_for_burned_id_fails() {
     let e = Env::default();
     e.mock_all_auths();

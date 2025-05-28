@@ -159,26 +159,28 @@ pub trait FungibleToken {
 pub enum FungibleTokenError {
     /// Indicates an error related to the current balance of account from which
     /// tokens are expected to be transferred.
-    InsufficientBalance = 200,
+    InsufficientBalance = 100,
     /// Indicates a failure with the allowance mechanism when a given spender
     /// doesn't have enough allowance.
-    InsufficientAllowance = 201,
+    InsufficientAllowance = 101,
     /// Indicates an invalid value for `live_until_ledger` when setting an
     /// allowance.
-    InvalidLiveUntilLedger = 202,
+    InvalidLiveUntilLedger = 102,
     /// Indicates an error when an input that must be >= 0
-    LessThanZero = 203,
+    LessThanZero = 103,
     /// Indicates overflow when adding two values
-    MathOverflow = 204,
+    MathOverflow = 104,
     /// Indicates access to uninitialized metadata
-    UnsetMetadata = 205,
+    UnsetMetadata = 105,
     /// Indicates that the operation would have caused `total_supply` to exceed
     /// the `cap`.
-    ExceededCap = 206,
+    ExceededCap = 106,
     /// Indicates the supplied `cap` is not a valid cap value.
-    InvalidCap = 207,
+    InvalidCap = 107,
     /// Indicates the Cap was not set.
-    CapNotSet = 208,
+    CapNotSet = 108,
+    /// Indicates the SAC address was not set.
+    SACNotSet = 109,
 }
 
 // ################## EVENTS ##################

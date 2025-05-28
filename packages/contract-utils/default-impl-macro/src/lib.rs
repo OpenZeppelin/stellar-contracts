@@ -47,6 +47,8 @@ mod helper;
 /// - `NonFungibleToken`
 /// - `NonFungibleBurnable`
 /// - `NonFungibleEnumerable`
+/// - `AccessControl`
+/// - `Ownable`
 #[proc_macro_attribute]
 pub fn default_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_default_impl(item)

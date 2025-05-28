@@ -1,0 +1,21 @@
+[package]
+name = "stellar-merkle-distributor"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version.workspace = true
+
+[lib]
+crate-type = ["lib", "cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+stellar-crypto = { workspace = true }
+stellar-constants = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+hex-literal = { workspace = true }
+stellar-event-assertion = { workspace = true }

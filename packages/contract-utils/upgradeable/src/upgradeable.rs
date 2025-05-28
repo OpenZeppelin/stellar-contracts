@@ -117,5 +117,5 @@ pub trait UpgradeableMigratableInternal {
 #[repr(u32)]
 pub enum UpgradeableError {
     /// When migration is attempted but not allowed due to upgrade state.
-    MigrationNotAllowed = 110,
+    MigrationNotAllowed = 1100,
 }

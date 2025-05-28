@@ -273,34 +273,34 @@ pub trait NonFungibleToken {
 #[repr(u32)]
 pub enum NonFungibleTokenError {
     /// Indicates a non-existent `token_id`.
-    NonExistentToken = 300,
+    NonExistentToken = 200,
     /// Indicates an error related to the ownership over a particular token.
     /// Used in transfers.
-    IncorrectOwner = 301,
-    /// Indicates a failure with the `operator`’s approval. Used in transfers.
-    InsufficientApproval = 302,
+    IncorrectOwner = 201,
+    /// Indicates a failure with the `operator`s approval. Used in transfers.
+    InsufficientApproval = 202,
     /// Indicates a failure with the `approver` of a token to be approved. Used
     /// in approvals.
-    InvalidApprover = 303,
+    InvalidApprover = 203,
     /// Indicates an invalid value for `live_until_ledger` when setting
     /// approvals.
-    InvalidLiveUntilLedger = 304,
+    InvalidLiveUntilLedger = 204,
     /// Indicates overflow when adding two values
-    MathOverflow = 305,
+    MathOverflow = 205,
     /// Indicates all possible `token_id`s are already in use.
-    TokenIDsAreDepleted = 306,
-    /// Indicates a token with given `token_id` already exists.
-    TokenIDInUse = 307,
-    /// Indicates the token does not exist in owner's list.
-    TokenNotFoundInOwnerList = 308,
-    /// Indicates the token does not exist in global list.
-    TokenNotFoundInGlobalList = 309,
-    /// Indicates access to unset metadata
-    UnsetMetadata = 310,
-    /// Indicates the length of the base URI exceeds the maximum allowed
-    BaseUriMaxLenExceeded = 311,
+    TokenIDsAreDepleted = 206,
     /// Indicates an invalid amount to batch mint in `consecutive` extension.
-    InvalidAmount = 312,
+    InvalidAmount = 207,
+    /// Indicates the token does not exist in owner's list.
+    TokenNotFoundInOwnerList = 208,
+    /// Indicates the token does not exist in global list.
+    TokenNotFoundInGlobalList = 209,
+    /// Indicates access to unset metadata.
+    UnsetMetadata = 210,
+    /// Indicates the length of the base URI exceeds the maximum allowed.
+    BaseUriMaxLenExceeded = 211,
+    /// Indicates the royalty amount is higher than 10_000 (100%) basis points.
+    InvalidRoyaltyAmount = 212,
 }
 
 // ################## EVENTS ##################
@@ -333,7 +333,8 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
 ///   `operator`).
 /// * `approved` - Address of the approved.
 /// * `token_id` - The identifier of the transferred token.
-/// * `live_until_ledger` - The ledger number at which the approval expires.
+/// * `live_until_ledger` - The ledger number at which the approval expires. If
+///   `live_until_ledger` is `0`, the approval is revoked.
 ///
 /// # Events
 ///

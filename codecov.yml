@@ -1,0 +1,6 @@
+ignore:
+  - "packages/contract-utils/access-control-macros"
+  - "packages/contract-utils/ownable-macro"
+  - "packages/contract-utils/macro-helpers"
+  - "packages/tokens/fungible/src/impl_token_interface_macro.rs"
+  - "packages/tokens/non-fungible/src/overrides.rs"

@@ -74,3 +74,4 @@ jobs:
           files: ./lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: OpenZeppelin/stellar-contracts
+          verbose: true

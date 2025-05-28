@@ -375,9 +375,11 @@ impl Base {
             return;
         }
 
+        let current_ledger = e.ledger().sequence();
+
         // If the provided ledger number is invalid (less than the current ledger
         // number)
-        if live_until_ledger < e.ledger().sequence() {
+        if live_until_ledger < current_ledger {
             panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
         }
 
@@ -385,7 +387,7 @@ impl Base {
         e.storage().temporary().set(&key, &live_until_ledger);
 
         // Update the TTL based on the expiration ledger
-        let live_for = live_until_ledger - e.ledger().sequence();
+        let live_for = live_until_ledger - current_ledger;
         e.storage().temporary().extend_ttl(&key, live_for, live_for);
 
         emit_approve_for_all(e, owner, operator, live_until_ledger);
