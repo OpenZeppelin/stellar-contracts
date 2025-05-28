@@ -135,8 +135,9 @@ fn set_binver_from_env() -> proc_macro2::TokenStream {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::env;
+
+    use super::*;
 
     #[test]
     fn test_set_binver_from_env_zero_version() {
