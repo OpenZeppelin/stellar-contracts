@@ -3,6 +3,10 @@ use core::marker::PhantomData;
 use soroban_sdk::{contracterror, symbol_short, Bytes, Env, Symbol, Val};
 use stellar_crypto::hasher::Hasher;
 
+pub trait IndexableNode {
+    fn index(&self) -> u32;
+}
+
 pub struct MerkleDistributor<H: Hasher>(PhantomData<H>);
 
 // ################## ERRORS ##################
@@ -19,8 +23,6 @@ pub enum MerkleDistributorError {
     IndexAlreadyClaimed = 1302,
     /// The proof is invalid.
     InvalidProof = 1303,
-    // The node does not contain an `index` field
-    InvalidNodeStructure = 1304,
 }
 
 // ################## EVENTS ##################

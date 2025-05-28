@@ -1,13 +1,9 @@
-use soroban_sdk::{
-    contracttype, panic_with_error, symbol_short,
-    xdr::{FromXdr, ScMap, ScVal, ToXdr},
-    BytesN, Env, TryFromVal, Val, Vec,
-};
+use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, BytesN, Env, Vec};
 use stellar_constants::{MERKLE_CLAIMED_EXTEND_AMOUNT, MERKLE_CLAIMED_TTL_THRESHOLD};
 use stellar_crypto::{hasher::Hasher, merkle::Verifier};
 
 use crate::{
-    merkle_distributor::{emit_set_claimed, emit_set_root, MerkleDistributorError},
+    merkle_distributor::{emit_set_claimed, emit_set_root, IndexableNode, MerkleDistributorError},
     MerkleDistributor,
 };
 
@@ -115,8 +111,6 @@ where
     ///
     /// # Errors
     ///
-    /// * [`MerkleDistributorError::InvalidNodeStructure`] - When the node data
-    ///   structure does not contain an `index` field.
     /// * [`MerkleDistributorError::IndexAlreadyClaimed`] - When attempting to
     ///   claim an index that has already been claimed. claim an index that has
     ///   already been claimed.
@@ -124,28 +118,13 @@ where
     ///   proof is invalid.
     /// * [`MerkleDistributorError::RootNotSet`] - When the root is not set or
     ///   when the node data does not contain a valid index.
-    pub fn verify_and_set_claimed<N: TryFromVal<Env, Val> + ToXdr>(
+    pub fn verify_and_set_claimed<N: ToXdr + IndexableNode>(
         e: &Env,
         node: N,
         proof: Vec<H::Output>,
     ) {
+        let index = node.index();
         let encoded = node.to_xdr(e);
-        // Extract index from node data
-        let index = ScVal::from_xdr(e, &encoded)
-            .and_then(|val| {
-                let index: Option<u32> = match val {
-                    ScVal::Map(Some(ScMap(entries))) => entries.iter().find_map(|entry| {
-                        if entry.key == symbol_short!("index").into() {
-                            TryInto::<u32>::try_into(entry.val.clone()).ok()
-                        } else {
-                            None
-                        }
-                    }),
-                    _ => None,
-                };
-                index.ok_or_else(|| (MerkleDistributorError::InvalidNodeStructure).into())
-            })
-            .unwrap_or_else(|err| panic_with_error!(e, err));
 
         // Check if already claimed
         if Self::is_claimed(e, index) {

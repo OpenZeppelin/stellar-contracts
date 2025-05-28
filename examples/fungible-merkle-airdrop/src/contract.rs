@@ -19,22 +19,26 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, token, Address, BytesN, Env, Vec};
 use stellar_crypto::sha256::Sha256;
-use stellar_merkle_distributor::MerkleDistributor;
+use stellar_merkle_distributor::{IndexableNode, MerkleDistributor};
 
 type Distributor = MerkleDistributor<Sha256>;
 
 #[contracttype]
-#[derive(Clone)]
 enum DataKey {
     TokenAddress,
 }
 
 #[contracttype]
-#[derive(Clone, Debug)]
 struct Receiver {
     pub index: u32,
     pub address: Address,
     pub amount: i128,
+}
+
+impl IndexableNode for Receiver {
+    fn index(&self) -> u32 {
+        self.index
+    }
 }
 
 #[contract]
