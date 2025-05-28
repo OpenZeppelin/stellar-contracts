@@ -39,6 +39,11 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
             ) {
                 Self::_require_auth(e, &operator);
 
+                // Set the flag in case the next contract version needs to perform a migration
+                // i.e. when the current version is `Upgradeable` only,
+                // while the next one becomes `UpgradeableMigratable`.
+                stellar_upgradeable::enable_migration(e);
+
                 e.deployer().update_current_contract_wasm(new_wasm_hash);
             }
         }
@@ -68,6 +73,11 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
 /// #[derive(UpgradeableMigratable)]
 /// pub struct MyContract;
 /// ```
+///
+/// **Warning:** This derive macro should only be used on contracts that have
+/// previously used either `#[derive(Upgradeable)]` or
+/// `#[derive(UpgradeableMigratable)]`. The migration function depends on an
+/// internal flag set by calling `stellar_upgradeable::enable_migration()`.
 pub fn derive_upgradeable_migratable(input: &DeriveInput) -> proc_macro2::TokenStream {
     let name = &input.ident;
 
@@ -88,7 +98,7 @@ pub fn derive_upgradeable_migratable(input: &DeriveInput) -> proc_macro2::TokenS
             ) {
                 Self::_require_auth(e, &operator);
 
-                stellar_upgradeable::start_migration(e);
+                stellar_upgradeable::enable_migration(e);
 
                 e.deployer().update_current_contract_wasm(new_wasm_hash);
             }
