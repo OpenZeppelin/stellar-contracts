@@ -1838,6 +1838,8 @@ name = "upgrader-example"
 version = "0.2.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-ownable",
+ "stellar-ownable-macro",
  "stellar-upgradeable",
 ]
 
