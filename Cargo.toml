@@ -11,6 +11,7 @@ members = [
     "examples/nft-sequential-minting",
     "examples/sac-admin-wrapper",
     "examples/ownable",
+    "examples/merkle-voting",
     "examples/upgradeable/*",
     "packages/constants",
     "packages/access/*",

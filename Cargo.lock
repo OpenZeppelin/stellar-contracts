@@ -587,7 +587,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fungible-merkle-airdrop"
+name = "fungible-merkle-airdrop-example"
 version = "0.2.0"
 dependencies = [
  "hex-literal",
@@ -849,6 +849,15 @@ name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
+
+[[package]]
+name = "merkle-voting-example"
+version = "0.2.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-crypto",
+ "stellar-merkle-distributor",
+]
 
 [[package]]
 name = "nft-access-control-example"
