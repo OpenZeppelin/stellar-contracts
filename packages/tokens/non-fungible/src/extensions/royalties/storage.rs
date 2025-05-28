@@ -87,7 +87,6 @@ impl Base {
         let key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
         let royalty_info = RoyaltyInfo { receiver: receiver.clone(), basis_points };
         e.storage().persistent().set(&key, &royalty_info);
-        e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
     }
 
     /// Returns `(Address, u32)` - A tuple containing the receiver address and
@@ -127,6 +126,7 @@ impl Base {
         // Fall back to default royalty if no token-specific royalty is set
         let default_key = NFTRoyaltiesStorageKey::DefaultRoyalty;
         if let Some(royalty_info) = e.storage().instance().get::<_, RoyaltyInfo>(&default_key) {
+            e.storage().instance().extend_ttl(OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
             let royalty_amount =
                 (sale_price as u64 * royalty_info.basis_points as u64 / 10000) as u32;
             return (royalty_info.receiver, royalty_amount);

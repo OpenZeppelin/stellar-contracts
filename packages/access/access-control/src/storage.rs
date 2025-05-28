@@ -1,5 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
-use stellar_constants::{ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
+use stellar_constants::{
+    ADMIN_TRANSFER_THRESHOLD, ADMIN_TRANSFER_TTL, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
+};
 use stellar_role_transfer::{accept_transfer, transfer_role};
 
 use crate::{
@@ -39,7 +41,11 @@ pub enum AccessControlStorageKey {
 /// * `role` - The role to check for.
 pub fn has_role(e: &Env, account: &Address, role: &Symbol) -> Option<u32> {
     let key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
-    e.storage().persistent().get(&key)
+
+    // extend ttl if `Some(index)`
+    e.storage().persistent().get(&key).inspect(|_| {
+        e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT)
+    })
 }
 
 /// Returns the admin account.
@@ -52,10 +58,12 @@ pub fn has_role(e: &Env, account: &Address, role: &Symbol) -> Option<u32> {
 ///
 /// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
 pub fn get_admin(e: &Env) -> Address {
-    e.storage()
-        .instance()
-        .get(&AccessControlStorageKey::Admin)
-        .unwrap_or_else(|| panic_with_error!(e, AccessControlError::AdminNotSet))
+    if let Some(admin) = e.storage().instance().get(&AccessControlStorageKey::Admin) {
+        e.storage().instance().extend_ttl(ADMIN_TRANSFER_THRESHOLD, ADMIN_TRANSFER_TTL);
+        admin
+    } else {
+        panic_with_error!(e, AccessControlError::AdminNotSet)
+    }
 }
 
 /// Returns the total number of accounts that have the specified role.
@@ -67,7 +75,12 @@ pub fn get_admin(e: &Env) -> Address {
 /// * `role` - The role to get the count for.
 pub fn get_role_member_count(e: &Env, role: &Symbol) -> u32 {
     let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());
-    e.storage().persistent().get(&count_key).unwrap_or(0)
+    if let Some(count) = e.storage().persistent().get(&count_key) {
+        e.storage().persistent().extend_ttl(&count_key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
+        count
+    } else {
+        0
+    }
 }
 
 /// Returns the account at the specified index for a given role.
@@ -85,10 +98,12 @@ pub fn get_role_member_count(e: &Env, role: &Symbol) -> u32 {
 pub fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {
     let key = AccessControlStorageKey::RoleAccounts(RoleAccountKey { role: role.clone(), index });
 
-    e.storage()
-        .persistent()
-        .get(&key)
-        .unwrap_or_else(|| panic_with_error!(e, AccessControlError::AccountNotFound))
+    if let Some(account) = e.storage().persistent().get(&key) {
+        e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
+        account
+    } else {
+        panic_with_error!(e, AccessControlError::AccountNotFound)
+    }
 }
 
 /// Returns the admin role for a specific role.
@@ -100,7 +115,12 @@ pub fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {
 /// * `role` - The role to query the admin role for.
 pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
-    e.storage().persistent().get(&key)
+    if let Some(admin_role) = e.storage().persistent().get(&key) {
+        e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
+        Some(admin_role)
+    } else {
+        None
+    }
 }
 
 // ################## CHANGE STATE ##################
@@ -182,10 +202,8 @@ pub fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &S
     }
 
     let index = add_to_role_enumeration(e, account, role);
-
     let key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
     e.storage().persistent().set(&key, &index);
-    e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
 
     emit_role_granted(e, role, account, caller);
 }
@@ -423,7 +441,6 @@ pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
         e.storage().persistent().get::<_, Symbol>(&key).unwrap_or_else(|| Symbol::new(e, ""));
 
     e.storage().persistent().set(&key, admin_role);
-    e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
 
     emit_role_admin_changed(e, role, &previous_admin_role, admin_role);
 }
@@ -514,16 +531,13 @@ pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) -> u32
     let new_key =
         AccessControlStorageKey::RoleAccounts(RoleAccountKey { role: role.clone(), index: count });
     e.storage().persistent().set(&new_key, account);
-    e.storage().persistent().extend_ttl(&new_key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
 
     // Store the index for the account in HasRole
     let has_role_key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
     e.storage().persistent().set(&has_role_key, &count);
-    e.storage().persistent().extend_ttl(&has_role_key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
 
     // Update the count
     e.storage().persistent().set(&count_key, &(count + 1));
-    e.storage().persistent().extend_ttl(&count_key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
 
     count
 }
@@ -592,5 +606,4 @@ pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
 
     // Update the count
     e.storage().persistent().set(&count_key, &last_index);
-    e.storage().persistent().extend_ttl(&count_key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
 }

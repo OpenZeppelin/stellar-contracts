@@ -12,6 +12,7 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+stellar-constants = { workspace = true }
 stellar-role-transfer = { workspace = true }
 
 [dev-dependencies]
