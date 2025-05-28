@@ -1639,6 +1639,7 @@ name = "stellar-ownable"
 version = "0.2.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-constants",
  "stellar-event-assertion",
  "stellar-role-transfer",
 ]

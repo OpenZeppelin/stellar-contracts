@@ -1,4 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use stellar_constants::{OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD};
 use stellar_role_transfer::{accept_transfer, transfer_role};
 
 use crate::ownable::{
@@ -22,7 +23,10 @@ pub enum OwnableStorageKey {
 ///
 /// * `e` - Access to the Soroban environment.
 pub fn get_owner(e: &Env) -> Option<Address> {
-    e.storage().instance().get::<_, Address>(&OwnableStorageKey::Owner)
+    e.storage()
+        .instance()
+        .get::<_, Address>(&OwnableStorageKey::Owner)
+        .inspect(|_| e.storage().instance().extend_ttl(OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT))
 }
 
 // ################## CHANGE STATE ##################
@@ -121,8 +125,10 @@ pub fn accept_ownership(e: &Env) {
 /// * Authorization for the current owner is required.
 pub fn renounce_ownership(e: &Env) {
     let owner = enforce_owner_auth(e);
+    let key = OwnableStorageKey::PendingOwner;
 
-    if e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner).is_some() {
+    if e.storage().temporary().get::<_, Address>(&key).is_some() {
+        e.storage().temporary().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
         panic_with_error!(e, OwnableError::TransferInProgress);
     }
 
