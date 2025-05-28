@@ -123,12 +123,13 @@ pub fn derive_upgradeable_migratable(input: &DeriveInput) -> proc_macro2::TokenS
 fn set_binver_from_env() -> proc_macro2::TokenStream {
     // However when "version" is missing from Cargo.toml,
     // the following does not return error, but Ok("0.0.0")
-    let version = std::env::var("CARGO_PKG_VERSION");
-
-    match version {
-        Ok(v) if v != "0.0.0" => {
-            quote! { soroban_sdk::contractmeta!(key = "binver", val = #v); }
+    let mut tokens = quote! {};
+    if let Ok(v) = std::env::var("CARGO_PKG_VERSION") {
+        if v != "0.0.0" {
+            tokens = quote! {
+                soroban_sdk::contractmeta!(key = "binver", val = #v);
+            };
         }
-        _ => quote! {},
     }
+    tokens
 }
