@@ -106,6 +106,7 @@ impl Base {
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
+    /// * refer to [`Base::owner_of`] errors.
     pub fn royalty_info(e: &Env, token_id: u32, sale_price: u32) -> (Address, u32) {
         // Verify token exists by checking owner
         let _ = Base::owner_of(e, token_id);
