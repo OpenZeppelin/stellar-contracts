@@ -35,18 +35,20 @@ fn test_sac_generic() {
     let chief_keypair = Keypair::generate(&mut thread_rng());
     let operator_keypair = Keypair::generate(&mut thread_rng());
 
-    //std::println!("owner_public: {:?}", hex::encode(chief_keypair.public.as_bytes()));
-    //let owner_account =
-    //AccountId(PublicKey::PublicKeyTypeEd25519(Uint256::from(chief_keypair.public.to_bytes())));
-    //let owner = Address::from_str(&e, &std::string::ToString::to_string(&owner_account));
-    //std::println!("owner: {:?}", owner);
+    //std::println!("owner_public: {:?}",
+    // hex::encode(chief_keypair.public.as_bytes())); let owner_account =
+    //AccountId(PublicKey::PublicKeyTypeEd25519(Uint256::from(chief_keypair.public.
+    // to_bytes()))); let owner = Address::from_str(&e,
+    // &std::string::ToString::to_string(&owner_account)); std::println!("owner:
+    // {:?}", owner);
 
     // Deploy the Stellar Asset Contract
     let sac = e.register_stellar_asset_contract_v2(issuer.clone());
     let sac_client = StellarAssetClient::new(&e, &sac.address());
     //std::println!("sac: {:?}", sac_client.address);
 
-    // Register the account contract, passing in the two signers (public keys) to the constructor.
+    // Register the account contract, passing in the two signers (public keys) to
+    // the constructor.
     let new_admin = e.register(
         SacAdminExampleContract,
         (

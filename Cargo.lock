@@ -1284,7 +1284,7 @@ checksum = "6ea1a2d0a644769cc99faa24c3ad26b379b786fe7c36fd3c546254801650e6dd"
 
 [[package]]
 name = "sac-admin-generic-example"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "ed25519-dalek 1.0.1",
  "rand 0.7.3",

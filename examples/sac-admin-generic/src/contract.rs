@@ -4,7 +4,6 @@ use soroban_sdk::{
     crypto::Hash,
     Address, BytesN, Env, IntoVal, Val, Vec,
 };
-
 use stellar_fungible::sac_admin_generic::{
     extract_context, get_sac_address, set_sac_address, SacFn,
 };
@@ -52,8 +51,8 @@ impl SacAdminExampleContract {
 
 #[contractimpl]
 impl CustomAccountInterface for SacAdminExampleContract {
-    type Signature = Signature;
     type Error = SACAdminGenericError;
+    type Signature = Signature;
 
     fn __check_auth(
         e: Env,
