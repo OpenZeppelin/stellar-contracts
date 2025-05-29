@@ -14,26 +14,6 @@ It provides a flexible and secure framework for defining and managing token stan
 
 We provide the below extensions to enhance the capabilities of the Fungible Token Standard.
 
-=== - Mintable
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/mintable[Source Code]
-
-==== Summary
-The `FungibleMintable` trait extends the `FungibleToken` trait to provide the capability to mint tokens.
-
-==== Events
-* `mint_event` :  broadcasted to the network when the `mint()` function is invoked.
-
-=== - Capped
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/capped[Source Code]
-
-==== Summary
-The `Capped` trait extends the `FungibleToken` trait to provide the capability to set a maximum supply for the token.
-
-Note that the `Capped` trait is designed to be used in conjunction with the `Mintable` trait.
-
-==== Events
-There are no custom events associated with the `Capped` trait.
-
 === - Burnable
 https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/burnable[Source Code]
 
@@ -51,15 +31,6 @@ for various smart contract use cases.
 
 ==== Events
 * `burn_event`: broadcasted to the network when the `burn()` or `burn_from()` function is invoked.
-
-=== - Metadata
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/metadata[Source Code]
-
-==== Summary
-Provides `setter` and `getter` methods for `symbol`, `name`, and `decimal` metadata information for your token.
-
-==== Events
-There are no custom events associated with the `Metadata` trait.
 
 == Misc
 

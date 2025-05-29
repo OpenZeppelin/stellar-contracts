@@ -35,7 +35,6 @@
 //!
 //! - Metadata: Provides additional information about the token, such as name,
 //!   symbol, and decimals.
-//! - Mintable: Allows creation of new tokens that increases the total supply.
 //! - Burnable: Enables token holders to destroy their tokens, reducing the
 //!   total supply.
 //! - Capped: Enables the contract to set a maximum limit on the total supply.
@@ -72,15 +71,14 @@
 mod extensions;
 mod fungible;
 mod impl_token_interface_macro;
+mod overrides;
 mod storage;
 mod utils;
 
-pub use extensions::{burnable, capped, metadata, mintable};
+pub use extensions::{burnable, capped};
 pub use fungible::{emit_approve, emit_transfer, FungibleToken, FungibleTokenError};
-pub use storage::{
-    allowance, allowance_data, approve, balance, set_allowance, spend_allowance, total_supply,
-    transfer, transfer_from, update, AllowanceData, AllowanceKey, StorageKey,
-};
+pub use overrides::{Base, ContractOverrides};
+pub use storage::{AllowanceData, AllowanceKey, StorageKey};
 pub use utils::sac_admin_wrapper;
 
 mod test;

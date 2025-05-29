@@ -75,7 +75,7 @@ pub use extensions::{burnable, consecutive, enumerable, royalties};
 pub use non_fungible::{
     emit_approve, emit_approve_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenError,
 };
-pub use overrides::*;
+pub use overrides::{Base, ContractOverrides};
 pub use storage::{ApprovalData, NFTStorageKey};
 pub use utils::sequential;
 

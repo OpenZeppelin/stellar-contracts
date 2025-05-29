@@ -10,7 +10,7 @@ macro_rules! impl_token_interface {
                 stellar_fungible::FungibleToken + stellar_fungible::burnable::FungibleBurnable,
         {
             fn balance(env: soroban_sdk::Env, id: soroban_sdk::Address) -> i128 {
-                <$contract as stellar_fungible::FungibleToken>::balance(&env, id)
+                <Self as FungibleToken>::ContractType::balance(&env, &id)
             }
 
             fn transfer(
@@ -19,7 +19,7 @@ macro_rules! impl_token_interface {
                 to: soroban_sdk::Address,
                 amount: i128,
             ) {
-                <$contract as stellar_fungible::FungibleToken>::transfer(&env, from, to, amount)
+                <Self as FungibleToken>::ContractType::transfer(&env, &from, &to, amount)
             }
 
             fn transfer_from(
@@ -29,15 +29,13 @@ macro_rules! impl_token_interface {
                 to: soroban_sdk::Address,
                 amount: i128,
             ) {
-                <$contract as stellar_fungible::FungibleToken>::transfer_from(
-                    &env, spender, from, to, amount,
+                <Self as FungibleToken>::ContractType::transfer_from(
+                    &env, &spender, &from, &to, amount,
                 )
             }
 
             fn burn(env: soroban_sdk::Env, from: soroban_sdk::Address, amount: i128) {
-                <$contract as stellar_fungible::burnable::FungibleBurnable>::burn(
-                    &env, from, amount,
-                )
+                <Self as FungibleToken>::ContractType::burn(&env, &from, amount)
             }
 
             fn burn_from(
@@ -46,9 +44,7 @@ macro_rules! impl_token_interface {
                 from: soroban_sdk::Address,
                 amount: i128,
             ) {
-                <$contract as stellar_fungible::burnable::FungibleBurnable>::burn_from(
-                    &env, spender, from, amount,
-                )
+                <Self as FungibleToken>::ContractType::burn_from(&env, &spender, &from, amount)
             }
 
             fn allowance(
@@ -56,7 +52,7 @@ macro_rules! impl_token_interface {
                 from: soroban_sdk::Address,
                 spender: soroban_sdk::Address,
             ) -> i128 {
-                <$contract as stellar_fungible::FungibleToken>::allowance(&env, from, spender)
+                <Self as FungibleToken>::ContractType::allowance(&env, &from, &spender)
             }
 
             fn approve(
@@ -66,25 +62,25 @@ macro_rules! impl_token_interface {
                 amount: i128,
                 live_until_ledger: u32,
             ) {
-                <$contract as stellar_fungible::FungibleToken>::approve(
+                <Self as FungibleToken>::ContractType::approve(
                     &env,
-                    from,
-                    spender,
+                    &from,
+                    &spender,
                     amount,
                     live_until_ledger,
                 )
             }
 
             fn decimals(env: soroban_sdk::Env) -> u32 {
-                <$contract as stellar_fungible::FungibleToken>::decimals(&env)
+                <Self as FungibleToken>::ContractType::decimals(&env)
             }
 
             fn name(env: soroban_sdk::Env) -> soroban_sdk::String {
-                <$contract as stellar_fungible::FungibleToken>::name(&env)
+                <Self as FungibleToken>::ContractType::name(&env)
             }
 
             fn symbol(env: soroban_sdk::Env) -> soroban_sdk::String {
-                <$contract as stellar_fungible::FungibleToken>::symbol(&env)
+                <Self as FungibleToken>::ContractType::symbol(&env)
             }
         }
     };

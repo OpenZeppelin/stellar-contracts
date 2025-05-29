@@ -17,7 +17,7 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, token::TokenInterface,
     Address, Env, String, Symbol,
 };
-use stellar_fungible::{self as fungible, mintable::FungibleMintable};
+use stellar_fungible::Base;
 use stellar_pausable::{self as pausable, Pausable};
 use stellar_pausable_macros::when_not_paused;
 
@@ -36,20 +36,26 @@ pub enum ExampleContractError {
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address, initial_supply: i128) {
-        fungible::metadata::set_metadata(
-            e,
-            18,
-            String::from_str(e, "My Token"),
-            String::from_str(e, "TKN"),
-        );
-        fungible::mintable::mint(e, &owner, initial_supply);
+        Base::set_metadata(e, 18, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
+        Base::mint(e, &owner, initial_supply);
         e.storage().instance().set(&OWNER, &owner);
     }
 
     /// `TokenInterface` doesn't require implementing `total_supply()` because
     /// of the need for backwards compatibility with Stellar classic assets.
     pub fn total_supply(e: &Env) -> i128 {
-        fungible::total_supply(e)
+        Base::total_supply(e)
+    }
+
+    #[when_not_paused]
+    pub fn mint(e: &Env, account: Address, amount: i128) {
+        // When `ownable` module is available,
+        // the following checks should be equivalent to:
+        // `ownable::only_owner(&e);`
+        let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
+        owner.require_auth();
+
+        Base::mint(e, &account, amount);
     }
 }
 
@@ -87,60 +93,46 @@ impl Pausable for ExampleContract {
 #[contractimpl]
 impl TokenInterface for ExampleContract {
     fn balance(e: Env, account: Address) -> i128 {
-        fungible::balance(&e, &account)
+        Base::balance(&e, &account)
     }
 
     fn allowance(e: Env, owner: Address, spender: Address) -> i128 {
-        fungible::allowance(&e, &owner, &spender)
+        Base::allowance(&e, &owner, &spender)
     }
 
     #[when_not_paused]
     fn transfer(e: Env, from: Address, to: Address, amount: i128) {
-        fungible::transfer(&e, &from, &to, amount);
+        Base::transfer(&e, &from, &to, amount);
     }
 
     #[when_not_paused]
     fn transfer_from(e: Env, spender: Address, from: Address, to: Address, amount: i128) {
-        fungible::transfer_from(&e, &spender, &from, &to, amount);
+        Base::transfer_from(&e, &spender, &from, &to, amount);
     }
 
     fn approve(e: Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32) {
-        fungible::approve(&e, &owner, &spender, amount, live_until_ledger);
+        Base::approve(&e, &owner, &spender, amount, live_until_ledger);
     }
 
     #[when_not_paused]
     fn burn(e: Env, from: Address, amount: i128) {
-        fungible::burnable::burn(&e, &from, amount)
+        Base::burn(&e, &from, amount)
     }
 
     #[when_not_paused]
     fn burn_from(e: Env, spender: Address, from: Address, amount: i128) {
-        fungible::burnable::burn_from(&e, &spender, &from, amount)
+        Base::burn_from(&e, &spender, &from, amount)
     }
 
     fn decimals(e: Env) -> u32 {
-        fungible::metadata::decimals(&e)
+        Base::decimals(&e)
     }
 
     fn name(e: Env) -> String {
-        fungible::metadata::name(&e)
+        Base::name(&e)
     }
 
     fn symbol(e: Env) -> String {
-        fungible::metadata::symbol(&e)
-    }
-}
-
-#[contractimpl]
-impl FungibleMintable for ExampleContract {
-    #[when_not_paused]
-    fn mint(e: &Env, account: Address, amount: i128) {
-        // When `ownable` module is available,
-        // the following checks should be equivalent to:
-        // `ownable::only_owner(&e);`
-        let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
-        owner.require_auth();
-
-        fungible::mintable::mint(e, &account, amount);
+        Base::symbol(&e)
     }
 }

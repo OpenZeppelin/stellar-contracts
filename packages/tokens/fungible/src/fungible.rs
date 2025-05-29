@@ -1,5 +1,7 @@
 use soroban_sdk::{contracterror, symbol_short, Address, Env, String};
 
+use crate::ContractOverrides;
+
 /// Vanilla Fungible Token Trait
 ///
 /// The `FungibleToken` trait defines the core functionality for fungible
@@ -11,15 +13,67 @@ use soroban_sdk::{contracterror, symbol_short, Address, Env, String};
 /// To fully comply with the SEP-41 specification one has to implement the
 /// `FungibleBurnable` trait in addition to this one. SEP-41 mandates support
 /// for token burning to be considered compliant.
+///
+/// Event for `mint` is defined, but `mint` function itself is not included
+/// as a method in this trait because it is not a part of the standard,
+/// the function signature may change depending on the implementation.
+///
+/// We do provide a function [`crate::Base::sequential_mint`] for sequential
+/// minting, and [`crate::Base::mint`] for non-sequential minting strategies.
+///
+/// # Notes
+///
+/// `#[contractimpl]` macro requires even the default implementations to be
+/// present under its scope. To not confuse the developers, we did not provide
+/// the default implementations here, but we are providing a macro to generate
+/// the default implementations for you.
+///
+/// When implementing [`NonFungibleToken`] trait for your Smart Contract,
+/// you can follow the below example:
+///
+/// ```ignore
+/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
+/// #[contractimpl]
+/// impl FungibleToken for MyContract {
+///     ContractType = {Your Contract Type Here};
+///
+///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
+///     /* and the macro will generate all the missing default implementations for you */
+/// }
+/// ```
+///
+/// This trait is implemented for the following Contract Types:
+/// * [`crate::Base`] (covering the vanilla case, and compatible with
+///   [`crate::extensions::burnable::FungibleBurnable`]) trait
+/// * [`crate::extensions::enumerable::Enumerable`] (enabling the compatibility
+///   and overrides for
+///   [`crate::extensions::enumerable::NonFungibleEnumerable`]) trait,
+///   incompatible with [`crate::extensions::burnable::NonFungibleBurnable`])
+///   and [`crate::extensions::consecutive::NonFungibleConsecutive`] trait. //
+///   TODO: change the above for allowlist denylist in the future.
+///
+/// You can find the default implementations of this trait for `Base`,
+/// `Enumerable`, by navigating to:
+/// `ContractType::{method_name}`. For example, if you want to find how
+/// [`NonFungibleToken::transfer`] is implemented for the `Enumerable` contract
+/// type, you can find it using
+/// [`crate::extensions::enumerable::Enumerable::transfer`].
+/// // TODO: change the above for allowlist denylist in the future.
 pub trait FungibleToken {
+    /// Helper type that allows us to override some of the functionality of the
+    /// base trait based on the extensions implemented. You should use
+    /// [`crate::Base`] as the type if you are not using
+    /// [`crate::extensions::enumerable::Enumerable`] or
+    /// [`crate::extensions::consecutive::Consecutive`] extensions.
+    /// // TODO: change the above for allowlist denylist in the future.
+    type ContractType: ContractOverrides;
+
     /// Returns the total amount of tokens in circulation.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn total_supply(e: &Env) -> i128 {
-        crate::total_supply(e)
-    }
+    fn total_supply(e: &Env) -> i128;
 
     /// Returns the amount of tokens held by `account`.
     ///
@@ -27,9 +81,7 @@ pub trait FungibleToken {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address for which the balance is being queried.
-    fn balance(e: &Env, account: Address) -> i128 {
-        crate::balance(e, &account)
-    }
+    fn balance(e: &Env, account: Address) -> i128;
 
     /// Returns the amount of tokens a `spender` is allowed to spend on behalf
     /// of an `owner`.
@@ -39,9 +91,7 @@ pub trait FungibleToken {
     /// * `e` - Access to Soroban environment.
     /// * `owner` - The address holding the tokens.
     /// * `spender` - The address authorized to spend the tokens.
-    fn allowance(e: &Env, owner: Address, spender: Address) -> i128 {
-        crate::allowance(e, &owner, &spender)
-    }
+    fn allowance(e: &Env, owner: Address, spender: Address) -> i128;
 
     /// Transfers `amount` of tokens from `from` to `to`.
     ///
@@ -62,9 +112,7 @@ pub trait FungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
-    fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
-        crate::transfer(e, &from, &to, amount);
-    }
+    fn transfer(e: &Env, from: Address, to: Address, amount: i128);
 
     /// Transfers `amount` of tokens from `from` to `to` using the
     /// allowance mechanism. `amount` is then deducted from `spender`
@@ -91,9 +139,7 @@ pub trait FungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128) {
-        crate::transfer_from(e, &spender, &from, &to, amount);
-    }
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128);
 
     /// Sets the amount of tokens a `spender` is allowed to spend on behalf of
     /// an `owner`. Overrides any existing allowance set between `spender` and
@@ -119,36 +165,28 @@ pub trait FungibleToken {
     ///
     /// * topics - `["approve", from: Address, spender: Address]`
     /// * data - `[amount: i128, live_until_ledger: u32]`
-    fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32) {
-        crate::approve(e, &owner, &spender, amount, live_until_ledger);
-    }
+    fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32);
 
     /// Returns the number of decimals used to represent amounts of this token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    fn decimals(e: &Env) -> u32 {
-        crate::metadata::decimals(e)
-    }
+    fn decimals(e: &Env) -> u32;
 
     /// Returns the name for this token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    fn name(e: &Env) -> String {
-        crate::metadata::name(e)
-    }
+    fn name(e: &Env) -> String;
 
     /// Returns the symbol for this token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    fn symbol(e: &Env) -> String {
-        crate::metadata::symbol(e)
-    }
+    fn symbol(e: &Env) -> String;
 }
 
 // ################## ERRORS ##################
@@ -226,4 +264,21 @@ pub fn emit_approve(
 ) {
     let topics = (symbol_short!("approve"), owner, spender);
     e.events().publish(topics, (amount, live_until_ledger))
+}
+
+/// Emits an event indicating a mint of tokens.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `to` - The address receiving the new tokens.
+/// * `amount` - The amount of tokens to mint.
+///
+/// # Events
+///
+/// * topics - `["mint", account: Address]`
+/// * data - `[amount: i128]`
+pub fn emit_mint(e: &Env, to: &Address, amount: i128) {
+    let topics = (symbol_short!("mint"), to);
+    e.events().publish(topics, amount)
 }

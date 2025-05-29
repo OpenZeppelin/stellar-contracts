@@ -20,8 +20,8 @@ pub const CAP_KEY: Symbol = symbol_short!("CAP");
 ///
 /// * We recommend using this function in the constructor of your smart
 ///   contract.
-/// * Cap functionality is designed to be used in conjunction with the
-///   `mintable` extension.
+/// * Cap functionality is designed to be used in the `mint` function
+///   definition.
 /// * This function DOES NOT enforce that the cap must be greater than or equal
 ///   to the current total supply. While this may deviate from common
 ///   assumptions (e.g., treating `supply_cap >= total_supply` as an invariant),
