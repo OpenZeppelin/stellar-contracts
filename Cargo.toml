@@ -4,6 +4,7 @@ members = [
     "examples/fungible-capped",
     "examples/fungible-pausable",
     "examples/fungible-token-interface",
+    "examples/fungible-merkle-airdrop",
     "examples/nft-access-control",
     "examples/nft-consecutive",
     "examples/nft-enumerable",
@@ -11,6 +12,7 @@ members = [
     "examples/sac-admin-wrapper",
     "examples/sac-admin-generic",
     "examples/ownable",
+    "examples/merkle-voting",
     "examples/upgradeable/*",
     "packages/constants",
     "packages/access/*",
@@ -25,7 +27,7 @@ authors = ["OpenZeppelin"]
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/OpenZeppelin/stellar-contracts"
-version = "0.2.0"
+version = "0.3.0"
 
 [workspace.dependencies]
 soroban-sdk = "22.0.6"

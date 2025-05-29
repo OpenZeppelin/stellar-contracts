@@ -1,9 +1,9 @@
-use soroban_sdk::{contracttype, panic_with_error, BytesN, Env, Vec};
+use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, BytesN, Env, Vec};
 use stellar_constants::{MERKLE_CLAIMED_EXTEND_AMOUNT, MERKLE_CLAIMED_TTL_THRESHOLD};
 use stellar_crypto::{hasher::Hasher, merkle::Verifier};
 
 use crate::{
-    merkle_distributor::{emit_set_claimed, emit_set_root, MerkleDistributorError},
+    merkle_distributor::{emit_set_claimed, emit_set_root, IndexableNode, MerkleDistributorError},
     MerkleDistributor,
 };
 
@@ -12,8 +12,8 @@ use crate::{
 pub enum MerkleDistributorStorageKey {
     /// The Merkle root of the distribution tree
     Root,
-    /// Maps a leaf hash to its claimed status
-    Claimed(BytesN<32>),
+    /// Maps an index to its claimed status
+    Claimed(u32),
 }
 
 impl<H> MerkleDistributor<H>
@@ -37,14 +37,14 @@ where
             .unwrap_or_else(|| panic_with_error!(e, MerkleDistributorError::RootNotSet))
     }
 
-    /// Checks if a leaf has been claimed and extends its TTL if it has.
+    /// Checks if an index has been claimed and extends its TTL if it has.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `leaf` - The leaf hash to check.
-    pub fn is_claimed(e: &Env, leaf: H::Output) -> bool {
-        let key = MerkleDistributorStorageKey::Claimed(leaf);
+    /// * `index` - The index to check.
+    pub fn is_claimed(e: &Env, index: u32) -> bool {
+        let key = MerkleDistributorStorageKey::Claimed(index);
         if let Some(claimed) = e.storage().persistent().get(&key) {
             e.storage().persistent().extend_ttl(
                 &key,
@@ -83,48 +83,63 @@ where
         }
     }
 
-    /// Verifies a Merkle proof for a leaf and marks it as claimed if valid.
+    /// Marks an index as claimed.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `leaf` - The leaf hash to verify and claim.
-    /// * `proof` - The Merkle proof for the leaf.
-    ///
-    /// # Errors
-    ///
-    /// * [`MerkleDistributorError::LeafAlreadyClaimed`] - When attempting to
-    ///   claim a leaf that has already been claimed.
-    /// * [`MerkleDistributorError::InvalidProof`] - When the provided Merkle
-    ///   proof is invalid.
-    /// * refer to [`Self::get_root`] errors.
-    pub fn verify_and_set_claimed(e: &Env, leaf: H::Output, proof: Vec<H::Output>) {
-        if Self::is_claimed(e, leaf.clone()) {
-            panic_with_error!(e, MerkleDistributorError::LeafAlreadyClaimed);
-        }
-
-        let root = Self::get_root(e);
-
-        match Verifier::<H>::verify(e, proof, root, leaf.clone()) {
-            true => Self::set_claimed(e, leaf),
-            false => panic_with_error!(e, MerkleDistributorError::InvalidProof),
-        };
-    }
-
-    /// Marks a leaf as claimed in storage.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
-    /// * `leaf` - The leaf hash to mark as claimed.
+    /// * `index` - The index to mark as claimed.
     ///
     /// # Events
     ///
     /// * topics - `["set_claimed"]`
-    /// * data - `[leaf: Bytes]`
-    pub fn set_claimed(e: &Env, leaf: H::Output) {
-        let key = MerkleDistributorStorageKey::Claimed(leaf.clone());
+    /// * data - `[index: u32]`
+    pub fn set_claimed(e: &Env, index: u32) {
+        let key = MerkleDistributorStorageKey::Claimed(index);
         e.storage().persistent().set(&key, &true);
-        emit_set_claimed(e, leaf.into());
+        emit_set_claimed(e, index.into());
+    }
+
+    /// Verifies a Merkle proof for a node and marks its index as claimed if the
+    /// proof is valid.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `node` - The node data containing an index field.
+    /// * `proof` - The Merkle proof for the node.
+    ///
+    /// # Errors
+    ///
+    /// * [`MerkleDistributorError::IndexAlreadyClaimed`] - When attempting to
+    ///   claim an index that has already been claimed. claim an index that has
+    ///   already been claimed.
+    /// * [`MerkleDistributorError::InvalidProof`] - When the provided Merkle
+    ///   proof is invalid.
+    /// * [`MerkleDistributorError::RootNotSet`] - When the root is not set or
+    ///   when the node data does not contain a valid index.
+    pub fn verify_and_set_claimed<N: ToXdr + IndexableNode>(
+        e: &Env,
+        node: N,
+        proof: Vec<H::Output>,
+    ) {
+        let index = node.index();
+        let encoded = node.to_xdr(e);
+
+        // Check if already claimed
+        if Self::is_claimed(e, index) {
+            panic_with_error!(e, MerkleDistributorError::IndexAlreadyClaimed);
+        }
+
+        // Verify proof
+        let root = Self::get_root(e);
+        let mut hasher = H::new(e);
+        hasher.update(encoded);
+        let leaf = hasher.finalize();
+
+        match Verifier::<H>::verify(e, proof, root, leaf) {
+            true => Self::set_claimed(e, index),
+            false => panic_with_error!(e, MerkleDistributorError::InvalidProof),
+        };
     }
 }

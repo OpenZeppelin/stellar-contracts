@@ -1,22 +1,45 @@
 #![no_std]
 //! # Merkle Distributor
 //!
-//! This module implements a Merkle-based distribution system where claims are
-//! stored and verified using Merkle proofs.
+//! This module implements a Merkle-based claim distribution system using Merkle
+//! proofs for verification.
 //!
 //! ## Implementation Notes
 //!
-//! Each claim is **indexed by the hash of the leaf node** in the Merkle tree.
-//! This means:
+//! Claims are **indexed by a `u32` index**, corresponding to the position of
+//! each leaf in the original Merkle tree.
 //!
-//! - Every leaf must be unique, as duplicate leaves will result in identical
-//!   hashes and would overwrite or conflict with existing claims.
-//! - Indexing by leaf hash allows flexibility in the leaf structure, meaning
-//!   any custom data structure (e.g., index + address + amount, address +
-//!   metadata, etc.) can be used as long as it's hashed consistently.
+//! ### Requirements for Leaf Structure
 //!
-//! This design makes the distributor highly adaptable for various use cases
-//! such as:
+//! - Each node (leaf) **MUST** include an indexable field of type `u32` and
+//!   implement the `IndexableNode`.
+//! - Aside from the `index`, the node can contain any additional fields, with
+//!   any names and types, depending on the specific use case (e.g., `address`,
+//!   `amount`, `token_id`, etc.).
+//! - When constructing the Merkle tree, ensure that the `index` values are
+//!   unique and consecutive (or at least unique).
+//!
+//! ### Example
+//!
+//! ```ignore,rust
+//! use soroban_sdk::contracttype;
+//! use stellar_merkle_distributor::IndexableNode;
+//!
+//! #[contracttype]
+//! struct LeafData {
+//!     pub index: u32,
+//!     pub address: Address,
+//!     pub amount: i128,
+//! }
+//!
+//! impl IndexableNode for LeafData {
+//!     fn index(&self) -> u32 {
+//!         self.index
+//!     }
+//! }
+//! ```
+//!
+//! This structure supports a wide variety of distribution mechanisms such as:
 //!
 //! - Token airdrops
 //! - NFT distributions
@@ -30,7 +53,7 @@ mod test;
 
 pub use crate::{
     merkle_distributor::{
-        emit_set_claimed, emit_set_root, MerkleDistributor, MerkleDistributorError,
+        emit_set_claimed, emit_set_root, IndexableNode, MerkleDistributor, MerkleDistributorError,
     },
     storage::MerkleDistributorStorageKey,
 };
