@@ -1,7 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
-use stellar_constants::{
-    ADMIN_TRANSFER_THRESHOLD, ADMIN_TRANSFER_TTL, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
-};
+use stellar_constants::{ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
 use stellar_role_transfer::{accept_transfer, transfer_role};
 
 use crate::{
@@ -58,12 +56,10 @@ pub fn has_role(e: &Env, account: &Address, role: &Symbol) -> Option<u32> {
 ///
 /// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
 pub fn get_admin(e: &Env) -> Address {
-    if let Some(admin) = e.storage().instance().get(&AccessControlStorageKey::Admin) {
-        e.storage().instance().extend_ttl(ADMIN_TRANSFER_THRESHOLD, ADMIN_TRANSFER_TTL);
-        admin
-    } else {
-        panic_with_error!(e, AccessControlError::AdminNotSet)
-    }
+    e.storage()
+        .instance()
+        .get(&AccessControlStorageKey::Admin)
+        .unwrap_or_else(|| panic_with_error!(e, AccessControlError::AdminNotSet))
 }
 
 /// Returns the total number of accounts that have the specified role.
