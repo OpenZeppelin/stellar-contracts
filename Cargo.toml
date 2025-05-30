@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
+    "examples/fungible-allowlist",
+    "examples/fungible-blocklist",
     "examples/fungible-capped",
     "examples/fungible-pausable",
     "examples/fungible-token-interface",

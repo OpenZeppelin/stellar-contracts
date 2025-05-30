@@ -14,7 +14,7 @@ fn create_client<'a>(e: &Env, admin: &Address, initial_supply: &i128) -> Example
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #209)")]
+#[should_panic(expected = "Error(Contract, #110)")]
 fn cannot_transfer_before_allow() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -44,24 +44,24 @@ fn transfer_to_allowed_account_works() {
     let client = create_client(&e, &admin, &initial_supply);
     let transfer_amount = 1000;
 
-    // e.mock_all_auths();
+    e.mock_all_auths();
 
-    // // Verify initial state - admin is allowed, others are not
-    // assert!(!client.allowed(&admin));
-    // assert!(!client.allowed(&user1));
-    // assert!(!client.allowed(&user2));
+    // Verify initial state - admin is allowed, others are not
+    assert!(client.allowed(&admin));
+    assert!(!client.allowed(&user1));
+    assert!(!client.allowed(&user2));
 
-    // // Allow user1
-    // client.allow_user(&user1);
-    // assert!(client.allowed(&user1));
+    // Allow user1
+    client.allow_user(&user1);
+    assert!(client.allowed(&user1));
 
-    // // Now admin can transfer to user1
-    // client.transfer(&admin, &user1, &transfer_amount);
-    // assert_eq!(client.balance(&user1), transfer_amount);
+    // Now admin can transfer to user1
+    client.transfer(&admin, &user1, &transfer_amount);
+    assert_eq!(client.balance(&user1), transfer_amount);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #209)")]
+#[should_panic(expected = "Error(Contract, #110)")]
 fn cannot_transfer_after_disallow() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -70,6 +70,8 @@ fn cannot_transfer_after_disallow() {
     let initial_supply = 1_000_000;
     let client = create_client(&e, &admin, &initial_supply);
     let transfer_amount = 1000;
+
+    e.mock_all_auths();
 
     // Verify initial state - admin is allowed, others are not
     assert!(client.allowed(&admin));
@@ -93,7 +95,7 @@ fn cannot_transfer_after_disallow() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
 fn test_unauthorized_allow() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -114,4 +116,61 @@ fn test_unauthorized_allow() {
     }]);
 
     client.allow_user(&user);
+}
+
+#[test]
+fn allowlist_transfer_from_override_works() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &initial_supply);
+    let transfer_amount = 1000;
+
+    e.mock_all_auths();
+
+    // Verify initial state - admin is allowed, others are not
+    assert!(client.allowed(&admin));
+    assert!(!client.allowed(&user1));
+    assert!(!client.allowed(&user2));
+
+    // Allow user1 & user2
+    client.allow_user(&user1);
+    client.allow_user(&user2);
+    assert!(client.allowed(&user1));
+    assert!(client.allowed(&user2));
+
+    // Now admin can transfer to user1
+    client.approve(&admin, &user1, &transfer_amount, &1000);
+    client.transfer_from(&user1, &admin, &user2, &transfer_amount);
+    assert_eq!(client.balance(&user2), transfer_amount);
+}
+
+#[test]
+fn allowlist_approve_override_works() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &initial_supply);
+    let transfer_amount = 1000;
+
+    e.mock_all_auths();
+
+    // Verify initial state - admin is allowed, others are not
+    assert!(client.allowed(&admin));
+    assert!(!client.allowed(&user1));
+    assert!(!client.allowed(&user2));
+
+    // Allow user1 & user2
+    client.allow_user(&user1);
+    client.allow_user(&user2);
+    assert!(client.allowed(&user1));
+    assert!(client.allowed(&user2));
+
+    // Approve user2 to transfer from user1
+    client.approve(&user1, &user2, &transfer_amount, &1000);
+    assert_eq!(client.allowance(&user1, &user2), transfer_amount);
 }

@@ -15,7 +15,7 @@ fn create_client<'a>(e: &Env, admin: &Address, initial_supply: &i128) -> Example
 }
 
 #[test]
-fn test_blocklist_functionality() {
+fn block_unblock_works() {
     let e = Env::default();
     let admin = Address::generate(&e);
     let user1 = Address::generate(&e);
@@ -40,13 +40,13 @@ fn test_blocklist_functionality() {
     assert!(!client.blocked(&user1));
 
     // Admin can transfer to user1 again after unblocking
-    client.transfer(&admin, &user1, &100);
-    assert_eq!(client.balance(&user1), transfer_amount + 100);
+    client.transfer(&admin, &user1, &transfer_amount);
+    assert_eq!(client.balance(&user1), transfer_amount);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
-fn test_unauthorized_block() {
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
+fn unauthorized_block_attempt_fails() {
     let e = Env::default();
     let admin = Address::generate(&e);
     let user = Address::generate(&e);
@@ -66,4 +66,176 @@ fn test_unauthorized_block() {
     }]);
 
     client.block_user(&user);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #111)")]
+fn blocked_user_cannot_approve() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &initial_supply);
+    let transfer_amount = 1000;
+
+    e.mock_all_auths();
+
+    // Transfer some tokens to user1
+    client.transfer(&admin, &user1, &transfer_amount);
+    assert_eq!(client.balance(&user1), transfer_amount);
+
+    // Block user1
+    client.block_user(&user1);
+    assert!(client.blocked(&user1));
+
+    // Blocked user1 tries to approve user2 (should fail)
+    client.approve(&user1, &user2, &transfer_amount, &1000);
+}
+
+#[test]
+fn blocklist_approve_override_works() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &initial_supply);
+    let transfer_amount = 1000;
+
+    e.mock_all_auths();
+
+    // Verify initial state - no users are blocked
+    assert!(!client.blocked(&user1));
+    assert!(!client.blocked(&user2));
+
+    // Transfer some tokens to user1
+    client.transfer(&admin, &user1, &transfer_amount);
+    assert_eq!(client.balance(&user1), transfer_amount);
+
+    // User1 approves user2
+    client.approve(&user1, &user2, &transfer_amount, &1000);
+    assert_eq!(client.allowance(&user1, &user2), transfer_amount);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #111)")]
+fn blocked_spender_cannot_transfer_from() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let user3 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &initial_supply);
+    let transfer_amount = 1000;
+
+    e.mock_all_auths();
+
+    // Transfer some tokens to user1
+    client.transfer(&admin, &user1, &transfer_amount);
+    assert_eq!(client.balance(&user1), transfer_amount);
+
+    // User1 approves user2
+    client.approve(&user1, &user2, &transfer_amount, &1000);
+    assert_eq!(client.allowance(&user1, &user2), transfer_amount);
+
+    // Block user2 (the spender)
+    client.block_user(&user2);
+    assert!(client.blocked(&user2));
+
+    // Blocked user2 tries to transfer from user1 to user3 (should fail)
+    client.transfer_from(&user2, &user1, &user3, &transfer_amount);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #111)")]
+fn transfer_from_blocked_user() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let user3 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &initial_supply);
+    let transfer_amount = 1000;
+
+    e.mock_all_auths();
+
+    // Transfer some tokens to user1
+    client.transfer(&admin, &user1, &transfer_amount);
+    assert_eq!(client.balance(&user1), transfer_amount);
+
+    // User1 approves user2
+    client.approve(&user1, &user2, &transfer_amount, &1000);
+    assert_eq!(client.allowance(&user1, &user2), transfer_amount);
+
+    // Block user1 (the from account)
+    client.block_user(&user1);
+    assert!(client.blocked(&user1));
+
+    // User2 tries to transfer from blocked user1 to user3 (should fail)
+    client.transfer_from(&user2, &user1, &user3, &transfer_amount);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #111)")]
+fn transfer_from_to_blocked_user() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let user3 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &initial_supply);
+    let transfer_amount = 1000;
+
+    e.mock_all_auths();
+
+    // Transfer some tokens to user1
+    client.transfer(&admin, &user1, &transfer_amount);
+    assert_eq!(client.balance(&user1), transfer_amount);
+
+    // User1 approves user2
+    client.approve(&user1, &user2, &transfer_amount, &1000);
+    assert_eq!(client.allowance(&user1, &user2), transfer_amount);
+
+    // Block user3 (the recipient)
+    client.block_user(&user3);
+    assert!(client.blocked(&user3));
+
+    // User2 tries to transfer from user1 to blocked user3 (should fail)
+    client.transfer_from(&user2, &user1, &user3, &transfer_amount);
+}
+
+#[test]
+fn blocklist_transfer_from_override_works() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let user3 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &initial_supply);
+    let transfer_amount = 1000;
+
+    e.mock_all_auths();
+
+    // Verify initial state - no users are blocked
+    assert!(!client.blocked(&user1));
+    assert!(!client.blocked(&user2));
+    assert!(!client.blocked(&user3));
+
+    // Transfer some tokens to user1
+    client.transfer(&admin, &user1, &transfer_amount);
+    assert_eq!(client.balance(&user1), transfer_amount);
+
+    // User1 approves user2
+    client.approve(&user1, &user2, &transfer_amount, &1000);
+    assert_eq!(client.allowance(&user1, &user2), transfer_amount);
+
+    // User2 transfers from user1 to user3
+    client.transfer_from(&user2, &user1, &user3, &transfer_amount);
+    assert_eq!(client.balance(&user3), transfer_amount);
+    assert_eq!(client.balance(&user1), 0);
 }

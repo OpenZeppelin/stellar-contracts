@@ -86,6 +86,32 @@ impl AllowList {
         let admin = AllowList::get_admin(e);
         admin.require_auth();
 
+        // Call the no_auth implementation
+        AllowList::allow_user_no_auth(e, user);
+    }
+
+    /// Low-level function to allow a user without performing authorization checks.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user` - The address to allow.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["user_allowed", user: Address]`
+    /// * data - `[]`
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks and should only
+    /// be used:
+    /// - During contract initialization/construction
+    /// - In admin functions that implement their own authorization logic
+    ///
+    /// Using this function in public-facing methods creates significant security
+    /// risks as it could allow unauthorized allowlist modifications.
+    pub fn allow_user_no_auth(e: &Env, user: &Address) {
         // Set the user as allowed
         let key = AllowListStorageKey::Allowed(user.clone());
         e.storage().persistent().set(&key, &true);
@@ -111,6 +137,32 @@ impl AllowList {
         let admin = AllowList::get_admin(e);
         admin.require_auth();
 
+        // Call the no_auth implementation
+        AllowList::disallow_user_no_auth(e, user);
+    }
+
+    /// Low-level function to disallow a user without performing authorization checks.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user` - The address to disallow.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["user_disallowed", user: Address]`
+    /// * data - `[]`
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks and should only
+    /// be used:
+    /// - During contract initialization/construction
+    /// - In admin functions that implement their own authorization logic
+    ///
+    /// Using this function in public-facing methods creates significant security
+    /// risks as it could allow unauthorized allowlist modifications.
+    pub fn disallow_user_no_auth(e: &Env, user: &Address) {
         // Set the user as not allowed
         let key = AllowListStorageKey::Allowed(user.clone());
         e.storage().persistent().set(&key, &false);

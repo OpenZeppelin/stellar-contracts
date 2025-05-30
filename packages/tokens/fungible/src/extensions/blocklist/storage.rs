@@ -86,6 +86,32 @@ impl BlockList {
         let admin = BlockList::get_admin(e);
         admin.require_auth();
 
+        // Call the no_auth implementation
+        BlockList::block_user_no_auth(e, user);
+    }
+
+    /// Low-level function to block a user without performing authorization checks.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user` - The address to block.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["user_blocked", user: Address]`
+    /// * data - `[]`
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks and should only
+    /// be used:
+    /// - During contract initialization/construction
+    /// - In admin functions that implement their own authorization logic
+    ///
+    /// Using this function in public-facing methods creates significant security
+    /// risks as it could allow unauthorized blocklist modifications.
+    pub fn block_user_no_auth(e: &Env, user: &Address) {
         // Set the user as blocked
         let key = BlockListStorageKey::Blocked(user.clone());
         e.storage().persistent().set(&key, &true);
@@ -111,6 +137,32 @@ impl BlockList {
         let admin = BlockList::get_admin(e);
         admin.require_auth();
 
+        // Call the no_auth implementation
+        BlockList::unblock_user_no_auth(e, user);
+    }
+
+    /// Low-level function to unblock a user without performing authorization checks.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user` - The address to unblock.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["user_unblocked", user: Address]`
+    /// * data - `[]`
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks and should only
+    /// be used:
+    /// - During contract initialization/construction
+    /// - In admin functions that implement their own authorization logic
+    ///
+    /// Using this function in public-facing methods creates significant security
+    /// risks as it could allow unauthorized blocklist modifications.
+    pub fn unblock_user_no_auth(e: &Env, user: &Address) {
         // Set the user as not blocked
         let key = BlockListStorageKey::Blocked(user.clone());
         e.storage().persistent().set(&key, &false);
