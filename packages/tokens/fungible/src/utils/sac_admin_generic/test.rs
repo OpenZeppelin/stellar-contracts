@@ -119,6 +119,23 @@ fn test_extract_context_unknown_fn(e: Env, sac: Address) {
 }
 
 #[soroban_test_helpers::test]
+#[should_panic(expected = "Error(Contract, #110)")] // SACMissingFnParam
+fn test_extract_context_address_mismatch(e: Env, sac: Address, other: Address) {
+    let new_admin = e.register(MockContract, ());
+
+    let context = ContractContext {
+        contract: other,
+        fn_name: Symbol::new(&e, "mint"),
+        args: ().into_val(&e),
+    };
+
+    e.as_contract(&new_admin, || {
+        set_sac_address(&e, &sac);
+        let _ = extract_sac_contract_context(&e, &context);
+    });
+}
+
+#[soroban_test_helpers::test]
 #[should_panic(expected = "Error(Contract, #111)")] // SACMissingFnParam
 fn test_extract_context_missing_param(e: Env, sac: Address) {
     let new_admin = e.register(MockContract, ());
