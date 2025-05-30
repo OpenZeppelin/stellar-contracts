@@ -39,7 +39,8 @@ impl SacAdminExampleContract {
     pub fn __constructor(e: Env, sac: Address, chief: BytesN<32>, operator: BytesN<32>) {
         set_sac_address(&e, &sac);
         e.storage().instance().set(&SacDataKey::Chief, &chief);
-        e.storage().instance().set(&SacDataKey::Operator(operator), &true);
+        e.storage().instance().set(&SacDataKey::Operator(operator.clone()), &true);
+        e.storage().instance().set(&SacDataKey::MintingLimit(operator), &(1_000_000_000, 0i128));
     }
 
     pub fn get_sac_address(e: &Env) -> Address {
@@ -56,9 +57,17 @@ impl SacAdminExampleContract {
         e.storage().instance().remove(&SacDataKey::Operator(operator));
     }
 
+    // set or reset
     pub fn set_minting_limit(e: &Env, operator: BytesN<32>, limit: i128) {
         e.current_contract_address().require_auth();
         e.storage().instance().set(&SacDataKey::MintingLimit(operator), &(limit, 0i128));
+    }
+
+    pub fn update_minting_limit(e: &Env, operator: BytesN<32>, new_limit: i128) {
+        e.current_contract_address().require_auth();
+        let key = SacDataKey::MintingLimit(operator);
+        let (_, curr): (i128, i128) = e.storage().instance().get(&key).expect("limit not set");
+        e.storage().instance().set(&key, &(new_limit, curr));
     }
 }
 
