@@ -45,27 +45,27 @@ use crate::ContractOverrides;
 /// This trait is implemented for the following Contract Types:
 /// * [`crate::Base`] (covering the vanilla case, and compatible with
 ///   [`crate::extensions::burnable::FungibleBurnable`]) trait
-/// * [`crate::extensions::enumerable::Enumerable`] (enabling the compatibility
-///   and overrides for
-///   [`crate::extensions::enumerable::NonFungibleEnumerable`]) trait,
-///   incompatible with [`crate::extensions::burnable::NonFungibleBurnable`])
-///   and [`crate::extensions::consecutive::NonFungibleConsecutive`] trait. //
-///   TODO: change the above for allowlist denylist in the future.
+/// * [`crate::extensions::allowlist::AllowList`] (enabling the compatibility
+///   and overrides for [`crate::extensions::allowlist::FungibleAllowList`])
+///   trait, incompatible with [`crate::extensions::blocklist::BlockList`]
+///   trait.
+/// * [`crate::extensions::blocklist::BlockList`] (enabling the compatibility
+///   and overrides for [`crate::extensions::blocklist::FungibleBlockList`])
+///   trait, incompatible with [`crate::extensions::allowlist::AllowList`]
+///   trait.
 ///
 /// You can find the default implementations of this trait for `Base`,
-/// `Enumerable`, by navigating to:
+/// `Allowlist`, and `Blocklist` by navigating to:
 /// `ContractType::{method_name}`. For example, if you want to find how
-/// [`NonFungibleToken::transfer`] is implemented for the `Enumerable` contract
+/// [`FungibleToken::transfer`] is implemented for the `Allowlist` contract
 /// type, you can find it using
-/// [`crate::extensions::enumerable::Enumerable::transfer`].
-/// // TODO: change the above for allowlist denylist in the future.
+/// [`crate::extensions::allowlist::AllowList::transfer`].
 pub trait FungibleToken {
     /// Helper type that allows us to override some of the functionality of the
     /// base trait based on the extensions implemented. You should use
     /// [`crate::Base`] as the type if you are not using
-    /// [`crate::extensions::enumerable::Enumerable`] or
-    /// [`crate::extensions::consecutive::Consecutive`] extensions.
-    /// // TODO: change the above for allowlist denylist in the future.
+    /// [`crate::extensions::allowlist::AllowList`] or
+    /// [`crate::extensions::blocklist::BlockList`] extensions.
     type ContractType: ContractOverrides;
 
     /// Returns the total amount of tokens in circulation.

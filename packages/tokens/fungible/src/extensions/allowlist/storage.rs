@@ -32,7 +32,7 @@ pub enum AllowListStorageKey {
     Admin,
 }
 
-impl AllowList {
+impl FungibleAllowList {
     // ################## QUERY STATE ##################
 
     /// Returns the allowed status of an account.
