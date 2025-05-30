@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 2,
+    "address": 3,
     "nonce": 0
   },
   "auth": [
@@ -38,10 +38,10 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "RoleAdmin"
+                  "symbol": "Allowed"
                 },
                 {
-                  "symbol": "user"
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                 }
               ]
             },
@@ -58,22 +58,22 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "RoleAdmin"
+                      "symbol": "Allowed"
                     },
                     {
-                      "symbol": "user"
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "symbol": "admin"
+                  "bool": true
                 }
               }
             },
             "ext": "v0"
           },
-          1555200
+          518400
         ]
       ],
       [
@@ -187,22 +187,13 @@
           "v0": {
             "topics": [
               {
-                "symbol": "role_admin_changed"
+                "symbol": "allow"
               },
               {
-                "symbol": "user"
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
               }
             ],
-            "data": {
-              "vec": [
-                {
-                  "symbol": ""
-                },
-                {
-                  "symbol": "admin"
-                }
-              ]
-            }
+            "data": "void"
           }
         }
       },
