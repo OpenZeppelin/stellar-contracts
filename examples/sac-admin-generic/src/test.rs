@@ -7,13 +7,7 @@ use soroban_sdk::{
     auth::{Context, ContractContext},
     testutils::{Address as _, BytesN as _},
     token::StellarAssetClient,
-    vec,
-    //xdr::{AccountId, PublicKey, Uint256},
-    Address,
-    BytesN,
-    Env,
-    IntoVal,
-    Symbol,
+    vec, Address, BytesN, Env, IntoVal, Symbol,
 };
 
 use crate::contract::{SACAdminGenericError, SacAdminExampleContract, Signature};
@@ -34,13 +28,6 @@ fn test_sac_generic() {
     // Generate signing keypairs.
     let chief_keypair = Keypair::generate(&mut thread_rng());
     let operator_keypair = Keypair::generate(&mut thread_rng());
-
-    //std::println!("owner_public: {:?}",
-    // hex::encode(chief_keypair.public.as_bytes())); let owner_account =
-    //AccountId(PublicKey::PublicKeyTypeEd25519(Uint256::from(chief_keypair.public.
-    // to_bytes()))); let owner = Address::from_str(&e,
-    // &std::string::ToString::to_string(&owner_account)); std::println!("owner:
-    // {:?}", owner);
 
     // Deploy the Stellar Asset Contract
     let sac = e.register_stellar_asset_contract_v2(issuer.clone());

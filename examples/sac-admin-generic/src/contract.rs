@@ -40,7 +40,9 @@ impl SacAdminExampleContract {
         set_sac_address(&e, &sac);
         e.storage().instance().set(&SacDataKey::Chief, &chief);
         e.storage().instance().set(&SacDataKey::Operator(operator.clone()), &true);
-        e.storage().instance().set(&SacDataKey::MintingLimit(operator), &(1_000_000_000, 0i128));
+        e.storage()
+            .instance()
+            .set(&SacDataKey::MintingLimit(operator), &(1_000_000_000i128, 0i128));
     }
 
     pub fn get_sac_address(e: &Env) -> Address {
@@ -100,26 +102,26 @@ impl CustomAccountInterface for SacAdminExampleContract {
             match extract_sac_contract_context(&e, &context) {
                 SacFn::Mint(amount) => {
                     // ensure caller has required permissions
-                    ensure_caller(&e, &caller, &SacDataKey::Operator(caller.clone()))?;
+                    ensure_caller_operator(&e, &SacDataKey::Operator(caller.clone()))?;
                     // ensure operator has minting limit
                     ensure_minting_limit(&e, &caller, amount)?;
                 }
                 SacFn::Clawback(_amount) => {
                     // ensure caller has required permissions
-                    ensure_caller(&e, &caller, &SacDataKey::Operator(caller.clone()))?;
+                    ensure_caller_operator(&e, &SacDataKey::Operator(caller.clone()))?;
                 }
                 SacFn::SetAuthorized(_) => {
                     // ensure caller has required permissions
-                    ensure_caller(&e, &caller, &SacDataKey::Operator(caller.clone()))?;
+                    ensure_caller_operator(&e, &SacDataKey::Operator(caller.clone()))?;
                 }
                 SacFn::SetAdmin => {
                     // ensure caller has required permissions
-                    ensure_caller(&e, &caller, &SacDataKey::Chief)?;
+                    ensure_caller_chief(&e, &caller, &SacDataKey::Chief)?;
                 }
                 SacFn::Unknown => {
                     // ensure only chief can call other functions such as `assign_operator()`,
                     // `remove_operator()` or `set_minting_limit()`
-                    ensure_caller(&e, &caller, &SacDataKey::Chief)?
+                    ensure_caller_chief(&e, &caller, &SacDataKey::Chief)?
                 }
             }
         }
@@ -128,7 +130,7 @@ impl CustomAccountInterface for SacAdminExampleContract {
     }
 }
 
-fn ensure_caller<K: IntoVal<Env, Val>>(
+fn ensure_caller_chief<K: IntoVal<Env, Val>>(
     e: &Env,
     caller: &BytesN<32>,
     key: &K,
@@ -138,6 +140,16 @@ fn ensure_caller<K: IntoVal<Env, Val>>(
         return Err(SACAdminGenericError::Unauthorized);
     }
     Ok(())
+}
+
+fn ensure_caller_operator<K: IntoVal<Env, Val>>(
+    e: &Env,
+    key: &K,
+) -> Result<(), SACAdminGenericError> {
+    match e.storage().instance().get::<_, bool>(key) {
+        Some(is_op) if is_op => Ok(()),
+        _ => Err(SACAdminGenericError::Unauthorized),
+    }
 }
 
 fn ensure_minting_limit(

@@ -129,7 +129,35 @@
                           ]
                         },
                         "val": {
-                          "bytes": "38a0d243c99df70766387eb9e5c288ac6a0323d523c63005d3e7ae829566311d"
+                          "bytes": "0a0025f8e0e66663d2b7d03155ae3420c9bae67e9653f49caf25818dd94ae2e0"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
+                              "symbol": "MintingLimit"
+                            },
+                            {
+                              "bytes": "2ac9bec77bfbf8214de486ef73ad5d29849e008e178d4ee467b971b1675645fa"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "vec": [
+                            {
+                              "i128": {
+                                "hi": 0,
+                                "lo": 1000000000
+                              }
+                            },
+                            {
+                              "i128": {
+                                "hi": 0,
+                                "lo": 1000
+                              }
+                            }
+                          ]
                         }
                       },
                       {
@@ -137,11 +165,14 @@
                           "vec": [
                             {
                               "symbol": "Operator"
+                            },
+                            {
+                              "bytes": "2ac9bec77bfbf8214de486ef73ad5d29849e008e178d4ee467b971b1675645fa"
                             }
                           ]
                         },
                         "val": {
-                          "bytes": "4f49dbda987a1cf540cb5dec3c1662f50182560e450818a89bf600885f9e4dd1"
+                          "bool": true
                         }
                       },
                       {
