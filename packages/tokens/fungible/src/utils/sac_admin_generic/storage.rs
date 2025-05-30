@@ -1,6 +1,5 @@
 use soroban_sdk::{
-    auth::{Context, ContractContext},
-    contracttype, panic_with_error, Address, Env, Symbol, TryFromVal, Val,
+    auth::ContractContext, contracttype, panic_with_error, Address, Env, Symbol, TryFromVal, Val,
 };
 
 use crate::FungibleTokenError;
@@ -11,10 +10,15 @@ pub enum SACAdminGenericDataKey {
     Sac,
 }
 
+/// Index of `amount` in `fn mint(e: Env, to: Address, amount: i128)`
 pub const MINT_AMOUNT_INDEX: u32 = 2;
+/// Index of `amount` in `fn clawback(e: Env, from: Address, amount: i128)`
 pub const CLAWBACK_AMOUNT_INDEX: u32 = 2;
+/// Index of `authorized` in `fn set_authorized(e: Env, authorized: bool,
+/// account: Address)`
 pub const SET_AUTHORIZED_BOOL_INDEX: u32 = 1;
 
+/// Container mapping the extracted values from a SAC `ContractContext`
 pub enum SacFn {
     Mint(i128),
     Clawback(i128),
@@ -40,12 +44,27 @@ pub fn get_sac_address(e: &Env) -> Address {
         .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::SACNotSet))
 }
 
-pub fn extract_context(e: &Env, context: &Context) -> SacFn {
-    let contract_context = match context {
-        Context::Contract(c) => c,
-        _ => panic_with_error!(e, FungibleTokenError::SACInvalidContext),
-    };
-
+/// A helper function that extracts some elements from `ContractContext` passed
+/// in to `__check_auth` of a SAC Admin Generic contract.
+///
+/// # Returns
+///
+/// This function wraps and returns the extracted elements in a minimal form,
+/// deemed necessary to perform a validation.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `contract_context` - `ContractContext` passed to `__check_auth`.
+///
+/// # Errors
+///
+/// * [`FungibleTokenError::SACNotSet`] - Occurs when the SAC address wasn't set
+///   beforehand.
+/// * [`FungibleTokenError::SACAddressMismatch`] - Occurs when the SAC address
+///   doesn't match with the one from `ContractContext`.
+/// * refer to [`get_fn_param`] errors.
+pub fn extract_sac_contract_context(e: &Env, contract_context: &ContractContext) -> SacFn {
     let sac_addr: Address = e
         .storage()
         .instance()
@@ -53,7 +72,7 @@ pub fn extract_context(e: &Env, context: &Context) -> SacFn {
         .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::SACNotSet));
 
     if contract_context.contract != sac_addr {
-        panic_with_error!(e, FungibleTokenError::SACInvalidContext);
+        panic_with_error!(e, FungibleTokenError::SACAddressMismatch);
     }
 
     if contract_context.fn_name == Symbol::new(e, "mint") {
@@ -72,6 +91,27 @@ pub fn extract_context(e: &Env, context: &Context) -> SacFn {
     }
 }
 
+/// A helper function that extracts a parameter given its `index` in the
+/// parameter list of a function from the SAC admin interface.
+///
+/// # Returns
+///
+/// The element that was extracted.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `contract_context` - `ContractContext` passed to `__check_auth`.
+/// * `index` - The expected position of the function parameter.
+///
+/// # Errors
+///
+/// * [`FungibleTokenError::SACMissingFnParam`] - Occurs when `ContractContext`
+///   is missing an expected function parameter for a given admin function of
+///   the SAC interface.
+/// * [`FungibleTokenError::SACInvalidFnParam`] - Occurs when an function
+///   parameter extracted from `ContractContext` can't be transformed to the
+///   expected type.
 pub fn get_fn_param<V: TryFromVal<Env, Val>>(
     e: &Env,
     contract_context: &ContractContext,
