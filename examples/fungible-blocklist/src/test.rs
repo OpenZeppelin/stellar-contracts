@@ -7,7 +7,7 @@ use soroban_sdk::{
     Address, Env, IntoVal,
 };
 
-use crate::{ExampleContract, ExampleContractClient};
+use crate::contract::{ExampleContract, ExampleContractClient};
 
 fn create_client<'a>(e: &Env, admin: &Address, initial_supply: &i128) -> ExampleContractClient<'a> {
     let address = e.register(ExampleContract, (admin, initial_supply));

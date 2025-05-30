@@ -1,4 +1,5 @@
-mod contract;
-pub use contract::*;
+#![no_std]
+#![allow(dead_code)]
 
+mod contract;
 mod test;
