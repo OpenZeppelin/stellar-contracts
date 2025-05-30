@@ -45,6 +45,11 @@
 //! This module implements **the wrapper version** for an Admin contract,
 //! defining the interface and functions necessary to interact with a SAC.
 //!
+//! - An example contract that follows this approach can be found in
+//!   "examples/sac-admin-wrapper".
+//! - An example flow when a `SACAdminWrapper` contract is set as a new
+//!   administrator for a SAC can be found [here](./README.md);
+//!
 //! **NOTE**
 //!
 //! All functions, exposed in the `SACAdminWrapper` trait, include an additional
