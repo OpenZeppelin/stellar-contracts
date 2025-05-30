@@ -2,7 +2,8 @@
 
 //! This contract showcases how to integrate the BlockList extension with a
 //! SEP-41-compliant fungible token. It includes essential features such as
-//! controlled token transfers by an admin who can block or unblock specific accounts.
+//! controlled token transfers by an admin who can block or unblock specific
+//! accounts.
 
 use soroban_sdk::{contract, contracterror, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;

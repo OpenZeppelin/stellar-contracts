@@ -90,7 +90,8 @@ impl BlockList {
         BlockList::block_user_no_auth(e, user);
     }
 
-    /// Low-level function to block a user without performing authorization checks.
+    /// Low-level function to block a user without performing authorization
+    /// checks.
     ///
     /// # Arguments
     ///
@@ -104,13 +105,14 @@ impl BlockList {
     ///
     /// # Security Warning
     ///
-    /// **IMPORTANT**: This function bypasses authorization checks and should only
-    /// be used:
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used:
     /// - During contract initialization/construction
     /// - In admin functions that implement their own authorization logic
     ///
-    /// Using this function in public-facing methods creates significant security
-    /// risks as it could allow unauthorized blocklist modifications.
+    /// Using this function in public-facing methods creates significant
+    /// security risks as it could allow unauthorized blocklist
+    /// modifications.
     pub fn block_user_no_auth(e: &Env, user: &Address) {
         // Set the user as blocked
         let key = BlockListStorageKey::Blocked(user.clone());
@@ -141,7 +143,8 @@ impl BlockList {
         BlockList::unblock_user_no_auth(e, user);
     }
 
-    /// Low-level function to unblock a user without performing authorization checks.
+    /// Low-level function to unblock a user without performing authorization
+    /// checks.
     ///
     /// # Arguments
     ///
@@ -155,13 +158,14 @@ impl BlockList {
     ///
     /// # Security Warning
     ///
-    /// **IMPORTANT**: This function bypasses authorization checks and should only
-    /// be used:
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used:
     /// - During contract initialization/construction
     /// - In admin functions that implement their own authorization logic
     ///
-    /// Using this function in public-facing methods creates significant security
-    /// risks as it could allow unauthorized blocklist modifications.
+    /// Using this function in public-facing methods creates significant
+    /// security risks as it could allow unauthorized blocklist
+    /// modifications.
     pub fn unblock_user_no_auth(e: &Env, user: &Address) {
         // Set the user as not blocked
         let key = BlockListStorageKey::Blocked(user.clone());
