@@ -10,12 +10,15 @@
 //! [`stellar_fungible::burnable::FungibleBurnable`].
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env, String,
+    contract, contracterror, contractimpl, symbol_short, Address, Env, String,
     Symbol,
 };
 use stellar_fungible::{burnable::FungibleBurnable, impl_token_interface, Base, FungibleToken};
 use stellar_pausable::{self as pausable, Pausable};
 use stellar_pausable_macros::when_not_paused;
+use stellar_default_impl_macro::default_impl;
+use stellar_ownable::{set_owner, Ownable};
+use stellar_ownable_macro::only_owner;
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
 
@@ -32,19 +35,15 @@ pub enum ExampleContractError {
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address, initial_supply: i128) {
+        set_owner(e, &owner);
         Base::set_metadata(e, 18, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
         Base::mint(e, &owner, initial_supply);
         e.storage().instance().set(&OWNER, &owner);
     }
 
     #[when_not_paused]
+    #[only_owner]
     pub fn mint(e: &Env, account: Address, amount: i128) {
-        // When `ownable` module is available,
-        // the following checks should be equivalent to:
-        // `ownable::only_owner(&e);`
-        let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
-        owner.require_auth();
-
         Base::mint(e, &account, amount);
     }
 }
@@ -55,27 +54,13 @@ impl Pausable for ExampleContract {
         pausable::paused(e)
     }
 
+    #[only_owner]
     fn pause(e: &Env, caller: Address) {
-        // When `ownable` module is available,
-        // the following checks should be equivalent to:
-        // `ownable::only_owner(&e);`
-        let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
-        if owner != caller {
-            panic_with_error!(e, ExampleContractError::Unauthorized);
-        }
-
         pausable::pause(e, &caller);
     }
 
+    #[only_owner]
     fn unpause(e: &Env, caller: Address) {
-        // When `ownable` module is available,
-        // the following checks should be equivalent to:
-        // `ownable::only_owner(&e);`
-        let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
-        if owner != caller {
-            panic_with_error!(e, ExampleContractError::Unauthorized);
-        }
-
         pausable::unpause(e, &caller);
     }
 }
@@ -135,6 +120,10 @@ impl FungibleBurnable for ExampleContract {
         Self::ContractType::burn_from(e, &spender, &from, amount)
     }
 }
+
+#[default_impl]
+#[contractimpl]
+impl Ownable for ExampleContract {}
 
 // NOTE: if your contract implements `FungibleToken` and `FungibleBurnable`,
 // and you also want your contract to implement
