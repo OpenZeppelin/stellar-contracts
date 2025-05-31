@@ -192,6 +192,18 @@
                         "key": {
                           "vec": [
                             {
+                              "symbol": "Owner"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
                               "symbol": "TotalSupply"
                             }
                           ]
@@ -210,7 +222,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ],
       [
@@ -231,7 +243,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ]
     ]

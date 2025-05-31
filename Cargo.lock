@@ -658,7 +658,10 @@ name = "fungible-pausable-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-default-impl-macro",
  "stellar-fungible",
+ "stellar-ownable",
+ "stellar-ownable-macro",
  "stellar-pausable",
  "stellar-pausable-macros",
 ]
@@ -668,7 +671,10 @@ name = "fungible-token-interface-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-default-impl-macro",
  "stellar-fungible",
+ "stellar-ownable",
+ "stellar-ownable-macro",
  "stellar-pausable",
  "stellar-pausable-macros",
 ]
