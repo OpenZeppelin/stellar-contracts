@@ -75,7 +75,7 @@ mod overrides;
 mod storage;
 mod utils;
 
-pub use extensions::{burnable, capped};
+pub use extensions::{allowlist, blocklist, burnable, capped};
 pub use fungible::{emit_approve, emit_transfer, FungibleToken, FungibleTokenError};
 pub use overrides::{Base, ContractOverrides};
 pub use storage::{AllowanceData, AllowanceKey, StorageKey};
