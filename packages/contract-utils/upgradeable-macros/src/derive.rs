@@ -10,9 +10,11 @@ use syn::DeriveInput;
 ///
 /// # Behavior
 ///
-/// - Sets the current crate version (`CARGO_PKG_VERSION`) as `"binver"`
-///   metadata using `contractmeta!`.
 /// - Implements the `upgrade` function with access control (`_require_auth`).
+/// - Sets the contract crate version  as `"binver"` metadata using
+///   `soroban_sdk::contractmeta!`. Gets the crate version via the env variable
+///   `CARGO_PKG_VERSION` which corresponds to the "version" attribute in
+///   Cargo.toml. If no such attribute or if it is "0.0.0", skips this step.
 /// - Throws a compile-time error if `UpgradeableInternal` is not implemented.
 ///
 /// # Example
@@ -23,12 +25,12 @@ use syn::DeriveInput;
 pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
     let name = &input.ident;
 
-    let version = env!("CARGO_PKG_VERSION");
+    let binver = set_binver_from_env();
 
     quote! {
         use stellar_upgradeable::Upgradeable as _;
 
-        soroban_sdk::contractmeta!(key = "binver", val = #version);
+        #binver
 
         #[soroban_sdk::contractimpl]
         impl stellar_upgradeable::Upgradeable for #name {
@@ -36,6 +38,11 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
                 e: &soroban_sdk::Env, new_wasm_hash: soroban_sdk::BytesN<32>, operator: soroban_sdk::Address
             ) {
                 Self::_require_auth(e, &operator);
+
+                // Set the flag in case the next contract version needs to perform a migration
+                // i.e. when the current version is `Upgradeable` only,
+                // while the next one becomes `UpgradeableMigratable`.
+                stellar_upgradeable::enable_migration(e);
 
                 e.deployer().update_current_contract_wasm(new_wasm_hash);
             }
@@ -52,10 +59,12 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
 ///
 /// # Behavior
 ///
-/// - Sets the current crate version (`CARGO_PKG_VERSION`) as `"binver"`
-///   metadata using `contractmeta!`.
 /// - Implements `upgrade` and `migrate` functions with access control
 ///   (`_require_auth`).
+/// - Sets the current crate version  as `"binver"` metadata using
+///   `soroban_sdk::contractmeta!`. Gets the crate version via the env variable
+///   `CARGO_PKG_VERSION` which corresponds to the "version" attribute in
+///   Cargo.toml. If no such attribute or if it is "0.0.0", skips this step.
 /// - Throws a compile-time error if `UpgradeableMigratableInternal` is not
 ///   implemented.
 ///
@@ -64,15 +73,20 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
 /// #[derive(UpgradeableMigratable)]
 /// pub struct MyContract;
 /// ```
+///
+/// **Warning:** This derive macro should only be used on contracts that have
+/// previously used either `#[derive(Upgradeable)]` or
+/// `#[derive(UpgradeableMigratable)]`. The migration function depends on an
+/// internal flag set by calling `stellar_upgradeable::enable_migration()`.
 pub fn derive_upgradeable_migratable(input: &DeriveInput) -> proc_macro2::TokenStream {
     let name = &input.ident;
 
-    let version = env!("CARGO_PKG_VERSION");
+    let binver = set_binver_from_env();
 
     quote! {
         use stellar_upgradeable::UpgradeableMigratable as _;
 
-        soroban_sdk::contractmeta!(key = "binver", val = #version);
+        #binver
 
         type MigrationData = <#name as stellar_upgradeable::UpgradeableMigratableInternal>::MigrationData;
 
@@ -84,7 +98,7 @@ pub fn derive_upgradeable_migratable(input: &DeriveInput) -> proc_macro2::TokenS
             ) {
                 Self::_require_auth(e, &operator);
 
-                stellar_upgradeable::start_migration(e);
+                stellar_upgradeable::enable_migration(e);
 
                 e.deployer().update_current_contract_wasm(new_wasm_hash);
             }
@@ -99,5 +113,41 @@ pub fn derive_upgradeable_migratable(input: &DeriveInput) -> proc_macro2::TokenS
                 stellar_upgradeable::complete_migration(e);
             }
         }
+    }
+}
+
+/// Sets the value of the environment variable `CARGO_PKG_VERSION` as `binver`
+/// in the wasm binary metadata. This env variable corresponds to the attribute
+/// "version" in Cargo.toml. If the attribute is missing or if it is "0.0.0",
+/// the function does nothing.
+fn set_binver_from_env() -> proc_macro2::TokenStream {
+    // However when "version" is missing from Cargo.toml,
+    // the following does not return error, but Ok("0.0.0")
+    let version = std::env::var("CARGO_PKG_VERSION");
+
+    match version {
+        Ok(v) if v != "0.0.0" => {
+            quote! { soroban_sdk::contractmeta!(key = "binver", val = #v); }
+        }
+        _ => quote! {},
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+
+    use super::*;
+
+    #[test]
+    fn test_set_binver_from_env_zero_version() {
+        // Set version to 0.0.0
+        env::set_var("CARGO_PKG_VERSION", "0.0.0");
+
+        let result = set_binver_from_env();
+        let result_str = result.to_string();
+
+        // Should return empty tokens
+        assert_eq!(result_str.trim(), "");
     }
 }

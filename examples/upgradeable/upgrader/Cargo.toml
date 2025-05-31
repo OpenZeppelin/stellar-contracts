@@ -13,6 +13,8 @@ doctest = false
 [dependencies]
 soroban-sdk = { workspace = true }
 stellar-upgradeable = { workspace = true }
+stellar-ownable = { workspace = true }
+stellar-ownable-macro = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

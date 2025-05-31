@@ -3,7 +3,7 @@
 use soroban_sdk::{contract, Env};
 
 use crate::storage::{
-    can_complete_migration, complete_migration, ensure_can_complete_migration, start_migration,
+    can_complete_migration, complete_migration, enable_migration, ensure_can_complete_migration,
 };
 
 #[contract]
@@ -17,7 +17,7 @@ fn upgrade_flow_works() {
     e.as_contract(&address, || {
         assert!(!can_complete_migration(&e));
 
-        start_migration(&e);
+        enable_migration(&e);
         assert!(can_complete_migration(&e));
 
         complete_migration(&e);

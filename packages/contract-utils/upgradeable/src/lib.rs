@@ -80,7 +80,7 @@ mod upgradeable;
 
 pub use crate::{
     storage::{
-        can_complete_migration, complete_migration, ensure_can_complete_migration, start_migration,
+        can_complete_migration, complete_migration, enable_migration, ensure_can_complete_migration,
     },
     upgradeable::{
         Upgradeable, UpgradeableClient, UpgradeableInternal, UpgradeableMigratable,
