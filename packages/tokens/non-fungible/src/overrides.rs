@@ -5,19 +5,18 @@ use soroban_sdk::{Address, Env, String};
 /// override mechanism that favors the DevX.
 ///
 /// One can also override the `NonFungibleToken` trait directly, but the reason
-/// we have another trait for the same methods, is to provide the default
-/// implementations in an easier way for the end developer.
+/// we have another helper trait for the same methods, is to provide the default
+/// implementations in an easier way for the developers.
 ///
 /// The way to provide different default implementations for different
 /// extensions is by implementing the trait for different types (unit structs).
-/// The problem is, `NonFungbileToken` trait has to be implemented for the smart
-/// contract (which is another struct) by the end-developer. So, we need a level
+/// The problem is, `NonFungibleToken` trait has to be implemented for the smart
+/// contract (which is another struct) by the developers. So, we need a level
 /// of abstraction by introducing an associated type, which will grant
 /// `NonFungibleToken` trait the ability to switch between different default
-/// implementations by calling the methods on this associated type. And for
-/// this, we need another trait, which this associated type will implement.
+/// implementations by calling the methods on this associated type.
 ///
-/// By introducing this abstraction, we allow the end-developer to implement
+/// By introducing this abstraction, we allow the developers to implement
 /// every method of the `NonFungibleToken` trait using
 /// `Self::ContractType::{function_name}`, which will in turn use either the
 /// overridden or the base variant according to the extension, provided by the
@@ -49,11 +48,10 @@ use soroban_sdk::{Address, Env, String};
 /// }
 /// ```
 ///
-/// or the end-developer can use the type directly (in this case `Consecutive`)
+/// or the type can be used directly (in this case `Consecutive`)
 /// instead of referring to it as `Self::ContractType`:
 ///
 /// ```rust
-/// /// ```rust
 /// impl NonFungibleToken for ExampleContract {
 ///     type ContractType = Consecutive;
 ///
