@@ -15,18 +15,18 @@ use crate::ContractOverrides;
 /// for token burning to be considered compliant.
 ///
 /// Event for `mint` is defined, but `mint` function itself is not included
-/// as a method in this trait because it is not a part of the standard,
+/// as a method in this trait because it is not a part of the SEP-41 standard,
 /// the function signature may change depending on the implementation.
 ///
-/// We do provide a function [`crate::Base::sequential_mint`] for sequential
-/// minting, and [`crate::Base::mint`] for non-sequential minting strategies.
+/// We do provide a function [`crate::Base::mint`] for minting to cover the
+/// general use case.
 ///
 /// # Notes
 ///
 /// `#[contractimpl]` macro requires even the default implementations to be
 /// present under its scope. To not confuse the developers, we did not provide
 /// the default implementations here, but we are providing a macro to generate
-/// the default implementations for you.
+/// them.
 ///
 /// When implementing [`NonFungibleToken`] trait for your Smart Contract,
 /// you can follow the below example:

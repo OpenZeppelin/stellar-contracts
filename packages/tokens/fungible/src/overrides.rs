@@ -6,17 +6,17 @@ use soroban_sdk::{Address, Env, String};
 ///
 /// One can also override the `FungibleToken` trait directly, but the reason
 /// we have another helper trait for the same methods, is to provide the default
-/// implementations in an easier way for the end developer.
+/// implementations in an easier way for the developers.
 ///
 /// The way to provide different default implementations for different
 /// extensions is by implementing the trait for different types (unit structs).
 /// The problem is, `FungibleToken` trait has to be implemented for the smart
-/// contract (which is another struct) by the end-developer. So, we need a level
+/// contract (which is another struct) by the developers. So, we need a level
 /// of abstraction by introducing an associated type, which will grant
 /// `FungibleToken` trait the ability to switch between different default
 /// implementations by calling the methods on this associated type.
 ///
-/// By introducing this abstraction, we allow the end-developer to implement
+/// By introducing this abstraction, we allow the developers to implement
 /// every method of the `FungibleToken` trait using
 /// `Self::ContractType::{function_name}`, which will in turn use either the
 /// overridden or the base variant according to the extension, provided by the
@@ -40,7 +40,7 @@ use soroban_sdk::{Address, Env, String};
 /// }
 /// ```
 ///
-/// or the end-developer can use the type directly (in this case `Base`)
+/// or the type can be used directly (in this case `Base`)
 /// instead of referring to it as `Self::ContractType`:
 ///
 /// ```rust

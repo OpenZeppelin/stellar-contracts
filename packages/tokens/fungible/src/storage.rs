@@ -116,6 +116,62 @@ impl Base {
         allowance.amount
     }
 
+    /// Returns the token metadata such as decimals, name and symbol.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
+    ///   uninitialized metadata.
+    pub fn get_metadata(e: &Env) -> Metadata {
+        e.storage()
+            .instance()
+            .get(&METADATA_KEY)
+            .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::UnsetMetadata))
+    }
+
+    /// Returns the token decimals.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`get_metadata`] errors.
+    pub fn decimals(e: &Env) -> u32 {
+        Base::get_metadata(e).decimals
+    }
+
+    /// Returns the token name.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`get_metadata`] errors.
+    pub fn name(e: &Env) -> String {
+        Base::get_metadata(e).name
+    }
+
+    /// Returns the token symbol.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`get_metadata`] errors.
+    pub fn symbol(e: &Env) -> String {
+        Base::get_metadata(e).symbol
+    }
+
     // ################## CHANGE STATE ##################
 
     /// Sets the amount of tokens a `spender` is allowed to spend on behalf of
@@ -422,62 +478,6 @@ impl Base {
     pub fn mint(e: &Env, to: &Address, amount: i128) {
         Base::update(e, None, Some(to), amount);
         emit_mint(e, to, amount);
-    }
-
-    /// Returns the token metadata such as decimals, name and symbol.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * [`FungibleTokenError::UnsetMetadata`] - When trying to access
-    ///   uninitialized metadata.
-    pub fn get_metadata(e: &Env) -> Metadata {
-        e.storage()
-            .instance()
-            .get(&METADATA_KEY)
-            .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::UnsetMetadata))
-    }
-
-    /// Returns the token decimals.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`get_metadata`] errors.
-    pub fn decimals(e: &Env) -> u32 {
-        Base::get_metadata(e).decimals
-    }
-
-    /// Returns the token name.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`get_metadata`] errors.
-    pub fn name(e: &Env) -> String {
-        Base::get_metadata(e).name
-    }
-
-    /// Returns the token symbol.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`get_metadata`] errors.
-    pub fn symbol(e: &Env) -> String {
-        Base::get_metadata(e).symbol
     }
 
     /// Sets the token metadata such as decimals, name and symbol.
