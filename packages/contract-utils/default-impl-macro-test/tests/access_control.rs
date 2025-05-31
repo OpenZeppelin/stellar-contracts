@@ -4,7 +4,7 @@ use soroban_sdk::{
 use stellar_access_control::{set_admin, AccessControl};
 use stellar_access_control_macros::has_role;
 use stellar_default_impl_macro::default_impl;
-use stellar_fungible::FungibleToken;
+use stellar_fungible::{Base, FungibleToken};
 
 #[contracttype]
 pub enum DataKey {
@@ -18,23 +18,20 @@ pub struct ExampleContract;
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
         set_admin(e, &owner);
-        stellar_fungible::metadata::set_metadata(
-            e,
-            7,
-            String::from_str(e, "My Token"),
-            String::from_str(e, "TKN"),
-        );
+        Base::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
     }
 
     #[has_role(caller, "minter")]
     pub fn mint(e: &Env, caller: Address, to: Address, amount: i128) {
-        stellar_fungible::mintable::mint(e, &to, amount);
+        Base::mint(e, &to, amount);
     }
 }
 
 #[default_impl]
 #[contractimpl]
-impl FungibleToken for ExampleContract {}
+impl FungibleToken for ExampleContract {
+    type ContractType = Base;
+}
 
 #[default_impl]
 #[contractimpl]

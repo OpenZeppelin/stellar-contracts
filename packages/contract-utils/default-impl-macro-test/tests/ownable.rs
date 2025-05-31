@@ -2,7 +2,7 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, testutils::Address as _, Address, Env, String,
 };
 use stellar_default_impl_macro::default_impl;
-use stellar_fungible::FungibleToken;
+use stellar_fungible::{Base, FungibleToken};
 use stellar_ownable::{set_owner, Ownable};
 use stellar_ownable_macro::only_owner;
 
@@ -18,23 +18,20 @@ pub struct ExampleContract;
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
         set_owner(e, &owner);
-        stellar_fungible::metadata::set_metadata(
-            e,
-            7,
-            String::from_str(e, "My Token"),
-            String::from_str(e, "TKN"),
-        );
+        Base::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
     }
 
     #[only_owner]
     pub fn mint(e: &Env, to: Address, amount: i128) {
-        stellar_fungible::mintable::mint(e, &to, amount);
+        Base::mint(e, &to, amount);
     }
 }
 
 #[default_impl]
 #[contractimpl]
-impl FungibleToken for ExampleContract {}
+impl FungibleToken for ExampleContract {
+    type ContractType = Base;
+}
 
 #[default_impl]
 #[contractimpl]

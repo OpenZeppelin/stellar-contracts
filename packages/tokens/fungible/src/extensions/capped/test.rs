@@ -5,11 +5,8 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::{
-    extensions::{
-        capped::{check_cap, query_cap, set_cap},
-        mintable::mint,
-    },
-    storage::{balance, total_supply},
+    extensions::capped::{check_cap, query_cap, set_cap},
+    Base,
 };
 
 #[contract]
@@ -25,10 +22,10 @@ fn test_mint_under_cap() {
         set_cap(&e, 1000);
 
         check_cap(&e, 500);
-        mint(&e, &user, 500);
+        Base::mint(&e, &user, 500);
 
-        assert_eq!(balance(&e, &user), 500);
-        assert_eq!(total_supply(&e), 500);
+        assert_eq!(Base::balance(&e, &user), 500);
+        assert_eq!(Base::total_supply(&e), 500);
     });
 }
 
@@ -42,10 +39,10 @@ fn test_mint_exact_cap() {
         set_cap(&e, 1000);
 
         check_cap(&e, 1000);
-        mint(&e, &user, 1000);
+        Base::mint(&e, &user, 1000);
 
-        assert_eq!(balance(&e, &user), 1000);
-        assert_eq!(total_supply(&e), 1000);
+        assert_eq!(Base::balance(&e, &user), 1000);
+        assert_eq!(Base::total_supply(&e), 1000);
     });
 }
 
@@ -60,7 +57,7 @@ fn test_mint_exceeds_cap() {
         set_cap(&e, 1000);
 
         check_cap(&e, 1001);
-        mint(&e, &user, 1001); // This should panic
+        Base::mint(&e, &user, 1001); // This should panic
     });
 }
 
@@ -76,14 +73,14 @@ fn test_mint_multiple_exceeds_cap() {
 
         // Mint 600 tokens first
         check_cap(&e, 600);
-        mint(&e, &user, 600);
+        Base::mint(&e, &user, 600);
 
-        assert_eq!(balance(&e, &user), 600);
-        assert_eq!(total_supply(&e), 600);
+        assert_eq!(Base::balance(&e, &user), 600);
+        assert_eq!(Base::total_supply(&e), 600);
 
         // Attempt to mint 500 more tokens (would exceed cap)
         check_cap(&e, 500);
-        mint(&e, &user, 500); // This should panic
+        Base::mint(&e, &user, 500); // This should panic
     });
 }
 
@@ -96,7 +93,7 @@ fn test_check_cap_overflows() {
 
     e.as_contract(&contract_address, || {
         set_cap(&e, i128::MAX);
-        mint(&e, &user, i128::MAX);
+        Base::mint(&e, &user, i128::MAX);
 
         check_cap(&e, 1); // should overflow
     });

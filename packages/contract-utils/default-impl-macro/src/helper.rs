@@ -64,59 +64,59 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
         "FungibleToken" => vec![
             syn::parse_quote! {
                 fn total_supply(e: &soroban_sdk::Env) -> i128 {
-                    stellar_fungible::total_supply(e)
+                    Self::ContractType::total_supply(e)
                 }
             },
             syn::parse_quote! {
                 fn balance(e: &soroban_sdk::Env, account: soroban_sdk::Address) -> i128 {
-                    stellar_fungible::balance(e, &account)
+                    Self::ContractType::balance(e, &account)
                 }
             },
             syn::parse_quote! {
                 fn allowance(e: &soroban_sdk::Env, owner: soroban_sdk::Address, spender: soroban_sdk::Address) -> i128 {
-                    stellar_fungible::allowance(e, &owner, &spender)
+                    Self::ContractType::allowance(e, &owner, &spender)
                 }
             },
             syn::parse_quote! {
                 fn transfer(e: &soroban_sdk::Env, from: soroban_sdk::Address, to: soroban_sdk::Address, amount: i128) {
-                    stellar_fungible::transfer(e, &from, &to, amount);
+                    Self::ContractType::transfer(e, &from, &to, amount);
                 }
             },
             syn::parse_quote! {
                 fn transfer_from(e: &soroban_sdk::Env, spender: soroban_sdk::Address, from: soroban_sdk::Address, to: soroban_sdk::Address, amount: i128) {
-                    stellar_fungible::transfer_from(e, &spender, &from, &to, amount);
+                    Self::ContractType::transfer_from(e, &spender, &from, &to, amount);
                 }
             },
             syn::parse_quote! {
                 fn approve(e: &soroban_sdk::Env, owner: soroban_sdk::Address, spender: soroban_sdk::Address, amount: i128, live_until_ledger: u32) {
-                    stellar_fungible::approve(e, &owner, &spender, amount, live_until_ledger);
+                    Self::ContractType::approve(e, &owner, &spender, amount, live_until_ledger);
                 }
             },
             syn::parse_quote! {
                 fn decimals(e: &soroban_sdk::Env) -> u32 {
-                    stellar_fungible::metadata::decimals(e)
+                    Self::ContractType::decimals(e)
                 }
             },
             syn::parse_quote! {
                 fn name(e: &soroban_sdk::Env) -> soroban_sdk::String {
-                    stellar_fungible::metadata::name(e)
+                    Self::ContractType::name(e)
                 }
             },
             syn::parse_quote! {
                 fn symbol(e: &soroban_sdk::Env) -> soroban_sdk::String {
-                    stellar_fungible::metadata::symbol(e)
+                    Self::ContractType::symbol(e)
                 }
             },
         ],
         "FungibleBurnable" => vec![
             syn::parse_quote! {
                 fn burn(e: &soroban_sdk::Env, from: soroban_sdk::Address, amount: i128) {
-                    stellar_fungible::burnable::burn(e, &from, amount);
+                    Self::ContractType::burn(e, &from, amount);
                 }
             },
             syn::parse_quote! {
                 fn burn_from(e: &soroban_sdk::Env, spender: soroban_sdk::Address, from: soroban_sdk::Address, amount: i128) {
-                    stellar_fungible::burnable::burn_from(e, &spender, &from, amount);
+                    Self::ContractType::burn_from(e, &spender, &from, amount);
                 }
             },
         ],
@@ -270,10 +270,16 @@ pub fn generate_default_impl(item: TokenStream) -> TokenStream {
     // `existing_items` now contains the merged items
     let new_impl = ItemImpl { items: existing_items, ..input };
 
-    // Import the necessary trait if the trait is `NonFungibleToken`
+    // Import the necessary trait if the trait is `NonFungibleToken` or
+    // `FungibleToken`
     let expanded = if trait_name == "NonFungibleToken" {
         quote! {
             use stellar_non_fungible::ContractOverrides;
+            #new_impl
+        }
+    } else if trait_name == "FungibleToken" {
+        quote! {
+            use stellar_fungible::ContractOverrides;
             #new_impl
         }
     } else {

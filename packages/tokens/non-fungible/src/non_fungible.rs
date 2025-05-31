@@ -65,8 +65,9 @@ pub const MAX_BASE_URI_LEN: usize = 200;
 pub trait NonFungibleToken {
     /// Helper type that allows us to override some of the functionality of the
     /// base trait based on the extensions implemented. You should use
-    /// `BaseContract` as the type if you are not using `Enumerable` or
-    /// `Consecutive` extensions.
+    /// [`crate::Base`] as the type if you are not using
+    /// [`crate::extensions::enumerable::Enumerable`] or
+    /// [`crate::extensions::consecutive::Consecutive`] extensions.
     type ContractType: ContractOverrides;
 
     /// Returns the number of tokens owned by `account`.

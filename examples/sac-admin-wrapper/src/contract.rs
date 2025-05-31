@@ -1,4 +1,3 @@
-// TODO: Refactor to use access_control and/or ownable when merged
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env};
 use stellar_access_control::{self as access_control, AccessControl};
 use stellar_access_control_macros::{has_role, only_admin};
