@@ -79,6 +79,6 @@ pub use extensions::{burnable, capped};
 pub use fungible::{emit_approve, emit_transfer, FungibleToken, FungibleTokenError};
 pub use overrides::{Base, ContractOverrides};
 pub use storage::{AllowanceData, AllowanceKey, StorageKey};
-pub use utils::sac_admin_wrapper;
+pub use utils::{sac_admin_generic, sac_admin_wrapper};
 
 mod test;

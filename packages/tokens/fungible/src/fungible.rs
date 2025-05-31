@@ -219,6 +219,12 @@ pub enum FungibleTokenError {
     CapNotSet = 108,
     /// Indicates the SAC address was not set.
     SACNotSet = 109,
+    /// Indicates a SAC address different than expected.
+    SACAddressMismatch = 110,
+    /// Indicates a missing function parameter in the SAC contract context.
+    SACMissingFnParam = 111,
+    /// Indicates an invalid function parameter in the SAC contract context.
+    SACInvalidFnParam = 112,
 }
 
 // ################## EVENTS ##################
