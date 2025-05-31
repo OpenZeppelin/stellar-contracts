@@ -4,13 +4,12 @@ use crate::upgradeable::UpgradeableError;
 
 pub const MIGRATING: Symbol = symbol_short!("MIGRATING");
 
-/// Sets the `MIGRATING` state to `true`, indicating the beginning of a
-/// migration process.
+/// Sets the `MIGRATING` state to `true`, enabling migration process.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-pub fn start_migration(e: &Env) {
+pub fn enable_migration(e: &Env) {
     e.storage().instance().set(&MIGRATING, &true);
 }
 
