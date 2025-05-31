@@ -12,13 +12,9 @@ fn block_user_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Set admin
-        BlockList::set_admin(&e, &admin);
-
         // Check initial state
         assert!(!BlockList::blocked(&e, &user));
 
@@ -35,19 +31,13 @@ fn unblock_user_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Set admin
-        BlockList::set_admin(&e, &admin);
-
         // Block user first
         BlockList::block_user(&e, &user);
         assert!(BlockList::blocked(&e, &user));
-    });
 
-    e.as_contract(&address, || {
         // Unblock user
         BlockList::unblock_user(&e, &user);
 
@@ -61,14 +51,10 @@ fn transfer_with_unblocked_users_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Set admin
-        BlockList::set_admin(&e, &admin);
-
         // Mint tokens to user1
         Base::mint(&e, &user1, 100);
 
@@ -87,14 +73,10 @@ fn transfer_with_sender_blocked_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Set admin
-        BlockList::set_admin(&e, &admin);
-
         // Block user1
         BlockList::block_user(&e, &user1);
 
@@ -112,14 +94,10 @@ fn transfer_with_receiver_blocked_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Set admin
-        BlockList::set_admin(&e, &admin);
-
         // Block user2
         BlockList::block_user(&e, &user2);
 

@@ -21,6 +21,17 @@ use crate::FungibleToken;
 ///
 /// This trait is designed to be used in conjunction with the `FungibleToken`
 /// trait.
+///
+/// **NOTE**
+///
+/// All setter functions, exposed in the `FungibleAllowList` trait, include an
+/// additional parameter `operator: Address`. This account is the one
+/// authorizing the invocation. Having it as a parameter grants the flexibility
+/// to introduce simple or complex role-based access controls.
+///
+/// However, this parameter is omitted from the module functions, defined in
+/// "storage.rs", because the authorizations are to be handled in the access
+/// control helpers or directly implemented.
 pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     /// Returns the allowed status of an account.
     ///
@@ -36,12 +47,13 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `user` - The address to allow.
+    /// * `operator` - The address authorizing the invocation.
     ///
     /// # Events
     ///
-    /// * topics - `["user_allowed", user: Address]`
+    /// * topics - `["allow", user: Address]`
     /// * data - `[]`
-    fn allow_user(e: &Env, user: Address);
+    fn allow_user(e: &Env, user: Address, operator: Address);
 
     /// Disallows a user from receiving and transferring tokens.
     ///
@@ -49,12 +61,13 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `user` - The address to disallow.
+    /// * `operator` - The address authorizing the invocation.
     ///
     /// # Events
     ///
-    /// * topics - `["user_disallowed", user: Address]`
+    /// * topics - `["disallow", user: Address]`
     /// * data - `[]`
-    fn disallow_user(e: &Env, user: Address);
+    fn disallow_user(e: &Env, user: Address, operator: Address);
 }
 
 // ################## EVENTS ##################
@@ -84,9 +97,9 @@ pub fn emit_user_allowed(e: &Env, user: &Address) {
 ///
 /// # Events
 ///
-/// * topics - `["deny", user: Address]`
+/// * topics - `["disallow", user: Address]`
 /// * data - `[]`
 pub fn emit_user_disallowed(e: &Env, user: &Address) {
-    let topics = (symbol_short!("deny"), user);
+    let topics = (symbol_short!("disallow"), user);
     e.events().publish(topics, ());
 }

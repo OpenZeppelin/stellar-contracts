@@ -5,7 +5,9 @@
 //! controlled token transfers by an admin who can block or unblock specific
 //! accounts.
 
-use soroban_sdk::{contract, contracterror, contractimpl, Address, Env, String};
+use soroban_sdk::{contract, contracterror, contractimpl, symbol_short, Address, Env, String};
+use stellar_access_control::{self as access_control, AccessControl};
+use stellar_access_control_macros::has_role;
 use stellar_default_impl_macro::default_impl;
 use stellar_fungible::{
     blocklist::{BlockList, FungibleBlockList},
@@ -24,7 +26,7 @@ pub enum ExampleContractError {
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, admin: Address, initial_supply: i128) {
+    pub fn __constructor(e: &Env, admin: Address, manager: Address, initial_supply: i128) {
         Base::set_metadata(
             e,
             18,
@@ -32,8 +34,11 @@ impl ExampleContract {
             String::from_str(e, "BLT"),
         );
 
-        // Set the admin for the BlockList extension
-        BlockList::set_admin(e, &admin);
+        access_control::set_admin(e, &admin);
+
+        // create a role "manager" and grant it to `manager`
+
+        access_control::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
 
         // Mint initial supply to the admin
         Base::mint(e, &admin, initial_supply);
@@ -52,11 +57,17 @@ impl FungibleBlockList for ExampleContract {
         BlockList::blocked(e, &account)
     }
 
-    fn block_user(e: &Env, user: Address) {
+    #[has_role(operator, "manager")]
+    fn block_user(e: &Env, user: Address, operator: Address) {
         BlockList::block_user(e, &user)
     }
 
-    fn unblock_user(e: &Env, user: Address) {
+    #[has_role(operator, "manager")]
+    fn unblock_user(e: &Env, user: Address, operator: Address) {
         BlockList::unblock_user(e, &user)
     }
 }
+
+#[default_impl]
+#[contractimpl]
+impl AccessControl for ExampleContract {}

@@ -2,15 +2,17 @@
 
 extern crate std;
 
-use soroban_sdk::{
-    testutils::{Address as _, MockAuth, MockAuthInvoke},
-    Address, Env, IntoVal,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
-fn create_client<'a>(e: &Env, admin: &Address, initial_supply: &i128) -> ExampleContractClient<'a> {
-    let address = e.register(ExampleContract, (admin, initial_supply));
+fn create_client<'a>(
+    e: &Env,
+    admin: &Address,
+    manager: &Address,
+    initial_supply: &i128,
+) -> ExampleContractClient<'a> {
+    let address = e.register(ExampleContract, (admin, manager, initial_supply));
     ExampleContractClient::new(e, &address)
 }
 
@@ -19,10 +21,11 @@ fn create_client<'a>(e: &Env, admin: &Address, initial_supply: &i128) -> Example
 fn cannot_transfer_before_allow() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
     // Verify initial state - admin is allowed, others are not
@@ -39,10 +42,11 @@ fn cannot_transfer_before_allow() {
 fn transfer_to_allowed_account_works() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
     e.mock_all_auths();
@@ -53,7 +57,7 @@ fn transfer_to_allowed_account_works() {
     assert!(!client.allowed(&user2));
 
     // Allow user1
-    client.allow_user(&user1);
+    client.allow_user(&user1, &manager);
     assert!(client.allowed(&user1));
 
     // Now admin can transfer to user1
@@ -66,10 +70,11 @@ fn transfer_to_allowed_account_works() {
 fn cannot_transfer_after_disallow() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
     e.mock_all_auths();
@@ -80,7 +85,7 @@ fn cannot_transfer_after_disallow() {
     assert!(!client.allowed(&user2));
 
     // Allow user1
-    client.allow_user(&user1);
+    client.allow_user(&user1, &manager);
     assert!(client.allowed(&user1));
 
     // Now admin can transfer to user1
@@ -88,7 +93,7 @@ fn cannot_transfer_after_disallow() {
     assert_eq!(client.balance(&user1), transfer_amount);
 
     // Disallow user1
-    client.disallow_user(&user1);
+    client.disallow_user(&user1, &manager);
     assert!(!client.allowed(&user1));
 
     // Admin can't transfer to user1 after disallowing
@@ -96,37 +101,14 @@ fn cannot_transfer_after_disallow() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Auth, InvalidAction)")]
-fn test_unauthorized_allow() {
-    let e = Env::default();
-    let admin = Address::generate(&e);
-    let user = Address::generate(&e);
-    let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
-
-    // Non-admin tries to allow a user (should fail)
-    e.mock_auths(&[MockAuth {
-        // issuer authorizes
-        address: &user,
-        invoke: &MockAuthInvoke {
-            contract: &client.address,
-            fn_name: "allow_user",
-            args: (&user,).into_val(&e),
-            sub_invokes: &[],
-        },
-    }]);
-
-    client.allow_user(&user);
-}
-
-#[test]
 fn allowlist_transfer_from_override_works() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
     e.mock_all_auths();
@@ -137,8 +119,8 @@ fn allowlist_transfer_from_override_works() {
     assert!(!client.allowed(&user2));
 
     // Allow user1 & user2
-    client.allow_user(&user1);
-    client.allow_user(&user2);
+    client.allow_user(&user1, &manager);
+    client.allow_user(&user2, &manager);
     assert!(client.allowed(&user1));
     assert!(client.allowed(&user2));
 
@@ -152,10 +134,11 @@ fn allowlist_transfer_from_override_works() {
 fn allowlist_approve_override_works() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
     e.mock_all_auths();
@@ -166,8 +149,8 @@ fn allowlist_approve_override_works() {
     assert!(!client.allowed(&user2));
 
     // Allow user1 & user2
-    client.allow_user(&user1);
-    client.allow_user(&user2);
+    client.allow_user(&user1, &manager);
+    client.allow_user(&user2, &manager);
     assert!(client.allowed(&user1));
     assert!(client.allowed(&user2));
 

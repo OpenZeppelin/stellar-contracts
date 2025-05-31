@@ -637,6 +637,8 @@ name = "fungible-allowlist-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-access-control",
+ "stellar-access-control-macros",
  "stellar-default-impl-macro",
  "stellar-event-assertion",
  "stellar-fungible",
@@ -647,6 +649,8 @@ name = "fungible-blocklist-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-access-control",
+ "stellar-access-control-macros",
  "stellar-default-impl-macro",
  "stellar-event-assertion",
  "stellar-fungible",

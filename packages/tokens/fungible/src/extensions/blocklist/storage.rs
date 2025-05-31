@@ -28,8 +28,6 @@ impl ContractOverrides for BlockList {
 pub enum BlockListStorageKey {
     /// Stores the blocked status of an account
     Blocked(Address),
-    /// Stores the admin address
-    Admin,
 }
 
 impl BlockList {
@@ -46,52 +44,9 @@ impl BlockList {
         e.storage().persistent().get(&key).unwrap_or(false)
     }
 
-    /// Returns the admin address.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    pub fn get_admin(e: &Env) -> Address {
-        e.storage().instance().get(&BlockListStorageKey::Admin).unwrap()
-    }
-
     // ################## CHANGE STATE ##################
 
-    /// Sets the admin address.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `admin` - The address to set as admin.
-    ///
-    /// **IMPORTANT**: this function lacks authorization checks.
-    /// It is expected to call this function only in the constructor!
-    pub fn set_admin(e: &Env, admin: &Address) {
-        e.storage().instance().set(&BlockListStorageKey::Admin, admin);
-    }
-
     /// Blocks a user from receiving and transferring tokens.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `user` - The address to block.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["user_blocked", user: Address]`
-    /// * data - `[]`
-    pub fn block_user(e: &Env, user: &Address) {
-        // Verify admin authorization
-        let admin = BlockList::get_admin(e);
-        admin.require_auth();
-
-        // Call the no_auth implementation
-        BlockList::block_user_no_auth(e, user);
-    }
-
-    /// Low-level function to block a user without performing authorization
-    /// checks.
     ///
     /// # Arguments
     ///
@@ -113,7 +68,7 @@ impl BlockList {
     /// Using this function in public-facing methods creates significant
     /// security risks as it could allow unauthorized blocklist
     /// modifications.
-    pub fn block_user_no_auth(e: &Env, user: &Address) {
+    pub fn block_user(e: &Env, user: &Address) {
         // Set the user as blocked
         let key = BlockListStorageKey::Blocked(user.clone());
         e.storage().persistent().set(&key, &true);
@@ -134,27 +89,6 @@ impl BlockList {
     ///
     /// * topics - `["user_unblocked", user: Address]`
     /// * data - `[]`
-    pub fn unblock_user(e: &Env, user: &Address) {
-        // Verify admin authorization
-        let admin = BlockList::get_admin(e);
-        admin.require_auth();
-
-        // Call the no_auth implementation
-        BlockList::unblock_user_no_auth(e, user);
-    }
-
-    /// Low-level function to unblock a user without performing authorization
-    /// checks.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `user` - The address to unblock.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["user_unblocked", user: Address]`
-    /// * data - `[]`
     ///
     /// # Security Warning
     ///
@@ -166,7 +100,7 @@ impl BlockList {
     /// Using this function in public-facing methods creates significant
     /// security risks as it could allow unauthorized blocklist
     /// modifications.
-    pub fn unblock_user_no_auth(e: &Env, user: &Address) {
+    pub fn unblock_user(e: &Env, user: &Address) {
         // Set the user as not blocked
         let key = BlockListStorageKey::Blocked(user.clone());
         e.storage().persistent().set(&key, &false);

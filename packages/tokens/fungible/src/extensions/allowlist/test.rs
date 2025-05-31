@@ -12,13 +12,9 @@ fn allow_user_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Set admin
-        AllowList::set_admin(&e, &admin);
-
         // Check initial state
         assert!(!AllowList::allowed(&e, &user));
 
@@ -35,13 +31,9 @@ fn disallow_user_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Set admin
-        AllowList::set_admin(&e, &admin);
-
         // Allow user first
         AllowList::allow_user(&e, &user);
         assert!(AllowList::allowed(&e, &user));
@@ -61,19 +53,12 @@ fn transfer_with_allowed_users_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Set admin
-        AllowList::set_admin(&e, &admin);
-
         // Allow both users
         AllowList::allow_user(&e, &user1);
-    });
-
-    e.as_contract(&address, || {
         AllowList::allow_user(&e, &user2);
 
         // Mint tokens to user1
@@ -94,14 +79,10 @@ fn transfer_with_sender_not_allowed_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Set admin
-        AllowList::set_admin(&e, &admin);
-
         // Allow only user2
         AllowList::allow_user(&e, &user2);
 
@@ -119,14 +100,10 @@ fn transfer_with_receiver_not_allowed_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let admin = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // Set admin
-        AllowList::set_admin(&e, &admin);
-
         // Allow only user1
         AllowList::allow_user(&e, &user1);
 

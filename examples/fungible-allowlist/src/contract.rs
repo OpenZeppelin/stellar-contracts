@@ -5,7 +5,9 @@
 //! controlled token transfers by an admin who can allow or disallow specific
 //! accounts.
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
+use stellar_access_control::{self as access_control, AccessControl};
+use stellar_access_control_macros::has_role;
 use stellar_default_impl_macro::default_impl;
 use stellar_fungible::{
     allowlist::{AllowList, FungibleAllowList},
@@ -17,7 +19,7 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, admin: Address, initial_supply: i128) {
+    pub fn __constructor(e: &Env, admin: Address, manager: Address, initial_supply: i128) {
         Base::set_metadata(
             e,
             18,
@@ -25,11 +27,14 @@ impl ExampleContract {
             String::from_str(e, "ALT"),
         );
 
-        // Set the admin for the AllowList extension
-        AllowList::set_admin(e, &admin);
+        access_control::set_admin(e, &admin);
+
+        // create a role "manager" and grant it to `manager`
+
+        access_control::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
 
         // Allow the admin to transfer tokens
-        AllowList::allow_user_no_auth(e, &admin);
+        AllowList::allow_user(e, &admin);
 
         // Mint initial supply to the admin
         Base::mint(e, &admin, initial_supply);
@@ -47,11 +52,17 @@ impl FungibleAllowList for ExampleContract {
         AllowList::allowed(e, &account)
     }
 
-    fn allow_user(e: &Env, user: Address) {
+    #[has_role(operator, "manager")]
+    fn allow_user(e: &Env, user: Address, operator: Address) {
         AllowList::allow_user(e, &user)
     }
 
-    fn disallow_user(e: &Env, user: Address) {
+    #[has_role(operator, "manager")]
+    fn disallow_user(e: &Env, user: Address, operator: Address) {
         AllowList::disallow_user(e, &user)
     }
 }
+
+#[default_impl]
+#[contractimpl]
+impl AccessControl for ExampleContract {}

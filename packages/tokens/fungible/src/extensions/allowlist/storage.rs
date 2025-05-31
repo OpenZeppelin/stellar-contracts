@@ -28,8 +28,6 @@ impl ContractOverrides for AllowList {
 pub enum AllowListStorageKey {
     /// Stores the allowed status of an account
     Allowed(Address),
-    /// Stores the admin address
-    Admin,
 }
 
 impl AllowList {
@@ -46,52 +44,9 @@ impl AllowList {
         e.storage().persistent().get(&key).unwrap_or(false)
     }
 
-    /// Returns the admin address.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    pub fn get_admin(e: &Env) -> Address {
-        e.storage().instance().get(&AllowListStorageKey::Admin).unwrap()
-    }
-
     // ################## CHANGE STATE ##################
 
-    /// Sets the admin address.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `admin` - The address to set as admin.
-    ///
-    /// **IMPORTANT**: this function lacks authorization checks.
-    /// It is expected to call this function only in the constructor!
-    pub fn set_admin(e: &Env, admin: &Address) {
-        e.storage().instance().set(&AllowListStorageKey::Admin, admin);
-    }
-
     /// Allows a user to receive and transfer tokens.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `user` - The address to allow.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["user_allowed", user: Address]`
-    /// * data - `[]`
-    pub fn allow_user(e: &Env, user: &Address) {
-        // Verify admin authorization
-        let admin = AllowList::get_admin(e);
-        admin.require_auth();
-
-        // Call the no_auth implementation
-        AllowList::allow_user_no_auth(e, user);
-    }
-
-    /// Low-level function to allow a user without performing authorization
-    /// checks.
     ///
     /// # Arguments
     ///
@@ -113,7 +68,7 @@ impl AllowList {
     /// Using this function in public-facing methods creates significant
     /// security risks as it could allow unauthorized allowlist
     /// modifications.
-    pub fn allow_user_no_auth(e: &Env, user: &Address) {
+    pub fn allow_user(e: &Env, user: &Address) {
         // Set the user as allowed
         let key = AllowListStorageKey::Allowed(user.clone());
         e.storage().persistent().set(&key, &true);
@@ -134,27 +89,6 @@ impl AllowList {
     ///
     /// * topics - `["user_disallowed", user: Address]`
     /// * data - `[]`
-    pub fn disallow_user(e: &Env, user: &Address) {
-        // Verify admin authorization
-        let admin = AllowList::get_admin(e);
-        admin.require_auth();
-
-        // Call the no_auth implementation
-        AllowList::disallow_user_no_auth(e, user);
-    }
-
-    /// Low-level function to disallow a user without performing authorization
-    /// checks.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `user` - The address to disallow.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["user_disallowed", user: Address]`
-    /// * data - `[]`
     ///
     /// # Security Warning
     ///
@@ -166,7 +100,7 @@ impl AllowList {
     /// Using this function in public-facing methods creates significant
     /// security risks as it could allow unauthorized allowlist
     /// modifications.
-    pub fn disallow_user_no_auth(e: &Env, user: &Address) {
+    pub fn disallow_user(e: &Env, user: &Address) {
         // Set the user as not allowed
         let key = AllowListStorageKey::Allowed(user.clone());
         e.storage().persistent().set(&key, &false);

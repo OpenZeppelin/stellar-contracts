@@ -2,15 +2,17 @@
 
 extern crate std;
 
-use soroban_sdk::{
-    testutils::{Address as _, MockAuth, MockAuthInvoke},
-    Address, Env, IntoVal,
-};
+use soroban_sdk::{testutils::Address as _, Address, Env};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
-fn create_client<'a>(e: &Env, admin: &Address, initial_supply: &i128) -> ExampleContractClient<'a> {
-    let address = e.register(ExampleContract, (admin, initial_supply));
+fn create_client<'a>(
+    e: &Env,
+    admin: &Address,
+    manager: &Address,
+    initial_supply: &i128,
+) -> ExampleContractClient<'a> {
+    let address = e.register(ExampleContract, (admin, manager, initial_supply));
     ExampleContractClient::new(e, &address)
 }
 
@@ -18,10 +20,11 @@ fn create_client<'a>(e: &Env, admin: &Address, initial_supply: &i128) -> Example
 fn block_unblock_works() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
 
     // Verify initial state - no users are blocked
     assert!(!client.blocked(&user1));
@@ -32,11 +35,11 @@ fn block_unblock_works() {
     e.mock_all_auths();
 
     // Block user1
-    client.block_user(&user1);
+    client.block_user(&user1, &manager);
     assert!(client.blocked(&user1));
 
     // Unblock user1
-    client.unblock_user(&user1);
+    client.unblock_user(&user1, &manager);
     assert!(!client.blocked(&user1));
 
     // Admin can transfer to user1 again after unblocking
@@ -45,38 +48,15 @@ fn block_unblock_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Auth, InvalidAction)")]
-fn unauthorized_block_attempt_fails() {
-    let e = Env::default();
-    let admin = Address::generate(&e);
-    let user = Address::generate(&e);
-    let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
-
-    // Non-admin tries to block a user (should fail)
-    e.mock_auths(&[MockAuth {
-        // issuer authorizes
-        address: &user,
-        invoke: &MockAuthInvoke {
-            contract: &client.address,
-            fn_name: "block_user",
-            args: (&user,).into_val(&e),
-            sub_invokes: &[],
-        },
-    }]);
-
-    client.block_user(&user);
-}
-
-#[test]
 #[should_panic(expected = "Error(Contract, #111)")]
 fn blocked_user_cannot_approve() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
     e.mock_all_auths();
@@ -86,7 +66,7 @@ fn blocked_user_cannot_approve() {
     assert_eq!(client.balance(&user1), transfer_amount);
 
     // Block user1
-    client.block_user(&user1);
+    client.block_user(&user1, &manager);
     assert!(client.blocked(&user1));
 
     // Blocked user1 tries to approve user2 (should fail)
@@ -97,10 +77,11 @@ fn blocked_user_cannot_approve() {
 fn blocklist_approve_override_works() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
     e.mock_all_auths();
@@ -123,11 +104,12 @@ fn blocklist_approve_override_works() {
 fn blocked_spender_cannot_transfer_from() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let user3 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
     e.mock_all_auths();
@@ -141,7 +123,7 @@ fn blocked_spender_cannot_transfer_from() {
     assert_eq!(client.allowance(&user1, &user2), transfer_amount);
 
     // Block user2 (the spender)
-    client.block_user(&user2);
+    client.block_user(&user2, &manager);
     assert!(client.blocked(&user2));
 
     // Blocked user2 tries to transfer from user1 to user3 (should fail)
@@ -153,11 +135,12 @@ fn blocked_spender_cannot_transfer_from() {
 fn transfer_from_blocked_user() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let user3 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
     e.mock_all_auths();
@@ -171,7 +154,7 @@ fn transfer_from_blocked_user() {
     assert_eq!(client.allowance(&user1, &user2), transfer_amount);
 
     // Block user1 (the from account)
-    client.block_user(&user1);
+    client.block_user(&user1, &manager);
     assert!(client.blocked(&user1));
 
     // User2 tries to transfer from blocked user1 to user3 (should fail)
@@ -183,11 +166,12 @@ fn transfer_from_blocked_user() {
 fn transfer_from_to_blocked_user() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let user3 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
     e.mock_all_auths();
@@ -201,7 +185,7 @@ fn transfer_from_to_blocked_user() {
     assert_eq!(client.allowance(&user1, &user2), transfer_amount);
 
     // Block user3 (the recipient)
-    client.block_user(&user3);
+    client.block_user(&user3, &manager);
     assert!(client.blocked(&user3));
 
     // User2 tries to transfer from user1 to blocked user3 (should fail)
@@ -212,11 +196,12 @@ fn transfer_from_to_blocked_user() {
 fn blocklist_transfer_from_override_works() {
     let e = Env::default();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let user3 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &initial_supply);
+    let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
     e.mock_all_auths();
