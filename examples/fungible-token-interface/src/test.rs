@@ -2,7 +2,9 @@
 
 extern crate std;
 
-use soroban_sdk::{testutils::Address as _, Address, Env, String};
+use soroban_sdk::
+    {testutils::{Address as _,MockAuth, MockAuthInvoke},
+     Address, Env, String, IntoVal};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
@@ -39,14 +41,22 @@ fn transfer_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1000)")]
+#[should_panic(expected = "HostError: Error(Auth, InvalidAction)")]
 fn transfer_fails_when_paused() {
     let e = Env::default();
     let owner = Address::generate(&e);
     let recipient = Address::generate(&e);
     let client = create_client(&e, &owner, 1000);
 
-    e.mock_all_auths();
+    e.mock_auths(&[MockAuth {
+        address: &owner,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "pause",
+            args: ().into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
     client.pause(&owner);
     client.transfer(&owner, &recipient, &100);
 }
@@ -67,7 +77,7 @@ fn transfer_from_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1000)")]
+#[should_panic(expected = "HostError: Error(Auth, InvalidAction)")]
 fn transfer_from_fails_when_paused() {
     let e = Env::default();
     let owner = Address::generate(&e);
@@ -75,7 +85,15 @@ fn transfer_from_fails_when_paused() {
     let recipient = Address::generate(&e);
     let client = create_client(&e, &owner, 1000);
 
-    e.mock_all_auths();
+    e.mock_auths(&[MockAuth {
+        address: &owner,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "pause",
+            args: ().into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
     client.pause(&owner);
     client.transfer_from(&spender, &owner, &recipient, &200);
 }
@@ -93,13 +111,21 @@ fn mint_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1000)")]
+#[should_panic(expected = "HostError: Error(Auth, InvalidAction)")]
 fn mint_fails_when_paused() {
     let e = Env::default();
     let owner = Address::generate(&e);
     let client = create_client(&e, &owner, 1000);
 
-    e.mock_all_auths();
+    e.mock_auths(&[MockAuth {
+        address: &owner,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "pause",
+            args: ().into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
     client.pause(&owner);
     client.mint(&owner, &500);
 }
@@ -117,13 +143,21 @@ fn burn_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1000)")]
+#[should_panic(expected = "HostError: Error(Auth, InvalidAction)")]
 fn burn_fails_when_paused() {
     let e = Env::default();
     let owner = Address::generate(&e);
     let client = create_client(&e, &owner, 1000);
 
-    e.mock_all_auths();
+    e.mock_auths(&[MockAuth {
+        address: &owner,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "pause",
+            args: ().into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
     client.pause(&owner);
     client.burn(&owner, &200);
 }
