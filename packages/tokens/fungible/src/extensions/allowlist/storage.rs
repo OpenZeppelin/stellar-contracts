@@ -1,5 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
-use stellar_constants::{BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD};
+use stellar_constants::{ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD};
 
 use crate::{
     extensions::allowlist::{emit_user_allowed, emit_user_disallowed},
@@ -41,7 +41,16 @@ impl AllowList {
     /// * `account` - The address to check the allowed status for.
     pub fn allowed(e: &Env, account: &Address) -> bool {
         let key = AllowListStorageKey::Allowed(account.clone());
-        e.storage().persistent().get(&key).unwrap_or(false)
+        if let Some(allowed) = e.storage().persistent().get(&key) {
+            e.storage().persistent().extend_ttl(
+                &key,
+                ALLOW_BLOCK_TTL_THRESHOLD,
+                ALLOW_BLOCK_EXTEND_AMOUNT,
+            );
+            allowed
+        } else {
+            false
+        }
     }
 
     // ################## CHANGE STATE ##################
@@ -55,7 +64,7 @@ impl AllowList {
     ///
     /// # Events
     ///
-    /// * topics - `["user_allowed", user: Address]`
+    /// * topics - `["allow", user: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -72,7 +81,6 @@ impl AllowList {
         // Set the user as allowed
         let key = AllowListStorageKey::Allowed(user.clone());
         e.storage().persistent().set(&key, &true);
-        e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
 
         // Emit event
         emit_user_allowed(e, user);
@@ -87,7 +95,7 @@ impl AllowList {
     ///
     /// # Events
     ///
-    /// * topics - `["user_disallowed", user: Address]`
+    /// * topics - `["disallow", user: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -104,7 +112,6 @@ impl AllowList {
         // Set the user as not allowed
         let key = AllowListStorageKey::Allowed(user.clone());
         e.storage().persistent().set(&key, &false);
-        e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
 
         // Emit event
         emit_user_disallowed(e, user);
@@ -128,10 +135,7 @@ impl AllowList {
     /// * Also refer to [`Base::transfer`] errors.
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         // Check if both addresses are allowed
-        if !AllowList::allowed(e, from) {
-            panic_with_error!(e, FungibleTokenError::UserNotAllowed);
-        }
-        if !AllowList::allowed(e, to) {
+        if !AllowList::allowed(e, from) || !AllowList::allowed(e, to) {
             panic_with_error!(e, FungibleTokenError::UserNotAllowed);
         }
 
@@ -154,18 +158,12 @@ impl AllowList {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::UserNotAllowed`] - When either `from`, `to`, or
-    ///   `spender` is not allowed.
+    /// * [`FungibleTokenError::UserNotAllowed`] - When either `from`, or `to`
+    ///   is not allowed.
     /// * Also refer to [`Base::transfer_from`] errors.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         // Check if all addresses are allowed
-        if !AllowList::allowed(e, spender) {
-            panic_with_error!(e, FungibleTokenError::UserNotAllowed);
-        }
-        if !AllowList::allowed(e, from) {
-            panic_with_error!(e, FungibleTokenError::UserNotAllowed);
-        }
-        if !AllowList::allowed(e, to) {
+        if !AllowList::allowed(e, from) || !AllowList::allowed(e, to) {
             panic_with_error!(e, FungibleTokenError::UserNotAllowed);
         }
 
@@ -188,8 +186,7 @@ impl AllowList {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::UserNotAllowed`] - When either `owner` or
-    ///   `spender` is not allowed.
+    /// * [`FungibleTokenError::UserNotAllowed`] - When `owner` is not allowed.
     /// * Also refer to [`Base::approve`] errors.
     pub fn approve(
         e: &Env,
@@ -200,9 +197,6 @@ impl AllowList {
     ) {
         // Check if both addresses are allowed
         if !AllowList::allowed(e, owner) {
-            panic_with_error!(e, FungibleTokenError::UserNotAllowed);
-        }
-        if !AllowList::allowed(e, spender) {
             panic_with_error!(e, FungibleTokenError::UserNotAllowed);
         }
 

@@ -118,10 +118,8 @@ fn allowlist_transfer_from_override_works() {
     assert!(!client.allowed(&user1));
     assert!(!client.allowed(&user2));
 
-    // Allow user1 & user2
-    client.allow_user(&user1, &manager);
+    // Allow user2
     client.allow_user(&user2, &manager);
-    assert!(client.allowed(&user1));
     assert!(client.allowed(&user2));
 
     // Now admin can transfer to user1
@@ -148,11 +146,9 @@ fn allowlist_approve_override_works() {
     assert!(!client.allowed(&user1));
     assert!(!client.allowed(&user2));
 
-    // Allow user1 & user2
+    // Allow user1
     client.allow_user(&user1, &manager);
-    client.allow_user(&user2, &manager);
     assert!(client.allowed(&user1));
-    assert!(client.allowed(&user2));
 
     // Approve user2 to transfer from user1
     client.approve(&user1, &user2, &transfer_amount, &1000);

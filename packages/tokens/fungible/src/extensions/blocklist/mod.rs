@@ -50,7 +50,7 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     ///
     /// # Events
     ///
-    /// * topics - `["user_blocked", user: Address]`
+    /// * topics - `["block", user: Address]`
     /// * data - `[]`
     fn block_user(e: &Env, user: Address, operator: Address);
 
@@ -64,7 +64,7 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     ///
     /// # Events
     ///
-    /// * topics - `["user_unblocked", user: Address]`
+    /// * topics - `["unblock", user: Address]`
     /// * data - `[]`
     fn unblock_user(e: &Env, user: Address, operator: Address);
 }

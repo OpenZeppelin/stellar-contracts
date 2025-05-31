@@ -1,5 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
-use stellar_constants::{BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD};
+use stellar_constants::{ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD};
 
 use crate::{
     extensions::blocklist::{emit_user_blocked, emit_user_unblocked},
@@ -41,7 +41,16 @@ impl BlockList {
     /// * `account` - The address to check the blocked status for.
     pub fn blocked(e: &Env, account: &Address) -> bool {
         let key = BlockListStorageKey::Blocked(account.clone());
-        e.storage().persistent().get(&key).unwrap_or(false)
+        if let Some(blocked) = e.storage().persistent().get(&key) {
+            e.storage().persistent().extend_ttl(
+                &key,
+                ALLOW_BLOCK_TTL_THRESHOLD,
+                ALLOW_BLOCK_EXTEND_AMOUNT,
+            );
+            blocked
+        } else {
+            false
+        }
     }
 
     // ################## CHANGE STATE ##################
@@ -55,7 +64,7 @@ impl BlockList {
     ///
     /// # Events
     ///
-    /// * topics - `["user_blocked", user: Address]`
+    /// * topics - `["block", user: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -72,7 +81,6 @@ impl BlockList {
         // Set the user as blocked
         let key = BlockListStorageKey::Blocked(user.clone());
         e.storage().persistent().set(&key, &true);
-        e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
 
         // Emit event
         emit_user_blocked(e, user);
@@ -87,7 +95,7 @@ impl BlockList {
     ///
     /// # Events
     ///
-    /// * topics - `["user_unblocked", user: Address]`
+    /// * topics - `["unblock", user: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -104,7 +112,6 @@ impl BlockList {
         // Set the user as not blocked
         let key = BlockListStorageKey::Blocked(user.clone());
         e.storage().persistent().set(&key, &false);
-        e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
 
         // Emit event
         emit_user_unblocked(e, user);
@@ -128,10 +135,7 @@ impl BlockList {
     /// * Also refer to [`Base::transfer`] errors.
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         // Check if either address is blocked
-        if BlockList::blocked(e, from) {
-            panic_with_error!(e, FungibleTokenError::UserBlocked);
-        }
-        if BlockList::blocked(e, to) {
+        if BlockList::blocked(e, from) || BlockList::blocked(e, to) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
 
@@ -154,18 +158,12 @@ impl BlockList {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::UserBlocked`] - When either `from`, `to`, or
-    ///   `spender` is blocked.
+    /// * [`FungibleTokenError::UserBlocked`] - When either `from`, or `to` is
+    ///   blocked.
     /// * Also refer to [`Base::transfer_from`] errors.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         // Check if any address is blocked
-        if BlockList::blocked(e, spender) {
-            panic_with_error!(e, FungibleTokenError::UserBlocked);
-        }
-        if BlockList::blocked(e, from) {
-            panic_with_error!(e, FungibleTokenError::UserBlocked);
-        }
-        if BlockList::blocked(e, to) {
+        if BlockList::blocked(e, from) || BlockList::blocked(e, to) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
 
@@ -188,8 +186,7 @@ impl BlockList {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::UserBlocked`] - When either `owner` or `spender`
-    ///   is blocked.
+    /// * [`FungibleTokenError::UserBlocked`] - When `owner` is blocked.
     /// * Also refer to [`Base::approve`] errors.
     pub fn approve(
         e: &Env,
@@ -200,9 +197,6 @@ impl BlockList {
     ) {
         // Check if either address is blocked
         if BlockList::blocked(e, owner) {
-            panic_with_error!(e, FungibleTokenError::UserBlocked);
-        }
-        if BlockList::blocked(e, spender) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
 

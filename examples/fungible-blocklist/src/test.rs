@@ -101,37 +101,6 @@ fn blocklist_approve_override_works() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #114)")]
-fn blocked_spender_cannot_transfer_from() {
-    let e = Env::default();
-    let admin = Address::generate(&e);
-    let manager = Address::generate(&e);
-    let user1 = Address::generate(&e);
-    let user2 = Address::generate(&e);
-    let user3 = Address::generate(&e);
-    let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &manager, &initial_supply);
-    let transfer_amount = 1000;
-
-    e.mock_all_auths();
-
-    // Transfer some tokens to user1
-    client.transfer(&admin, &user1, &transfer_amount);
-    assert_eq!(client.balance(&user1), transfer_amount);
-
-    // User1 approves user2
-    client.approve(&user1, &user2, &transfer_amount, &1000);
-    assert_eq!(client.allowance(&user1, &user2), transfer_amount);
-
-    // Block user2 (the spender)
-    client.block_user(&user2, &manager);
-    assert!(client.blocked(&user2));
-
-    // Blocked user2 tries to transfer from user1 to user3 (should fail)
-    client.transfer_from(&user2, &user1, &user3, &transfer_amount);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #114)")]
 fn transfer_from_blocked_user() {
     let e = Env::default();
     let admin = Address::generate(&e);

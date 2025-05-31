@@ -640,7 +640,6 @@ dependencies = [
  "stellar-access-control",
  "stellar-access-control-macros",
  "stellar-default-impl-macro",
- "stellar-event-assertion",
  "stellar-fungible",
 ]
 
@@ -652,7 +651,6 @@ dependencies = [
  "stellar-access-control",
  "stellar-access-control-macros",
  "stellar-default-impl-macro",
- "stellar-event-assertion",
  "stellar-fungible",
 ]
 

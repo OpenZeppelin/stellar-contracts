@@ -19,4 +19,3 @@ stellar-default-impl-macro = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-stellar-event-assertion = { workspace = true }
