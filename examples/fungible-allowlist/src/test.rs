@@ -17,7 +17,7 @@ fn create_client<'a>(
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #110)")]
+#[should_panic(expected = "Error(Contract, #113)")]
 fn cannot_transfer_before_allow() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -66,7 +66,7 @@ fn transfer_to_allowed_account_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #110)")]
+#[should_panic(expected = "Error(Contract, #113)")]
 fn cannot_transfer_after_disallow() {
     let e = Env::default();
     let admin = Address::generate(&e);

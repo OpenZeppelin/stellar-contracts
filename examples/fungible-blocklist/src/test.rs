@@ -48,7 +48,7 @@ fn block_unblock_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #111)")]
+#[should_panic(expected = "Error(Contract, #114)")]
 fn blocked_user_cannot_approve() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -100,7 +100,7 @@ fn blocklist_approve_override_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #111)")]
+#[should_panic(expected = "Error(Contract, #114)")]
 fn blocked_spender_cannot_transfer_from() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -131,7 +131,7 @@ fn blocked_spender_cannot_transfer_from() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #111)")]
+#[should_panic(expected = "Error(Contract, #114)")]
 fn transfer_from_blocked_user() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -162,7 +162,7 @@ fn transfer_from_blocked_user() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #111)")]
+#[should_panic(expected = "Error(Contract, #114)")]
 fn transfer_from_to_blocked_user() {
     let e = Env::default();
     let admin = Address::generate(&e);

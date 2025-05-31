@@ -74,7 +74,7 @@ fn transfer_with_allowed_users_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #110)")]
+#[should_panic(expected = "Error(Contract, #113)")]
 fn transfer_with_sender_not_allowed_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -95,7 +95,7 @@ fn transfer_with_sender_not_allowed_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #110)")]
+#[should_panic(expected = "Error(Contract, #113)")]
 fn transfer_with_receiver_not_allowed_panics() {
     let e = Env::default();
     e.mock_all_auths();
