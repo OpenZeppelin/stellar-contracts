@@ -108,3 +108,21 @@ fn transfer_with_receiver_blocked_panics() {
         BlockList::transfer(&e, &user1, &user2, 50);
     });
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn approve_with_owner_blocked_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Block user1
+        BlockList::block_user(&e, &user1);
+
+        // Try to approve tokens from user1 (blocked) to user2
+        BlockList::approve(&e, &user1, &user2, 50, 100);
+    });
+}

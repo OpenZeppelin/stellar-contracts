@@ -114,3 +114,18 @@ fn transfer_with_receiver_not_allowed_panics() {
         AllowList::transfer(&e, &user1, &user2, 50);
     });
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #113)")]
+fn approve_with_owner_not_allowed_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Try to approve tokens from user1 (not allowed) to user2 (not allowed)
+        AllowList::approve(&e, &user1, &user2, 50, 100);
+    });
+}
