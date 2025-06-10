@@ -4,13 +4,17 @@
 *** xref:tokens/non-fungible/non-fungible.adoc#extensions[Extensions]
 **** xref:tokens/non-fungible/nft-consecutive.adoc[Consecutive]
 **** xref:tokens/non-fungible/nft-enumerable.adoc[Enumerable]
-// TODO: sequential utility for non fungible
 
 * Utilities
 ** xref:utils/pausable.adoc[Pausable]
 ** xref:utils/upgradeable.adoc[Upgradeable]
-// TODO: access control
+** xref:access/access-control.adoc[Access Control]
+** xref:access/ownable.adoc[Ownable]
 // TODO: crypto and merkle tree
 
+
+// TODO: helpers section for default impl macro
+
+// TODO: general page on explaining our TTL strategy, trait based design architecture, etc.
 
 * xref:get-started.adoc[Get Started]
