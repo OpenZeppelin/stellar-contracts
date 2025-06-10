@@ -1,12 +1,16 @@
 * Tokens
-** xref:tokens/fungible.adoc[Fungible Tokens]
-** xref:tokens/non-fungible.adoc[Non-Fungible Tokens]
-*** xref:tokens/non-fungible.adoc#base_and_extensions[Extensions]
-**** xref:tokens/nft-consecutive.adoc[Consecutive]
-**** xref:tokens/nft-enumerable.adoc[Enumerable]
+** xref:tokens/fungible/fungible.adoc[Fungible Tokens]
+** xref:tokens/non-fungible/non-fungible.adoc[Non-Fungible Tokens]
+*** xref:tokens/non-fungible/non-fungible.adoc#extensions[Extensions]
+**** xref:tokens/non-fungible/nft-consecutive.adoc[Consecutive]
+**** xref:tokens/non-fungible/nft-enumerable.adoc[Enumerable]
+// TODO: sequential utility for non fungible
 
 * Utilities
 ** xref:utils/pausable.adoc[Pausable]
 ** xref:utils/upgradeable.adoc[Upgradeable]
+// TODO: access control
+// TODO: crypto and merkle tree
+
 
 * xref:get-started.adoc[Get Started]

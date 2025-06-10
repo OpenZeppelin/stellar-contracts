@@ -190,3 +190,42 @@ pub fn emit_remove_token_royalty(e: &Env, token_id: u32) {
     let topics = (Symbol::new(e, "remove_token_royalty"), token_id);
     e.events().publish(topics, ());
 }
+
+// ################## EVENTS ##################
+
+/// Emits an event indicating that default royalty has been set.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `receiver` - The address that will receive royalty payments.
+/// * `basis_points` - The royalty percentage in basis points (100 = 1%, 10000 =
+///   100%).
+///
+/// # Events
+///
+/// * topics - `["set_default_royalty", receiver: Address]`
+/// * data - `[basis_points: u32]`
+pub fn emit_set_default_royalty(e: &Env, receiver: &Address, basis_points: u32) {
+    let topics = (Symbol::new(e, "set_default_royalty"), receiver);
+    e.events().publish(topics, basis_points);
+}
+
+/// Emits an event indicating that token royalty has been set.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `receiver` - The address that will receive royalty payments.
+/// * `token_id` - The identifier of the token.
+/// * `basis_points` - The royalty percentage in basis points (100 = 1%, 10000 =
+///   100%).
+///
+/// # Events
+///
+/// * topics - `["set_token_royalty", receiver: Address]`
+/// * data - `[token_id: u32, basis_points: u32]`
+pub fn emit_set_token_royalty(e: &Env, receiver: &Address, token_id: u32, basis_points: u32) {
+    let topics = (Symbol::new(e, "set_token_royalty"), receiver);
+    e.events().publish(topics, (token_id, basis_points));
+}
