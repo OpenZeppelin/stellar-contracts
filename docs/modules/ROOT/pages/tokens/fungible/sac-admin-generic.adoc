@@ -1,0 +1,129 @@
+:source-highlighter: highlight.js
+:highlightjs-languages: rust
+:github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
+= SAC Admin Generic
+
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/utils/sac_admin_generic[Source Code]
+
+== Overview
+
+The Stellar Asset Contract (SAC) Admin Generic module provides a way to implement custom administrative
+functionality for Stellar Asset Contracts (SACs) using the generic approach. This approach leverages the
+`__check_auth` function to handle authentication and authorization logic while maintaining a unified
+interface for both user-facing and admin functions.
+
+== Key Concepts
+
+When a classic Stellar asset is ported to Soroban, it is represented by a SAC - a smart contract that provides
+both user-facing and administrative functions for asset management. SACs expose standard functions for handling
+fungible tokens, such as `transfer`, `approve`, `burn`, etc. Additionally, they include administrative functions
+(`mint`, `clawback`, `set_admin`, `set_authorized`) that are initially restricted to the issuer (a G-account).
+
+The `set_admin` function enables transferring administrative control to a custom contract, allowing for more
+complex authorization logic. This flexibility opens up possibilities for implementing custom rules, such as
+role-based access control, two-step admin transfers, mint rate limits, and upgradeability.
+
+== Generic Approach
+
+The Generic approach to SAC Admin implementation:
+
+* Leverages the `__check_auth` function to handle authentication and authorization logic
+* Maintains a unified interface for both user-facing and admin functions
+* Allows for injecting any custom authorization logic
+* Requires a more sophisticated authorization mechanism
+
+=== Key Functions
+
+* `set_sac_address`: Sets the address of the SAC contract
+* `get_sac_address`: Gets the address of the SAC contract
+* `extract_sac_contract_context`: Extracts the SAC contract context from the environment
+* `SacFn`: Enum representing the different SAC functions that can be called
+
+=== Example Implementation
+
+Here's a simplified example of a SAC Admin Generic contract:
+
+[source,rust]
+----
+#[contract]
+pub struct SacAdminExampleContract;
+
+#[contractimpl]
+impl SacAdminExampleContract {
+    pub fn __constructor(e: Env, sac: Address, chief: BytesN<32>, operator: BytesN<32>) {
+        set_sac_address(&e, &sac);
+        e.storage().instance().set(&SacDataKey::Chief, &chief);
+        e.storage().instance().set(&SacDataKey::Operator(operator.clone()), &true);
+        e.storage()
+            .instance()
+            .set(&SacDataKey::MintingLimit(operator), &(1_000_000_000i128, 0i128));
+    }
+
+    pub fn get_sac_address(e: &Env) -> Address {
+        get_sac_address(e)
+    }
+}
+----
+
+=== Custom Authorization Logic
+
+The key feature of the Generic approach is the ability to implement custom authorization logic in the `__check_auth`
+function:
+
+[source,rust]
+----
+#[contractimpl]
+impl CustomAccountInterface for SacAdminExampleContract {
+    fn __check_auth(e: Env, signature_payload: BytesN<32>, signature: Val) -> Val {
+        // Extract the SAC contract context
+        let (sac_fn, args) = match extract_sac_contract_context(&e, &signature_payload) {
+            Some(result) => result,
+            None => return false.into_val(&e),
+        };
+
+        // Implement custom authorization logic based on the SAC function
+        match sac_fn {
+            SacFn::Mint => {
+                // Custom logic for minting
+                // For example, check minting limits
+            }
+            SacFn::Clawback => {
+                // Custom logic for clawback
+            }
+            SacFn::SetAdmin => {
+                // Custom logic for setting admin
+            }
+            SacFn::SetAuthorized => {
+                // Custom logic for setting authorized
+            }
+        }
+
+        // Return true if authorized
+        true.into_val(&e)
+    }
+}
+----
+
+== Benefits and Trade-offs
+
+=== Benefits
+
+* Maintains a unified interface for both user-facing and admin functions
+* Allows for complex authorization logic
+* Provides flexibility in implementing custom rules
+
+=== Trade-offs
+
+* Requires a more sophisticated authorization mechanism
+* More complex to implement compared to the wrapper approach
+* Requires understanding of the Soroban authorization system
+
+== Full Example
+
+A complete example implementation can be found in the
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/sac-admin-generic[sac-admin-generic example].
+
+== See Also
+
+* xref:tokens/fungible/sac-admin-wrapper.adoc[SAC Admin Wrapper]
+* xref:tokens/fungible/fungible.adoc[Fungible Token]
