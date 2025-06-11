@@ -975,6 +975,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nft-royalties-example"
+version = "0.3.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-default-impl-macro",
+ "stellar-non-fungible",
+]
+
+[[package]]
 name = "nft-sequential-minting-example"
 version = "0.3.0"
 dependencies = [

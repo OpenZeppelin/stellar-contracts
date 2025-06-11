@@ -47,8 +47,20 @@ mod helper;
 /// - `NonFungibleToken`
 /// - `NonFungibleBurnable`
 /// - `NonFungibleEnumerable`
+/// - `NonFungibleRoyalties`
 /// - `AccessControl`
 /// - `Ownable`
+///
+/// # Notes
+///
+/// This macro does not support the below traits on purpose:
+/// - `FungibleAllowList`
+/// - `FungibleBlockList`
+///
+/// Because, there are no default implementation to enforce how the
+/// authorization should be configured. Not providing a default implementation
+/// for these traits is basically acting as a reminder for the implementor to
+/// provide the authorization logic for these traits.
 #[proc_macro_attribute]
 pub fn default_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
     generate_default_impl(item)

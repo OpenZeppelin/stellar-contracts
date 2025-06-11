@@ -206,6 +206,23 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
         ],
+        "NonFungibleRoyalties" => vec![
+            syn::parse_quote! {
+                fn set_default_royalty(e: &soroban_sdk::Env, receiver: soroban_sdk::Address, basis_points: u32) {
+                    Self::ContractType::set_default_royalty(e, &receiver, basis_points);
+                }
+            },
+            syn::parse_quote! {
+                fn set_token_royalty(e: &soroban_sdk::Env, token_id: u32, receiver: soroban_sdk::Address, basis_points: u32) {
+                    Self::ContractType::set_token_royalty(e, token_id, &receiver, basis_points);
+                }
+            },
+            syn::parse_quote! {
+                fn royalty_info(e: &soroban_sdk::Env, token_id: u32, sale_price: u32) -> (soroban_sdk::Address, u32) {
+                    Self::ContractType::royalty_info(e, token_id, sale_price)
+                }
+            },
+        ],
         "Ownable" => vec![
             syn::parse_quote! {
                 fn get_owner(e: &soroban_sdk::Env) -> Option<soroban_sdk::Address> {
