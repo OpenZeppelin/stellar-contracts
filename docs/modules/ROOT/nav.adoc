@@ -10,8 +10,7 @@
 ** xref:utils/upgradeable.adoc[Upgradeable]
 ** xref:access/access-control.adoc[Access Control]
 ** xref:access/ownable.adoc[Ownable]
-// TODO: crypto and merkle tree
-
+** xref:utils/crypto.adoc[Cryptography]
 
 // TODO: helpers section for default impl macro
 
