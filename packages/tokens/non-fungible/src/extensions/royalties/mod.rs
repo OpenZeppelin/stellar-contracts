@@ -3,7 +3,7 @@ use crate::NonFungibleToken;
 
 mod test;
 
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{Address, Env, Symbol};
 
 /// Royalties Trait for Non-Fungible Token (ERC2981)
 ///
@@ -51,6 +51,11 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * [`crate::NonFungibleTokenError::InvalidRoyaltyAmount`] - If the
     ///   royalty amount is higher than 10_000 (100%) basis points.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["set_default_royalty", receiver: Address]`
+    /// * data - `[basis_points: u32]`
     fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32);
 
     /// Sets the royalty information for a specific token.
@@ -69,6 +74,11 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///   royalty amount is higher than 10_000 (100%) basis points.
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
     ///   not exist.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["set_token_royalty", receiver: Address]`
+    /// * data - `[token_id: u32, basis_points: u32]`
     fn set_token_royalty(e: &Env, token_id: u32, receiver: Address, basis_points: u32);
 
     /// Returns `(Address, u32)` - A tuple containing the receiver address and
@@ -86,4 +96,43 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
     ///   not exist.
     fn royalty_info(e: &Env, token_id: u32, sale_price: u32) -> (Address, u32);
+}
+
+// ################## EVENTS ##################
+
+/// Emits an event indicating that default royalty has been set.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `receiver` - The address that will receive royalty payments.
+/// * `basis_points` - The royalty percentage in basis points (100 = 1%, 10000 =
+///   100%).
+///
+/// # Events
+///
+/// * topics - `["set_default_royalty", receiver: Address]`
+/// * data - `[basis_points: u32]`
+pub fn emit_set_default_royalty(e: &Env, receiver: &Address, basis_points: u32) {
+    let topics = (Symbol::new(e, "set_default_royalty"), receiver);
+    e.events().publish(topics, basis_points);
+}
+
+/// Emits an event indicating that token royalty has been set.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `receiver` - The address that will receive royalty payments.
+/// * `token_id` - The identifier of the token.
+/// * `basis_points` - The royalty percentage in basis points (100 = 1%, 10000 =
+///   100%).
+///
+/// # Events
+///
+/// * topics - `["set_token_royalty", receiver: Address, token_id: u32]`
+/// * data - `[basis_points: u32]`
+pub fn emit_set_token_royalty(e: &Env, receiver: &Address, token_id: u32, basis_points: u32) {
+    let topics = (Symbol::new(e, "set_token_royalty"), receiver, token_id);
+    e.events().publish(topics, basis_points);
 }
