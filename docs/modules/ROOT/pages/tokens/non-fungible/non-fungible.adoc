@@ -130,6 +130,6 @@ Key methods:
 
 Events:
 * `set_default_royalty`: Emitted when default royalty is set, with topics `["set_default_royalty", receiver: Address]` and data `[basis_points: u32]`
-* `set_token_royalty`: Emitted when token royalty is set, with topics `["set_token_royalty", receiver: Address]` and data `[token_id: u32, basis_points: u32]`
+* `set_token_royalty`: Emitted when token royalty is set, with topics `["set_token_royalty", receiver: Address, token_id: u32]` and data `[basis_points: u32]`
 
 Note: The royalties extension allows both collection-wide default royalties and per-token royalty settings.
