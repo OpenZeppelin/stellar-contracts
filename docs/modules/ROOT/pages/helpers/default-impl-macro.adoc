@@ -29,7 +29,6 @@ The `#[default_impl]` macro supports the following OpenZeppelin Stellar traits:
 * `NonFungibleToken`
 * `NonFungibleBurnable`
 * `NonFungibleEnumerable`
-* `NonFungibleRoyalties`
 * `AccessControl`
 * `Ownable`
 
@@ -37,6 +36,7 @@ The `#[default_impl]` macro intentionally does not support the following traits:
 
 * `FungibleAllowlist`
 * `FungibleBlocklist`
+* `NonFungibleRoyalties`
 
 This limitation is by design: authorization configurations require specific implementation tailored to
 each project's security requirements. By requiring manual implementation of these traits, we ensure
