@@ -981,6 +981,8 @@ dependencies = [
  "soroban-sdk",
  "stellar-default-impl-macro",
  "stellar-non-fungible",
+ "stellar-ownable",
+ "stellar-ownable-macro",
 ]
 
 [[package]]
