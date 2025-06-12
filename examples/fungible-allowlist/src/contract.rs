@@ -30,7 +30,6 @@ impl ExampleContract {
         access_control::set_admin(e, &admin);
 
         // create a role "manager" and grant it to `manager`
-
         access_control::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
 
         // Allow the admin to transfer tokens

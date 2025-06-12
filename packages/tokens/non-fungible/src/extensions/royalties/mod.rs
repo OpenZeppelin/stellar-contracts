@@ -46,12 +46,13 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// * `receiver` - The address that should receive royalty payments.
     /// * `basis_points` - The royalty percentage in basis points (100 = 1%,
     ///   10000 = 100%).
+    /// * `operator` - The address authorizing the invocation.
     ///
     /// # Errors
     ///
     /// * [`crate::NonFungibleTokenError::InvalidRoyaltyAmount`] - If the
     ///   royalty amount is higher than 10_000 (100%) basis points.
-    fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32);
+    fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32, operator: Address);
 
     /// Sets the royalty information for a specific token.
     ///
@@ -62,6 +63,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// * `receiver` - The address that should receive royalty payments.
     /// * `basis_points` - The royalty percentage in basis points (100 = 1%,
     ///   10000 = 100%).
+    /// * `operator` - The address authorizing the invocation.
     ///
     /// # Errors
     ///
@@ -69,7 +71,13 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///   royalty amount is higher than 10_000 (100%) basis points.
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
     ///   not exist.
-    fn set_token_royalty(e: &Env, token_id: u32, receiver: Address, basis_points: u32);
+    fn set_token_royalty(
+        e: &Env,
+        token_id: u32,
+        receiver: Address,
+        basis_points: u32,
+        operator: Address,
+    );
 
     /// Returns `(Address, u32)` - A tuple containing the receiver address and
     /// the royalty amount.

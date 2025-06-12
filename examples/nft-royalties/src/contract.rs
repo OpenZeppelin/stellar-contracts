@@ -4,20 +4,18 @@
 //! setting and querying royalty information for NFTs following the ERC2981
 //! standard.
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
+use stellar_access_control::{self as access_control, AccessControl};
+use stellar_access_control_macros::{has_role, only_admin};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{royalties::NonFungibleRoyalties, Base, NonFungibleToken};
-use stellar_ownable::{self as ownable};
-use stellar_ownable_macro::only_owner;
 
 #[contract]
 pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, owner: Address) {
-        ownable::set_owner(e, &owner);
-
+    pub fn __constructor(e: &Env, admin: Address, manager: Address) {
         Base::set_metadata(
             e,
             String::from_str(e, "https://example.com/nft/"),
@@ -26,16 +24,21 @@ impl ExampleContract {
         );
 
         // Set default royalty for the entire collection (10%)
-        Base::set_default_royalty(e, &owner, 1000);
+        Base::set_default_royalty(e, &admin, 1000);
+
+        access_control::set_admin(e, &admin);
+
+        // create a role "manager" and grant it to `manager`
+        access_control::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
     }
 
-    #[only_owner]
+    #[only_admin]
     pub fn mint(e: &Env, to: Address) -> u32 {
         // Mint token with sequential ID
         Base::sequential_mint(e, &to)
     }
 
-    #[only_owner]
+    #[only_admin]
     pub fn mint_with_royalty(e: &Env, to: Address, receiver: Address, basis_points: u32) -> u32 {
         // Mint token with sequential ID
         let token_id = Base::sequential_mint(e, &to);
@@ -59,13 +62,19 @@ impl NonFungibleToken for ExampleContract {
 
 #[contractimpl]
 impl NonFungibleRoyalties for ExampleContract {
-    #[only_owner]
-    fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32) {
+    #[has_role(operator, "manager")]
+    fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32, operator: Address) {
         Base::set_default_royalty(e, &receiver, basis_points);
     }
 
-    #[only_owner]
-    fn set_token_royalty(e: &Env, token_id: u32, receiver: Address, basis_points: u32) {
+    #[has_role(operator, "manager")]
+    fn set_token_royalty(
+        e: &Env,
+        token_id: u32,
+        receiver: Address,
+        basis_points: u32,
+        operator: Address,
+    ) {
         Base::set_token_royalty(e, token_id, &receiver, basis_points);
     }
 
@@ -73,3 +82,7 @@ impl NonFungibleRoyalties for ExampleContract {
         Base::royalty_info(e, token_id, sale_price)
     }
 }
+
+#[default_impl]
+#[contractimpl]
+impl AccessControl for ExampleContract {}
