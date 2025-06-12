@@ -73,8 +73,8 @@ impl Base {
     ///
     /// # Events
     ///
-    /// * topics - `["set_token_royalty", receiver: Address]`
-    /// * data - `[token_id: u32, basis_points: u32]`
+    /// * topics - `["set_token_royalty", receiver: Address, token_id: u32]`
+    /// * data - `[basis_points: u32]`
     ///
     /// # Errors
     ///

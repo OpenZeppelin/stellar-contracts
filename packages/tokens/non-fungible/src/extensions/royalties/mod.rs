@@ -130,9 +130,9 @@ pub fn emit_set_default_royalty(e: &Env, receiver: &Address, basis_points: u32) 
 ///
 /// # Events
 ///
-/// * topics - `["set_token_royalty", receiver: Address]`
-/// * data - `[token_id: u32, basis_points: u32]`
+/// * topics - `["set_token_royalty", receiver: Address, token_id: u32]`
+/// * data - `[basis_points: u32]`
 pub fn emit_set_token_royalty(e: &Env, receiver: &Address, token_id: u32, basis_points: u32) {
-    let topics = (Symbol::new(e, "set_token_royalty"), receiver);
-    e.events().publish(topics, (token_id, basis_points));
+    let topics = (Symbol::new(e, "set_token_royalty"), receiver, token_id);
+    e.events().publish(topics, basis_points);
 }
