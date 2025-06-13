@@ -5,13 +5,13 @@
 
 https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/non-fungible/src/extensions/consecutive[Source Code]
 
-Consecutive extension for xref:tokens/non-fungible.adoc[Non-Fungible Token] is useful
+Consecutive extension for xref:tokens/non-fungible/non-fungible.adoc[Non-Fungible Token] is useful
 for efficiently minting multiple tokens in a single transaction. This can significantly
 reduce costs and improve performance when creating a large number of tokens at once.
 
 == Usage
 
-We'll continue with the xref:tokens/non-fungible.adoc#usage[example] from *Non-Fungible Token*
+We'll continue with the xref:tokens/non-fungible/non-fungible.adoc#usage[example] from *Non-Fungible Token*
 and modify the contract so that now batches of tokens can be minted with each call
 to `award_items`. Please note any account can call `award_items` and we might want to
 implement access control to restrict who can mint.
