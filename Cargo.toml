@@ -11,6 +11,7 @@ members = [
     "examples/nft-consecutive",
     "examples/nft-enumerable",
     "examples/nft-sequential-minting",
+    "examples/nft-royalties",
     "examples/sac-admin-wrapper",
     "examples/sac-admin-generic",
     "examples/ownable",
