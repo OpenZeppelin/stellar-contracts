@@ -1,6 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 use stellar_constants::{OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD};
 
+use super::{emit_set_default_royalty, emit_set_token_royalty};
 use crate::{Base, NonFungibleTokenError};
 
 /// Storage container for royalty information
@@ -29,6 +30,11 @@ impl Base {
     /// * `basis_points` - The royalty percentage in basis points (100 = 1%,
     ///   10000 = 100%).
     ///
+    /// # Events
+    ///
+    /// * topics - `["set_default_royalty", receiver: Address]`
+    /// * data - `[basis_points: u32]`
+    ///
     /// # Errors
     ///
     /// * [`NonFungibleTokenError::InvalidRoyaltyAmount`] - If the royalty
@@ -49,6 +55,8 @@ impl Base {
         let key = NFTRoyaltiesStorageKey::DefaultRoyalty;
         let royalty_info = RoyaltyInfo { receiver: receiver.clone(), basis_points };
         e.storage().instance().set(&key, &royalty_info);
+
+        emit_set_default_royalty(e, receiver, basis_points);
     }
 
     /// Sets the royalty information for a specific token.
@@ -62,6 +70,11 @@ impl Base {
     /// * `receiver` - The address that should receive royalty payments.
     /// * `basis_points` - The royalty percentage in basis points (100 = 1%,
     ///   10000 = 100%).
+    ///
+    /// # Events
+    ///
+    /// * topics - `["set_token_royalty", receiver: Address, token_id: u32]`
+    /// * data - `[basis_points: u32]`
     ///
     /// # Errors
     ///
@@ -87,6 +100,8 @@ impl Base {
         let key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
         let royalty_info = RoyaltyInfo { receiver: receiver.clone(), basis_points };
         e.storage().persistent().set(&key, &royalty_info);
+
+        emit_set_token_royalty(e, receiver, token_id, basis_points);
     }
 
     /// Returns `(Address, u32)` - A tuple containing the receiver address and
