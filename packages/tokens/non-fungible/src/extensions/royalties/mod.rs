@@ -59,7 +59,6 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// * data - `[basis_points: u32]`
     fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32, operator: Address);
 
-
     /// Sets the royalty information for a specific token.
     ///
     /// # Arguments
