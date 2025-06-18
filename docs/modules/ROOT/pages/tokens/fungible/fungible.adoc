@@ -37,13 +37,15 @@ Here's what a basic fungible token contract might look like:
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
 use stellar_fungible::{burnable::FungibleBurnable, Base, ContractOverrides, FungibleToken};
+use stellar_ownable::{self as ownable, Ownable};
+use stellar_ownable_macro::only_owner;
 
 #[contract]
 pub struct GameCurrency;
 
 #[contractimpl]
 impl GameCurrency {
-    pub fn __constructor(e: &Env, admin: Address) {
+    pub fn __constructor(e: &Env, initial_owner: Address) {
         // Set token metadata
         Base::set_metadata(
             e,
@@ -52,15 +54,12 @@ impl GameCurrency {
             String::from_str(e, "GCUR"),
         );
 
-        // Store the admin address
-        e.storage().instance().set(&"ADMIN", &admin);
+        // Set the contract owner
+        ownable::set_owner(e, &initial_owner);
     }
 
+    #[only_owner]
     pub fn mint_tokens(e: &Env, to: Address, amount: i128) {
-        // Get admin and require authorization
-        let admin: Address = e.storage().instance().get(&"ADMIN").unwrap();
-        admin.require_auth();
-
         // Mint tokens to the recipient
         Base::mint(e, &to, amount);
     }
@@ -88,23 +87,11 @@ The `FungibleBurnable` trait extends the `FungibleToken` trait to provide the ca
 To fully comply with the SEP-41 specification, a contract must implement both the `FungibleToken`
 and `FungibleBurnable` traits.
 
-Key methods:
-* `burn`: Destroys tokens from an account
-* `burn_from`: Destroys tokens from an account using the allowance mechanism
-
-Events:
-* `burn`: Emitted when tokens are burned, with topics `["burn", from: Address]` and data `[amount: i128]`
-
 === - Capped
 https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/capped[Source Code]
 
 Unlike other extensions, the capped extension does not expose a separate trait. Instead,
 it offers helper functions designed to assist in implementing the mint function, enforcing a supply cap.
-
-Helper functions:
-* `set_cap`: Sets the maximum token supply
-* `query_cap`: Returns the maximum token supply
-* `check_cap`: Validates that minting a specified amount would not exceed the cap
 
 === - AllowList
 https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/allowlist[Source Code]
@@ -113,22 +100,12 @@ The `FungibleAllowList` trait extends the `FungibleToken` trait to provide an al
 can be managed by an authorized account. This extension ensures that only allowed accounts can
 transfer tokens or approve token transfers.
 
-Key methods:
-* `allowed`: Returns the allowed status of an account
-* `allow_user`: Allows a user to receive and transfer tokens
-* `disallow_user`: Disallows a user from receiving and transferring tokens
-
 === - BlockList
 https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/blocklist[Source Code]
 
 The `FungibleBlockList` trait extends the `FungibleToken` trait to provide a blocklist mechanism that
 can be managed by an authorized account. This extension ensures that blocked accounts cannot transfer
 tokens or approve token transfers.
-
-Key methods:
-* `blocked`: Returns the blocked status of an account
-* `block_user`: Blocks a user from receiving and transferring tokens
-* `unblock_user`: Unblocks a user, allowing them to receive and transfer tokens
 
 === TokenInterface Macro
 

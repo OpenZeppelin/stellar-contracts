@@ -28,17 +28,6 @@ The Ownable module allows the owner to permanently renounce ownership of the con
 
 This feature is useful for contracts that need to become fully decentralized after an initial setup phase.
 
-== Implementation
-
-=== Core Functions
-
-* `set_owner(e: &Env, owner: &Address)`: Sets the contract owner
-* `get_owner(e: &Env) -> Option<Address>`: Returns the current owner (or None if ownership has been renounced)
-* `transfer_ownership(e: &Env, new_owner: Address, live_until_ledger: u32)`: Initiates ownership transfer
-* `accept_ownership(e: &Env)`: Accepts an ownership transfer
-* `renounce_ownership(e: &Env)`: Permanently removes the owner
-* `enforce_owner_auth(e: &Env)`: Helper function to require owner authorization
-
 === Procedural Macro
 
 The module includes a procedural macro to simplify owner authorization checks:
@@ -56,17 +45,6 @@ pub fn restricted_function(e: &Env, other_param: u32) {
 ----
 
 This expands to code that retrieves the owner from storage and requires authorization before executing the function body.
-
-== Events
-
-The module emits events for important ownership actions:
-
-* `ownership_transfer`: When an ownership transfer is initiated
-  * Data: `[old_owner: Address, new_owner: Address, live_until_ledger: u32]`
-* `ownership_transfer_completed`: When an ownership transfer is completed
-  * Data: `[new_owner: Address]`
-* `ownership_renounced`: When ownership is permanently renounced
-  * Data: `[old_owner: Address]`
 
 == Usage Example
 

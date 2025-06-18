@@ -141,23 +141,6 @@ The `MerkleDistributor` struct provides functionality for:
 * Checking if an index has been claimed
 * Verifying proofs and marking indices as claimed
 
-=== Core Functions
-
-* `get_root(e: &Env) -> H::Output`: Returns the stored Merkle root
-* `is_claimed(e: &Env, index: u32) -> bool`: Checks if an index has been claimed
-* `set_root(e: &Env, root: H::Output)`: Sets the Merkle root (can only be set once)
-* `set_claimed(e: &Env, index: u32)`: Marks an index as claimed
-* `verify_and_set_claimed<N: ToXdr + IndexableNode>(e: &Env, node: N, proof: Vec<H::Output>)`: Verifies a proof and marks the index as claimed if valid
-
-=== Events
-
-The Merkle Distributor emits events for important actions:
-
-* `set_root`: When a Merkle root is set
-  * Data: `[root: Bytes]`
-* `set_claimed`: When an index is claimed
-  * Data: `[index: u32]`
-
 === Usage Example
 
 [source,rust]

@@ -42,19 +42,6 @@ The system tracks account-role pairs in storage with additional enumeration logi
 
 Roles exist only through their relationships with accounts, so a role with zero accounts is indistinguishable from a role that never existed.
 
-== Implementation
-
-=== Core Functions
-
-* `set_admin(e: &Env, admin: &Address)`: Sets the contract admin
-* `get_admin(e: &Env) -> Address`: Returns the current admin
-* `transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32)`: Initiates admin transfer
-* `accept_admin_transfer(e: &Env)`: Accepts an admin transfer
-* `grant_role(e: &Env, account: &Address, role: &Symbol)`: Grants a role to an account
-* `revoke_role(e: &Env, account: &Address, role: &Symbol)`: Revokes a role from an account
-* `has_role(e: &Env, account: &Address, role: &Symbol) -> bool`: Checks if an account has a role
-* `set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol)`: Sets the admin role for a role
-
 === Procedural Macros
 
 The module includes procedural macros to simplify authorization checks:
@@ -82,16 +69,6 @@ pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
     // Function body - only accessible to accounts with "minter" role
 }
 ----
-
-== Events
-
-The module emits events for important actions:
-
-* `admin_transfer_initiated`: When an admin transfer is started
-* `admin_transfer_completed`: When an admin transfer is completed
-* `role_granted`: When a role is granted to an account
-* `role_revoked`: When a role is revoked from an account
-* `role_admin_changed`: When the admin role for a role is changed
 
 == Usage Example
 
@@ -138,7 +115,6 @@ impl MyContract {
 * Hierarchical role management
 * Secure admin transfer process
 * Easy integration with procedural macros
-* Event emission for important actions
 
 === Trade-offs
 
