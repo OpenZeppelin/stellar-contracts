@@ -13,7 +13,7 @@ The Ownable module provides a simple access control mechanism where a contract h
 
 === Ownership Management
 
-The system designates a single owner with exclusive access to functions marked with the `#[only_owner]` attribute. This owner must be set during contract initialization for the module to function properly.
+The system designates a single owner with exclusive access to functions marked with the `#[only_owner]` macro. The initial owner must be ideally set during contract initialization for the module to function properly.
 
 Like the Access Control module, ownership transfers are implemented as a two-step process to prevent accidental or malicious takeovers:
 
