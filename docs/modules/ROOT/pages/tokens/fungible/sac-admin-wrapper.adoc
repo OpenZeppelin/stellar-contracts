@@ -39,15 +39,6 @@ pub trait SACAdminWrapper {
 }
 ----
 
-=== Key Functions
-
-* `set_sac_address`: Sets the address of the SAC contract
-* `get_sac_address`: Gets the address of the SAC contract
-* `set_admin`: Forwards the set_admin call to the SAC
-* `set_authorized`: Forwards the set_authorized call to the SAC
-* `mint`: Forwards the mint call to the SAC
-* `clawback`: Forwards the clawback call to the SAC
-
 === Example Implementation
 
 Here's a simplified example of a SAC Admin Wrapper contract using the OpenZeppelin access control library:
