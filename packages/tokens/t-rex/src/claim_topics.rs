@@ -1,3 +1,5 @@
+use soroban_sdk::{Address, Env, Vec};
+
 pub trait ClaimTopics {
     // Adds a claim topic to the required topics
     fn add_claim_topic(operator: Address, claim_topic: u32);
