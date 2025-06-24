@@ -41,7 +41,6 @@ syn = { version = "2.0", features = ["full"] }
 soroban-test-helpers = "0.2.3"
 hex-literal = "0.4.1"
 ed25519-dalek = "2.1.1"
-rand = "0.8.3"
 
 # members
 stellar-access-control = { path = "packages/access/access-control" }

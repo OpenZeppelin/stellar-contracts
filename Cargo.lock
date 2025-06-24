@@ -1208,7 +1208,6 @@ name = "sac-admin-generic-example"
 version = "0.3.0"
 dependencies = [
  "ed25519-dalek",
- "rand",
  "soroban-sdk",
  "stellar-fungible",
 ]
