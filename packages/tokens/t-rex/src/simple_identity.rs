@@ -1,3 +1,4 @@
+use soroban_sdk::{Address, Env, Vec};
 use ClaimTopics::ClaimTopics;
 use Identity::IdentityVerifier;
 
@@ -12,6 +13,7 @@ pub trait SimpleIdentityVerifier: IdentityVerifier + ClaimTopics {
     // and if the `operator` and `user_address` are the same,
     // we can skip the signature check.
     fn add_claim(
+        e: &Env,
         operator: Address,
         user_address: Address,
         claim_topic: u32,
@@ -20,6 +22,7 @@ pub trait SimpleIdentityVerifier: IdentityVerifier + ClaimTopics {
 
     // Removes a claim from a user
     fn remove_claim(
+        e: &Env,
         operator: Address,
         user_address: Address,
         claim_topic: u32,
@@ -27,11 +30,12 @@ pub trait SimpleIdentityVerifier: IdentityVerifier + ClaimTopics {
 
     // Revokes a claim for a user
     fn revoke_claim(
+        e: &Env,
         operator: Address,
         user_address: Address,
         claim_topic: u32,
     ) -> Result<(), Error>;
 
     // Checks if a user has a specific claim
-    fn has_claim(user_address: Address, claim_topic: u32) -> bool;
+    fn has_claim(e: &Env, user_address: Address, claim_topic: u32) -> bool;
 }
