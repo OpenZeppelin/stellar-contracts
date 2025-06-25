@@ -30,7 +30,9 @@ use syn::{
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn only_admin(_attrs: TokenStream, input: TokenStream) -> TokenStream {
+pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    assert!(attrs.is_empty(), "This macro does not accept any arguments");
+
     let input_fn = parse_macro_input!(input as ItemFn);
 
     // Generate the function with the admin authorization check
