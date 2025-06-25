@@ -89,6 +89,26 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
         operator: Address,
     );
 
+    /// Removes token-specific royalty information, allowing the token to fall
+    /// back to the collection-wide default royalty settings.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `token_id` - The identifier of the token.
+    /// * `operator` - The address authorizing the invocation.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
+    ///   not exist.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["remove_token_royalty", token_id: u32]`
+    /// * data - `[]`
+    fn remove_token_royalty(e: &Env, token_id: u32, operator: Address);
+
     /// Returns `(Address, u128)` - A tuple containing the receiver address and
     /// the royalty amount.
     ///
@@ -143,4 +163,20 @@ pub fn emit_set_default_royalty(e: &Env, receiver: &Address, basis_points: u32) 
 pub fn emit_set_token_royalty(e: &Env, receiver: &Address, token_id: u32, basis_points: u32) {
     let topics = (Symbol::new(e, "set_token_royalty"), receiver, token_id);
     e.events().publish(topics, basis_points);
+}
+
+/// Emits an event indicating that token royalty has been removed.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `token_id` - The identifier of the token.
+///
+/// # Events
+///
+/// * topics - `["remove_token_royalty", token_id: u32]`
+/// * data - `[]`
+pub fn emit_remove_token_royalty(e: &Env, token_id: u32) {
+    let topics = (Symbol::new(e, "remove_token_royalty"), token_id);
+    e.events().publish(topics, ());
 }
