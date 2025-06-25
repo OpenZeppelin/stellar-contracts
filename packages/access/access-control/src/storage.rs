@@ -166,7 +166,7 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 }
 
 /// Low-level function to grant a role to an account without performing
-// authorization checks.
+/// authorization checks.
 /// Creates the role if it does not exist.
 /// Returns early if the account already has the role.
 ///
@@ -456,9 +456,14 @@ pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
 ///
 /// * [`AccessControlError::Unauthorized`] - If the caller is neither the
 ///   contract admin nor has the admin role.
-/// * refer to [`get_admin`] errors.
 pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
-    let is_admin = caller == &get_admin(e);
+    // Check if caller is contract admin (if one is set)
+    let is_admin = match e.storage().instance().get::<_, Address>(&AccessControlStorageKey::Admin) {
+        Some(admin) => caller == &admin,
+        None => false, // No admin is set, so caller can't be admin
+    };
+
+    // Check if caller has admin role for the specified role
     let is_admin_role = match get_role_admin(e, role) {
         Some(admin_role) => has_role(e, caller, &admin_role).is_some(),
         None => false,

@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 3,
+    "address": 2,
     "nonce": 0
   },
   "auth": [
@@ -24,10 +24,13 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "Balance"
+                  "symbol": "HasRole"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
+                {
+                  "symbol": "manager"
                 }
               ]
             },
@@ -44,55 +47,13 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "Balance"
+                      "symbol": "HasRole"
                     },
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u32": 1
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          518400
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "GlobalTokens"
-                },
-                {
-                  "u32": 0
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "GlobalTokens"
                     },
                     {
-                      "u32": 0
+                      "symbol": "manager"
                     }
                   ]
                 },
@@ -104,7 +65,7 @@
             },
             "ext": "v0"
           },
-          4095
+          1555200
         ]
       ],
       [
@@ -114,97 +75,7 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "GlobalTokensIndex"
-                },
-                {
-                  "u32": 0
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "GlobalTokensIndex"
-                    },
-                    {
-                      "u32": 0
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "u32": 0
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          4095
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "Owner"
-                },
-                {
-                  "u32": 0
-                }
-              ]
-            },
-            "durability": "persistent"
-          }
-        },
-        [
-          {
-            "last_modified_ledger_seq": 0,
-            "data": {
-              "contract_data": {
-                "ext": "v0",
-                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-                "key": {
-                  "vec": [
-                    {
-                      "symbol": "Owner"
-                    },
-                    {
-                      "u32": 0
-                    }
-                  ]
-                },
-                "durability": "persistent",
-                "val": {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-                }
-              }
-            },
-            "ext": "v0"
-          },
-          518400
-        ]
-      ],
-      [
-        {
-          "contract_data": {
-            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-            "key": {
-              "vec": [
-                {
-                  "symbol": "OwnerTokens"
+                  "symbol": "RoleAccounts"
                 },
                 {
                   "map": [
@@ -218,10 +89,10 @@
                     },
                     {
                       "key": {
-                        "symbol": "owner"
+                        "symbol": "role"
                       },
                       "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                        "symbol": "manager"
                       }
                     }
                   ]
@@ -241,7 +112,7 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "OwnerTokens"
+                      "symbol": "RoleAccounts"
                     },
                     {
                       "map": [
@@ -255,10 +126,10 @@
                         },
                         {
                           "key": {
-                            "symbol": "owner"
+                            "symbol": "role"
                           },
                           "val": {
-                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                            "symbol": "manager"
                           }
                         }
                       ]
@@ -267,7 +138,7 @@
                 },
                 "durability": "persistent",
                 "val": {
-                  "u32": 0
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 }
               }
             },
@@ -283,10 +154,10 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "OwnerTokensIndex"
+                  "symbol": "RoleAccountsCount"
                 },
                 {
-                  "u32": 0
+                  "symbol": "manager"
                 }
               ]
             },
@@ -303,16 +174,16 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "OwnerTokensIndex"
+                      "symbol": "RoleAccountsCount"
                     },
                     {
-                      "u32": 0
+                      "symbol": "manager"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "u32": 0
+                  "u32": 1
                 }
               }
             },
@@ -328,10 +199,10 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "TokenRoyalty"
+                  "symbol": "RoleAdmin"
                 },
                 {
-                  "u32": 0
+                  "symbol": "user"
                 }
               ]
             },
@@ -348,39 +219,22 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "TokenRoyalty"
+                      "symbol": "RoleAdmin"
                     },
                     {
-                      "u32": 0
+                      "symbol": "user"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "map": [
-                    {
-                      "key": {
-                        "symbol": "basis_points"
-                      },
-                      "val": {
-                        "u32": 500
-                      }
-                    },
-                    {
-                      "key": {
-                        "symbol": "receiver"
-                      },
-                      "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                      }
-                    }
-                  ]
+                  "symbol": "manager"
                 }
               }
             },
             "ext": "v0"
           },
-          518400
+          1555200
         ]
       ],
       [
@@ -405,32 +259,7 @@
                     "executable": {
                       "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                     },
-                    "storage": [
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "TokenIdCounter"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "u32": 1
-                        }
-                      },
-                      {
-                        "key": {
-                          "vec": [
-                            {
-                              "symbol": "TotalSupply"
-                            }
-                          ]
-                        },
-                        "val": {
-                          "u32": 1
-                        }
-                      }
-                    ]
+                    "storage": null
                   }
                 }
               }
@@ -473,14 +302,21 @@
           "v0": {
             "topics": [
               {
-                "symbol": "mint"
+                "symbol": "role_admin_changed"
               },
               {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                "symbol": "user"
               }
             ],
             "data": {
-              "u32": 0
+              "vec": [
+                {
+                  "symbol": ""
+                },
+                {
+                  "symbol": "manager"
+                }
+              ]
             }
           }
         }
@@ -496,17 +332,17 @@
           "v0": {
             "topics": [
               {
-                "symbol": "set_token_royalty"
+                "symbol": "role_granted"
               },
               {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                "symbol": "manager"
               },
               {
-                "u32": 0
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
               }
             ],
             "data": {
-              "u32": 500
+              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
             }
           }
         }

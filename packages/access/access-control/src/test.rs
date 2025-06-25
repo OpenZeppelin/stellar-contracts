@@ -6,9 +6,10 @@ use soroban_sdk::{contract, symbol_short, testutils::Address as _, Address, Env,
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
-    accept_admin_transfer, add_to_role_enumeration, get_admin, get_role_admin, get_role_member,
-    get_role_member_count, grant_role, has_role, remove_from_role_enumeration, renounce_role,
-    revoke_role, set_admin, set_role_admin, transfer_admin_role,
+    accept_admin_transfer, add_to_role_enumeration, ensure_if_admin_or_admin_role, get_admin,
+    get_role_admin, get_role_member, get_role_member_count, grant_role, grant_role_no_auth,
+    has_role, remove_from_role_enumeration, renounce_role, revoke_role, set_admin, set_role_admin,
+    set_role_admin_no_auth, transfer_admin_role,
 };
 
 #[contract]
@@ -490,5 +491,25 @@ fn remove_from_role_enumeration_with_account_not_in_role_panics() {
 
         // Attempt to remove a different account that doesn't have the role
         remove_from_role_enumeration(&e, &account2, &USER_ROLE);
+    });
+}
+
+#[test]
+fn ensure_if_admin_or_admin_role_allows_role_admin_without_contract_admin() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let manager = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Set up MANAGER_ROLE as admin for USER_ROLE without setting a contract admin
+        set_role_admin_no_auth(&e, &USER_ROLE, &MANAGER_ROLE);
+
+        // Grant MANAGER_ROLE to manager directly
+        grant_role_no_auth(&e, &manager, &manager, &MANAGER_ROLE);
+
+        // This should not panic - manager should be authorized for USER_ROLE operations
+        // even though there's no contract admin
+        ensure_if_admin_or_admin_role(&e, &manager, &USER_ROLE);
     });
 }
