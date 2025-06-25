@@ -74,6 +74,54 @@ fn transfer_with_allowed_users_works() {
 }
 
 #[test]
+fn allowlist_burn_override_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Allow user first
+        AllowList::allow_user(&e, &user);
+
+        // Mint tokens to user
+        Base::mint(&e, &user, 100);
+
+        // Burn tokens from user
+        AllowList::burn(&e, &user, 50);
+
+        // Verify balance
+        assert_eq!(Base::balance(&e, &user), 50);
+    });
+}
+
+#[test]
+fn allowlist_burn_from_override_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Allow user1 first
+        AllowList::allow_user(&e, &user1);
+
+        // Mint tokens to user1
+        Base::mint(&e, &user1, 100);
+
+        // Allow user2 to burn tokens from user1
+        Base::approve(&e, &user1, &user2, 50, 100);
+
+        // Burn tokens from user1 by user2
+        AllowList::burn_from(&e, &user2, &user1, 50);
+
+        // Verify balance
+        assert_eq!(Base::balance(&e, &user1), 50);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #113)")]
 fn transfer_with_sender_not_allowed_panics() {
     let e = Env::default();
