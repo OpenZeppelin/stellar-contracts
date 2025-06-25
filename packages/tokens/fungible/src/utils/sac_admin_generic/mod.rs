@@ -40,6 +40,12 @@
 //! - The wrapper approach is simpler to implement and more flexible but
 //!   requires additional entry points for each admin function.
 //!
+//! _Security Considerations_
+//! When changing a SAC Admin address, the new admin address provided is not
+//! validated at that time. This means administration from the SAC can be lock
+//! down forever. The choice of the new SAC Admin address must be carefully and
+//! thoroughly considered.
+//!
 //! ## Module Overview
 //!
 //! This module provides helper functions for implementing **the generic
