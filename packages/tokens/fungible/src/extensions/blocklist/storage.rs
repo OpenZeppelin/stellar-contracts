@@ -211,4 +211,22 @@ impl BlockList {
         // Call the base implementation
         Base::approve(e, owner, spender, amount, live_until_ledger);
     }
+
+    /// This is a wrapper around [`Base::burn()`] to enable
+    /// the compatibility across [`crate::burnable::FungibleBurnable`]
+    /// with [`crate::blocklist::FungibleBlockList`]
+    ///
+    /// Please refer to [`Base::burn`] for the inline documentation.
+    pub fn burn(e: &Env, from: &Address, amount: i128) {
+        Base::burn(e, from, amount);
+    }
+
+    /// This is a wrapper around [`Base::burn_from()`] to enable
+    /// the compatibility across [`crate::burnable::FungibleBurnable`]
+    /// with [`crate::blocklist::FungibleBlockList`]
+    ///
+    /// Please refer to [`Base::burn_from`] for the inline documentation.
+    pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        Base::burn_from(e, spender, from, amount);
+    }
 }
