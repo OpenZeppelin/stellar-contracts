@@ -13,9 +13,13 @@
 //! that are safe against this attack out of the box.
 use core::marker::PhantomData;
 
-use soroban_sdk::{BytesN, Env, Vec};
+use soroban_sdk::{panic_with_error, BytesN, Env, Vec};
 
-use crate::{hashable::commutative_hash_pair, hasher::Hasher};
+use crate::{
+    error::CryptoError,
+    hashable::{commutative_hash_pair, hash_pair},
+    hasher::Hasher,
+};
 
 type Bytes32 = BytesN<32>;
 
@@ -51,6 +55,62 @@ where
 
         leaf == root
     }
+
+    /// Verify that `leaf` is part of a Merkle tree defined by `root` by using
+    /// `proof` and a custom hashing algorithm defined by `Hasher`.
+    ///
+    /// A new root is rebuilt by traversing up the Merkle tree. The `proof`
+    /// provided must contain sibling hashes on the branch starting from the
+    /// leaf to the root of the tree. There is no assumption about leaves or
+    /// nodes being sorted, which differentiates this function from
+    /// [`Verifier::verify`]).
+    ///
+    /// A `proof` is valid if and only if the rebuilt hash matches the root
+    /// of the tree.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `proof` - A slice of hashes that constitute the merkle proof.
+    /// * `root` - The root of the merkle tree, in bytes.
+    /// * `leaf` - The leaf of the merkle tree to proof, in bytes.
+    /// * `index` - The 0-based index of the `leaf`.
+    ///
+    /// # Errors
+    ///
+    /// * [`CryptoError::MerkleProofOutOfBounds`] - When the length of the proof
+    ///   is >= 32.
+    /// * [`CryptoError::MerkleIndexOutOfBounds`] - When the index of the leaf
+    ///   is out of bounds given the length of the proof.
+    #[must_use]
+    pub fn verify_with_index(
+        e: &Env,
+        proof: Vec<Bytes32>,
+        root: Bytes32,
+        mut leaf: Bytes32,
+        mut index: u32,
+    ) -> bool {
+        // validate proof length and index range
+        let len = proof.len();
+        if len >= 32 {
+            panic_with_error!(e, CryptoError::MerkleProofOutOfBounds)
+        }
+        if index >= (1 << len) {
+            panic_with_error!(e, CryptoError::MerkleIndexOutOfBounds)
+        }
+
+        // hash without sorting
+        for hash in proof {
+            leaf = if index % 2 == 0 {
+                hash_pair(&leaf, &hash, H::new(e))
+            } else {
+                hash_pair(&hash, &leaf, H::new(e))
+            };
+            index /= 2;
+        }
+
+        leaf == root
+    }
 }
 
 #[cfg(test)]
@@ -67,7 +127,7 @@ mod tests {
     use soroban_sdk::Env;
 
     use super::{commutative_hash_pair, Bytes32, Verifier};
-    use crate::{hasher::Hasher, keccak::Keccak256, sha256::Sha256};
+    use crate::{hashable::hash_pair, hasher::Hasher, keccak::Keccak256, sha256::Sha256};
 
     macro_rules! to_bytes {
         ($env:tt, $lit:literal) => {
@@ -107,6 +167,38 @@ mod tests {
         }
     }
 
+    prop_compose! {
+        fn valid_merkle_proof_with_index(e: Env, max_proof_len: usize)(
+            leaf: [u8; 32],
+            (proof, index) in prop::collection::vec(any::<[u8; 32]>(), 0..max_proof_len)
+                .prop_flat_map(|proof| {
+                    let mut len = proof.len() as u32;
+                    if len == 0 { len = 1 } // to avoid (0..0) range error
+                    (
+                        Just(proof.clone()),
+                        (0..len).prop_filter("index can't exceed max leafs count", move |i| *i < 1 << len)
+                    )
+                }),
+        ) -> (soroban_sdk::Vec<Bytes32>, Bytes32, Bytes32, u32) {
+            let mut current = Bytes32::from_array(&e, &leaf);
+            let mut proof_vec: soroban_sdk::Vec<Bytes32> = soroban_sdk::Vec::new(&e);
+            let mut current_index = index;
+            for hash in &proof {
+                let hash = Bytes32::from_array(&e, &hash.clone());
+                proof_vec.push_back(hash.clone());
+                current = if current_index % 2 == 0 {
+                    hash_pair(&current, &hash, Keccak256::new(&e))
+                } else {
+                    hash_pair(&hash, &current, Keccak256::new(&e))
+                };
+                current_index /= 2;
+            }
+            let root = current;
+            let leaf = Bytes32::from_array(&e, &leaf);
+            (proof_vec, root, leaf, index)
+        }
+    }
+
     #[test]
     fn proof_tampering_invalidates() {
         let e = Env::default();
@@ -128,6 +220,7 @@ mod tests {
             }
         )
     }
+
     #[test]
     fn proof_length_affects_verification() {
         let e = Env::default();
@@ -335,5 +428,47 @@ mod tests {
 
         // invalid if root != leaf
         assert!(!Verifier::<Keccak256>::verify(&e, proof, root, leaf));
+    }
+
+    #[test]
+    fn proof_validates_with_index() {
+        let e = Env::default();
+        // Turn off the CPU/memory budget for testing.
+        e.cost_estimate().budget().reset_unlimited();
+
+        proptest!(
+            |((proof, root, leaf, index) in valid_merkle_proof_with_index(e.clone(), 32))| {
+                prop_assert!(Verifier::<Keccak256>::verify_with_index(&e, proof, root, leaf, index));
+            }
+        )
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #1400)")]
+    fn verify_fails_with_wrong_proof_len() {
+        let e = Env::default();
+        // root and leaf values are not important, as we try to test bound errors
+        let root = Bytes32::from_array(&e, &[0u8; 32]);
+        let leaf = Bytes32::from_array(&e, &[0u8; 32]);
+        let mut proof = soroban_sdk::vec![&e];
+        for _ in 0..32 {
+            proof.push_back(leaf.clone());
+        }
+        let _ = Verifier::<Keccak256>::verify_with_index(&e, proof, root, leaf, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #1401)")]
+    fn verify_fails_with_wrong_index() {
+        let e = Env::default();
+        // root and leaf values are not important, as we try to test bound errors
+        let root = Bytes32::from_array(&e, &[0u8; 32]);
+        let leaf = Bytes32::from_array(&e, &[0u8; 32]);
+        let mut proof = soroban_sdk::vec![&e];
+        let wrong_idx = 1 << 31;
+        for _ in 0..31 {
+            proof.push_back(leaf.clone());
+        }
+        let _ = Verifier::<Keccak256>::verify_with_index(&e, proof, root, leaf, wrong_idx);
     }
 }
