@@ -132,6 +132,10 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 /// **IMPORTANT**: this function lacks authorization checks.
 /// It is expected to call this function only in the constructor!
 pub fn set_admin(e: &Env, admin: &Address) {
+    // Check if admin is already set
+    if e.storage().instance().has(&AccessControlStorageKey::Admin) {
+        panic_with_error!(e, AccessControlError::AdminAlreadySet);
+    }
     e.storage().instance().set(&AccessControlStorageKey::Admin, &admin);
 }
 
