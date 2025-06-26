@@ -429,6 +429,21 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
 ///
 /// Using this function in public-facing methods creates significant security
 /// risks as it could allow unauthorized admin role assignments.
+///
+/// # Circular Admin Warning
+///
+/// **CAUTION**: This function allows the creation of circular admin
+/// relationships between roles. For example, it's possible to assign MINT_ADMIN
+/// as the admin of MINT_ROLE while also making MINT_ROLE the admin of
+/// MINT_ADMIN. Such circular relationships can lead to unintended consequences,
+/// including:
+///
+/// - Race conditions where each role can revoke the other
+/// - Potential security vulnerabilities in role management
+/// - Confusing governance structures that are difficult to reason about
+///
+/// When designing your role hierarchy, carefully consider the relationships
+/// between roles and avoid creating circular dependencies.
 pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
 
