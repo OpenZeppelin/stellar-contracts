@@ -53,6 +53,18 @@
 //! }
 //! ```
 //!
+//! ### ⚠️ Warning: Circular Admin Relationships
+//!
+//! When designing your role hierarchy, be careful to avoid creating circular
+//! admin relationships. For example, it's possible but not recommended to
+//! assign `MINT_ADMIN` as the admin of `MINT_ROLE` while also making
+//! `MINT_ROLE` the admin of `MINT_ADMIN`. Such circular relationships can lead
+//! to unintended consequences, including:
+//!
+//! - Race conditions where each role can revoke the other
+//! - Potential security vulnerabilities in role management
+//! - Confusing governance structures that are difficult to reason about
+//!
 //! ## Enumeration of Roles
 //!
 //! In this access control system, roles don't exist as standalone entities.
