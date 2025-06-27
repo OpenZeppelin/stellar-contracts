@@ -181,7 +181,7 @@ where
         };
     }
 
-    /// Internal helper function that returns a tupple of the root, the hashed
+    /// Internal helper function that returns a tuple of the root, the hashed
     /// leaf and the leaf index.
     ///
     /// # Arguments

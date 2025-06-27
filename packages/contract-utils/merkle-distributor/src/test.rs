@@ -53,7 +53,7 @@ fn get_valid_args_sorted(e: &Env) -> (Bytes32, LeafData, Vec<Bytes32>) {
 }
 
 fn get_valid_args_unsorted(e: &Env) -> (Bytes32, LeafData, Vec<Bytes32>) {
-    // contructed with the following data and sha256 hasher
+    // constructed with the following data and sha256 hasher
     //[
     //{ index: 0, address:
     //{ "GDD4CDYMGZ2TST2P3FI453VPP5HYKQJZXPDUQEV23V4E2BFI2U7W6BH6", amount: 101 }
