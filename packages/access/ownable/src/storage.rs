@@ -33,15 +33,22 @@ pub fn get_owner(e: &Env) -> Option<Address> {
 
 /// Sets owner role.
 ///
-///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `owner` - The account to grant the owner privilege.
 ///
+/// # Errors
+///
+/// * [`OwnableError::OwnerAlreadySet`] - If the owner is already set.
+///
 /// **IMPORTANT**: this function lacks authorization checks.
 /// It is expected to call this function only in the constructor!
 pub fn set_owner(e: &Env, owner: &Address) {
+    // Check if owner is already set
+    if e.storage().instance().has(&OwnableStorageKey::Owner) {
+        panic_with_error!(e, OwnableError::OwnerAlreadySet);
+    }
     e.storage().instance().set(&OwnableStorageKey::Owner, &owner);
 }
 

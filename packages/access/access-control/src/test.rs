@@ -513,3 +513,25 @@ fn ensure_if_admin_or_admin_role_allows_role_admin_without_contract_admin() {
         ensure_if_admin_or_admin_role(&e, &manager, &USER_ROLE);
     });
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1213)")]
+fn set_admin_when_already_set_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin1 = Address::generate(&e);
+    let admin2 = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Set admin for the first time - should succeed
+        set_admin(&e, &admin1);
+
+        // Verify admin is set correctly
+        let current_admin = get_admin(&e);
+        assert_eq!(current_admin, admin1);
+
+        // Try to set admin again - should panic with AdminAlreadySet error
+        set_admin(&e, &admin2);
+    });
+}

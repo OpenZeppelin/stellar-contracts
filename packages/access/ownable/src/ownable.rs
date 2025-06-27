@@ -89,6 +89,7 @@ pub trait Ownable {
 pub enum OwnableError {
     NotAuthorized = 1220,
     TransferInProgress = 1221,
+    OwnerAlreadySet = 1222,
 }
 
 // ################## EVENTS ##################
