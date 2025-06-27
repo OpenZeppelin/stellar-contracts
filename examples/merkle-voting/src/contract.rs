@@ -17,7 +17,7 @@
 //! voter lists.
 use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, Vec};
 use stellar_crypto::sha256::Sha256;
-use stellar_merkle_distributor::{IndexableNode, MerkleDistributor};
+use stellar_merkle_distributor::{IndexableLeaf, MerkleDistributor};
 
 type Distributor = MerkleDistributor<Sha256>;
 
@@ -29,7 +29,7 @@ pub struct VoteData {
     pub voting_power: i128,
 }
 
-impl IndexableNode for VoteData {
+impl IndexableLeaf for VoteData {
     fn index(&self) -> u32 {
         self.index
     }
