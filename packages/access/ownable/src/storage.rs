@@ -81,7 +81,6 @@ pub fn transfer_ownership(e: &Env, new_owner: &Address, live_until_ledger: u32) 
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `caller` - The address of the pending owner accepting ownership.
 ///
 /// # Errors
 ///
@@ -128,7 +127,6 @@ pub fn renounce_ownership(e: &Env) {
     let key = OwnableStorageKey::PendingOwner;
 
     if e.storage().temporary().get::<_, Address>(&key).is_some() {
-        e.storage().temporary().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
         panic_with_error!(e, OwnableError::TransferInProgress);
     }
 
