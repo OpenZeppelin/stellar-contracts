@@ -495,8 +495,7 @@ pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
     }
 }
 
-/// Enforces that the caller is the admin and returns the admin address.
-/// This function retrieves the admin from storage, requires authorization,
+/// Retrieves the admin from storage, enforces authorization,
 /// and returns the admin address.
 ///
 /// # Arguments

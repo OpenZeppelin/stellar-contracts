@@ -3,11 +3,8 @@ use quote::quote;
 use stellar_macro_helpers::generate_auth_check;
 use syn::{parse_macro_input, ItemFn};
 
-/// A procedural macro that ensures the caller is the owner before executing the
-/// function.
-///
-/// This macro retrieves the owner from storage and requires authorization from
-/// the owner before executing the function body.
+/// A procedural macro that retrieves the owner from storage and requires
+/// authorization from the owner before executing the function body.
 ///
 /// # Usage
 ///
