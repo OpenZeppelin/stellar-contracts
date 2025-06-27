@@ -79,19 +79,6 @@ fn test_root_not_set_fails() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #1301)")]
-fn test_set_root_twice_fails() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    let root = Bytes32::from_array(&e, &[0; 32]);
-    e.as_contract(&address, || {
-        Distributor::set_root(&e, root.clone());
-        Distributor::set_root(&e, root);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #1302)")]
 fn test_claim_already_claimed_index_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -105,7 +92,7 @@ fn test_claim_already_claimed_index_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1303)")]
+#[should_panic(expected = "Error(Contract, #1302)")]
 fn test_verify_with_invalid_proof_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -120,7 +107,7 @@ fn test_verify_with_invalid_proof_fails() {
 }
 
 #[test]
-fn test_successful_claim_emits_events() {
+fn test_set_root_and_successful_claim_emits_events() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
@@ -128,7 +115,9 @@ fn test_successful_claim_emits_events() {
 
     e.as_contract(&address, || {
         // Set root and verify event
-        Distributor::set_root(&e, root);
+        Distributor::set_root(&e, root.clone());
+        assert_eq!(Distributor::get_root(&e), root);
+
         let assert = EventAssertion::new(&e, address.clone());
         assert.assert_event_count(1);
 
