@@ -13,11 +13,24 @@ pub trait Hasher {
     type Output;
 
     /// Creates a new [`Hasher`] instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
     fn new(e: &Env) -> Self;
 
     /// Absorbs additional input. Can be called multiple times.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - Bytes to be added to the internal state.
     fn update(&mut self, input: Bytes);
 
     /// Outputs the hashing algorithm state.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::error::CryptoError::HasherEmptyState`] - When the state is
+    ///   empty.
     fn finalize(self) -> Self::Output;
 }
