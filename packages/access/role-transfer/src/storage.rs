@@ -13,16 +13,28 @@ use crate::RoleTransferError;
 /// * `new` - The proposed new role holder.
 /// * `pending_key` - Storage key for the pending role holder.
 /// * `live_until_ledger` - Ledger number until which the new role holder can
-///   accept. A value of `0` cancels the pending transfer.
+///   accept. `live_until_ledger`` argument is implicitly bounded by the maximum
+///   allowed and the minimum default TTL for a temporary storage entry. A value
+///   of `0` cancels the pending transfer.
 ///
 /// # Errors
 ///
 /// * [`RoleTransferError::NoPendingTransfer`] - If trying to cancel a transfer
 ///   that doesn't exist.
-/// * [`RoleTransferError::InvalidLiveUntilLedger`] - If the specified ledger is
-///   in the past.
+/// * [`RoleTransferError::InvalidLiveUntilLedger`] - If trying to set a
+///   `live_until_ledger` that is in the past.
 /// * [`RoleTransferError::InvalidPendingAccount`] - If the specified pending
 ///   account is not the same as the provided `new` address.
+///
+/// # Notes
+///
+/// * This function does not enforce authorization. Ensure that authorization is
+///   handled at a higher level.
+/// * The period during which the transfer can be accepted is implicitly
+///   timebound by the maximum allowed storage TTL value which is a network
+///   parameter, i.e. one cannot set `live_until_ledger` for a longer period.
+/// * There is also a default minimum TTL and if the computed period is shorter
+///   than it, the entry will outlive `live_until_ledger`.
 pub fn transfer_role<T>(e: &Env, new: &Address, pending_key: &T, live_until_ledger: u32)
 where
     T: IntoVal<Env, Val>,
