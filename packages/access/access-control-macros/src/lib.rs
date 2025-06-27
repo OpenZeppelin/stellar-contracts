@@ -6,11 +6,8 @@ use syn::{
     parse_macro_input, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
 };
 
-/// A procedural macro that ensures the caller is the admin before executing the
-/// function.
-///
-/// This macro retrieves the admin from storage and requires authorization from
-/// the admin before executing the function body.
+/// A procedural macro that retrieves the admin from storage and requires
+/// authorization from the admin before executing the function body.
 ///
 /// # Usage
 ///
@@ -30,7 +27,9 @@ use syn::{
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn only_admin(_attrs: TokenStream, input: TokenStream) -> TokenStream {
+pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    assert!(attrs.is_empty(), "This macro does not accept any arguments");
+
     let input_fn = parse_macro_input!(input as ItemFn);
 
     // Generate the function with the admin authorization check
@@ -116,7 +115,7 @@ fn generate_role_check(args: TokenStream, input: TokenStream, require_auth: bool
     let param_name = args.param;
     let role_str = args.role;
 
-    let is_ref_param = validate_param_type(&input_fn, &param_name);
+    let is_ref_param = validate_address_type(&input_fn, &param_name);
 
     let param_reference = if is_ref_param {
         quote! { #param_name }
@@ -163,7 +162,7 @@ impl Parse for HasRoleArgs {
     }
 }
 
-fn validate_param_type(func: &ItemFn, param_name: &Ident) -> bool {
+fn validate_address_type(func: &ItemFn, param_name: &Ident) -> bool {
     for arg in &func.sig.inputs {
         if let FnArg::Typed(pat_type) = arg {
             if let Pat::Ident(pat_ident) = &*pat_type.pat {
