@@ -118,7 +118,9 @@
                   ]
                 },
                 "durability": "persistent",
-                "val": "void"
+                "val": {
+                  "bool": true
+                }
               }
             },
             "ext": "v0"
@@ -161,7 +163,9 @@
                   ]
                 },
                 "durability": "persistent",
-                "val": "void"
+                "val": {
+                  "bool": true
+                }
               }
             },
             "ext": "v0"

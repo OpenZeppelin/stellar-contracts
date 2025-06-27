@@ -142,25 +142,3 @@ fn renounce_fails_if_pending_transfer_exists() {
         renounce_ownership(&e);
     });
 }
-
-#[test]
-#[should_panic(expected = "Error(Contract, #1222)")]
-fn set_owner_when_already_set_panics() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let contract = e.register(MockContract, ());
-    let owner1 = Address::generate(&e);
-    let owner2 = Address::generate(&e);
-
-    e.as_contract(&contract, || {
-        // Set owner for the first time - should succeed
-        set_owner(&e, &owner1);
-
-        // Verify owner is set correctly
-        let current_owner = get_owner(&e).unwrap();
-        assert_eq!(current_owner, owner1);
-
-        // Try to set owner again - should panic with OwnerAlreadySet error
-        set_owner(&e, &owner2);
-    });
-}

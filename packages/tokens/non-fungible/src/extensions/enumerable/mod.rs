@@ -83,13 +83,6 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// Use along with [`NonFungibleEnumerable::total_supply()`] to enumerate
     /// all the tokens in the contract.
     ///
-    /// We do not provide a function to get all the tokens of a contract,
-    /// due to that would be unbounded. If you need to enumerate all the
-    /// tokens of a contract, you can use
-    /// [`NonFungibleEnumerable::total_supply()`] to get the total number of
-    /// tokens and then use [`NonFungibleEnumerable::get_token_id()`] to get
-    /// each token one by one.
-    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.

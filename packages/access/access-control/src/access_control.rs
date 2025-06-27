@@ -24,13 +24,6 @@ pub trait AccessControl {
 
     /// Returns the account at the specified index for a given role.
     ///
-    /// We do not provide a function to get all the members of a role,
-    /// due to that would be unbounded. If you need to enumerate all the
-    /// members of a role, you can use
-    /// [`AccessControl::get_role_member_count()`] to get the total number
-    /// of members and then use [`AccessControl::get_role_member()`] to get
-    /// each member one by one.
-    ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
@@ -68,7 +61,7 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the admin or have the
+    /// * `caller` - The address of the caller, must be the admin or has the
     ///   `RoleAdmin` for the `role`.
     /// * `account` - The account to grant the role to.
     /// * `role` - The role to grant.
@@ -216,10 +209,6 @@ pub enum AccessControlError {
     Unauthorized = 1210,
     AccountNotFound = 1211,
     AdminNotSet = 1212,
-    AdminRoleNotFound = 1213,
-    RoleCountIsNotZero = 1214,
-    RoleNotFound = 1215,
-    AdminAlreadySet = 1216,
 }
 
 // ################## EVENTS ##################

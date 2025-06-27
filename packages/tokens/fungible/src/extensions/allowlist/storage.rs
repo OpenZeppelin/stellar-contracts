@@ -41,13 +41,13 @@ impl AllowList {
     /// * `account` - The address to check the allowed status for.
     pub fn allowed(e: &Env, account: &Address) -> bool {
         let key = AllowListStorageKey::Allowed(account.clone());
-        if e.storage().persistent().has(&key) {
+        if let Some(allowed) = e.storage().persistent().get(&key) {
             e.storage().persistent().extend_ttl(
                 &key,
                 ALLOW_BLOCK_TTL_THRESHOLD,
                 ALLOW_BLOCK_EXTEND_AMOUNT,
             );
-            true
+            allowed
         } else {
             false
         }
@@ -80,14 +80,10 @@ impl AllowList {
     pub fn allow_user(e: &Env, user: &Address) {
         // Set the user as allowed
         let key = AllowListStorageKey::Allowed(user.clone());
+        e.storage().persistent().set(&key, &true);
 
-        // if the user is not allowed, allow them
-        if !e.storage().persistent().has(&key) {
-            e.storage().persistent().set(&key, &());
-
-            // Emit event
-            emit_user_allowed(e, user);
-        }
+        // Emit event
+        emit_user_allowed(e, user);
     }
 
     /// Disallows a user from receiving and transferring tokens.
@@ -113,15 +109,12 @@ impl AllowList {
     /// security risks as it could allow unauthorized allowlist
     /// modifications.
     pub fn disallow_user(e: &Env, user: &Address) {
+        // Set the user as not allowed
         let key = AllowListStorageKey::Allowed(user.clone());
+        e.storage().persistent().set(&key, &false);
 
-        // Remove from storage and emit event if the user is currently allowed
-        if e.storage().persistent().has(&key) {
-            e.storage().persistent().remove(&key);
-
-            // Emit event
-            emit_user_disallowed(e, user);
-        }
+        // Emit event
+        emit_user_disallowed(e, user);
     }
 
     // ################## OVERRIDDEN FUNCTIONS ##################

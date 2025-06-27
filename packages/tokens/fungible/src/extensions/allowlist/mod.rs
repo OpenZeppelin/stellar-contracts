@@ -12,8 +12,11 @@ use crate::FungibleToken;
 ///
 /// The `FungibleAllowList` trait extends the `FungibleToken` trait to
 /// provide an allowlist mechanism that can be managed by an authorized account.
-/// This extension ensures that transfer can only take place if the sender and
-/// the receiver are both allowed. Note that, spender does not have to be
+/// This extension ensures that only allowed accounts can transfer tokens or
+/// approve token transfers.
+///
+/// The allowlist provides the guarantee to the contract owner that any account
+/// won't be able to execute transfers or approvals if it's not explicitly
 /// allowed.
 ///
 /// This trait is designed to be used in conjunction with the `FungibleToken`

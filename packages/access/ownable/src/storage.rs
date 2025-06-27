@@ -33,22 +33,15 @@ pub fn get_owner(e: &Env) -> Option<Address> {
 
 /// Sets owner role.
 ///
+///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `owner` - The account to grant the owner privilege.
 ///
-/// # Errors
-///
-/// * [`OwnableError::OwnerAlreadySet`] - If the owner is already set.
-///
 /// **IMPORTANT**: this function lacks authorization checks.
 /// It is expected to call this function only in the constructor!
 pub fn set_owner(e: &Env, owner: &Address) {
-    // Check if owner is already set
-    if e.storage().instance().has(&OwnableStorageKey::Owner) {
-        panic_with_error!(e, OwnableError::OwnerAlreadySet);
-    }
     e.storage().instance().set(&OwnableStorageKey::Owner, &owner);
 }
 
@@ -88,6 +81,7 @@ pub fn transfer_ownership(e: &Env, new_owner: &Address, live_until_ledger: u32) 
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+/// * `caller` - The address of the pending owner accepting ownership.
 ///
 /// # Errors
 ///
@@ -134,6 +128,7 @@ pub fn renounce_ownership(e: &Env) {
     let key = OwnableStorageKey::PendingOwner;
 
     if e.storage().temporary().get::<_, Address>(&key).is_some() {
+        e.storage().temporary().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
         panic_with_error!(e, OwnableError::TransferInProgress);
     }
 

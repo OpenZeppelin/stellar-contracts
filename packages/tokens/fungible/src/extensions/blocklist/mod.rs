@@ -12,9 +12,11 @@ use crate::FungibleToken;
 ///
 /// The `FungibleBlockList` trait extends the `FungibleToken` trait to
 /// provide a blocklist mechanism that can be managed by an authorized account.
-/// This extension ensures that transfer can only take place if both the sender
-/// and the receiver are not blocked. Note that, this restriction does not
-/// apply to the spender.
+/// This extension ensures that blocked accounts cannot transfer tokens or
+/// approve token transfers.
+///
+/// The blocklist provides the guarantee to the contract owner that any blocked
+/// account won't be able to execute transfers or approvals.
 ///
 /// This trait is designed to be used in conjunction with the `FungibleToken`
 /// trait.
