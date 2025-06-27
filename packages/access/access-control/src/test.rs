@@ -218,7 +218,7 @@ fn admin_transfer_works_with_admin_auth() {
         accept_admin_transfer(&e);
 
         // Verify new admin
-        assert_eq!(get_admin(&e), new_admin);
+        assert_eq!(get_admin(&e), Some(new_admin));
 
         // Verify events
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -253,7 +253,7 @@ fn admin_transfer_cancel_works() {
         transfer_admin_role(&e, &new_admin, 0);
 
         // Verify admin hasn't changed
-        assert_eq!(get_admin(&e), admin);
+        assert_eq!(get_admin(&e), Some(admin));
 
         // Verify events
         let event_assert = EventAssertion::new(&e, address.clone());
@@ -301,7 +301,7 @@ fn unauthorized_role_revoke_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1211)")]
+#[should_panic(expected = "Error(Contract, #1217)")]
 fn renounce_nonexistent_role_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -318,20 +318,19 @@ fn renounce_nonexistent_role_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1212)")]
-fn get_admin_with_no_admin_set_panics() {
+fn get_admin_with_no_admin_set_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
         // No admin is set in storage
-        get_admin(&e);
+        assert!(get_admin(&e).is_none());
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1211)")]
+#[should_panic(expected = "Error(Contract, #1212)")]
 fn get_role_member_with_out_of_bounds_index_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -354,7 +353,7 @@ fn get_role_member_with_out_of_bounds_index_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1212)")]
+#[should_panic(expected = "Error(Contract, #1211)")]
 fn admin_transfer_fails_when_no_admin_set() {
     let e = Env::default();
     e.mock_all_auths();
@@ -463,7 +462,7 @@ fn remove_from_role_enumeration_for_last_account_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1211)")]
+#[should_panic(expected = "Error(Contract, #1218)")]
 fn remove_from_role_enumeration_with_nonexistent_role_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -478,7 +477,7 @@ fn remove_from_role_enumeration_with_nonexistent_role_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1211)")]
+#[should_panic(expected = "Error(Contract, #1217)")]
 fn remove_from_role_enumeration_with_account_not_in_role_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -556,7 +555,7 @@ fn set_admin_when_already_set_panics() {
 
         // Verify admin is set correctly
         let current_admin = get_admin(&e);
-        assert_eq!(current_admin, admin1);
+        assert_eq!(current_admin, Some(admin1));
 
         // Try to set admin again - should panic with AdminAlreadySet error
         set_admin(&e, &admin2);
@@ -645,7 +644,7 @@ fn renounce_admin_works() {
         set_admin(&e, &admin);
 
         // Verify admin is set correctly
-        assert_eq!(get_admin(&e), admin);
+        assert_eq!(get_admin(&e), Some(admin));
 
         // Admin renounces their role
         renounce_admin(&e);
@@ -653,7 +652,7 @@ fn renounce_admin_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1212)")]
+#[should_panic(expected = "Error(Contract, #1211)")]
 fn renounce_admin_fails_when_no_admin_set() {
     let e = Env::default();
     e.mock_all_auths();

@@ -39,8 +39,8 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::AccountNotFound`] - If the account is not found
-    ///   at the given index.
+    /// * [`AccessControlError::IndexOutOfBounds`] - If the index is out of
+    ///   bounds for the role's member list.
     fn get_role_member(e: &Env, role: Symbol, index: u32) -> Address;
 
     /// Returns the admin role for a specific role.
@@ -57,11 +57,7 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * [`AccessControlError::AccountNotFound`] - If no admin account is set.
-    fn get_admin(e: &Env) -> Address;
+    fn get_admin(e: &Env) -> Option<Address>;
 
     /// Grants a role to an account.
     ///
@@ -77,7 +73,6 @@ pub trait AccessControl {
     ///
     /// * [`AccessControlError::Unauthorized`] - If the caller does not have
     ///   enough privileges.
-    /// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
     ///
     /// # Events
     ///
@@ -101,9 +96,9 @@ pub trait AccessControl {
     ///
     /// * [`AccessControlError::Unauthorized`] - If the `caller` does not have
     ///   enough privileges.
-    /// * [`AccessControlError::AccountNotFound`] - If the `account` doesn't
-    ///   have the role.
-    /// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
+    /// * [`AccessControlError::RoleNotHeld`] - If the `account` doesn't have
+    ///   the role.
+    /// * [`AccessControlError::RoleIsEmpty`] - If the role has no members.
     ///
     /// # Events
     ///
@@ -123,8 +118,9 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::AccountNotFound`] - If the `caller` doesn't have
-    ///   the role.
+    /// * [`AccessControlError::RoleNotHeld`] - If the `caller` doesn't have the
+    ///   role.
+    /// * [`AccessControlError::RoleIsEmpty`] - If the role has no members.
     ///
     /// # Events
     ///
@@ -237,12 +233,14 @@ pub trait AccessControl {
 #[repr(u32)]
 pub enum AccessControlError {
     Unauthorized = 1210,
-    AccountNotFound = 1211,
-    AdminNotSet = 1212,
+    AdminNotSet = 1211,
+    IndexOutOfBounds = 1212,
     AdminRoleNotFound = 1213,
     RoleCountIsNotZero = 1214,
     RoleNotFound = 1215,
     AdminAlreadySet = 1216,
+    RoleNotHeld = 1217,
+    RoleIsEmpty = 1218,
 }
 
 // ################## EVENTS ##################
