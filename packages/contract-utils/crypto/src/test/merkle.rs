@@ -64,7 +64,7 @@ prop_compose! {
                 if len == 0 { len = 1 } // to avoid (0..0) range error
                 (
                     Just(proof.clone()),
-                    (0..len).prop_filter("index can't exceed max leafs count", move |i| *i < 1 << len)
+                    (0..len).prop_filter("index can't exceed max leaves count", move |i| *i < 1 << len)
                 )
             }),
     ) -> (soroban_sdk::Vec<Bytes32>, Bytes32, Bytes32, u32) {

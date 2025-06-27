@@ -236,7 +236,7 @@ fn sha256_known_hash() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #1402)")]
-fn sha256_fails_with_emtpy_state() {
+fn sha256_fails_with_empty_state() {
     let e = Env::default();
     let hasher = Sha256::new(&e);
     let _ = hasher.finalize();

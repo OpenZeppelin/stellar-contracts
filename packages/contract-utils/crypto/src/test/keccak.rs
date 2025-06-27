@@ -236,7 +236,7 @@ fn known_hash() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #1402)")]
-fn fails_with_emtpy_state() {
+fn fails_with_empty_state() {
     let e = Env::default();
     let hasher = Keccak256::new(&e);
     let _ = hasher.finalize();
