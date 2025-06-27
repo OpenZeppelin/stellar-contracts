@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use soroban_sdk::{contracterror, symbol_short, Bytes, Env, Symbol, Val};
 use stellar_crypto::hasher::Hasher;
 
-pub trait IndexableNode {
+pub trait IndexableLeaf {
     fn index(&self) -> u32;
 }
 
