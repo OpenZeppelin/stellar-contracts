@@ -460,6 +460,60 @@ pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
     emit_role_admin_changed(e, role, &previous_admin_role, admin_role);
 }
 
+/// Removes the admin role for a specified role without performing authorization
+/// checks.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `role` - The role to remove the admin for.
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - In admin functions that implement their own authorization logic
+/// - When cleaning up unused roles
+pub fn remove_role_admin_no_auth(e: &Env, role: &Symbol) {
+    let key = AccessControlStorageKey::RoleAdmin(role.clone());
+
+    // Check if the key exists before attempting to remove
+    if e.storage().persistent().has(&key) {
+        e.storage().persistent().remove(&key);
+    } else {
+        panic_with_error!(e, AccessControlError::AdminRoleNotFound);
+    }
+}
+
+/// Removes the role accounts count for a specified role without performing
+/// authorization checks.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `role` - The role to remove the accounts count for.
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - In admin functions that implement their own authorization logic
+/// - When cleaning up unused roles with zero members
+pub fn remove_role_accounts_count_no_auth(e: &Env, role: &Symbol) {
+    let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());
+
+    // Check if the key exists and has a zero count before removing
+    if let Some(count) = e.storage().persistent().get::<_, u32>(&count_key) {
+        if count == 0 {
+            e.storage().persistent().remove(&count_key);
+        } else {
+            panic_with_error!(e, AccessControlError::RoleCountIsNotZero);
+        }
+    } else {
+        panic_with_error!(e, AccessControlError::RoleNotFound);
+    }
+}
+
 // ################## LOW-LEVEL HELPERS ##################
 
 /// Ensures that the caller is either the contract admin or has the admin role

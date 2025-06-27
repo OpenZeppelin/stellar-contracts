@@ -216,7 +216,10 @@ pub enum AccessControlError {
     Unauthorized = 1210,
     AccountNotFound = 1211,
     AdminNotSet = 1212,
-    AdminAlreadySet = 1213,
+    AdminRoleNotFound = 1213,
+    RoleCountIsNotZero = 1214,
+    RoleNotFound = 1215,
+    AdminAlreadySet = 1216,
 }
 
 // ################## EVENTS ##################
