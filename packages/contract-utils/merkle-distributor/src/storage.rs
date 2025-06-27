@@ -73,6 +73,13 @@ where
     ///
     /// * topics - `["set_root"]`
     /// * data - `[root: Bytes]`
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function lacks authorization checks and should
+    /// only be used:
+    /// - During contract initialization/construction
+    /// - In admin functions that implement their own authorization logic
     pub fn set_root(e: &Env, root: H::Output) {
         let key = MerkleDistributorStorageKey::Root;
         if e.storage().instance().has(&key) {
@@ -94,6 +101,11 @@ where
     ///
     /// * topics - `["set_claimed"]`
     /// * data - `[index: u32]`
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function lacks authorization checks and should only
+    /// be used in admin functions that implement their own authorization logic.
     pub fn set_claimed(e: &Env, index: u32) {
         let key = MerkleDistributorStorageKey::Claimed(index);
         e.storage().persistent().set(&key, &true);
