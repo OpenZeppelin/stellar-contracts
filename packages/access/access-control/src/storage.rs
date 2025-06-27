@@ -196,10 +196,7 @@ pub fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &S
     if has_role(e, account, role).is_some() {
         return;
     }
-
-    let index = add_to_role_enumeration(e, account, role);
-    let key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
-    e.storage().persistent().set(&key, &index);
+    add_to_role_enumeration(e, account, role);
 
     emit_role_granted(e, role, account, caller);
 }
@@ -511,14 +508,14 @@ pub fn enforce_admin_auth(e: &Env) -> Address {
     admin
 }
 
-/// Adds an account to role enumeration. Returns the previous count.
+/// Adds an account to role enumeration.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `account` - The account to add to the role.
 /// * `role` - The role to add the account to.
-pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) -> u32 {
+pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     // Get the current count of accounts with this role
     let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());
     let count = e.storage().persistent().get(&count_key).unwrap_or(0);
@@ -534,8 +531,6 @@ pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) -> u32
 
     // Update the count
     e.storage().persistent().set(&count_key, &(count + 1));
-
-    count
 }
 
 /// Removes an account from role enumeration.
