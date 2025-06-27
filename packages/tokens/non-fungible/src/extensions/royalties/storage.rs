@@ -104,6 +104,39 @@ impl Base {
         emit_set_token_royalty(e, receiver, token_id, basis_points);
     }
 
+    /// Removes token-specific royalty information, allowing the token to fall
+    /// back to the collection-wide default royalty settings.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `token_id` - The identifier of the token.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["remove_token_royalty", token_id: u32]`
+    /// * data - `[]`
+    ///
+    /// # Errors
+    ///
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
+    ///   exist.
+    ///
+    /// # Notes
+    ///
+    /// **IMPORTANT**: This function lacks authorization controls. Most likely,
+    /// you want to invoke it from a function with admin-only authorization.
+    pub fn remove_token_royalty(e: &Env, token_id: u32) {
+        // Verify token exists by checking owner
+        let _ = Base::owner_of(e, token_id);
+
+        // Remove the token royalty information
+        let key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
+        e.storage().persistent().remove(&key);
+
+        super::emit_remove_token_royalty(e, token_id);
+    }
+
     /// Returns `(Address, u32)` - A tuple containing the receiver address and
     /// the royalty amount. If there is no token-specific royalty set, it
     /// returns the default royalty. If there is no default royalty set, it
