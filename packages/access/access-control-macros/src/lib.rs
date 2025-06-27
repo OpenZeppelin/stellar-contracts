@@ -6,11 +6,8 @@ use syn::{
     parse_macro_input, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
 };
 
-/// A procedural macro that ensures the caller is the admin before executing the
-/// function.
-///
-/// This macro retrieves the admin from storage and requires authorization from
-/// the admin before executing the function body.
+/// A procedural macro that retrieves the admin from storage and requires
+/// authorization from the admin before executing the function body.
 ///
 /// # Usage
 ///

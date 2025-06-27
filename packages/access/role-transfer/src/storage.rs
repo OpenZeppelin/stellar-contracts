@@ -49,12 +49,12 @@ where
     e.storage().temporary().extend_ttl(pending_key, live_for, live_for);
 }
 
-/// Completes the role transfer if `caller` is the pending new role holder.
+/// Completes the role transfer if authorization is provided by the pending role
+/// holder. Pending role holder is retrieved from the storage.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `caller` - The address of the pending role holder accepting the transfer.
 /// * `active_key` - Storage key for the current role holder.
 /// * `pending_key` - Storage key for the pending role holder.
 ///
