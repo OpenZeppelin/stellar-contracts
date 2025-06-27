@@ -308,6 +308,8 @@ pub fn revoke_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &
 /// * Authorization for `caller` is required.
 pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
     caller.require_auth();
+
+    // Check if account has the role
     if has_role(e, caller, role).is_none() {
         panic_with_error!(e, AccessControlError::AccountNotFound);
     }
@@ -432,14 +434,10 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
 ///
 /// * Authorization for the current admin is required.
 pub fn renounce_admin(e: &Env) {
-    // Get the current admin and require authorization
-    let admin = get_admin(e);
-    admin.require_auth();
+    let admin = enforce_admin_auth(e);
 
-    // Remove the admin from instance storage
     e.storage().instance().remove(&AccessControlStorageKey::Admin);
 
-    // Emit an event that the admin has been renounced
     emit_admin_renounced(e, &admin);
 }
 
