@@ -4,7 +4,7 @@
 
 use soroban_sdk::{contract, contractimpl, vec, Address, Env, String, Vec};
 use stellar_access_control::{set_admin, AccessControl};
-use stellar_access_control_macros::{has_role, only_admin};
+use stellar_access_control_macros::{has_role, only_admin, only_role};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
 
@@ -28,7 +28,9 @@ impl ExampleContract {
         vec![&e, String::from_str(e, "seems sus")]
     }
 
-    #[has_role(caller, "minter")]
+    // we want `require_auth()` provided by the macro, since there is no
+    // `require_auth()` in `Base::mint`.
+    #[only_role(caller, "minter")]
     pub fn mint(e: &Env, caller: Address, to: Address, token_id: u32) {
         Base::mint(e, &to, token_id)
     }
@@ -44,6 +46,8 @@ impl NonFungibleToken for ExampleContract {
 // specific people with the `burner` role
 #[contractimpl]
 impl NonFungibleBurnable for ExampleContract {
+    // we DON'T want `require_auth()` provided by the macro, since there is already
+    // `require_auth()` in `Base::burn`
     #[has_role(from, "burner")]
     fn burn(e: &Env, from: Address, token_id: u32) {
         Base::burn(e, &from, token_id);
