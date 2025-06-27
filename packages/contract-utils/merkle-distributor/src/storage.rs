@@ -57,17 +57,12 @@ where
         }
     }
 
-    /// Sets the Merkle root for the distribution. Can only be set once.
+    /// Sets the Merkle root for the distribution.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
     /// * `root` - The Merkle root to set.
-    ///
-    /// # Errors
-    ///
-    /// * [`MerkleDistributorError::RootAlreadySet`] - When attempting to set
-    ///   the root after it has already been set.
     ///
     /// # Events
     ///
@@ -82,12 +77,8 @@ where
     /// - In admin functions that implement their own authorization logic
     pub fn set_root(e: &Env, root: H::Output) {
         let key = MerkleDistributorStorageKey::Root;
-        if e.storage().instance().has(&key) {
-            panic_with_error!(&e, MerkleDistributorError::RootAlreadySet);
-        } else {
-            e.storage().instance().set(&key, &root);
-            emit_set_root(e, root.into());
-        }
+        e.storage().instance().set(&key, &root);
+        emit_set_root(e, root.into());
     }
 
     /// Marks an index as claimed.
