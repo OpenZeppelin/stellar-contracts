@@ -1,9 +1,10 @@
 {
   "generators": {
-    "address": 3,
+    "address": 2,
     "nonce": 0
   },
   "auth": [
+    [],
     []
   ],
   "ledger": {
@@ -23,10 +24,13 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "Balance"
+                  "symbol": "HasRole"
                 },
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                },
+                {
+                  "symbol": "manager"
                 }
               ]
             },
@@ -43,19 +47,98 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "Balance"
+                      "symbol": "HasRole"
                     },
                     {
                       "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                    },
+                    {
+                      "symbol": "manager"
                     }
                   ]
                 },
                 "durability": "persistent",
                 "val": {
-                  "i128": {
-                    "hi": 0,
-                    "lo": 100
-                  }
+                  "u32": 0
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          1555200
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "RoleAccounts"
+                },
+                {
+                  "map": [
+                    {
+                      "key": {
+                        "symbol": "index"
+                      },
+                      "val": {
+                        "u32": 0
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "role"
+                      },
+                      "val": {
+                        "symbol": "manager"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "RoleAccounts"
+                    },
+                    {
+                      "map": [
+                        {
+                          "key": {
+                            "symbol": "index"
+                          },
+                          "val": {
+                            "u32": 0
+                          }
+                        },
+                        {
+                          "key": {
+                            "symbol": "role"
+                          },
+                          "val": {
+                            "symbol": "manager"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
                 }
               }
             },
@@ -71,10 +154,10 @@
             "key": {
               "vec": [
                 {
-                  "symbol": "Blocked"
+                  "symbol": "RoleAccountsCount"
                 },
                 {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                  "symbol": "manager"
                 }
               ]
             },
@@ -91,20 +174,67 @@
                 "key": {
                   "vec": [
                     {
-                      "symbol": "Blocked"
+                      "symbol": "RoleAccountsCount"
                     },
                     {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                      "symbol": "manager"
                     }
                   ]
                 },
                 "durability": "persistent",
-                "val": "void"
+                "val": {
+                  "u32": 1
+                }
               }
             },
             "ext": "v0"
           },
-          518400
+          4095
+        ]
+      ],
+      [
+        {
+          "contract_data": {
+            "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+            "key": {
+              "vec": [
+                {
+                  "symbol": "RoleAdmin"
+                },
+                {
+                  "symbol": "user"
+                }
+              ]
+            },
+            "durability": "persistent"
+          }
+        },
+        [
+          {
+            "last_modified_ledger_seq": 0,
+            "data": {
+              "contract_data": {
+                "ext": "v0",
+                "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+                "key": {
+                  "vec": [
+                    {
+                      "symbol": "RoleAdmin"
+                    },
+                    {
+                      "symbol": "user"
+                    }
+                  ]
+                },
+                "durability": "persistent",
+                "val": {
+                  "symbol": "manager"
+                }
+              }
+            },
+            "ext": "v0"
+          },
+          1555200
         ]
       ],
       [
@@ -172,13 +302,22 @@
           "v0": {
             "topics": [
               {
-                "symbol": "block"
+                "symbol": "role_admin_changed"
               },
               {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                "symbol": "user"
               }
             ],
-            "data": "void"
+            "data": {
+              "vec": [
+                {
+                  "symbol": ""
+                },
+                {
+                  "symbol": "manager"
+                }
+              ]
+            }
           }
         }
       },
@@ -193,17 +332,17 @@
           "v0": {
             "topics": [
               {
-                "symbol": "mint"
+                "symbol": "role_granted"
+              },
+              {
+                "symbol": "manager"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
               }
             ],
             "data": {
-              "i128": {
-                "hi": 0,
-                "lo": 100
-              }
+              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
             }
           }
         }

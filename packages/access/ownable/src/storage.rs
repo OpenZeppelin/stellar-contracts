@@ -81,7 +81,6 @@ pub fn transfer_ownership(e: &Env, new_owner: &Address, live_until_ledger: u32) 
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `caller` - The address of the pending owner accepting ownership.
 ///
 /// # Errors
 ///
