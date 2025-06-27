@@ -5,15 +5,14 @@ use std::{format, vec, vec::Vec};
 use proptest::prelude::*;
 use soroban_sdk::{Bytes, Env};
 
-use crate::sha256::Sha256;
-use crate::hasher::Hasher;
+use crate::{hasher::Hasher, sha256::Sha256};
 
 fn non_empty_u8_vec_strategy() -> impl Strategy<Value = Vec<u8>> {
     prop::collection::vec(any::<u8>(), 1..ProptestConfig::default().max_default_size_range)
 }
 
 #[test]
-fn single_bit_change_affects_output() {
+fn sha256_single_bit_change_affects_output() {
     let e = Env::default();
     proptest!(|(data in non_empty_u8_vec_strategy())| {
         let mut modified = data.clone();
@@ -29,7 +28,7 @@ fn single_bit_change_affects_output() {
 }
 
 #[test]
-fn sequential_updates_match_concatenated() {
+fn sha256_sequential_updates_match_concatenated() {
     let e = Env::default();
     proptest!(|(data1: Vec<u8>, data2: Vec<u8>)| {
         let mut hasher1 = Sha256::new(&e);
@@ -48,7 +47,7 @@ fn sequential_updates_match_concatenated() {
 }
 
 #[test]
-fn split_updates_match_full_update() {
+fn sha256_split_updates_match_full_update() {
     let e = Env::default();
     proptest!(|(data in non_empty_u8_vec_strategy(), split_point: usize)| {
         let split_at = split_point % data.len();
@@ -67,7 +66,7 @@ fn split_updates_match_full_update() {
 }
 
 #[test]
-fn multiple_hasher_instances_are_consistent() {
+fn sha256_multiple_hasher_instances_are_consistent() {
     let e = Env::default();
     proptest!(|(data1: Vec<u8>, data2: Vec<u8>)| {
         let mut hasher1 = Sha256::new(&e);
@@ -85,7 +84,7 @@ fn multiple_hasher_instances_are_consistent() {
 }
 
 #[test]
-fn output_is_always_32_bytes() {
+fn sha256_output_is_always_32_bytes() {
     let e = Env::default();
     proptest!(|(data: Vec<u8>)| {
         let mut hasher = Sha256::new(&e);
@@ -96,7 +95,7 @@ fn output_is_always_32_bytes() {
 }
 
 #[test]
-fn update_order_dependence() {
+fn sha256_update_order_dependence() {
     let e = Env::default();
     proptest!(|(data1 in non_empty_u8_vec_strategy(),
                 data2 in non_empty_u8_vec_strategy())| {
@@ -115,7 +114,7 @@ fn update_order_dependence() {
 }
 
 #[test]
-fn empty_input_order_independence() {
+fn sha256_empty_input_order_independence() {
     let e = Env::default();
     proptest!(|(data in non_empty_u8_vec_strategy())| {
         let empty = vec![];
@@ -133,7 +132,7 @@ fn empty_input_order_independence() {
 }
 
 #[test]
-fn trailing_zero_affects_output() {
+fn sha256_trailing_zero_affects_output() {
     let e = Env::default();
     proptest!(|(data: Vec<u8>)| {
         let mut hasher1 = Sha256::new(&e);
@@ -150,7 +149,7 @@ fn trailing_zero_affects_output() {
 }
 
 #[test]
-fn leading_zeros_affect_output() {
+fn sha256_leading_zeros_affect_output() {
     let e = Env::default();
     proptest!(|(data in non_empty_u8_vec_strategy())| {
         let mut hasher1 = Sha256::new(&e);
@@ -169,7 +168,7 @@ fn leading_zeros_affect_output() {
 }
 
 #[test]
-fn no_trivial_collisions_same_length() {
+fn sha256_no_trivial_collisions_same_length() {
     let e = Env::default();
     proptest!(|(data in non_empty_u8_vec_strategy())| {
         let mut hasher1 = Sha256::new(&e);
@@ -186,7 +185,7 @@ fn no_trivial_collisions_same_length() {
 }
 
 #[test]
-fn length_extension_attack_resistance() {
+fn sha256_length_extension_attack_resistance() {
     let e = Env::default();
     proptest!(|(data1 in non_empty_u8_vec_strategy(), data2 in non_empty_u8_vec_strategy())| {
         let mut hasher1 = Sha256::new(&e);
@@ -214,9 +213,9 @@ fn sha256_empty_input() {
     hasher.update(Bytes::from_slice(&e, &[]));
     let result = hasher.finalize();
     let expected: [u8; 32] = [
-        0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f,
-        0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b,
-        0x78, 0x52, 0xb8, 0x55,
+        0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9,
+        0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52,
+        0xb8, 0x55,
     ];
     assert_eq!(result.to_array(), expected);
 }
@@ -228,9 +227,17 @@ fn sha256_known_hash() {
     hasher.update(Bytes::from_slice(&e, b"hello"));
     let result = hasher.finalize();
     let expected: [u8; 32] = [
-        0x2c, 0xf2, 0x4d, 0xba, 0x5f, 0xb0, 0xa3, 0x0e, 0x26, 0xe8, 0x3b, 0x2a, 0xc5, 0xb9,
-        0xe2, 0x9e, 0x1b, 0x16, 0x1e, 0x5c, 0x1f, 0xa7, 0x42, 0x5e, 0x73, 0x04, 0x33, 0x62,
-        0x93, 0x8b, 0x98, 0x24,
+        0x2c, 0xf2, 0x4d, 0xba, 0x5f, 0xb0, 0xa3, 0x0e, 0x26, 0xe8, 0x3b, 0x2a, 0xc5, 0xb9, 0xe2,
+        0x9e, 0x1b, 0x16, 0x1e, 0x5c, 0x1f, 0xa7, 0x42, 0x5e, 0x73, 0x04, 0x33, 0x62, 0x93, 0x8b,
+        0x98, 0x24,
     ];
     assert_eq!(result.to_array(), expected);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1402)")]
+fn sha256_fails_with_emtpy_state() {
+    let e = Env::default();
+    let hasher = Sha256::new(&e);
+    let _ = hasher.finalize();
 }

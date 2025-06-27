@@ -9,8 +9,13 @@ use hex_literal::hex;
 use proptest::{prelude::*, prop_compose};
 use soroban_sdk::Env;
 
-use crate::merkle::{Verifier, Bytes32};
-use crate::{hashable::{hash_pair, commutative_hash_pair}, hasher::Hasher, keccak::Keccak256, sha256::Sha256};
+use crate::{
+    hashable::{commutative_hash_pair, hash_pair},
+    hasher::Hasher,
+    keccak::Keccak256,
+    merkle::{Bytes32, Verifier},
+    sha256::Sha256,
+};
 
 macro_rules! to_bytes {
     ($env:tt, $lit:literal) => {
@@ -151,10 +156,8 @@ fn verifies_valid_proofs() {
     // const proof = merkleTree.getProof(['A']);
     // ```
     let root = to_bytes!(e, "b89eb120147840e813a77109b44063488a346b4ca15686185cf314320560d3f3");
-    let leaf_a =
-        to_bytes!(e, "6efbf77e320741a027b50f02224545461f97cd83762d5fbfeb894b9eb3287c16");
-    let leaf_b =
-        to_bytes!(e, "7051e21dd45e25ed8c605a53da6f77de151dcbf47b0e3ced3c5d8b61f4a13dbc");
+    let leaf_a = to_bytes!(e, "6efbf77e320741a027b50f02224545461f97cd83762d5fbfeb894b9eb3287c16");
+    let leaf_b = to_bytes!(e, "7051e21dd45e25ed8c605a53da6f77de151dcbf47b0e3ced3c5d8b61f4a13dbc");
     let proof = to_bytes_array!(
         e,
         "7051e21dd45e25ed8c605a53da6f77de151dcbf47b0e3ced3c5d8b61f4a13dbc",
@@ -179,10 +182,8 @@ fn sha256_verifies_valid_proofs() {
     // generated with the same data as above but using sha256 as a hashing function
     let e = Env::default();
     let root = to_bytes!(e, "b0d388be1fe96067c100c6731770b70f87fa1287c4d6ddf9e107bdd015ae445c");
-    let leaf_a =
-        to_bytes!(e, "9c707ca1d6e1963a6a974a40f20c51f899cc96c9a7edef911953f424186641bf");
-    let leaf_b =
-        to_bytes!(e, "a2e125b5cc0b89c38c9030830083dc6d194e4d38d6d19aba7340d5a34767ddd2");
+    let leaf_a = to_bytes!(e, "9c707ca1d6e1963a6a974a40f20c51f899cc96c9a7edef911953f424186641bf");
+    let leaf_b = to_bytes!(e, "a2e125b5cc0b89c38c9030830083dc6d194e4d38d6d19aba7340d5a34767ddd2");
 
     let proof = to_bytes_array!(
         e,
@@ -193,8 +194,7 @@ fn sha256_verifies_valid_proofs() {
         "c05b8b50e47b1583b14272de489eaadfeaf264e3a1b868be1f290f219549fc83",
         "ae9abdff40bea69fda504681175ffe68c109866f37e1eab183365d73c49c9939"
     );
-    let verification =
-        Verifier::<Sha256>::verify(&e, proof.clone(), root.clone(), leaf_a.clone());
+    let verification = Verifier::<Sha256>::verify(&e, proof.clone(), root.clone(), leaf_a.clone());
     assert!(verification);
 
     let no_such_leaf = commutative_hash_pair(&leaf_a, &leaf_b, Sha256::new(&e));
@@ -215,11 +215,9 @@ fn rejects_invalid_proofs() {
     let e = Env::default();
     let root = to_bytes!(e, "f2129b5a697531ef818f644564a6552b35c549722385bc52aa7fe46c0b5f46b1");
     let leaf = to_bytes!(e, "9c15a6a0eaeed500fd9eed4cbeab71f797cefcc67bfd46683e4d2e6ff7f06d1c");
-    let proof =
-        to_bytes!(e, "7b0c6cd04b82bfc0e250030a5d2690c52585e0cc6a4f3bc7909d7723b0236ece");
+    let proof = to_bytes!(e, "7b0c6cd04b82bfc0e250030a5d2690c52585e0cc6a4f3bc7909d7723b0236ece");
 
-    let verification =
-        Verifier::<Keccak256>::verify(&e, soroban_sdk::vec![&e, proof], root, leaf);
+    let verification = Verifier::<Keccak256>::verify(&e, soroban_sdk::vec![&e, proof], root, leaf);
     assert!(!verification);
 }
 

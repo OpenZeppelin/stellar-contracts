@@ -1,16 +1,5 @@
 //! This module deals with verification of Merkle Tree proofs. It was adapted
 //! from [rust-contracts-stylus](https://github.com/OpenZeppelin/rust-contracts-stylus/blob/main/lib/crypto/src/merkle.rs) to work with Soroban contract.
-//!
-//! The tree and the proofs can be generated using `OpenZeppelin`'s
-//! [merkle tree library](https://github.com/OpenZeppelin/merkle-tree). You will
-//! find a quickstart guide in its README.
-//!
-//! WARNING: You should avoid using leaf values that are 64 bytes long
-//! prior to hashing, or use a hash function other than keccak256 for
-//! hashing leaves. This is because the concatenation of a sorted pair
-//! of internal nodes in the Merkle tree could be reinterpreted as a
-//! leaf value. `OpenZeppelin`'s JavaScript library generates Merkle trees
-//! that are safe against this attack out of the box.
 use core::marker::PhantomData;
 
 use soroban_sdk::{panic_with_error, BytesN, Env, Vec};
@@ -21,6 +10,7 @@ use crate::{
     hasher::Hasher,
 };
 
+/// Alias type for `BytesN<32>`
 pub type Bytes32 = BytesN<32>;
 
 /// Verify merkle proofs.
@@ -40,6 +30,14 @@ where
     ///
     /// A `proof` is valid if and only if the rebuilt hash matches the root
     /// of the tree.
+    ///
+    /// The tree and the proofs by using keccak256 can be generated with
+    /// `OpenZeppelin`'s [merkle tree library](https://github.com/OpenZeppelin/merkle-tree).
+    /// WARNING: You should avoid using leaf values that are 64 bytes long
+    /// prior to hashing. This is because the concatenation of a sorted pair
+    /// of internal nodes in the Merkle tree could be reinterpreted as a
+    /// leaf value. `OpenZeppelin`'s JavaScript library generates Merkle trees
+    /// that are safe against this attack out of the box.
     ///
     /// # Arguments
     ///
