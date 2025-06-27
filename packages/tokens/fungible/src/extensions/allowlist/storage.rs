@@ -81,7 +81,7 @@ impl AllowList {
         // Set the user as allowed
         let key = AllowListStorageKey::Allowed(user.clone());
 
-        // Write to storage and emit event if the value is changing
+        // if the user is not allowed, allow them
         if !e.storage().persistent().has(&key) {
             e.storage().persistent().set(&key, &());
 
