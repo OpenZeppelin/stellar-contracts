@@ -139,7 +139,7 @@ fn renounce_fails_if_pending_transfer_exists() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1222)")]
+#[should_panic(expected = "Error(Contract, #1220)")]
 fn get_owner_not_set_panics() {
     let e = Env::default();
     let contract = e.register(MockContract, ());
