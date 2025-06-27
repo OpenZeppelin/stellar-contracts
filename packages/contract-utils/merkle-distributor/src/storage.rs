@@ -104,7 +104,9 @@ where
     }
 
     /// Verifies a Merkle proof for a leaf and marks its index as claimed if the
-    /// proof is valid.
+    /// proof is valid. Internally using [`Verifier::verify`] which assumes that
+    /// when the tree gets constructed, **commutative** hashing was used,
+    /// i.e.the leaves are **sorted**.
     ///
     /// # Arguments
     ///
@@ -126,8 +128,7 @@ where
         leaf: N,
         proof: Vec<H::Output>,
     ) {
-        let index = leaf.index();
-        let encoded = leaf.to_xdr(e);
+        let (root, leaf_hash, index) = Self::get_verification_args(e, leaf);
 
         // Check if already claimed
         if Self::is_claimed(e, index) {
@@ -135,14 +136,70 @@ where
         }
 
         // Verify proof
+        match Verifier::<H>::verify(e, proof, root, leaf_hash) {
+            true => Self::set_claimed(e, index),
+            false => panic_with_error!(e, MerkleDistributorError::InvalidProof),
+        };
+    }
+
+    /// Verifies a Merkle proof for a leaf and marks its index as claimed if the
+    /// proof is valid. Internally using [`Verifier::verify_with_index`] which
+    /// assumes that when the tree gets constructed, **non-commutative** hashing
+    /// was used, i.e. the leaves and the nodes are **unsorted**.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `leaf` - The leaf data containing an index field.
+    /// * `proof` - The Merkle proof for the leaf.
+    ///
+    /// # Errors
+    ///
+    /// * [`MerkleDistributorError::IndexAlreadyClaimed`] - When attempting to
+    ///   claim an index that has already been claimed. claim an index that has
+    ///   already been claimed.
+    /// * [`MerkleDistributorError::InvalidProof`] - When the provided Merkle
+    ///   proof is invalid.
+    /// * [`MerkleDistributorError::RootNotSet`] - When the root is not set or
+    ///   when the leaf data does not contain a valid index.
+    pub fn verify_with_index_and_set_claimed<N: ToXdr + IndexableLeaf>(
+        e: &Env,
+        leaf: N,
+        proof: Vec<H::Output>,
+    ) {
+        let (root, leaf_hash, index) = Self::get_verification_args(e, leaf);
+
+        // Check if already claimed
+        if Self::is_claimed(e, index) {
+            panic_with_error!(e, MerkleDistributorError::IndexAlreadyClaimed);
+        }
+
+        // Verify proof
+        match Verifier::<H>::verify_with_index(e, proof, root, leaf_hash, index) {
+            true => Self::set_claimed(e, index),
+            false => panic_with_error!(e, MerkleDistributorError::InvalidProof),
+        };
+    }
+
+    /// Internal helper function that returns a tupple of the root, the hashed
+    /// leaf and the leaf index.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `leaf` - The leaf data containing an index field.
+    fn get_verification_args<N: ToXdr + IndexableLeaf>(
+        e: &Env,
+        leaf: N,
+    ) -> (H::Output, H::Output, u32) {
+        let index = leaf.index();
+        let encoded = leaf.to_xdr(e);
+
         let root = Self::get_root(e);
         let mut hasher = H::new(e);
         hasher.update(encoded);
         let leaf_hash = hasher.finalize();
 
-        match Verifier::<H>::verify(e, proof, root, leaf_hash) {
-            true => Self::set_claimed(e, index),
-            false => panic_with_error!(e, MerkleDistributorError::InvalidProof),
-        };
+        (root, leaf_hash, index)
     }
 }
