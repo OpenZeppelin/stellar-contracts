@@ -343,8 +343,7 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// * Authorization for the current admin is required.
 pub fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32) {
-    let admin = get_admin(e);
-    admin.require_auth();
+    let admin = enforce_admin_auth(e);
 
     transfer_role(e, new_admin, &AccessControlStorageKey::PendingAdmin, live_until_ledger);
 
