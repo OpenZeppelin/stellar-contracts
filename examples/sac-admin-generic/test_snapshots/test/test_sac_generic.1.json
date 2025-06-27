@@ -129,7 +129,7 @@
                           ]
                         },
                         "val": {
-                          "bytes": "48efce34460053afee68690a5b6873d35e9ddf115fc475a876502ac868f2a682"
+                          "bytes": "5543574470fb2bfb6d62b5420b0ce1a8e527a64c8563fcd6baa16d95c2ee2c15"
                         }
                       },
                       {
@@ -139,7 +139,7 @@
                               "symbol": "MintingLimit"
                             },
                             {
-                              "bytes": "c249c6653790a41e0940531ef62dc860d316710542981288077680edb6c31f3f"
+                              "bytes": "639f196774398ed87e63330993b57a73a385e6a4c9a9da908a25c5eacdf9b473"
                             }
                           ]
                         },
@@ -167,7 +167,7 @@
                               "symbol": "Operator"
                             },
                             {
-                              "bytes": "c249c6653790a41e0940531ef62dc860d316710542981288077680edb6c31f3f"
+                              "bytes": "639f196774398ed87e63330993b57a73a385e6a4c9a9da908a25c5eacdf9b473"
                             }
                           ]
                         },
