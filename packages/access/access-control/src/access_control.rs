@@ -68,7 +68,7 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the admin or has the
+    /// * `caller` - The address of the caller, must be the admin or have the
     ///   `RoleAdmin` for the `role`.
     /// * `account` - The account to grant the role to.
     /// * `role` - The role to grant.

@@ -121,7 +121,7 @@ impl Base {
     /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
     /// * refer to [`Base::owner_of`] errors.
-    pub fn royalty_info(e: &Env, token_id: u32, sale_price: u32) -> (Address, u32) {
+    pub fn royalty_info(e: &Env, token_id: u32, sale_price: u128) -> (Address, u128) {
         // Verify token exists by checking owner
         let _ = Base::owner_of(e, token_id);
 
@@ -133,8 +133,7 @@ impl Base {
                 OWNER_TTL_THRESHOLD,
                 OWNER_EXTEND_AMOUNT,
             );
-            let royalty_amount =
-                (sale_price as u64 * royalty_info.basis_points as u64 / 10000) as u32;
+            let royalty_amount = sale_price * royalty_info.basis_points as u128 / 10000;
             return (royalty_info.receiver, royalty_amount);
         }
 
@@ -142,8 +141,7 @@ impl Base {
         let default_key = NFTRoyaltiesStorageKey::DefaultRoyalty;
         if let Some(royalty_info) = e.storage().instance().get::<_, RoyaltyInfo>(&default_key) {
             e.storage().instance().extend_ttl(OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
-            let royalty_amount =
-                (sale_price as u64 * royalty_info.basis_points as u64 / 10000) as u32;
+            let royalty_amount = sale_price * royalty_info.basis_points as u128 / 10000;
             return (royalty_info.receiver, royalty_amount);
         }
 
