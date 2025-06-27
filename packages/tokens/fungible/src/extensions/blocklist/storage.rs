@@ -78,14 +78,12 @@ impl BlockList {
     /// security risks as it could allow unauthorized blocklist
     /// modifications.
     pub fn block_user(e: &Env, user: &Address) {
-        // Set the user as blocked
         let key = BlockListStorageKey::Blocked(user.clone());
 
         // if the user is not blocked, block them
         if !e.storage().persistent().has(&key) {
             e.storage().persistent().set(&key, &());
 
-            // Emit event
             emit_user_blocked(e, user);
         }
     }
@@ -113,14 +111,12 @@ impl BlockList {
     /// security risks as it could allow unauthorized blocklist
     /// modifications.
     pub fn unblock_user(e: &Env, user: &Address) {
-        // Remove the user from the blocklist instead of setting to false
         let key = BlockListStorageKey::Blocked(user.clone());
 
-        // Only remove from storage and emit event if the user is currently blocked
+        // if the user is currently blocked, unblock them
         if e.storage().persistent().has(&key) {
             e.storage().persistent().remove(&key);
 
-            // Emit event
             emit_user_unblocked(e, user);
         }
     }
@@ -142,12 +138,10 @@ impl BlockList {
     ///   blocked.
     /// * Also refer to [`Base::transfer`] errors.
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        // Check if either address is blocked
         if BlockList::blocked(e, from) || BlockList::blocked(e, to) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
 
-        // Call the base implementation
         Base::transfer(e, from, to, amount);
     }
 
@@ -170,12 +164,10 @@ impl BlockList {
     ///   blocked.
     /// * Also refer to [`Base::transfer_from`] errors.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-        // Check if any address is blocked
         if BlockList::blocked(e, from) || BlockList::blocked(e, to) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
 
-        // Call the base implementation
         Base::transfer_from(e, spender, from, to, amount);
     }
 
@@ -203,12 +195,10 @@ impl BlockList {
         amount: i128,
         live_until_ledger: u32,
     ) {
-        // Check if either address is blocked
         if BlockList::blocked(e, owner) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
 
-        // Call the base implementation
         Base::approve(e, owner, spender, amount, live_until_ledger);
     }
 
@@ -218,6 +208,10 @@ impl BlockList {
     ///
     /// Please refer to [`Base::burn`] for the inline documentation.
     pub fn burn(e: &Env, from: &Address, amount: i128) {
+        if BlockList::blocked(e, from) {
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
+        }
+
         Base::burn(e, from, amount);
     }
 
@@ -227,6 +221,10 @@ impl BlockList {
     ///
     /// Please refer to [`Base::burn_from`] for the inline documentation.
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        if BlockList::blocked(e, from) {
+            panic_with_error!(e, FungibleTokenError::UserBlocked);
+        }
+
         Base::burn_from(e, spender, from, amount);
     }
 }

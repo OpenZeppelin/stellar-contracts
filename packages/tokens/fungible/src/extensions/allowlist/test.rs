@@ -177,3 +177,41 @@ fn approve_with_owner_not_allowed_panics() {
         AllowList::approve(&e, &user1, &user2, 50, 100);
     });
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #113)")]
+fn burn_with_not_allowed_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Mint tokens to user
+        Base::mint(&e, &user, 100);
+
+        // Try to burn tokens from user (not allowed)
+        AllowList::burn(&e, &user, 50);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #113)")]
+fn burn_from_with_not_allowed_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Mint tokens to user1
+        Base::mint(&e, &user1, 100);
+
+        // Allow user2 to burn tokens from user1
+        Base::approve(&e, &user1, &user2, 50, 100);
+
+        // Try to burn tokens from user1 by user2 (not allowed)
+        AllowList::burn_from(&e, &user2, &user1, 50);
+    });
+}
