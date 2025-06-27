@@ -41,7 +41,7 @@
 //! to other accounts.
 //!
 //! One can create as many roles as they want, and create a chain of command
-//! structure if they want to with this approach.
+//! structure if they want to go with this approach.
 //!
 //! If you need even more granular control over which roles can do what, you can
 //! introduce your own business logic, and annotate it with our macro:
