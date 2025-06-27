@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use soroban_sdk::{contracterror, symbol_short, Bytes, Env, Symbol, Val};
 use stellar_crypto::hasher::Hasher;
 
-pub trait IndexableNode {
+pub trait IndexableLeaf {
     fn index(&self) -> u32;
 }
 
@@ -17,12 +17,10 @@ pub struct MerkleDistributor<H: Hasher>(PhantomData<H>);
 pub enum MerkleDistributorError {
     /// The merkle root is not set.
     RootNotSet = 1300,
-    /// The merkle root is already set.
-    RootAlreadySet = 1301,
     /// The provided index was already claimed.
-    IndexAlreadyClaimed = 1302,
+    IndexAlreadyClaimed = 1301,
     /// The proof is invalid.
-    InvalidProof = 1303,
+    InvalidProof = 1302,
 }
 
 // ################## EVENTS ##################

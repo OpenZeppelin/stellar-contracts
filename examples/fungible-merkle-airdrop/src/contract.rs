@@ -19,7 +19,7 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, token, Address, BytesN, Env, Vec};
 use stellar_crypto::sha256::Sha256;
-use stellar_merkle_distributor::{IndexableNode, MerkleDistributor};
+use stellar_merkle_distributor::{IndexableLeaf, MerkleDistributor};
 
 type Distributor = MerkleDistributor<Sha256>;
 
@@ -35,7 +35,7 @@ struct Receiver {
     pub amount: i128,
 }
 
-impl IndexableNode for Receiver {
+impl IndexableLeaf for Receiver {
     fn index(&self) -> u32 {
         self.index
     }
