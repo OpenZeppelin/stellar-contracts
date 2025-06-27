@@ -8,4 +8,6 @@ pub enum CryptoError {
     MerkleProofOutOfBounds = 1400,
     /// The index of the leaf is out of bounds.
     MerkleIndexOutOfBounds = 1401,
+    /// No data in hasher state.
+    HasherEmptyState = 1402,
 }

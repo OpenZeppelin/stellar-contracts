@@ -1,6 +1,6 @@
-use soroban_sdk::{Bytes, BytesN, Env};
+use soroban_sdk::{panic_with_error, Bytes, BytesN, Env};
 
-use crate::hasher::Hasher;
+use crate::{error::CryptoError, hasher::Hasher};
 
 /// Struct to store bytes that will be consumed by the keccak256 [`Hasher`]
 /// implementation.
@@ -24,7 +24,9 @@ impl Hasher for Keccak256 {
     }
 
     fn finalize(self) -> Self::Output {
-        let data = self.state.expect("No data to hash: state empty!");
+        let data = self
+            .state
+            .unwrap_or_else(|| panic_with_error!(&self.env, CryptoError::HasherEmptyState));
         self.env.crypto().keccak256(&data).to_bytes()
     }
 }
