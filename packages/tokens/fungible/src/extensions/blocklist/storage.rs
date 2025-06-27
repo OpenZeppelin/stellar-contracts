@@ -41,13 +41,13 @@ impl BlockList {
     /// * `account` - The address to check the blocked status for.
     pub fn blocked(e: &Env, account: &Address) -> bool {
         let key = BlockListStorageKey::Blocked(account.clone());
-        if let Some(blocked) = e.storage().persistent().get(&key) {
+        if e.storage().persistent().has(&key) {
             e.storage().persistent().extend_ttl(
                 &key,
                 ALLOW_BLOCK_TTL_THRESHOLD,
                 ALLOW_BLOCK_EXTEND_AMOUNT,
             );
-            blocked
+            true
         } else {
             false
         }
@@ -80,10 +80,14 @@ impl BlockList {
     pub fn block_user(e: &Env, user: &Address) {
         // Set the user as blocked
         let key = BlockListStorageKey::Blocked(user.clone());
-        e.storage().persistent().set(&key, &true);
 
-        // Emit event
-        emit_user_blocked(e, user);
+        // if the user is not blocked, block them
+        if !e.storage().persistent().has(&key) {
+            e.storage().persistent().set(&key, &());
+
+            // Emit event
+            emit_user_blocked(e, user);
+        }
     }
 
     /// Unblocks a user, allowing them to receive and transfer tokens.
@@ -109,12 +113,16 @@ impl BlockList {
     /// security risks as it could allow unauthorized blocklist
     /// modifications.
     pub fn unblock_user(e: &Env, user: &Address) {
-        // Set the user as not blocked
+        // Remove the user from the blocklist instead of setting to false
         let key = BlockListStorageKey::Blocked(user.clone());
-        e.storage().persistent().set(&key, &false);
 
-        // Emit event
-        emit_user_unblocked(e, user);
+        // Only remove from storage and emit event if the user is currently blocked
+        if e.storage().persistent().has(&key) {
+            e.storage().persistent().remove(&key);
+
+            // Emit event
+            emit_user_unblocked(e, user);
+        }
     }
 
     // ################## OVERRIDDEN FUNCTIONS ##################
