@@ -41,6 +41,15 @@ pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
 
 /// A procedural macro that ensures the parameter has the specified role.
 ///
+/// # Security Warning
+///
+/// **IMPORTANT**: This macro does NOT enforce authorization. This is a
+/// deliberate choice, since in Stellar contracts, duplicate `require_auth()`
+/// calls for the same account within the same call stack panics. This macro is
+/// designed for use cases where you want to further limit a function that has
+/// `require_auth()` in it with access control roles. If you also need
+/// `require_auth()` provided by the macro, please use `#[only_role]` instead.
+///
 /// # Usage
 ///
 /// ```rust
@@ -60,6 +69,46 @@ pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_role_check(args, input, false)
+}
+
+/// A procedural macro that ensures the parameter has the specified role and
+/// requires authorization.
+///
+/// **IMPORTANT**: This macro does enforce authorization. This is a deliberate
+/// choice, since in Stellar contracts, duplicate `require_auth()` calls for the
+/// same account within the same call stack panics. If you are getting errors
+/// while using this macro, it could be that the function you're annotating
+/// already has a `require_auth()` call for the same account. In that case,
+/// please use `#[has_role]` instead.
+///
+/// # Usage
+///
+/// ```rust
+/// #[only_role(account, "minter")]
+/// pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
+///     // Function body
+/// }
+/// ```
+///
+/// This will expand to:
+///
+/// ```rust
+/// pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
+///     stellar_access_control::ensure_role(e, &account, &soroban_sdk::Symbol::new(e, "minter"));
+///     account.require_auth();
+///     // Function body
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn only_role(args: TokenStream, input: TokenStream) -> TokenStream {
+    generate_role_check(args, input, true)
+}
+
+/// Helper function that generates the role check code for both has_role and
+/// only_role macros. If require_auth is true, it also adds the
+/// account.require_auth() call.
+fn generate_role_check(args: TokenStream, input: TokenStream, require_auth: bool) -> TokenStream {
     let args = parse_macro_input!(args as HasRoleArgs);
     let input_fn = parse_macro_input!(input as ItemFn);
 
@@ -81,10 +130,17 @@ pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let env_arg = parse_env_arg(&input_fn);
 
+    let auth_check = if require_auth {
+        quote! { #param_name.require_auth(); }
+    } else {
+        quote! {}
+    };
+
     let expanded = quote! {
         #(#fn_attrs)*
         #fn_vis #fn_sig {
             stellar_access_control::ensure_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, #role_str));
+            #auth_check
             #fn_block
         }
     };
