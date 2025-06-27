@@ -333,6 +333,7 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 /// # Errors
 ///
 /// * refer to [`transfer_role`] errors.
+/// * refer to [`get_admin`] errors.
 ///
 /// # Events
 ///

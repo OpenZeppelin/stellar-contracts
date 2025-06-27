@@ -16,17 +16,21 @@ pub enum OwnableStorageKey {
 
 // ################## QUERY STATE ##################
 
-/// Returns `Some(Address)` if ownership is set, or `None` if ownership has been
-/// renounced or has never been set.
+/// Returns the address of the owner.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-pub fn get_owner(e: &Env) -> Option<Address> {
+///
+/// # Errors
+///
+/// * [`OwnableError::OwnerNotSet`] - If ownership has been renounced or has
+///   never been set.
+pub fn get_owner(e: &Env) -> Address {
     e.storage()
         .instance()
         .get::<_, Address>(&OwnableStorageKey::Owner)
-        .inspect(|_| e.storage().instance().extend_ttl(OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT))
+        .unwrap_or_else(|| panic_with_error!(e, OwnableError::OwnerNotSet))
 }
 
 // ################## CHANGE STATE ##################
@@ -152,7 +156,7 @@ pub fn renounce_ownership(e: &Env) {
 /// * [`OwnableError::NotAuthorized`] - If the authorization from the current
 ///   owner is missing.
 pub fn enforce_owner_auth(e: &Env) -> Address {
-    if let Some(owner) = get_owner(e) {
+    if let Some(owner) = e.storage().instance().get::<_, Address>(&OwnableStorageKey::Owner) {
         owner.require_auth();
         owner
     } else {

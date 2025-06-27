@@ -53,7 +53,7 @@ fn accept_ownership_completes_transfer() {
         accept_ownership(&e);
 
         let stored_owner = get_owner(&e);
-        assert_eq!(stored_owner, Some(new_owner));
+        assert_eq!(stored_owner, new_owner);
 
         let assert = EventAssertion::new(&e, contract.clone());
         assert.assert_event_count(1);
@@ -75,8 +75,7 @@ fn renounce_ownership_removes_owner() {
     e.as_contract(&contract, || {
         renounce_ownership(&e);
 
-        assert_eq!(get_owner(&e), None);
-
+        assert!(e.storage().instance().get::<_, Address>(&OwnableStorageKey::Owner).is_none());
         let assert = EventAssertion::new(&e, contract.clone());
         assert.assert_event_count(1);
     });
@@ -115,10 +114,6 @@ fn enforce_owner_auth_panics_if_renounced() {
     e.as_contract(&contract, || {
         renounce_ownership(&e);
 
-        assert_eq!(get_owner(&e), None);
-    });
-
-    e.as_contract(&contract, || {
         enforce_owner_auth(&e);
     });
 }
@@ -140,5 +135,16 @@ fn renounce_fails_if_pending_transfer_exists() {
 
     e.as_contract(&contract, || {
         renounce_ownership(&e);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1222)")]
+fn get_owner_not_set_panics() {
+    let e = Env::default();
+    let contract = e.register(MockContract, ());
+
+    e.as_contract(&contract, || {
+        get_owner(&e);
     });
 }

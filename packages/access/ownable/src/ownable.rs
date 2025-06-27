@@ -11,7 +11,12 @@ pub trait Ownable {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn get_owner(e: &Env) -> Option<Address> {
+    ///
+    /// # Errors
+    ///
+    /// * [`OwnableError::OwnerNotSet`] - If ownership has been renounced or has
+    ///   never been set.
+    fn get_owner(e: &Env) -> Address {
         crate::get_owner(e)
     }
 
@@ -87,8 +92,12 @@ pub trait Ownable {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum OwnableError {
+    /// Non-owner tries to access a permissioned function.
     NotAuthorized = 1220,
+    /// Attempting an unallowed action while ownership transfer is in progress.
     TransferInProgress = 1221,
+    /// Owner is not set, or was renounced.
+    OwnerNotSet = 1222,
 }
 
 // ################## EVENTS ##################

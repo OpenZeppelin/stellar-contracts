@@ -208,7 +208,7 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
         ],
         "Ownable" => vec![
             syn::parse_quote! {
-                fn get_owner(e: &soroban_sdk::Env) -> Option<soroban_sdk::Address> {
+                fn get_owner(e: &soroban_sdk::Env) -> soroban_sdk::Address {
                     stellar_ownable::get_owner(e)
                 }
             },
