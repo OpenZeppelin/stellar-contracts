@@ -89,7 +89,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
         operator: Address,
     );
 
-    /// Returns `(Address, u32)` - A tuple containing the receiver address and
+    /// Returns `(Address, u128)` - A tuple containing the receiver address and
     /// the royalty amount.
     ///
     /// # Arguments
@@ -103,7 +103,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
     ///   not exist.
-    fn royalty_info(e: &Env, token_id: u32, sale_price: u32) -> (Address, u32);
+    fn royalty_info(e: &Env, token_id: u32, sale_price: u128) -> (Address, u128);
 }
 
 // ################## EVENTS ##################

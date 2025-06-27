@@ -29,7 +29,9 @@ use syn::{parse_macro_input, ItemFn};
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn only_owner(_attrs: TokenStream, input: TokenStream) -> TokenStream {
+pub fn only_owner(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    assert!(attrs.is_empty(), "This macro does not accept any arguments");
+
     let input_fn = parse_macro_input!(input as ItemFn);
 
     // Generate the function with the owner authorization check
