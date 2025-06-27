@@ -3,7 +3,7 @@ use stellar_constants::{MERKLE_CLAIMED_EXTEND_AMOUNT, MERKLE_CLAIMED_TTL_THRESHO
 use stellar_crypto::{hasher::Hasher, merkle::Verifier};
 
 use crate::{
-    merkle_distributor::{emit_set_claimed, emit_set_root, IndexableNode, MerkleDistributorError},
+    merkle_distributor::{emit_set_claimed, emit_set_root, IndexableLeaf, MerkleDistributorError},
     MerkleDistributor,
 };
 
@@ -112,14 +112,14 @@ where
         emit_set_claimed(e, index.into());
     }
 
-    /// Verifies a Merkle proof for a node and marks its index as claimed if the
+    /// Verifies a Merkle proof for a leaf and marks its index as claimed if the
     /// proof is valid.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `node` - The node data containing an index field.
-    /// * `proof` - The Merkle proof for the node.
+    /// * `leaf` - The leaf data containing an index field.
+    /// * `proof` - The Merkle proof for the leaf.
     ///
     /// # Errors
     ///
@@ -129,14 +129,14 @@ where
     /// * [`MerkleDistributorError::InvalidProof`] - When the provided Merkle
     ///   proof is invalid.
     /// * [`MerkleDistributorError::RootNotSet`] - When the root is not set or
-    ///   when the node data does not contain a valid index.
-    pub fn verify_and_set_claimed<N: ToXdr + IndexableNode>(
+    ///   when the leaf data does not contain a valid index.
+    pub fn verify_and_set_claimed<N: ToXdr + IndexableLeaf>(
         e: &Env,
-        node: N,
+        leaf: N,
         proof: Vec<H::Output>,
     ) {
-        let index = node.index();
-        let encoded = node.to_xdr(e);
+        let index = leaf.index();
+        let encoded = leaf.to_xdr(e);
 
         // Check if already claimed
         if Self::is_claimed(e, index) {
@@ -147,9 +147,9 @@ where
         let root = Self::get_root(e);
         let mut hasher = H::new(e);
         hasher.update(encoded);
-        let leaf = hasher.finalize();
+        let leaf_hash = hasher.finalize();
 
-        match Verifier::<H>::verify(e, proof, root, leaf) {
+        match Verifier::<H>::verify(e, proof, root, leaf_hash) {
             true => Self::set_claimed(e, index),
             false => panic_with_error!(e, MerkleDistributorError::InvalidProof),
         };

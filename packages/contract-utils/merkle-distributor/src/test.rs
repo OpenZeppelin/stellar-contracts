@@ -9,7 +9,7 @@ use soroban_sdk::{
 use stellar_crypto::sha256::Sha256;
 use stellar_event_assertion::EventAssertion;
 
-use crate::{merkle_distributor::IndexableNode, MerkleDistributor};
+use crate::{merkle_distributor::IndexableLeaf, MerkleDistributor};
 
 type Bytes32 = BytesN<32>;
 type Distributor = MerkleDistributor<Sha256>;
@@ -25,7 +25,7 @@ struct LeafData {
     pub amount: i128,
 }
 
-impl IndexableNode for LeafData {
+impl IndexableLeaf for LeafData {
     fn index(&self) -> u32 {
         self.index
     }
