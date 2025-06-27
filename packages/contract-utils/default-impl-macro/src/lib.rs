@@ -62,6 +62,8 @@ mod helper;
 /// for these traits is a reminder for the implementor to provide the
 /// authorization logic for these traits.
 #[proc_macro_attribute]
-pub fn default_impl(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn default_impl(attrs: TokenStream, item: TokenStream) -> TokenStream {
+    assert!(attrs.is_empty(), "This macro does not accept any arguments");
+
     generate_default_impl(item)
 }
