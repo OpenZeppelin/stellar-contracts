@@ -3,11 +3,8 @@ use quote::quote;
 use stellar_macro_helpers::generate_auth_check;
 use syn::{parse_macro_input, ItemFn};
 
-/// A procedural macro that ensures the caller is the owner before executing the
-/// function.
-///
-/// This macro retrieves the owner from storage and requires authorization from
-/// the owner before executing the function body.
+/// A procedural macro that retrieves the owner from storage and requires
+/// authorization from the owner before executing the function body.
 ///
 /// # Usage
 ///
@@ -29,7 +26,9 @@ use syn::{parse_macro_input, ItemFn};
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn only_owner(_attrs: TokenStream, input: TokenStream) -> TokenStream {
+pub fn only_owner(attrs: TokenStream, input: TokenStream) -> TokenStream {
+    assert!(attrs.is_empty(), "This macro does not accept any arguments");
+
     let input_fn = parse_macro_input!(input as ItemFn);
 
     // Generate the function with the owner authorization check

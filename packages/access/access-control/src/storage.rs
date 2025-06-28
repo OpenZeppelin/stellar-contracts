@@ -129,9 +129,17 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 /// * `e` - Access to Soroban environment.
 /// * `admin` - The account to grant the admin privilege.
 ///
+/// # Errors
+///
+/// * [`AccessControlError::AdminAlreadySet`] - If the admin is already set.
+///
 /// **IMPORTANT**: this function lacks authorization checks.
 /// It is expected to call this function only in the constructor!
 pub fn set_admin(e: &Env, admin: &Address) {
+    // Check if admin is already set
+    if e.storage().instance().has(&AccessControlStorageKey::Admin) {
+        panic_with_error!(e, AccessControlError::AdminAlreadySet);
+    }
     e.storage().instance().set(&AccessControlStorageKey::Admin, &admin);
 }
 
@@ -166,7 +174,7 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 }
 
 /// Low-level function to grant a role to an account without performing
-// authorization checks.
+/// authorization checks.
 /// Creates the role if it does not exist.
 /// Returns early if the account already has the role.
 ///
@@ -196,10 +204,7 @@ pub fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &S
     if has_role(e, account, role).is_some() {
         return;
     }
-
-    let index = add_to_role_enumeration(e, account, role);
-    let key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
-    e.storage().persistent().set(&key, &index);
+    add_to_role_enumeration(e, account, role);
 
     emit_role_granted(e, role, account, caller);
 }
@@ -343,8 +348,7 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// * Authorization for the current admin is required.
 pub fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32) {
-    let admin = get_admin(e);
-    admin.require_auth();
+    let admin = enforce_admin_auth(e);
 
     transfer_role(e, new_admin, &AccessControlStorageKey::PendingAdmin, live_until_ledger);
 
@@ -429,6 +433,21 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
 ///
 /// Using this function in public-facing methods creates significant security
 /// risks as it could allow unauthorized admin role assignments.
+///
+/// # Circular Admin Warning
+///
+/// **CAUTION**: This function allows the creation of circular admin
+/// relationships between roles. For example, it's possible to assign MINT_ADMIN
+/// as the admin of MINT_ROLE while also making MINT_ROLE the admin of
+/// MINT_ADMIN. Such circular relationships can lead to unintended consequences,
+/// including:
+///
+/// - Race conditions where each role can revoke the other
+/// - Potential security vulnerabilities in role management
+/// - Confusing governance structures that are difficult to reason about
+///
+/// When designing your role hierarchy, carefully consider the relationships
+/// between roles and avoid creating circular dependencies.
 pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
 
@@ -439,6 +458,60 @@ pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
     e.storage().persistent().set(&key, admin_role);
 
     emit_role_admin_changed(e, role, &previous_admin_role, admin_role);
+}
+
+/// Removes the admin role for a specified role without performing authorization
+/// checks.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `role` - The role to remove the admin for.
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - In admin functions that implement their own authorization logic
+/// - When cleaning up unused roles
+pub fn remove_role_admin_no_auth(e: &Env, role: &Symbol) {
+    let key = AccessControlStorageKey::RoleAdmin(role.clone());
+
+    // Check if the key exists before attempting to remove
+    if e.storage().persistent().has(&key) {
+        e.storage().persistent().remove(&key);
+    } else {
+        panic_with_error!(e, AccessControlError::AdminRoleNotFound);
+    }
+}
+
+/// Removes the role accounts count for a specified role without performing
+/// authorization checks.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `role` - The role to remove the accounts count for.
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - In admin functions that implement their own authorization logic
+/// - When cleaning up unused roles with zero members
+pub fn remove_role_accounts_count_no_auth(e: &Env, role: &Symbol) {
+    let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());
+
+    // Check if the key exists and has a zero count before removing
+    if let Some(count) = e.storage().persistent().get::<_, u32>(&count_key) {
+        if count == 0 {
+            e.storage().persistent().remove(&count_key);
+        } else {
+            panic_with_error!(e, AccessControlError::RoleCountIsNotZero);
+        }
+    } else {
+        panic_with_error!(e, AccessControlError::RoleNotFound);
+    }
 }
 
 // ################## LOW-LEVEL HELPERS ##################
@@ -456,9 +529,14 @@ pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
 ///
 /// * [`AccessControlError::Unauthorized`] - If the caller is neither the
 ///   contract admin nor has the admin role.
-/// * refer to [`get_admin`] errors.
 pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
-    let is_admin = caller == &get_admin(e);
+    // Check if caller is contract admin (if one is set)
+    let is_admin = match e.storage().instance().get::<_, Address>(&AccessControlStorageKey::Admin) {
+        Some(admin) => caller == &admin,
+        None => false, // No admin is set, so caller can't be admin
+    };
+
+    // Check if caller has admin role for the specified role
     let is_admin_role = match get_role_admin(e, role) {
         Some(admin_role) => has_role(e, caller, &admin_role).is_some(),
         None => false,
@@ -490,8 +568,7 @@ pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
     }
 }
 
-/// Enforces that the caller is the admin and returns the admin address.
-/// This function retrieves the admin from storage, requires authorization,
+/// Retrieves the admin from storage, enforces authorization,
 /// and returns the admin address.
 ///
 /// # Arguments
@@ -511,14 +588,14 @@ pub fn enforce_admin_auth(e: &Env) -> Address {
     admin
 }
 
-/// Adds an account to role enumeration. Returns the previous count.
+/// Adds an account to role enumeration.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `account` - The account to add to the role.
 /// * `role` - The role to add the account to.
-pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) -> u32 {
+pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     // Get the current count of accounts with this role
     let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());
     let count = e.storage().persistent().get(&count_key).unwrap_or(0);
@@ -534,8 +611,6 @@ pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) -> u32
 
     // Update the count
     e.storage().persistent().set(&count_key, &(count + 1));
-
-    count
 }
 
 /// Removes an account from role enumeration.
