@@ -58,7 +58,9 @@ pub fn set_sac_address(e: &Env, sac: &Address) {
     e.storage().instance().set(&SACAdminWrapperDataKey::Sac, &sac);
 }
 
-/// Sets the administrator to the specified address `new_admin`.
+/// Sets the administrator to the specified address `new_admin`. The `new_admin`
+/// address is not validated so the change must be carefully and thoroughly
+/// considered, otherwise administration from the SAC can be lock down forever.
 ///
 /// # Arguments
 ///
