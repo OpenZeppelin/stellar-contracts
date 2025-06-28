@@ -11,6 +11,7 @@ use stellar_access_control_macros::has_role;
 use stellar_default_impl_macro::default_impl;
 use stellar_fungible::{
     allowlist::{AllowList, FungibleAllowList},
+    burnable::FungibleBurnable,
     Base, FungibleToken,
 };
 
@@ -65,3 +66,7 @@ impl FungibleAllowList for ExampleContract {
 #[default_impl]
 #[contractimpl]
 impl AccessControl for ExampleContract {}
+
+#[default_impl]
+#[contractimpl]
+impl FungibleBurnable for ExampleContract {}

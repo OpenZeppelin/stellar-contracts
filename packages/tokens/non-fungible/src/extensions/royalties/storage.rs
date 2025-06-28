@@ -104,6 +104,39 @@ impl Base {
         emit_set_token_royalty(e, receiver, token_id, basis_points);
     }
 
+    /// Removes token-specific royalty information, allowing the token to fall
+    /// back to the collection-wide default royalty settings.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `token_id` - The identifier of the token.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["remove_token_royalty", token_id: u32]`
+    /// * data - `[]`
+    ///
+    /// # Errors
+    ///
+    /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
+    ///   exist.
+    ///
+    /// # Notes
+    ///
+    /// **IMPORTANT**: This function lacks authorization controls. Most likely,
+    /// you want to invoke it from a function with admin-only authorization.
+    pub fn remove_token_royalty(e: &Env, token_id: u32) {
+        // Verify token exists by checking owner
+        let _ = Base::owner_of(e, token_id);
+
+        // Remove the token royalty information
+        let key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
+        e.storage().persistent().remove(&key);
+
+        super::emit_remove_token_royalty(e, token_id);
+    }
+
     /// Returns `(Address, u32)` - A tuple containing the receiver address and
     /// the royalty amount. If there is no token-specific royalty set, it
     /// returns the default royalty. If there is no default royalty set, it
@@ -121,7 +154,7 @@ impl Base {
     /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
     /// * refer to [`Base::owner_of`] errors.
-    pub fn royalty_info(e: &Env, token_id: u32, sale_price: u32) -> (Address, u32) {
+    pub fn royalty_info(e: &Env, token_id: u32, sale_price: u128) -> (Address, u128) {
         // Verify token exists by checking owner
         let _ = Base::owner_of(e, token_id);
 
@@ -133,8 +166,7 @@ impl Base {
                 OWNER_TTL_THRESHOLD,
                 OWNER_EXTEND_AMOUNT,
             );
-            let royalty_amount =
-                (sale_price as u64 * royalty_info.basis_points as u64 / 10000) as u32;
+            let royalty_amount = sale_price * royalty_info.basis_points as u128 / 10000;
             return (royalty_info.receiver, royalty_amount);
         }
 
@@ -142,8 +174,7 @@ impl Base {
         let default_key = NFTRoyaltiesStorageKey::DefaultRoyalty;
         if let Some(royalty_info) = e.storage().instance().get::<_, RoyaltyInfo>(&default_key) {
             e.storage().instance().extend_ttl(OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
-            let royalty_amount =
-                (sale_price as u64 * royalty_info.basis_points as u64 / 10000) as u32;
+            let royalty_amount = sale_price * royalty_info.basis_points as u128 / 10000;
             return (royalty_info.receiver, royalty_amount);
         }
 
