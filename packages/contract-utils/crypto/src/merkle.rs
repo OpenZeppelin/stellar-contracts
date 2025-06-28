@@ -99,7 +99,7 @@ where
 
         // hash without sorting
         for hash in proof {
-            leaf = if index % 2 == 0 {
+            leaf = if index.is_multiple_of(2) {
                 hash_pair(&leaf, &hash, H::new(e))
             } else {
                 hash_pair(&hash, &leaf, H::new(e))

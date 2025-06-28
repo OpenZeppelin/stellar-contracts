@@ -74,7 +74,7 @@ prop_compose! {
         for hash in &proof {
             let hash = Bytes32::from_array(&e, &hash.clone());
             proof_vec.push_back(hash.clone());
-            current = if current_index % 2 == 0 {
+            current = if current_index.is_multiple_of(2) {
                 hash_pair(&current, &hash, Keccak256::new(&e))
             } else {
                 hash_pair(&hash, &current, Keccak256::new(&e))
