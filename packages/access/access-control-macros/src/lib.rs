@@ -2,6 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use stellar_macro_helpers::{generate_auth_check, parse_env_arg};
 use syn::{
+    bracketed,
     parse::{Parse, ParseStream},
     parse_macro_input, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
 };
@@ -43,12 +44,14 @@ pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// # Security Warning
 ///
-/// **IMPORTANT**: This macro does NOT enforce authorization. This is a
-/// deliberate choice, since in Stellar contracts, duplicate `require_auth()`
-/// calls for the same account within the same call stack panics. This macro is
-/// designed for use cases where you want to further limit a function that
-/// already has `require_auth()` in it with access control roles. If you also
-/// need `require_auth()` provided by the macro, please use `#[only_role]`
+/// **IMPORTANT**: This macro checks role membership but does NOT enforce
+/// authorization. This design prevents duplicate `require_auth()` calls which
+/// would cause panics in Stellar contracts. Use this macro when:
+///
+/// 1. Your function already contains a `require_auth()` call
+/// 2. You need additional role-based access control
+///
+/// If you need both role checking AND authorization, use `#[only_role]`
 /// instead.
 ///
 /// # Usage
@@ -76,12 +79,11 @@ pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
 /// A procedural macro that ensures the parameter has the specified role and
 /// requires authorization.
 ///
-/// **IMPORTANT**: This macro does enforce authorization. This is a deliberate
-/// choice, since in Stellar contracts, duplicate `require_auth()` calls for the
-/// same account within the same call stack panics. If you are getting errors
-/// while using this macro, it could be that the function you're annotating
-/// already has a `require_auth()` call for the same account. In that case,
-/// please use `#[has_role]` instead.
+/// **IMPORTANT**: This macro both checks role membership AND enforces
+/// authorization. Be aware that in Stellar contracts, duplicate
+/// `require_auth()` calls for the same account will cause panics. If your
+/// function already contains a `require_auth()` call for the same account, use
+/// `#[has_role]` instead to avoid duplicate authorization checks.
 ///
 /// # Usage
 ///
@@ -170,18 +172,29 @@ struct HasAnyRoleArgs {
 
 impl Parse for HasAnyRoleArgs {
     fn parse(input: ParseStream) -> syn::Result<Self> {
+        // Parse the parameter name
         let param: Ident = input.parse()?;
         input.parse::<Token![,]>()?;
 
-        let mut roles = Vec::new();
-        let first_role: LitStr = input.parse()?;
-        roles.push(first_role);
+        // Parse the array of roles
+        let content;
+        bracketed!(content in input);
 
-        // Parse additional roles separated by commas
-        while !input.is_empty() {
-            input.parse::<Token![,]>()?;
-            let role: LitStr = input.parse()?;
+        let mut roles = Vec::new();
+
+        // Parse roles until we reach the end of the array
+        while !content.is_empty() {
+            let role: LitStr = content.parse()?;
             roles.push(role);
+
+            if content.is_empty() {
+                break;
+            }
+            content.parse::<Token![,]>()?;
+        }
+
+        if roles.is_empty() {
+            return Err(syn::Error::new(input.span(), "At least one role must be specified"));
         }
 
         Ok(HasAnyRoleArgs { param, roles })
@@ -227,18 +240,20 @@ fn panic_type(param_name: &Ident) -> ! {
 ///
 /// # Security Warning
 ///
-/// **IMPORTANT**: This macro does NOT enforce authorization. This is a
-/// deliberate choice, since in Stellar contracts, duplicate `require_auth()`
-/// calls for the same account within the same call stack panics. This macro is
-/// designed for use cases where you want to further limit a function that
-/// already has `require_auth()` in it with access control roles. If you also
-/// need `require_auth()` provided by the macro, please use `#[only_any_role]`
+/// **IMPORTANT**: This macro checks role membership but does NOT enforce
+/// authorization. This design prevents duplicate `require_auth()` calls which
+/// would cause panics in Stellar contracts. Use this macro when:
+///
+/// 1. Your function already contains a `require_auth()` call
+/// 2. You need additional role-based access control
+///
+/// If you need both role checking AND authorization, use `#[only_any_role]`
 /// instead.
 ///
 /// # Usage
 ///
 /// ```rust
-/// #[has_any_role(account, "minter", "admin", "operator")]
+/// #[has_any_role(account, ["minter", "admin", "operator"])]
 /// pub fn manage_tokens(e: &Env, amount: u32, account: Address) {
 ///     // Function body
 /// }
@@ -254,17 +269,16 @@ pub fn has_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
 /// A procedural macro that ensures the parameter has any of the specified roles
 /// and requires authorization.
 ///
-/// **IMPORTANT**: This macro does enforce authorization. This is a deliberate
-/// choice, since in Stellar contracts, duplicate `require_auth()` calls for the
-/// same account within the same call stack panics. If you are getting errors
-/// while using this macro, it could be that the function you're annotating
-/// already has a `require_auth()` call for the same account. In that case,
-/// please use `#[has_any_role]` instead.
+/// **IMPORTANT**: This macro both checks role membership AND enforces
+/// authorization. Be aware that in Stellar contracts, duplicate
+/// `require_auth()` calls for the same account will cause panics. If your
+/// function already contains a `require_auth()` call for the same account, use
+/// `#[has_any_role]` instead to avoid duplicate authorization checks.
 ///
 /// # Usage
 ///
 /// ```rust
-/// #[only_any_role(account, "minter", "admin", "operator")]
+/// #[only_any_role(account, ["minter", "admin", "operator"])]
 /// pub fn manage_tokens(e: &Env, amount: u32, account: Address) {
 ///     // Function body
 /// }
