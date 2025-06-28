@@ -8,7 +8,7 @@ use soroban_sdk::{
     vec, Address, Env, IntoVal, Symbol,
 };
 
-use crate::storage::{pause, paused, unpause, when_not_paused, when_paused, PAUSED};
+use crate::storage::{pause, paused, unpause, when_not_paused, when_paused, PausableStorageKey};
 
 #[contract]
 struct MockContract;
@@ -26,7 +26,6 @@ fn initial_state() {
 #[test]
 fn pause_works() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockContract, ());
     let caller = Address::generate(&e);
 
@@ -54,13 +53,12 @@ fn pause_works() {
 #[test]
 fn unpause_works() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockContract, ());
     let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
         // Manually set storage
-        e.storage().instance().set(&PAUSED, &true);
+        e.storage().instance().set(&PausableStorageKey::Paused, &true);
 
         // Test unpause
         unpause(&e, &caller);
@@ -85,13 +83,12 @@ fn unpause_works() {
 #[should_panic(expected = "Error(Contract, #1000)")]
 fn errors_pause_when_paused() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockContract, ());
     let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
         // Manually set storage
-        e.storage().instance().set(&PAUSED, &true);
+        e.storage().instance().set(&PausableStorageKey::Paused, &true);
         // Should panic when trying to pause again
         pause(&e, &caller);
     });
@@ -101,7 +98,6 @@ fn errors_pause_when_paused() {
 #[should_panic(expected = "Error(Contract, #1001)")]
 fn errors_unpause_when_not_paused() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockContract, ());
     let caller = Address::generate(&e);
 
@@ -125,7 +121,6 @@ fn when_not_paused_works() {
 #[test]
 fn when_paused_works() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockContract, ());
     let caller = Address::generate(&e);
 

@@ -1,9 +1,13 @@
-use soroban_sdk::{panic_with_error, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::{emit_paused, emit_unpaused, pausable::PausableError};
 
-/// Indicates whether the contract is in `Paused` state.
-pub const PAUSED: Symbol = symbol_short!("PAUSED");
+/// Storage key for the data associated with `Pausable`
+#[contracttype]
+pub enum PausableStorageKey {
+    /// Indicates whether the contract is in `Paused` state.
+    Paused,
+}
 
 /// Returns true if the contract is paused, and false otherwise.
 ///
@@ -12,7 +16,7 @@ pub const PAUSED: Symbol = symbol_short!("PAUSED");
 /// * `e` - Access to Soroban environment.
 pub fn paused(e: &Env) -> bool {
     // if not paused, consider default false (unpaused)
-    e.storage().instance().get(&PAUSED).unwrap_or(false)
+    e.storage().instance().get(&PausableStorageKey::Paused).unwrap_or(false)
 
     // NOTE: We don't extend the TTL here. We don’t think utilities should
     // have any opinion on the TTLs, contracts usually manage TTL's themselves.
@@ -35,13 +39,13 @@ pub fn paused(e: &Env) -> bool {
 /// * topics - `["paused"]`
 /// * data - `[caller: Address]`
 ///
-/// # Notes
+/// # Security Warning
 ///
-/// Authorization for `caller` is required.
+/// **IMPORTANT**: This function lacks authorization checks and should only
+/// be used in admin functions that implement their own authorization logic.
 pub fn pause(e: &Env, caller: &Address) {
-    caller.require_auth();
     when_not_paused(e);
-    e.storage().instance().set(&PAUSED, &true);
+    e.storage().instance().set(&PausableStorageKey::Paused, &true);
     emit_paused(e, caller);
 }
 
@@ -61,13 +65,13 @@ pub fn pause(e: &Env, caller: &Address) {
 /// * topics - `["unpaused"]`
 /// * data - `[caller: Address]`
 ///
-/// # Notes
+/// # Security Warning
 ///
-/// Authorization for `caller` is required.
+/// **IMPORTANT**: This function lacks authorization checks and should only
+/// be used in admin functions that implement their own authorization logic.
 pub fn unpause(e: &Env, caller: &Address) {
-    caller.require_auth();
     when_paused(e);
-    e.storage().instance().set(&PAUSED, &false);
+    e.storage().instance().set(&PausableStorageKey::Paused, &false);
     emit_unpaused(e, caller);
 }
 
