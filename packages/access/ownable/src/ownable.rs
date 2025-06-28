@@ -11,9 +11,7 @@ pub trait Ownable {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn get_owner(e: &Env) -> Option<Address> {
-        crate::get_owner(e)
-    }
+    fn get_owner(e: &Env) -> Option<Address>;
 
     /// Initiates a 2-step ownership transfer to a new address.
     ///

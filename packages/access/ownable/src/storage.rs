@@ -1,5 +1,4 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
-use stellar_constants::{OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD};
 use stellar_role_transfer::{accept_transfer, transfer_role};
 
 use crate::ownable::{
@@ -23,10 +22,7 @@ pub enum OwnableStorageKey {
 ///
 /// * `e` - Access to the Soroban environment.
 pub fn get_owner(e: &Env) -> Option<Address> {
-    e.storage()
-        .instance()
-        .get::<_, Address>(&OwnableStorageKey::Owner)
-        .inspect(|_| e.storage().instance().extend_ttl(OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT))
+    e.storage().instance().get::<_, Address>(&OwnableStorageKey::Owner)
 }
 
 // ################## CHANGE STATE ##################
