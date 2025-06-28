@@ -3,8 +3,8 @@ use stellar_constants::{ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
 use stellar_role_transfer::{accept_transfer, transfer_role};
 
 use crate::{
-    emit_admin_transfer_completed, emit_admin_transfer_initiated, emit_role_admin_changed,
-    emit_role_granted, emit_role_revoked, AccessControlError,
+    emit_admin_renounced, emit_admin_transfer_completed, emit_admin_transfer_initiated,
+    emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControlError,
 };
 
 /// Storage key for enumeration of accounts per role.
@@ -308,6 +308,8 @@ pub fn revoke_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &
 /// * Authorization for `caller` is required.
 pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
     caller.require_auth();
+
+    // Check if account has the role
     if has_role(e, caller, role).is_none() {
         panic_with_error!(e, AccessControlError::AccountNotFound);
     }
@@ -408,6 +410,35 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
     admin.require_auth();
 
     set_role_admin_no_auth(e, role, admin_role);
+}
+
+/// Allows the current admin to renounce their role, making the contract
+/// permanently admin-less. This is useful for decentralization purposes or when
+/// the admin role is no longer needed. Once the admin is renounced, it cannot
+/// be reinstated.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+///
+/// # Errors
+///
+/// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
+///
+/// # Events
+///
+/// * topics - `["admin_renounced", admin: Address]`
+/// * data - `[]`
+///
+/// # Notes
+///
+/// * Authorization for the current admin is required.
+pub fn renounce_admin(e: &Env) {
+    let admin = enforce_admin_auth(e);
+
+    e.storage().instance().remove(&AccessControlStorageKey::Admin);
+
+    emit_admin_renounced(e, &admin);
 }
 
 /// Low-level function to set the admin role for a specified role without
