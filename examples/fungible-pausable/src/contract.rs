@@ -65,7 +65,7 @@ impl Pausable for ExampleContract {
             panic_with_error!(e, ExampleContractError::Unauthorized);
         }
 
-        pausable::pause(e, &caller);
+        pausable::pause(e);
     }
 
     fn unpause(e: &Env, caller: Address) {
@@ -78,7 +78,7 @@ impl Pausable for ExampleContract {
             panic_with_error!(e, ExampleContractError::Unauthorized);
         }
 
-        pausable::unpause(e, &caller);
+        pausable::unpause(e);
     }
 }
 

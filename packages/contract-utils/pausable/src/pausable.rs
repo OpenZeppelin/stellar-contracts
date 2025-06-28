@@ -25,7 +25,7 @@ pub trait Pausable {
     /// # Events
     ///
     /// * topics - `["paused"]`
-    /// * data - `[caller: Address]`
+    /// * data - `[]`
     ///
     /// # Notes
     ///
@@ -54,7 +54,7 @@ pub trait Pausable {
     /// # Events
     ///
     /// * topics - `["unpaused"]`
-    /// * data - `[caller: Address]`
+    /// * data - `[]`
     ///
     /// # Notes
     ///
@@ -88,15 +88,14 @@ pub enum PausableError {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller.
 ///
 /// # Events
 ///
 /// * topics - `["paused"]`
-/// * data - `[caller: Address]`
-pub fn emit_paused(e: &Env, caller: &Address) {
+/// * data - `[]`
+pub fn emit_paused(e: &Env) {
     let topics = (symbol_short!("paused"),);
-    e.events().publish(topics, caller)
+    e.events().publish(topics, ())
 }
 
 /// Emits an event when `Unpaused` state is triggered.
@@ -104,13 +103,12 @@ pub fn emit_paused(e: &Env, caller: &Address) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller.
 ///
 /// # Events
 ///
 /// * topics - `["unpaused"]`
-/// * data - `[caller: Address]`
-pub fn emit_unpaused(e: &Env, caller: &Address) {
+/// * data - `[]`
+pub fn emit_unpaused(e: &Env) {
     let topics = (symbol_short!("unpaused"),);
-    e.events().publish(topics, caller)
+    e.events().publish(topics, ())
 }

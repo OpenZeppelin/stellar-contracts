@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use soroban_sdk::{contracttype, panic_with_error, Env};
 
 use crate::{emit_paused, emit_unpaused, pausable::PausableError};
 
@@ -28,7 +28,6 @@ pub fn paused(e: &Env) -> bool {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller.
 ///
 /// # Errors
 ///
@@ -37,16 +36,16 @@ pub fn paused(e: &Env) -> bool {
 /// # Events
 ///
 /// * topics - `["paused"]`
-/// * data - `[caller: Address]`
+/// * data - `[]`
 ///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function lacks authorization checks and should only
 /// be used in admin functions that implement their own authorization logic.
-pub fn pause(e: &Env, caller: &Address) {
+pub fn pause(e: &Env) {
     when_not_paused(e);
     e.storage().instance().set(&PausableStorageKey::Paused, &true);
-    emit_paused(e, caller);
+    emit_paused(e);
 }
 
 /// Triggers `Unpaused` state.
@@ -54,7 +53,6 @@ pub fn pause(e: &Env, caller: &Address) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller.
 ///
 /// # Errors
 ///
@@ -63,16 +61,16 @@ pub fn pause(e: &Env, caller: &Address) {
 /// # Events
 ///
 /// * topics - `["unpaused"]`
-/// * data - `[caller: Address]`
+/// * data - `[]`
 ///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function lacks authorization checks and should only
 /// be used in admin functions that implement their own authorization logic.
-pub fn unpause(e: &Env, caller: &Address) {
+pub fn unpause(e: &Env) {
     when_paused(e);
     e.storage().instance().set(&PausableStorageKey::Paused, &false);
-    emit_unpaused(e, caller);
+    emit_unpaused(e);
 }
 
 /// Helper to make a function callable only when the contract is NOT paused.
