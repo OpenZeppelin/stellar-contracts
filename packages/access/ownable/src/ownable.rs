@@ -27,8 +27,7 @@ pub trait Ownable {
     ///
     /// # Errors
     ///
-    /// * [`OwnableError::NotAuthorized`] - If the authorization from the
-    ///   current owner is missing.
+    /// * [`OwnableError::OwnerNotSet`] - If the owner is not set.
     /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If
     ///   trying to cancel a transfer that doesn't exist.
     /// * [`stellar_role_transfer::RoleTransferError::InvalidLiveUntilLedger`] -
@@ -72,8 +71,7 @@ pub trait Ownable {
     ///
     /// * [`OwnableError::TransferInProgress`] - If there is a pending ownership
     ///   transfer.
-    /// * [`OwnableError::NotAuthorized`] - If the authorization from the
-    ///   current owner is missing.
+    /// * [`OwnableError::OwnerNotSet`] - If the owner is not set.
     ///
     /// # Notes
     ///
@@ -85,7 +83,7 @@ pub trait Ownable {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum OwnableError {
-    NotAuthorized = 1220,
+    OwnerNotSet = 1220,
     TransferInProgress = 1221,
     OwnerAlreadySet = 1222,
 }

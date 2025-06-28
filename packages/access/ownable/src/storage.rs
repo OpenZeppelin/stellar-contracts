@@ -150,15 +150,11 @@ pub fn renounce_ownership(e: &Env) {
 ///
 /// # Errors
 ///
-/// * [`OwnableError::NotAuthorized`] - If the authorization from the current
-///   owner is missing.
+/// * [`OwnableError::OwnerNotSet`] - If the owner is not set.
 pub fn enforce_owner_auth(e: &Env) -> Address {
-    if let Some(owner) = get_owner(e) {
-        owner.require_auth();
-        owner
-    } else {
-        // No owner means ownership has been renounced — no one can call restricted
-        // functions
-        panic_with_error!(e, OwnableError::NotAuthorized);
-    }
+    let Some(owner) = get_owner(e) else {
+        panic_with_error!(e, OwnableError::OwnerNotSet);
+    };
+    owner.require_auth();
+    owner
 }
