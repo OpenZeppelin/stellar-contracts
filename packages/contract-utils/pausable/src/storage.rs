@@ -23,7 +23,7 @@ pub fn paused(e: &Env) -> bool {
     // Extending the TTL in the utilities would be redundant in the most cases.
 }
 
-/// Triggers `Paused` state.
+/// Triggers paused state.
 ///
 /// # Arguments
 ///
@@ -42,13 +42,24 @@ pub fn paused(e: &Env) -> bool {
 ///
 /// **IMPORTANT**: This function lacks authorization checks and should only
 /// be used in admin functions that implement their own authorization logic.
+///
+/// Example:
+///
+/// ```ignore,rust
+/// use stellar_access_control_macros::only_role;
+///
+/// #[only_role(operator, "pauser")] // `only_role` handles authorization
+/// fn emergency_pause(e: &Env, operator: Address) {
+///     pausable::pause(e);
+/// }
+/// ```
 pub fn pause(e: &Env) {
     when_not_paused(e);
     e.storage().instance().set(&PausableStorageKey::Paused, &true);
     emit_paused(e);
 }
 
-/// Triggers `Unpaused` state.
+/// Triggers unpaused state.
 ///
 /// # Arguments
 ///
@@ -67,6 +78,17 @@ pub fn pause(e: &Env) {
 ///
 /// **IMPORTANT**: This function lacks authorization checks and should only
 /// be used in admin functions that implement their own authorization logic.
+///
+/// Example:
+///
+/// ```ignore,rust
+/// use stellar_access_control_macros::only_role;
+///
+/// #[only_role(operator, "unpauser")] // `only_role` handles authorization
+/// fn unpause(e: &Env, operator: Address) {
+///     pausable::unpause(e);
+/// }
+/// ```
 pub fn unpause(e: &Env) {
     when_paused(e);
     e.storage().instance().set(&PausableStorageKey::Paused, &false);
