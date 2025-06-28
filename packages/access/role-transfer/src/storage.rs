@@ -26,6 +26,16 @@ use crate::RoleTransferError;
 ///   storage entry.
 /// * [`RoleTransferError::InvalidPendingAccount`] - If the specified pending
 ///   account is not the same as the provided `new` address.
+///
+/// # Notes
+///
+/// * This function does not enforce authorization. Ensure that authorization is
+///   handled at a higher level.
+/// * The period during which the transfer can be accepted is implicitly
+///   timebound by the maximum allowed storage TTL value which is a network
+///   parameter, i.e. one cannot set `live_until_ledger` for a longer period.
+/// * There is also a default minimum TTL and if the computed period is shorter
+///   than it, the entry will outlive `live_until_ledger`.
 pub fn transfer_role<T>(e: &Env, new: &Address, pending_key: &T, live_until_ledger: u32)
 where
     T: IntoVal<Env, Val>,

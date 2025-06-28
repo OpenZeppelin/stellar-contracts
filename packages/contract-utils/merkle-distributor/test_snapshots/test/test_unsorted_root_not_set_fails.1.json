@@ -71,26 +71,5 @@
       ]
     ]
   },
-  "events": [
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "set_root"
-              }
-            ],
-            "data": {
-              "bytes": "11932105f1a4d0092e87cead3a543da5afd8adcff63f9a8ceb6c5db3c8135722"
-            }
-          }
-        }
-      },
-      "failed_call": false
-    }
-  ]
+  "events": []
 }

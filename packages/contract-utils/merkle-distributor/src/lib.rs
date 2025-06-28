@@ -12,7 +12,7 @@
 //! ### Requirements for Leaf Structure
 //!
 //! - Each node (leaf) **MUST** include an indexable field of type `u32` and
-//!   implement the `IndexableNode`.
+//!   implement the `IndexableLeaf`.
 //! - Aside from the `index`, the node can contain any additional fields, with
 //!   any names and types, depending on the specific use case (e.g., `address`,
 //!   `amount`, `token_id`, etc.).
@@ -23,7 +23,7 @@
 //!
 //! ```ignore,rust
 //! use soroban_sdk::contracttype;
-//! use stellar_merkle_distributor::IndexableNode;
+//! use stellar_merkle_distributor::IndexableLeaf;
 //!
 //! #[contracttype]
 //! struct LeafData {
@@ -32,7 +32,7 @@
 //!     pub amount: i128,
 //! }
 //!
-//! impl IndexableNode for LeafData {
+//! impl IndexableLeaf for LeafData {
 //!     fn index(&self) -> u32 {
 //!         self.index
 //!     }
@@ -53,7 +53,7 @@ mod test;
 
 pub use crate::{
     merkle_distributor::{
-        emit_set_claimed, emit_set_root, IndexableNode, MerkleDistributor, MerkleDistributorError,
+        emit_set_claimed, emit_set_root, IndexableLeaf, MerkleDistributor, MerkleDistributorError,
     },
     storage::MerkleDistributorStorageKey,
 };
