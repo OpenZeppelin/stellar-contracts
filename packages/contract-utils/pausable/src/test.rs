@@ -2,13 +2,9 @@
 
 extern crate std;
 
-use soroban_sdk::{
-    contract,
-    testutils::{Address as _, Events},
-    vec, Address, Env, IntoVal, Symbol,
-};
+use soroban_sdk::{contract, testutils::Events, vec, Env, IntoVal, Symbol};
 
-use crate::storage::{pause, paused, unpause, when_not_paused, when_paused, PAUSED};
+use crate::storage::{pause, paused, unpause, when_not_paused, when_paused, PausableStorageKey};
 
 #[contract]
 struct MockContract;
@@ -26,13 +22,11 @@ fn initial_state() {
 #[test]
 fn pause_works() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
         // Test pause
-        pause(&e, &caller);
+        pause(&e);
         assert!(paused(&e));
 
         let events = e.events().all();
@@ -44,7 +38,7 @@ fn pause_works() {
                 (
                     address.clone(),
                     vec![&e, Symbol::new(&e, "paused").into_val(&e)],
-                    caller.into_val(&e)
+                    ().into_val(&e)
                 )
             ]
         );
@@ -54,16 +48,14 @@ fn pause_works() {
 #[test]
 fn unpause_works() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
         // Manually set storage
-        e.storage().instance().set(&PAUSED, &true);
+        e.storage().instance().set(&PausableStorageKey::Paused, &true);
 
         // Test unpause
-        unpause(&e, &caller);
+        unpause(&e);
         assert!(!paused(&e));
         let events = e.events().all();
         assert_eq!(events.len(), 1);
@@ -74,7 +66,7 @@ fn unpause_works() {
                 (
                     address.clone(),
                     vec![&e, Symbol::new(&e, "unpaused").into_val(&e)],
-                    caller.into_val(&e)
+                    ().into_val(&e)
                 )
             ]
         );
@@ -85,15 +77,13 @@ fn unpause_works() {
 #[should_panic(expected = "Error(Contract, #1000)")]
 fn errors_pause_when_paused() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
         // Manually set storage
-        e.storage().instance().set(&PAUSED, &true);
+        e.storage().instance().set(&PausableStorageKey::Paused, &true);
         // Should panic when trying to pause again
-        pause(&e, &caller);
+        pause(&e);
     });
 }
 
@@ -101,13 +91,11 @@ fn errors_pause_when_paused() {
 #[should_panic(expected = "Error(Contract, #1001)")]
 fn errors_unpause_when_not_paused() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
         // Should panic when trying to unpause while not paused
-        unpause(&e, &caller);
+        unpause(&e);
     });
 }
 
@@ -125,12 +113,10 @@ fn when_not_paused_works() {
 #[test]
 fn when_paused_works() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
-        pause(&e, &caller);
+        pause(&e);
         // Should not panic when contract is paused
         when_paused(&e);
     });

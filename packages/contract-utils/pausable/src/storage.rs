@@ -1,9 +1,13 @@
-use soroban_sdk::{panic_with_error, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{contracttype, panic_with_error, Env};
 
 use crate::{emit_paused, emit_unpaused, pausable::PausableError};
 
-/// Indicates whether the contract is in `Paused` state.
-pub const PAUSED: Symbol = symbol_short!("PAUSED");
+/// Storage key for the pausable state
+#[contracttype]
+pub enum PausableStorageKey {
+    /// Indicates whether the contract is in paused state.
+    Paused,
+}
 
 /// Returns true if the contract is paused, and false otherwise.
 ///
@@ -12,19 +16,18 @@ pub const PAUSED: Symbol = symbol_short!("PAUSED");
 /// * `e` - Access to Soroban environment.
 pub fn paused(e: &Env) -> bool {
     // if not paused, consider default false (unpaused)
-    e.storage().instance().get(&PAUSED).unwrap_or(false)
+    e.storage().instance().get(&PausableStorageKey::Paused).unwrap_or(false)
 
     // NOTE: We don't extend the TTL here. We don’t think utilities should
     // have any opinion on the TTLs, contracts usually manage TTL's themselves.
     // Extending the TTL in the utilities would be redundant in the most cases.
 }
 
-/// Triggers `Paused` state.
+/// Triggers paused state.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller.
 ///
 /// # Errors
 ///
@@ -33,24 +36,34 @@ pub fn paused(e: &Env) -> bool {
 /// # Events
 ///
 /// * topics - `["paused"]`
-/// * data - `[caller: Address]`
+/// * data - `[]`
 ///
-/// # Notes
+/// # Security Warning
 ///
-/// Authorization for `caller` is required.
-pub fn pause(e: &Env, caller: &Address) {
-    caller.require_auth();
+/// **IMPORTANT**: This function lacks authorization checks and should only
+/// be used in admin functions that implement their own authorization logic.
+///
+/// Example:
+///
+/// ```ignore,rust
+/// use stellar_access_control_macros::only_role;
+///
+/// #[only_role(operator, "pauser")] // `only_role` handles authorization
+/// fn emergency_pause(e: &Env, operator: Address) {
+///     pausable::pause(e);
+/// }
+/// ```
+pub fn pause(e: &Env) {
     when_not_paused(e);
-    e.storage().instance().set(&PAUSED, &true);
-    emit_paused(e, caller);
+    e.storage().instance().set(&PausableStorageKey::Paused, &true);
+    emit_paused(e);
 }
 
-/// Triggers `Unpaused` state.
+/// Triggers unpaused state.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller.
 ///
 /// # Errors
 ///
@@ -59,16 +72,27 @@ pub fn pause(e: &Env, caller: &Address) {
 /// # Events
 ///
 /// * topics - `["unpaused"]`
-/// * data - `[caller: Address]`
+/// * data - `[]`
 ///
-/// # Notes
+/// # Security Warning
 ///
-/// Authorization for `caller` is required.
-pub fn unpause(e: &Env, caller: &Address) {
-    caller.require_auth();
+/// **IMPORTANT**: This function lacks authorization checks and should only
+/// be used in admin functions that implement their own authorization logic.
+///
+/// Example:
+///
+/// ```ignore,rust
+/// use stellar_access_control_macros::only_role;
+///
+/// #[only_role(operator, "unpauser")] // `only_role` handles authorization
+/// fn unpause(e: &Env, operator: Address) {
+///     pausable::unpause(e);
+/// }
+/// ```
+pub fn unpause(e: &Env) {
     when_paused(e);
-    e.storage().instance().set(&PAUSED, &false);
-    emit_unpaused(e, caller);
+    e.storage().instance().set(&PausableStorageKey::Paused, &false);
+    emit_unpaused(e);
 }
 
 /// Helper to make a function callable only when the contract is NOT paused.
