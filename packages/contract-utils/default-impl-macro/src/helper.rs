@@ -46,6 +46,11 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
+                fn renounce_admin(e: &soroban_sdk::Env) {
+                    stellar_access_control::renounce_admin(e);
+                }
+            },
+            syn::parse_quote! {
                 fn transfer_admin_role(e: &soroban_sdk::Env, new_admin: soroban_sdk::Address, live_until_ledger: u32) {
                     stellar_access_control::transfer_admin_role(e, &new_admin, live_until_ledger);
                 }
