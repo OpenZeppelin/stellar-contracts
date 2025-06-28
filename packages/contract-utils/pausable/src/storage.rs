@@ -2,10 +2,10 @@ use soroban_sdk::{contracttype, panic_with_error, Env};
 
 use crate::{emit_paused, emit_unpaused, pausable::PausableError};
 
-/// Storage key for the data associated with `Pausable`
+/// Storage key for the pausable state
 #[contracttype]
 pub enum PausableStorageKey {
-    /// Indicates whether the contract is in `Paused` state.
+    /// Indicates whether the contract is in paused state.
     Paused,
 }
 
