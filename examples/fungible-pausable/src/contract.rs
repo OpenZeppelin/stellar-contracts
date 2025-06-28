@@ -59,6 +59,7 @@ impl Pausable for ExampleContract {
         // When `ownable` module is available,
         // the following checks should be equivalent to:
         // `ownable::only_owner(&e);`
+        caller.require_auth();
         let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
         if owner != caller {
             panic_with_error!(e, ExampleContractError::Unauthorized);
@@ -71,6 +72,7 @@ impl Pausable for ExampleContract {
         // When `ownable` module is available,
         // the following checks should be equivalent to:
         // `ownable::only_owner(&e);`
+        caller.require_auth();
         let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
         if owner != caller {
             panic_with_error!(e, ExampleContractError::Unauthorized);

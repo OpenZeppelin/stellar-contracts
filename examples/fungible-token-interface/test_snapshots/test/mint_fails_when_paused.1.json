@@ -183,7 +183,11 @@
                       },
                       {
                         "key": {
-                          "symbol": "PAUSED"
+                          "vec": [
+                            {
+                              "symbol": "Paused"
+                            }
+                          ]
                         },
                         "val": {
                           "bool": true
