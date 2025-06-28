@@ -78,14 +78,12 @@ impl AllowList {
     /// security risks as it could allow unauthorized allowlist
     /// modifications.
     pub fn allow_user(e: &Env, user: &Address) {
-        // Set the user as allowed
         let key = AllowListStorageKey::Allowed(user.clone());
 
         // if the user is not allowed, allow them
         if !e.storage().persistent().has(&key) {
             e.storage().persistent().set(&key, &());
 
-            // Emit event
             emit_user_allowed(e, user);
         }
     }
@@ -115,11 +113,10 @@ impl AllowList {
     pub fn disallow_user(e: &Env, user: &Address) {
         let key = AllowListStorageKey::Allowed(user.clone());
 
-        // Remove from storage and emit event if the user is currently allowed
+        // if the user is currently allowed, disallow them
         if e.storage().persistent().has(&key) {
             e.storage().persistent().remove(&key);
 
-            // Emit event
             emit_user_disallowed(e, user);
         }
     }
@@ -141,12 +138,9 @@ impl AllowList {
     ///   not allowed.
     /// * Also refer to [`Base::transfer`] errors.
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        // Check if both addresses are allowed
         if !AllowList::allowed(e, from) || !AllowList::allowed(e, to) {
             panic_with_error!(e, FungibleTokenError::UserNotAllowed);
         }
-
-        // Call the base implementation
         Base::transfer(e, from, to, amount);
     }
 
@@ -169,12 +163,10 @@ impl AllowList {
     ///   is not allowed.
     /// * Also refer to [`Base::transfer_from`] errors.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-        // Check if all addresses are allowed
         if !AllowList::allowed(e, from) || !AllowList::allowed(e, to) {
             panic_with_error!(e, FungibleTokenError::UserNotAllowed);
         }
 
-        // Call the base implementation
         Base::transfer_from(e, spender, from, to, amount);
     }
 
@@ -202,12 +194,34 @@ impl AllowList {
         amount: i128,
         live_until_ledger: u32,
     ) {
-        // Check if both addresses are allowed
         if !AllowList::allowed(e, owner) {
             panic_with_error!(e, FungibleTokenError::UserNotAllowed);
         }
 
-        // Call the base implementation
         Base::approve(e, owner, spender, amount, live_until_ledger);
+    }
+
+    /// This is a wrapper around [`Base::burn()`] to enable
+    /// the compatibility across [`crate::burnable::FungibleBurnable`]
+    /// with [`crate::allowlist::FungibleAllowList`]
+    ///
+    /// Please refer to [`Base::burn`] for the inline documentation.
+    pub fn burn(e: &Env, from: &Address, amount: i128) {
+        if !AllowList::allowed(e, from) {
+            panic_with_error!(e, FungibleTokenError::UserNotAllowed);
+        }
+        Base::burn(e, from, amount);
+    }
+
+    /// This is a wrapper around [`Base::burn_from()`] to enable
+    /// the compatibility across [`crate::burnable::FungibleBurnable`]
+    /// with [`crate::allowlist::FungibleAllowList`]
+    ///
+    /// Please refer to [`Base::burn_from`] for the inline documentation.
+    pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        if !AllowList::allowed(e, from) {
+            panic_with_error!(e, FungibleTokenError::UserNotAllowed);
+        }
+        Base::burn_from(e, spender, from, amount);
     }
 }
