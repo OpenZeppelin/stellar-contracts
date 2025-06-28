@@ -4,7 +4,7 @@
 
 use soroban_sdk::{contract, contractimpl, vec, Address, Env, String, Vec};
 use stellar_access_control::{set_admin, AccessControl};
-use stellar_access_control_macros::{has_role, only_admin, only_role};
+use stellar_access_control_macros::{has_any_role, has_role, only_admin, only_any_role, only_role};
 use stellar_default_impl_macro::default_impl;
 use stellar_non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
 
@@ -33,6 +33,18 @@ impl ExampleContract {
     #[only_role(caller, "minter")]
     pub fn mint(e: &Env, caller: Address, to: Address, token_id: u32) {
         Base::mint(e, &to, token_id)
+    }
+
+    // allows either minter or burner role
+    #[has_any_role(caller, ["minter", "burner"])]
+    pub fn multi_role_action(e: &Env, caller: Address) -> String {
+        String::from_str(e, "multi_role_action_success")
+    }
+
+    // allows either minter or burner role AND requires auth
+    #[only_any_role(caller, ["minter", "burner"])]
+    pub fn multi_role_auth_action(e: &Env, caller: Address) -> String {
+        String::from_str(e, "multi_role_auth_action_success")
     }
 }
 

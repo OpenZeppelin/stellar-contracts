@@ -26,7 +26,7 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
-                fn get_admin(e: &soroban_sdk::Env) -> soroban_sdk::Address {
+                fn get_admin(e: &soroban_sdk::Env) -> Option<soroban_sdk::Address> {
                     stellar_access_control::get_admin(e)
                 }
             },
