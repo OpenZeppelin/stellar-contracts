@@ -1,5 +1,4 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
-use stellar_constants::{OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD};
 use stellar_role_transfer::{accept_transfer, transfer_role};
 
 use crate::ownable::{
