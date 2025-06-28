@@ -41,7 +41,7 @@
 //! to other accounts.
 //!
 //! One can create as many roles as they want, and create a chain of command
-//! structure if they want to with this approach.
+//! structure if they want to go with this approach.
 //!
 //! If you need even more granular control over which roles can do what, you can
 //! introduce your own business logic, and annotate it with our macro:
@@ -52,6 +52,18 @@
 //!     ...
 //! }
 //! ```
+//!
+//! ### ⚠️ Warning: Circular Admin Relationships
+//!
+//! When designing your role hierarchy, be careful to avoid creating circular
+//! admin relationships. For example, it's possible but not recommended to
+//! assign `MINT_ADMIN` as the admin of `MINT_ROLE` while also making
+//! `MINT_ROLE` the admin of `MINT_ADMIN`. Such circular relationships can lead
+//! to unintended consequences, including:
+//!
+//! - Race conditions where each role can revoke the other
+//! - Potential security vulnerabilities in role management
+//! - Confusing governance structures that are difficult to reason about
 //!
 //! ## Enumeration of Roles
 //!
@@ -81,15 +93,18 @@ mod storage;
 
 pub use crate::{
     access_control::{
-        emit_admin_transfer_completed, emit_admin_transfer_initiated, emit_role_admin_changed,
-        emit_role_granted, emit_role_revoked, AccessControl, AccessControlError,
+        emit_admin_renounced, emit_admin_transfer_completed, emit_admin_transfer_initiated,
+        emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControl,
+        AccessControlError,
     },
     storage::{
         accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
         ensure_if_admin_or_admin_role, ensure_role, get_admin, get_role_admin, get_role_member,
         get_role_member_count, grant_role, grant_role_no_auth, has_role,
-        remove_from_role_enumeration, renounce_role, revoke_role, revoke_role_no_auth, set_admin,
-        set_role_admin, set_role_admin_no_auth, transfer_admin_role, AccessControlStorageKey,
+        remove_from_role_enumeration, remove_role_accounts_count_no_auth,
+        remove_role_admin_no_auth, renounce_admin, renounce_role, revoke_role, revoke_role_no_auth,
+        set_admin, set_role_admin, set_role_admin_no_auth, transfer_admin_role,
+        AccessControlStorageKey,
     },
 };
 
