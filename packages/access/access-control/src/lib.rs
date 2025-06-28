@@ -93,16 +93,18 @@ mod storage;
 
 pub use crate::{
     access_control::{
-        emit_admin_transfer_completed, emit_admin_transfer_initiated, emit_role_admin_changed,
-        emit_role_granted, emit_role_revoked, AccessControl, AccessControlError,
+        emit_admin_renounced, emit_admin_transfer_completed, emit_admin_transfer_initiated,
+        emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControl,
+        AccessControlError,
     },
     storage::{
         accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
         ensure_if_admin_or_admin_role, ensure_role, get_admin, get_role_admin, get_role_member,
         get_role_member_count, grant_role, grant_role_no_auth, has_role,
         remove_from_role_enumeration, remove_role_accounts_count_no_auth,
-        remove_role_admin_no_auth, renounce_role, revoke_role, revoke_role_no_auth, set_admin,
-        set_role_admin, set_role_admin_no_auth, transfer_admin_role, AccessControlStorageKey,
+        remove_role_admin_no_auth, renounce_admin, renounce_role, revoke_role, revoke_role_no_auth,
+        set_admin, set_role_admin, set_role_admin_no_auth, transfer_admin_role,
+        AccessControlStorageKey,
     },
 };
 

@@ -9,8 +9,8 @@ use crate::{
     accept_admin_transfer, add_to_role_enumeration, ensure_if_admin_or_admin_role, get_admin,
     get_role_admin, get_role_member, get_role_member_count, grant_role, grant_role_no_auth,
     has_role, remove_from_role_enumeration, remove_role_accounts_count_no_auth,
-    remove_role_admin_no_auth, renounce_role, revoke_role, set_admin, set_role_admin,
-    set_role_admin_no_auth, transfer_admin_role,
+    remove_role_admin_no_auth, renounce_admin, renounce_role, revoke_role, set_admin,
+    set_role_admin, set_role_admin_no_auth, transfer_admin_role,
 };
 
 #[contract]
@@ -630,5 +630,37 @@ fn remove_role_accounts_count_no_auth_panics_with_nonexistent_role() {
     e.as_contract(&address, || {
         // Attempt to remove accounts count for a role that doesn't exist
         remove_role_accounts_count_no_auth(&e, &nonexistent_role);
+    });
+}
+
+#[test]
+fn renounce_admin_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Set up an admin
+        set_admin(&e, &admin);
+
+        // Verify admin is set correctly
+        assert_eq!(get_admin(&e), admin);
+
+        // Admin renounces their role
+        renounce_admin(&e);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1212)")]
+fn renounce_admin_fails_when_no_admin_set() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        // Try to renounce admin when no admin is set
+        renounce_admin(&e);
     });
 }

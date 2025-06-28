@@ -207,6 +207,29 @@ pub trait AccessControl {
     ///
     /// * Authorization for the current admin is required.
     fn set_role_admin(e: &Env, role: Symbol, admin_role: Symbol);
+
+    /// Allows the current admin to renounce their role, making the contract
+    /// permanently admin-less. This is useful for decentralization purposes
+    /// or when the admin role is no longer needed. Once the admin is
+    /// renounced, it cannot be reinstated.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["admin_renounced", admin: Address]`
+    /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for the current admin is required.
+    fn renounce_admin(e: &Env);
 }
 
 #[contracterror]
@@ -323,4 +346,20 @@ pub fn emit_admin_transfer_initiated(
 pub fn emit_admin_transfer_completed(e: &Env, previous_admin: &Address, new_admin: &Address) {
     let topics = (Symbol::new(e, "admin_transfer_completed"), new_admin);
     e.events().publish(topics, previous_admin);
+}
+
+/// Emits an event when the admin role is renounced.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `admin` - The admin that renounced the role.
+///
+/// # Events
+///
+/// * topics - `["admin_renounced", admin: Address]`
+/// * data - `[]`
+pub fn emit_admin_renounced(e: &Env, admin: &Address) {
+    let topics = (Symbol::new(e, "admin_renounced"), admin);
+    e.events().publish(topics, ());
 }
