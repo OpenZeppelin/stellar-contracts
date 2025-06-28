@@ -376,9 +376,7 @@
                   ]
                 },
                 "durability": "persistent",
-                "val": {
-                  "bool": true
-                }
+                "val": "void"
               }
             },
             "ext": "v0"
