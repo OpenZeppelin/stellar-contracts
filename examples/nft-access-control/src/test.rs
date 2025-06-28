@@ -447,3 +447,99 @@ fn non_admin_cannot_call_admin_restricted_function() {
 
     let _ = client.admin_restricted_function();
 }
+
+#[test]
+fn minters_can_call_multi_role_action() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    e.mock_all_auths();
+
+    let accounts = setup_roles(&e, &client, &admin);
+
+    // Minters should be able to call the function
+    let result = client.multi_role_action(&accounts.minter1);
+    assert_eq!(result, String::from_str(&e, "multi_role_action_success"));
+
+    let result = client.multi_role_action(&accounts.minter2);
+    assert_eq!(result, String::from_str(&e, "multi_role_action_success"));
+}
+
+#[test]
+fn burners_can_call_multi_role_action() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    e.mock_all_auths();
+
+    let accounts = setup_roles(&e, &client, &admin);
+
+    // Burners should be able to call the function
+    let result = client.multi_role_action(&accounts.burner1);
+    assert_eq!(result, String::from_str(&e, "multi_role_action_success"));
+
+    let result = client.multi_role_action(&accounts.burner2);
+    assert_eq!(result, String::from_str(&e, "multi_role_action_success"));
+}
+
+#[test]
+#[should_panic(expected = "Account does not have any of the required roles")]
+fn outsiders_cannot_call_multi_role_action() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    e.mock_all_auths();
+
+    let accounts = setup_roles(&e, &client, &admin);
+
+    // Outsider should not be able to call the function
+    client.multi_role_action(&accounts.outsider);
+}
+
+#[test]
+fn minters_can_call_multi_role_auth_action() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    e.mock_all_auths();
+
+    let accounts = setup_roles(&e, &client, &admin);
+
+    // Minter1 should be able to call the function with auth
+    let result = client.multi_role_auth_action(&accounts.minter1);
+    assert_eq!(result, String::from_str(&e, "multi_role_auth_action_success"));
+}
+
+#[test]
+fn burners_can_call_multi_role_auth_action() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    e.mock_all_auths();
+
+    let accounts = setup_roles(&e, &client, &admin);
+
+    // Burner1 should be able to call the function with auth
+    let result = client.multi_role_auth_action(&accounts.burner1);
+    assert_eq!(result, String::from_str(&e, "multi_role_auth_action_success"));
+}
+
+#[test]
+#[should_panic(expected = "Account does not have any of the required roles")]
+fn outsiders_cannot_call_multi_role_auth_action() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    e.mock_all_auths();
+
+    let accounts = setup_roles(&e, &client, &admin);
+
+    // Outsider should not be able to call the function even with auth
+    client.multi_role_auth_action(&accounts.outsider);
+}
