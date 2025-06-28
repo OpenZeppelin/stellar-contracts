@@ -46,9 +46,10 @@ pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
 /// **IMPORTANT**: This macro does NOT enforce authorization. This is a
 /// deliberate choice, since in Stellar contracts, duplicate `require_auth()`
 /// calls for the same account within the same call stack panics. This macro is
-/// designed for use cases where you want to further limit a function that has
-/// `require_auth()` in it with access control roles. If you also need
-/// `require_auth()` provided by the macro, please use `#[only_role]` instead.
+/// designed for use cases where you want to further limit a function that
+/// already has `require_auth()` in it with access control roles. If you also
+/// need `require_auth()` provided by the macro, please use `#[only_role]`
+/// instead.
 ///
 /// # Usage
 ///
@@ -229,8 +230,10 @@ fn panic_type(param_name: &Ident) -> ! {
 /// **IMPORTANT**: This macro does NOT enforce authorization. This is a
 /// deliberate choice, since in Stellar contracts, duplicate `require_auth()`
 /// calls for the same account within the same call stack panics. This macro is
-/// designed for use cases where you want to further limit a function that has
-/// `require_auth()` in it with access control roles.
+/// designed for use cases where you want to further limit a function that
+/// already has `require_auth()` in it with access control roles. If you also
+/// need `require_auth()` provided by the macro, please use `#[only_any_role]`
+/// instead.
 ///
 /// # Usage
 ///
