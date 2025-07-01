@@ -173,7 +173,6 @@ impl Base {
         // Fall back to default royalty if no token-specific royalty is set
         let default_key = NFTRoyaltiesStorageKey::DefaultRoyalty;
         if let Some(royalty_info) = e.storage().instance().get::<_, RoyaltyInfo>(&default_key) {
-            e.storage().instance().extend_ttl(OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
             let royalty_amount = sale_price * royalty_info.basis_points as i128 / 10000;
             return (royalty_info.receiver, royalty_amount);
         }
