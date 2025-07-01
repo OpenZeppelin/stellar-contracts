@@ -1,4 +1,4 @@
-//! Ownable Contract Module.
+//! # Ownable Contract Module.
 //!
 //! This module introduces a simple access control mechanism where a contract
 //! has an account (owner) that can be granted exclusive access to specific
@@ -19,6 +19,16 @@
 //! ```
 //!
 //! See `examples/ownable/src/contract.rs` for a working example.
+//!
+//! ## Note
+//!
+//! The onwership transfer is processed in 2 steps:
+//!
+//! 1. Initiating the ownership transfer by the current owner
+//! 2. Accepting the ownership by the designated owner
+//!
+//! Not providing a direct ownership transfer is a deliberate design decision to
+//! help avoid mistakes by transfering to a wrong address.
 
 #![no_std]
 
