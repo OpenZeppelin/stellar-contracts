@@ -26,10 +26,10 @@ use soroban_sdk::{Address, Env, Symbol};
 /// # Notes
 ///
 /// In most marketplaces, royalty calculations are done in amounts of fungible
-/// tokens, (i.e. ERC20s or native tokens). So for example, if an NFT is sold
-/// for 10000 USDC and royalty is 10%, 1000 USDC goes to the creator. To
-/// preserve the compatibility across Non-Fungible and Fungible tokens, we are
-/// using `i128` instead of `u128` for the `sale_price`, due to SEP-41.
+/// tokens. For example, if an NFT is sold for 10000 USDC and royalty is 10%,
+/// 1000 USDC goes to the creator. To preserve the compatibility across
+/// Non-Fungible and Fungible tokens, we are using `i128` instead of `u128` for
+/// the `sale_price`, due to SEP-41.
 ///
 /// `#[contractimpl]` macro requires even the default implementations to be
 /// present under its scope. To avoid confusion, we do not provide the default
