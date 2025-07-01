@@ -49,7 +49,7 @@ impl ExampleContract {
         token_id
     }
 
-    pub fn get_royalty_info(e: &Env, token_id: u32, sale_price: u128) -> (Address, u128) {
+    pub fn get_royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
         Base::royalty_info(e, token_id, sale_price)
     }
 }
@@ -83,7 +83,7 @@ impl NonFungibleRoyalties for ExampleContract {
         Base::remove_token_royalty(e, token_id);
     }
 
-    fn royalty_info(e: &Env, token_id: u32, sale_price: u128) -> (Address, u128) {
+    fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
         Base::royalty_info(e, token_id, sale_price)
     }
 }

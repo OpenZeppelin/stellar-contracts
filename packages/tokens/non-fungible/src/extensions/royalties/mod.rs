@@ -12,14 +12,24 @@ use soroban_sdk::{Address, Env, Symbol};
 /// trait is designed to be used in conjunction with the `NonFungibleToken`
 /// trait.
 ///
-/// This implementation follows the ERC2981 standard for royalties, allowing:
-/// - Setting global royalties for the entire collection
-/// - Setting per-token royalties that override the global setting
+/// This implementation is inspired by the ERC2981 standard for royalties, and
+/// additionally, it allows:
+/// - Get the royalty info for a token
+/// - Set the global default royalty for the entire collection
+/// - Set per-token royalties that override the global setting
+/// - Remove per-token royalties to fall-back to the global royalty set for the
+///   contract
 ///
 /// `storage.rs` file of this module provides the `NonFungibleRoyalties` trait
 /// implementation.
 ///
 /// # Notes
+///
+/// In most marketplaces, royalty calculations are done in amounts of fungible
+/// tokens, (i.e. ERC20s or native tokens). So for example, if an NFT is sold
+/// for 10000 USDC and royalty is 10%, 1000 USDC goes to the creator. To
+/// preserve the compatibility across Non-Fungible and Fungible tokens, we are
+/// using `i128` instead of `u128` for the `sale_price`, due to SEP-41.
 ///
 /// `#[contractimpl]` macro requires even the default implementations to be
 /// present under its scope. To avoid confusion, we do not provide the default
@@ -109,7 +119,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     /// * data - `[]`
     fn remove_token_royalty(e: &Env, token_id: u32, operator: Address);
 
-    /// Returns `(Address, u128)` - A tuple containing the receiver address and
+    /// Returns `(Address, i128)` - A tuple containing the receiver address and
     /// the royalty amount.
     ///
     /// # Arguments
@@ -123,7 +133,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
     ///   not exist.
-    fn royalty_info(e: &Env, token_id: u32, sale_price: u128) -> (Address, u128);
+    fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128);
 }
 
 // ################## EVENTS ##################
