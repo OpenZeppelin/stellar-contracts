@@ -25,7 +25,7 @@ pub trait AccessControl {
     /// Returns the account at the specified index for a given role.
     ///
     /// We do not provide a function to get all the members of a role,
-    /// due to that would be unbounded. If you need to enumerate all the
+    /// since that would be unbounded. If you need to enumerate all the
     /// members of a role, you can use
     /// [`AccessControl::get_role_member_count()`] to get the total number
     /// of members and then use [`AccessControl::get_role_member()`] to get

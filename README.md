@@ -63,6 +63,10 @@ stellar-upgradeable-macros = { git = "https://github.com/OpenZeppelin/stellar-co
 
 ```
 
+## Notes
+
+We strive to maintain consistency with other OpenZeppelin libraries as much as possible, following the same conventions and patterns. However, this Soroban library does not have a 1-to-1 mapping with the other OpenZeppelin contracts. Due to differences in the Stellar/Soroban architecture and capabilities, certain features and implementations may differ from their counterparts from other ecosystems.
+
 ## Security
 
 For security concerns, please refer to our [Security Policy](SECURITY.md).
