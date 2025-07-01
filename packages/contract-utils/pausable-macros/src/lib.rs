@@ -24,7 +24,9 @@ use syn::{parse_macro_input, ItemFn};
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn when_not_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn when_not_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
+    assert!(attrs.is_empty(), "This macro does not accept any arguments");
+
     generate_pause_check(item, "when_not_paused")
 }
 
@@ -49,7 +51,9 @@ pub fn when_not_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn when_paused(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn when_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
+    assert!(attrs.is_empty(), "This macro does not accept any arguments");
+
     generate_pause_check(item, "when_paused")
 }
 
