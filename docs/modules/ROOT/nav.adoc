@@ -1,9 +1,7 @@
 * Tokens
 ** xref:tokens/fungible/fungible.adoc[Fungible Tokens]
 ** xref:tokens/non-fungible/non-fungible.adoc[Non-Fungible Tokens]
-*** xref:tokens/non-fungible/non-fungible.adoc#extensions[Extensions]
-**** xref:tokens/non-fungible/nft-consecutive.adoc[Consecutive]
-**** xref:tokens/non-fungible/nft-enumerable.adoc[Enumerable]
+
 
 * Utilities
 ** xref:utils/access/access-control.adoc[Access Control]

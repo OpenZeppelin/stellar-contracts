@@ -98,14 +98,14 @@ https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fung
 
 The `FungibleAllowList` trait extends the `FungibleToken` trait to provide an allowlist mechanism that
 can be managed by an authorized account. This extension ensures that only allowed accounts can
-transfer tokens or approve token transfers.
+transfer/receive tokens or approve token transfers.
 
 === - BlockList
 https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/extensions/blocklist[Source Code]
 
 The `FungibleBlockList` trait extends the `FungibleToken` trait to provide a blocklist mechanism that
-can be managed by an authorized account. This extension ensures that blocked accounts cannot transfer
-tokens or approve token transfers.
+can be managed by an authorized account. This extension ensures that blocked accounts cannot transfer/receive
+tokens, or approve token transfers.
 
 === TokenInterface Macro
 

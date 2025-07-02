@@ -40,6 +40,11 @@ Any future tokens will continue from `4XX`, `5XX`, and so on.
 
 Any future utilities will continue from `14XX`, `15XX`, and so on.
 
+== Important Notes
+As a deliberate design choice, this library manages the TTL for temporary and persistent storage items.
+To provide flexibility to the owner of the contract, this library deliberately does not manage the TTL for instance storage items.
+It is the responsibility of the developer to manage the TTL for instance storage items.
+
 == Audits
 You can find our audit reports https://github.com/OpenZeppelin/stellar-contracts/tree/main/audits[here].
 

@@ -90,6 +90,7 @@ https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/non-
 The `NonFungibleConsecutive` extension is optimized for batch minting of tokens with consecutive IDs. This approach drastically reduces storage writes during minting by storing ownership only at boundaries and inferring ownership for other tokens. See xref:tokens/non-fungible/nft-consecutive.adoc[Non-Fungible Consecutive] for detailed documentation.
 
 This extension is build around the contract variant `Consecutive`. Here is an example usage:
+
 * xref:tokens/non-fungible/nft-consecutive.adoc[Non-Fungible Consecutive]
 
 === - Enumerable
@@ -98,11 +99,12 @@ https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/non-
 The `NonFungibleEnumerable` extension enables on-chain enumeration of tokens owned by an address. See xref:tokens/non-fungible/nft-enumerable.adoc[Non-Fungible Enumerable] for detailed documentation.
 
 This extension is build around the contract variant `Enumerable`. Here is an example usage:
+
 * xref:tokens/non-fungible/nft-enumerable.adoc[Non-Fungible Enumerable]
 
 === - Royalties
 https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/non-fungible/src/extensions/royalties[Source Code]
 
-The `NonFungibleRoyalties` trait extends the `NonFungibleToken` trait to provide royalty information for tokens, following the ERC-2981 standard. This allows marketplaces to query royalty information and pay appropriate fees to creators.
+The `NonFungibleRoyalties` trait extends the `NonFungibleToken` trait to provide royalty information for tokens, similar to ERC-2981 standard. This allows marketplaces to query royalty information and pay appropriate fees to creators.
 
 Note: The royalties extension allows both collection-wide default royalties and per-token royalty settings.

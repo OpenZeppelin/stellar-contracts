@@ -7,13 +7,13 @@ https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/access/acce
 
 == Overview
 
-The Access Control module provides a comprehensive role-based access control system for Soroban contracts. It enables developers to manage permissions through a hierarchical role system, with a single overarching admin and customizable role assignments.
+The Access Control module provides a comprehensive role-based access control system for Soroban contracts. It enables developers to manage permissions through a hierarchical role system, with a renounceable single overarching admin and customizable role assignments.
 
 == Key Concepts
 
 === Admin Management
 
-The system features a single top-level admin with privileges to call any function in the `AccessControl` trait. This admin must be set during contract initialization for the module to function properly.
+The system features a single top-level admin with privileges to call any function in the `AccessControl` trait. This admin must be set during contract initialization for the module to function properly. This overarching admin can renounce themselves for decentralization purposes.
 
 Admin transfers are implemented as a two-step process to prevent accidental or malicious takeovers:
 
@@ -41,33 +41,6 @@ The system tracks account-role pairs in storage with additional enumeration logi
 * If all accounts are removed from a role, the helper storage items become empty or 0
 
 Roles exist only through their relationships with accounts, so a role with zero accounts is indistinguishable from a role that never existed.
-
-=== Procedural Macros
-
-The module includes procedural macros to simplify authorization checks:
-
-==== @only_admin
-
-Ensures the caller is the admin before executing the function:
-
-[source,rust]
-----
-#[only_admin]
-pub fn restricted_function(e: &Env, other_param: u32) {
-    // Function body - only accessible to admin
-}
-----
-
-==== @has_role
-
-Ensures the specified parameter has the required role:
-
-[source,rust]
-----
-#[has_role(account, "minter")]
-pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
-    // Function body - only accessible to accounts with "minter" role
-}
 ----
 
 == Usage Example
@@ -94,15 +67,28 @@ impl MyContract {
     }
 
     #[only_admin]
-    pub fn add_minter(e: &Env, account: Address) {
-        // Only the admin can call this function
-        access_control::grant_role(e, &account, &symbol_short!("minter"));
+    pub fn admin_restricted_function(e: &Env) -> Vec<String> {
+        vec![&e, String::from_str(e, "seems sus")]
     }
 
-    #[has_role(caller, "minter")]
-    pub fn mint(e: &Env, caller: Address, to: Address, amount: i128) {
-        // Only accounts with "minter" role can call this function
-        // Mint implementation...
+    // we want `require_auth()` provided by the macro, since there is no
+    // `require_auth()` in `Base::mint`.
+    #[only_role(caller, "minter")]
+    pub fn mint(e: &Env, caller: Address, to: Address, token_id: u32) {
+        Base::mint(e, &to, token_id)
+    }
+
+    // allows either minter or burner role, does not enforce `require_auth` in the macro
+    #[has_any_role(caller, ["minter", "burner"])]
+    pub fn multi_role_action(e: &Env, caller: Address) -> String {
+        caller.require_auth();
+        String::from_str(e, "multi_role_action_success")
+    }
+
+    // allows either minter or burner role AND enforces `require_auth` in the macro
+    #[only_any_role(caller, ["minter", "burner"])]
+    pub fn multi_role_auth_action(e: &Env, caller: Address) -> String {
+        String::from_str(e, "multi_role_auth_action_success")
     }
 }
 ----
@@ -114,6 +100,7 @@ impl MyContract {
 * Flexible role-based permission system
 * Hierarchical role management
 * Secure admin transfer process
+* Admin is renounceable
 * Easy integration with procedural macros
 
 === Trade-offs

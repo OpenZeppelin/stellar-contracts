@@ -35,13 +35,14 @@ impl ExampleContract {
         Base::mint(e, &to, token_id)
     }
 
-    // allows either minter or burner role
+    // allows either minter or burner role, does not enforce `require_auth` in the macro
     #[has_any_role(caller, ["minter", "burner"])]
     pub fn multi_role_action(e: &Env, caller: Address) -> String {
+        caller.require_auth();
         String::from_str(e, "multi_role_action_success")
     }
 
-    // allows either minter or burner role AND requires auth
+    // allows either minter or burner role AND enforces `require_auth` in the macro
     #[only_any_role(caller, ["minter", "burner"])]
     pub fn multi_role_auth_action(e: &Env, caller: Address) -> String {
         String::from_str(e, "multi_role_auth_action_success")
