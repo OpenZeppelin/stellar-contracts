@@ -97,6 +97,6 @@ impl MyContract {
 
 == See Also
 
-* xref:access/access-control.adoc[Access Control]
+* xref:utils/access/access-control.adoc[Access Control]
 * xref:tokens/fungible/fungible.adoc[Fungible Token]
 * xref:tokens/non-fungible/non-fungible.adoc[Non-Fungible Token]

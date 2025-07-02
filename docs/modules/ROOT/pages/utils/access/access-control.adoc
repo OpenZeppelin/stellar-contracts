@@ -122,6 +122,6 @@ impl MyContract {
 
 == See Also
 
-* xref:access/ownable.adoc[Ownable]
+* xref:utils/access/ownable.adoc[Ownable]
 * xref:tokens/fungible/fungible.adoc[Fungible Token]
 * xref:tokens/non-fungible/non-fungible.adoc[Non-Fungible Token]
