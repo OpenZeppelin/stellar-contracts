@@ -3,7 +3,7 @@ use crate::NonFungibleToken;
 
 mod test;
 
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{Address, Env, Symbol};
 
 /// Royalties Trait for Non-Fungible Token (ERC2981)
 ///
