@@ -1,7 +1,10 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 use stellar_constants::{OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD};
 
-use crate::{Base, NonFungibleTokenError};
+use crate::{
+    royalties::{emit_set_default_royalty, emit_set_token_royalty},
+    Base, NonFungibleTokenError,
+};
 
 /// Storage container for royalty information
 #[contracttype]
@@ -28,6 +31,11 @@ impl Base {
     /// * `receiver` - The address that should receive royalty payments.
     /// * `basis_points` - The royalty percentage in basis points (100 = 1%,
     ///   10000 = 100%).
+    ///
+    /// # Events
+    ///
+    /// * topics - `["set_default_royalty", receiver: Address]`
+    /// * data - `[basis_points: u32]`
     ///
     /// # Errors
     ///
