@@ -84,9 +84,11 @@ pub struct MyToken;
 #[default_impl]
 #[contractimpl]
 impl FungibleToken for MyToken {
+    type ContractType = Base;
+
     // Only override methods that need custom behavior
-    fn mint(e: &Env, to: Address, amount: i128) {
-        // Custom minting logic here
+    fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
+        // custom transfer logic here
     }
 
     // All other FungibleToken methods will be automatically implemented
