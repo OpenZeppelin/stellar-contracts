@@ -13,10 +13,11 @@ OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stel
 ## Project Structure
 
 - `packages/`: Source code
-  - `tokens/`: Various token types (fungible, non-fungible, etc.)
-  - `contract-utils/`: Utilities for token types (pausable, upgradeable, etc.)
+  - `access/`: Role-based access controls and ownable
   - `constants/`: Constants shared across token standards
+  - `contract-utils/`: Utilities for contracts (pausable, upgradeable, etc.)
   - `test-utils/`: Utilities for testing
+  - `tokens/`: Various token types (fungible, non-fungible, etc.)
 - `examples/`: Example contracts
 - `docs/`: Documentation
 - `audits/`: Audit reports
@@ -48,18 +49,24 @@ We provide a set of example contracts that demonstrate how to use the library. Y
 
 The library has not been published yet to `crates.io`, and this will be the case until we reach a stable version. However, one can [specify a git dependency](https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#specifying-dependencies-from-git-repositories) in a `Cargo.toml`. We also recommend pinning to a specific commit/tag, because rapid iterations are expected as the library is in an active development phase.
 
-- **v0.2.0 (audited)**
+- **v0.3.0 (audited)**
 ```toml
 [dependencies]
-stellar-constants = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
-stellar-default-impl-macro = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
-stellar-event-assertion = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
-stellar-fungible = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
-stellar-non-fungible = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
-stellar-pausable = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
-stellar-pausable-macros = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
-stellar-upgradeable = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
-stellar-upgradeable-macros = { git = "https://github.com/OpenZeppelin/stellar-contracts" }
+stellar-constants = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-default-impl-macro = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-event-assertion = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-fungible = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-non-fungible = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-pausable = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-pausable-macros = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-upgradeable = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-upgradeable-macros = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-ownable = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-ownable-macro = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-access-control = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-access-control-macros = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-crypto = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
+stellar-merkle-distributor = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
 
 ```
 
