@@ -1,12 +1,16 @@
 * Tokens
-** xref:tokens/fungible.adoc[Fungible Tokens]
-** xref:tokens/non-fungible.adoc[Non-Fungible Tokens]
-*** xref:tokens/non-fungible.adoc#base_and_extensions[Extensions]
-**** xref:tokens/nft-consecutive.adoc[Consecutive]
-**** xref:tokens/nft-enumerable.adoc[Enumerable]
+** xref:tokens/fungible/fungible.adoc[Fungible Tokens]
+** xref:tokens/non-fungible/non-fungible.adoc[Non-Fungible Tokens]
+
 
 * Utilities
+** xref:utils/access/access-control.adoc[Access Control]
+** xref:utils/access/ownable.adoc[Ownable]
 ** xref:utils/pausable.adoc[Pausable]
 ** xref:utils/upgradeable.adoc[Upgradeable]
+** xref:utils/crypto.adoc[Cryptography]
+
+* Helpers
+** xref:helpers/default-impl-macro.adoc[Default Implementation Macro]
 
 * xref:get-started.adoc[Get Started]

@@ -1,8 +1,10 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 use stellar_constants::{OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD};
 
-use super::{emit_set_default_royalty, emit_set_token_royalty};
-use crate::{Base, NonFungibleTokenError};
+use crate::{
+    royalties::{emit_set_default_royalty, emit_set_token_royalty},
+    Base, NonFungibleTokenError,
+};
 
 /// Storage container for royalty information
 #[contracttype]
