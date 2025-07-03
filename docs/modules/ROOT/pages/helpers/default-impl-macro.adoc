@@ -51,6 +51,8 @@ To use the `#[default_impl]` macro, place it above the `#[contractimpl]` macro w
 #[default_impl] // IMPORTANT: place this above `#[contractimpl]`
 #[contractimpl]
 impl NonFungibleToken for MyContract {
+    type ContractType = Base;
+
     // Only override the methods you need to customize
     // All other methods will be automatically implemented with their default behavior
 }
