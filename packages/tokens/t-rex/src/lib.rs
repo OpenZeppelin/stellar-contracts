@@ -1,13 +1,17 @@
 #![no_std]
 
-mod claim_topics;
-mod claims_registry;
+mod claim_issuer;
+mod claim_topics_and_issuers;
 mod compliance;
-mod t_rex;
-mod token_registry;
+mod identity_claims;
+mod identity_registry_storage;
+mod token;
+mod token_binder;
 
-pub use claim_topics::*;
-pub use claims_registry::*;
+pub use claim_issuer::*;
+pub use claim_topics_and_issuers::*;
 pub use compliance::*;
-pub use t_rex::TRexToken;
-pub use token_registry::*;
+pub use identity_claims::*;
+pub use identity_registry_storage::*;
+pub use token::*;
+pub use token_binder::*;

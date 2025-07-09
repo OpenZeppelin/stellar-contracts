@@ -1,15 +1,19 @@
 use soroban_sdk::{Address, Env, Symbol, Val, Vec};
 
-pub trait ModularCompliance {
-    fn bind_token(e: &Env, token: Address);
+use crate::TokenBinder;
 
-    fn unbind_token(e: &Env, token: Address);
+pub trait ModularCompliance: TokenBinder {
+    fn add_module(e: &Env, module: Address, operator: Address);
 
-    fn add_module(e: &Env, module: Address);
+    fn remove_module(e: &Env, module: Address, operator: Address);
 
-    fn remove_module(e: &Env, module: Address);
-
-    fn call_module_function(e: &Env, module: Address, module_fn: Symbol, params: Vec<Val>);
+    fn call_module_function(
+        e: &Env,
+        module: Address,
+        module_fn: Symbol,
+        params: Vec<Val>,
+        operator: Address,
+    );
 
     fn transferred(e: &Env, from: Address, to: Address, amount: i128);
 
