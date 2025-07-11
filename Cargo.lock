@@ -1875,6 +1875,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-t-rex-merkle-tree"
+version = "0.3.0"
+dependencies = [
+ "soroban-sdk",
+ "soroban-test-helpers",
+ "stellar-constants",
+ "stellar-event-assertion",
+ "stellar-fungible",
+]
+
+[[package]]
+name = "stellar-t-rex-reference"
+version = "0.3.0"
+dependencies = [
+ "soroban-sdk",
+ "soroban-test-helpers",
+ "stellar-constants",
+ "stellar-event-assertion",
+ "stellar-fungible",
+]
+
+[[package]]
 name = "stellar-upgradeable"
 version = "0.3.0"
 dependencies = [

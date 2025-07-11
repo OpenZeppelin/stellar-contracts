@@ -1,0 +1,21 @@
+[package]
+name = "stellar-t-rex-reference"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version.workspace = true
+
+[lib]
+crate-type = ["lib", "cdylib"]
+doctest = false
+
+[dependencies]
+stellar-constants = { workspace = true }
+stellar-fungible = { workspace = true }
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+soroban-test-helpers = { workspace = true }
+stellar-event-assertion = { workspace = true }
