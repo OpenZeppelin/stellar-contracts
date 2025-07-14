@@ -14,6 +14,7 @@ doctest = false
 soroban-sdk = { workspace = true }
 stellar-constants = { workspace = true }
 stellar-role-transfer = { workspace = true }
+stellar-pausable = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

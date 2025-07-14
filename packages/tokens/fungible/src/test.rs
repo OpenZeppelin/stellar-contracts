@@ -14,7 +14,9 @@ use soroban_sdk::{
 use stellar_constants::{BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD};
 use stellar_event_assertion::EventAssertion;
 
-use crate::{Base, StorageKey};
+use crate::{burnable::FungibleBurnable, Base, StorageKey};
+
+use super::fungible::FungibleToken;
 
 #[contract]
 struct MockContract;
@@ -227,7 +229,7 @@ fn transfer_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 100);
+        Base::internal_mint(&e, &from, 100);
         Base::transfer(&e, &from, &recipient, 50);
         assert_eq!(Base::balance(&e, &from), 50);
         assert_eq!(Base::balance(&e, &recipient), 50);
@@ -266,7 +268,7 @@ fn extend_balance_ttl_thru_transfer() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 100);
+        Base::internal_mint(&e, &from, 100);
 
         let key = StorageKey::Balance(from.clone());
 
@@ -290,7 +292,7 @@ fn approve_and_transfer_from() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &owner, 100);
+        Base::internal_mint(&e, &owner, 100);
         Base::approve(&e, &owner, &spender, 50, 1000);
 
         let allowance_val = Base::allowance(&e, &owner, &spender);
@@ -321,7 +323,7 @@ fn transfer_insufficient_balance_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 50);
+        Base::internal_mint(&e, &from, 50);
         Base::transfer(&e, &from, &recipient, 100);
     });
 }
@@ -337,7 +339,7 @@ fn transfer_from_insufficient_allowance_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &owner, 100);
+        Base::internal_mint(&e, &owner, 100);
         Base::approve(&e, &owner, &spender, 30, 1000);
         Base::transfer_from(&e, &spender, &owner, &recipient, 50);
     });
@@ -351,7 +353,7 @@ fn update_transfers_between_accounts() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 100);
+        Base::internal_mint(&e, &from, 100);
         Base::update(&e, Some(&from), Some(&to), 50);
         assert_eq!(Base::balance(&e, &from), 50);
         assert_eq!(Base::balance(&e, &to), 50);
@@ -378,7 +380,7 @@ fn update_burns_tokens() {
     let from = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 100);
+        Base::internal_mint(&e, &from, 100);
         Base::update(&e, Some(&from), None, 50);
         assert_eq!(Base::balance(&e, &from), 50);
         assert_eq!(Base::total_supply(&e), 50);
@@ -406,7 +408,7 @@ fn update_overflow_panics() {
     let account = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &account, i128::MAX);
+        Base::internal_mint(&e, &account, i128::MAX);
         Base::update(&e, None, Some(&account), 1);
     });
 }
@@ -420,7 +422,7 @@ fn update_with_insufficient_balance_panics() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 50);
+        Base::internal_mint(&e, &from, 50);
         Base::update(&e, Some(&from), Some(&to), 100);
     });
 }
@@ -474,7 +476,7 @@ fn transfer_requires_auth() {
     let amount = 100;
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, amount);
+        Base::internal_mint(&e, &from, amount);
         Base::transfer(&e, &from, &to, amount);
     });
 
@@ -503,7 +505,7 @@ fn transfer_from_requires_auth() {
     let amount = 50;
 
     e.as_contract(&address, || {
-        Base::mint(&e, &owner, 100);
+        Base::internal_mint(&e, &owner, 100);
         Base::approve(&e, &owner, &spender, amount, 1000);
         Base::transfer_from(&e, &spender, &owner, &recipient, amount);
     });
@@ -555,7 +557,7 @@ fn burn_requires_auth() {
     let amount = 50;
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 100);
+        Base::internal_mint(&e, &from, 100);
         Base::burn(&e, &from, amount);
     });
 
@@ -583,7 +585,7 @@ fn burn_from_requires_auth() {
     let amount = 50;
 
     e.as_contract(&address, || {
-        Base::mint(&e, &owner, 100);
+        Base::internal_mint(&e, &owner, 100);
         Base::approve(&e, &owner, &spender, amount, 1000);
         Base::burn_from(&e, &spender, &owner, amount);
     });
@@ -632,7 +634,7 @@ fn mint_works() {
     let address = e.register(MockContract, ());
     let account = Address::generate(&e);
     e.as_contract(&address, || {
-        Base::mint(&e, &account, 100);
+        Base::internal_mint(&e, &account, 100);
         assert_eq!(Base::balance(&e, &account), 100);
         assert_eq!(Base::total_supply(&e), 100);
 
@@ -661,7 +663,7 @@ fn mint_base_implementation_has_no_auth() {
 
     // This should NOT panic even without authorization
     e.as_contract(&address, || {
-        Base::mint(&e, &account, 100);
+        Base::internal_mint(&e, &account, 100);
         assert_eq!(Base::balance(&e, &account), 100);
     });
 }

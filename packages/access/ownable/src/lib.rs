@@ -38,12 +38,39 @@ mod storage;
 pub use crate::{
     ownable::{
         emit_ownership_renounced, emit_ownership_transfer, emit_ownership_transfer_completed,
-        Ownable, OwnableError,
+        Ownable, OwnableError, OwnableExt,
     },
-    storage::{
-        accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
-        transfer_ownership, OwnableStorageKey,
-    },
+    storage::OwnableStorageKey,
 };
+
+pub struct Owner;
+
+impl ownable::Ownable for Owner {
+    type Impl = Self;
+
+    fn get_owner(e: &soroban_sdk::Env) -> Option<soroban_sdk::Address> {
+        storage::get_owner(e)
+    }
+
+    fn transfer_ownership(
+        e: &soroban_sdk::Env,
+        new_owner: &soroban_sdk::Address,
+        live_until_ledger: u32,
+    ) {
+        storage::transfer_ownership(e, new_owner, live_until_ledger);
+    }
+
+    fn accept_ownership(e: &soroban_sdk::Env) {
+        storage::accept_ownership(e);
+    }
+
+    fn renounce_ownership(e: &soroban_sdk::Env) {
+        storage::renounce_ownership(e);
+    }
+
+    fn set_owner(e: &soroban_sdk::Env, owner: &soroban_sdk::Address) {
+        storage::set_owner(e, owner)
+    }
+}
 
 mod test;

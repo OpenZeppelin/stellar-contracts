@@ -1,7 +1,5 @@
 use proc_macro::TokenStream;
-use quote::quote;
-use stellar_macro_helpers::parse_env_arg;
-use syn::{parse_macro_input, ItemFn};
+use stellar_macro_helpers::{parse_env_arg, FunctionInsert};
 
 /// Adds a pause check at the beginning of the function that ensures the
 /// contract is not paused.
@@ -26,7 +24,6 @@ use syn::{parse_macro_input, ItemFn};
 #[proc_macro_attribute]
 pub fn when_not_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
     generate_pause_check(item, "when_not_paused")
 }
 
@@ -53,28 +50,20 @@ pub fn when_not_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn when_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
     generate_pause_check(item, "when_paused")
 }
 
-fn generate_pause_check(item: TokenStream, check_fn: &str) -> TokenStream {
-    let input_fn = parse_macro_input!(item as ItemFn);
-    let env_arg = parse_env_arg(&input_fn);
-
-    let fn_vis = &input_fn.vis;
-    let fn_sig = &input_fn.sig;
-    let fn_block = &input_fn.block;
-    let fn_attrs = &input_fn.attrs;
-
-    let check_ident = syn::Ident::new(check_fn, proc_macro2::Span::call_site());
-    let output = quote! {
-        #(#fn_attrs)* // retain other macros
-        #fn_vis #fn_sig {
-            stellar_pausable::#check_ident(#env_arg);
-
-            #fn_block
-        }
+fn generate_pause_check(input: TokenStream, check_fn: &str) -> TokenStream {
+    let Ok(syn::Item::Fn(mut input_fn)): Result<syn::Item, syn::Error> =
+        syn::parse::<syn::Item>(input.clone())
+    else {
+        return input;
     };
-
-    output.into()
+    let env_arg = parse_env_arg(&input_fn);
+    let check_ident = syn::Ident::new(check_fn, proc_macro2::Span::call_site());
+    input_fn
+        .insert_stmts_to_token_stream(syn::parse_quote! {
+            Self::#check_ident(#env_arg);
+        })
+        .into()
 }

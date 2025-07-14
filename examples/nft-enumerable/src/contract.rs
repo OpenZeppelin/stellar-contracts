@@ -4,13 +4,11 @@
 //! enumeration of all the token IDs in the contract as well as all the token
 //! IDs owned by each account.
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
-use stellar_default_impl_macro::default_impl;
+use soroban_sdk::{contract, contractimpl, contracttype, derive_contract, Address, Env, String};
 use stellar_non_fungible::{
-    burnable::NonFungibleBurnable,
-    enumerable::{Enumerable, NonFungibleEnumerable},
-    Base, NonFungibleToken,
+    enumerable::Enumerable, NonFungibleBurnable, NonFungibleEnumerable, NonFungibleToken,
 };
+use stellar_ownable::Ownable;
 
 #[contracttype]
 pub enum DataKey {
@@ -18,13 +16,19 @@ pub enum DataKey {
 }
 
 #[contract]
+#[derive_contract(
+    NonFungibleToken(default = Enumerable),
+    NonFungibleBurnable(default = Enumerable),
+    NonFungibleEnumerable,
+    Ownable,
+)]
 pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        e.storage().instance().set(&DataKey::Owner, &owner);
-        Base::set_metadata(
+        Self::set_owner(e, &owner);
+        Self::set_metadata(
             e,
             String::from_str(e, "www.mytoken.com"),
             String::from_str(e, "My Token"),
@@ -33,23 +37,7 @@ impl ExampleContract {
     }
 
     pub fn mint(e: &Env, to: Address) -> u32 {
-        let owner: Address =
-            e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
-        owner.require_auth();
+        Self::only_owner(e);
         Enumerable::sequential_mint(e, &to)
     }
 }
-
-#[default_impl]
-#[contractimpl]
-impl NonFungibleToken for ExampleContract {
-    type ContractType = Enumerable;
-}
-
-#[default_impl]
-#[contractimpl]
-impl NonFungibleEnumerable for ExampleContract {}
-
-#[default_impl]
-#[contractimpl]
-impl NonFungibleBurnable for ExampleContract {}

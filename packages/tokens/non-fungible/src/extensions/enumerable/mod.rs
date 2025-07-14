@@ -2,10 +2,8 @@ pub mod storage;
 
 mod test;
 
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{contracttrait, Env};
 pub use storage::Enumerable;
-
-use crate::NonFungibleToken;
 
 /// Enumerable Trait for Non-Fungible Token
 ///
@@ -59,7 +57,8 @@ use crate::NonFungibleToken;
 ///     /* and the macro will generate all the missing default implementations for you */
 /// }
 /// ```
-pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
+#[contracttrait(default = Enumerable)]
+pub trait NonFungibleEnumerable {
     /// Returns the total amount of tokens stored by the contract.
     ///
     /// # Arguments
@@ -77,7 +76,7 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `index` - Index of the token in the owner's local list.
-    fn get_owner_token_id(e: &Env, owner: Address, index: u32) -> u32;
+    fn get_owner_token_id(e: &Env, owner: &soroban_sdk::Address, index: u32) -> u32;
 
     /// Returns the `token_id` at a given `index` in the global token list.
     /// Use along with [`NonFungibleEnumerable::total_supply()`] to enumerate

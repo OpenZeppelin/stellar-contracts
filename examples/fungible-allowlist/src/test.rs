@@ -25,6 +25,7 @@ fn cannot_transfer_before_allow() {
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
+    e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
@@ -34,7 +35,6 @@ fn cannot_transfer_before_allow() {
     assert!(!client.allowed(&user2));
 
     // Admin can't transfer to user1 initially (user1 not allowed)
-    e.mock_all_auths();
     client.transfer(&admin, &user1, &transfer_amount);
 }
 
@@ -46,10 +46,10 @@ fn transfer_to_allowed_account_works() {
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
+    e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-    e.mock_all_auths();
 
     // Verify initial state - admin is allowed, others are not
     assert!(client.allowed(&admin));
@@ -74,10 +74,10 @@ fn cannot_transfer_after_disallow() {
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
+    e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-    e.mock_all_auths();
 
     // Verify initial state - admin is allowed, others are not
     assert!(client.allowed(&admin));
@@ -108,10 +108,10 @@ fn allowlist_transfer_from_override_works() {
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
+    e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-    e.mock_all_auths();
 
     // Verify initial state - admin is allowed, others are not
     assert!(client.allowed(&admin));
@@ -136,10 +136,10 @@ fn allowlist_approve_override_works() {
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
+    e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-    e.mock_all_auths();
 
     // Verify initial state - admin is allowed, others are not
     assert!(client.allowed(&admin));

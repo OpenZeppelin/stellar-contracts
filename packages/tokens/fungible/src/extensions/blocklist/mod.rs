@@ -1,12 +1,10 @@
-pub mod storage;
+mod storage;
 
 #[cfg(test)]
 mod test;
 
 use soroban_sdk::{symbol_short, Address, Env};
-pub use storage::BlockList;
-
-use crate::FungibleToken;
+pub use storage::*;
 
 /// BlockList Trait for Fungible Token
 ///
@@ -29,14 +27,15 @@ use crate::FungibleToken;
 /// However, this parameter is omitted from the module functions, defined in
 /// "storage.rs", because the authorizations are to be handled in the access
 /// control helpers or directly implemented.
-pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
+#[soroban_sdk::contracttrait(default = BlockList, is_extension = true, extension_required = true)]
+pub trait FungibleBlockList {
     /// Returns the blocked status of an account.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to check the blocked status for.
-    fn blocked(e: &Env, account: Address) -> bool;
+    fn blocked(e: &Env, account: &soroban_sdk::Address) -> bool;
 
     /// Blocks a user from receiving and transferring tokens.
     ///
@@ -50,7 +49,7 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     ///
     /// * topics - `["block", user: Address]`
     /// * data - `[]`
-    fn block_user(e: &Env, user: Address, operator: Address);
+    fn block_user(e: &Env, user: &soroban_sdk::Address, operator: &soroban_sdk::Address);
 
     /// Unblocks a user, allowing them to receive and transfer tokens.
     ///
@@ -64,7 +63,7 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     ///
     /// * topics - `["unblock", user: Address]`
     /// * data - `[]`
-    fn unblock_user(e: &Env, user: Address, operator: Address);
+    fn unblock_user(e: &Env, user: &soroban_sdk::Address, operator: &soroban_sdk::Address);
 }
 
 // ################## EVENTS ##################

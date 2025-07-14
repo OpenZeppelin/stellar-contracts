@@ -1,6 +1,4 @@
-use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
-
-use crate::ContractOverrides;
+use soroban_sdk::{contracterror, contracttrait, symbol_short, Address, Env, String, Symbol};
 
 /// Max. number of digits in a token ID (u32)
 pub const MAX_NUM_DIGITS: usize = 10;
@@ -62,21 +60,20 @@ pub const MAX_BASE_URI_LEN: usize = 200;
 /// [`NonFungibleToken::transfer`] is implemented for the `Enumerable` contract
 /// type, you can find it using
 /// [`crate::extensions::enumerable::Enumerable::transfer`].
+#[contracttrait(default = Base)]
 pub trait NonFungibleToken {
     /// Helper type that allows us to override some of the functionality of the
     /// base trait based on the extensions implemented. You should use
     /// [`crate::Base`] as the type if you are not using
     /// [`crate::extensions::enumerable::Enumerable`] or
     /// [`crate::extensions::consecutive::Consecutive`] extensions.
-    type ContractType: ContractOverrides;
-
     /// Returns the number of tokens owned by `account`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address for which the balance is being queried.
-    fn balance(e: &Env, account: Address) -> u32;
+    fn balance(e: &Env, account: &soroban_sdk::Address) -> u32;
 
     /// Returns the owner of the token with `token_id`.
     ///
@@ -89,7 +86,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
-    fn owner_of(e: &Env, token_id: u32) -> Address;
+    fn owner_of(e: &Env, token_id: u32) -> soroban_sdk::Address;
 
     /// Transfers the token with `token_id` from `from` to `to`.
     ///
@@ -115,7 +112,7 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[token_id: u32]`
-    fn transfer(e: &Env, from: Address, to: Address, token_id: u32);
+    fn transfer(e: &Env, from: &soroban_sdk::Address, to: &soroban_sdk::Address, token_id: u32);
 
     /// Transfers the token with `token_id` from `from` to `to` by using
     /// `spender`s approval.
@@ -150,7 +147,13 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[token_id: u32]`
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32);
+    fn transfer_from(
+        e: &Env,
+        spender: &soroban_sdk::Address,
+        from: &soroban_sdk::Address,
+        to: &soroban_sdk::Address,
+        token_id: u32,
+    );
 
     /// Gives permission to `approved` to transfer the token with `token_id` to
     /// another account. The approval is cleared when the token is
@@ -186,8 +189,8 @@ pub trait NonFungibleToken {
     /// * data - `[token_id: u32, live_until_ledger: u32]`
     fn approve(
         e: &Env,
-        approver: Address,
-        approved: Address,
+        approver: &soroban_sdk::Address,
+        approved: &soroban_sdk::Address,
         token_id: u32,
         live_until_ledger: u32,
     );
@@ -214,7 +217,12 @@ pub trait NonFungibleToken {
     ///
     /// * topics - `["approve_for_all", from: Address]`
     /// * data - `[operator: Address, live_until_ledger: u32]`
-    fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32);
+    fn approve_for_all(
+        e: &Env,
+        owner: &soroban_sdk::Address,
+        operator: &soroban_sdk::Address,
+        live_until_ledger: u32,
+    );
 
     /// Returns the account approved for the token with `token_id`.
     ///
@@ -227,7 +235,7 @@ pub trait NonFungibleToken {
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - If the token does not
     ///   exist.
-    fn get_approved(e: &Env, token_id: u32) -> Option<Address>;
+    fn get_approved(e: &Env, token_id: u32) -> Option<soroban_sdk::Address>;
 
     /// Returns whether the `operator` is allowed to manage all the assets of
     /// `owner`.
@@ -237,7 +245,11 @@ pub trait NonFungibleToken {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `operator` - Account to be checked.
-    fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool;
+    fn is_approved_for_all(
+        e: &Env,
+        owner: &soroban_sdk::Address,
+        operator: &soroban_sdk::Address,
+    ) -> bool;
 
     /// Returns the token collection name.
     ///
@@ -265,6 +277,117 @@ pub trait NonFungibleToken {
     ///
     /// If the token does not exist, this function is expected to panic.
     fn token_uri(e: &Env, token_id: u32) -> String;
+
+    /// Creates a token with the provided `token_id` and assigns it to
+    /// `to`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to` - The address receiving the new token.
+    /// * `token_id` - The token_id of the new token.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`update`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["mint", to: Address]`
+    /// * data - `[token_id: u32]`
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// It is the responsibility of the implementer to establish appropriate
+    /// access controls to ensure that only authorized accounts can execute
+    /// minting operations. Failure to implement proper authorization could
+    /// lead to security vulnerabilities and unauthorized token creation.
+    ///
+    /// You probably want to do something like this (pseudo-code):
+    ///
+    /// ```ignore
+    /// let admin = read_administrator(e);
+    /// admin.require_auth();
+    /// ```
+    ///
+    /// **IMPORTANT**: This function does NOT verify whether the provided
+    /// `token_id` already exists. It is the developer's responsibility to
+    /// ensure `token_id` uniqueness before passing it to this function. The
+    /// strategy for generating `token_id`s varies by project and must be
+    /// implemented accordingly.
+    #[internal]
+    fn internal_mint(e: &Env, to: &soroban_sdk::Address, token_id: u32);
+    /// Creates a token with the next available `token_id` and assigns it to
+    /// `to`. Returns the `token_id` for the newly minted token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to` - The address receiving the new token.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`increment_token_id`] errors.
+    /// * refer to [`update`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["mint", to: Address]`
+    /// * data - `[token_id: u32]`
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// It is the responsibility of the implementer to establish appropriate
+    /// access controls to ensure that only authorized accounts can execute
+    /// minting operations. Failure to implement proper authorization could
+    /// lead to security vulnerabilities and unauthorized token creation.
+    ///
+    /// You probably want to do something like this (pseudo-code):
+    ///
+    /// ```ignore
+    /// let admin = read_administrator(e);
+    /// admin.require_auth();
+    /// ```
+    ///
+    /// **IMPORTANT**: This function utilizes [`increment_token_id()`] to
+    /// determine the next `token_id`, but it does NOT check if that
+    /// `token_id` is already in use. If the developer has other means of
+    /// minting tokens and generating `token_id`s, they should ensure that
+    /// the `token_id` is unique and not already in use.
+    #[internal]
+    fn sequential_mint(e: &Env, to: &soroban_sdk::Address) -> u32;
+
+    /// Sets the token metadata such as token collection URI, name and symbol.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `base_uri` - The base collection URI, assuming it's a valid URI and
+    ///   ends with `/`.
+    /// * `name` - The token collection name.
+    /// * `symbol` - The token collection symbol.
+    ///
+    /// # Errors
+    ///
+    /// * [`NonFungibleTokenError::BaseUriMaxLenExceeded`] - If the length of
+    ///   `base_uri` exceeds the maximum allowed.
+    ///
+    /// # Notes
+    ///
+    /// **IMPORTANT**: This function lacks authorization controls. Most likely,
+    /// you want to invoke it from a constructor or from another function
+    /// with admin-only authorization.
+    #[internal]
+    fn set_metadata(
+        e: &Env,
+        base_uri: soroban_sdk::String,
+        name: soroban_sdk::String,
+        symbol: soroban_sdk::String,
+    );
 }
 
 // ################## ERRORS ##################

@@ -33,14 +33,14 @@ repository = "https://github.com/OpenZeppelin/stellar-contracts"
 version = "0.3.0"
 
 [workspace.dependencies]
-soroban-sdk = "22.0.6"
+soroban-sdk = { git = "https://github.com/ahalabs/rs-soroban-sdk", rev = "93c46d5c88b18028e31edc7700c9b30eab4f7331" }
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 soroban-test-helpers = "0.2.3"
 hex-literal = "0.4.1"
-ed25519-dalek = "2.1.1"
+# ed25519-dalek = "2.0.0"
 
 # members
 stellar-access-control = { path = "packages/access/access-control" }

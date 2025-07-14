@@ -3,13 +3,12 @@
 //! macros.
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{FnArg, Ident, ItemFn, Pat, PatIdent, PatType, Type, TypePath, TypeReference};
 
 /// Parses the environment argument from the function signature
 pub fn parse_env_arg(input_fn: &ItemFn) -> TokenStream {
     let (env_ident, is_ref) = check_env_arg(input_fn);
-
     if is_ref {
         quote! { #env_ident }
     } else {
@@ -68,15 +67,17 @@ pub fn find_address_param(func: &ItemFn) -> Option<(proc_macro2::TokenStream, bo
             if let Pat::Ident(PatIdent { ident, .. }) = &**pat {
                 match &**ty {
                     // Check for &Address
-                    Type::Reference(TypeReference { elem, .. }) =>
+                    Type::Reference(TypeReference { elem, .. }) => {
                         if is_address_type(elem) {
                             return Some((quote! { #ident }, true));
-                        },
+                        }
+                    }
                     // Check for Address
-                    Type::Path(_) =>
+                    Type::Path(_) => {
                         if is_address_type(ty) {
                             return Some((quote! { #ident }, false));
-                        },
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -108,22 +109,42 @@ fn is_address_type(ty: &Type) -> bool {
 /// # Returns
 ///
 /// A TokenStream containing the function with authorization check added
-pub fn generate_auth_check(input_fn: &ItemFn, auth_check_func: TokenStream) -> TokenStream {
+pub fn generate_auth_check(input_fn: &mut ItemFn, auth_check_func: TokenStream) {
     // Get the environment parameter
     let env_param = parse_env_arg(input_fn);
 
-    // Extract function components
-    let fn_attrs = &input_fn.attrs;
-    let fn_vis = &input_fn.vis;
-    let fn_sig = &input_fn.sig;
-    let fn_block = &input_fn.block;
-
-    // Generate the expanded function with authorization check
-    quote! {
-        #(#fn_attrs)*
-        #fn_vis #fn_sig {
+    input_fn.block.stmts.insert(
+        0,
+        syn::parse_quote! {
             #auth_check_func(#env_param);
-            #fn_block
-        }
+        },
+    );
+}
+
+pub fn add_auth_check(input_fn: syn::Item, auth_check_func: TokenStream) -> TokenStream {
+    let mut input_fn = match input_fn {
+        syn::Item::Fn(func) => func,
+        _ => return input_fn.to_token_stream(),
+    };
+    // Get the environment parameter
+    let env_param = parse_env_arg(&input_fn);
+
+    input_fn.insert_stmts_to_token_stream(syn::parse_quote! {
+        #auth_check_func(#env_param);
+    })
+}
+
+pub trait FunctionInsert: ToTokens {
+    fn insert_stmts(&mut self, stmts:Vec<syn::Stmt>);
+
+    fn insert_stmts_to_token_stream(&mut self, stmts: Vec<syn::Stmt>) -> TokenStream {
+        self.insert_stmts(stmts);
+        self.to_token_stream()
+    }
+}
+
+impl FunctionInsert for ItemFn {
+    fn insert_stmts(&mut self, stmts: Vec<syn::Stmt>) {
+        self.block.stmts.splice(0..0, stmts.into_iter());
     }
 }

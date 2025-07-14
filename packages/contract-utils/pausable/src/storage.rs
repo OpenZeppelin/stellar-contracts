@@ -1,12 +1,45 @@
 use soroban_sdk::{contracttype, panic_with_error, Env};
 
-use crate::{emit_paused, emit_unpaused, pausable::PausableError};
+use crate::{emit_paused, emit_unpaused, pausable::{PausableError, Pausable}};
 
 /// Storage key for the pausable state
 #[contracttype]
 pub enum PausableStorageKey {
     /// Indicates whether the contract is in paused state.
     Paused,
+}
+
+pub struct PausableDefault;
+
+impl Pausable for PausableDefault {
+    type Impl = Self;
+
+    /// Returns true if the contract is paused, and false otherwise.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    fn paused(e: &Env) -> bool {
+        paused(e)
+    }
+
+    /// Triggers `Paused` state.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    fn pause(e: &Env, _caller: &soroban_sdk::Address) {
+        pause(e);
+    }
+
+    /// Triggers `Unpaused` state.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    fn unpause(e: &Env, _caller: &soroban_sdk::Address) {
+        unpause(e);
+    }
 }
 
 /// Returns true if the contract is paused, and false otherwise.

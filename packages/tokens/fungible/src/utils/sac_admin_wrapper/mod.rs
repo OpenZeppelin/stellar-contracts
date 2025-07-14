@@ -72,14 +72,20 @@
 mod storage;
 pub use storage::{
     clawback, get_sac_address, get_sac_client, mint, set_admin, set_authorized, set_sac_address,
+    DefaultSacAdminWrapper, SACAdminWrapperDataKey,
 };
 
 mod test;
 
-use soroban_sdk::{Address, Env};
+use soroban_sdk::Env;
 
 /// A trait to be implemented on a wrapper contract, serving as an administrator
 /// for a SAC.
+#[soroban_sdk::contracttrait(
+    default = DefaultSacAdminWrapper,
+    is_extension = true,
+    extension_required = true
+)]
 pub trait SACAdminWrapper {
     /// Sets the administrator to the specified address `new_admin`.
     ///
@@ -96,7 +102,9 @@ pub trait SACAdminWrapper {
     /// implementing this function in conjunction with `stellar_ownable` or
     /// `stellar_access_control` crates. Otherwise, authorizations MUST be
     /// diligently checked.
-    fn set_admin(e: Env, new_admin: Address, operator: Address);
+    fn set_admin(e: &Env, new_admin: &soroban_sdk::Address, _operator: &soroban_sdk::Address) {
+        Self::get_sac_client(e).set_admin(new_admin);
+    }
 
     /// Sets whether the account is authorized to use its balance. If
     /// `authorized` is true, `id` should be able to use its balance.
@@ -114,7 +122,14 @@ pub trait SACAdminWrapper {
     /// implementing this function in conjunction with `stellar_ownable` or
     /// `stellar_access_control` crates. Otherwise, authorizations MUST be
     /// diligently checked.
-    fn set_authorized(e: Env, id: Address, authorize: bool, operator: Address);
+    fn set_authorized(
+        e: &Env,
+        id: &soroban_sdk::Address,
+        authorize: bool,
+        _operator: &soroban_sdk::Address,
+    ) {
+        Self::get_sac_client(e).set_authorized(id, &authorize);
+    }
 
     /// Mints `amount` to `to`.
     ///
@@ -131,7 +146,9 @@ pub trait SACAdminWrapper {
     /// implementing this function in conjunction with `stellar_ownable` or
     /// `stellar_access_control` crates. Otherwise, authorizations MUST be
     /// diligently checked.
-    fn mint(e: Env, to: Address, amount: i128, operator: Address);
+    fn mint(e: &Env, to: &soroban_sdk::Address, amount: i128, _operator: &soroban_sdk::Address) {
+        Self::get_sac_client(e).mint(to, &amount);
+    }
 
     /// Clawback `amount` from `from` account. `amount` is burned in the
     /// clawback process.
@@ -150,5 +167,23 @@ pub trait SACAdminWrapper {
     /// implementing this function in conjunction with `stellar_ownable` or
     /// `stellar_access_control` crates. Otherwise, authorizations MUST be
     /// diligently checked.
-    fn clawback(e: Env, from: Address, amount: i128, operator: Address);
+    fn clawback(
+        e: &Env,
+        from: &soroban_sdk::Address,
+        amount: i128,
+        _operator: &soroban_sdk::Address,
+    ) {
+        Self::get_sac_client(e).clawback(from, &amount);
+    }
+
+    #[internal]
+    fn get_sac_client<'a>(e: &Env) -> soroban_sdk::token::StellarAssetClient<'a> {
+        soroban_sdk::token::StellarAssetClient::new(e, &Self::get_sac_address(e))
+    }
+
+    #[internal]
+    fn get_sac_address(e: &Env) -> soroban_sdk::Address;
+
+    #[internal]
+    fn set_sac_address(e: &Env, sac_address: &soroban_sdk::Address);
 }

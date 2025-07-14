@@ -11,6 +11,7 @@ use crate::{
         storage::{NFTConsecutiveStorageKey, IDS_IN_ITEM},
         Consecutive,
     },
+    non_fungible::NonFungibleToken,
     sequential, Base,
 };
 

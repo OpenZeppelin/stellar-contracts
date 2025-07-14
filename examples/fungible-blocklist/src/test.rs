@@ -24,6 +24,7 @@ fn block_unblock_works() {
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
+    e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
 
     // Verify initial state - no users are blocked
@@ -32,7 +33,6 @@ fn block_unblock_works() {
 
     // Admin can transfer to user1 initially
     let transfer_amount = 1000;
-    e.mock_all_auths();
 
     // Block user1
     client.block_user(&user1, &manager);
@@ -56,10 +56,10 @@ fn blocked_user_cannot_approve() {
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
+    e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-    e.mock_all_auths();
 
     // Transfer some tokens to user1
     client.transfer(&admin, &user1, &transfer_amount);
@@ -81,10 +81,10 @@ fn blocklist_approve_override_works() {
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &manager, &initial_supply);
-    let transfer_amount = 1000;
-
     e.mock_all_auths();
+    let client = create_client(&e, &admin, &manager, &initial_supply);
+
+    let transfer_amount = 1000;
 
     // Verify initial state - no users are blocked
     assert!(!client.blocked(&user1));
@@ -109,10 +109,10 @@ fn transfer_from_blocked_user() {
     let user2 = Address::generate(&e);
     let user3 = Address::generate(&e);
     let initial_supply = 1_000_000;
+    e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-    e.mock_all_auths();
 
     // Transfer some tokens to user1
     client.transfer(&admin, &user1, &transfer_amount);
@@ -140,10 +140,10 @@ fn transfer_from_to_blocked_user() {
     let user2 = Address::generate(&e);
     let user3 = Address::generate(&e);
     let initial_supply = 1_000_000;
+    e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-    e.mock_all_auths();
 
     // Transfer some tokens to user1
     client.transfer(&admin, &user1, &transfer_amount);
@@ -170,10 +170,10 @@ fn blocklist_transfer_from_override_works() {
     let user2 = Address::generate(&e);
     let user3 = Address::generate(&e);
     let initial_supply = 1_000_000;
+    e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-    e.mock_all_auths();
 
     // Verify initial state - no users are blocked
     assert!(!client.blocked(&user1));

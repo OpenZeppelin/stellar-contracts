@@ -5,7 +5,9 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
-use crate::{extensions::enumerable::Enumerable, Base, NFTStorageKey};
+use crate::{
+    extensions::enumerable::Enumerable, non_fungible::NonFungibleToken, Base, NFTStorageKey,
+};
 
 #[contract]
 struct MockContract;

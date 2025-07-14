@@ -3,9 +3,8 @@
 //! Demonstrates an example usage of `ownable` module by
 //! implementing `#[only_owner]` macro on a sensitive function.
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
-use stellar_default_impl_macro::default_impl;
-use stellar_ownable::{set_owner, Ownable};
+use soroban_sdk::{contract, contractimpl, contracttype, derive_contract, Address, Env};
+use stellar_ownable::Ownable;
 use stellar_ownable_macro::only_owner;
 
 #[contracttype]
@@ -15,12 +14,13 @@ pub enum DataKey {
 }
 
 #[contract]
+#[derive_contract(Ownable)]
 pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        set_owner(e, &owner);
+        Self::set_owner(e, &owner);
         e.storage().instance().set(&DataKey::Counter, &0);
     }
 
@@ -36,7 +36,3 @@ impl ExampleContract {
         counter
     }
 }
-
-#[default_impl]
-#[contractimpl]
-impl Ownable for ExampleContract {}
