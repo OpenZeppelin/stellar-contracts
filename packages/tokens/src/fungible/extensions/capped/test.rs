@@ -4,7 +4,7 @@ extern crate std;
 
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
-use crate::{
+use crate::fungible::{
     extensions::capped::{check_cap, query_cap, set_cap},
     Base,
 };

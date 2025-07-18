@@ -20,6 +20,7 @@ members = [
     "packages/constants",
     "packages/access/*",
     "packages/contract-utils/*",
+    "packages/proc-macros",
     "packages/test-utils/*",
     "packages/tokens",
 ]
@@ -47,21 +48,16 @@ ed25519-dalek = "2.1.1"
 
 # members
 stellar-access-control = { path = "packages/access/access-control" }
-stellar-access-control-macros = { path = "packages/access/access-control-macros" }
 stellar-constants = { path = "packages/constants" }
-stellar-default-impl-macro = { path = "packages/contract-utils/default-impl-macro" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
-stellar-macro-helpers = { path = "packages/contract-utils/macro-helpers" }
 stellar-tokens = { path = "packages/tokens" }
 stellar-ownable = { path = "packages/access/ownable" }
-stellar-ownable-macro = { path = "packages/access/ownable-macro" }
 stellar-pausable = { path = "packages/contract-utils/pausable" }
-stellar-pausable-macros = { path = "packages/contract-utils/pausable-macros" }
 stellar-role-transfer = { path = "packages/access/role-transfer" }
 stellar-upgradeable = { path = "packages/contract-utils/upgradeable" }
-stellar-upgradeable-macros = { path = "packages/contract-utils/upgradeable-macros" }
 stellar-crypto = { path = "packages/contract-utils/crypto" }
 stellar-merkle-distributor = { path = "packages/contract-utils/merkle-distributor" }
+stellar-proc-macros = { path = "packages/proc-macros" }
 
 [profile.release]
 opt-level = "z"

@@ -14,7 +14,7 @@ use soroban_sdk::{
     Symbol,
 };
 use stellar_pausable::{self as pausable, Pausable};
-use stellar_pausable_macros::when_not_paused;
+use stellar_proc_macros::when_not_paused;
 use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, FungibleToken};
 use stellar_tokens::impl_token_interface;
 

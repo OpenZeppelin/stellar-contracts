@@ -6,7 +6,7 @@ use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, String, 
 use stellar_event_assertion::EventAssertion;
 
 use super::storage::{find_bit_in_bucket, find_bit_in_item, IDS_IN_BUCKET, MAX_TOKENS_IN_BATCH};
-use crate::{
+use crate::non_fungible::{
     extensions::consecutive::{
         storage::{NFTConsecutiveStorageKey, IDS_IN_ITEM},
         Consecutive,

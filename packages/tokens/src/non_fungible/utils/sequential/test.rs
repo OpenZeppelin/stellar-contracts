@@ -4,7 +4,9 @@ extern crate std;
 
 use soroban_sdk::{contract, Env};
 
-use crate::sequential::storage::{increment_token_id, next_token_id, NFTSequentialStorageKey};
+use crate::non_fungible::sequential::storage::{
+    increment_token_id, next_token_id, NFTSequentialStorageKey,
+};
 
 #[contract]
 pub struct MockContract;

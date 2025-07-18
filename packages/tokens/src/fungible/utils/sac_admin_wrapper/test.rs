@@ -11,7 +11,7 @@ use soroban_sdk::{
 };
 use soroban_test_helpers;
 
-use crate::sac_admin_wrapper::storage::{
+use crate::fungible::sac_admin_wrapper::storage::{
     clawback, get_sac_address, mint, set_admin, set_authorized, set_sac_address,
     SACAdminWrapperDataKey,
 };

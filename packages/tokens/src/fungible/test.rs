@@ -14,7 +14,7 @@ use soroban_sdk::{
 use stellar_constants::{BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD};
 use stellar_event_assertion::EventAssertion;
 
-use crate::{Base, StorageKey};
+use crate::fungible::{Base, StorageKey};
 
 #[contract]
 struct MockContract;

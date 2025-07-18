@@ -7,8 +7,10 @@ use soroban_sdk::{
 };
 use soroban_test_helpers;
 
-use super::{extract_sac_contract_context, get_sac_address, set_sac_address, SacFn};
-use crate::sac_admin_generic::storage::SACAdminGenericDataKey;
+use crate::fungible::sac_admin_generic::{
+    extract_sac_contract_context, get_sac_address, set_sac_address,
+    storage::SACAdminGenericDataKey, SacFn,
+};
 
 #[contract]
 struct MockContract;

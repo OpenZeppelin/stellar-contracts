@@ -2,7 +2,7 @@ extern crate std;
 
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
-use crate::{extensions::allowlist::storage::AllowList, Base};
+use crate::fungible::{extensions::allowlist::storage::AllowList, Base};
 
 #[contract]
 struct MockContract;

@@ -20,4 +20,4 @@ stellar-merkle-distributor = { workspace = true }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 hex-literal = { workspace = true }
-stellar-default-impl-macro = { workspace = true }
+stellar-proc-macros = { workspace = true }

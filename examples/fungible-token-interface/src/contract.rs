@@ -17,9 +17,9 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, token::TokenInterface,
     Address, Env, String, Symbol,
 };
-use stellar_tokens::fungible::Base;
 use stellar_pausable::{self as pausable, Pausable};
-use stellar_pausable_macros::when_not_paused;
+use stellar_proc_macros::when_not_paused;
+use stellar_tokens::fungible::Base;
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
 

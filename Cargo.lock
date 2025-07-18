@@ -584,8 +584,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
+ "stellar-proc-macros",
  "stellar-tokens",
 ]
 
@@ -595,8 +594,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
+ "stellar-proc-macros",
  "stellar-tokens",
 ]
 
@@ -615,9 +613,9 @@ dependencies = [
  "hex-literal",
  "soroban-sdk",
  "stellar-crypto",
- "stellar-default-impl-macro",
  "stellar-merkle-distributor",
  "stellar-ownable",
+ "stellar-proc-macros",
  "stellar-tokens",
 ]
 
@@ -627,7 +625,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-pausable",
- "stellar-pausable-macros",
+ "stellar-proc-macros",
  "stellar-tokens",
 ]
 
@@ -637,7 +635,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-pausable",
- "stellar-pausable-macros",
+ "stellar-proc-macros",
  "stellar-tokens",
 ]
 
@@ -887,8 +885,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
+ "stellar-proc-macros",
  "stellar-tokens",
 ]
 
@@ -905,7 +902,7 @@ name = "nft-enumerable-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-default-impl-macro",
+ "stellar-proc-macros",
  "stellar-tokens",
 ]
 
@@ -915,8 +912,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
+ "stellar-proc-macros",
  "stellar-tokens",
 ]
 
@@ -925,7 +921,7 @@ name = "nft-sequential-minting-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-default-impl-macro",
+ "stellar-proc-macros",
  "stellar-tokens",
 ]
 
@@ -985,9 +981,8 @@ name = "ownable-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-default-impl-macro",
  "stellar-ownable",
- "stellar-ownable-macro",
+ "stellar-proc-macros",
 ]
 
 [[package]]
@@ -1218,8 +1213,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
+ "stellar-proc-macros",
  "stellar-tokens",
 ]
 
@@ -1580,16 +1574,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "stellar-access-control-macros"
-version = "0.3.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "stellar-macro-helpers",
- "syn 2.0.96",
-]
-
-[[package]]
 name = "stellar-constants"
 version = "0.3.0"
 dependencies = [
@@ -1606,43 +1590,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "stellar-default-impl-macro"
-version = "0.3.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
-]
-
-[[package]]
-name = "stellar-default-impl-macro-test"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
- "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
- "stellar-event-assertion",
- "stellar-ownable",
- "stellar-ownable-macro",
- "stellar-tokens",
-]
-
-[[package]]
 name = "stellar-event-assertion"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
-]
-
-[[package]]
-name = "stellar-macro-helpers"
-version = "0.3.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
 ]
 
 [[package]]
@@ -1667,16 +1619,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "stellar-ownable-macro"
-version = "0.3.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "stellar-macro-helpers",
- "syn 2.0.96",
-]
-
-[[package]]
 name = "stellar-pausable"
 version = "0.3.0"
 dependencies = [
@@ -1684,12 +1626,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "stellar-pausable-macros"
+name = "stellar-proc-macros"
 version = "0.3.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "stellar-macro-helpers",
  "syn 2.0.96",
 ]
 
@@ -1726,15 +1667,6 @@ name = "stellar-upgradeable"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
-]
-
-[[package]]
-name = "stellar-upgradeable-macros"
-version = "0.3.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
 ]
 
 [[package]]
@@ -1874,8 +1806,8 @@ name = "upgradeable-v1-example"
 version = "1.0.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-proc-macros",
  "stellar-upgradeable",
- "stellar-upgradeable-macros",
 ]
 
 [[package]]
@@ -1883,8 +1815,8 @@ name = "upgradeable-v2-example"
 version = "2.0.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-proc-macros",
  "stellar-upgradeable",
- "stellar-upgradeable-macros",
 ]
 
 [[package]]
@@ -1893,7 +1825,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-ownable",
- "stellar-ownable-macro",
+ "stellar-proc-macros",
  "stellar-upgradeable",
 ]
 
