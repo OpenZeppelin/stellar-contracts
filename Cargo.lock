@@ -1589,6 +1589,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-default-impl-macro-test"
+version = "0.3.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-event-assertion",
+ "stellar-proc-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "stellar-event-assertion"
 version = "0.3.0"
 dependencies = [
