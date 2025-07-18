@@ -1,7 +1,5 @@
 ignore:
-  - "packages/access/access-control-macros"
-  - "packages/access/ownable-macro"
-  - "packages/contract-utils/macro-helpers"
-  - "packages/tokens/fungible/src/impl_token_interface_macro.rs"
-  - "packages/tokens/fungible/src/overrides.rs"
-  - "packages/tokens/non-fungible/src/overrides.rs"
+  - "packages/proc-macros/*"
+  - "packages/tokens/src/fungible/impl_token_interface_macro.rs"
+  - "packages/tokens/src/fungible/overrides.rs"
+  - "packages/tokens/src/non-fungible/overrides.rs"

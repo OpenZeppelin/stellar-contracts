@@ -4,7 +4,7 @@ use soroban_sdk::{
     crypto::Hash,
     Address, BytesN, Env, IntoVal, Val, Vec,
 };
-use stellar_fungible::sac_admin_generic::{
+use stellar_tokens::fungible::sac_admin_generic::{
     extract_sac_contract_context, get_sac_address, set_sac_address, SacFn,
 };
 

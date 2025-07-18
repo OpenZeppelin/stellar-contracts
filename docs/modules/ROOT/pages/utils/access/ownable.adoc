@@ -53,7 +53,7 @@ Here's a simple example of using the Ownable module:
 [source,rust]
 ----
 use soroban_sdk::{contract, contractimpl, Address, Env};
-use stellar_ownable::{self as ownable, Ownable};
+use stellar_access::ownable::{self as ownable, Ownable};
 use stellar_ownable_macro::only_owner;
 
 #[contract]
