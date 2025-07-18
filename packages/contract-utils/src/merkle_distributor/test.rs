@@ -8,8 +8,10 @@ use soroban_sdk::{
 };
 use stellar_event_assertion::EventAssertion;
 
-use crate::crypto::sha256::Sha256;
-use crate::merkle_distributor::{IndexableLeaf, MerkleDistributor};
+use crate::{
+    crypto::sha256::Sha256,
+    merkle_distributor::{IndexableLeaf, MerkleDistributor},
+};
 
 type Bytes32 = BytesN<32>;
 type Distributor = MerkleDistributor<Sha256>;

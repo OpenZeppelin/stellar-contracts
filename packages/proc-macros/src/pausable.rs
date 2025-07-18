@@ -1,8 +1,8 @@
-use crate::parse_env_arg;
-
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, ItemFn};
+
+use crate::parse_env_arg;
 
 pub fn generate_pause_check(item: TokenStream, check_fn: &str) -> TokenStream {
     let input_fn = parse_macro_input!(item as ItemFn);

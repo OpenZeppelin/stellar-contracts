@@ -1,9 +1,11 @@
 use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, BytesN, Env, Vec};
 
-use crate::crypto::{hasher::Hasher, merkle::Verifier};
-use crate::merkle_distributor::{
-    MerkleDistributor, MERKLE_CLAIMED_EXTEND_AMOUNT, MERKLE_CLAIMED_TTL_THRESHOLD,
-    {emit_set_claimed, emit_set_root, IndexableLeaf, MerkleDistributorError},
+use crate::{
+    crypto::{hasher::Hasher, merkle::Verifier},
+    merkle_distributor::{
+        emit_set_claimed, emit_set_root, IndexableLeaf, MerkleDistributor, MerkleDistributorError,
+        MERKLE_CLAIMED_EXTEND_AMOUNT, MERKLE_CLAIMED_TTL_THRESHOLD,
+    },
 };
 
 /// Storage keys for the data associated with `MerkleDistributor`

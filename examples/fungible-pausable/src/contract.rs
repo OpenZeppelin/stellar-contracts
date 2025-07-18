@@ -15,8 +15,10 @@ use soroban_sdk::{
 };
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_proc_macros::when_not_paused;
-use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, FungibleToken};
-use stellar_tokens::impl_token_interface;
+use stellar_tokens::{
+    fungible::{burnable::FungibleBurnable, Base, FungibleToken},
+    impl_token_interface,
+};
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
 

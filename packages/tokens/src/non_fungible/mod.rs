@@ -73,12 +73,10 @@ mod test;
 
 pub use extensions::{burnable, consecutive, enumerable, royalties};
 pub use overrides::{Base, ContractOverrides};
+// ################## TRAIT ##################
+use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
 pub use storage::{ApprovalData, NFTStorageKey};
 pub use utils::sequential;
-
-// ################## TRAIT ##################
-
-use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
 
 /// Vanilla NonFungible Token Trait
 ///

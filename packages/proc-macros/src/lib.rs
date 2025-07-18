@@ -8,11 +8,10 @@ use access_control::{generate_any_role_check, generate_role_check};
 use default_impl_macro::generate_default_impl;
 use helpers::*;
 use pausable::generate_pause_check;
-use upgradeable::*;
-
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, ItemFn};
+use upgradeable::*;
 
 /* DEFAULT_IMPL_MACRO */
 
@@ -142,7 +141,11 @@ pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
-///     stellar_access::access_control::ensure_role(e, &account, &soroban_sdk::Symbol::new(e, "minter"));
+///     stellar_access::access_control::ensure_role(
+///         e,
+///         &account,
+///         &soroban_sdk::Symbol::new(e, "minter"),
+///     );
 ///     // Function body
 /// }
 /// ```
@@ -173,7 +176,11 @@ pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
-///     stellar_access::access_control::ensure_role(e, &account, &soroban_sdk::Symbol::new(e, "minter"));
+///     stellar_access::access_control::ensure_role(
+///         e,
+///         &account,
+///         &soroban_sdk::Symbol::new(e, "minter"),
+///     );
 ///     account.require_auth();
 ///     // Function body
 /// }

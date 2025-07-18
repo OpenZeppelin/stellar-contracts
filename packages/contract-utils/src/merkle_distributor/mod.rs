@@ -50,12 +50,12 @@ mod storage;
 
 mod test;
 
-pub use crate::merkle_distributor::storage::MerkleDistributorStorageKey;
-
 use core::marker::PhantomData;
+
 use soroban_sdk::{contracterror, symbol_short, Bytes, Env, Symbol, Val};
 
 use crate::crypto::hasher::Hasher;
+pub use crate::merkle_distributor::storage::MerkleDistributorStorageKey;
 
 pub trait IndexableLeaf {
     fn index(&self) -> u32;

@@ -1,5 +1,3 @@
-use crate::parse_env_arg;
-
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
@@ -7,6 +5,8 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
 };
+
+use crate::parse_env_arg;
 
 /// Helper function that generates the role check code for both has_role and
 /// only_role macros. If require_auth is true, it also adds the

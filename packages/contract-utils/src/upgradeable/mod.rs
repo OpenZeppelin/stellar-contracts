@@ -76,11 +76,11 @@ mod storage;
 
 mod test;
 
+use soroban_sdk::{contractclient, contracterror, Address, BytesN, Env, FromVal, Val};
+
 pub use crate::upgradeable::storage::{
     can_complete_migration, complete_migration, enable_migration, ensure_can_complete_migration,
 };
-
-use soroban_sdk::{contractclient, contracterror, Address, BytesN, Env, FromVal, Val};
 
 /// High-level trait for contract upgrades.
 ///

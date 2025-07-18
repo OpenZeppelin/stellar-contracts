@@ -1,10 +1,12 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
-use crate::ownable::{
-    emit_ownership_renounced, emit_ownership_transfer, emit_ownership_transfer_completed,
-    OwnableError,
+use crate::{
+    ownable::{
+        emit_ownership_renounced, emit_ownership_transfer, emit_ownership_transfer_completed,
+        OwnableError,
+    },
+    role_transfer::{accept_transfer, transfer_role},
 };
-use crate::role_transfer::{accept_transfer, transfer_role};
 
 /// Storage keys for `Ownable` utility.
 #[contracttype]

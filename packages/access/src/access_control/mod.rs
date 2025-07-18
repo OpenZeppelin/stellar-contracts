@@ -90,6 +90,8 @@ mod storage;
 
 mod test;
 
+use soroban_sdk::{contracterror, Address, Env, Symbol};
+
 pub use crate::access_control::storage::{
     accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
     ensure_if_admin_or_admin_role, ensure_role, get_admin, get_role_admin, get_role_member,
@@ -98,8 +100,6 @@ pub use crate::access_control::storage::{
     revoke_role, revoke_role_no_auth, set_admin, set_role_admin, set_role_admin_no_auth,
     transfer_admin_role, AccessControlStorageKey,
 };
-
-use soroban_sdk::{contracterror, Address, Env, Symbol};
 
 pub trait AccessControl {
     /// Returns `Some(index)` if the account has the specified role,

@@ -1,8 +1,8 @@
 use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env, String, Symbol};
 
 use crate::fungible::{
-    Base, BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD,
-    {emit_approve, emit_mint, emit_transfer, FungibleTokenError},
+    emit_approve, emit_mint, emit_transfer, Base, FungibleTokenError, BALANCE_EXTEND_AMOUNT,
+    BALANCE_TTL_THRESHOLD,
 };
 
 /// Storage key that maps to [`Metadata`]

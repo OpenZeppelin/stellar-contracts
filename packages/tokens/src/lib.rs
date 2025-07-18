@@ -1,7 +1,7 @@
 //! # Stellar Tokens
 //!
-//! This crate provides implementations for both fungible and non-fungible tokens
-//! for use in Soroban smart contracts on the Stellar network.
+//! This crate provides implementations for both fungible and non-fungible
+//! tokens for use in Soroban smart contracts on the Stellar network.
 //!
 //! ## Modules
 //!

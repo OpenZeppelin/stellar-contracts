@@ -77,7 +77,8 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
 /// **Warning:** This derive macro should only be used on contracts that have
 /// previously used either `#[derive(Upgradeable)]` or
 /// `#[derive(UpgradeableMigratable)]`. The migration function depends on an
-/// internal flag set by calling `stellar_contract_utils::upgradeable::enable_migration()`.
+/// internal flag set by calling
+/// `stellar_contract_utils::upgradeable::enable_migration()`.
 pub fn derive_upgradeable_migratable(input: &DeriveInput) -> proc_macro2::TokenStream {
     let name = &input.ident;
 

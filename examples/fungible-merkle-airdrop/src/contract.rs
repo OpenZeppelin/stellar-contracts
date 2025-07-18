@@ -18,8 +18,10 @@
 //! [philipliu/soroban-merkle-airdrop](https://github.com/philipliu/soroban-merkle-airdrop).
 
 use soroban_sdk::{contract, contractimpl, contracttype, token, Address, BytesN, Env, Vec};
-use stellar_contract_utils::crypto::sha256::Sha256;
-use stellar_contract_utils::merkle_distributor::{IndexableLeaf, MerkleDistributor};
+use stellar_contract_utils::{
+    crypto::sha256::Sha256,
+    merkle_distributor::{IndexableLeaf, MerkleDistributor},
+};
 
 type Distributor = MerkleDistributor<Sha256>;
 
