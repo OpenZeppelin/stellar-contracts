@@ -4,7 +4,7 @@
 //! efficient batch minting in a single transaction.
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
-use stellar_non_fungible::{
+use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
     consecutive::{Consecutive, NonFungibleConsecutive},
     Base, ContractOverrides, NonFungibleToken,

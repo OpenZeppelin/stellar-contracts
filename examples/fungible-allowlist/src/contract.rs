@@ -9,7 +9,7 @@ use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
 use stellar_access_control::{self as access_control, AccessControl};
 use stellar_access_control_macros::has_role;
 use stellar_default_impl_macro::default_impl;
-use stellar_fungible::{
+use stellar_tokens::fungible::{
     allowlist::{AllowList, FungibleAllowList},
     burnable::FungibleBurnable,
     Base, FungibleToken,

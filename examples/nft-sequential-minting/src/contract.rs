@@ -4,7 +4,7 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
-use stellar_non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
+use stellar_tokens::non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
 
 #[contracttype]
 pub enum DataKey {

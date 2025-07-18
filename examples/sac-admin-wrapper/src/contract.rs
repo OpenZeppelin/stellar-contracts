@@ -2,7 +2,7 @@ use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env};
 use stellar_access_control::{self as access_control, AccessControl};
 use stellar_access_control_macros::{has_role, only_admin};
 use stellar_default_impl_macro::default_impl;
-use stellar_fungible::{self as fungible, sac_admin_wrapper::SACAdminWrapper};
+use stellar_tokens::fungible::{self as fungible, sac_admin_wrapper::SACAdminWrapper};
 
 #[contract]
 pub struct ExampleContract;

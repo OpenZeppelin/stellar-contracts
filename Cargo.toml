@@ -21,7 +21,7 @@ members = [
     "packages/access/*",
     "packages/contract-utils/*",
     "packages/test-utils/*",
-    "packages/tokens/*",
+    "packages/tokens",
 ]
 exclude = ["examples/upgradeable/testdata"]
 
@@ -51,9 +51,8 @@ stellar-access-control-macros = { path = "packages/access/access-control-macros"
 stellar-constants = { path = "packages/constants" }
 stellar-default-impl-macro = { path = "packages/contract-utils/default-impl-macro" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
-stellar-fungible = { path = "packages/tokens/fungible" }
 stellar-macro-helpers = { path = "packages/contract-utils/macro-helpers" }
-stellar-non-fungible = { path = "packages/tokens/non-fungible" }
+stellar-tokens = { path = "packages/tokens" }
 stellar-ownable = { path = "packages/access/ownable" }
 stellar-ownable-macro = { path = "packages/access/ownable-macro" }
 stellar-pausable = { path = "packages/contract-utils/pausable" }

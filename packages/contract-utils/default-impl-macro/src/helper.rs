@@ -279,12 +279,12 @@ pub fn generate_default_impl(item: TokenStream) -> TokenStream {
     // `FungibleToken`
     let expanded = if trait_name == "NonFungibleToken" {
         quote! {
-            use stellar_non_fungible::ContractOverrides;
+            use stellar_tokens::non_fungible::ContractOverrides;
             #new_impl
         }
     } else if trait_name == "FungibleToken" {
         quote! {
-            use stellar_fungible::ContractOverrides;
+            use stellar_tokens::fungible::ContractOverrides;
             #new_impl
         }
     } else {

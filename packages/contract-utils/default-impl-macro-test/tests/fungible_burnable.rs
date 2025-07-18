@@ -1,6 +1,6 @@
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
-use stellar_fungible::{burnable::FungibleBurnable, Base, FungibleToken};
+use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, FungibleToken};
 
 #[contract]
 pub struct ExampleContract;

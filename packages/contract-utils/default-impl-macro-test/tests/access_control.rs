@@ -4,7 +4,7 @@ use soroban_sdk::{
 use stellar_access_control::{set_admin, AccessControl};
 use stellar_access_control_macros::has_role;
 use stellar_default_impl_macro::default_impl;
-use stellar_fungible::{Base, FungibleToken};
+use stellar_tokens::fungible::{Base, FungibleToken};
 
 #[contracttype]
 pub enum DataKey {

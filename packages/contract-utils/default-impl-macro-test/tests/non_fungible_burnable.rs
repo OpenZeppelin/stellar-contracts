@@ -9,7 +9,7 @@
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
-use stellar_non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
+use stellar_tokens::non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
 
 #[contract]
 pub struct ExampleContract;

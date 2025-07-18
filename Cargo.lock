@@ -586,7 +586,7 @@ dependencies = [
  "stellar-access-control",
  "stellar-access-control-macros",
  "stellar-default-impl-macro",
- "stellar-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -597,7 +597,7 @@ dependencies = [
  "stellar-access-control",
  "stellar-access-control-macros",
  "stellar-default-impl-macro",
- "stellar-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -605,7 +605,7 @@ name = "fungible-capped-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -616,9 +616,9 @@ dependencies = [
  "soroban-sdk",
  "stellar-crypto",
  "stellar-default-impl-macro",
- "stellar-fungible",
  "stellar-merkle-distributor",
  "stellar-ownable",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -626,9 +626,9 @@ name = "fungible-pausable-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-fungible",
  "stellar-pausable",
  "stellar-pausable-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -636,9 +636,9 @@ name = "fungible-token-interface-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-fungible",
  "stellar-pausable",
  "stellar-pausable-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -889,7 +889,7 @@ dependencies = [
  "stellar-access-control",
  "stellar-access-control-macros",
  "stellar-default-impl-macro",
- "stellar-non-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -897,7 +897,7 @@ name = "nft-consecutive-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-non-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -906,7 +906,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-default-impl-macro",
- "stellar-non-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -917,7 +917,7 @@ dependencies = [
  "stellar-access-control",
  "stellar-access-control-macros",
  "stellar-default-impl-macro",
- "stellar-non-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -926,7 +926,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-default-impl-macro",
- "stellar-non-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -1209,7 +1209,7 @@ version = "0.3.0"
 dependencies = [
  "ed25519-dalek",
  "soroban-sdk",
- "stellar-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -1220,7 +1220,7 @@ dependencies = [
  "stellar-access-control",
  "stellar-access-control-macros",
  "stellar-default-impl-macro",
- "stellar-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -1623,10 +1623,9 @@ dependencies = [
  "stellar-access-control-macros",
  "stellar-default-impl-macro",
  "stellar-event-assertion",
- "stellar-fungible",
- "stellar-non-fungible",
  "stellar-ownable",
  "stellar-ownable-macro",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -1634,17 +1633,7 @@ name = "stellar-event-assertion"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-non-fungible",
-]
-
-[[package]]
-name = "stellar-fungible"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
- "soroban-test-helpers",
- "stellar-constants",
- "stellar-event-assertion",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -1664,15 +1653,6 @@ dependencies = [
  "soroban-sdk",
  "stellar-constants",
  "stellar-crypto",
- "stellar-event-assertion",
-]
-
-[[package]]
-name = "stellar-non-fungible"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
- "stellar-constants",
  "stellar-event-assertion",
 ]
 
@@ -1729,6 +1709,16 @@ dependencies = [
  "crate-git-revision",
  "data-encoding",
  "thiserror",
+]
+
+[[package]]
+name = "stellar-tokens"
+version = "0.3.0"
+dependencies = [
+ "soroban-sdk",
+ "soroban-test-helpers",
+ "stellar-constants",
+ "stellar-event-assertion",
 ]
 
 [[package]]
