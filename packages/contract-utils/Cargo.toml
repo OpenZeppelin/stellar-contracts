@@ -3,8 +3,10 @@ name = "stellar-contract-utils"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = true
 version.workspace = true
+publish = true
+description = "Utilities for Stellar contracts."
+
 
 [lib]
 crate-type = ["lib", "cdylib"]

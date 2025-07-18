@@ -3,8 +3,10 @@ name = "stellar-proc-macros"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false
 version.workspace = true
+publish = false
+description = "Proc macros for Stellar contracts."
+
 
 [lib]
 proc-macro = true

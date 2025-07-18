@@ -3,8 +3,10 @@ name = "stellar-access"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false
 version.workspace = true
+publish = true
+description = "Access Control, Ownable, and Role Transfer utilities for Stellar contracts."
+
 
 [lib]
 crate-type = ["lib", "cdylib"]
