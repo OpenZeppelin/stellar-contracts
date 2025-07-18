@@ -6,7 +6,7 @@
 //! accounts.
 
 use soroban_sdk::{contract, contracterror, contractimpl, symbol_short, Address, Env, String};
-use stellar_access_control::{self as access_control, AccessControl};
+use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_proc_macros::{default_impl, has_role};
 use stellar_tokens::fungible::{
     blocklist::{BlockList, FungibleBlockList},

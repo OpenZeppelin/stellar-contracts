@@ -98,7 +98,7 @@ pub fn default_impl(attrs: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// pub fn restricted_function(e: &Env, other_param: u32) {
-///     stellar_access_control::enforce_admin_auth(e);
+///     stellar_access::access_control::enforce_admin_auth(e);
 ///     // Function body
 /// }
 /// ```
@@ -109,7 +109,7 @@ pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(input as ItemFn);
 
     // Generate the function with the admin authorization check
-    let auth_check_path = quote! { stellar_access_control::enforce_admin_auth };
+    let auth_check_path = quote! { stellar_access::access_control::enforce_admin_auth };
     let expanded = generate_auth_check(&input_fn, auth_check_path);
 
     TokenStream::from(expanded)
@@ -142,7 +142,7 @@ pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
-///     stellar_access_control::ensure_role(e, &account, &soroban_sdk::Symbol::new(e, "minter"));
+///     stellar_access::access_control::ensure_role(e, &account, &soroban_sdk::Symbol::new(e, "minter"));
 ///     // Function body
 /// }
 /// ```
@@ -173,7 +173,7 @@ pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// pub fn mint_tokens(e: &Env, amount: u32, account: Address) {
-///     stellar_access_control::ensure_role(e, &account, &soroban_sdk::Symbol::new(e, "minter"));
+///     stellar_access::access_control::ensure_role(e, &account, &soroban_sdk::Symbol::new(e, "minter"));
 ///     account.require_auth();
 ///     // Function body
 /// }
@@ -256,7 +256,7 @@ pub fn only_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```rust
 /// pub fn restricted_function(e: &Env, other_param: u32) {
 ///     let owner: soroban_sdk::Address =
-///         e.storage().instance().get(&stellar_ownable::OwnableStorageKey::Owner).unwrap();
+///         e.storage().instance().get(&stellar_access::ownable::OwnableStorageKey::Owner).unwrap();
 ///     owner.require_auth();
 ///     // Function body
 /// }
@@ -268,7 +268,7 @@ pub fn only_owner(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(input as ItemFn);
 
     // Generate the function with the owner authorization check
-    let auth_check_path = quote! { stellar_ownable::enforce_owner_auth };
+    let auth_check_path = quote! { stellar_access::ownable::enforce_owner_auth };
     let expanded = generate_auth_check(&input_fn, auth_check_path);
 
     TokenStream::from(expanded)

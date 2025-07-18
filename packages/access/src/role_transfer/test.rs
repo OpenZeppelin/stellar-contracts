@@ -8,7 +8,7 @@ use soroban_sdk::{
     Address, Env,
 };
 
-use crate::{accept_transfer, transfer_role};
+use crate::role_transfer::{accept_transfer, transfer_role};
 
 #[contract]
 struct MockContract;

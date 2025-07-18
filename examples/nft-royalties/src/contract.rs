@@ -5,7 +5,7 @@
 //! standard.
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
-use stellar_access_control::{self as access_control, AccessControl};
+use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_proc_macros::{default_impl, has_role, only_admin};
 use stellar_tokens::non_fungible::{royalties::NonFungibleRoyalties, Base, NonFungibleToken};
 

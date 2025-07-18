@@ -3,7 +3,7 @@
 //! Demonstrates how can Access Control be utilized.
 
 use soroban_sdk::{contract, contractimpl, vec, Address, Env, String, Vec};
-use stellar_access_control::{set_admin, AccessControl};
+use stellar_access::access_control::{set_admin, AccessControl};
 use stellar_proc_macros::{
     default_impl, has_any_role, has_role, only_admin, only_any_role, only_role,
 };

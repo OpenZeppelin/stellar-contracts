@@ -70,7 +70,7 @@ fn check_is_env(path: &TypePath, fn_name: &Ident) {
 ///
 /// * `input_fn` - The function to wrap with authorization check
 /// * `auth_check_func` - The function to be called to enforce authorization
-///   (e.g., `stellar_ownable::enforce_owner_auth`)
+///   (e.g., `stellar_access::ownable::enforce_owner_auth`)
 ///
 /// # Returns
 ///

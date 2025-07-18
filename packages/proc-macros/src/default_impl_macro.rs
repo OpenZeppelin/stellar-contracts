@@ -7,62 +7,62 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
         "AccessControl" => vec![
             syn::parse_quote! {
                 fn has_role(e: &soroban_sdk::Env, account: soroban_sdk::Address, role: soroban_sdk::Symbol) -> Option<u32> {
-                    stellar_access_control::has_role(e, &account, &role)
+                    stellar_access::access_control::has_role(e, &account, &role)
                 }
             },
             syn::parse_quote! {
                 fn get_role_member_count(e: &soroban_sdk::Env, role: soroban_sdk::Symbol) -> u32 {
-                    stellar_access_control::get_role_member_count(e, &role)
+                    stellar_access::access_control::get_role_member_count(e, &role)
                 }
             },
             syn::parse_quote! {
                 fn get_role_member(e: &soroban_sdk::Env, role: soroban_sdk::Symbol, index: u32) -> soroban_sdk::Address {
-                    stellar_access_control::get_role_member(e, &role, index)
+                    stellar_access::access_control::get_role_member(e, &role, index)
                 }
             },
             syn::parse_quote! {
                 fn get_role_admin(e: &soroban_sdk::Env, role: soroban_sdk::Symbol) -> Option<soroban_sdk::Symbol> {
-                    stellar_access_control::get_role_admin(e, &role)
+                    stellar_access::access_control::get_role_admin(e, &role)
                 }
             },
             syn::parse_quote! {
                 fn get_admin(e: &soroban_sdk::Env) -> Option<soroban_sdk::Address> {
-                    stellar_access_control::get_admin(e)
+                    stellar_access::access_control::get_admin(e)
                 }
             },
             syn::parse_quote! {
                 fn grant_role(e: &soroban_sdk::Env, caller: soroban_sdk::Address, account: soroban_sdk::Address, role: soroban_sdk::Symbol) {
-                    stellar_access_control::grant_role(e, &caller, &account, &role);
+                    stellar_access::access_control::grant_role(e, &caller, &account, &role);
                 }
             },
             syn::parse_quote! {
                 fn revoke_role(e: &soroban_sdk::Env, caller: soroban_sdk::Address, account: soroban_sdk::Address, role: soroban_sdk::Symbol) {
-                    stellar_access_control::revoke_role(e, &caller, &account, &role);
+                    stellar_access::access_control::revoke_role(e, &caller, &account, &role);
                 }
             },
             syn::parse_quote! {
                 fn renounce_role(e: &soroban_sdk::Env, caller: soroban_sdk::Address, role: soroban_sdk::Symbol) {
-                    stellar_access_control::renounce_role(e, &caller, &role);
+                    stellar_access::access_control::renounce_role(e, &caller, &role);
                 }
             },
             syn::parse_quote! {
                 fn renounce_admin(e: &soroban_sdk::Env) {
-                    stellar_access_control::renounce_admin(e);
+                    stellar_access::access_control::renounce_admin(e);
                 }
             },
             syn::parse_quote! {
                 fn transfer_admin_role(e: &soroban_sdk::Env, new_admin: soroban_sdk::Address, live_until_ledger: u32) {
-                    stellar_access_control::transfer_admin_role(e, &new_admin, live_until_ledger);
+                    stellar_access::access_control::transfer_admin_role(e, &new_admin, live_until_ledger);
                 }
             },
             syn::parse_quote! {
                 fn accept_admin_transfer(e: &soroban_sdk::Env) {
-                    stellar_access_control::accept_admin_transfer(e);
+                    stellar_access::access_control::accept_admin_transfer(e);
                 }
             },
             syn::parse_quote! {
                 fn set_role_admin(e: &soroban_sdk::Env, role: soroban_sdk::Symbol, admin_role: soroban_sdk::Symbol) {
-                    stellar_access_control::set_role_admin(e, &role, &admin_role);
+                    stellar_access::access_control::set_role_admin(e, &role, &admin_role);
                 }
             },
         ],
@@ -214,22 +214,22 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
         "Ownable" => vec![
             syn::parse_quote! {
                 fn get_owner(e: &soroban_sdk::Env) -> Option<soroban_sdk::Address> {
-                    stellar_ownable::get_owner(e)
+                    stellar_access::ownable::get_owner(e)
                 }
             },
             syn::parse_quote! {
                 fn transfer_ownership(e: &soroban_sdk::Env, new_owner: soroban_sdk::Address, live_until_ledger: u32) {
-                    stellar_ownable::transfer_ownership(e, &new_owner, live_until_ledger);
+                    stellar_access::ownable::transfer_ownership(e, &new_owner, live_until_ledger);
                 }
             },
             syn::parse_quote! {
                 fn accept_ownership(e: &soroban_sdk::Env) {
-                    stellar_ownable::accept_ownership(e);
+                    stellar_access::ownable::accept_ownership(e);
                 }
             },
             syn::parse_quote! {
                 fn renounce_ownership(e: &soroban_sdk::Env) {
-                    stellar_ownable::renounce_ownership(e);
+                    stellar_access::ownable::renounce_ownership(e);
                 }
             },
         ],

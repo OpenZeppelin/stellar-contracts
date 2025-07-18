@@ -1,6 +1,6 @@
 use soroban_sdk::{panic_with_error, Address, Env, IntoVal, Val};
 
-use crate::RoleTransferError;
+use crate::role_transfer::RoleTransferError;
 
 /// Initiates the role transfer. If `live_until_ledger == 0`, cancels the
 /// pending transfer.

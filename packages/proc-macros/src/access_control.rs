@@ -46,7 +46,7 @@ pub fn generate_role_check(
     let expanded = quote! {
         #(#fn_attrs)*
         #fn_vis #fn_sig {
-            stellar_access_control::ensure_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, #role_str));
+            stellar_access::access_control::ensure_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, #role_str));
             #auth_check
             #fn_block
         }
@@ -175,7 +175,7 @@ pub fn generate_any_role_check(
     };
 
     let combined_checks = quote! {
-        let has_any_role = [#(#roles),*].iter().any(|role| stellar_access_control::has_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, role)).is_some());
+        let has_any_role = [#(#roles),*].iter().any(|role| stellar_access::access_control::has_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, role)).is_some());
         if !has_any_role {
             panic!("Account does not have any of the required roles");
         }

@@ -583,7 +583,7 @@ name = "fungible-allowlist-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access-control",
+ "stellar-access",
  "stellar-proc-macros",
  "stellar-tokens",
 ]
@@ -593,7 +593,7 @@ name = "fungible-blocklist-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access-control",
+ "stellar-access",
  "stellar-proc-macros",
  "stellar-tokens",
 ]
@@ -612,8 +612,8 @@ version = "0.3.0"
 dependencies = [
  "hex-literal",
  "soroban-sdk",
+ "stellar-access",
  "stellar-contract-utils",
- "stellar-ownable",
  "stellar-proc-macros",
  "stellar-tokens",
 ]
@@ -882,7 +882,7 @@ name = "nft-access-control-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access-control",
+ "stellar-access",
  "stellar-proc-macros",
  "stellar-tokens",
 ]
@@ -909,7 +909,7 @@ name = "nft-royalties-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access-control",
+ "stellar-access",
  "stellar-proc-macros",
  "stellar-tokens",
 ]
@@ -979,7 +979,7 @@ name = "ownable-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-ownable",
+ "stellar-access",
  "stellar-proc-macros",
 ]
 
@@ -1219,7 +1219,7 @@ name = "sac-admin-wrapper-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access-control",
+ "stellar-access",
  "stellar-proc-macros",
  "stellar-tokens",
 ]
@@ -1571,12 +1571,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "stellar-access-control"
+name = "stellar-access"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-event-assertion",
- "stellar-role-transfer",
 ]
 
 [[package]]
@@ -1598,28 +1597,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "stellar-ownable"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
- "stellar-event-assertion",
- "stellar-role-transfer",
-]
-
-[[package]]
 name = "stellar-proc-macros"
 version = "0.3.0"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.96",
-]
-
-[[package]]
-name = "stellar-role-transfer"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
 ]
 
 [[package]]
@@ -1797,8 +1780,8 @@ name = "upgrader-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
  "stellar-contract-utils",
- "stellar-ownable",
  "stellar-proc-macros",
 ]
 

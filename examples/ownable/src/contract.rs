@@ -4,7 +4,7 @@
 //! implementing `#[only_owner]` macro on a sensitive function.
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
-use stellar_ownable::{set_owner, Ownable};
+use stellar_access::ownable::{set_owner, Ownable};
 use stellar_proc_macros::{default_impl, only_owner};
 
 #[contracttype]

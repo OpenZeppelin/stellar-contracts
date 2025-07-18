@@ -37,7 +37,7 @@ Here's what a basic fungible token contract might look like:
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
 use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, ContractOverrides, FungibleToken};
-use stellar_ownable::{self as ownable, Ownable};
+use stellar_access::ownable::{self as ownable, Ownable};
 use stellar_ownable_macro::only_owner;
 
 #[contract]

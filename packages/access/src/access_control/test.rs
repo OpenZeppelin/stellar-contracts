@@ -5,7 +5,7 @@ extern crate std;
 use soroban_sdk::{contract, symbol_short, testutils::Address as _, Address, Env, Symbol};
 use stellar_event_assertion::EventAssertion;
 
-use crate::{
+use crate::access_control::{
     accept_admin_transfer, add_to_role_enumeration, ensure_if_admin_or_admin_role, get_admin,
     get_role_admin, get_role_member, get_role_member_count, grant_role, grant_role_no_auth,
     has_role, remove_from_role_enumeration, remove_role_accounts_count_no_auth,

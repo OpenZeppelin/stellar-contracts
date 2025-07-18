@@ -1,5 +1,5 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env};
-use stellar_access_control::{self as access_control, AccessControl};
+use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_proc_macros::{default_impl, has_role, only_admin};
 use stellar_tokens::fungible::{self as fungible, sac_admin_wrapper::SACAdminWrapper};
 

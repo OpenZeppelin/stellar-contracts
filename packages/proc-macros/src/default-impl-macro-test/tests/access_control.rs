@@ -1,7 +1,7 @@
 use soroban_sdk::{
     contract, contractimpl, contracttype, testutils::Address as _, Address, Env, String, Symbol,
 };
-use stellar_access_control::{set_admin, AccessControl};
+use stellar_access::access_control::{set_admin, AccessControl};
 use stellar_access_control_macros::has_role;
 use stellar_default_impl_macro::default_impl;
 use stellar_tokens::fungible::{Base, FungibleToken};

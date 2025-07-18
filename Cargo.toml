@@ -18,7 +18,7 @@ members = [
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
     "examples/upgradeable/*",
-    "packages/access/*",
+    "packages/access",
     "packages/contract-utils",
     "packages/proc-macros",
     "packages/test-utils/*",
@@ -47,12 +47,10 @@ hex-literal = "0.4.1"
 ed25519-dalek = "2.1.1"
 
 # members
-stellar-access-control = { path = "packages/access/access-control" }
+stellar-access = { path = "packages/access" }
 stellar-contract-utils = { path = "packages/contract-utils" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-tokens = { path = "packages/tokens" }
-stellar-ownable = { path = "packages/access/ownable" }
-stellar-role-transfer = { path = "packages/access/role-transfer" }
 stellar-proc-macros = { path = "packages/proc-macros" }
 
 [profile.release]
