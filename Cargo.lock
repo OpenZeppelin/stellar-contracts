@@ -612,8 +612,7 @@ version = "0.3.0"
 dependencies = [
  "hex-literal",
  "soroban-sdk",
- "stellar-crypto",
- "stellar-merkle-distributor",
+ "stellar-contract-utils",
  "stellar-ownable",
  "stellar-proc-macros",
  "stellar-tokens",
@@ -624,7 +623,7 @@ name = "fungible-pausable-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-pausable",
+ "stellar-contract-utils",
  "stellar-proc-macros",
  "stellar-tokens",
 ]
@@ -634,7 +633,7 @@ name = "fungible-token-interface-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-pausable",
+ "stellar-contract-utils",
  "stellar-proc-macros",
  "stellar-tokens",
 ]
@@ -875,8 +874,7 @@ name = "merkle-voting-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-crypto",
- "stellar-merkle-distributor",
+ "stellar-contract-utils",
 ]
 
 [[package]]
@@ -1002,6 +1000,15 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pausable-example"
+version = "0.3.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-contract-utils",
+ "stellar-proc-macros",
+]
 
 [[package]]
 name = "pkcs8"
@@ -1568,25 +1575,18 @@ name = "stellar-access-control"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-constants",
  "stellar-event-assertion",
  "stellar-role-transfer",
 ]
 
 [[package]]
-name = "stellar-constants"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
-name = "stellar-crypto"
+name = "stellar-contract-utils"
 version = "0.3.0"
 dependencies = [
  "hex-literal",
  "proptest",
  "soroban-sdk",
+ "stellar-event-assertion",
 ]
 
 [[package]]
@@ -1598,31 +1598,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "stellar-merkle-distributor"
-version = "0.3.0"
-dependencies = [
- "hex-literal",
- "soroban-sdk",
- "stellar-constants",
- "stellar-crypto",
- "stellar-event-assertion",
-]
-
-[[package]]
 name = "stellar-ownable"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-constants",
  "stellar-event-assertion",
  "stellar-role-transfer",
-]
-
-[[package]]
-name = "stellar-pausable"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
 ]
 
 [[package]]
@@ -1658,15 +1639,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "soroban-test-helpers",
- "stellar-constants",
  "stellar-event-assertion",
-]
-
-[[package]]
-name = "stellar-upgradeable"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
 ]
 
 [[package]]
@@ -1806,8 +1779,8 @@ name = "upgradeable-v1-example"
 version = "1.0.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-contract-utils",
  "stellar-proc-macros",
- "stellar-upgradeable",
 ]
 
 [[package]]
@@ -1815,8 +1788,8 @@ name = "upgradeable-v2-example"
 version = "2.0.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-contract-utils",
  "stellar-proc-macros",
- "stellar-upgradeable",
 ]
 
 [[package]]
@@ -1824,9 +1797,9 @@ name = "upgrader-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-contract-utils",
  "stellar-ownable",
  "stellar-proc-macros",
- "stellar-upgradeable",
 ]
 
 [[package]]

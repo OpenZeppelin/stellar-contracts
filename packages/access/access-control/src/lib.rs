@@ -95,7 +95,7 @@ pub use crate::{
     access_control::{
         emit_admin_renounced, emit_admin_transfer_completed, emit_admin_transfer_initiated,
         emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControl,
-        AccessControlError,
+        AccessControlError, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
     },
     storage::{
         accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,

@@ -17,7 +17,7 @@ pub fn generate_pause_check(item: TokenStream, check_fn: &str) -> TokenStream {
     let output = quote! {
         #(#fn_attrs)* // retain other macros
         #fn_vis #fn_sig {
-            stellar_pausable::#check_ident(#env_arg);
+            stellar_contract_utils::pausable::#check_ident(#env_arg);
 
             #fn_block
         }

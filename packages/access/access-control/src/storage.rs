@@ -1,10 +1,10 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
-use stellar_constants::{ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD};
 use stellar_role_transfer::{accept_transfer, transfer_role};
 
 use crate::{
     emit_admin_renounced, emit_admin_transfer_completed, emit_admin_transfer_initiated,
     emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControlError,
+    ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
 };
 
 /// Storage key for enumeration of accounts per role.

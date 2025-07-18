@@ -1,7 +1,9 @@
 #![cfg(test)]
 
 use soroban_sdk::{testutils::Address as _, xdr::ToXdr, Address, BytesN, Env, Vec};
-use stellar_crypto::{hashable::commutative_hash_pair, hasher::Hasher, sha256::Sha256};
+use stellar_contract_utils::crypto::{
+    hashable::commutative_hash_pair, hasher::Hasher, sha256::Sha256,
+};
 
 use crate::contract::{MerkleVoting, MerkleVotingClient, VoteData};
 

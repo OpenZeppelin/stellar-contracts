@@ -52,7 +52,6 @@ The library has not been published yet to `crates.io`, and this will be the case
 - **v0.3.0 (audited)**
 ```toml
 [dependencies]
-stellar-constants = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
 stellar-default-impl-macro = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
 stellar-event-assertion = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }
 stellar-fungible = { git = "https://github.com/OpenZeppelin/stellar-contracts", tag = "v0.3.0" }

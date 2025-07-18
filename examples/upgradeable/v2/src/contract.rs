@@ -6,8 +6,8 @@
 use soroban_sdk::{
     contract, contracterror, contracttype, panic_with_error, symbol_short, Address, Env, Symbol,
 };
+use stellar_contract_utils::upgradeable::UpgradeableMigratableInternal;
 use stellar_proc_macros::UpgradeableMigratable;
-use stellar_upgradeable::UpgradeableMigratableInternal;
 
 pub const DATA_KEY: Symbol = symbol_short!("DATA_KEY");
 pub const OWNER: Symbol = symbol_short!("OWNER");

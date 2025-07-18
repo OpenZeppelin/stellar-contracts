@@ -1,10 +1,9 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
-use stellar_constants::{ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD};
 
-use crate::{
-    fungible::extensions::allowlist::{emit_user_allowed, emit_user_disallowed},
-    fungible::overrides::{Base, ContractOverrides},
-    fungible::FungibleTokenError,
+use crate::fungible::{
+    extensions::allowlist::{emit_user_allowed, emit_user_disallowed},
+    overrides::{Base, ContractOverrides},
+    FungibleTokenError, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
 pub struct AllowList;

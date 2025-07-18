@@ -1,11 +1,9 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
-use stellar_constants::{
-    BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
-};
 
 use crate::non_fungible::{
     emit_approve, emit_approve_for_all, emit_mint, emit_transfer, sequential::increment_token_id,
-    Base, NonFungibleTokenError, MAX_BASE_URI_LEN, MAX_NUM_DIGITS,
+    Base, NonFungibleTokenError, BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, MAX_BASE_URI_LEN,
+    MAX_NUM_DIGITS, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
 };
 
 /// Storage container for the token for which an approval is granted

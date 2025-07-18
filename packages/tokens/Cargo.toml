@@ -12,7 +12,6 @@ crate-type = ["lib", "cdylib"]
 doctest = false
 
 [dependencies]
-stellar-constants = { workspace = true }
 soroban-sdk = { workspace = true }
 
 [dev-dependencies]

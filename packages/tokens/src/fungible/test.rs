@@ -11,10 +11,11 @@ use soroban_sdk::{
     },
     vec, Address, Env, IntoVal, String,
 };
-use stellar_constants::{BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD};
 use stellar_event_assertion::EventAssertion;
 
-use crate::fungible::{Base, StorageKey};
+use crate::fungible::{
+    Base, StorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
+};
 
 #[contract]
 struct MockContract;

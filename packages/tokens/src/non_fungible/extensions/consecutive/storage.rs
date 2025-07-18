@@ -1,17 +1,15 @@
 use core::mem;
 
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, String, TryFromVal, Val, Vec};
-use stellar_constants::{
-    OWNERSHIP_EXTEND_AMOUNT, OWNERSHIP_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
-    TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
-};
 
 use crate::non_fungible::{
     burnable::emit_burn,
     emit_transfer,
     extensions::consecutive::emit_consecutive_mint,
     sequential::{self as sequential},
-    ContractOverrides, Base, NonFungibleTokenError,
+    Base, ContractOverrides, NonFungibleTokenError, OWNERSHIP_EXTEND_AMOUNT,
+    OWNERSHIP_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT,
+    TOKEN_TTL_THRESHOLD,
 };
 
 pub struct Consecutive;

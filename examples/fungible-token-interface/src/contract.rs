@@ -17,7 +17,7 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, token::TokenInterface,
     Address, Env, String, Symbol,
 };
-use stellar_pausable::{self as pausable, Pausable};
+use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_proc_macros::when_not_paused;
 use stellar_tokens::fungible::Base;
 

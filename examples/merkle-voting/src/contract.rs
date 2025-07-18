@@ -16,8 +16,8 @@
 //! This pattern is useful for snapshot-based governance systems or off-chain
 //! voter lists.
 use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, Vec};
-use stellar_crypto::sha256::Sha256;
-use stellar_merkle_distributor::{IndexableLeaf, MerkleDistributor};
+use stellar_contract_utils::crypto::sha256::Sha256;
+use stellar_contract_utils::merkle_distributor::{IndexableLeaf, MerkleDistributor};
 
 type Distributor = MerkleDistributor<Sha256>;
 

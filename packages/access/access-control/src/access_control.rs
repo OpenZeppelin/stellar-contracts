@@ -228,6 +228,8 @@ pub trait AccessControl {
     fn renounce_admin(e: &Env);
 }
 
+// ################## ERRORS ##################
+
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
@@ -242,6 +244,12 @@ pub enum AccessControlError {
     RoleNotHeld = 1217,
     RoleIsEmpty = 1218,
 }
+
+// ################## CONSTANTS ##################
+
+const DAY_IN_LEDGERS: u32 = 17280;
+pub const ROLE_EXTEND_AMOUNT: u32 = 90 * DAY_IN_LEDGERS;
+pub const ROLE_TTL_THRESHOLD: u32 = ROLE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 // ################## EVENTS ##################
 

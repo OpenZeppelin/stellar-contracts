@@ -1,9 +1,9 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
-use stellar_constants::{
-    OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
-};
 
-use crate::non_fungible::{emit_mint, Base, ContractOverrides, NonFungibleTokenError};
+use crate::non_fungible::{
+    emit_mint, Base, ContractOverrides, NonFungibleTokenError, OWNER_EXTEND_AMOUNT,
+    OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
+};
 
 pub struct Enumerable;
 

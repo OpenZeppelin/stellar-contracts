@@ -4,22 +4,22 @@ members = [
     "examples/fungible-allowlist",
     "examples/fungible-blocklist",
     "examples/fungible-capped",
+    "examples/fungible-merkle-airdrop",
     "examples/fungible-pausable",
     "examples/fungible-token-interface",
-    "examples/fungible-merkle-airdrop",
+    "examples/merkle-voting",
     "examples/nft-access-control",
     "examples/nft-consecutive",
     "examples/nft-enumerable",
-    "examples/nft-sequential-minting",
     "examples/nft-royalties",
-    "examples/sac-admin-wrapper",
-    "examples/sac-admin-generic",
+    "examples/nft-sequential-minting",
     "examples/ownable",
-    "examples/merkle-voting",
+    "examples/pausable",
+    "examples/sac-admin-generic",
+    "examples/sac-admin-wrapper",
     "examples/upgradeable/*",
-    "packages/constants",
     "packages/access/*",
-    "packages/contract-utils/*",
+    "packages/contract-utils",
     "packages/proc-macros",
     "packages/test-utils/*",
     "packages/tokens",
@@ -48,15 +48,11 @@ ed25519-dalek = "2.1.1"
 
 # members
 stellar-access-control = { path = "packages/access/access-control" }
-stellar-constants = { path = "packages/constants" }
+stellar-contract-utils = { path = "packages/contract-utils" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-tokens = { path = "packages/tokens" }
 stellar-ownable = { path = "packages/access/ownable" }
-stellar-pausable = { path = "packages/contract-utils/pausable" }
 stellar-role-transfer = { path = "packages/access/role-transfer" }
-stellar-upgradeable = { path = "packages/contract-utils/upgradeable" }
-stellar-crypto = { path = "packages/contract-utils/crypto" }
-stellar-merkle-distributor = { path = "packages/contract-utils/merkle-distributor" }
 stellar-proc-macros = { path = "packages/proc-macros" }
 
 [profile.release]
