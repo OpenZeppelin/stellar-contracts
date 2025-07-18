@@ -30,6 +30,9 @@ authors = ["OpenZeppelin"]
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/OpenZeppelin/stellar-contracts"
+documentation = "https://docs.openzeppelin.com/stellar-contracts/"
+keywords = ["stellar", "soroban", "smart-contracts", "standards"]
+categories = ["no-std", "wasm"]
 version = "0.3.0"
 
 [workspace.dependencies]
