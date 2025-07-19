@@ -97,8 +97,8 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// as a method in this trait because it is not a part of the SEP-41 standard,
 /// the function signature may change depending on the implementation.
 ///
-/// We do provide a function [`crate::Base::mint`] for minting to cover the
-/// general use case.
+/// We do provide a function [`crate::fungible::Base::mint`] for minting to
+/// cover the general use case.
 ///
 /// # Notes
 ///
@@ -107,8 +107,8 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// the default implementations here, but we are providing a macro to generate
 /// them.
 ///
-/// When implementing [`NonFungibleToken`] trait for your Smart Contract,
-/// you can follow the below example:
+/// When implementing [`crate::non_fungible::NonFungibleToken`] trait for your
+/// Smart Contract, you can follow the below example:
 ///
 /// ```ignore
 /// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
@@ -122,29 +122,27 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// ```
 ///
 /// This trait is implemented for the following Contract Types:
-/// * [`crate::Base`] (covering the vanilla case, and compatible with
-///   [`crate::extensions::burnable::FungibleBurnable`]) trait
-/// * [`crate::extensions::allowlist::AllowList`] (enabling the compatibility
-///   and overrides for [`crate::extensions::allowlist::FungibleAllowList`])
-///   trait, incompatible with [`crate::extensions::blocklist::BlockList`]
-///   trait.
-/// * [`crate::extensions::blocklist::BlockList`] (enabling the compatibility
-///   and overrides for [`crate::extensions::blocklist::FungibleBlockList`])
-///   trait, incompatible with [`crate::extensions::allowlist::AllowList`]
-///   trait.
+/// * [`crate::fungible::Base`] (covering the vanilla case, and compatible with
+///   [`crate::fungible::burnable::FungibleBurnable`]) trait
+/// * [`crate::fungible::allowlist::AllowList`] (enabling the compatibility and
+///   overrides for [`crate::fungible::allowlist::FungibleAllowList`]) trait,
+///   incompatible with [`crate::fungible::blocklist::BlockList`] trait.
+/// * [`crate::fungible::blocklist::BlockList`] (enabling the compatibility and
+///   overrides for [`crate::fungible::blocklist::FungibleBlockList`]) trait,
+///   incompatible with [`crate::fungible::allowlist::AllowList`] trait.
 ///
 /// You can find the default implementations of this trait for `Base`,
 /// `Allowlist`, and `Blocklist` by navigating to:
 /// `ContractType::{method_name}`. For example, if you want to find how
 /// [`FungibleToken::transfer`] is implemented for the `Allowlist` contract
 /// type, you can find it using
-/// [`crate::extensions::allowlist::AllowList::transfer`].
+/// [`crate::fungible::allowlist::AllowList::transfer`].
 pub trait FungibleToken {
     /// Helper type that allows us to override some of the functionality of the
     /// base trait based on the extensions implemented. You should use
-    /// [`crate::Base`] as the type if you are not using
-    /// [`crate::extensions::allowlist::AllowList`] or
-    /// [`crate::extensions::blocklist::BlockList`] extensions.
+    /// [`crate::fungible::Base`] as the type if you are not using
+    /// [`crate::fungible::allowlist::AllowList`] or
+    /// [`crate::fungible::blocklist::BlockList`] extensions.
     type ContractType: ContractOverrides;
 
     /// Returns the total amount of tokens in circulation.

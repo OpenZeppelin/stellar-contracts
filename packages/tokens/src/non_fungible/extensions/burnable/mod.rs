@@ -66,10 +66,10 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`crate::NonFungibleTokenError::NonExistentToken`] - When attempting
-    ///   to burn a token that does not exist.
-    /// * [`crate::NonFungibleTokenError::IncorrectOwner`] - If the current
-    ///   owner (before calling this function) is not `from`.
+    /// * [`crate::non_fungible::NonFungibleTokenError::NonExistentToken`] -
+    ///   When attempting to burn a token that does not exist.
+    /// * [`crate::non_fungible::NonFungibleTokenError::IncorrectOwner`] - If
+    ///   the current owner (before calling this function) is not `from`.
     ///
     /// # Events
     ///
@@ -90,12 +90,12 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`crate::NonFungibleTokenError::NonExistentToken`] - When attempting
-    ///   to burn a token that does not exist.
-    /// * [`crate::NonFungibleTokenError::IncorrectOwner`] - If the current
-    ///   owner (before calling this function) is not `from`.
-    /// * [`crate::NonFungibleTokenError::InsufficientApproval`] - If the
-    ///   spender does not have a valid approval.
+    /// * [`crate::non_fungible::NonFungibleTokenError::NonExistentToken`] -
+    ///   When attempting to burn a token that does not exist.
+    /// * [`crate::non_fungible::NonFungibleTokenError::IncorrectOwner`] - If
+    ///   the current owner (before calling this function) is not `from`.
+    /// * [`crate::non_fungible::NonFungibleTokenError::InsufficientApproval`] -
+    ///   If the spender does not have a valid approval.
     ///
     /// # Events
     ///

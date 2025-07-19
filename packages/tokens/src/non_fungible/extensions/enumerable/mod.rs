@@ -69,8 +69,8 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
     /// owner's local list. Use along with
-    /// [`crate::NonFungibleToken::balance()`] to enumerate all of `owner`'s
-    /// tokens.
+    /// [`crate::non_fungible::NonFungibleToken::balance`] to enumerate all of
+    /// `owner`'s tokens.
     ///
     /// # Arguments
     ///
@@ -80,14 +80,14 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     fn get_owner_token_id(e: &Env, owner: Address, index: u32) -> u32;
 
     /// Returns the `token_id` at a given `index` in the global token list.
-    /// Use along with [`NonFungibleEnumerable::total_supply()`] to enumerate
+    /// Use along with [`NonFungibleEnumerable::total_supply`] to enumerate
     /// all the tokens in the contract.
     ///
     /// We do not provide a function to get all the tokens of a contract,
     /// since that would be unbounded. If you need to enumerate all the
     /// tokens of a contract, you can use
-    /// [`NonFungibleEnumerable::total_supply()`] to get the total number of
-    /// tokens and then use [`NonFungibleEnumerable::get_token_id()`] to get
+    /// [`NonFungibleEnumerable::total_supply`] to get the total number of
+    /// tokens and then use [`NonFungibleEnumerable::get_token_id`] to get
     /// each token one by one.
     ///
     /// # Arguments

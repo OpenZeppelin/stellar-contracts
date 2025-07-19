@@ -148,7 +148,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`get_metadata`] errors.
+    /// * refer to [`Base::get_metadata`] errors.
     pub fn name(e: &Env) -> String {
         Base::get_metadata(e).name
     }
@@ -161,7 +161,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`get_metadata`] errors.
+    /// * refer to [`Base::get_metadata`] errors.
     pub fn symbol(e: &Env) -> String {
         Base::get_metadata(e).symbol
     }
@@ -174,7 +174,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`get_metadata`] errors.
+    /// * refer to [`Base::get_metadata`] errors.
     pub fn base_uri(e: &Env) -> String {
         Base::get_metadata(e).base_uri
     }
@@ -188,8 +188,8 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`owner_of`] errors.
-    /// * refer to [`base_uri`] errors.
+    /// * refer to [`Base::owner_of`] errors.
+    /// * refer to [`Base::base_uri`] errors.
     pub fn token_uri(e: &Env, token_id: u32) -> String {
         // used to panic if non-existent token_id
         let _ = Base::owner_of(e, token_id);
@@ -238,7 +238,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`update`] errors.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///
@@ -269,8 +269,8 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`check_spender_approval`] errors.
-    /// * refer to [`update`] errors.
+    /// * refer to [`Base::check_spender_approval`] errors.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///
@@ -306,8 +306,8 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`owner_of`] errors.
-    /// * refer to [`approve_for_owner`] errors.
+    /// * refer to [`Base::owner_of`] errors.
+    /// * refer to [`Base::approve_for_owner`] errors.
     ///
     /// # Events
     ///
@@ -402,9 +402,9 @@ impl Base {
     ///
     /// * [`NonFungibleTokenError::IncorrectOwner`] - If the `from` address is
     ///   not the owner of the token.
-    /// * refer to [`owner_of`] errors.
-    /// * refer to [`decrease_balance`] errors.
-    /// * refer to [`increase_balance`] errors.
+    /// * refer to [`Base::owner_of`] errors.
+    /// * refer to [`Base::decrease_balance`] errors.
+    /// * refer to [`Base::increase_balance`] errors.
     pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
         if let Some(from_address) = from {
             let owner = Base::owner_of(e, token_id);
@@ -628,7 +628,7 @@ impl Base {
     /// # Errors
     ///
     /// * refer to [`increment_token_id`] errors.
-    /// * refer to [`update`] errors.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///
@@ -675,7 +675,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`update`] errors.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///

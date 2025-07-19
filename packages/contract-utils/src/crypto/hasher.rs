@@ -8,7 +8,7 @@ use soroban_sdk::{Bytes, Env};
 /// `Hasher` provides a fairly basic interface for retrieving the generated hash
 /// (with [`Hasher::finalize`]), and absorbing an arbitrary number of bytes
 /// (with [`Hasher::update`]). Most of the time, [`Hasher`] instances are used
-/// in conjunction with the [`Hashable`] trait.
+/// in conjunction with the [`crate::crypto::hashable::Hashable`] trait.
 pub trait Hasher {
     type Output;
 
@@ -30,7 +30,7 @@ pub trait Hasher {
     ///
     /// # Errors
     ///
-    /// * [`crate::error::CryptoError::HasherEmptyState`] - When the state is
-    ///   empty.
+    /// * [`crate::crypto::error::CryptoError::HasherEmptyState`] - When the
+    ///   state is empty.
     fn finalize(self) -> Self::Output;
 }

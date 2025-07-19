@@ -246,11 +246,11 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If
+    /// * [`crate::role_transfer::RoleTransferError::NoPendingTransfer`] - If
     ///   trying to cancel a transfer that doesn't exist.
-    /// * [`stellar_role_transfer::RoleTransferError::InvalidLiveUntilLedger`] -
+    /// * [`crate::role_transfer::RoleTransferError::InvalidLiveUntilLedger`] -
     ///   If the specified ledger is in the past.
-    /// * [`stellar_role_transfer::RoleTransferError::InvalidPendingAccount`] -
+    /// * [`crate::role_transfer::RoleTransferError::InvalidPendingAccount`] -
     ///   If the specified pending account is not the same as the provided `new`
     ///   address.
     /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
@@ -278,7 +278,7 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`stellar_role_transfer::RoleTransferError::NoPendingTransfer`] - If
+    /// * [`crate::role_transfer::RoleTransferError::NoPendingTransfer`] - If
     ///   there is no pending transfer to accept.
     /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
     fn accept_admin_transfer(e: &Env);

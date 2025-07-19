@@ -31,9 +31,10 @@ pub trait FungibleBurnable: FungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`crate::FungibleTokenError::InsufficientBalance`] - When attempting
-    ///   to burn more tokens than `from` current balance.
-    /// * [`FungibleTokenError::LessThanZero`] - When `amount < 0`.
+    /// * [`crate::fungible::FungibleTokenError::InsufficientBalance`] - When
+    ///   attempting to burn more tokens than `from` current balance.
+    /// * [`crate::fungible::FungibleTokenError::LessThanZero`] - When `amount <
+    ///   0`.
     ///
     /// # Events
     ///
@@ -53,11 +54,12 @@ pub trait FungibleBurnable: FungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`crate::FungibleTokenError::InsufficientBalance`] - When attempting
-    ///   to burn more tokens than `from` current balance.
-    /// * [`crate::FungibleTokenError::InsufficientAllowance`] - When attempting
-    ///   to burn more tokens than `from` allowance.
-    /// * [`FungibleTokenError::LessThanZero`] - When `amount < 0`.
+    /// * [`crate::fungible::FungibleTokenError::InsufficientBalance`] - When
+    ///   attempting to burn more tokens than `from` current balance.
+    /// * [`crate::fungible::FungibleTokenError::InsufficientAllowance`] - When
+    ///   attempting to burn more tokens than `from` allowance.
+    /// * [`crate::fungible::FungibleTokenError::LessThanZero`] - When `amount <
+    ///   0`.
     ///
     /// # Events
     ///

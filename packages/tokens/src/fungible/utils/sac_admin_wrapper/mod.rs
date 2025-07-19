@@ -92,10 +92,10 @@ pub trait SACAdminWrapper {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::sac_admin_wrapper::set_admin()`] when
-    /// implementing this function in conjunction with `stellar_ownable` or
-    /// `stellar_access_control` crates. Otherwise, authorizations MUST be
-    /// diligently checked.
+    /// We recommend using [`crate::fungible::sac_admin_wrapper::set_admin`]
+    /// when implementing this function in conjunction with
+    /// `stellar_ownable` or `stellar_access_control` crates. Otherwise,
+    /// authorizations MUST be diligently checked.
     fn set_admin(e: Env, new_admin: Address, operator: Address);
 
     /// Sets whether the account is authorized to use its balance. If
@@ -110,7 +110,8 @@ pub trait SACAdminWrapper {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::sac_admin_wrapper::set_authorized()`] when
+    /// We recommend using
+    /// [`crate::fungible::sac_admin_wrapper::set_authorized`] when
     /// implementing this function in conjunction with `stellar_ownable` or
     /// `stellar_access_control` crates. Otherwise, authorizations MUST be
     /// diligently checked.
@@ -127,7 +128,7 @@ pub trait SACAdminWrapper {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::sac_admin_wrapper::mint()`] when
+    /// We recommend using [`crate::fungible::sac_admin_wrapper::mint`] when
     /// implementing this function in conjunction with `stellar_ownable` or
     /// `stellar_access_control` crates. Otherwise, authorizations MUST be
     /// diligently checked.
@@ -146,9 +147,9 @@ pub trait SACAdminWrapper {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::sac_admin_wrapper::clawback()`] when
-    /// implementing this function in conjunction with `stellar_ownable` or
-    /// `stellar_access_control` crates. Otherwise, authorizations MUST be
-    /// diligently checked.
+    /// We recommend using [`crate::fungible::sac_admin_wrapper::clawback`]
+    /// when implementing this function in conjunction with
+    /// `stellar_ownable` or `stellar_access_control` crates. Otherwise,
+    /// authorizations MUST be diligently checked.
     fn clawback(e: Env, from: Address, amount: i128, operator: Address);
 }

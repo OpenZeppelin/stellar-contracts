@@ -1,8 +1,8 @@
 use soroban_sdk::{Address, Env, String};
 
-/// Based on the extension, some default behavior of [`crate::FungibleToken`]
-/// might have to be overridden. This is a helper trait that allows us this
-/// override mechanism that favors the DevX.
+/// Based on the extension, some default behavior of
+/// [`crate::fungible::FungibleToken`] might have to be overridden. This is a
+/// helper trait that allows us this override mechanism that favors the DevX.
 ///
 /// One can also override the `FungibleToken` trait directly, but the reason
 /// we have another helper trait for the same methods, is to provide the default

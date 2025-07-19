@@ -47,9 +47,8 @@ impl Enumerable {
     }
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
-    /// owner's local list. Use along with
-    /// [`crate::NonFungibleToken::balance()`] to enumerate all of `owner`'s
-    /// tokens.
+    /// owner's local list. Use along with [`Base::balance`] to enumerate all of
+    /// `owner`'s tokens.
     ///
     /// # Arguments
     ///
@@ -73,8 +72,8 @@ impl Enumerable {
     }
 
     /// Returns the `token_id` at a given `index` in the global token list.
-    /// Use along with [`NonFungibleEnumerable::total_supply()`] to enumerate
-    /// all the tokens in the contract.
+    /// Use along with [`Enumerable::total_supply`] to enumerate all the tokens
+    /// in the contract.
     ///
     /// # Arguments
     ///
@@ -108,7 +107,7 @@ impl Enumerable {
     /// # Errors
     ///
     /// * refer to [`Base::sequential_mint`] errors.
-    /// * refer to [`increment_total_supply`] errors.
+    /// * refer to [`Enumerable::increment_total_supply`] errors.
     ///
     /// # Events
     ///
@@ -139,11 +138,12 @@ impl Enumerable {
     /// admin.require_auth();
     /// ```
     ///
-    /// **IMPORTANT**: This function utilizes [`increment_token_id()`] to
-    /// determine the next `token_id`, but it does NOT check if that
-    /// `token_id` is already in use. If the developer has other means of
-    /// minting tokens and generating `token_id`s, they should ensure that
-    /// the `token_id` is unique and not already in use.
+    /// **IMPORTANT**: This function utilizes
+    /// [`crate::non_fungible::sequential::increment_token_id`] to determine
+    /// the next `token_id`, but it does NOT check if that `token_id` is
+    /// already in use. If the developer has other means of minting tokens
+    /// and generating `token_id`s, they should ensure that the `token_id`
+    /// is unique and not already in use.
     pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
         let token_id = Base::sequential_mint(e, to);
 
@@ -163,7 +163,7 @@ impl Enumerable {
     /// # Errors
     ///
     /// * refer to [`Base::update`] errors.
-    /// * refer to [`increment_total_supply`] errors.
+    /// * refer to [`Enumerable::increment_total_supply`] errors.
     ///
     /// # Events
     ///
@@ -179,7 +179,7 @@ impl Enumerable {
     /// # Security Warning
     ///
     /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
+    ///Base
     /// It is the responsibility of the implementer to establish appropriate
     /// access controls to ensure that only authorized accounts can execute
     /// minting operations. Failure to implement proper authorization could
@@ -215,8 +215,8 @@ impl Enumerable {
     /// # Errors
     ///
     /// * refer to [`Base::burn`] errors.
-    /// * refer to [`remove_from_owner_enumeration`] errors.
-    /// * refer to [`remove_from_global_enumeration`] errors.
+    /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
+    /// * refer to [`Enumerable::remove_from_global_enumeration`] errors.
     ///
     /// # Events
     ///
@@ -225,7 +225,7 @@ impl Enumerable {
     ///
     /// # Notes
     ///
-    /// This is a wrapper around [`Base::burn()`], that also
+    /// This is a wrapper around [`Base::burn`], that also
     /// handles the storage updates for:
     /// * total supply
     /// * owner_tokens enumeration
@@ -250,8 +250,8 @@ impl Enumerable {
     /// # Errors
     ///
     /// * refer to [`Base::burn_from`] errors.
-    /// * refer to [`remove_from_owner_enumeration`] errors.
-    /// * refer to [`remove_from_global_enumeration`] errors.
+    /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
+    /// * refer to [`Enumerable::remove_from_global_enumeration`] errors.
     ///
     /// # Events
     ///
@@ -260,7 +260,7 @@ impl Enumerable {
     ///
     /// # Notes
     ///
-    /// This is a wrapper around [`Base::burn_from()`], that also
+    /// This is a wrapper around [`Base::burn_from`], that also
     /// handles the storage updates for:
     /// * total supply
     /// * owner_tokens enumeration
@@ -283,7 +283,7 @@ impl Enumerable {
     /// # Errors
     ///
     /// * refer to [`Base::transfer`] errors.
-    /// * refer to [`remove_from_owner_enumeration`] errors.
+    /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
     ///
     /// # Events
     ///
@@ -318,7 +318,7 @@ impl Enumerable {
     /// # Errors
     ///
     /// * refer to [`Base::transfer_from`] errors.
-    /// * refer to [`remove_from_owner_enumeration`] errors.
+    /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
     ///
     /// # Events
     ///
@@ -389,8 +389,8 @@ impl Enumerable {
     ///
     /// # Errors
     ///
-    /// * refer to [`add_to_owner_enumeration`] errors.
-    /// * refer to [`increment_total_supply`] errors.
+    /// * refer to [`Enumerable::add_to_owner_enumeration`] errors.
+    /// * refer to [`Enumerable::increment_total_supply`] errors.
     pub fn add_to_enumerations(e: &Env, owner: &Address, token_id: u32) {
         Enumerable::add_to_owner_enumeration(e, owner, token_id);
         let total_supply = Enumerable::increment_total_supply(e);
@@ -407,9 +407,9 @@ impl Enumerable {
     ///
     /// # Errors
     ///
-    /// * refer to [`remove_from_owner_enumeration`] errors.
-    /// * refer to [`decrement_total_supply`] errors.
-    /// * refer to [`remove_from_global_enumeration`] errors.
+    /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
+    /// * refer to [`Enumerable::decrement_total_supply`] errors.
+    /// * refer to [`Enumerable::remove_from_global_enumeration`] errors.
     pub fn remove_from_enumerations(e: &Env, owner: &Address, token_id: u32) {
         Enumerable::remove_from_owner_enumeration(e, owner, token_id);
         let total_supply = Enumerable::decrement_total_supply(e);
