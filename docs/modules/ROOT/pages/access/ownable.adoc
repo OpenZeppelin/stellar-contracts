@@ -3,7 +3,7 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Ownable
 
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/access/ownable[Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/access/src/ownable[Source Code]
 
 == Overview
 
@@ -54,7 +54,7 @@ Here's a simple example of using the Ownable module:
 ----
 use soroban_sdk::{contract, contractimpl, Address, Env};
 use stellar_access::ownable::{self as ownable, Ownable};
-use stellar_ownable_macro::only_owner;
+use stellar_proc_macros::only_owner;
 
 #[contract]
 pub struct MyContract;
@@ -97,6 +97,6 @@ impl MyContract {
 
 == See Also
 
-* xref:utils/access/access-control.adoc[Access Control]
+* xref:access/access-control.adoc[Access Control]
 * xref:tokens/fungible/fungible.adoc[Fungible Token]
 * xref:tokens/non-fungible/non-fungible.adoc[Non-Fungible Token]

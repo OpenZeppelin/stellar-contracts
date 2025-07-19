@@ -3,7 +3,7 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Non-Fungible Enumerable
 
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/non-fungible/src/extensions/enumerable[Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/src/non-fungible/extensions/enumerable[Source Code]
 
 Enumerable extension for xref:tokens/non-fungible/non-fungible.adoc[Non-Fungible Token] allows for enumeration
 of all the token IDs in the contract as well as all the token IDs owned by each account. This is
@@ -18,7 +18,7 @@ can call `award_item` and we might want to implement access control to restrict 
 [source,rust]
 ----
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_default_impl_macro::default_impl;
+use stellar_proc_macros::default_impl;
 use stellar_tokens::non_fungible::{
     enumerable::{Enumerable, NonFungibleEnumerable},
     Base, ContractOverrides, NonFungibleToken,
