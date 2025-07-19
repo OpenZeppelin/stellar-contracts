@@ -2,9 +2,8 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{symbol_short, Env};
 
-use crate::FungibleToken;
 
 /// Burnable Trait for Fungible Token
 ///
@@ -19,7 +18,8 @@ use crate::FungibleToken;
 /// Excluding the `burn` functionality from the `[FungibleToken]` trait
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
-pub trait FungibleBurnable: FungibleToken {
+#[soroban_sdk::contracttrait(default = Base, is_extension = true)]
+pub trait FungibleBurnable {
     /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.
     ///
@@ -39,7 +39,7 @@ pub trait FungibleBurnable: FungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[amount: i128]`
-    fn burn(e: &Env, from: Address, amount: i128);
+    fn burn(e: &Env, from: &soroban_sdk::Address, amount: i128);
 
     /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.
@@ -63,7 +63,7 @@ pub trait FungibleBurnable: FungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[amount: i128]`
-    fn burn_from(e: &Env, spender: Address, from: Address, amount: i128);
+    fn burn_from(e: &Env, spender: &soroban_sdk::Address, from: &soroban_sdk::Address, amount: i128);
 }
 
 // ################## EVENTS ##################
@@ -80,7 +80,7 @@ pub trait FungibleBurnable: FungibleToken {
 ///
 /// * topics - `["burn", from: Address]`
 /// * data - `[amount: i128]`
-pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
+pub fn emit_burn(e: &Env, from: &soroban_sdk::Address, amount: i128) {
     let topics = (symbol_short!("burn"), from);
     e.events().publish(topics, amount)
 }

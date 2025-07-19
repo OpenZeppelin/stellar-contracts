@@ -15,6 +15,7 @@ soroban-sdk = { workspace = true }
 stellar-pausable = { workspace = true }
 stellar-pausable-macros = { workspace = true }
 stellar-fungible = { workspace = true }
+stellar-ownable = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

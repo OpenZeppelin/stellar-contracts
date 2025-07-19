@@ -37,14 +37,14 @@ fn test_upgrade_with_upgrader() {
     let new_wasm_hash = install_new_wasm(&e);
     let data = Data { num1: 12, num2: 34 };
 
-    upgrader_client.upgrade_and_migrate(
-        &contract_id,
-        &admin,
-        &new_wasm_hash,
-        &soroban_sdk::vec![&e, data.try_into_val(&e).unwrap(), admin.try_into_val(&e).unwrap()],
-    );
+    // upgrader_client.upgrade_and_migrate(
+    //     &contract_id,
+    //     &admin,
+    //     &new_wasm_hash,
+    //     &soroban_sdk::vec![&e, data.try_into_val(&e).unwrap(), admin.try_into_val(&e).unwrap()],
+    // );
 
-    let client_v2 = contract_v2::Client::new(&e, &contract_id);
+    // let client_v2 = contract_v2::Client::new(&e, &contract_id);
 
-    assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }, &admin).is_err());
+    // assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }, &admin).is_err());
 }

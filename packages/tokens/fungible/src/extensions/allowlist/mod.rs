@@ -1,4 +1,4 @@
-pub mod storage;
+mod storage;
 
 #[cfg(test)]
 mod test;
@@ -6,7 +6,6 @@ mod test;
 use soroban_sdk::{symbol_short, Address, Env};
 pub use storage::AllowList;
 
-use crate::FungibleToken;
 
 /// AllowList Trait for Fungible Token
 ///
@@ -29,14 +28,16 @@ use crate::FungibleToken;
 /// However, this parameter is omitted from the module functions, defined in
 /// "storage.rs", because the authorizations are to be handled in the access
 /// control helpers or directly implemented.
-pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
+#[soroban_sdk::contracttrait(default = AllowList, is_extension = true, extension_required = true)]
+pub trait FungibleAllowList {
+
     /// Returns the allowed status of an account.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to check the allowed status for.
-    fn allowed(e: &Env, account: Address) -> bool;
+    fn allowed(e: &Env, account: &soroban_sdk::Address) -> bool;
 
     /// Allows a user to receive and transfer tokens.
     ///
@@ -50,7 +51,7 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * topics - `["allow", user: Address]`
     /// * data - `[]`
-    fn allow_user(e: &Env, user: Address, operator: Address);
+    fn allow_user(e: &Env, user: &soroban_sdk::Address, operator: &soroban_sdk::Address);
 
     /// Disallows a user from receiving and transferring tokens.
     ///
@@ -64,7 +65,7 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * topics - `["disallow", user: Address]`
     /// * data - `[]`
-    fn disallow_user(e: &Env, user: Address, operator: Address);
+    fn disallow_user(e: &Env, user: &soroban_sdk::Address, operator: &soroban_sdk::Address);
 }
 
 // ################## EVENTS ##################

@@ -68,17 +68,21 @@
 //!   `INSTANCE_TTL_THRESHOLD` and `INSTANCE_EXTEND_AMOUNT`.
 #![no_std]
 
-mod extensions;
-mod fungible;
-mod impl_token_interface_macro;
-mod overrides;
-mod storage;
-mod utils;
+pub(crate) mod extensions;
+pub(crate) mod fungible;
+pub(crate) mod impl_token_interface_macro;
+pub(crate) mod overrides;
+pub(crate) mod storage;
+pub(crate) mod utils;
 
 pub use extensions::{allowlist, blocklist, burnable, capped};
-pub use fungible::{emit_approve, emit_transfer, FungibleToken, FungibleTokenError};
-pub use overrides::{Base, ContractOverrides};
-pub use storage::{AllowanceData, AllowanceKey, StorageKey};
-pub use utils::{sac_admin_generic, sac_admin_wrapper};
+
+pub use extensions::{allowlist::*, blocklist::*, burnable::*};
+pub use fungible::*;
+pub use storage::{AllowanceData, AllowanceKey, Base, StorageKey};
+pub use utils::{
+    sac_admin_generic, sac_admin_wrapper,
+    sac_admin_wrapper::{DefaultSacAdminWrapper, SACAdminWrapper},
+};
 
 mod test;

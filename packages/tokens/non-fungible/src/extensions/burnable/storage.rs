@@ -1,8 +1,9 @@
 use soroban_sdk::{Address, Env};
 
-use crate::{extensions::burnable::emit_burn, Base};
+use crate::{burnable::NonFungibleBurnable, extensions::burnable::emit_burn, Base};
 
-impl Base {
+impl NonFungibleBurnable for Base {
+    type Impl = Self;
     /// Destroys the token with `token_id` from `from`, ensuring ownership
     /// checks, and emits a `burn` event.
     ///
@@ -24,7 +25,7 @@ impl Base {
     /// # Notes
     ///
     /// Authorization for `from` is required.
-    pub fn burn(e: &Env, from: &Address, token_id: u32) {
+    fn burn(e: &Env, from: &Address, token_id: u32) {
         from.require_auth();
         Base::update(e, Some(from), None, token_id);
         emit_burn(e, from, token_id);
@@ -54,7 +55,7 @@ impl Base {
     /// # Notes
     ///
     /// Authorization for `spender` is required.
-    pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+    fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
         spender.require_auth();
         Base::check_spender_approval(e, spender, from, token_id);
         Base::update(e, Some(from), None, token_id);

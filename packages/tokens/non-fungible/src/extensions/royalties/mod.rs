@@ -1,9 +1,8 @@
 mod storage;
-use crate::NonFungibleToken;
 
 mod test;
 
-use soroban_sdk::{Address, Env, Symbol};
+use soroban_sdk::{contracttrait, Address, Env, Symbol};
 
 /// Royalties Trait for Non-Fungible Token (ERC2981)
 ///
@@ -45,7 +44,8 @@ use soroban_sdk::{Address, Env, Symbol};
 ///     /* and the macro will generate all the missing default implementations for you */
 /// }
 /// ```
-pub trait NonFungibleRoyalties: NonFungibleToken {
+#[contracttrait(default = Base, extension_required = true)]
+pub trait NonFungibleRoyalties {
     /// Sets the global default royalty information for the entire collection.
     /// This will be used for all tokens that don't have specific royalty
     /// information.
@@ -67,7 +67,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * topics - `["set_default_royalty", receiver: Address]`
     /// * data - `[basis_points: u32]`
-    fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32, operator: Address);
+    fn set_default_royalty(e: &Env, receiver: &soroban_sdk::Address, basis_points: u32, operator: &soroban_sdk::Address);
 
     /// Sets the royalty information for a specific token.
     ///
@@ -94,9 +94,9 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     fn set_token_royalty(
         e: &Env,
         token_id: u32,
-        receiver: Address,
+        receiver: &soroban_sdk::Address,
         basis_points: u32,
-        operator: Address,
+        operator: &soroban_sdk::Address,
     );
 
     /// Removes token-specific royalty information, allowing the token to fall
@@ -117,7 +117,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * topics - `["remove_token_royalty", token_id: u32]`
     /// * data - `[]`
-    fn remove_token_royalty(e: &Env, token_id: u32, operator: Address);
+    fn remove_token_royalty(e: &Env, token_id: u32, operator: &soroban_sdk::Address);
 
     /// Returns `(Address, i128)` - A tuple containing the receiver address and
     /// the royalty amount.
@@ -133,7 +133,7 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
     ///   not exist.
-    fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128);
+    fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (soroban_sdk::Address, i128);
 }
 
 // ################## EVENTS ##################

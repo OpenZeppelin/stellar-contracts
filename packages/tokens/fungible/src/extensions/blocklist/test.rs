@@ -2,10 +2,16 @@ extern crate std;
 
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
-use crate::{extensions::blocklist::storage::BlockList, Base};
+use crate::{extensions::blocklist::storage::BlockList, Base, fungible::FungibleToken, extensions::burnable::FungibleBurnable};
+use super::{FungibleBlockList, FungibleBlockListExt};
+
 
 #[contract]
 struct MockContract;
+
+type BurableBlockList = FungibleBlockListExt<BlockList, Base>;
+type FungibleTokenBlockList = FungibleBlockListExt<BlockList, Base>;
+
 
 #[test]
 fn block_user_works() {
@@ -19,7 +25,7 @@ fn block_user_works() {
         assert!(!BlockList::blocked(&e, &user));
 
         // Block user
-        BlockList::block_user(&e, &user);
+        BlockList::block_user(&e, &user, &user);
 
         // Verify user is blocked
         assert!(BlockList::blocked(&e, &user));
@@ -35,11 +41,11 @@ fn unblock_user_works() {
 
     e.as_contract(&address, || {
         // Block user first
-        BlockList::block_user(&e, &user);
+        BlockList::block_user(&e, &user, &user);
         assert!(BlockList::blocked(&e, &user));
 
         // Unblock user
-        BlockList::unblock_user(&e, &user);
+        BlockList::unblock_user(&e, &user, &user);
 
         // Verify user is not blocked
         assert!(!BlockList::blocked(&e, &user));
@@ -56,10 +62,10 @@ fn transfer_with_unblocked_users_works() {
 
     e.as_contract(&address, || {
         // Mint tokens to user1
-        Base::mint(&e, &user1, 100);
+        Base::internal_mint(&e, &user1, 100);
 
         // Transfer tokens from user1 to user2
-        BlockList::transfer(&e, &user1, &user2, 50);
+        FungibleTokenBlockList::transfer(&e, &user1, &user2, 50);
 
         // Verify balances
         assert_eq!(Base::balance(&e, &user1), 50);
@@ -76,10 +82,10 @@ fn blocklist_burn_override_works() {
 
     e.as_contract(&address, || {
         // Mint tokens to user
-        Base::mint(&e, &user, 100);
+        Base::internal_mint(&e, &user, 100);
 
         // Burn tokens from user
-        BlockList::burn(&e, &user, 50);
+        BurableBlockList::burn(&e, &user, 50);
 
         // Verify balance
         assert_eq!(Base::balance(&e, &user), 50);
@@ -96,13 +102,13 @@ fn blocklist_burn_from_override_works() {
 
     e.as_contract(&address, || {
         // Mint tokens to user1
-        Base::mint(&e, &user1, 100);
+        Base::internal_mint(&e, &user1, 100);
 
         // Allow user2 to burn tokens from user1
         Base::approve(&e, &user1, &user2, 50, 100);
 
         // Burn tokens from user1 by user2
-        BlockList::burn_from(&e, &user2, &user1, 50);
+        BurableBlockList::burn_from(&e, &user2, &user1, 50);
 
         // Verify balance
         assert_eq!(Base::balance(&e, &user1), 50);
@@ -120,13 +126,13 @@ fn transfer_with_sender_blocked_panics() {
 
     e.as_contract(&address, || {
         // Block user1
-        BlockList::block_user(&e, &user1);
+        BlockList::block_user(&e, &user1, &user1);
 
         // Mint tokens to user1
-        Base::mint(&e, &user1, 100);
+        Base::internal_mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 (blocked) to user2
-        BlockList::transfer(&e, &user1, &user2, 50);
+        FungibleTokenBlockList::transfer(&e, &user1, &user2, 50);
     });
 }
 
@@ -141,13 +147,13 @@ fn transfer_with_receiver_blocked_panics() {
 
     e.as_contract(&address, || {
         // Block user2
-        BlockList::block_user(&e, &user2);
+        BlockList::block_user(&e, &user2, &user2);
 
         // Mint tokens to user1
-        Base::mint(&e, &user1, 100);
+        Base::internal_mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 to user2 (blocked)
-        BlockList::transfer(&e, &user1, &user2, 50);
+        FungibleTokenBlockList::transfer(&e, &user1, &user2, 50);
     });
 }
 
@@ -162,10 +168,10 @@ fn approve_with_owner_blocked_panics() {
 
     e.as_contract(&address, || {
         // Block user1
-        BlockList::block_user(&e, &user1);
+        BlockList::block_user(&e, &user1, &user1);
 
         // Try to approve tokens from user1 (blocked) to user2
-        BlockList::approve(&e, &user1, &user2, 50, 100);
+        FungibleTokenBlockList::approve(&e, &user1, &user2, 50, 100);
     });
 }
 
@@ -179,13 +185,13 @@ fn burn_with_blocked_user_panics() {
 
     e.as_contract(&address, || {
         // Block user
-        BlockList::block_user(&e, &user);
+        BlockList::block_user(&e, &user, &user);
 
         // Mint tokens to user
-        Base::mint(&e, &user, 100);
+        Base::internal_mint(&e, &user, 100);
 
         // Try to burn tokens from user (blocked)
-        BlockList::burn(&e, &user, 50);
+        BurableBlockList::burn(&e, &user, 50);
     });
 }
 
@@ -200,15 +206,15 @@ fn burn_from_with_blocked_user_panics() {
 
     e.as_contract(&address, || {
         // Block user1
-        BlockList::block_user(&e, &user1);
+        BlockList::block_user(&e, &user1, &user1);
 
         // Mint tokens to user1
-        Base::mint(&e, &user1, 100);
+        Base::internal_mint(&e, &user1, 100);
 
         // Allow user2 to burn tokens from user1
         Base::approve(&e, &user1, &user2, 50, 100);
 
         // Try to burn tokens from user1 by user2 (blocked)
-        BlockList::burn_from(&e, &user2, &user1, 50);
+        BurableBlockList::burn_from(&e, &user2, &user1, 50);
     });
 }

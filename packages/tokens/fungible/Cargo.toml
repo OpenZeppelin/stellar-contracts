@@ -12,6 +12,7 @@ doctest = false
 
 [dependencies]
 stellar-constants = { workspace = true }
+stellar-pausable = { workspace = true }
 soroban-sdk = { workspace = true }
 
 [dev-dependencies]

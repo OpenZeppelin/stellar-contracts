@@ -2,7 +2,8 @@ use soroban_sdk::{Address, Env};
 
 use crate::{extensions::burnable::emit_burn, Base};
 
-impl Base {
+impl super::FungibleBurnable for Base {
+    type Impl = Base;
     /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.
     ///
@@ -24,7 +25,7 @@ impl Base {
     /// # Notes
     ///
     /// Authorization for `from` is required.
-    pub fn burn(e: &Env, from: &Address, amount: i128) {
+    fn burn(e: &Env, from: &Address, amount: i128) {
         from.require_auth();
         Base::update(e, Some(from), None, amount);
         emit_burn(e, from, amount);
@@ -55,7 +56,7 @@ impl Base {
     /// # Notes
     ///
     /// Authorization for `spender` is required.
-    pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         spender.require_auth();
         Base::spend_allowance(e, from, spender, amount);
         Base::update(e, Some(from), None, amount);

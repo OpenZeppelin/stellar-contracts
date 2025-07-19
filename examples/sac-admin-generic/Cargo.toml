@@ -16,4 +16,4 @@ stellar-fungible = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-ed25519-dalek = { workspace = true }
+# ed25519-dalek = { workspace = true }

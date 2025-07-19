@@ -7,16 +7,39 @@ use stellar_constants::{
 };
 
 use crate::{
-    burnable::emit_burn,
+    burnable::{emit_burn, NonFungibleBurnable},
     emit_transfer,
     extensions::consecutive::emit_consecutive_mint,
+    non_fungible::NonFungibleToken,
     sequential::{self as sequential},
-    Base, ContractOverrides, NonFungibleTokenError,
+    Base, NonFungibleTokenError,
 };
 
 pub struct Consecutive;
 
-impl ContractOverrides for Consecutive {
+impl NonFungibleBurnable for Consecutive {
+    type Impl = Self;
+    fn burn(e: &Env, from: &Address, token_id: u32) {
+        from.require_auth();
+
+        Consecutive::update(e, Some(from), None, token_id);
+        emit_burn(e, from, token_id);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+        spender.require_auth();
+
+        Base::check_spender_approval(e, spender, from, token_id);
+
+        Consecutive::update(e, Some(from), None, token_id);
+        emit_burn(e, from, token_id);
+    }
+
+    
+}
+
+impl NonFungibleToken for Consecutive {
+    type Impl = Base;
     fn owner_of(e: &Env, token_id: u32) -> Address {
         Consecutive::owner_of(e, token_id)
     }
@@ -38,6 +61,7 @@ impl ContractOverrides for Consecutive {
         approver: &Address,
         approved: &Address,
         token_id: u32,
+
         live_until_ledger: u32,
     ) {
         Consecutive::approve(e, approver, approved, token_id, live_until_ledger);

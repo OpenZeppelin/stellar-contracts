@@ -72,11 +72,17 @@ mod storage;
 mod utils;
 
 pub use extensions::{burnable, consecutive, enumerable, royalties};
+pub use extensions::{
+    burnable::NonFungibleBurnable,
+    consecutive::Consecutive,
+    enumerable::{Enumerable, NonFungibleEnumerable},
+    royalties::NonFungibleRoyalties,
+};
 pub use non_fungible::{
     emit_approve, emit_approve_for_all, emit_transfer, NonFungibleToken, NonFungibleTokenError,
 };
-pub use overrides::{Base, ContractOverrides};
-pub use storage::{ApprovalData, NFTStorageKey};
+
+pub use storage::{ApprovalData, Base, NFTStorageKey};
 pub use utils::sequential;
 
 mod test;

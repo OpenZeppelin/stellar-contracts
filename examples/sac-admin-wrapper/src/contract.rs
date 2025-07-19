@@ -1,10 +1,13 @@
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env};
-use stellar_access_control::{self as access_control, AccessControl};
+use soroban_sdk::{contract, contractimpl, derive_contract, symbol_short, Address, Env};
+use stellar_access_control::AccessControl;
 use stellar_access_control_macros::{has_role, only_admin};
-use stellar_default_impl_macro::default_impl;
-use stellar_fungible::{self as fungible, sac_admin_wrapper::SACAdminWrapper};
+use stellar_fungible::SACAdminWrapper;
 
 #[contract]
+#[derive_contract(
+    SACAdminWrapper(default = ExampleContract),
+    AccessControl,
+)]
 pub struct ExampleContract;
 
 #[contractimpl]
@@ -16,41 +19,37 @@ impl ExampleContract {
         manager2: Address,
         sac: Address,
     ) {
-        access_control::set_admin(e, &default_admin);
+        <Self as AccessControl>::set_admin(e, &default_admin);
 
         // create a role "manager" and grant it to `manager1`
-        access_control::grant_role_no_auth(e, &default_admin, &manager1, &symbol_short!("manager"));
+        Self::grant_role_no_auth(e, &default_admin, &manager1, &symbol_short!("manager"));
 
         // grant it to `manager2`
-        access_control::grant_role_no_auth(e, &default_admin, &manager2, &symbol_short!("manager"));
+        Self::grant_role_no_auth(e, &default_admin, &manager2, &symbol_short!("manager"));
 
-        fungible::sac_admin_wrapper::set_sac_address(e, &sac);
+        Self::set_sac_address(e, &sac);
     }
 }
 
-#[contractimpl]
 impl SACAdminWrapper for ExampleContract {
+    type Impl = SACAdminWrapper!();
     #[only_admin]
-    fn set_admin(e: Env, new_admin: Address, _operator: Address) {
-        fungible::sac_admin_wrapper::set_admin(&e, &new_admin);
+    fn set_admin(e: &Env, new_admin: &Address, _operator: &Address) {
+        Self::Impl::set_admin(e, new_admin, _operator);
     }
 
     #[has_role(operator, "manager")]
-    fn set_authorized(e: Env, id: Address, authorize: bool, operator: Address) {
-        fungible::sac_admin_wrapper::set_authorized(&e, &id, authorize);
+    fn set_authorized(e: &Env, id: &Address, authorize: bool, operator: &Address) {
+        Self::Impl::set_authorized(e, id, authorize, operator);
     }
 
     #[has_role(operator, "manager")]
-    fn mint(e: Env, to: Address, amount: i128, operator: Address) {
-        fungible::sac_admin_wrapper::mint(&e, &to, amount);
+    fn mint(e: &Env, to: &Address, amount: i128, operator: &Address) {
+        Self::Impl::mint(e, to, amount, operator);
     }
 
     #[has_role(operator, "manager")]
-    fn clawback(e: Env, from: Address, amount: i128, operator: Address) {
-        fungible::sac_admin_wrapper::clawback(&e, &from, amount);
+    fn clawback(e: &Env, from: &Address, amount: i128, operator: &Address) {
+        Self::Impl::clawback(e, from, amount, operator);
     }
 }
-
-#[default_impl]
-#[contractimpl]
-impl AccessControl for ExampleContract {}

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
-use quote::quote;
-use stellar_macro_helpers::{generate_auth_check, parse_env_arg};
+use quote::{quote};
+use stellar_macro_helpers::{add_auth_check, parse_env_arg, FunctionInsert};
 use syn::{
     bracketed,
     parse::{Parse, ParseStream},
@@ -30,14 +30,8 @@ use syn::{
 #[proc_macro_attribute]
 pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
-    let input_fn = parse_macro_input!(input as ItemFn);
-
-    // Generate the function with the admin authorization check
-    let auth_check_path = quote! { stellar_access_control::enforce_admin_auth };
-    let expanded = generate_auth_check(&input_fn, auth_check_path);
-
-    TokenStream::from(expanded)
+    let auth_check_path = quote! { Self::enforce_admin_auth };
+    add_auth_check(parse_macro_input!(input as syn::Item), auth_check_path).into()
 }
 
 /// A procedural macro that ensures the parameter has the specified role.
@@ -112,8 +106,14 @@ pub fn only_role(args: TokenStream, input: TokenStream) -> TokenStream {
 /// only_role macros. If require_auth is true, it also adds the
 /// account.require_auth() call.
 fn generate_role_check(args: TokenStream, input: TokenStream, require_auth: bool) -> TokenStream {
+    let Ok(syn::Item::Fn(mut input_fn)): Result<syn::Item, syn::Error> =
+        syn::parse::<syn::Item>(input.clone())
+    else {
+        return input;
+    };
+
+    let env_arg = parse_env_arg(&input_fn);
     let args = parse_macro_input!(args as HasRoleArgs);
-    let input_fn = parse_macro_input!(input as ItemFn);
 
     let param_name = args.param;
     let role_str = args.role;
@@ -126,29 +126,12 @@ fn generate_role_check(args: TokenStream, input: TokenStream, require_auth: bool
         quote! { &#param_name }
     };
 
-    let fn_attrs = &input_fn.attrs;
-    let fn_vis = &input_fn.vis;
-    let fn_sig = &input_fn.sig;
-    let fn_block = &input_fn.block;
+    let auth_check = require_auth.then(|| quote! { #param_name.require_auth(); });
 
-    let env_arg = parse_env_arg(&input_fn);
-
-    let auth_check = if require_auth {
-        quote! { #param_name.require_auth(); }
-    } else {
-        quote! {}
-    };
-
-    let expanded = quote! {
-        #(#fn_attrs)*
-        #fn_vis #fn_sig {
-            stellar_access_control::ensure_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, #role_str));
-            #auth_check
-            #fn_block
-        }
-    };
-
-    TokenStream::from(expanded)
+    input_fn.insert_stmts_to_token_stream(syn::parse_quote! {
+        Self::ensure_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, #role_str));
+        #auth_check
+    }).into()
 }
 
 struct HasRoleArgs {
@@ -300,8 +283,12 @@ fn generate_any_role_check(
     require_auth: bool,
 ) -> TokenStream {
     let args = parse_macro_input!(args as HasAnyRoleArgs);
-    let input_fn = parse_macro_input!(input as ItemFn);
-
+    let Ok(syn::Item::Fn(mut input_fn)): Result<syn::Item, syn::Error> =
+        syn::parse::<syn::Item>(input.clone())
+    else {
+        return input;
+    };
+    let env_arg = parse_env_arg(&input_fn);
     let param_name = args.param;
     let roles = args.roles;
 
@@ -313,34 +300,13 @@ fn generate_any_role_check(
         quote! { &#param_name }
     };
 
-    let fn_attrs = &input_fn.attrs;
-    let fn_vis = &input_fn.vis;
-    let fn_sig = &input_fn.sig;
-    let fn_block = &input_fn.block;
+    let auth_check = require_auth.then(|| quote! { #param_name.require_auth(); });
 
-    let env_arg = parse_env_arg(&input_fn);
-
-    let auth_check = if require_auth {
-        quote! { #param_name.require_auth(); }
-    } else {
-        quote! {}
-    };
-
-    let combined_checks = quote! {
-        let has_any_role = [#(#roles),*].iter().any(|role| stellar_access_control::has_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, role)).is_some());
+    input_fn.insert_stmts_to_token_stream(syn::parse_quote! {
+        let has_any_role = [#(#roles),*].iter().any(|role| <Self as AccessControl>::has_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, role)).is_some());
         if !has_any_role {
             panic!("Account does not have any of the required roles");
         }
-    };
-
-    let expanded = quote! {
-        #(#fn_attrs)*
-        #fn_vis #fn_sig {
-            #combined_checks
-            #auth_check
-            #fn_block
-        }
-    };
-
-    TokenStream::from(expanded)
+        #auth_check
+    }).into()
 }

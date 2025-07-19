@@ -3,19 +3,24 @@ use stellar_constants::{
     OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
 
-use crate::{non_fungible::emit_mint, Base, ContractOverrides, NonFungibleTokenError};
+use crate::{
+    burnable::NonFungibleBurnable,
+    enumerable::NonFungibleEnumerable,
+    non_fungible::{emit_mint, NonFungibleToken},
+    Base, NonFungibleTokenError,
+};
 
 pub struct Enumerable;
 
-impl ContractOverrides for Enumerable {
-    fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-        Enumerable::transfer(e, from, to, token_id);
-    }
+// impl ContractOverrides for Enumerable {
+//     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
+//         Enumerable::transfer(e, from, to, token_id);
+//     }
 
-    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
-        Enumerable::transfer_from(e, spender, from, to, token_id);
-    }
-}
+//     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
+//         Enumerable::transfer_from(e, spender, from, to, token_id);
+//     }
+// }
 
 #[contracttype]
 pub struct OwnerTokensKey {
@@ -32,6 +37,46 @@ pub enum NFTEnumerableStorageKey {
     OwnerTokensIndex(/* token_id */ u32),
     GlobalTokens(/* index */ u32),
     GlobalTokensIndex(/* token_id */ u32),
+}
+
+impl NonFungibleEnumerable for Enumerable {
+    type Impl = Self;
+
+    fn total_supply(e: &Env) -> u32 {
+        Enumerable::total_supply(e)
+    }
+
+    fn get_owner_token_id(e: &Env, owner: &Address, index: u32) -> u32 {
+        Enumerable::get_owner_token_id(e, owner, index)
+    }
+
+    fn get_token_id(e: &Env, index: u32) -> u32 {
+        Enumerable::get_token_id(e, index)
+    }
+}
+
+impl NonFungibleToken for Enumerable {
+    type Impl = Base;
+
+    fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
+        Enumerable::transfer(e, from, to, token_id);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
+        Enumerable::transfer_from(e, spender, from, to, token_id);
+    }
+}
+
+impl NonFungibleBurnable for Enumerable {
+    type Impl = Base;
+
+    fn burn(e: &Env, from: &Address, token_id: u32) {
+        Enumerable::burn(e, from, token_id);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+        Enumerable::burn_from(e, spender, from, token_id);
+    }
 }
 
 impl Enumerable {

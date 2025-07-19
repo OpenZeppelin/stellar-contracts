@@ -17,6 +17,7 @@ use soroban_sdk::{contractclient, contracterror, Address, BytesN, Env, FromVal, 
 ///    - Provide access control by implementing [`UpgradeableInternal`] with
 ///      your custom logic
 #[contractclient(name = "UpgradeableClient")]
+#[soroban_sdk::contracttrait(default = UpgradeableDefault, extension_required = true)]
 pub trait Upgradeable {
     /// Upgrades the contract by setting a new WASM bytecode. The
     /// contract will only be upgraded after the invocation has
@@ -28,7 +29,20 @@ pub trait Upgradeable {
     /// * `new_wasm_hash` - A 32-byte hash identifying the new WASM blob,
     ///   uploaded to the ledger.
     /// * `operator` - The authorized address performing the upgrade.
-    fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address);
+    fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Option<soroban_sdk::Address>);
+}
+
+#[soroban_sdk::contracttrait(default = UpgradeableDefault, extension_required = true)]
+pub trait MigrationUpgradeable<T: FromVal<Env, Val>> {
+    /// Entry point to handle a contract migration.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `migration_data` - Arbitrary data passed to the migration logic.
+    /// * `operator` - The authorized address performing the upgrade and the
+    ///   migration.
+    fn migrate(e: &Env, migration_data: T, operator: Address);
 }
 
 /// Trait to be implemented for a custom upgrade authorization mechanism.
@@ -59,6 +73,7 @@ pub trait UpgradeableInternal {
 /// Instead, the contract must define access control via `_require_auth` and
 /// provide its custom migration logic by implementing
 /// `UpgradeableMigratableInternal`.
+// #[contracttrait(default = UpgradeableDefault, extension_required = true)]
 pub trait UpgradeableMigratable: UpgradeableMigratableInternal {
     /// Upgrades the contract by setting a new WASM bytecode. The
     /// contract will only be upgraded after the invocation has

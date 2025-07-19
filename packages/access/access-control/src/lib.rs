@@ -48,7 +48,7 @@
 //!
 //! ```rust
 //! #[has_role(caller, "minter_admin")]
-//! pub fn custom_sensitive_logic(e: &Env, caller: Address) {
+//! pub fn custom_sensitive_logic(e: &Env, caller: &Address) {
 //!     ...
 //! }
 //! ```
@@ -91,6 +91,8 @@
 mod access_control;
 mod storage;
 
+use soroban_sdk::{Address, Env, Symbol};
+
 pub use crate::{
     access_control::{
         emit_admin_renounced, emit_admin_transfer_completed, emit_admin_transfer_initiated,
@@ -107,5 +109,62 @@ pub use crate::{
         AccessControlStorageKey,
     },
 };
+
+pub struct AccessControlDefault;
+
+impl crate::access_control::AccessControl for AccessControlDefault {
+    type Impl = Self;
+    fn has_role(e: &Env, account: &Address, role: &Symbol) -> Option<u32>{
+        has_role(e, account, role)
+    }
+
+    fn get_role_member_count(e: &Env, role: &Symbol) -> u32{
+        get_role_member_count(e, role)
+    }
+
+    fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address{
+        get_role_member(e, role, index)
+    }
+
+    fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol>{
+        get_role_admin(e, role)
+    }
+
+    fn get_admin(e: &Env) -> Option<Address>{
+        get_admin(e)
+    }
+
+    fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol){
+        grant_role(e, caller, account, role);
+    }
+
+    fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol){
+        revoke_role(e, caller, account, role);
+    }
+
+    fn renounce_role(e: &Env, caller: &Address, role: &Symbol){
+        renounce_role(e, caller, role);
+    }
+
+    fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32){
+        transfer_admin_role(e, new_admin, live_until_ledger);
+    }
+
+    fn accept_admin_transfer(e: &Env) {
+        accept_admin_transfer(e);
+    }   
+
+    fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol){
+        set_role_admin(e, role, admin_role);
+    }
+
+    fn renounce_admin(e: &Env){
+        renounce_admin(e);
+    }
+
+    fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
+        grant_role_no_auth(e, caller, account, role);
+    }
+}
 
 mod test;

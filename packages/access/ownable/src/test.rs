@@ -5,10 +5,10 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
-use crate::{
-    accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
-    transfer_ownership, OwnableStorageKey,
-};
+use crate::storage::set_owner;
+use crate::OwnableStorageKey;
+use crate::ownable::Ownable;
+use crate::Owner;
 
 #[contract]
 struct MockContract;
@@ -27,7 +27,7 @@ fn transfer_ownership_sets_pending() {
     });
 
     e.as_contract(&contract, || {
-        transfer_ownership(&e, &new_owner, 1000);
+        Owner::transfer_ownership(&e, &new_owner, 1000);
 
         let pending: Option<Address> =
             e.storage().temporary().get(&OwnableStorageKey::PendingOwner);
@@ -50,9 +50,9 @@ fn accept_ownership_completes_transfer() {
         set_owner(&e, &old_owner);
         e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &new_owner);
 
-        accept_ownership(&e);
+        Owner::accept_ownership(&e);
 
-        let stored_owner = get_owner(&e);
+        let stored_owner = Owner::get_owner(&e);
         assert_eq!(stored_owner, Some(new_owner));
 
         let assert = EventAssertion::new(&e, contract.clone());
@@ -73,9 +73,9 @@ fn renounce_ownership_removes_owner() {
     e.mock_all_auths();
 
     e.as_contract(&contract, || {
-        renounce_ownership(&e);
+        Owner::renounce_ownership(&e);
 
-        assert_eq!(get_owner(&e), None);
+        assert_eq!(Owner::get_owner(&e), None);
 
         let assert = EventAssertion::new(&e, contract.clone());
         assert.assert_event_count(1);
@@ -95,7 +95,7 @@ fn enforce_owner_auth_works() {
     e.mock_all_auths();
 
     e.as_contract(&contract, || {
-        enforce_owner_auth(&e);
+        Owner::enforce_owner_auth(&e);
     });
 }
 
@@ -113,13 +113,13 @@ fn enforce_owner_auth_panics_if_renounced() {
     e.mock_all_auths();
 
     e.as_contract(&contract, || {
-        renounce_ownership(&e);
+        Owner::renounce_ownership(&e);
 
-        assert_eq!(get_owner(&e), None);
+        assert_eq!(Owner::get_owner(&e), None);
     });
 
     e.as_contract(&contract, || {
-        enforce_owner_auth(&e);
+        Owner::enforce_owner_auth(&e);
     });
 }
 
@@ -139,7 +139,7 @@ fn renounce_fails_if_pending_transfer_exists() {
     e.mock_all_auths();
 
     e.as_contract(&contract, || {
-        renounce_ownership(&e);
+        Owner::renounce_ownership(&e);
     });
 }
 
@@ -157,7 +157,7 @@ fn set_owner_when_already_set_panics() {
         set_owner(&e, &owner1);
 
         // Verify owner is set correctly
-        let current_owner = get_owner(&e).unwrap();
+        let current_owner = Owner::get_owner(&e).unwrap();
         assert_eq!(current_owner, owner1);
 
         // Try to set owner again - should panic with OwnerAlreadySet error

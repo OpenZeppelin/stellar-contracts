@@ -5,11 +5,10 @@ use stellar_constants::{
 
 use crate::{
     non_fungible::{
-        emit_approve, emit_approve_for_all, emit_mint, emit_transfer, NonFungibleTokenError,
-        MAX_BASE_URI_LEN, MAX_NUM_DIGITS,
+        emit_approve, emit_approve_for_all, emit_mint, emit_transfer, NonFungibleToken,
+        NonFungibleTokenError, MAX_BASE_URI_LEN, MAX_NUM_DIGITS,
     },
     sequential::increment_token_id,
-    Base,
 };
 
 /// Storage container for the token for which an approval is granted
@@ -38,17 +37,13 @@ pub enum NFTStorageKey {
     Metadata,
 }
 
-impl Base {
-    // ################## QUERY STATE ##################
+/// Default marker type
+pub struct Base;
 
-    /// Returns the amount of tokens held by `account`. Defaults to `0` if no
-    /// balance is stored.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `account` - The address for which the balance is being queried.
-    pub fn balance(e: &Env, account: &Address) -> u32 {
+impl NonFungibleToken for Base {
+    type Impl = Self;
+
+    fn balance(e: &Env, account: &soroban_sdk::Address) -> u32 {
         let key = NFTStorageKey::Balance(account.clone());
         if let Some(balance) = e.storage().persistent().get::<_, u32>(&key) {
             e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
@@ -58,18 +53,7 @@ impl Base {
         }
     }
 
-    /// Returns the address of the owner of the given `token_id`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `token_id` - Token ID as a number.
-    ///
-    /// # Errors
-    ///
-    /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
-    ///   `token_id` does not exist.
-    pub fn owner_of(e: &Env, token_id: u32) -> Address {
+    fn owner_of(e: &Env, token_id: u32) -> soroban_sdk::Address {
         let key = NFTStorageKey::Owner(token_id);
         if let Some(owner) = e.storage().persistent().get::<_, Address>(&key) {
             e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
@@ -80,54 +64,137 @@ impl Base {
         }
     }
 
-    /// Returns the address approved for the specified token:
-    /// * `Some(Address)` - The approved address if there is a valid,
-    ///   non-expired approval
-    /// * `None` - If there is no approval or if the approval has expired
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `token_id` - The identifier of the token to check approval for.
-    pub fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
+    fn transfer(e: &Env, from: &soroban_sdk::Address, to: &soroban_sdk::Address, token_id: u32) {
+        from.require_auth();
+        Base::update(e, Some(from), Some(to), token_id);
+        emit_transfer(e, from, to, token_id);
+    }
+
+    fn transfer_from(
+        e: &Env,
+        spender: &soroban_sdk::Address,
+        from: &soroban_sdk::Address,
+        to: &soroban_sdk::Address,
+        token_id: u32,
+    ) {
+        spender.require_auth();
+        Base::check_spender_approval(e, spender, from, token_id);
+        Base::update(e, Some(from), Some(to), token_id);
+        emit_transfer(e, from, to, token_id);
+    }
+
+    fn approve(
+        e: &Env,
+        approver: &soroban_sdk::Address,
+        approved: &soroban_sdk::Address,
+        token_id: u32,
+        live_until_ledger: u32,
+    ) {
+        approver.require_auth();
+        let owner = Base::owner_of(e, token_id);
+        Base::approve_for_owner(e, &owner, approver, approved, token_id, live_until_ledger);
+    }
+
+    fn approve_for_all(
+        e: &Env,
+        owner: &soroban_sdk::Address,
+        operator: &soroban_sdk::Address,
+        live_until_ledger: u32,
+    ) {
+        owner.require_auth();
+
+        let key = NFTStorageKey::ApprovalForAll(owner.clone(), operator.clone());
+
+        // If revoking approval (live_until_ledger == 0)
+        if live_until_ledger == 0 {
+            e.storage().temporary().remove(&key);
+            emit_approve_for_all(e, owner, operator, live_until_ledger);
+            return;
+        }
+
+        let current_ledger = e.ledger().sequence();
+
+        // If the provided ledger number is invalid (less than the current ledger
+        // number)
+        if live_until_ledger < current_ledger {
+            panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
+        }
+
+        // Update the storage
+        e.storage().temporary().set(&key, &live_until_ledger);
+
+        // Update the TTL based on the expiration ledger
+        let live_for = live_until_ledger - current_ledger;
+        e.storage().temporary().extend_ttl(&key, live_for, live_for);
+
+        emit_approve_for_all(e, owner, operator, live_until_ledger);
+    }
+
+    fn get_approved(e: &Env, token_id: u32) -> Option<soroban_sdk::Address> {
         let key = NFTStorageKey::Approval(token_id);
 
         if let Some(approval_data) = e.storage().temporary().get::<_, ApprovalData>(&key) {
-            if approval_data.live_until_ledger < e.ledger().sequence() {
-                return None; // Return None if approval expired
-            }
-            Some(approval_data.approved)
+            (approval_data.live_until_ledger >= e.ledger().sequence())
+                .then_some(approval_data.approved)
         } else {
             // if there is no `ApprovalData` entry for this `token_id`
             None
         }
     }
 
-    /// Returns whether the operator is allowed to manage all assets of the
-    /// owner:
-    /// * `true` - If the operator has a valid, non-expired approval for all
-    ///   tokens
-    /// * `false` - If there is no approval or if the approval has expired
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `owner` - The address that owns the tokens.
-    /// * `operator` - The address to check for approval status.
-    pub fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool {
+    fn is_approved_for_all(
+        e: &Env,
+        owner: &soroban_sdk::Address,
+        operator: &soroban_sdk::Address,
+    ) -> bool {
         let key = NFTStorageKey::ApprovalForAll(owner.clone(), operator.clone());
-
         // Retrieve the approval data for the owner
         if let Some(live_until_ledger) = e.storage().temporary().get::<_, u32>(&key) {
             // Check if the operator's approval is valid (non-expired)
-            if live_until_ledger >= e.ledger().sequence() {
-                return true;
-            }
+            return live_until_ledger >= e.ledger().sequence();
         }
-
         // If no operator with a valid approval
         false
     }
+
+    fn name(e: &Env) -> String {
+        Self::get_metadata(e).name
+    }
+
+    fn symbol(e: &Env) -> String {
+        Self::get_metadata(e).symbol
+    }
+
+    fn token_uri(e: &Env, token_id: u32) -> String {
+        // used to panic if non-existent token_id
+        let _ = Self::owner_of(e, token_id);
+        let base_uri = Self::base_uri(e);
+        Self::compose_uri_for_token(e, base_uri, token_id)
+    }
+
+    fn internal_mint(e: &Env, to: &Address, token_id: u32) {
+        Self::update(e, None, Some(to), token_id);
+        emit_mint(e, to, token_id);
+    }
+
+    fn sequential_mint(e: &Env, to: &Address) -> u32 {
+        let token_id = increment_token_id(e, 1);
+        Self::internal_mint(e, to, token_id);
+        token_id
+    }
+
+    fn set_metadata(e: &Env, base_uri: String, name: String, symbol: String) {
+        if base_uri.len() as usize > MAX_BASE_URI_LEN {
+            panic_with_error!(e, NonFungibleTokenError::BaseUriMaxLenExceeded)
+        }
+
+        let metadata = Metadata { base_uri, name, symbol };
+        e.storage().instance().set(&NFTStorageKey::Metadata, &metadata);
+    }
+}
+
+impl Base {
+    // ################## QUERY STATE ##################
 
     /// Returns the token metadata such as `base_uri`, `name` and `symbol`.
     ///
@@ -146,32 +213,6 @@ impl Base {
             .unwrap_or_else(|| panic_with_error!(e, NonFungibleTokenError::UnsetMetadata))
     }
 
-    /// Returns the token collection name.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`get_metadata`] errors.
-    pub fn name(e: &Env) -> String {
-        Base::get_metadata(e).name
-    }
-
-    /// Returns the token collection symbol.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`get_metadata`] errors.
-    pub fn symbol(e: &Env) -> String {
-        Base::get_metadata(e).symbol
-    }
-
     /// Returns the collection base URI.
     ///
     /// # Arguments
@@ -183,24 +224,6 @@ impl Base {
     /// * refer to [`get_metadata`] errors.
     pub fn base_uri(e: &Env) -> String {
         Base::get_metadata(e).base_uri
-    }
-
-    /// Returns the URI for a specific `token_id`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `token_id` - The identifier of the token.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`owner_of`] errors.
-    /// * refer to [`base_uri`] errors.
-    pub fn token_uri(e: &Env, token_id: u32) -> String {
-        // used to panic if non-existent token_id
-        let _ = Base::owner_of(e, token_id);
-        let base_uri = Base::base_uri(e);
-        Base::compose_uri_for_token(e, base_uri, token_id)
     }
 
     /// Composes and returns a URI for a specific `token_id`, without
@@ -231,168 +254,6 @@ impl Base {
         }
     }
 
-    // ################## CHANGE STATE ##################
-
-    /// Transfers a non-fungible token (NFT), ensuring ownership checks.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The environment reference.
-    /// * `from` - The current owner's address.
-    /// * `to` - The recipient's address.
-    /// * `token_id` - The identifier of the token being transferred.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`update`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: u32]`
-    ///
-    /// # Notes
-    ///
-    /// * Authorization for `from` is required.
-    /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
-    ///   lost.
-    pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-        from.require_auth();
-        Base::update(e, Some(from), Some(to), token_id);
-        emit_transfer(e, from, to, token_id);
-    }
-
-    /// Transfers a non-fungible token (NFT), ensuring ownership and approval
-    /// checks.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The environment reference.
-    /// * `spender` - The address attempting to transfer the token.
-    /// * `from` - The current owner's address.
-    /// * `to` - The recipient's address.
-    /// * `token_id` - The identifier of the token being transferred.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`check_spender_approval`] errors.
-    /// * refer to [`update`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: u32]`
-    ///
-    /// # Notes
-    ///
-    /// * Authorization for `spender` is required.
-    /// * **IMPORTANT**: If the recipient is unable to receive, the NFT may get
-    ///   lost.
-    pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
-        spender.require_auth();
-        Base::check_spender_approval(e, spender, from, token_id);
-        Base::update(e, Some(from), Some(to), token_id);
-        emit_transfer(e, from, to, token_id);
-    }
-
-    /// Approves an address to transfer a specific token.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `approver` - The address of the approver (should be `owner` or
-    ///   `operator`).
-    /// * `approved` - The address receiving the approval.
-    /// * `token_id` - The identifier of the token to be approved.
-    /// * `live_until_ledger` - The ledger number at which the allowance
-    ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
-    ///   `live_until_ledger` argument is implicitly bounded by the maximum
-    ///   allowed TTL extension for a temporary storage entry and specifying a
-    ///   higher value will cause the code to panic.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`owner_of`] errors.
-    /// * refer to [`approve_for_owner`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["approve", owner: Address, token_id: u32]`
-    /// * data - `[approved: Address, live_until_ledger: u32]`
-    ///
-    /// # Notes
-    ///
-    /// * Authorization for `approver` is required.
-    pub fn approve(
-        e: &Env,
-        approver: &Address,
-        approved: &Address,
-        token_id: u32,
-        live_until_ledger: u32,
-    ) {
-        approver.require_auth();
-
-        let owner = Base::owner_of(e, token_id);
-        Base::approve_for_owner(e, &owner, approver, approved, token_id, live_until_ledger);
-    }
-
-    /// Sets or removes operator approval for managing all tokens owned by the
-    /// owner.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `owner` - The address granting approval for all their tokens.
-    /// * `operator` - The address being granted or revoked approval.
-    /// * `live_until_ledger` - The ledger number at which the allowance
-    ///   expires. If `live_until_ledger` is `0`, the approval is revoked.
-    ///   `live_until_ledger` argument is implicitly bounded by the maximum
-    ///   allowed TTL extension for a temporary storage entry and specifying a
-    ///   higher value will cause the code to panic.
-    ///
-    /// # Errors
-    ///
-    /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger
-    ///   number is less than the current ledger number.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["approve", owner: Address]`
-    /// * data - `[operator: Address, live_until_ledger: u32]`
-    ///
-    /// # Notes
-    ///
-    /// * Authorization for `owner` is required.
-    pub fn approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
-        owner.require_auth();
-
-        let key = NFTStorageKey::ApprovalForAll(owner.clone(), operator.clone());
-
-        // If revoking approval (live_until_ledger == 0)
-        if live_until_ledger == 0 {
-            e.storage().temporary().remove(&key);
-            emit_approve_for_all(e, owner, operator, live_until_ledger);
-            return;
-        }
-
-        let current_ledger = e.ledger().sequence();
-
-        // If the provided ledger number is invalid (less than the current ledger
-        // number)
-        if live_until_ledger < current_ledger {
-            panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
-        }
-
-        // Update the storage
-        e.storage().temporary().set(&key, &live_until_ledger);
-
-        // Update the TTL based on the expiration ledger
-        let live_for = live_until_ledger - current_ledger;
-        e.storage().temporary().extend_ttl(&key, live_for, live_for);
-
-        emit_approve_for_all(e, owner, operator, live_until_ledger);
-    }
-
     /// Low-level function for handling transfers, mints and burns of an NFT,
     /// without handling authorization. Updates ownership records, adjusts
     /// balances, and clears existing approvals.
@@ -413,7 +274,7 @@ impl Base {
     /// * refer to [`increase_balance`] errors.
     pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
         if let Some(from_address) = from {
-            let owner = Base::owner_of(e, token_id);
+            let owner = Self::owner_of(e, token_id);
 
             // Ensure the `from` address is indeed the owner.
             if owner != *from_address {
@@ -563,35 +424,6 @@ impl Base {
         e.storage().persistent().set(&NFTStorageKey::Balance(from.clone()), &balance);
     }
 
-    /// Sets the token metadata such as token collection URI, name and symbol.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `base_uri` - The base collection URI, assuming it's a valid URI and
-    ///   ends with `/`.
-    /// * `name` - The token collection name.
-    /// * `symbol` - The token collection symbol.
-    ///
-    /// # Errors
-    ///
-    /// * [`NonFungibleTokenError::BaseUriMaxLenExceeded`] - If the length of
-    ///   `base_uri` exceeds the maximum allowed.
-    ///
-    /// # Notes
-    ///
-    /// **IMPORTANT**: This function lacks authorization controls. Most likely,
-    /// you want to invoke it from a constructor or from another function
-    /// with admin-only authorization.
-    pub fn set_metadata(e: &Env, base_uri: String, name: String, symbol: String) {
-        if base_uri.len() as usize > MAX_BASE_URI_LEN {
-            panic_with_error!(e, NonFungibleTokenError::BaseUriMaxLenExceeded)
-        }
-
-        let metadata = Metadata { base_uri, name, symbol };
-        e.storage().instance().set(&NFTStorageKey::Metadata, &metadata);
-    }
-
     // ################## INTERNAL HELPERS ##################
 
     /// Converts `u32` to `String` and returns it alongside the
@@ -621,96 +453,5 @@ impl Base {
         }
 
         (String::from_bytes(e, &slice[..digits]), digits)
-    }
-
-    /// Creates a token with the next available `token_id` and assigns it to
-    /// `to`. Returns the `token_id` for the newly minted token.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `to` - The address receiving the new token.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`increment_token_id`] errors.
-    /// * refer to [`update`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["mint", to: Address]`
-    /// * data - `[token_id: u32]`
-    ///
-    /// # Security Warning
-    ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// It is the responsibility of the implementer to establish appropriate
-    /// access controls to ensure that only authorized accounts can execute
-    /// minting operations. Failure to implement proper authorization could
-    /// lead to security vulnerabilities and unauthorized token creation.
-    ///
-    /// You probably want to do something like this (pseudo-code):
-    ///
-    /// ```ignore
-    /// let admin = read_administrator(e);
-    /// admin.require_auth();
-    /// ```
-    ///
-    /// **IMPORTANT**: This function utilizes [`increment_token_id()`] to
-    /// determine the next `token_id`, but it does NOT check if that
-    /// `token_id` is already in use. If the developer has other means of
-    /// minting tokens and generating `token_id`s, they should ensure that
-    /// the `token_id` is unique and not already in use.
-    pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
-        let token_id = increment_token_id(e, 1);
-        Base::update(e, None, Some(to), token_id);
-        emit_mint(e, to, token_id);
-
-        token_id
-    }
-
-    /// Creates a token with the provided `token_id` and assigns it to
-    /// `to`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `to` - The address receiving the new token.
-    /// * `token_id` - The token_id of the new token.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`update`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["mint", to: Address]`
-    /// * data - `[token_id: u32]`
-    ///
-    /// # Security Warning
-    ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// It is the responsibility of the implementer to establish appropriate
-    /// access controls to ensure that only authorized accounts can execute
-    /// minting operations. Failure to implement proper authorization could
-    /// lead to security vulnerabilities and unauthorized token creation.
-    ///
-    /// You probably want to do something like this (pseudo-code):
-    ///
-    /// ```ignore
-    /// let admin = read_administrator(e);
-    /// admin.require_auth();
-    /// ```
-    ///
-    /// **IMPORTANT**: This function does NOT verify whether the provided
-    /// `token_id` already exists. It is the developer's responsibility to
-    /// ensure `token_id` uniqueness before passing it to this function. The
-    /// strategy for generating `token_id`s varies by project and must be
-    /// implemented accordingly.
-    pub fn mint(e: &Env, to: &Address, token_id: u32) {
-        Base::update(e, None, Some(to), token_id);
-        emit_mint(e, to, token_id);
     }
 }

@@ -1,9 +1,8 @@
 mod storage;
-use crate::NonFungibleToken;
 
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{contracttrait, symbol_short, Address, Env};
 
 /// Burnable Trait for Non-Fungible Token
 ///
@@ -55,7 +54,8 @@ use soroban_sdk::{symbol_short, Address, Env};
 ///     /* and the macro will generate all the missing default implementations for you */
 /// }
 /// ```
-pub trait NonFungibleBurnable: NonFungibleToken {
+#[contracttrait(default = Base)]
+pub trait NonFungibleBurnable {
     /// Destroys the token with `token_id` from `from`.
     ///
     /// # Arguments
@@ -75,7 +75,7 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: u32]`
-    fn burn(e: &Env, from: Address, token_id: u32);
+    fn burn(e: &Env, from: &soroban_sdk::Address, token_id: u32);
 
     /// Destroys the token with `token_id` from `from`, by using `spender`s
     /// approval.
@@ -101,7 +101,12 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: u32]`
-    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32);
+    fn burn_from(
+        e: &Env,
+        spender: &soroban_sdk::Address,
+        from: &soroban_sdk::Address,
+        token_id: u32,
+    );
 }
 
 // ################## EVENTS ##################

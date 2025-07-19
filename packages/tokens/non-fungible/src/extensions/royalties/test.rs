@@ -6,6 +6,8 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::{extensions::enumerable::Enumerable, Base};
 
+use super::NonFungibleRoyalties;
+
 #[contract]
 struct MockContract;
 
@@ -21,7 +23,7 @@ fn test_set_default_royalty() {
 
     e.as_contract(&address, || {
         // Set default royalty
-        Base::set_default_royalty(&e, &receiver, 1000); // 10%
+        Base::set_default_royalty(&e, &receiver, 1000, &receiver); // 10%
 
         // Check royalty info for a non-existent token (should use default)
         let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id, 1000);
@@ -43,7 +45,7 @@ fn test_set_token_royalty() {
 
         // Set token-specific royalty
         let receiver = Address::generate(&e);
-        Base::set_token_royalty(&e, token_id, &receiver, 500); // 5%
+        Base::set_token_royalty(&e, token_id, &receiver, 500, &receiver); // 5%
 
         // Check royalty info
         let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id, 2000);
@@ -64,13 +66,13 @@ fn test_token_royalty_overrides_default() {
     // First set default royalty and mint first token
     e.as_contract(&address, || {
         // Set default royalty
-        Base::set_default_royalty(&e, &default_receiver, 1000); // 10%
+        Base::set_default_royalty(&e, &default_receiver, 1000, &default_receiver); // 10%
 
         // Mint a token
         let token_id = Enumerable::sequential_mint(&e, &owner);
 
         // Set token-specific royalty
-        Base::set_token_royalty(&e, token_id, &token_receiver, 500); // 5%
+        Base::set_token_royalty(&e, token_id, &token_receiver, 500, &token_receiver); // 5%
 
         // Check that token royalty overrides default
         let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id, 2000);
@@ -100,7 +102,7 @@ fn test_zero_royalty() {
         let token_id = Enumerable::sequential_mint(&e, &owner);
 
         // Set zero royalty
-        Base::set_token_royalty(&e, token_id, &receiver, 0);
+        Base::set_token_royalty(&e, token_id, &receiver, 0, &receiver);
 
         // Check royalty info
         let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id, 1000);
@@ -153,7 +155,7 @@ fn test_invalid_royalty_amount() {
         let token_id = Enumerable::sequential_mint(&e, &owner);
 
         // Set invalid royalty amount
-        Base::set_token_royalty(&e, token_id, &Address::generate(&e), 10001);
+        Base::set_token_royalty(&e, token_id, &Address::generate(&e), 10001, &owner);
     });
 }
 
@@ -168,13 +170,13 @@ fn test_remove_token_royalty() {
 
     e.as_contract(&address, || {
         // Set default royalty
-        Base::set_default_royalty(&e, &default_receiver, 1000); // 10%
+        Base::set_default_royalty(&e, &default_receiver, 1000, &default_receiver); // 10%
 
         // Mint a token
         let token_id = Enumerable::sequential_mint(&e, &owner);
 
         // Set token-specific royalty
-        Base::set_token_royalty(&e, token_id, &token_receiver, 500); // 5%
+        Base::set_token_royalty(&e, token_id, &token_receiver, 500, &default_receiver); // 5%
 
         // Verify token-specific royalty is used
         let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id, 2000);
@@ -182,7 +184,7 @@ fn test_remove_token_royalty() {
         assert_eq!(royalty_amount, 100); // 5% of 2000
 
         // Remove token-specific royalty
-        Base::remove_token_royalty(&e, token_id);
+        Base::remove_token_royalty(&e, token_id, &owner);
 
         // Verify default royalty is now used
         let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id, 2000);
@@ -204,7 +206,7 @@ fn test_remove_token_royalty_no_default() {
         let token_id = Enumerable::sequential_mint(&e, &owner);
 
         // Set token-specific royalty
-        Base::set_token_royalty(&e, token_id, &token_receiver, 500); // 5%
+        Base::set_token_royalty(&e, token_id, &token_receiver, 500, &owner); // 5%
 
         // Verify token-specific royalty is used
         let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id, 2000);
@@ -212,7 +214,7 @@ fn test_remove_token_royalty_no_default() {
         assert_eq!(royalty_amount, 100); // 5% of 2000
 
         // Remove token-specific royalty
-        Base::remove_token_royalty(&e, token_id);
+        Base::remove_token_royalty(&e, token_id, &owner);
 
         // Verify zero royalty is now used (since no default is set)
         let (royalty_receiver, royalty_amount) = Base::royalty_info(&e, token_id, 2000);
