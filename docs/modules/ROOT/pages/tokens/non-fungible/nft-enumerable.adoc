@@ -18,7 +18,7 @@ can call `award_item` and we might want to implement access control to restrict 
 [source,rust]
 ----
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_proc_macros::default_impl;
+use stellar_macros::default_impl;
 use stellar_tokens::non_fungible::{
     enumerable::{Enumerable, NonFungibleEnumerable},
     Base, ContractOverrides, NonFungibleToken,

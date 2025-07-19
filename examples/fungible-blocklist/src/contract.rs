@@ -7,7 +7,7 @@
 
 use soroban_sdk::{contract, contracterror, contractimpl, symbol_short, Address, Env, String};
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_proc_macros::{default_impl, only_role};
+use stellar_macros::{default_impl, only_role};
 use stellar_tokens::fungible::{
     blocklist::{BlockList, FungibleBlockList},
     Base, FungibleToken,

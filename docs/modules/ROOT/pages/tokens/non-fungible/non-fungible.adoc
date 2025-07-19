@@ -38,7 +38,7 @@ Here's what a contract for tokenized items might look like:
 [source,rust]
 ----
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_proc_macros::default_impl;
+use stellar_macros::default_impl;
 use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
     Base, ContractOverrides, NonFungibleToken,

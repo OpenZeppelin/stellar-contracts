@@ -63,7 +63,7 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env,
 };
 use stellar_contract_utils::upgradeable::UpgradeableInternal;
-use stellar_proc_macros::Upgradeable;
+use stellar_macros::Upgradeable;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -112,7 +112,7 @@ use soroban_sdk::{
     contract, contracterror, contracttype, panic_with_error, symbol_short, Address, Env,
 };
 use stellar_contract_utils::upgradeable::UpgradeableMigratableInternal;
-use stellar_proc_macros::UpgradeableMigratable;
+use stellar_macros::UpgradeableMigratable;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]

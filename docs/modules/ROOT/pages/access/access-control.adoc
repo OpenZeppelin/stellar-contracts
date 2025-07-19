@@ -50,7 +50,7 @@ Here's a simple example of using the Access Control module:
 ----
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env};
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_proc_macros::{has_role, only_admin};
+use stellar_macros::{has_role, only_admin};
 
 #[contract]
 pub struct MyContract;

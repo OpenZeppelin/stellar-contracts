@@ -78,7 +78,7 @@ This process ensures that all trait methods are available to the client generate
 ----
 use soroban_sdk::{contract, contractimpl, Address, Env};
 use stellar_tokens::fungible::FungibleToken;
-use stellar_proc_macros::default_impl;
+use stellar_macros::default_impl;
 
 #[contract]
 pub struct MyToken;

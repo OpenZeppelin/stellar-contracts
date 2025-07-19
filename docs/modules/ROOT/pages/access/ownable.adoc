@@ -54,7 +54,7 @@ Here's a simple example of using the Ownable module:
 ----
 use soroban_sdk::{contract, contractimpl, Address, Env};
 use stellar_access::ownable::{self as ownable, Ownable};
-use stellar_proc_macros::only_owner;
+use stellar_macros::only_owner;
 
 #[contract]
 pub struct MyContract;

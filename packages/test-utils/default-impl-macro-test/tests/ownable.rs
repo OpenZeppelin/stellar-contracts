@@ -2,7 +2,7 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, testutils::Address as _, Address, Env, String,
 };
 use stellar_access::ownable::{set_owner, Ownable};
-use stellar_proc_macros::{default_impl, only_owner};
+use stellar_macros::{default_impl, only_owner};
 use stellar_tokens::fungible::{Base, FungibleToken};
 
 #[contracttype]

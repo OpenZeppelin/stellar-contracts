@@ -51,7 +51,7 @@ stellar-access = { path = "packages/access" }
 stellar-contract-utils = { path = "packages/contract-utils" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-tokens = { path = "packages/tokens" }
-stellar-proc-macros = { path = "packages/proc-macros" }
+stellar-macros = { path = "packages/proc-macros" }
 
 [profile.release]
 opt-level = "z"

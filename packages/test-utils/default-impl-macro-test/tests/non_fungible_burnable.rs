@@ -8,7 +8,7 @@
 //! control to sensitive operations is not taken into consideration!
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
-use stellar_proc_macros::default_impl;
+use stellar_macros::default_impl;
 use stellar_tokens::non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
 
 #[contract]

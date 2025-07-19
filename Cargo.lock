@@ -584,7 +584,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
- "stellar-proc-macros",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -594,7 +594,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
- "stellar-proc-macros",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -614,7 +614,7 @@ dependencies = [
  "soroban-sdk",
  "stellar-access",
  "stellar-contract-utils",
- "stellar-proc-macros",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -624,7 +624,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-contract-utils",
- "stellar-proc-macros",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -634,7 +634,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-contract-utils",
- "stellar-proc-macros",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -883,7 +883,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
- "stellar-proc-macros",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -900,7 +900,7 @@ name = "nft-enumerable-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-proc-macros",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -910,7 +910,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
- "stellar-proc-macros",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -919,7 +919,7 @@ name = "nft-sequential-minting-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-proc-macros",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -980,7 +980,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
- "stellar-proc-macros",
+ "stellar-macros",
 ]
 
 [[package]]
@@ -1007,7 +1007,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-contract-utils",
- "stellar-proc-macros",
+ "stellar-macros",
 ]
 
 [[package]]
@@ -1220,7 +1220,7 @@ version = "0.3.0"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
- "stellar-proc-macros",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -1595,7 +1595,7 @@ dependencies = [
  "soroban-sdk",
  "stellar-access",
  "stellar-event-assertion",
- "stellar-proc-macros",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -1608,7 +1608,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "stellar-proc-macros"
+name = "stellar-macros"
 version = "0.3.0"
 dependencies = [
  "proc-macro2",
@@ -1774,7 +1774,7 @@ version = "1.0.0"
 dependencies = [
  "soroban-sdk",
  "stellar-contract-utils",
- "stellar-proc-macros",
+ "stellar-macros",
 ]
 
 [[package]]
@@ -1783,7 +1783,7 @@ version = "2.0.0"
 dependencies = [
  "soroban-sdk",
  "stellar-contract-utils",
- "stellar-proc-macros",
+ "stellar-macros",
 ]
 
 [[package]]
@@ -1793,7 +1793,7 @@ dependencies = [
  "soroban-sdk",
  "stellar-access",
  "stellar-contract-utils",
- "stellar-proc-macros",
+ "stellar-macros",
 ]
 
 [[package]]
