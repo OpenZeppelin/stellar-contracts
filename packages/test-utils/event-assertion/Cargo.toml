@@ -12,4 +12,4 @@ workspace = true
 features = ["testutils"]
 
 [dependencies]
-stellar-non-fungible = { workspace = true }
+stellar-tokens = { workspace = true }

@@ -4,24 +4,25 @@ members = [
     "examples/fungible-allowlist",
     "examples/fungible-blocklist",
     "examples/fungible-capped",
+    "examples/fungible-merkle-airdrop",
     "examples/fungible-pausable",
     "examples/fungible-token-interface",
-    "examples/fungible-merkle-airdrop",
+    "examples/merkle-voting",
     "examples/nft-access-control",
     "examples/nft-consecutive",
     "examples/nft-enumerable",
-    "examples/nft-sequential-minting",
     "examples/nft-royalties",
-    "examples/sac-admin-wrapper",
-    "examples/sac-admin-generic",
+    "examples/nft-sequential-minting",
     "examples/ownable",
-    "examples/merkle-voting",
+    "examples/pausable",
+    "examples/sac-admin-generic",
+    "examples/sac-admin-wrapper",
     "examples/upgradeable/*",
-    "packages/constants",
-    "packages/access/*",
-    "packages/contract-utils/*",
+    "packages/access",
+    "packages/contract-utils",
+    "packages/macros",
     "packages/test-utils/*",
-    "packages/tokens/*",
+    "packages/tokens",
 ]
 exclude = ["examples/upgradeable/testdata"]
 
@@ -46,23 +47,11 @@ hex-literal = "0.4.1"
 ed25519-dalek = "2.1.1"
 
 # members
-stellar-access-control = { path = "packages/access/access-control" }
-stellar-access-control-macros = { path = "packages/access/access-control-macros" }
-stellar-constants = { path = "packages/constants" }
-stellar-default-impl-macro = { path = "packages/contract-utils/default-impl-macro" }
+stellar-access = { path = "packages/access" }
+stellar-contract-utils = { path = "packages/contract-utils" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
-stellar-fungible = { path = "packages/tokens/fungible" }
-stellar-macro-helpers = { path = "packages/contract-utils/macro-helpers" }
-stellar-non-fungible = { path = "packages/tokens/non-fungible" }
-stellar-ownable = { path = "packages/access/ownable" }
-stellar-ownable-macro = { path = "packages/access/ownable-macro" }
-stellar-pausable = { path = "packages/contract-utils/pausable" }
-stellar-pausable-macros = { path = "packages/contract-utils/pausable-macros" }
-stellar-role-transfer = { path = "packages/access/role-transfer" }
-stellar-upgradeable = { path = "packages/contract-utils/upgradeable" }
-stellar-upgradeable-macros = { path = "packages/contract-utils/upgradeable-macros" }
-stellar-crypto = { path = "packages/contract-utils/crypto" }
-stellar-merkle-distributor = { path = "packages/contract-utils/merkle-distributor" }
+stellar-tokens = { path = "packages/tokens" }
+stellar-macros = { path = "packages/macros" }
 
 [profile.release]
 opt-level = "z"

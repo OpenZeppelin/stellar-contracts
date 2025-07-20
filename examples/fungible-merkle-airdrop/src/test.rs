@@ -2,8 +2,8 @@
 
 use hex_literal::hex;
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, vec, Address, BytesN, Env};
-use stellar_default_impl_macro::default_impl;
-use stellar_fungible::{Base, FungibleToken};
+use stellar_macros::default_impl;
+use stellar_tokens::fungible::{Base, FungibleToken};
 
 use crate::contract::{AirdropContract, AirdropContractClient};
 

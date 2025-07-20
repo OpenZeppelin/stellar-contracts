@@ -583,10 +583,9 @@ name = "fungible-allowlist-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
- "stellar-fungible",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -594,10 +593,9 @@ name = "fungible-blocklist-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
- "stellar-fungible",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -605,7 +603,7 @@ name = "fungible-capped-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -614,11 +612,10 @@ version = "0.3.0"
 dependencies = [
  "hex-literal",
  "soroban-sdk",
- "stellar-crypto",
- "stellar-default-impl-macro",
- "stellar-fungible",
- "stellar-merkle-distributor",
- "stellar-ownable",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -626,9 +623,9 @@ name = "fungible-pausable-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-fungible",
- "stellar-pausable",
- "stellar-pausable-macros",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -636,9 +633,9 @@ name = "fungible-token-interface-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-fungible",
- "stellar-pausable",
- "stellar-pausable-macros",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -877,8 +874,7 @@ name = "merkle-voting-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-crypto",
- "stellar-merkle-distributor",
+ "stellar-contract-utils",
 ]
 
 [[package]]
@@ -886,10 +882,9 @@ name = "nft-access-control-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
- "stellar-non-fungible",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -897,7 +892,7 @@ name = "nft-consecutive-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-non-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -905,8 +900,8 @@ name = "nft-enumerable-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-default-impl-macro",
- "stellar-non-fungible",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -914,10 +909,9 @@ name = "nft-royalties-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
- "stellar-non-fungible",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -925,8 +919,8 @@ name = "nft-sequential-minting-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-default-impl-macro",
- "stellar-non-fungible",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -985,9 +979,8 @@ name = "ownable-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-default-impl-macro",
- "stellar-ownable",
- "stellar-ownable-macro",
+ "stellar-access",
+ "stellar-macros",
 ]
 
 [[package]]
@@ -1007,6 +1000,15 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
+
+[[package]]
+name = "pausable-example"
+version = "0.3.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-contract-utils",
+ "stellar-macros",
+]
 
 [[package]]
 name = "pkcs8"
@@ -1209,7 +1211,7 @@ version = "0.3.0"
 dependencies = [
  "ed25519-dalek",
  "soroban-sdk",
- "stellar-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -1217,10 +1219,9 @@ name = "sac-admin-wrapper-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
- "stellar-fungible",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -1570,48 +1571,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "stellar-access-control"
+name = "stellar-access"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-constants",
  "stellar-event-assertion",
- "stellar-role-transfer",
 ]
 
 [[package]]
-name = "stellar-access-control-macros"
-version = "0.3.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "stellar-macro-helpers",
- "syn 2.0.96",
-]
-
-[[package]]
-name = "stellar-constants"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
-name = "stellar-crypto"
+name = "stellar-contract-utils"
 version = "0.3.0"
 dependencies = [
  "hex-literal",
  "proptest",
  "soroban-sdk",
-]
-
-[[package]]
-name = "stellar-default-impl-macro"
-version = "0.3.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
+ "stellar-event-assertion",
 ]
 
 [[package]]
@@ -1619,14 +1593,10 @@ name = "stellar-default-impl-macro-test"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access-control",
- "stellar-access-control-macros",
- "stellar-default-impl-macro",
+ "stellar-access",
  "stellar-event-assertion",
- "stellar-fungible",
- "stellar-non-fungible",
- "stellar-ownable",
- "stellar-ownable-macro",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
@@ -1634,90 +1604,16 @@ name = "stellar-event-assertion"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-non-fungible",
+ "stellar-tokens",
 ]
 
 [[package]]
-name = "stellar-fungible"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
- "soroban-test-helpers",
- "stellar-constants",
- "stellar-event-assertion",
-]
-
-[[package]]
-name = "stellar-macro-helpers"
+name = "stellar-macros"
 version = "0.3.0"
 dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.96",
-]
-
-[[package]]
-name = "stellar-merkle-distributor"
-version = "0.3.0"
-dependencies = [
- "hex-literal",
- "soroban-sdk",
- "stellar-constants",
- "stellar-crypto",
- "stellar-event-assertion",
-]
-
-[[package]]
-name = "stellar-non-fungible"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
- "stellar-constants",
- "stellar-event-assertion",
-]
-
-[[package]]
-name = "stellar-ownable"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
- "stellar-constants",
- "stellar-event-assertion",
- "stellar-role-transfer",
-]
-
-[[package]]
-name = "stellar-ownable-macro"
-version = "0.3.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "stellar-macro-helpers",
- "syn 2.0.96",
-]
-
-[[package]]
-name = "stellar-pausable"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
-]
-
-[[package]]
-name = "stellar-pausable-macros"
-version = "0.3.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "stellar-macro-helpers",
- "syn 2.0.96",
-]
-
-[[package]]
-name = "stellar-role-transfer"
-version = "0.3.0"
-dependencies = [
- "soroban-sdk",
 ]
 
 [[package]]
@@ -1732,19 +1628,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "stellar-upgradeable"
+name = "stellar-tokens"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
-]
-
-[[package]]
-name = "stellar-upgradeable-macros"
-version = "0.3.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.96",
+ "soroban-test-helpers",
+ "stellar-event-assertion",
 ]
 
 [[package]]
@@ -1884,8 +1773,8 @@ name = "upgradeable-v1-example"
 version = "1.0.0"
 dependencies = [
  "soroban-sdk",
- "stellar-upgradeable",
- "stellar-upgradeable-macros",
+ "stellar-contract-utils",
+ "stellar-macros",
 ]
 
 [[package]]
@@ -1893,8 +1782,8 @@ name = "upgradeable-v2-example"
 version = "2.0.0"
 dependencies = [
  "soroban-sdk",
- "stellar-upgradeable",
- "stellar-upgradeable-macros",
+ "stellar-contract-utils",
+ "stellar-macros",
 ]
 
 [[package]]
@@ -1902,9 +1791,9 @@ name = "upgrader-example"
 version = "0.3.0"
 dependencies = [
  "soroban-sdk",
- "stellar-ownable",
- "stellar-ownable-macro",
- "stellar-upgradeable",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
 ]
 
 [[package]]

@@ -5,8 +5,8 @@
 //! IDs owned by each account.
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
-use stellar_default_impl_macro::default_impl;
-use stellar_non_fungible::{
+use stellar_macros::default_impl;
+use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
     enumerable::{Enumerable, NonFungibleEnumerable},
     Base, NonFungibleToken,

@@ -13,9 +13,12 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env, String,
     Symbol,
 };
-use stellar_fungible::{burnable::FungibleBurnable, impl_token_interface, Base, FungibleToken};
-use stellar_pausable::{self as pausable, Pausable};
-use stellar_pausable_macros::when_not_paused;
+use stellar_contract_utils::pausable::{self as pausable, Pausable};
+use stellar_macros::when_not_paused;
+use stellar_tokens::{
+    fungible::{burnable::FungibleBurnable, Base, FungibleToken},
+    impl_token_interface,
+};
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
 

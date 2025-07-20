@@ -21,7 +21,7 @@ implement access control to restrict who can mint.
 ----
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_default_impl_macro::default_impl;
-use stellar_non_fungible::{
+use stellar_tokens::non_fungible::{
     consecutive::{Consecutive, NonFungibleConsecutive},
     Base, ContractOverrides, NonFungibleToken,
 };

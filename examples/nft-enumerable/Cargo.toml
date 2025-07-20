@@ -12,8 +12,8 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-stellar-non-fungible = { workspace = true }
-stellar-default-impl-macro = { workspace = true }
+stellar-tokens = { workspace = true }
+stellar-macros = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

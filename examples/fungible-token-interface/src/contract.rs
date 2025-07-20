@@ -4,8 +4,8 @@
 //! "examples/fungible-pausable", offering the same features. The key difference
 //! lies in how SEP-41 compliance is achieved. The contract in "contract.rs"
 //! accomplishes this by implementing
-//! [`stellar_fungible::fungible::FungibleToken`] and
-//! [`stellar_fungible::burnable::FungibleBurnable`], whereas this
+//! [`stellar_tokens::fungible::FungibleToken`] and
+//! [`stellar_tokens::fungible_burnable::FungibleBurnable`], whereas this
 //! version directly implements [`soroban_sdk::token::TokenInterface`].
 //!
 //! Ultimately, it is up to the user to choose their preferred approach to
@@ -17,9 +17,9 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, token::TokenInterface,
     Address, Env, String, Symbol,
 };
-use stellar_fungible::Base;
-use stellar_pausable::{self as pausable, Pausable};
-use stellar_pausable_macros::when_not_paused;
+use stellar_contract_utils::pausable::{self as pausable, Pausable};
+use stellar_macros::when_not_paused;
+use stellar_tokens::fungible::Base;
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
 
