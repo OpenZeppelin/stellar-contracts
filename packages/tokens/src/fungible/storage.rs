@@ -140,7 +140,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`get_metadata`] errors.
+    /// * refer to [`Base::get_metadata`] errors.
     pub fn decimals(e: &Env) -> u32 {
         Base::get_metadata(e).decimals
     }
@@ -153,7 +153,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`get_metadata`] errors.
+    /// * refer to [`Base::get_metadata`] errors.
     pub fn name(e: &Env) -> String {
         Base::get_metadata(e).name
     }
@@ -166,7 +166,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`get_metadata`] errors.
+    /// * refer to [`Base::get_metadata`] errors.
     pub fn symbol(e: &Env) -> String {
         Base::get_metadata(e).symbol
     }
@@ -188,7 +188,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`set_allowance`] errors.
+    /// * refer to [`Base::set_allowance`] errors.
     ///
     /// # Events
     ///
@@ -296,7 +296,7 @@ impl Base {
     /// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to
     ///   transfer more tokens than `spender` current allowance.
     /// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
-    /// * also refer to [`set_allowance`] errors.
+    /// * also refer to [`Base::set_allowance`] errors.
     ///
     /// # Notes
     ///
@@ -335,7 +335,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`update`] errors.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///
@@ -366,8 +366,8 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`spend_allowance`] errors.
-    /// * refer to [`update`] errors.
+    /// * refer to [`Base::spend_allowance`] errors.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///
@@ -452,7 +452,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// refer to [`update`] errors.
+    /// refer to [`Base::update`] errors.
     ///
     /// # Events
     ///

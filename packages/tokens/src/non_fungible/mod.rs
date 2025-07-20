@@ -88,8 +88,9 @@ pub use utils::sequential;
 /// as a method in this trait because it is not a part of the standard,
 /// the function signature may change depending on the implementation.
 ///
-/// We do provide a function [`crate::Base::sequential_mint`] for sequential
-/// minting, and [`crate::Base::mint`] for non-sequential minting strategies.
+/// We do provide a function [`crate::non_fungible::Base::sequential_mint`] for
+/// sequential minting, and [`crate::non_fungible::Base::mint`] for
+/// non-sequential minting strategies.
 ///
 /// # Notes
 ///
@@ -113,31 +114,37 @@ pub use utils::sequential;
 /// ```
 ///
 /// This trait is implemented for the following Contract Types:
-/// * [`crate::Base`] (covering the vanilla case, and compatible with
-///   [`crate::extensions::burnable::NonFungibleBurnable`]) trait
-/// * [`crate::extensions::enumerable::Enumerable`] (enabling the compatibility
-///   and overrides for
-///   [`crate::extensions::enumerable::NonFungibleEnumerable`]) trait,
-///   incompatible with [`crate::extensions::burnable::NonFungibleBurnable`])
-///   and [`crate::extensions::consecutive::NonFungibleConsecutive`] trait.
-/// * [`crate::extensions::consecutive::Consecutive`] (enabling the
+/// * [`crate::non_fungible::Base`] (covering the vanilla case, and compatible
+///   with [`crate::non_fungible::extensions::burnable::NonFungibleBurnable`])
+///   trait
+/// * [`crate::non_fungible::extensions::enumerable::Enumerable`] (enabling the
 ///   compatibility and overrides for
-///   [`crate::extensions::consecutive::NonFungibleConsecutive`]) trait,
-///   incompatible with [`crate::extensions::burnable::NonFungibleBurnable`])
-///   and [`crate::extensions::enumerable::NonFungibleEnumerable`] trait.
+///   [`crate::non_fungible::extensions::enumerable::NonFungibleEnumerable`])
+///   trait, incompatible with
+///   [`crate::non_fungible::extensions::burnable::NonFungibleBurnable`]) and
+///   [`crate::non_fungible::extensions::consecutive::NonFungibleConsecutive`]
+///   trait.
+/// * [`crate::non_fungible::extensions::consecutive::Consecutive`] (enabling
+///   the compatibility and overrides for
+///   [`crate::non_fungible::extensions::consecutive::NonFungibleConsecutive`])
+///   trait, incompatible with
+///   [`crate::non_fungible::extensions::burnable::NonFungibleBurnable`]) and
+///   [`crate::non_fungible::extensions::enumerable::NonFungibleEnumerable`]
+///   trait.
 ///
 /// You can find the default implementations of this trait for `Base`,
 /// `Enumerable`, and `Consecutive`, by navigating to:
 /// `ContractType::{method_name}`. For example, if you want to find how
 /// [`NonFungibleToken::transfer`] is implemented for the `Enumerable` contract
 /// type, you can find it using
-/// [`crate::extensions::enumerable::Enumerable::transfer`].
+/// [`crate::non_fungible::extensions::enumerable::Enumerable::transfer`].
 pub trait NonFungibleToken {
     /// Helper type that allows us to override some of the functionality of the
     /// base trait based on the extensions implemented. You should use
-    /// [`crate::Base`] as the type if you are not using
-    /// [`crate::extensions::enumerable::Enumerable`] or
-    /// [`crate::extensions::consecutive::Consecutive`] extensions.
+    /// [`crate::non_fungible::Base`] as the type if you are not using
+    /// [`crate::non_fungible::extensions::enumerable::Enumerable`] or
+    /// [`crate::non_fungible::extensions::consecutive::Consecutive`]
+    /// extensions.
     type ContractType: ContractOverrides;
 
     /// Returns the number of tokens owned by `account`.

@@ -14,7 +14,7 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`update`] errors.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///
@@ -43,8 +43,8 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`check_spender_approval`] errors.
-    /// * refer to [`update`] errors.
+    /// * refer to [`Base::check_spender_approval`] errors.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///

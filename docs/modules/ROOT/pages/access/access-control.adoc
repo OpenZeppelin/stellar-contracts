@@ -3,7 +3,7 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Access Control
 
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/access/access-control[Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/access/src/access-control[Source Code]
 
 == Overview
 
@@ -41,7 +41,6 @@ The system tracks account-role pairs in storage with additional enumeration logi
 * If all accounts are removed from a role, the helper storage items become empty or 0
 
 Roles exist only through their relationships with accounts, so a role with zero accounts is indistinguishable from a role that never existed.
-----
 
 == Usage Example
 
@@ -51,7 +50,7 @@ Here's a simple example of using the Access Control module:
 ----
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env};
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_access_control_macros::{has_role, only_admin};
+use stellar_macros::{has_role, only_admin};
 
 #[contract]
 pub struct MyContract;
@@ -109,6 +108,6 @@ impl MyContract {
 
 == See Also
 
-* xref:utils/access/ownable.adoc[Ownable]
+* xref:access/ownable.adoc[Ownable]
 * xref:tokens/fungible/fungible.adoc[Fungible Token]
 * xref:tokens/non-fungible/non-fungible.adoc[Non-Fungible Token]

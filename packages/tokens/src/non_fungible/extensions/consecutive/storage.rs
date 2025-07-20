@@ -174,7 +174,7 @@ impl Consecutive {
     /// * [`NonFungibleTokenError::InvalidAmount`] - If try to mint `0` or more
     ///   than `MAX_TOKENS_IN_BATCH`.
     /// * refer to [`Base::increase_balance`] errors.
-    /// * refer to [`set_ownership_in_bucket`] errors.
+    /// * refer to [`Consecutive::set_ownership_in_bucket`] errors.
     ///
     /// # Events
     ///
@@ -402,10 +402,10 @@ impl Consecutive {
     ///
     /// * [`NonFungibleTokenError::IncorrectOwner`] - If the `from` address is
     ///   not the owner of the token.
-    /// * refer to [`owner_of`] errors.
-    /// * refer to [`decrease_balance`] errors.
-    /// * refer to [`increase_balance`] errors.
-    /// * refer to [`set_ownership_in_bucket`] errors.
+    /// * refer to [`Consecutive::owner_of`] errors.
+    /// * refer to [`Base::decrease_balance`] errors.
+    /// * refer to [`Base::increase_balance`] errors.
+    /// * refer to [`Consecutive::set_ownership_in_bucket`] errors.
     pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
         if let Some(from_address) = from {
             let owner = Consecutive::owner_of(e, token_id);

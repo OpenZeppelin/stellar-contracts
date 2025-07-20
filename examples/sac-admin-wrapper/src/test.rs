@@ -15,8 +15,7 @@ fn test_sac_transfer() {
 
     let issuer = Address::generate(&e);
     let default_admin = Address::generate(&e);
-    let manager1 = Address::generate(&e);
-    let manager2 = Address::generate(&e);
+    let manager = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
 
@@ -45,7 +44,7 @@ fn test_sac_transfer() {
     // Deploy the New Admin
     let new_admin = e.register(
         ExampleContract,
-        (default_admin.clone(), manager1.clone(), manager2, sac_client.address.clone()),
+        (default_admin.clone(), manager.clone(), sac_client.address.clone()),
     );
     let new_admin_client = ExampleContractClient::new(&e, &new_admin);
 
@@ -66,15 +65,15 @@ fn test_sac_transfer() {
     // Mint 1000 tokens to user2 from the New Admin
     e.mock_auths(&[MockAuth {
         // default_admin authorizes
-        address: &manager1,
+        address: &manager,
         invoke: &MockAuthInvoke {
             contract: &new_admin,
             fn_name: "mint",
-            args: (&user2, 1000_i128).into_val(&e),
+            args: (&user2, 1000_i128, &manager).into_val(&e),
             sub_invokes: &[],
         },
     }]);
-    new_admin_client.mint(&user2, &1000, &manager1);
+    new_admin_client.mint(&user2, &1000, &manager);
 
     let balance2 = token_client.balance(&user2);
     assert_eq!(balance2, 1000);
@@ -87,8 +86,7 @@ fn test_transfer_admin() {
     let issuer = Address::generate(&e);
     let default_admin = Address::generate(&e);
     let new_default_admin = Address::generate(&e);
-    let manager1 = Address::generate(&e);
-    let manager2 = Address::generate(&e);
+    let manager = Address::generate(&e);
 
     // Deploy the Stellar Asset Contract
     let sac = e.register_stellar_asset_contract_v2(issuer.clone());
@@ -97,7 +95,7 @@ fn test_transfer_admin() {
     // Deploy the New Admin
     let new_admin = e.register(
         ExampleContract,
-        (default_admin.clone(), manager1.clone(), manager2, sac_client.address.clone()),
+        (default_admin.clone(), manager.clone(), sac_client.address.clone()),
     );
     let new_admin_client = ExampleContractClient::new(&e, &new_admin);
 
@@ -117,15 +115,15 @@ fn test_transfer_admin() {
 
     e.mock_auths(&[MockAuth {
         // default_admin authorizes
-        address: &manager1,
+        address: &manager,
         invoke: &MockAuthInvoke {
             contract: &new_admin,
             fn_name: "set_admin",
-            args: (&new_default_admin, &manager1).into_val(&e),
+            args: (&new_default_admin, &manager).into_val(&e),
             sub_invokes: &[],
         },
     }]);
-    assert!(new_admin_client.try_set_admin(&new_default_admin, &manager1).is_err());
+    assert!(new_admin_client.try_set_admin(&new_default_admin, &manager).is_err());
 
     e.mock_auths(&[MockAuth {
         // default_admin authorizes

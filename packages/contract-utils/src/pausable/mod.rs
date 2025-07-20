@@ -84,11 +84,11 @@ pub trait Pausable {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::pause()`] when implementing this function.
+    /// We recommend using [`pause`] when implementing this function.
     ///
     /// # Security Warning
     ///
-    /// **IMPORTANT**: The base implementation of [`crate::pause()`]
+    /// **IMPORTANT**: The base implementation of [`pause`]
     /// intentionally lacks authorization controls. If you want to restrict
     /// who can `pause` the contract, you MUST implement proper
     /// authorization in your contract.
@@ -113,11 +113,11 @@ pub trait Pausable {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::unpause()`] when implementing this function.
+    /// We recommend using [`unpause`] when implementing this function.
     ///
     /// # Security Warning
     ///
-    /// **IMPORTANT**: The base implementation of [`crate::unpause()`]
+    /// **IMPORTANT**: The base implementation of [`unpause`]
     /// intentionally lacks authorization controls. If you want to restrict
     /// who can `unpause` the contract, you MUST implement proper
     /// authorization in your contract.

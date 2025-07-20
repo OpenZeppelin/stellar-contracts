@@ -10,7 +10,7 @@ pub use storage::{accept_transfer, transfer_role};
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
-enum RoleTransferError {
+pub enum RoleTransferError {
     NoPendingTransfer = 1200,
     InvalidLiveUntilLedger = 1201,
     InvalidPendingAccount = 1202,

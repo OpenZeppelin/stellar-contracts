@@ -3,8 +3,8 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Cryptography Utilities
 
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/contract-utils/crypto[Crypto Source Code] |
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/contract-utils/merkle-distributor[Merkle Distributor Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/contract-utils/src/crypto[Crypto Source Code] |
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/contract-utils/src/merkle-distributor[Merkle Distributor Source Code]
 
 == Overview
 
@@ -84,8 +84,8 @@ where
 [source,rust]
 ----
 use soroban_sdk::{Bytes, Env};
-use stellar_crypto::keccak::Keccak256;
-use stellar_crypto::hasher::Hasher;
+use stellar_contract_utils::crypto::keccak::Keccak256;
+use stellar_contract_utils::crypto::hasher::Hasher;
 
 // Hash some data with Keccak256
 let e = Env::default();
@@ -120,13 +120,13 @@ other assets using Merkle proofs for verification.
 
 === Key Concepts
 
-==== IndexableNode
+==== IndexableLeaf
 
-The `IndexableNode` trait defines the structure for nodes in the Merkle tree:
+The `IndexableLeaf` trait defines the structure for nodes in the Merkle tree:
 
 [source,rust]
 ----
-pub trait IndexableNode {
+pub trait IndexableLeaf {
     fn index(&self) -> u32;
 }
 ----
@@ -146,8 +146,8 @@ The `MerkleDistributor` struct provides functionality for:
 [source,rust]
 ----
 use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, Vec};
-use stellar_crypto::keccak::Keccak256;
-use stellar_merkle_distributor::{IndexableNode, MerkleDistributor};
+use stellar_contract_utils::crypto::keccak::Keccak256;
+use stellar_contract_utils::merkle_distributor::{IndexableLeaf, MerkleDistributor};
 
 // Define a leaf node structure
 #[contracttype]
@@ -157,8 +157,8 @@ struct LeafData {
     pub amount: i128,
 }
 
-// Implement IndexableNode for the leaf structure
-impl IndexableNode for LeafData {
+// Implement IndexableLeaf for the leaf structure
+impl IndexableLeaf for LeafData {
     fn index(&self) -> u32 {
         self.index
     }

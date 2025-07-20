@@ -201,8 +201,8 @@ impl AllowList {
     }
 
     /// This is a wrapper around [`Base::burn()`] to enable
-    /// the compatibility across [`crate::burnable::FungibleBurnable`]
-    /// with [`crate::allowlist::FungibleAllowList`]
+    /// the compatibility across [`crate::fungible::burnable::FungibleBurnable`]
+    /// with [`crate::fungible::allowlist::FungibleAllowList`]
     ///
     /// Please refer to [`Base::burn`] for the inline documentation.
     pub fn burn(e: &Env, from: &Address, amount: i128) {
@@ -213,8 +213,8 @@ impl AllowList {
     }
 
     /// This is a wrapper around [`Base::burn_from()`] to enable
-    /// the compatibility across [`crate::burnable::FungibleBurnable`]
-    /// with [`crate::allowlist::FungibleAllowList`]
+    /// the compatibility across [`crate::fungible::burnable::FungibleBurnable`]
+    /// with [`crate::fungible::allowlist::FungibleAllowList`]
     ///
     /// Please refer to [`Base::burn_from`] for the inline documentation.
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {

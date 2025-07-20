@@ -7,7 +7,7 @@
 
 use soroban_sdk::{contract, contracterror, contractimpl, symbol_short, Address, Env, String};
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::{default_impl, has_role};
+use stellar_macros::{default_impl, only_role};
 use stellar_tokens::fungible::{
     blocklist::{BlockList, FungibleBlockList},
     Base, FungibleToken,
@@ -56,12 +56,12 @@ impl FungibleBlockList for ExampleContract {
         BlockList::blocked(e, &account)
     }
 
-    #[has_role(operator, "manager")]
+    #[only_role(operator, "manager")]
     fn block_user(e: &Env, user: Address, operator: Address) {
         BlockList::block_user(e, &user)
     }
 
-    #[has_role(operator, "manager")]
+    #[only_role(operator, "manager")]
     fn unblock_user(e: &Env, user: Address, operator: Address) {
         BlockList::unblock_user(e, &user)
     }

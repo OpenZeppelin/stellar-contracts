@@ -60,8 +60,8 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`crate::NonFungibleTokenError::InvalidRoyaltyAmount`] - If the
-    ///   royalty amount is higher than 10_000 (100%) basis points.
+    /// * [`crate::non_fungible::NonFungibleTokenError::InvalidRoyaltyAmount`] -
+    ///   If the royalty amount is higher than 10_000 (100%) basis points.
     ///
     /// # Events
     ///
@@ -82,10 +82,10 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`crate::NonFungibleTokenError::InvalidRoyaltyAmount`] - If the
-    ///   royalty amount is higher than 10_000 (100%) basis points.
-    /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
-    ///   not exist.
+    /// * [`crate::non_fungible::NonFungibleTokenError::InvalidRoyaltyAmount`] -
+    ///   If the royalty amount is higher than 10_000 (100%) basis points.
+    /// * [`crate::non_fungible::NonFungibleTokenError::NonExistentToken`] - If
+    ///   the token does not exist.
     ///
     /// # Events
     ///
@@ -110,8 +110,8 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
-    ///   not exist.
+    /// * [`crate::non_fungible::NonFungibleTokenError::NonExistentToken`] - If
+    ///   the token does not exist.
     ///
     /// # Events
     ///
@@ -131,8 +131,8 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// # Errors
     ///
-    /// * [`crate::NonFungibleTokenError::NonExistentToken`] - If the token does
-    ///   not exist.
+    /// * [`crate::non_fungible::NonFungibleTokenError::NonExistentToken`] - If
+    ///   the token does not exist.
     fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128);
 }
 

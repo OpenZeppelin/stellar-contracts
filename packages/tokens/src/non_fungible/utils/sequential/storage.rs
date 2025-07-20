@@ -26,8 +26,8 @@ pub fn next_token_id(e: &Env) -> u32 {
 ///
 /// # Errors
 ///
-/// * [`crate::NonFungibleTokenError::TokenIDsAreDepleted`] - When all the
-///   available `token_id`s are consumed for this smart contract.
+/// * [`crate::non_fungible::NonFungibleTokenError::TokenIDsAreDepleted`] - When
+///   all the available `token_id`s are consumed for this smart contract.
 pub fn increment_token_id(e: &Env, amount: u32) -> u32 {
     let current_id = next_token_id(e);
     let Some(next_id) = current_id.checked_add(amount) else {
