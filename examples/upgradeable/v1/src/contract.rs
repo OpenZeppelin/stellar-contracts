@@ -6,7 +6,7 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env, Symbol,
 };
 use stellar_contract_utils::upgradeable::UpgradeableInternal;
-use stellar_proc_macros::Upgradeable;
+use stellar_macros::Upgradeable;
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
 

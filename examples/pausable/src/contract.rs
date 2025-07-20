@@ -11,7 +11,7 @@ use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env,
 };
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
-use stellar_proc_macros::{when_not_paused, when_paused};
+use stellar_macros::{when_not_paused, when_paused};
 
 #[contracttype]
 pub enum DataKey {

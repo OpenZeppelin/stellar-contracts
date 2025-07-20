@@ -2,7 +2,7 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, testutils::Address as _, Address, Env, String, Symbol,
 };
 use stellar_access::access_control::{set_admin, AccessControl};
-use stellar_proc_macros::{default_impl, has_role};
+use stellar_macros::{default_impl, has_role};
 use stellar_tokens::fungible::{Base, FungibleToken};
 
 #[contracttype]

@@ -5,7 +5,7 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
 use stellar_access::ownable::{set_owner, Ownable};
-use stellar_proc_macros::{default_impl, only_owner};
+use stellar_macros::{default_impl, only_owner};
 
 #[contracttype]
 pub enum DataKey {

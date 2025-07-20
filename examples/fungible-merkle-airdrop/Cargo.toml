@@ -19,4 +19,4 @@ stellar-contract-utils = { workspace = true }
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 hex-literal = { workspace = true }
-stellar-proc-macros = { workspace = true }
+stellar-macros = { workspace = true }

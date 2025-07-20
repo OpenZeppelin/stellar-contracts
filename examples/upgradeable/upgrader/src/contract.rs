@@ -2,7 +2,7 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol, Val};
 use stellar_access::ownable;
 use stellar_contract_utils::upgradeable::UpgradeableClient;
-use stellar_proc_macros::only_owner;
+use stellar_macros::only_owner;
 
 pub const MIGRATE: Symbol = symbol_short!("migrate");
 

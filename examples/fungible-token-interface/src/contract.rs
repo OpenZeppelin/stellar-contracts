@@ -18,7 +18,7 @@ use soroban_sdk::{
     Address, Env, String, Symbol,
 };
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
-use stellar_proc_macros::when_not_paused;
+use stellar_macros::when_not_paused;
 use stellar_tokens::fungible::Base;
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
