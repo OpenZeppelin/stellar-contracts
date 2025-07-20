@@ -15,7 +15,7 @@ OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stel
 - `packages/`: Source code
   - `access/`: Role-based access controls and ownable
   - `contract-utils/`: Utilities for contracts (pausable, upgradeable, crypography, etc.)
-  - `macros/`: Proc and derive macros for some of the modules (`#[only_onwer]`, `#[when_not_paused]`, `#[derive(Upgradeable)]`, etc.)
+  - `macros/`: Proc and derive macros for some of the modules (`#[only_owner]`, `#[when_not_paused]`, `#[derive(Upgradeable)]`, etc.)
   - `test-utils/`: Utilities for testing
   - `tokens/`: Various token types (fungible, non-fungible, etc.)
 - `examples/`: Example contracts
