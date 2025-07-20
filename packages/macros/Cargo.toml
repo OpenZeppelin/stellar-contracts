@@ -5,7 +5,7 @@ license.workspace = true
 repository.workspace = true
 version.workspace = true
 publish = false
-description = "Proc macros for Stellar contracts."
+description = "Macros for Stellar contracts."
 
 
 [lib]
