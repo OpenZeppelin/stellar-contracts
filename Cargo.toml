@@ -34,10 +34,10 @@ repository = "https://github.com/OpenZeppelin/stellar-contracts"
 documentation = "https://docs.openzeppelin.com/stellar-contracts/"
 keywords = ["stellar", "soroban", "smart-contracts", "standards"]
 categories = ["no-std", "wasm"]
-version = "0.3.0"
+version = "0.4.0"
 
 [workspace.dependencies]
-soroban-sdk = "22.0.6"
+soroban-sdk = "22.0.8"
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
