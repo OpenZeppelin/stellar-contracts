@@ -6,18 +6,13 @@
 //! accounts.
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, derive_contract, symbol_short, Address, Env, String,
+    contract, contracterror, contractimpl, contracttrait, symbol_short, Address, Env, String,
 };
 use stellar_access_control::AccessControl;
 use stellar_access_control_macros::has_role;
 use stellar_fungible::{FungibleBlockList, FungibleBlockListExt, FungibleToken};
 
 #[contract]
-#[derive_contract(
-    AccessControl(default = MyBlockList),
-    FungibleToken(ext = FungibleBlockListExt),
-    FungibleBlockList(default = MyBlockList),
-)]
 pub struct ExampleContract;
 
 #[contracterror]
@@ -48,15 +43,14 @@ impl ExampleContract {
     }
 }
 
-pub struct MyBlockList;
+#[contracttrait(ext = FungibleBlockListExt)]
+impl FungibleToken for ExampleContract {}
 
-impl AccessControl for MyBlockList {
-    type Impl = AccessControl!();
-}
+#[contracttrait]
+impl AccessControl for ExampleContract {}
 
-impl FungibleBlockList for MyBlockList {
-    type Impl = FungibleBlockList!();
-
+#[contracttrait]
+impl FungibleBlockList for ExampleContract {
     #[has_role(operator, "manager")]
     fn block_user(e: &Env, user: &Address, operator: &Address) {
         Self::Impl::block_user(e, user, operator)

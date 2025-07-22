@@ -1,5 +1,5 @@
 use proc_macro::TokenStream;
-use quote::{quote};
+use quote::quote;
 use stellar_macro_helpers::{add_auth_check, parse_env_arg, FunctionInsert};
 use syn::{
     bracketed,

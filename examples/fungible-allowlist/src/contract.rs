@@ -5,18 +5,12 @@
 //! controlled token transfers by an admin who can allow or disallow specific
 //! accounts.
 
-use soroban_sdk::{contract, contractimpl, derive_contract, symbol_short, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, contracttrait, symbol_short, Address, Env, String};
 use stellar_access_control::AccessControl;
 use stellar_access_control_macros::has_role;
 use stellar_fungible::{FungibleAllowList, FungibleAllowListExt, FungibleBurnable, FungibleToken};
 
 #[contract]
-#[derive_contract(
-    AccessControl,
-    FungibleToken(ext = FungibleAllowListExt),
-    FungibleAllowList(default = ExampleContract),
-    FungibleBurnable(ext = FungibleAllowListExt),
-)]
 pub struct ExampleContract;
 
 #[contractimpl]
@@ -42,9 +36,17 @@ impl ExampleContract {
     }
 }
 
-impl FungibleAllowList for ExampleContract {
-    type Impl = FungibleAllowList!();
+#[contracttrait(ext = FungibleAllowListExt)]
+impl FungibleToken for ExampleContract {}
 
+#[contracttrait(ext = FungibleAllowListExt)]
+impl FungibleBurnable for ExampleContract {}
+
+#[contracttrait]
+impl AccessControl for ExampleContract {}
+
+#[contracttrait]
+impl FungibleAllowList for ExampleContract {
     #[has_role(operator, "manager")]
     fn allow_user(e: &Env, user: &Address, operator: &Address) {
         Self::Impl::allow_user(e, user, operator)

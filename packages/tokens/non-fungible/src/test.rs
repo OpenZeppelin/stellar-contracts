@@ -9,11 +9,10 @@ use soroban_sdk::{
 };
 use stellar_event_assertion::EventAssertion;
 
-use super::non_fungible::NonFungibleToken;
+use crate::non_fungible::NonFungibleToken;
 use crate::{Base, NFTStorageKey};
 
 #[contract]
-// #[derive_contract(NonFungibleToken)]
 struct MockContract;
 
 #[test]

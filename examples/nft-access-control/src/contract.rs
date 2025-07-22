@@ -2,17 +2,12 @@
 //!
 //! Demonstrates how can Access Control be utilized.
 
-use soroban_sdk::{contract, contractimpl, derive_contract, vec, Address, Env, String, Vec};
+use soroban_sdk::{contract, contractimpl, contracttrait, vec, Address, Env, String, Vec};
 use stellar_access_control::{set_admin, AccessControl};
 use stellar_access_control_macros::{has_any_role, has_role, only_admin, only_any_role, only_role};
 use stellar_non_fungible::{NonFungibleBurnable, NonFungibleToken};
 
 #[contract]
-#[derive_contract(
-    NonFungibleToken,
-    NonFungibleBurnable(default = ExampleContract),
-    AccessControl,
-)]
 pub struct ExampleContract;
 
 #[contractimpl]
@@ -54,11 +49,16 @@ impl ExampleContract {
     }
 }
 
+#[contracttrait]
+impl NonFungibleToken for ExampleContract {}
+
+#[contracttrait]
+impl AccessControl for ExampleContract {}
+
 // for this contract, the `burn*` functions are only meant to be called by
 // specific people with the `burner` role
-
+#[contracttrait]
 impl NonFungibleBurnable for ExampleContract {
-    type Impl = NonFungibleBurnable!();
     // we DON'T want `require_auth()` provided by the macro, since there is already
     // `require_auth()` in `Base::burn`
     #[has_role(from, "burner")]
