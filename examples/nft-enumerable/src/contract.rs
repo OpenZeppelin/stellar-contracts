@@ -4,24 +4,13 @@
 //! enumeration of all the token IDs in the contract as well as all the token
 //! IDs owned by each account.
 
-use soroban_sdk::{contract, contractimpl, contracttype, derive_contract, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env, String};
 use stellar_non_fungible::{
     enumerable::Enumerable, NonFungibleBurnable, NonFungibleEnumerable, NonFungibleToken,
 };
 use stellar_ownable::Ownable;
 
-#[contracttype]
-pub enum DataKey {
-    Owner,
-}
-
 #[contract]
-#[derive_contract(
-    NonFungibleToken(default = Enumerable),
-    NonFungibleBurnable(default = Enumerable),
-    NonFungibleEnumerable,
-    Ownable,
-)]
 pub struct ExampleContract;
 
 #[contractimpl]
@@ -41,3 +30,15 @@ impl ExampleContract {
         Enumerable::sequential_mint(e, &to)
     }
 }
+
+#[contracttrait(default = Enumerable)]
+impl NonFungibleToken for ExampleContract {}
+
+#[contracttrait(default = Enumerable)]
+impl NonFungibleBurnable for ExampleContract {}
+
+#[contracttrait]
+impl Ownable for ExampleContract {}
+
+#[contracttrait]
+impl NonFungibleEnumerable for ExampleContract {}

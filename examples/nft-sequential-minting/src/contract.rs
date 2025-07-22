@@ -2,13 +2,12 @@
 //!
 //! Demonstrates an example usage of the NFT default base implementation.
 
-use soroban_sdk::{contract, contractimpl, derive_contract, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env, String};
 
 use stellar_non_fungible::{NonFungibleBurnable, NonFungibleToken};
 use stellar_ownable::Ownable;
 
 #[contract]
-#[derive_contract(NonFungibleToken, Ownable, NonFungibleBurnable)]
 pub struct ExampleContract;
 
 #[contractimpl]
@@ -28,3 +27,12 @@ impl ExampleContract {
         Self::sequential_mint(e, &to)
     }
 }
+
+#[contracttrait]
+impl NonFungibleToken for ExampleContract {}
+
+#[contracttrait]
+impl Ownable for ExampleContract {}
+
+#[contracttrait]
+impl NonFungibleBurnable for ExampleContract {}

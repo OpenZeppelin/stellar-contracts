@@ -9,18 +9,13 @@
 //! [`stellar_fungible::fungible::FungibleToken`] and
 //! [`stellar_fungible::burnable::FungibleBurnable`].
 
-use soroban_sdk::{contract, contractimpl, derive_contract, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env, String};
 use stellar_fungible::{impl_token_interface, FungibleBurnable, FungibleToken};
 use stellar_ownable::{Ownable, OwnableExt};
 use stellar_pausable::{Pausable, PausableExt};
 
 #[contract]
-#[derive_contract(
-    Ownable,
-    FungibleToken(ext = PausableExt),
-    FungibleBurnable(ext = PausableExt),
-    Pausable(ext = OwnableExt),
-)]
+
 pub struct ExampleContract;
 
 #[contractimpl]
@@ -37,6 +32,18 @@ impl ExampleContract {
         Self::internal_mint(e, &account, amount);
     }
 }
+
+#[contracttrait]
+impl Ownable for ExampleContract {}
+
+#[contracttrait(ext = PausableExt)]
+impl FungibleToken for ExampleContract {}
+
+#[contracttrait(ext = PausableExt)]
+impl FungibleBurnable for ExampleContract {}
+
+#[contracttrait(ext = OwnableExt)]
+impl Pausable for ExampleContract {}
 
 // NOTE: if your contract implements `FungibleToken` and `FungibleBurnable`,
 // and you also want your contract to implement

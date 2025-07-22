@@ -8,7 +8,8 @@
 //! `paused`.
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env,
+    contract, contracterror, contractimpl, contracttrait, contracttype, panic_with_error, Address,
+    Env,
 };
 use stellar_ownable::{Ownable, OwnableExt};
 use stellar_pausable::Pausable;
@@ -21,10 +22,6 @@ pub enum DataKey {
 }
 
 #[contract]
-#[derive_contract(
-    Ownable,
-    Pausable( ext = OwnableExt)
-)]
 pub struct ExampleContract;
 
 #[contractimpl]
@@ -51,3 +48,9 @@ impl ExampleContract {
         e.storage().instance().set(&DataKey::Counter, &0);
     }
 }
+
+#[contracttrait]
+impl Ownable for ExampleContract {}
+
+#[contracttrait( ext = OwnableExt)]
+impl Pausable for ExampleContract {}

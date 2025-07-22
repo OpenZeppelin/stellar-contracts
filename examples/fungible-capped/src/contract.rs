@@ -7,14 +7,13 @@
 //! **IMPORTANT**: this example is for demonstration purposes, and authorization
 //! is not taken into consideration
 
-use soroban_sdk::{contract, contractimpl, derive_contract, Address, Env};
+use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env};
 use stellar_fungible::{
     capped::{check_cap, set_cap},
     FungibleToken,
 };
 
 #[contract]
-#[derive_contract(FungibleToken)]
 pub struct ExampleContract;
 
 #[contractimpl]
@@ -28,3 +27,6 @@ impl ExampleContract {
         Self::internal_mint(e, &account, amount);
     }
 }
+
+#[contracttrait]
+impl FungibleToken for ExampleContract {}

@@ -1,13 +1,9 @@
-use soroban_sdk::{contract, contractimpl, derive_contract, symbol_short, Address, Env};
+use soroban_sdk::{contract, contractimpl, contracttrait, symbol_short, Address, Env};
 use stellar_access_control::AccessControl;
 use stellar_access_control_macros::{has_role, only_admin};
 use stellar_fungible::SACAdminWrapper;
 
 #[contract]
-#[derive_contract(
-    SACAdminWrapper(default = ExampleContract),
-    AccessControl,
-)]
 pub struct ExampleContract;
 
 #[contractimpl]
@@ -31,8 +27,11 @@ impl ExampleContract {
     }
 }
 
+#[contracttrait]
+impl AccessControl for ExampleContract {}
+
+#[contracttrait]
 impl SACAdminWrapper for ExampleContract {
-    type Impl = SACAdminWrapper!();
     #[only_admin]
     fn set_admin(e: &Env, new_admin: &Address, _operator: &Address) {
         Self::Impl::set_admin(e, new_admin, _operator);
