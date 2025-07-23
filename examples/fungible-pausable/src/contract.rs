@@ -9,11 +9,16 @@
 //! [`stellar_fungible::fungible::FungibleToken`] and
 //! [`stellar_fungible::burnable::FungibleBurnable`].
 
-use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env, String};
-use stellar_fungible::{impl_token_interface, FungibleBurnable, FungibleToken};
-use stellar_ownable::{Ownable, OwnableExt};
-use stellar_pausable::{Pausable, PausableExt};
-use stellar_pausable_macros::when_not_paused;
+use soroban_sdk::{
+    contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env, String,
+    Symbol,
+};
+use stellar_contract_utils::pausable::{self as pausable, Pausable};
+use stellar_macros::when_not_paused;
+use stellar_tokens::{
+    fungible::{burnable::FungibleBurnable, Base, FungibleToken},
+    impl_token_interface,
+};
 
 #[contract]
 pub struct ExampleContract;

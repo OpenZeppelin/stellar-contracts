@@ -1,0 +1,21 @@
+[package]
+name = "stellar-tokens"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = true
+version.workspace = true
+description = "Fungible and NonFungible Tokens for the Stellar contracts."
+
+[lib]
+crate-type = ["lib", "cdylib"]
+doctest = false
+
+[dependencies]
+stellar-pausable = { workspace = true }
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+soroban-test-helpers = { workspace = true }
+stellar-event-assertion = { workspace = true }

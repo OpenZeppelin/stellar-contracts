@@ -7,8 +7,8 @@
 //! **IMPORTANT**: this example is for demonstration purposes, and authorization
 //! is not taken into consideration
 
-use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env};
-use stellar_fungible::{
+use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use stellar_tokens::fungible::{
     capped::{check_cap, set_cap},
     FungibleToken,
 };

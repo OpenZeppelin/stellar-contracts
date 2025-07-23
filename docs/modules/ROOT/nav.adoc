@@ -2,10 +2,11 @@
 ** xref:tokens/fungible/fungible.adoc[Fungible Tokens]
 ** xref:tokens/non-fungible/non-fungible.adoc[Non-Fungible Tokens]
 
+* Access
+** xref:access/access-control.adoc[Access Control]
+** xref:access/ownable.adoc[Ownable]
 
 * Utilities
-** xref:utils/access/access-control.adoc[Access Control]
-** xref:utils/access/ownable.adoc[Ownable]
 ** xref:utils/pausable.adoc[Pausable]
 ** xref:utils/upgradeable.adoc[Upgradeable]
 ** xref:utils/crypto.adoc[Cryptography]

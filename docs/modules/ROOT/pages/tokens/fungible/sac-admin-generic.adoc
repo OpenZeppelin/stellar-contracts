@@ -3,7 +3,7 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = SAC Admin Generic
 
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/fungible/src/utils/sac_admin_generic[Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/tokens/src/fungible/utils/sac_admin_generic[Source Code]
 
 == Overview
 

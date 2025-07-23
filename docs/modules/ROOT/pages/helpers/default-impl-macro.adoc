@@ -3,7 +3,7 @@
 :github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
 = Default Implementation Macro
 
-https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/contract-utils/default-impl-macro[Source Code]
+https://github.com/OpenZeppelin/stellar-contracts/tree/main/packages/contract-utils/src/default-impl-macro[Source Code]
 
 == Overview
 
@@ -77,8 +77,8 @@ This process ensures that all trait methods are available to the client generate
 [source,rust]
 ----
 use soroban_sdk::{contract, contractimpl, Address, Env};
-use stellar_fungible::FungibleToken;
-use stellar_default_impl::default_impl;
+use stellar_tokens::fungible::FungibleToken;
+use stellar_macros::default_impl;
 
 #[contract]
 pub struct MyToken;

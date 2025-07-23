@@ -5,10 +5,14 @@
 //! controlled token transfers by an admin who can allow or disallow specific
 //! accounts.
 
-use soroban_sdk::{contract, contractimpl, contracttrait, symbol_short, Address, Env, String};
-use stellar_access_control::AccessControl;
-use stellar_access_control_macros::has_role;
-use stellar_fungible::{FungibleAllowList, FungibleAllowListExt, FungibleBurnable, FungibleToken};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
+use stellar_access::access_control::{self as access_control, AccessControl};
+use stellar_macros::{default_impl, only_role};
+use stellar_tokens::fungible::{
+    allowlist::{AllowList, FungibleAllowList},
+    burnable::FungibleBurnable,
+    Base, FungibleToken,
+};
 
 #[contract]
 pub struct ExampleContract;

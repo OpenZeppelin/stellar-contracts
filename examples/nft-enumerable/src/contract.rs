@@ -4,9 +4,12 @@
 //! enumeration of all the token IDs in the contract as well as all the token
 //! IDs owned by each account.
 
-use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env, String};
-use stellar_non_fungible::{
-    enumerable::Enumerable, NonFungibleBurnable, NonFungibleEnumerable, NonFungibleToken,
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
+use stellar_macros::default_impl;
+use stellar_tokens::non_fungible::{
+    burnable::NonFungibleBurnable,
+    enumerable::{Enumerable, NonFungibleEnumerable},
+    Base, NonFungibleToken,
 };
 use stellar_ownable::Ownable;
 

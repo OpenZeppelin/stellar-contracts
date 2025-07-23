@@ -4,10 +4,10 @@
 //! setting and querying royalty information for NFTs following the ERC2981
 //! standard.
 
-use soroban_sdk::{contract, contractimpl, contracttrait, symbol_short, Address, Env, String};
-use stellar_access_control::AccessControl;
-use stellar_access_control_macros::has_role;
-use stellar_non_fungible::{NonFungibleRoyalties, NonFungibleToken};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
+use stellar_access::access_control::{self as access_control, AccessControl};
+use stellar_macros::{default_impl, only_admin, only_role};
+use stellar_tokens::non_fungible::{royalties::NonFungibleRoyalties, Base, NonFungibleToken};
 
 #[contract]
 pub struct ExampleContract;
@@ -74,7 +74,7 @@ impl NonFungibleRoyalties for ExampleContract {
         Self::Impl::set_default_royalty(e, receiver, basis_points, operator);
     }
 
-    #[has_role(operator, "manager")]
+    #[only_role(operator, "manager")]
     fn set_token_royalty(
         e: &Env,
         token_id: u32,
