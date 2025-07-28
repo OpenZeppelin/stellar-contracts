@@ -3,12 +3,13 @@ use stellar_macros::default_impl;
 use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, FungibleToken};
 
 #[contract]
-#[derive_contract(
-    FungibleToken,
-    FungibleBurnable,
-)]
 pub struct ExampleContract;
 
+#[contracttrait]
+impl FungibleToken for ExampleContract {}
+
+#[contracttrait]
+impl FungibleBurnable for ExampleContract {}
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env) {

@@ -3,9 +3,11 @@ use stellar_macros::default_impl;
 use stellar_tokens::fungible::{Base, FungibleToken};
 
 #[contract]
-#[derive_contract(FungibleToken)]
 pub struct ExampleContract;
 
+
+#[contracttrait]
+impl FungibleToken for ExampleContract {} ,
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env) {

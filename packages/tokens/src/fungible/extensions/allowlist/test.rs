@@ -2,15 +2,14 @@ extern crate std;
 
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
-use crate::{
-    extensions::allowlist::{FungibleAllowList, FungibleAllowListExt},
-    extensions::{allowlist::storage::AllowList, burnable::FungibleBurnable},
-    fungible::FungibleToken,
-    Base,
+use crate::fungible::{
+    extensions::allowlist::{AllowList, FungibleAllowList, FungibleAllowListExt},
+    extensions::burnable::FungibleBurnable,
+    FTBase, FungibleToken,
 };
 
-type BurableAllowList = FungibleAllowListExt<AllowList, Base>;
-type FungibleTokenAllowList = FungibleAllowListExt<AllowList, Base>;
+type BurableAllowList = FungibleAllowListExt<AllowList, FTBase>;
+type FungibleTokenAllowList = FungibleAllowListExt<AllowList, FTBase>;
 
 #[contract]
 struct MockContract;
@@ -70,14 +69,14 @@ fn transfer_with_allowed_users_works() {
         AllowList::allow_user(&e, &user2, &user1);
 
         // Mint tokens to user1
-        Base::internal_mint(&e, &user1, 100);
+        FTBase::internal_mint(&e, &user1, 100);
 
         // Transfer tokens from user1 to user2
         FungibleTokenAllowList::transfer(&e, &user1, &user2, 50);
 
         // Verify balances
-        assert_eq!(Base::balance(&e, &user1), 50);
-        assert_eq!(Base::balance(&e, &user2), 50);
+        assert_eq!(FTBase::balance(&e, &user1), 50);
+        assert_eq!(FTBase::balance(&e, &user2), 50);
     });
 }
 
@@ -93,13 +92,13 @@ fn allowlist_burn_override_works() {
         AllowList::allow_user(&e, &user, &user);
 
         // Mint tokens to user
-        Base::internal_mint(&e, &user, 100);
+        FTBase::internal_mint(&e, &user, 100);
 
         // Burn tokens from user
         BurableAllowList::burn(&e, &user, 50);
 
         // Verify balance
-        assert_eq!(Base::balance(&e, &user), 50);
+        assert_eq!(FTBase::balance(&e, &user), 50);
     });
 }
 
@@ -116,16 +115,16 @@ fn allowlist_burn_from_override_works() {
         AllowList::allow_user(&e, &user1, &user1);
 
         // Mint tokens to user1
-        Base::internal_mint(&e, &user1, 100);
+        FTBase::internal_mint(&e, &user1, 100);
 
         // Allow user2 to burn tokens from user1
-        Base::approve(&e, &user1, &user2, 50, 100);
+        FTBase::approve(&e, &user1, &user2, 50, 100);
 
         // Burn tokens from user1 by user2
         BurableAllowList::burn_from(&e, &user2, &user1, 50);
 
         // Verify balance
-        assert_eq!(Base::balance(&e, &user1), 50);
+        assert_eq!(FTBase::balance(&e, &user1), 50);
     });
 }
 
@@ -143,7 +142,7 @@ fn transfer_with_sender_not_allowed_panics() {
         AllowList::allow_user(&e, &user2, &user1);
 
         // Mint tokens to user1
-        Base::internal_mint(&e, &user1, 100);
+        FTBase::internal_mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 (not allowed) to user2
         FungibleTokenAllowList::transfer(&e, &user1, &user2, 50);
@@ -164,7 +163,7 @@ fn transfer_with_receiver_not_allowed_panics() {
         AllowList::allow_user(&e, &user1, &user1);
 
         // Mint tokens to user1
-        Base::internal_mint(&e, &user1, 100);
+        FTBase::internal_mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 to user2 (not allowed)
         FungibleTokenAllowList::transfer(&e, &user1, &user2, 50);
@@ -196,7 +195,7 @@ fn burn_with_not_allowed_panics() {
 
     e.as_contract(&address, || {
         // Mint tokens to user
-        Base::internal_mint(&e, &user, 100);
+        FTBase::internal_mint(&e, &user, 100);
 
         // Try to burn tokens from user (not allowed)
         BurableAllowList::burn(&e, &user, 50);
@@ -214,10 +213,10 @@ fn burn_from_with_not_allowed_panics() {
 
     e.as_contract(&address, || {
         // Mint tokens to user1
-        Base::internal_mint(&e, &user1, 100);
+        FTBase::internal_mint(&e, &user1, 100);
 
         // Allow user2 to burn tokens from user1
-        Base::approve(&e, &user1, &user2, 50, 100);
+        FTBase::approve(&e, &user1, &user2, 50, 100);
 
         // Try to burn tokens from user1 by user2 (not allowed)
         BurableAllowList::burn_from(&e, &user2, &user1, 50);

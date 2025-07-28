@@ -1,11 +1,9 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 
-use crate::{
-    non_fungible::{
-        emit_approve, emit_approve_for_all, emit_mint, emit_transfer, NonFungibleToken,
-        NonFungibleTokenError, MAX_BASE_URI_LEN, MAX_NUM_DIGITS,
-    },
-    sequential::increment_token_id,
+use crate::non_fungible::{
+    emit_approve, emit_approve_for_all, emit_mint, emit_transfer, sequential::increment_token_id,
+    NonFungibleToken, NonFungibleTokenError, BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD,
+    MAX_BASE_URI_LEN, MAX_NUM_DIGITS, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
 };
 
 /// Storage container for the token for which an approval is granted
@@ -35,9 +33,9 @@ pub enum NFTStorageKey {
 }
 
 /// Default marker type
-pub struct Base;
+pub struct NFTBase;
 
-impl NonFungibleToken for Base {
+impl NonFungibleToken for NFTBase {
     type Impl = Self;
 
     fn balance(e: &Env, account: &soroban_sdk::Address) -> u32 {
@@ -63,7 +61,7 @@ impl NonFungibleToken for Base {
 
     fn transfer(e: &Env, from: &soroban_sdk::Address, to: &soroban_sdk::Address, token_id: u32) {
         from.require_auth();
-        Base::update(e, Some(from), Some(to), token_id);
+        NFTBase::update(e, Some(from), Some(to), token_id);
         emit_transfer(e, from, to, token_id);
     }
 
@@ -75,8 +73,8 @@ impl NonFungibleToken for Base {
         token_id: u32,
     ) {
         spender.require_auth();
-        Base::check_spender_approval(e, spender, from, token_id);
-        Base::update(e, Some(from), Some(to), token_id);
+        NFTBase::check_spender_approval(e, spender, from, token_id);
+        NFTBase::update(e, Some(from), Some(to), token_id);
         emit_transfer(e, from, to, token_id);
     }
 
@@ -88,8 +86,8 @@ impl NonFungibleToken for Base {
         live_until_ledger: u32,
     ) {
         approver.require_auth();
-        let owner = Base::owner_of(e, token_id);
-        Base::approve_for_owner(e, &owner, approver, approved, token_id, live_until_ledger);
+        let owner = NFTBase::owner_of(e, token_id);
+        NFTBase::approve_for_owner(e, &owner, approver, approved, token_id, live_until_ledger);
     }
 
     fn approve_for_all(
@@ -190,7 +188,7 @@ impl NonFungibleToken for Base {
     }
 }
 
-impl Base {
+impl NFTBase {
     // ################## QUERY STATE ##################
 
     /// Returns the token metadata such as `base_uri`, `name` and `symbol`.
@@ -218,9 +216,9 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::get_metadata`] errors.
+    /// * refer to [`NFTBase::get_metadata`] errors.
     pub fn base_uri(e: &Env) -> String {
-        Base::get_metadata(e).base_uri
+        NFTBase::get_metadata(e).base_uri
     }
 
     /// Composes and returns a URI for a specific `token_id`, without
@@ -239,7 +237,7 @@ impl Base {
             // `token_id`` (currently `u32`)
             let uri = &mut [0u8; MAX_BASE_URI_LEN + MAX_NUM_DIGITS];
 
-            let (id, digits) = Base::token_id_to_string(e, token_id);
+            let (id, digits) = NFTBase::token_id_to_string(e, token_id);
 
             base_uri.copy_into_slice(&mut uri[..len]);
             let end = len + digits;
@@ -266,9 +264,9 @@ impl Base {
     ///
     /// * [`NonFungibleTokenError::IncorrectOwner`] - If the `from` address is
     ///   not the owner of the token.
-    /// * refer to [`Base::owner_of`] errors.
-    /// * refer to [`Base::decrease_balance`] errors.
-    /// * refer to [`Base::increase_balance`] errors.
+    /// * refer to [`NFTBase::owner_of`] errors.
+    /// * refer to [`NFTBase::decrease_balance`] errors.
+    /// * refer to [`NFTBase::increase_balance`] errors.
     pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
         if let Some(from_address) = from {
             let owner = Self::owner_of(e, token_id);
@@ -278,7 +276,7 @@ impl Base {
                 panic_with_error!(e, NonFungibleTokenError::IncorrectOwner);
             }
 
-            Base::decrease_balance(e, from_address, 1);
+            NFTBase::decrease_balance(e, from_address, 1);
 
             // Clear any existing approval
             let approval_key = NFTStorageKey::Approval(token_id);
@@ -289,7 +287,7 @@ impl Base {
         }
 
         if let Some(to_address) = to {
-            Base::increase_balance(e, to_address, 1);
+            NFTBase::increase_balance(e, to_address, 1);
 
             // Set the new owner
             e.storage().persistent().set(&NFTStorageKey::Owner(token_id), to_address);
@@ -328,7 +326,7 @@ impl Base {
         token_id: u32,
         live_until_ledger: u32,
     ) {
-        if approver != owner && !Base::is_approved_for_all(e, owner, approver) {
+        if approver != owner && !NFTBase::is_approved_for_all(e, owner, approver) {
             panic_with_error!(e, NonFungibleTokenError::InvalidApprover);
         }
 
@@ -373,8 +371,8 @@ impl Base {
     pub fn check_spender_approval(e: &Env, spender: &Address, owner: &Address, token_id: u32) {
         // If `spender` is not the owner, they must have explicit approval.
         let is_spender_owner = spender == owner;
-        let is_spender_approved = Base::get_approved(e, token_id) == Some(spender.clone());
-        let has_spender_approval_for_all = Base::is_approved_for_all(e, owner, spender);
+        let is_spender_approved = NFTBase::get_approved(e, token_id) == Some(spender.clone());
+        let has_spender_approval_for_all = NFTBase::is_approved_for_all(e, owner, spender);
 
         if !is_spender_owner && !is_spender_approved && !has_spender_approval_for_all {
             panic_with_error!(e, NonFungibleTokenError::InsufficientApproval);
@@ -395,7 +393,7 @@ impl Base {
     /// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `to`
     ///   would overflow.
     pub fn increase_balance(e: &Env, to: &Address, amount: u32) {
-        let Some(balance) = Base::balance(e, to).checked_add(amount) else {
+        let Some(balance) = NFTBase::balance(e, to).checked_add(amount) else {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);
         };
         e.storage().persistent().set(&NFTStorageKey::Balance(to.clone()), &balance);
@@ -415,7 +413,7 @@ impl Base {
     /// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `from`
     ///   would overflow.
     pub fn decrease_balance(e: &Env, from: &Address, amount: u32) {
-        let Some(balance) = Base::balance(e, from).checked_sub(amount) else {
+        let Some(balance) = NFTBase::balance(e, from).checked_sub(amount) else {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);
         };
         e.storage().persistent().set(&NFTStorageKey::Balance(from.clone()), &balance);

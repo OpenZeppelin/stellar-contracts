@@ -1,11 +1,11 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
-use crate::{
-    blocklist::{FungibleBlockList, FungibleBlockListExt},
-    burnable::FungibleBurnable,
-    extensions::blocklist::{emit_user_blocked, emit_user_unblocked},
-    FungibleTokenError,
-    fungible::FungibleToken,
+use crate::fungible::{
+    extensions::{
+        blocklist::{emit_user_blocked, emit_user_unblocked, FungibleBlockListExt},
+        burnable::FungibleBurnable,
+    },
+    FungibleToken, FungibleTokenError, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
 pub struct BlockList;
@@ -85,7 +85,6 @@ impl<T: super::FungibleBlockList, N: FungibleToken> FungibleToken for FungibleBl
         N::transfer(e, from, to, amount);
     }
 
-   
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         if T::blocked(e, from) || T::blocked(e, to) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
@@ -103,7 +102,9 @@ impl<T: super::FungibleBlockList, N: FungibleToken> FungibleToken for FungibleBl
     }
 }
 
-impl<T: FungibleBlockList, N: FungibleBurnable> FungibleBurnable for FungibleBlockListExt<T, N> {
+impl<T: super::FungibleBlockList, N: FungibleBurnable> FungibleBurnable
+    for FungibleBlockListExt<T, N>
+{
     type Impl = N;
 
     fn burn(e: &Env, from: &Address, amount: i128) {

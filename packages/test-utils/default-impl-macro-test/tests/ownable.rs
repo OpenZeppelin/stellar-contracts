@@ -1,23 +1,27 @@
 use soroban_sdk::{
-    contract, contractimpl, contracttype, derive_contract, testutils::Address as _, Address, Env,
-    String,
+    contract, contractimpl, contracttrait, contracttype, derive_contract, testutils::Address as _,
+    Address, Env, String,
 };
-use stellar_access::ownable::{set_owner, Ownable};
-use stellar_macros::{default_impl, only_owner};
-use stellar_tokens::fungible::{Base, FungibleToken};
+use stellar_access::Ownable;
+use stellar_macros::only_owner;
+use stellar_tokens::FungibleToken;
 
 #[contracttype]
 pub enum DataKey {
     Owner,
 }
 
-#[derive_contract(FungibleToken, Ownable)]
 #[contract]
 pub struct ExampleContract;
 
+#[contracttrait]
+impl FungibleToken for ExampleContract {}
+
+#[contracttrait]
+impl Ownable for ExampleContract {}
+
 #[contractimpl]
 impl ExampleContract {
-
     pub fn __constructor(e: &Env, owner: Address) {
         Self::set_owner(e, &owner);
         Base::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
@@ -28,7 +32,6 @@ impl ExampleContract {
         Base::internal_mint(e, &to, amount);
     }
 }
-
 
 fn create_client<'a>(e: &Env, owner: &Address) -> ExampleContractClient<'a> {
     let address = e.register(ExampleContract, (owner,));

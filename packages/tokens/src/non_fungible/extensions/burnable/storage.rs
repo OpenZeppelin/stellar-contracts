@@ -1,8 +1,10 @@
 use soroban_sdk::{Address, Env};
 
-use crate::{burnable::NonFungibleBurnable, extensions::burnable::emit_burn, Base};
+use crate::non_fungible::{
+    burnable::NonFungibleBurnable, extensions::burnable::emit_burn, NFTBase,
+};
 
-impl NonFungibleBurnable for Base {
+impl NonFungibleBurnable for NFTBase {
     type Impl = Self;
     /// Destroys the token with `token_id` from `from`, ensuring ownership
     /// checks, and emits a `burn` event.
@@ -15,7 +17,7 @@ impl NonFungibleBurnable for Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::update`] errors.
+    /// * refer to [`NFTBase::update`] errors.
     ///
     /// # Events
     ///
@@ -27,7 +29,7 @@ impl NonFungibleBurnable for Base {
     /// Authorization for `from` is required.
     fn burn(e: &Env, from: &Address, token_id: u32) {
         from.require_auth();
-        Base::update(e, Some(from), None, token_id);
+        NFTBase::update(e, Some(from), None, token_id);
         emit_burn(e, from, token_id);
     }
 
@@ -44,8 +46,8 @@ impl NonFungibleBurnable for Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::check_spender_approval`] errors.
-    /// * refer to [`Base::update`] errors.
+    /// * refer to [`NFTBase::check_spender_approval`] errors.
+    /// * refer to [`NFTBase::update`] errors.
     ///
     /// # Events
     ///
@@ -57,8 +59,8 @@ impl NonFungibleBurnable for Base {
     /// Authorization for `spender` is required.
     fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
         spender.require_auth();
-        Base::check_spender_approval(e, spender, from, token_id);
-        Base::update(e, Some(from), None, token_id);
+        NFTBase::check_spender_approval(e, spender, from, token_id);
+        NFTBase::update(e, Some(from), None, token_id);
         emit_burn(e, from, token_id);
     }
 }

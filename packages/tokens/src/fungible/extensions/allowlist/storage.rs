@@ -1,9 +1,11 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::fungible::{
-    extensions::allowlist::{emit_user_allowed, emit_user_disallowed},
-    overrides::{Base, ContractOverrides},
-    FungibleTokenError, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
+    extensions::{
+        allowlist::{emit_user_allowed, emit_user_disallowed},
+        burnable::FungibleBurnable,
+    },
+    FungibleToken, FungibleTokenError, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
 pub struct AllowList;
@@ -84,8 +86,8 @@ impl<T: super::FungibleAllowList, N: FungibleToken> crate::fungible::FungibleTok
     }
 }
 
-impl<T: super::FungibleAllowList, N: crate::extensions::burnable::FungibleBurnable>
-    crate::extensions::burnable::FungibleBurnable for super::FungibleAllowListExt<T, N>
+impl<T: super::FungibleAllowList, N: FungibleBurnable> FungibleBurnable
+    for super::FungibleAllowListExt<T, N>
 {
     type Impl = N;
 

@@ -18,13 +18,11 @@
 //! "examples/fungible-pausable" for better organization of the code,
 //! consistency and ease of inspection/debugging.
 
-use soroban_sdk::{
-    contract, contracterror, contractimpl, panic_with_error, symbol_short, token::TokenInterface,
-    Address, Env, String, Symbol,
-};
-use stellar_contract_utils::pausable::{self as pausable, Pausable};
+use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env, String};
+use stellar_access::{Ownable, OwnableExt};
+use stellar_contract_utils::{Pausable, PausableExt};
 use stellar_macros::when_not_paused;
-use stellar_tokens::fungible::Base;
+use stellar_tokens::{FungibleBurnable, FungibleToken};
 
 #[contract]
 
@@ -38,8 +36,8 @@ impl ExampleContract {
         Self::internal_mint(e, &owner, initial_supply);
     }
 
+    #[when_not_paused]
     pub fn mint(e: &Env, account: Address, amount: i128) {
-        Self::when_not_paused(e);
         Self::enforce_owner_auth(e);
         Self::internal_mint(e, &account, amount);
     }

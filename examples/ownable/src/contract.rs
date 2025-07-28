@@ -3,9 +3,9 @@
 //! Demonstrates an example usage of `ownable` module by
 //! implementing `#[only_owner]` macro on a sensitive function.
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
-use stellar_access::ownable::{set_owner, Ownable};
-use stellar_macros::{default_impl, only_owner};
+use soroban_sdk::{contract, contractimpl, contracttrait, contracttype, Address, Env};
+use stellar_access::Ownable;
+use stellar_macros::only_owner;
 
 #[contracttype]
 pub enum DataKey {

@@ -1,9 +1,8 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
-use crate::{
+use crate::non_fungible::{
     royalties::{emit_set_default_royalty, emit_set_token_royalty, NonFungibleRoyalties},
-    Base, NonFungibleTokenError,
-    non_fungible::NonFungibleToken,
+    NFTBase, NonFungibleToken, NonFungibleTokenError, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
 };
 
 /// Storage container for royalty information
@@ -20,7 +19,7 @@ pub enum NFTRoyaltiesStorageKey {
     TokenRoyalty(u32),
 }
 
-impl NonFungibleRoyalties for Base {
+impl NonFungibleRoyalties for NFTBase {
     type Impl = Self;
 
     /// Sets the global default royalty information for the entire collection.
@@ -61,7 +60,7 @@ impl NonFungibleRoyalties for Base {
         }
 
         // Verify token exists by checking owner
-        let _ = Base::owner_of(e, token_id);
+        let _ = NFTBase::owner_of(e, token_id);
 
         // Store the token royalty information
         let key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
@@ -74,7 +73,7 @@ impl NonFungibleRoyalties for Base {
     /// Removes token-specific royalty information.
     fn remove_token_royalty(e: &Env, token_id: u32, _operator: &Address) {
         // Verify token exists by checking owner
-        let _ = Base::owner_of(e, token_id);
+        let _ = NFTBase::owner_of(e, token_id);
 
         // Remove the token royalty information
         let key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
@@ -87,7 +86,7 @@ impl NonFungibleRoyalties for Base {
     /// the royalty amount.
     fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
         // Verify token exists by checking owner
-        let _ = Base::owner_of(e, token_id);
+        let _ = NFTBase::owner_of(e, token_id);
 
         // Check if there's a specific royalty for this token
         let token_key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);

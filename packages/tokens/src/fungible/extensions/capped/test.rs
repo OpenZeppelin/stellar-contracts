@@ -6,10 +6,8 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::fungible::{
     extensions::capped::{check_cap, query_cap, set_cap},
-    Base,
+    FTBase, FungibleToken,
 };
-
-use crate::fungible::FungibleToken;
 
 #[contract]
 struct MockContract;
@@ -24,10 +22,10 @@ fn test_mint_under_cap() {
         set_cap(&e, 1000);
 
         check_cap(&e, 500);
-        Base::internal_mint(&e, &user, 500);
+        FTBase::internal_mint(&e, &user, 500);
 
-        assert_eq!(Base::balance(&e, &user), 500);
-        assert_eq!(Base::total_supply(&e), 500);
+        assert_eq!(FTBase::balance(&e, &user), 500);
+        assert_eq!(FTBase::total_supply(&e), 500);
     });
 }
 
@@ -41,10 +39,10 @@ fn test_mint_exact_cap() {
         set_cap(&e, 1000);
 
         check_cap(&e, 1000);
-        Base::internal_mint(&e, &user, 1000);
+        FTBase::internal_mint(&e, &user, 1000);
 
-        assert_eq!(Base::balance(&e, &user), 1000);
-        assert_eq!(Base::total_supply(&e), 1000);
+        assert_eq!(FTBase::balance(&e, &user), 1000);
+        assert_eq!(FTBase::total_supply(&e), 1000);
     });
 }
 
@@ -59,7 +57,7 @@ fn test_mint_exceeds_cap() {
         set_cap(&e, 1000);
 
         check_cap(&e, 1001);
-        Base::internal_mint(&e, &user, 1001); // This should panic
+        FTBase::internal_mint(&e, &user, 1001); // This should panic
     });
 }
 
@@ -75,14 +73,14 @@ fn test_mint_multiple_exceeds_cap() {
 
         // Mint 600 tokens first
         check_cap(&e, 600);
-        Base::internal_mint(&e, &user, 600);
+        FTBase::internal_mint(&e, &user, 600);
 
-        assert_eq!(Base::balance(&e, &user), 600);
-        assert_eq!(Base::total_supply(&e), 600);
+        assert_eq!(FTBase::balance(&e, &user), 600);
+        assert_eq!(FTBase::total_supply(&e), 600);
 
         // Attempt to mint 500 more tokens (would exceed cap)
         check_cap(&e, 500);
-        Base::internal_mint(&e, &user, 500); // This should panic
+        FTBase::internal_mint(&e, &user, 500); // This should panic
     });
 }
 
@@ -95,7 +93,7 @@ fn test_check_cap_overflows() {
 
     e.as_contract(&contract_address, || {
         set_cap(&e, i128::MAX);
-        Base::internal_mint(&e, &user, i128::MAX);
+        FTBase::internal_mint(&e, &user, i128::MAX);
 
         check_cap(&e, 1); // should overflow
     });

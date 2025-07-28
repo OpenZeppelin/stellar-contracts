@@ -12,8 +12,8 @@ crate-type = ["lib", "cdylib"]
 doctest = false
 
 [dependencies]
-stellar-pausable = { workspace = true }
 soroban-sdk = { workspace = true }
+stellar-contract-utils = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

@@ -51,19 +51,20 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{contracterror, symbol_short, Address, Env};
+use soroban_sdk::{contracterror, contracttrait, panic_with_error, symbol_short, Env};
 
-pub use crate::pausable::storage::{pause, paused, unpause, when_not_paused, when_paused};
+pub use crate::pausable::storage::{
+    pause, paused, unpause, when_not_paused, when_paused, PausableDefault,
+};
 
+#[contracttrait(default = PausableDefault, is_extension = true)]
 pub trait Pausable {
     /// Returns true if the contract is paused, and false otherwise.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    fn paused(e: &Env) -> bool {
-        crate::pausable::paused(e)
-    }
+    fn paused(e: &Env) -> bool;
 
     /// Triggers `Paused` state.
     ///
@@ -153,7 +154,9 @@ pub trait Pausable {
     #[internal]
     fn when_paused(e: &Env) {
         if !Self::paused(e) {
-            panic_with_error!(e, PausableError::ExpectedPause);
+            {
+                e.panic_with_error(PausableError::ExpectedPause);
+            };
         }
     }
 }

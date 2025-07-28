@@ -76,19 +76,19 @@
 // /// ```
 // pub trait ContractOverrides {
 //     fn balance(e: &Env, owner: &Address) -> u32 {
-//         Base::balance(e, owner)
+//         NFTBase::balance(e, owner)
 //     }
 
 //     fn owner_of(e: &Env, token_id: u32) -> Address {
-//         Base::owner_of(e, token_id)
+//         NFTBase::owner_of(e, token_id)
 //     }
 
 //     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-//         Base::transfer(e, from, to, token_id);
+//         NFTBase::transfer(e, from, to, token_id);
 //     }
 
 //     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
-//         Base::transfer_from(e, spender, from, to, token_id);
+//         NFTBase::transfer_from(e, spender, from, to, token_id);
 //     }
 
 //     fn approve(
@@ -98,35 +98,33 @@
 //         token_id: u32,
 //         live_until_ledger: u32,
 //     ) {
-//         Base::approve(e, approver, approved, token_id, live_until_ledger);
+//         NFTBase::approve(e, approver, approved, token_id, live_until_ledger);
 //     }
 
 //     fn approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
-//         Base::approve_for_all(e, owner, operator, live_until_ledger);
+//         NFTBase::approve_for_all(e, owner, operator, live_until_ledger);
 //     }
 
 //     fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
-//         Base::get_approved(e, token_id)
+//         NFTBase::get_approved(e, token_id)
 //     }
 
 //     fn is_approved_for_all(e: &Env, owner: &Address, operator: &Address) -> bool {
-//         Base::is_approved_for_all(e, owner, operator)
+//         NFTBase::is_approved_for_all(e, owner, operator)
 //     }
 
 //     fn name(e: &Env) -> String {
-//         Base::name(e)
+//         NFTBase::name(e)
 //     }
 
 //     fn symbol(e: &Env) -> String {
-//         Base::symbol(e)
+//         NFTBase::symbol(e)
 //     }
 
 //     fn token_uri(e: &Env, token_id: u32) -> String {
-//         Base::token_uri(e, token_id)
+//         NFTBase::token_uri(e, token_id)
 //     }
 // }
 
-
-
-// // No override required for the `Base` contract type.
-// impl ContractOverrides for Base {}
+// // No override required for the `NFTBase` contract type.
+// impl ContractOverrides for NFTBase {}

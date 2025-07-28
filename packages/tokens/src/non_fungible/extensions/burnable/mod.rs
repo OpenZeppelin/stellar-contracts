@@ -16,7 +16,7 @@ use soroban_sdk::{contracttrait, symbol_short, Address, Env};
 /// contract use cases.
 ///
 /// `storage.rs` file of this module provides the `NonFungibelBurnable` trait
-/// implementation for the `Base` contract type. For other contract types (eg.
+/// implementation for the `NFTBase` contract type. For other contract types (eg.
 /// `Enumerable`, `Consecutive`), the overrides of the `NonFungibleBurnable`
 /// trait methods can be found in their respective `storage.rs` file.
 ///
@@ -54,7 +54,7 @@ use soroban_sdk::{contracttrait, symbol_short, Address, Env};
 ///     /* and the macro will generate all the missing default implementations for you */
 /// }
 /// ```
-#[contracttrait(default = Base)]
+#[contracttrait(default = NFTBase)]
 pub trait NonFungibleBurnable {
     /// Destroys the token with `token_id` from `from`.
     ///

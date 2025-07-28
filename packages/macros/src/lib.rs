@@ -7,10 +7,9 @@ mod upgradeable;
 use access_control::{generate_any_role_check, generate_role_check};
 use default_impl_macro::generate_default_impl;
 use helpers::*;
-use pausable::generate_pause_check;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, ItemFn};
+use syn::{parse_macro_input, DeriveInput, Item};
 use upgradeable::*;
 
 /* DEFAULT_IMPL_MACRO */
@@ -104,14 +103,10 @@ pub fn default_impl(attrs: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
-    let input_fn = parse_macro_input!(input as ItemFn);
-
+    let input_fn = parse_macro_input!(input as Item);
     // Generate the function with the admin authorization check
-    let auth_check_path = quote! { stellar_access::access_control::enforce_admin_auth };
-    let expanded = generate_auth_check(&input_fn, auth_check_path);
-
-    TokenStream::from(expanded)
+    let auth_check_path = quote! { Self:enforce_admin_auth };
+    insert_check(input_fn, auth_check_path).into()
 }
 
 /// A procedural macro that ensures the parameter has the specified role.
@@ -271,14 +266,7 @@ pub fn only_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn only_owner(attrs: TokenStream, input: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
-    let input_fn = parse_macro_input!(input as ItemFn);
-
-    // Generate the function with the owner authorization check
-    let auth_check_path = quote! { stellar_access::ownable::enforce_owner_auth };
-    let expanded = generate_auth_check(&input_fn, auth_check_path);
-
-    TokenStream::from(expanded)
+    insert_check(parse_macro_input!(input as Item), quote! { Self::enforce_owner_auth}).into()
 }
 
 /// Adds a pause check at the beginning of the function that ensures the
@@ -304,8 +292,7 @@ pub fn only_owner(attrs: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn when_not_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
-    generate_pause_check(item, "when_not_paused")
+    insert_check(parse_macro_input!(item as Item), quote! { Self::when_not_paused}).into()
 }
 
 /* PAUSABLE MACROS */
@@ -333,8 +320,7 @@ pub fn when_not_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn when_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
-    generate_pause_check(item, "when_paused")
+    insert_check(parse_macro_input!(item as Item), quote! { Self::when_not_paused}).into()
 }
 
 /* UPGRADEABLE MACROS */

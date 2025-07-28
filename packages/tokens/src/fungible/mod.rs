@@ -76,9 +76,8 @@ mod utils;
 mod test;
 
 pub use extensions::{allowlist, blocklist, burnable, capped};
-pub use overrides::{Base, ContractOverrides};
-use soroban_sdk::{contracterror, symbol_short, Address, Env, String};
-pub use storage::{AllowanceData, AllowanceKey, StorageKey};
+use soroban_sdk::{contracterror, contracttrait, symbol_short, Address, Env};
+pub use storage::{AllowanceData, AllowanceKey, FTBase, StorageKey};
 pub use utils::{sac_admin_generic, sac_admin_wrapper};
 
 /// Vanilla Fungible Token Trait
@@ -97,7 +96,7 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// as a method in this trait because it is not a part of the SEP-41 standard,
 /// the function signature may change depending on the implementation.
 ///
-/// We do provide a function [`crate::fungible::Base::mint`] for minting to
+/// We do provide a function [`crate::fungible::FTBase::mint`] for minting to
 /// cover the general use case.
 ///
 /// # Notes
@@ -122,7 +121,7 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// ```
 ///
 /// This trait is implemented for the following Contract Types:
-/// * [`crate::fungible::Base`] (covering the vanilla case, and compatible with
+/// * [`crate::fungible::FTBase`] (covering the vanilla case, and compatible with
 ///   [`crate::fungible::burnable::FungibleBurnable`]) trait
 /// * [`crate::fungible::allowlist::AllowList`] (enabling the compatibility and
 ///   overrides for [`crate::fungible::allowlist::FungibleAllowList`]) trait,
@@ -131,20 +130,14 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 ///   overrides for [`crate::fungible::blocklist::FungibleBlockList`]) trait,
 ///   incompatible with [`crate::fungible::allowlist::AllowList`] trait.
 ///
-/// You can find the default implementations of this trait for `Base`,
+/// You can find the default implementations of this trait for `FTBase`,
 /// `Allowlist`, and `Blocklist` by navigating to:
 /// `ContractType::{method_name}`. For example, if you want to find how
 /// [`FungibleToken::transfer`] is implemented for the `Allowlist` contract
 /// type, you can find it using
 /// [`crate::fungible::allowlist::AllowList::transfer`].
+#[contracttrait(default = FTBase)]
 pub trait FungibleToken {
-    /// Helper type that allows us to override some of the functionality of the
-    /// base trait based on the extensions implemented. You should use
-    /// [`crate::fungible::Base`] as the type if you are not using
-    /// [`crate::fungible::allowlist::AllowList`] or
-    /// [`crate::fungible::blocklist::BlockList`] extensions.
-    type ContractType: ContractOverrides;
-
     /// Returns the total amount of tokens in circulation.
     ///
     /// # Arguments

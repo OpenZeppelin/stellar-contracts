@@ -1,5 +1,6 @@
 use soroban_sdk::{contracttype, panic_with_error, Env};
 
+use super::Pausable;
 use crate::pausable::{emit_paused, emit_unpaused, PausableError};
 
 /// Storage key for the pausable state

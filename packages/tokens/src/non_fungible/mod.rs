@@ -71,15 +71,11 @@ mod storage;
 mod utils;
 
 mod test;
-/// Max. number of digits in a token ID (u32)
-pub const MAX_NUM_DIGITS: usize = 10;
 
 pub use extensions::{burnable, consecutive, enumerable, royalties};
-pub use overrides::{Base, ContractOverrides};
-// ################## TRAIT ##################
-use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
-pub use storage::{ApprovalData, NFTStorageKey};
+pub use storage::{ApprovalData, NFTBase, NFTStorageKey};
 pub use utils::sequential;
+// ################## TRAIT ##################
 
 /// Vanilla NonFungible Token Trait
 ///
@@ -91,8 +87,8 @@ pub use utils::sequential;
 /// as a method in this trait because it is not a part of the standard,
 /// the function signature may change depending on the implementation.
 ///
-/// We do provide a function [`crate::non_fungible::Base::sequential_mint`] for
-/// sequential minting, and [`crate::non_fungible::Base::mint`] for
+/// We do provide a function [`crate::non_fungible::NFTBase::sequential_mint`] for
+/// sequential minting, and [`crate::non_fungible::NFTBase::mint`] for
 /// non-sequential minting strategies.
 ///
 /// # Notes
@@ -117,7 +113,7 @@ pub use utils::sequential;
 /// ```
 ///
 /// This trait is implemented for the following Contract Types:
-/// * [`crate::non_fungible::Base`] (covering the vanilla case, and compatible
+/// * [`crate::non_fungible::NFTBase`] (covering the vanilla case, and compatible
 ///   with [`crate::non_fungible::extensions::burnable::NonFungibleBurnable`])
 ///   trait
 /// * [`crate::non_fungible::extensions::enumerable::Enumerable`] (enabling the
@@ -135,17 +131,17 @@ pub use utils::sequential;
 ///   [`crate::non_fungible::extensions::enumerable::NonFungibleEnumerable`]
 ///   trait.
 ///
-/// You can find the default implementations of this trait for `Base`,
+/// You can find the default implementations of this trait for `NFTBase`,
 /// `Enumerable`, and `Consecutive`, by navigating to:
 /// `ContractType::{method_name}`. For example, if you want to find how
 /// [`NonFungibleToken::transfer`] is implemented for the `Enumerable` contract
 /// type, you can find it using
 /// [`crate::extensions::enumerable::Enumerable::transfer`].
-#[contracttrait(default = Base)]
+#[contracttrait(default = NFTBase)]
 pub trait NonFungibleToken {
     /// Helper type that allows us to override some of the functionality of the
     /// base trait based on the extensions implemented. You should use
-    /// [`crate::Base`] as the type if you are not using
+    /// [`crate::NFTBase`] as the type if you are not using
     /// [`crate::extensions::enumerable::Enumerable`] or
     /// [`crate::extensions::consecutive::Consecutive`] extensions.
     /// Returns the number of tokens owned by `account`.

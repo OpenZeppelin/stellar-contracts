@@ -5,7 +5,7 @@
 use soroban_sdk::{
     contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env, Symbol,
 };
-use stellar_contract_utils::upgradeable::UpgradeableInternal;
+use stellar_contract_utils::upgradeable::{Upgradeable, UpgradeableInternal};
 use stellar_macros::Upgradeable;
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
@@ -17,7 +17,7 @@ pub enum ExampleContractError {
     Unauthorized = 1,
 }
 
-#[derive(Upgradeable)]
+// #[derive(Upgradeable)]
 #[contract]
 pub struct ExampleContract;
 

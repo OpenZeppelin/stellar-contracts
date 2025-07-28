@@ -1,7 +1,7 @@
 use soroban_sdk::{Address, Env};
-use stellar_pausable::{Pausable, PausableExt};
+use stellar_contract_utils::{Pausable, PausableExt};
 
-use crate::{extensions::burnable::FungibleBurnable, fungible::FungibleToken};
+use super::{extensions::burnable::FungibleBurnable, FungibleToken};
 
 impl<T: Pausable, N: FungibleToken> FungibleToken for PausableExt<T, N> {
     type Impl = N;

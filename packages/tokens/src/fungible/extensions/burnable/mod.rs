@@ -4,7 +4,6 @@ mod test;
 
 use soroban_sdk::{symbol_short, Env};
 
-
 /// Burnable Trait for Fungible Token
 ///
 /// The `FungibleBurnable` trait extends the `FungibleToken` trait to provide
@@ -18,7 +17,7 @@ use soroban_sdk::{symbol_short, Env};
 /// Excluding the `burn` functionality from the `[FungibleToken]` trait
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
-#[soroban_sdk::contracttrait(default = Base, is_extension = true)]
+#[soroban_sdk::contracttrait(default = FTBase, is_extension = true)]
 pub trait FungibleBurnable {
     /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.
@@ -65,7 +64,12 @@ pub trait FungibleBurnable {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[amount: i128]`
-    fn burn_from(e: &Env, spender: &soroban_sdk::Address, from: &soroban_sdk::Address, amount: i128);
+    fn burn_from(
+        e: &Env,
+        spender: &soroban_sdk::Address,
+        from: &soroban_sdk::Address,
+        amount: i128,
+    );
 }
 
 // ################## EVENTS ##################

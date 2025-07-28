@@ -1,16 +1,11 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::non_fungible::{
-    emit_mint, Base, ContractOverrides, NonFungibleTokenError, OWNER_EXTEND_AMOUNT,
+    emit_mint, NFTBase, NonFungibleToken, NonFungibleTokenError, OWNER_EXTEND_AMOUNT,
     OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
 
-use crate::{
-    burnable::NonFungibleBurnable,
-    enumerable::NonFungibleEnumerable,
-    non_fungible::{emit_mint, NonFungibleToken},
-    Base, NonFungibleTokenError,
-};
+use super::super::{burnable::NonFungibleBurnable, enumerable::NonFungibleEnumerable};
 
 pub struct Enumerable;
 
@@ -58,7 +53,7 @@ impl NonFungibleEnumerable for Enumerable {
 }
 
 impl NonFungibleToken for Enumerable {
-    type Impl = Base;
+    type Impl = NFTBase;
 
     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
         Enumerable::transfer(e, from, to, token_id);
@@ -70,7 +65,7 @@ impl NonFungibleToken for Enumerable {
 }
 
 impl NonFungibleBurnable for Enumerable {
-    type Impl = Base;
+    type Impl = NFTBase;
 
     fn burn(e: &Env, from: &Address, token_id: u32) {
         Enumerable::burn(e, from, token_id);
@@ -94,7 +89,7 @@ impl Enumerable {
     }
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
-    /// owner's local list. Use along with [`Base::balance`] to enumerate all of
+    /// owner's local list. Use along with [`NFTBase::balance`] to enumerate all of
     /// `owner`'s tokens.
     ///
     /// # Arguments
@@ -153,7 +148,7 @@ impl Enumerable {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::sequential_mint`] errors.
+    /// * refer to [`NFTBase::sequential_mint`] errors.
     /// * refer to [`Enumerable::increment_total_supply`] errors.
     ///
     /// # Events
@@ -163,7 +158,7 @@ impl Enumerable {
     ///
     /// # Notes
     ///
-    /// This is a wrapper around [`Base::sequential_mint()`], that
+    /// This is a wrapper around [`NFTBase::sequential_mint()`], that
     /// also handles the storage updates for:
     /// * total supply
     /// * global token list
@@ -192,7 +187,7 @@ impl Enumerable {
     /// and generating `token_id`s, they should ensure that the `token_id`
     /// is unique and not already in use.
     pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
-        let token_id = Base::sequential_mint(e, to);
+        let token_id = NFTBase::sequential_mint(e, to);
 
         Enumerable::add_to_enumerations(e, to, token_id);
 
@@ -209,7 +204,7 @@ impl Enumerable {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::update`] errors.
+    /// * refer to [`NFTBase::update`] errors.
     /// * refer to [`Enumerable::increment_total_supply`] errors.
     ///
     /// # Events
@@ -217,7 +212,7 @@ impl Enumerable {
     /// * topics - `["mint", to: Address]`
     /// * data - `[token_id: u32]`
     ///
-    /// This is a wrapper around [`Base::update()`], that also
+    /// This is a wrapper around [`NFTBase::update()`], that also
     /// handles the storage updates for:
     /// * total supply
     /// * owner_tokens enumeration
@@ -226,7 +221,7 @@ impl Enumerable {
     /// # Security Warning
     ///
     /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///Base
+    ///NFTBase
     /// It is the responsibility of the implementer to establish appropriate
     /// access controls to ensure that only authorized accounts can execute
     /// minting operations. Failure to implement proper authorization could
@@ -245,7 +240,7 @@ impl Enumerable {
     /// strategy for generating `token_id`s varies by project and must be
     /// implemented accordingly.
     pub fn non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
-        Base::update(e, None, Some(to), token_id);
+        NFTBase::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);
 
         Enumerable::add_to_enumerations(e, to, token_id);
@@ -261,7 +256,7 @@ impl Enumerable {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::burn`] errors.
+    /// * refer to [`NFTBase::burn`] errors.
     /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
     /// * refer to [`Enumerable::remove_from_global_enumeration`] errors.
     ///
@@ -272,13 +267,13 @@ impl Enumerable {
     ///
     /// # Notes
     ///
-    /// This is a wrapper around [`Base::burn`], that also
+    /// This is a wrapper around [`NFTBase::burn`], that also
     /// handles the storage updates for:
     /// * total supply
     /// * owner_tokens enumeration
     /// * global_tokens enumeration
     pub fn burn(e: &Env, from: &Address, token_id: u32) {
-        Base::burn(e, from, token_id);
+        NFTBase::burn(e, from, token_id);
 
         Enumerable::remove_from_enumerations(e, from, token_id);
     }
@@ -296,7 +291,7 @@ impl Enumerable {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::burn_from`] errors.
+    /// * refer to [`NFTBase::burn_from`] errors.
     /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
     /// * refer to [`Enumerable::remove_from_global_enumeration`] errors.
     ///
@@ -307,13 +302,13 @@ impl Enumerable {
     ///
     /// # Notes
     ///
-    /// This is a wrapper around [`Base::burn_from`], that also
+    /// This is a wrapper around [`NFTBase::burn_from`], that also
     /// handles the storage updates for:
     /// * total supply
     /// * owner_tokens enumeration
     /// * global_tokens enumeration
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
-        Base::burn_from(e, spender, from, token_id);
+        NFTBase::burn_from(e, spender, from, token_id);
 
         Enumerable::remove_from_enumerations(e, from, token_id);
     }
@@ -329,7 +324,7 @@ impl Enumerable {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::transfer`] errors.
+    /// * refer to [`NFTBase::transfer`] errors.
     /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
     ///
     /// # Events
@@ -339,11 +334,11 @@ impl Enumerable {
     ///
     /// # Notes
     ///
-    /// This is a wrapper around [`Base::transfer`], that also
+    /// This is a wrapper around [`NFTBase::transfer`], that also
     /// handles the storage updates for:
     /// * owner_tokens enumeration
     pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-        Base::transfer(e, from, to, token_id);
+        NFTBase::transfer(e, from, to, token_id);
 
         if from != to {
             Enumerable::remove_from_owner_enumeration(e, from, token_id);
@@ -364,7 +359,7 @@ impl Enumerable {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::transfer_from`] errors.
+    /// * refer to [`NFTBase::transfer_from`] errors.
     /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
     ///
     /// # Events
@@ -374,11 +369,11 @@ impl Enumerable {
     ///
     /// # Notes
     ///
-    /// This is a wrapper around [`Base::transfer_from`], that also
+    /// This is a wrapper around [`NFTBase::transfer_from`], that also
     /// handles the storage updates for:
     /// * owner_tokens enumeration
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
-        Base::transfer_from(e, spender, from, to, token_id);
+        NFTBase::transfer_from(e, spender, from, to, token_id);
 
         if from != to {
             Enumerable::remove_from_owner_enumeration(e, from, token_id);
@@ -484,7 +479,7 @@ impl Enumerable {
     pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: u32) {
         // balance is already incremented by 1, we need to subtract 1 from it
         // to get the `last_index + 1` (the index of the new token)
-        let Some(owner_balance) = Base::balance(e, owner).checked_sub(1) else {
+        let Some(owner_balance) = NFTBase::balance(e, owner).checked_sub(1) else {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);
         };
         e.storage().persistent().set(
@@ -525,7 +520,7 @@ impl Enumerable {
 
         // owner's balance is already decremented by 1, so it will be the index of the
         // last token in the enumeration list.
-        let last_token_index = Base::balance(e, owner);
+        let last_token_index = NFTBase::balance(e, owner);
 
         // Update the `OwnerTokens`.
         if to_be_removed_index != last_token_index {

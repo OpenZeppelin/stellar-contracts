@@ -44,7 +44,7 @@ use soroban_sdk::{contracttrait, Address, Env, Symbol};
 ///     /* and the macro will generate all the missing default implementations for you */
 /// }
 /// ```
-#[contracttrait(default = Base, extension_required = true)]
+#[contracttrait(default = NFTBase, extension_required = true)]
 pub trait NonFungibleRoyalties {
     /// Sets the global default royalty information for the entire collection.
     /// This will be used for all tokens that don't have specific royalty
@@ -67,7 +67,12 @@ pub trait NonFungibleRoyalties {
     ///
     /// * topics - `["set_default_royalty", receiver: Address]`
     /// * data - `[basis_points: u32]`
-    fn set_default_royalty(e: &Env, receiver: &soroban_sdk::Address, basis_points: u32, operator: &soroban_sdk::Address);
+    fn set_default_royalty(
+        e: &Env,
+        receiver: &soroban_sdk::Address,
+        basis_points: u32,
+        operator: &soroban_sdk::Address,
+    );
 
     /// Sets the royalty information for a specific token.
     ///

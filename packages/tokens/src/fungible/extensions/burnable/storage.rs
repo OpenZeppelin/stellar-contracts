@@ -1,9 +1,9 @@
 use soroban_sdk::{Address, Env};
 
-use crate::fungible::{extensions::burnable::emit_burn, Base};
+use crate::fungible::{extensions::burnable::emit_burn, FTBase};
 
-impl super::FungibleBurnable for Base {
-    type Impl = Base;
+impl super::FungibleBurnable for FTBase {
+    type Impl = FTBase;
     /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.
     ///
@@ -15,7 +15,7 @@ impl super::FungibleBurnable for Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::update`] errors.
+    /// * refer to [`FTBase::update`] errors.
     ///
     /// # Events
     ///
@@ -27,7 +27,7 @@ impl super::FungibleBurnable for Base {
     /// Authorization for `from` is required.
     fn burn(e: &Env, from: &Address, amount: i128) {
         from.require_auth();
-        Base::update(e, Some(from), None, amount);
+        FTBase::update(e, Some(from), None, amount);
         emit_burn(e, from, amount);
     }
 
@@ -45,8 +45,8 @@ impl super::FungibleBurnable for Base {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::spend_allowance`] errors.
-    /// * refer to [`Base::update`] errors.
+    /// * refer to [`FTBase::spend_allowance`] errors.
+    /// * refer to [`FTBase::update`] errors.
     ///
     /// # Events
     ///
@@ -58,8 +58,8 @@ impl super::FungibleBurnable for Base {
     /// Authorization for `spender` is required.
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         spender.require_auth();
-        Base::spend_allowance(e, from, spender, amount);
-        Base::update(e, Some(from), None, amount);
+        FTBase::spend_allowance(e, from, spender, amount);
+        FTBase::update(e, Some(from), None, amount);
         emit_burn(e, from, amount);
     }
 }

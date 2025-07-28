@@ -1,8 +1,11 @@
 use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env, String, Symbol};
 
-use crate::fungible::{emit_approve, emit_mint, emit_transfer, FungibleTokenError};
+use crate::fungible::{
+    emit_approve, emit_mint, emit_transfer, FungibleTokenError, BALANCE_EXTEND_AMOUNT,
+    BALANCE_TTL_THRESHOLD,
+};
 
-use super::fungible::FungibleToken;
+use super::FungibleToken;
 
 /// Storage key that maps to [`Metadata`]
 pub const METADATA_KEY: Symbol = symbol_short!("METADATA");
@@ -38,9 +41,9 @@ pub struct Metadata {
     pub symbol: String,
 }
 
-pub struct Base;
+pub struct FTBase;
 
-impl FungibleToken for Base {
+impl FungibleToken for FTBase {
     type Impl = Self;
 
     fn total_supply(e: &Env) -> i128 {
@@ -107,7 +110,7 @@ impl FungibleToken for Base {
     }
 }
 
-impl Base {
+impl FTBase {
     /// Returns the amount of tokens a `spender` is allowed to spend on behalf
     /// of an `owner` and the ledger number at which this allowance expires.
     /// Both values default to `0`.
@@ -230,7 +233,7 @@ impl Base {
     /// * [`FungibleTokenError::InsufficientAllowance`] - When attempting to
     ///   transfer more tokens than `spender` current allowance.
     /// * [`FungibleTokenError::LessThanZero`] - Occurs when `amount < 0`.
-    /// * also refer to [`Base::set_allowance`] errors.
+    /// * also refer to [`FTBase::set_allowance`] errors.
     ///
     /// # Notes
     ///
@@ -241,14 +244,14 @@ impl Base {
             panic_with_error!(e, FungibleTokenError::LessThanZero)
         }
 
-        let allowance = Base::allowance_data(e, owner, spender);
+        let allowance = FTBase::allowance_data(e, owner, spender);
 
         if allowance.amount < amount {
             panic_with_error!(e, FungibleTokenError::InsufficientAllowance);
         }
 
         if amount > 0 {
-            Base::set_allowance(
+            FTBase::set_allowance(
                 e,
                 owner,
                 spender,
@@ -257,7 +260,6 @@ impl Base {
             );
         }
     }
-
 
     /// Transfers `amount` of tokens from `from` to `to` or alternatively
     /// mints (or burns) tokens if `from` (or `to`) is `None`. Updates the total
@@ -286,7 +288,7 @@ impl Base {
             panic_with_error!(e, FungibleTokenError::LessThanZero);
         }
         if let Some(account) = from {
-            let mut from_balance = Base::balance(e, account);
+            let mut from_balance = FTBase::balance(e, account);
             if from_balance < amount {
                 panic_with_error!(e, FungibleTokenError::InsufficientBalance);
             }
@@ -295,7 +297,7 @@ impl Base {
             e.storage().persistent().set(&StorageKey::Balance(account.clone()), &from_balance);
         } else {
             // `from` is None, so we're minting tokens.
-            let total_supply = Base::total_supply(e);
+            let total_supply = FTBase::total_supply(e);
             let Some(new_total_supply) = total_supply.checked_add(amount) else {
                 panic_with_error!(e, FungibleTokenError::MathOverflow);
             };
@@ -304,14 +306,14 @@ impl Base {
 
         if let Some(account) = to {
             // NOTE: can't overflow because balance + amount is at most total_supply.
-            let to_balance = Base::balance(e, account) + amount;
+            let to_balance = FTBase::balance(e, account) + amount;
             e.storage().persistent().set(&StorageKey::Balance(account.clone()), &to_balance);
         } else {
             // `to` is None, so we're burning tokens.
 
             // NOTE: can't overflow because amount <= total_supply or amount <= from_balance
             // <= total_supply.
-            let total_supply = Base::total_supply(e) - amount;
+            let total_supply = FTBase::total_supply(e) - amount;
             e.storage().instance().set(&StorageKey::TotalSupply, &total_supply);
         }
     }

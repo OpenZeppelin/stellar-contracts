@@ -34,12 +34,9 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{contracterror, Address, Env, Symbol};
+use soroban_sdk::{contracterror, contracttrait, panic_with_error, Address, Env, Symbol};
 
-pub use crate::ownable::storage::{
-    accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
-    transfer_ownership, OwnableStorageKey,
-};
+pub use crate::ownable::storage::{OwnableStorageKey, Owner};
 
 /// A trait for managing contract ownership using a 2-step transfer pattern.
 ///
@@ -141,8 +138,12 @@ pub trait Ownable {
     }
 
     #[internal]
-    fn enforce_owner_auth(e: &soroban_sdk::Env) {
-        enforce_owner_auth(e);
+    fn enforce_owner_auth(e: &soroban_sdk::Env) -> Address {
+        let Some(owner) = Self::get_owner(e) else {
+            panic_with_error!(e, OwnableError::OwnerNotSet);
+        };
+        owner.require_auth();
+        owner
     }
 
     /// Sets owner role.

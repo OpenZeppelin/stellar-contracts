@@ -114,7 +114,7 @@ pub trait Upgradeable {
     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Option<soroban_sdk::Address>);
 }
 
-#[soroban_sdk::contracttrait(default = UpgradeableDefault, extension_required = true)]
+// #[soroban_sdk::contracttrait(default = UpgradeableDefault, extension_required = true)]
 pub trait MigrationUpgradeable<T: FromVal<Env, Val>> {
     /// Entry point to handle a contract migration.
     ///

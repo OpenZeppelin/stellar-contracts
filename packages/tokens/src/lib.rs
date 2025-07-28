@@ -15,3 +15,15 @@
 
 pub mod fungible;
 pub mod non_fungible;
+
+pub use fungible::{
+    allowlist::{AllowList, FungibleAllowList},
+    blocklist::{BlockList, FungibleBlockList},
+    burnable::FungibleBurnable,
+    FTBase, FungibleToken, FungibleTokenError,
+};
+
+pub use non_fungible::{
+    burnable::NonFungibleBurnable, consecutive::Consecutive, enumerable::Enumerable,
+    enumerable::NonFungibleEnumerable, royalties::NonFungibleRoyalties, NFTBase, NonFungibleToken,
+};

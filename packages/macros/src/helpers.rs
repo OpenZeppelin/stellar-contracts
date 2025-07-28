@@ -54,7 +54,6 @@ fn check_env_arg(input_fn: &ItemFn) -> (Ident, bool) {
 
 fn check_is_env(path: &TypePath, fn_name: &Ident) {
     let is_env = path.path.segments.last().map(|seg| seg.ident == "Env").unwrap_or(false);
-
     if !is_env {
         panic!("first argument of function '{fn_name}' must be Env or &Env",);
     }
@@ -121,7 +120,7 @@ pub fn generate_auth_check(input_fn: &mut ItemFn, auth_check_func: TokenStream) 
     );
 }
 
-pub fn add_auth_check(input_fn: syn::Item, auth_check_func: TokenStream) -> TokenStream {
+pub fn insert_check(input_fn: syn::Item, auth_check_func: TokenStream) -> TokenStream {
     let mut input_fn = match input_fn {
         syn::Item::Fn(func) => func,
         _ => return input_fn.to_token_stream(),
@@ -135,7 +134,7 @@ pub fn add_auth_check(input_fn: syn::Item, auth_check_func: TokenStream) -> Toke
 }
 
 pub trait FunctionInsert: ToTokens {
-    fn insert_stmts(&mut self, stmts:Vec<syn::Stmt>);
+    fn insert_stmts(&mut self, stmts: Vec<syn::Stmt>);
 
     fn insert_stmts_to_token_stream(&mut self, stmts: Vec<syn::Stmt>) -> TokenStream {
         self.insert_stmts(stmts);

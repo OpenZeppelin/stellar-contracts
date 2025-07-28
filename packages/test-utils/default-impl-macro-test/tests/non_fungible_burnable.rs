@@ -12,9 +12,13 @@ use stellar_macros::default_impl;
 use stellar_tokens::non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
 
 #[contract]
-#[soroban_sdk::derive_contract(NonFungibleToken, NonFungibleBurnable)]
 pub struct ExampleContract;
 
+#[contracttrait]
+impl NonFungibleToken for ExampleContract {}
+
+#[contracttrait]
+impl NonFungibleBurnable for ExampleContract {}
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env) {

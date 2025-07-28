@@ -5,11 +5,7 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
-use crate::ownable::{
-    accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
-    transfer_ownership, OwnableStorageKey,
-};
-use crate::Owner;
+use crate::ownable::{Ownable, OwnableStorageKey, Owner};
 
 #[contract]
 struct MockContract;
@@ -24,7 +20,7 @@ fn transfer_ownership_sets_pending() {
     e.mock_all_auths();
 
     e.as_contract(&contract, || {
-        set_owner(&e, &owner);
+        Owner::set_owner(&e, &owner);
     });
 
     e.as_contract(&contract, || {
@@ -48,7 +44,7 @@ fn accept_ownership_completes_transfer() {
     let contract = e.register(MockContract, ());
 
     e.as_contract(&contract, || {
-        set_owner(&e, &old_owner);
+        Owner::set_owner(&e, &old_owner);
         e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &new_owner);
 
         Owner::accept_ownership(&e);
@@ -68,7 +64,7 @@ fn renounce_ownership_removes_owner() {
     let contract = e.register(MockContract, ());
 
     e.as_contract(&contract, || {
-        set_owner(&e, &owner);
+        Owner::set_owner(&e, &owner);
     });
 
     e.mock_all_auths();
@@ -90,7 +86,7 @@ fn enforce_owner_auth_works() {
     let contract = e.register(MockContract, ());
 
     e.as_contract(&contract, || {
-        set_owner(&e, &owner);
+        Owner::set_owner(&e, &owner);
     });
 
     e.mock_all_auths();
@@ -108,7 +104,7 @@ fn enforce_owner_auth_panics_if_renounced() {
     let contract = e.register(MockContract, ());
 
     e.as_contract(&contract, || {
-        set_owner(&e, &owner);
+        Owner::set_owner(&e, &owner);
     });
 
     e.mock_all_auths();
@@ -133,7 +129,7 @@ fn renounce_fails_if_pending_transfer_exists() {
     let contract = e.register(MockContract, ());
 
     e.as_contract(&contract, || {
-        set_owner(&e, &owner);
+        Owner::set_owner(&e, &owner);
         e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &pending);
     });
 
@@ -155,13 +151,13 @@ fn set_owner_when_already_set_panics() {
 
     e.as_contract(&contract, || {
         // Set owner for the first time - should succeed
-        set_owner(&e, &owner1);
+        Owner::set_owner(&e, &owner1);
 
         // Verify owner is set correctly
         let current_owner = Owner::get_owner(&e).unwrap();
         assert_eq!(current_owner, owner1);
 
         // Try to set owner again - should panic with OwnerAlreadySet error
-        set_owner(&e, &owner2);
+        Owner::set_owner(&e, &owner2);
     });
 }

@@ -1,13 +1,18 @@
 use soroban_sdk::{
     contract, contractimpl, derive_contract, testutils::Address as _, Address, Env, String, Symbol,
 };
-use stellar_access::access_control::{set_admin, AccessControl};
+use stellar_access::AccessControl;
 use stellar_macros::{default_impl, has_role};
-use stellar_tokens::fungible::{Base, FungibleToken};
+use stellar_tokens::FungibleToken;
 
 #[contract]
-#[derive_contract(FungibleToken, AccessControl)]
 pub struct ExampleContract;
+
+#[contracttrait]
+impl FungibleToken for ExampleContract {}
+
+#[contracttrait]
+impl AccessControl for ExampleContract {}
 
 #[contractimpl]
 impl ExampleContract {

@@ -3,8 +3,10 @@ use quote::quote;
 use syn::{
     bracketed,
     parse::{Parse, ParseStream},
-    parse_macro_input, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
+    parse_macro_input, parse_quote, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
 };
+
+use crate::helpers::FunctionInsert;
 
 use crate::parse_env_arg;
 
@@ -17,7 +19,7 @@ pub fn generate_role_check(
     require_auth: bool,
 ) -> TokenStream {
     let args = parse_macro_input!(args as HasRoleArgs);
-    let input_fn = parse_macro_input!(input as ItemFn);
+    let mut input_fn = parse_macro_input!(input as ItemFn);
 
     let param_name = args.param;
     let role_str = args.role;
@@ -30,29 +32,13 @@ pub fn generate_role_check(
         quote! { &#param_name }
     };
 
-    let fn_attrs = &input_fn.attrs;
-    let fn_vis = &input_fn.vis;
-    let fn_sig = &input_fn.sig;
-    let fn_block = &input_fn.block;
-
     let env_arg = parse_env_arg(&input_fn);
 
-    let auth_check = if require_auth {
-        quote! { #param_name.require_auth(); }
-    } else {
-        quote! {}
-    };
-
-    let expanded = quote! {
-        #(#fn_attrs)*
-        #fn_vis #fn_sig {
-            stellar_access::access_control::ensure_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, #role_str));
+    let auth_check = require_auth.then(|| quote! { #param_name.require_auth(); });
+    input_fn.insert_stmts_to_token_stream(parse_quote! {
+            Self::ensure_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, #role_str));
             #auth_check
-            #fn_block
-        }
-    };
-
-    TokenStream::from(expanded)
+    }).into()
 }
 
 struct HasRoleArgs {
@@ -148,7 +134,7 @@ pub fn generate_any_role_check(
     require_auth: bool,
 ) -> TokenStream {
     let args = parse_macro_input!(args as HasAnyRoleArgs);
-    let input_fn = parse_macro_input!(input as ItemFn);
+    let mut input_fn = parse_macro_input!(input as ItemFn);
 
     let param_name = args.param;
     let roles = args.roles;
@@ -161,34 +147,23 @@ pub fn generate_any_role_check(
         quote! { &#param_name }
     };
 
-    let fn_attrs = &input_fn.attrs;
-    let fn_vis = &input_fn.vis;
-    let fn_sig = &input_fn.sig;
-    let fn_block = &input_fn.block;
-
     let env_arg = parse_env_arg(&input_fn);
 
-    let auth_check = if require_auth {
+    let auth_check = require_auth.then(|| {
         quote! { #param_name.require_auth(); }
-    } else {
-        quote! {}
-    };
+    });
 
     let combined_checks = quote! {
-        let has_any_role = [#(#roles),*].iter().any(|role| stellar_access::access_control::has_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, role)).is_some());
+        let has_any_role = [#(#roles),*].iter().any(|role| Self::has_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, role)).is_some());
         if !has_any_role {
             panic!("Account does not have any of the required roles");
         }
     };
 
-    let expanded = quote! {
-        #(#fn_attrs)*
-        #fn_vis #fn_sig {
-            #combined_checks
-            #auth_check
-            #fn_block
-        }
-    };
-
-    TokenStream::from(expanded)
+    input_fn
+        .insert_stmts_to_token_stream(parse_quote! {
+                #combined_checks
+                #auth_check
+        })
+        .into()
 }

@@ -90,7 +90,7 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{contracterror, Address, Env, Symbol};
+use soroban_sdk::{contracterror, contracttrait, Address, Env, Symbol};
 
 pub use crate::access_control::storage::{
     accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
@@ -98,9 +98,10 @@ pub use crate::access_control::storage::{
     get_role_member_count, grant_role, grant_role_no_auth, has_role, remove_from_role_enumeration,
     remove_role_accounts_count_no_auth, remove_role_admin_no_auth, renounce_admin, renounce_role,
     revoke_role, revoke_role_no_auth, set_admin, set_role_admin, set_role_admin_no_auth,
-    transfer_admin_role, AccessControlStorageKey,
+    transfer_admin_role, AccessControlStorageKey, AccessControler,
 };
 
+#[contracttrait(default = AccessControler)]
 pub trait AccessControl {
     /// Returns `Some(index)` if the account has the specified role,
     /// where `index` is the position of the account for that role,
@@ -112,7 +113,8 @@ pub trait AccessControl {
     /// * `e` - Access to Soroban environment.
     /// * `account` - The account to check.
     /// * `role` - The role to check for.
-    fn has_role(e: &Env, account: &soroban_sdk::Address, role: &soroban_sdk::Symbol) -> Option<u32>;
+    fn has_role(e: &Env, account: &soroban_sdk::Address, role: &soroban_sdk::Symbol)
+        -> Option<u32>;
 
     /// Returns the total number of accounts that have the specified role.
     /// If the role does not exist, returns 0.
@@ -329,9 +331,7 @@ pub trait AccessControl {
     fn renounce_admin(e: &Env);
 
     #[internal]
-    fn set_admin(e: &Env, admin: &soroban_sdk::Address) {
-        set_admin(e, admin);
-    }
+    fn set_admin(e: &Env, admin: &soroban_sdk::Address);
 
     #[internal]
     fn enforce_admin_auth(e: &Env) {
@@ -349,7 +349,11 @@ pub trait AccessControl {
     }
 
     #[internal]
-    fn ensure_if_admin_or_admin_role(e: &Env, caller: &soroban_sdk::Address, role: &soroban_sdk::Symbol) {
+    fn ensure_if_admin_or_admin_role(
+        e: &Env,
+        caller: &soroban_sdk::Address,
+        role: &soroban_sdk::Symbol,
+    ) {
         // Check if caller is contract admin (if one is set)
         let is_admin = match Self::get_admin(e) {
             Some(admin) => caller == &admin,
