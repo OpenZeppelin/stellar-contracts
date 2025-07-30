@@ -1,10 +1,8 @@
 use soroban_sdk::{contracterror, Address, Env, FromVal, Val, Vec};
 
-pub mod storage;
+mod storage;
 
-use storage::CountryInfo;
-
-use super::TokenBinder;
+pub use super::TokenBinder;
 
 /// The core trait for managing basic identities.
 /// It is generic over a `CountryProfile` type, allowing implementers to define
@@ -21,7 +19,7 @@ pub trait IdentityRegistryStorage: TokenBinder {
         operator: Address,
     );
 
-    fn remove_identity(e: &Env, account: Address, identity: Address, operator: Address);
+    fn remove_identity(e: &Env, account: Address, operator: Address);
 
     fn modify_identity(e: &Env, account: Address, identity: Address, operator: Address);
 
@@ -54,17 +52,10 @@ pub trait CountryProfileManager: IdentityRegistryStorage {
     fn get_country_profiles(e: &Env, account: Address) -> Vec<Self::CountryProfile>;
 
     /// Retrieves the total number of country profiles for an account.
-    fn get_country_profiles_count(e: &Env, account: Address) -> u32;
+    fn get_country_profile_count(e: &Env, account: Address) -> u32;
 
     /// Retrieves a specific country profile by its index.
-    fn get_country_profile_by_index(e: &Env, account: Address, index: u32) -> Self::CountryProfile;
-
-    /// Retrieves all country profiles that match a specific country info type.
-    fn get_country_profiles_by_country_info(
-        e: &Env,
-        account: Address,
-        country_info: CountryInfo,
-    ) -> Vec<Self::CountryProfile>;
+    fn get_country_profile(e: &Env, account: Address, index: u32) -> Self::CountryProfile;
 }
 
 // TODO: correct enumeration and move up to higher level
@@ -77,5 +68,8 @@ pub enum IRSError {
     CountryProfileNotFound = 3,
     NoCountryProfileLeft = 4,
 }
+
+// TODO: export one by one
+pub use storage::*;
 
 mod test;
