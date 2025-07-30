@@ -110,9 +110,13 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
 }
 
 pub fn remove_identity(e: &Env, account: &Address) {
-    // Remove the core identity
-    let identity_key = IRSStorageKey::Identity(account.clone());
-    e.storage().persistent().remove(&identity_key);
+    let key = IRSStorageKey::Identity(account.clone());
+
+    // check if identity exists
+    if !e.storage().persistent().has(&key) {
+        panic_with_error!(e, IRSError::IdentityNotFound)
+    }
+    e.storage().persistent().remove(&key);
 
     // Remove all associated country profiles
     let count = get_country_profile_count(e, account);
