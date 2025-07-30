@@ -67,7 +67,8 @@ pub fn get_trusted_issuers(e: &Env) -> Vec<Address> {
 ///
 /// # Errors
 ///
-/// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim topic does not exist.
+/// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim
+///   topic does not exist.
 pub fn get_trusted_issuers_for_claim_topic(e: &Env, claim_topic: u32) -> Vec<Address> {
     let key = ClaimTopicsAndIssuersStorageKey::ClaimTopicIssuers(claim_topic);
     if let Some(topic_issuers) = e.storage().persistent().get::<_, Vec<Address>>(&key) {
@@ -99,7 +100,8 @@ pub fn is_trusted_issuer(e: &Env, issuer: &Address) -> bool {
 ///
 /// # Errors
 ///
-/// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted issuer does not exist.
+/// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted issuer
+///   does not exist.
 pub fn get_trusted_issuer_claim_topics(e: &Env, trusted_issuer: &Address) -> Vec<u32> {
     let key = ClaimTopicsAndIssuersStorageKey::IssuerClaimTopics(trusted_issuer.clone());
     if let Some(issuer_topics) = e.storage().persistent().get::<_, Vec<u32>>(&key) {
@@ -137,8 +139,10 @@ pub fn has_claim_topic(e: &Env, issuer: &Address, claim_topic: u32) -> bool {
 ///
 /// # Errors
 ///
-/// * [`ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached`] - If the maximum number of claim topics is reached.
-/// * [`ClaimTopicsAndIssuersError::ClaimTopicAlreadyExists`] - If the claim topic already exists.
+/// * [`ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached`] - If the
+///   maximum number of claim topics is reached.
+/// * [`ClaimTopicsAndIssuersError::ClaimTopicAlreadyExists`] - If the claim
+///   topic already exists.
 ///
 /// # Events
 ///
@@ -186,7 +190,8 @@ pub fn add_claim_topic(e: &Env, claim_topic: u32) {
 ///
 /// # Errors
 ///
-/// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim topic does not exist.
+/// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim
+///   topic does not exist.
 ///
 /// # Events
 ///
@@ -226,17 +231,21 @@ pub fn remove_claim_topic(e: &Env, claim_topic: u32) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `trusted_issuer` - The claim issuer contract address of the trusted
-///   claim issuer.
+/// * `trusted_issuer` - The claim issuer contract address of the trusted claim
+///   issuer.
 /// * `claim_topics` - The set of claim topics that the trusted issuer is
 ///   allowed to emit.
 ///
 /// # Errors
 ///
-/// * [`ClaimTopicsAndIssuersError::ClaimTopicsSetCannotBeEmpty`] - If the claim topics set is empty.
-/// * [`ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached`] - If the maximum number of claim topics is reached.
-/// * [`ClaimTopicsAndIssuersError::MaxIssuersLimitReached`] - If the maximum number of issuers is reached.
-/// * [`ClaimTopicsAndIssuersError::IssuerAlreadyExists`] - If the issuer already exists.
+/// * [`ClaimTopicsAndIssuersError::ClaimTopicsSetCannotBeEmpty`] - If the claim
+///   topics set is empty.
+/// * [`ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached`] - If the
+///   maximum number of claim topics is reached.
+/// * [`ClaimTopicsAndIssuersError::MaxIssuersLimitReached`] - If the maximum
+///   number of issuers is reached.
+/// * [`ClaimTopicsAndIssuersError::IssuerAlreadyExists`] - If the issuer
+///   already exists.
 /// * also refer to [`get_trusted_issuer_claim_topics`] errors.
 ///
 /// # Events
@@ -305,7 +314,8 @@ pub fn add_trusted_issuer(e: &Env, trusted_issuer: &Address, claim_topics: &Vec<
 ///
 /// # Errors
 ///
-/// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted issuer does not exist.
+/// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted issuer
+///   does not exist.
 ///
 /// # Events
 ///
@@ -368,9 +378,12 @@ pub fn remove_trusted_issuer(e: &Env, trusted_issuer: &Address) {
 ///
 /// # Errors
 ///
-/// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted issuer does not exist.
-/// * [`ClaimTopicsAndIssuersError::ClaimTopicsSetCannotBeEmpty`] - If the claim topics set is empty.
-/// * [`ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached`] - If the maximum number of claim topics is reached.
+/// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted issuer
+///   does not exist.
+/// * [`ClaimTopicsAndIssuersError::ClaimTopicsSetCannotBeEmpty`] - If the claim
+///   topics set is empty.
+/// * [`ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached`] - If the
+///   maximum number of claim topics is reached.
 /// * also refer to [`get_trusted_issuer_claim_topics`] errors.
 ///
 /// # Events
