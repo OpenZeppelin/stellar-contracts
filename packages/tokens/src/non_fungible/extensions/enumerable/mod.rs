@@ -77,6 +77,11 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `index` - Index of the token in the owner's local list.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::non_fungible::NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token
+    ///   ID is not found in the owner's enumeration.
     fn get_owner_token_id(e: &Env, owner: Address, index: u32) -> u32;
 
     /// Returns the `token_id` at a given `index` in the global token list.
@@ -94,5 +99,10 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `index` - Index of the token in the global list.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::non_fungible::NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
+    ///   ID is not found in the global enumeration.
     fn get_token_id(e: &Env, index: u32) -> u32;
 }
