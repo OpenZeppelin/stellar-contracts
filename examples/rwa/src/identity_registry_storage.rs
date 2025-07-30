@@ -4,7 +4,7 @@ use stellar_tokens::rwa::{
     identity_storage_registry::{
         self as irs, CountryProfile, CountryProfileManager, IdentityRegistryStorage,
     },
-    TokenBinder,
+    utils::token_binder::TokenBinder,
 };
 
 #[contract]

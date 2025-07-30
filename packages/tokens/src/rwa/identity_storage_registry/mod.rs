@@ -2,7 +2,7 @@ use soroban_sdk::{contracterror, Address, Env, FromVal, Val, Vec};
 
 mod storage;
 
-pub use super::TokenBinder;
+use crate::rwa::utils::token_binder::TokenBinder;
 
 /// The core trait for managing basic identities.
 /// It is generic over a `CountryProfile` type, allowing implementers to define
