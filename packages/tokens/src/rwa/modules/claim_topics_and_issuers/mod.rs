@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{Address, Env, Symbol, Vec};
+use soroban_sdk::{contracterror, Address, Env, Symbol, Vec};
 
 // TODO: add an `operator` argument so that we can apply RBAC
 
@@ -234,7 +234,7 @@ pub fn emit_claim_topic_removed(e: &Env, claim_topic: u32) {
 ///
 /// * topics - `["issuer_added", trusted_issuer: Address]`
 /// * data - `[claim_topics: Vec<u32>]`
-pub fn emit_trusted_issuer_added(e: &Env, trusted_issuer: &Address, claim_topics: &Vec<u32>) {
+pub fn emit_trusted_issuer_added(e: &Env, trusted_issuer: &Address, claim_topics: Vec<u32>) {
     let topics = (Symbol::new(e, "issuer_added"), trusted_issuer);
     e.events().publish(topics, claim_topics)
 }
@@ -271,7 +271,7 @@ pub fn emit_trusted_issuer_removed(e: &Env, trusted_issuer: &Address) {
 ///
 /// * topics - `["topics_updated", trusted_issuer: Address]`
 /// * data - `[claim_topics: Vec<u32>]`
-pub fn emit_issuer_topics_updated(e: &Env, trusted_issuer: &Address, claim_topics: &Vec<u32>) {
+pub fn emit_issuer_topics_updated(e: &Env, trusted_issuer: &Address, claim_topics: Vec<u32>) {
     let topics = (Symbol::new(e, "issuer_topics_updated"), trusted_issuer);
     e.events().publish(topics, claim_topics)
 }

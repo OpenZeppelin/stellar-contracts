@@ -123,7 +123,7 @@ pub fn get_trusted_issuer_claim_topics(e: &Env, trusted_issuer: &Address) -> Vec
 ///   issuer is allowed to emit it.
 pub fn has_claim_topic(e: &Env, issuer: &Address, claim_topic: u32) -> bool {
     let issuer_topics = get_trusted_issuer_claim_topics(e, issuer);
-    issuer_topics.contains(&claim_topic)
+    issuer_topics.contains(claim_topic)
 }
 
 // ################## CHANGE STATE ##################
@@ -166,7 +166,7 @@ pub fn add_claim_topic(e: &Env, claim_topic: u32) {
     }
 
     // Check if topic already exists
-    if claim_topics.contains(&claim_topic) {
+    if claim_topics.contains(claim_topic) {
         panic_with_error!(e, ClaimTopicsAndIssuersError::ClaimTopicAlreadyExists);
     } else {
         claim_topics.push_back(claim_topic);
@@ -175,7 +175,7 @@ pub fn add_claim_topic(e: &Env, claim_topic: u32) {
 
         // initializing ClaimTopicIssuers for this topic
         let key = ClaimTopicsAndIssuersStorageKey::ClaimTopicIssuers(claim_topic);
-        e.storage().persistent().set(&key, &Vec::new(e));
+        e.storage().persistent().set(&key, &Vec::<Address>::new(e));
 
         emit_claim_topic_added(e, claim_topic);
     }
@@ -211,7 +211,7 @@ pub fn remove_claim_topic(e: &Env, claim_topic: u32) {
     let mut claim_topics = get_claim_topics(e);
 
     // Find and remove the topic
-    if claim_topics.contains(&claim_topic) {
+    if let Some(index) = claim_topics.iter().position(|x| x == claim_topic) {
         claim_topics.remove(index as u32);
         let key = ClaimTopicsAndIssuersStorageKey::ClaimTopics;
         e.storage().persistent().set(&key, &claim_topics);
@@ -302,7 +302,7 @@ pub fn add_trusted_issuer(e: &Env, trusted_issuer: &Address, claim_topics: &Vec<
         e.storage().persistent().set(&topic_key, &topic_issuers);
     }
 
-    emit_trusted_issuer_added(e, trusted_issuer, claim_topics);
+    emit_trusted_issuer_added(e, trusted_issuer, claim_topics.clone());
 }
 
 /// Removes the trusted issuer contract.
@@ -418,12 +418,28 @@ pub fn update_issuer_claim_topics(e: &Env, trusted_issuer: &Address, claim_topic
     let old_topics = get_trusted_issuer_claim_topics(e, trusted_issuer);
 
     // Calculate topics to remove (in old but not in new)
-    let topics_to_remove: Vec<u32> =
-        old_topics.iter().filter(|old_topic| !claim_topics.contains(old_topic)).collect();
+    // uncomment below when `FromIterator` is implemented for `Vec`
+    // let topics_to_remove: Vec<u32> =
+    // old_topics.iter().filter(|old_topic|
+    // !claim_topics.contains(old_topic)).collect();
+    let mut topics_to_remove = Vec::new(e);
+    for old_topic in old_topics.iter() {
+        if !claim_topics.contains(old_topic) {
+            topics_to_remove.push_back(old_topic);
+        }
+    }
 
     // Calculate topics to add (in new but not in old)
-    let topics_to_add: Vec<u32> =
-        claim_topics.iter().filter(|new_topic| !old_topics.contains(new_topic)).collect();
+    // uncomment below when `FromIterator` is implemented for `Vec`
+    // let topics_to_add: Vec<u32> =
+    // claim_topics.iter().filter(|new_topic|
+    // !old_topics.contains(new_topic)).collect();
+    let mut topics_to_add = Vec::new(e);
+    for new_topic in claim_topics.iter() {
+        if !old_topics.contains(new_topic) {
+            topics_to_add.push_back(new_topic);
+        }
+    }
 
     // Update issuer's claim topics
     let topics_key = ClaimTopicsAndIssuersStorageKey::IssuerClaimTopics(trusted_issuer.clone());
@@ -431,7 +447,7 @@ pub fn update_issuer_claim_topics(e: &Env, trusted_issuer: &Address, claim_topic
 
     // Remove issuer from topics that are no longer assigned
     for topic_to_remove in topics_to_remove {
-        let mut topic_issuers = get_trusted_issuers_for_claim_topic(e, &topic_to_remove);
+        let mut topic_issuers = get_trusted_issuers_for_claim_topic(e, topic_to_remove);
         if let Some(index) = topic_issuers.iter().position(|addr| addr == *trusted_issuer) {
             topic_issuers.remove(index as u32);
             let topic_key = ClaimTopicsAndIssuersStorageKey::ClaimTopicIssuers(topic_to_remove);
@@ -441,7 +457,7 @@ pub fn update_issuer_claim_topics(e: &Env, trusted_issuer: &Address, claim_topic
 
     // Add issuer to new topics
     for topic_to_add in topics_to_add {
-        let mut topic_issuers = get_trusted_issuers_for_claim_topic(e, &topic_to_add);
+        let mut topic_issuers = get_trusted_issuers_for_claim_topic(e, topic_to_add);
         // We are sure that the issuer is not in the list, because `topics_to_add` only
         // consists of the difference between old and new topics
         topic_issuers.push_back(trusted_issuer.clone());
@@ -449,5 +465,5 @@ pub fn update_issuer_claim_topics(e: &Env, trusted_issuer: &Address, claim_topic
         e.storage().persistent().set(&topic_key, &topic_issuers);
     }
 
-    emit_claim_topics_updated(e, trusted_issuer, claim_topics);
+    emit_issuer_topics_updated(e, trusted_issuer, claim_topics.clone());
 }

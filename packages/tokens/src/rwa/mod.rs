@@ -1,6 +1,6 @@
 //! TODO: describe the module
 
-mod modules;
+pub mod modules;
 
 /// TODO: describe the trait
 pub trait RWA {}
