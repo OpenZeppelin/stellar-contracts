@@ -4,14 +4,15 @@ pub mod storage;
 
 use storage::CountryInfo;
 
+use super::TokenBinder;
+
 /// The core trait for managing basic identities.
 /// It is generic over a `CountryProfile` type, allowing implementers to define
 /// what constitutes a country profile.
-pub trait IdentityRegistryStorage {
+pub trait IdentityRegistryStorage: TokenBinder {
     /// The specific type used for country profiles in this implementation.
     type CountryProfile: FromVal<Env, Val>;
 
-    /// Adds a new identity with one initial country profile.
     fn add_identity(
         e: &Env,
         account: Address,
@@ -71,8 +72,8 @@ pub trait CountryProfileManager: IdentityRegistryStorage {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum IRSError {
-    IdentityAlreadyExists = 2,
-    IdentityNotFound = 3,
-    CountryProfileNotFound = 4,
-    NoCountryProfileLeft = 5,
+    IdentityAlreadyExists = 1,
+    IdentityNotFound = 2,
+    CountryProfileNotFound = 3,
+    NoCountryProfileLeft = 4,
 }
