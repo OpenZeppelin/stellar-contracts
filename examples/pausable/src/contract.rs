@@ -7,13 +7,10 @@
 //! Counter can be incremented only when `unpaused` and reset only when
 //! `paused`.
 
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttrait, contracttype, panic_with_error, Address,
-    Env,
-};
-use stellar_access::{Ownable, OwnableExt};
+use soroban_sdk::{contract, contractimpl, contracttrait, contracttype, Address, Env};
+use stellar_access::Ownable;
 use stellar_contract_utils::Pausable;
-use stellar_macros::{when_not_paused, when_paused};
+use stellar_macros::{only_owner, when_not_paused, when_paused};
 
 #[contracttype]
 pub enum DataKey {
@@ -52,33 +49,15 @@ impl ExampleContract {
 #[contracttrait]
 impl Ownable for ExampleContract {}
 
-// #[contracttrait]
+#[contracttrait]
 impl Pausable for ExampleContract {
-    type Impl;
-
-    fn paused(e: &Env) -> bool {
-        Self::Impl::paused(e)
-    }
-
+    #[only_owner]
     fn pause(e: &Env, caller: &soroban_sdk::Address) {
         Self::Impl::pause(e, caller)
     }
 
+    #[only_owner]
     fn unpause(e: &Env, caller: &soroban_sdk::Address) {
         Self::Impl::unpause(e, caller)
-    }
-
-    fn when_not_paused(e: &Env) {
-        if Self::paused(e) {
-            panic_with_error!(e, PausableError::EnforcedPause);
-        }
-    }
-
-    fn when_paused(e: &Env) {
-        if !Self::paused(e) {
-            {
-                e.panic_with_error(PausableError::ExpectedPause);
-            };
-        }
     }
 }

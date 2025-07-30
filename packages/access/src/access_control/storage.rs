@@ -84,7 +84,7 @@ impl AccessControl for AccessControler {
         renounce_admin(e)
     }
 
-    fn set_admin(e: &Env, admin: &soroban_sdk::Address) {
+    fn init_admin(e: &Env, admin: &soroban_sdk::Address) {
         set_admin(e, admin);
     }
 
@@ -121,6 +121,14 @@ impl AccessControl for AccessControler {
 
     fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
         grant_role_no_auth(e, caller, account, role)
+    }
+
+    fn remove_role_accounts_count_no_auth(e: &Env, role: &Symbol) {
+        remove_role_accounts_count_no_auth(e, role)
+    }
+
+    fn remove_role_admin_no_auth(e: &Env, role: &Symbol) {
+        remove_role_admin_no_auth(e, role)
     }
 }
 
@@ -589,20 +597,6 @@ pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
     emit_role_admin_changed(e, role, &previous_admin_role, admin_role);
 }
 
-/// Removes the admin role for a specified role without performing authorization
-/// checks.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `role` - The role to remove the admin for.
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should only
-/// be used:
-/// - In admin functions that implement their own authorization logic
-/// - When cleaning up unused roles
 pub fn remove_role_admin_no_auth(e: &Env, role: &Symbol) {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
 
@@ -672,27 +666,6 @@ pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
     };
 
     if !is_admin && !is_admin_role {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
-}
-
-/// Ensures that the caller has the specified role.
-/// This function is used to check if an account has a specific role.
-/// The main purpose of this function is to act as a helper for the
-/// `#[has_role]` macro.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller to check the role for.
-/// * `role` - The role to check for.
-///
-/// # Errors
-///
-/// * [`AccessControlError::Unauthorized`] - If the caller does not have the
-///   specified role.
-pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
-    if has_role(e, caller, role).is_none() {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
 }

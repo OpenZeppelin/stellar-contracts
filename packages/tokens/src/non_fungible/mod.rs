@@ -87,8 +87,8 @@ pub use utils::sequential;
 /// as a method in this trait because it is not a part of the standard,
 /// the function signature may change depending on the implementation.
 ///
-/// We do provide a function [`crate::non_fungible::NFTBase::sequential_mint`] for
-/// sequential minting, and [`crate::non_fungible::NFTBase::mint`] for
+/// We do provide a function [`crate::non_fungible::NFTBase::sequential_mint`]
+/// for sequential minting, and [`crate::non_fungible::NFTBase::mint`] for
 /// non-sequential minting strategies.
 ///
 /// # Notes
@@ -113,9 +113,9 @@ pub use utils::sequential;
 /// ```
 ///
 /// This trait is implemented for the following Contract Types:
-/// * [`crate::non_fungible::NFTBase`] (covering the vanilla case, and compatible
-///   with [`crate::non_fungible::extensions::burnable::NonFungibleBurnable`])
-///   trait
+/// * [`crate::non_fungible::NFTBase`] (covering the vanilla case, and
+///   compatible with
+///   [`crate::non_fungible::extensions::burnable::NonFungibleBurnable`]) trait
 /// * [`crate::non_fungible::extensions::enumerable::Enumerable`] (enabling the
 ///   compatibility and overrides for
 ///   [`crate::non_fungible::extensions::enumerable::NonFungibleEnumerable`])

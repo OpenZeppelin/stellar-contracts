@@ -92,14 +92,7 @@ mod test;
 
 use soroban_sdk::{contracterror, contracttrait, Address, Env, Symbol};
 
-pub use crate::access_control::storage::{
-    accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
-    ensure_if_admin_or_admin_role, ensure_role, get_admin, get_role_admin, get_role_member,
-    get_role_member_count, grant_role, grant_role_no_auth, has_role, remove_from_role_enumeration,
-    remove_role_accounts_count_no_auth, remove_role_admin_no_auth, renounce_admin, renounce_role,
-    revoke_role, revoke_role_no_auth, set_admin, set_role_admin, set_role_admin_no_auth,
-    transfer_admin_role, AccessControlStorageKey, AccessControler,
-};
+pub use crate::access_control::storage::{AccessControlStorageKey, AccessControler};
 
 #[contracttrait(default = AccessControler)]
 pub trait AccessControl {
@@ -331,7 +324,7 @@ pub trait AccessControl {
     fn renounce_admin(e: &Env);
 
     #[internal]
-    fn set_admin(e: &Env, admin: &soroban_sdk::Address);
+    fn init_admin(e: &Env, admin: &soroban_sdk::Address);
 
     #[internal]
     fn enforce_admin_auth(e: &Env) {
@@ -341,6 +334,21 @@ pub trait AccessControl {
         admin.require_auth();
     }
 
+    /// Ensures that the caller has the specified role.
+    /// This function is used to check if an account has a specific role.
+    /// The main purpose of this function is to act as a helper for the
+    /// `#[has_role]` macro.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `caller` - The address of the caller to check the role for.
+    /// * `role` - The role to check for.
+    ///
+    /// # Errors
+    ///
+    /// * [`AccessControlError::Unauthorized`] - If the caller does not have the
+    ///   specified role.
     #[internal]
     fn ensure_role(e: &Env, caller: &soroban_sdk::Address, role: &soroban_sdk::Symbol) {
         if Self::has_role(e, caller, role).is_none() {
@@ -373,6 +381,26 @@ pub trait AccessControl {
 
     #[internal]
     fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol);
+
+    #[internal]
+    fn remove_role_accounts_count_no_auth(e: &Env, role: &Symbol);
+
+    /// Removes the admin role for a specified role without performing
+    /// authorization checks.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `role` - The role to remove the admin for.
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used:
+    /// - In admin functions that implement their own authorization logic
+    /// - When cleaning up unused roles
+    #[internal]
+    fn remove_role_admin_no_auth(e: &Env, role: &Symbol);
 }
 
 // ################## ERRORS ##################

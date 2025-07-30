@@ -1,11 +1,10 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
+use super::super::{burnable::NonFungibleBurnable, enumerable::NonFungibleEnumerable};
 use crate::non_fungible::{
     emit_mint, NFTBase, NonFungibleToken, NonFungibleTokenError, OWNER_EXTEND_AMOUNT,
     OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
-
-use super::super::{burnable::NonFungibleBurnable, enumerable::NonFungibleEnumerable};
 
 pub struct Enumerable;
 
@@ -14,9 +13,9 @@ pub struct Enumerable;
 //         Enumerable::transfer(e, from, to, token_id);
 //     }
 
-//     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
-//         Enumerable::transfer_from(e, spender, from, to, token_id);
-//     }
+//     fn transfer_from(e: &Env, spender: &Address, from: &Address, to:
+// &Address, token_id: u32) {         Enumerable::transfer_from(e, spender,
+// from, to, token_id);     }
 // }
 
 #[contracttype]
@@ -89,8 +88,8 @@ impl Enumerable {
     }
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
-    /// owner's local list. Use along with [`NFTBase::balance`] to enumerate all of
-    /// `owner`'s tokens.
+    /// owner's local list. Use along with [`NFTBase::balance`] to enumerate all
+    /// of `owner`'s tokens.
     ///
     /// # Arguments
     ///

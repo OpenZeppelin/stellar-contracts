@@ -1,25 +1,20 @@
-use proc_macro::TokenStream;
-use quote::quote;
+use proc_macro2::TokenStream;
+use quote::{quote, ToTokens};
 use syn::{
     bracketed,
     parse::{Parse, ParseStream},
-    parse_macro_input, parse_quote, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
+    parse_quote, FnArg, Ident, ItemFn, LitStr, Pat, Token, Type,
 };
 
-use crate::helpers::FunctionInsert;
-
-use crate::parse_env_arg;
+use crate::{helpers::FunctionInsert, parse_env_arg};
 
 /// Helper function that generates the role check code for both has_role and
 /// only_role macros. If require_auth is true, it also adds the
 /// account.require_auth() call.
-pub fn generate_role_check(
-    args: TokenStream,
-    input: TokenStream,
-    require_auth: bool,
-) -> TokenStream {
-    let args = parse_macro_input!(args as HasRoleArgs);
-    let mut input_fn = parse_macro_input!(input as ItemFn);
+pub fn generate_role_check(args: HasRoleArgs, input: syn::Item, require_auth: bool) -> TokenStream {
+    let syn::Item::Fn(mut input_fn) = input.clone() else {
+        return input.into_token_stream();
+    };
 
     let param_name = args.param;
     let role_str = args.role;
@@ -38,12 +33,12 @@ pub fn generate_role_check(
     input_fn.insert_stmts_to_token_stream(parse_quote! {
             Self::ensure_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, #role_str));
             #auth_check
-    }).into()
+    })
 }
 
-struct HasRoleArgs {
-    param: Ident,
-    role: LitStr,
+pub struct HasRoleArgs {
+    pub(crate) param: Ident,
+    pub(crate) role: LitStr,
 }
 
 impl Parse for HasRoleArgs {
@@ -55,9 +50,9 @@ impl Parse for HasRoleArgs {
     }
 }
 
-struct HasAnyRoleArgs {
-    param: Ident,
-    roles: Vec<LitStr>,
+pub struct HasAnyRoleArgs {
+    pub(crate) param: Ident,
+    pub(crate) roles: Vec<LitStr>,
 }
 
 impl Parse for HasAnyRoleArgs {
@@ -129,12 +124,13 @@ fn panic_type(param_name: &Ident) -> ! {
 /// macro. If require_auth is true, it also adds the account.require_auth()
 /// call.
 pub fn generate_any_role_check(
-    args: TokenStream,
-    input: TokenStream,
+    args: HasAnyRoleArgs,
+    input: syn::Item,
     require_auth: bool,
 ) -> TokenStream {
-    let args = parse_macro_input!(args as HasAnyRoleArgs);
-    let mut input_fn = parse_macro_input!(input as ItemFn);
+    let syn::Item::Fn(mut input_fn) = input.clone() else {
+        return input.into_token_stream();
+    };
 
     let param_name = args.param;
     let roles = args.roles;
@@ -154,10 +150,8 @@ pub fn generate_any_role_check(
     });
 
     let combined_checks = quote! {
-        let has_any_role = [#(#roles),*].iter().any(|role| Self::has_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, role)).is_some());
-        if !has_any_role {
-            panic!("Account does not have any of the required roles");
-        }
+        let has_any_role = [#(#roles),*].iter().any(|role| <Self as AccessControl>::has_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, role)).is_some());
+        assert!(has_any_role, "Account does not have any of the required roles");
     };
 
     input_fn

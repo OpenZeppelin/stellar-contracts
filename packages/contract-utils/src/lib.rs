@@ -6,3 +6,5 @@ pub mod pausable;
 pub mod upgradeable;
 
 pub use pausable::{Pausable, PausableDefault, PausableExt};
+pub use stellar_macros::Upgradeable;
+// pub use upgradeable::{Upgradeable, UpgradeableClient};

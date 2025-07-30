@@ -1,11 +1,10 @@
 use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env, String, Symbol};
 
+use super::FungibleToken;
 use crate::fungible::{
     emit_approve, emit_mint, emit_transfer, FungibleTokenError, BALANCE_EXTEND_AMOUNT,
     BALANCE_TTL_THRESHOLD,
 };
-
-use super::FungibleToken;
 
 /// Storage key that maps to [`Metadata`]
 pub const METADATA_KEY: Symbol = symbol_short!("METADATA");

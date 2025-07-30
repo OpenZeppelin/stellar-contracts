@@ -60,7 +60,6 @@ fn blocked_user_cannot_approve() {
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-
     // Transfer some tokens to user1
     client.transfer(&admin, &user1, &transfer_amount);
     assert_eq!(client.balance(&user1), transfer_amount);
@@ -113,7 +112,6 @@ fn transfer_from_blocked_user() {
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-
     // Transfer some tokens to user1
     client.transfer(&admin, &user1, &transfer_amount);
     assert_eq!(client.balance(&user1), transfer_amount);
@@ -144,7 +142,6 @@ fn transfer_from_to_blocked_user() {
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-
     // Transfer some tokens to user1
     client.transfer(&admin, &user1, &transfer_amount);
     assert_eq!(client.balance(&user1), transfer_amount);
@@ -173,7 +170,6 @@ fn blocklist_transfer_from_override_works() {
     e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
-
 
     // Verify initial state - no users are blocked
     assert!(!client.blocked(&user1));

@@ -2,10 +2,11 @@
 
 extern crate std;
 
-use super::NonFungibleBurnable;
-use crate::{non_fungible::NonFungibleToken, NFTBase};
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
+
+use super::NonFungibleBurnable;
+use crate::{non_fungible::NonFungibleToken, NFTBase};
 
 #[contract]
 struct MockContract;

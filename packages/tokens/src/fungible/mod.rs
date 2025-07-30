@@ -121,8 +121,8 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// ```
 ///
 /// This trait is implemented for the following Contract Types:
-/// * [`crate::fungible::FTBase`] (covering the vanilla case, and compatible with
-///   [`crate::fungible::burnable::FungibleBurnable`]) trait
+/// * [`crate::fungible::FTBase`] (covering the vanilla case, and compatible
+///   with [`crate::fungible::burnable::FungibleBurnable`]) trait
 /// * [`crate::fungible::allowlist::AllowList`] (enabling the compatibility and
 ///   overrides for [`crate::fungible::allowlist::FungibleAllowList`]) trait,
 ///   incompatible with [`crate::fungible::blocklist::BlockList`] trait.

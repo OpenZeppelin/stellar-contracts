@@ -1,8 +1,8 @@
 use soroban_sdk::{
-    contract, contractimpl, derive_contract, testutils::Address as _, Address, Env, String, Symbol,
+    contract, contractimpl, contracttrait, testutils::Address as _, Address, Env, String, Symbol,
 };
 use stellar_access::AccessControl;
-use stellar_macros::{default_impl, has_role};
+use stellar_macros::has_role;
 use stellar_tokens::FungibleToken;
 
 #[contract]
@@ -17,13 +17,13 @@ impl AccessControl for ExampleContract {}
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        Self::set_admin(e, &owner);
-        Base::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
+        Self::init_admin(e, &owner);
+        Self::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
     }
 
     #[has_role(caller, "minter")]
     pub fn mint(e: &Env, caller: Address, to: Address, amount: i128) {
-        Base::internal_mint(e, &to, amount);
+        Self::internal_mint(e, &to, amount);
     }
 }
 

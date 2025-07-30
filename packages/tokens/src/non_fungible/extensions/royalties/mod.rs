@@ -44,7 +44,7 @@ use soroban_sdk::{contracttrait, Address, Env, Symbol};
 ///     /* and the macro will generate all the missing default implementations for you */
 /// }
 /// ```
-#[contracttrait(default = NFTBase, extension_required = true)]
+#[contracttrait(default = NFTBase)]
 pub trait NonFungibleRoyalties {
     /// Sets the global default royalty information for the entire collection.
     /// This will be used for all tokens that don't have specific royalty

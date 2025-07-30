@@ -4,8 +4,8 @@ mod storage;
 mod test;
 
 use soroban_sdk::{symbol_short, Address, Env};
+use stellar_macros::make_ext;
 pub use storage::AllowList;
-
 
 /// AllowList Trait for Fungible Token
 ///
@@ -28,9 +28,9 @@ pub use storage::AllowList;
 /// However, this parameter is omitted from the module functions, defined in
 /// "storage.rs", because the authorizations are to be handled in the access
 /// control helpers or directly implemented.
-#[soroban_sdk::contracttrait(default = AllowList, is_extension = true, extension_required = true)]
+#[soroban_sdk::contracttrait(default = AllowList)]
+#[make_ext]
 pub trait FungibleAllowList {
-
     /// Returns the allowed status of an account.
     ///
     /// # Arguments

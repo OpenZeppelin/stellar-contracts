@@ -50,7 +50,6 @@ fn transfer_to_allowed_account_works() {
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-
     // Verify initial state - admin is allowed, others are not
     assert!(client.allowed(&admin));
     assert!(!client.allowed(&user1));
@@ -77,7 +76,6 @@ fn cannot_transfer_after_disallow() {
     e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
-
 
     // Verify initial state - admin is allowed, others are not
     assert!(client.allowed(&admin));
@@ -112,7 +110,6 @@ fn allowlist_transfer_from_override_works() {
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
 
-
     // Verify initial state - admin is allowed, others are not
     assert!(client.allowed(&admin));
     assert!(!client.allowed(&user1));
@@ -139,7 +136,6 @@ fn allowlist_approve_override_works() {
     e.mock_all_auths();
     let client = create_client(&e, &admin, &manager, &initial_supply);
     let transfer_amount = 1000;
-
 
     // Verify initial state - admin is allowed, others are not
     assert!(client.allowed(&admin));

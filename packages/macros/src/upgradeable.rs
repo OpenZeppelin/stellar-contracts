@@ -26,92 +26,18 @@ pub fn derive_upgradeable(input: &DeriveInput) -> TokenStream {
     let name = &input.ident;
 
     let binver = set_binver_from_env();
-
     quote! {
-        use stellar_contract_utils::upgradeable::Upgradeable as _;
-
+        use stellar_access::Ownable;
         #binver
+        impl stellar_contract_utils::upgradeable::Upgradeable for #name {}
+
+        #[soroban_sdk::contracttrait]
+        impl Ownable for #name {}
 
         #[soroban_sdk::contractimpl]
-        impl stellar_contract_utils::upgradeable::Upgradeable for #name {
-            fn upgrade(
-                e: &soroban_sdk::Env, new_wasm_hash: soroban_sdk::BytesN<32>, operator: soroban_sdk::Address
-            ) {
-                Self::_require_auth(e, &operator);
-
-                // Set the flag in case the next contract version needs to perform a migration
-                // i.e. when the current version is `Upgradeable` only,
-                // while the next one becomes `UpgradeableMigratable`.
-                stellar_contract_utils::upgradeable::enable_migration(e);
-
-                e.deployer().update_current_contract_wasm(new_wasm_hash);
-            }
-        }
-    }
-}
-
-/// Procedural macro implementation for `#[derive(UpgradeableMigratable)]`.
-///
-/// This function generates the implementation of the `UpgradeableMigratable`
-/// trait for a given contract type, wiring up the migration and rollback logic
-/// based on the `UpgradeableMigratableInternal` trait implementation provided
-/// by the user.
-///
-/// # Behavior
-///
-/// - Implements `upgrade` and `migrate` functions with access control
-///   (`_require_auth`).
-/// - Sets the current crate version  as `"binver"` metadata using
-///   `soroban_sdk::contractmeta!`. Gets the crate version via the env variable
-///   `CARGO_PKG_VERSION` which corresponds to the "version" attribute in
-///   Cargo.toml. If no such attribute or if it is "0.0.0", skips this step.
-/// - Throws a compile-time error if `UpgradeableMigratableInternal` is not
-///   implemented.
-///
-/// # Example
-/// ```ignore,rust
-/// #[derive(UpgradeableMigratable)]
-/// pub struct MyContract;
-/// ```
-///
-/// **Warning:** This derive macro should only be used on contracts that have
-/// previously used either `#[derive(Upgradeable)]` or
-/// `#[derive(UpgradeableMigratable)]`. The migration function depends on an
-/// internal flag set by calling
-/// `stellar_contract_utils::upgradeable::enable_migration()`.
-pub fn derive_upgradeable_migratable(input: &DeriveInput) -> proc_macro2::TokenStream {
-    let name = &input.ident;
-
-    let binver = set_binver_from_env();
-
-    quote! {
-        use stellar_contract_utils::upgradeable::UpgradeableMigratable as _;
-
-        #binver
-
-        type MigrationData = <#name as stellar_contract_utils::upgradeable::UpgradeableMigratableInternal>::MigrationData;
-
-        #[soroban_sdk::contractimpl]
-        impl stellar_contract_utils::upgradeable::UpgradeableMigratable for #name {
-
-            fn upgrade(
-                e: &soroban_sdk::Env, new_wasm_hash: soroban_sdk::BytesN<32>, operator: soroban_sdk::Address
-            ) {
-                Self::_require_auth(e, &operator);
-
-                stellar_contract_utils::upgradeable::enable_migration(e);
-
-                e.deployer().update_current_contract_wasm(new_wasm_hash);
-            }
-
-            fn migrate(e: &soroban_sdk::Env, migration_data: MigrationData, operator: soroban_sdk::Address) {
-                Self::_require_auth(e, &operator);
-
-                stellar_contract_utils::upgradeable::ensure_can_complete_migration(e);
-
-                Self::_migrate(e, &migration_data);
-
-                stellar_contract_utils::upgradeable::complete_migration(e);
+        impl #name {
+            pub fn upgrade(e: &soroban_sdk::Env, new_wasm_hash: soroban_sdk::BytesN<32>) {
+                <Self as stellar_contract_utils::upgradeable::Upgradeable>::upgrade(e, new_wasm_hash);
             }
         }
     }

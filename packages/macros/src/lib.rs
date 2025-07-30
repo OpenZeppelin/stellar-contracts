@@ -1,7 +1,6 @@
 mod access_control;
 mod default_impl_macro;
 mod helpers;
-mod pausable;
 mod upgradeable;
 
 use access_control::{generate_any_role_check, generate_role_check};
@@ -11,6 +10,8 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Item};
 use upgradeable::*;
+
+use crate::access_control::{HasAnyRoleArgs, HasRoleArgs};
 
 /* DEFAULT_IMPL_MACRO */
 
@@ -74,7 +75,6 @@ use upgradeable::*;
 #[proc_macro_attribute]
 pub fn default_impl(attrs: TokenStream, item: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
     generate_default_impl(item)
 }
 
@@ -105,7 +105,7 @@ pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
     let input_fn = parse_macro_input!(input as Item);
     // Generate the function with the admin authorization check
-    let auth_check_path = quote! { Self:enforce_admin_auth };
+    let auth_check_path = quote! { Self::enforce_admin_auth };
     insert_check(input_fn, auth_check_path).into()
 }
 
@@ -146,7 +146,12 @@ pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_role_check(args, input, false)
+    generate_role_check(
+        parse_macro_input!(args as HasRoleArgs),
+        parse_macro_input!(input as Item),
+        false,
+    )
+    .into()
 }
 
 /// A procedural macro that ensures the parameter has the specified role and
@@ -182,7 +187,12 @@ pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn only_role(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_role_check(args, input, true)
+    generate_role_check(
+        parse_macro_input!(args as HasRoleArgs),
+        parse_macro_input!(input as Item),
+        true,
+    )
+    .into()
 }
 
 /// A procedural macro that ensures the parameter has any of the specified
@@ -213,7 +223,12 @@ pub fn only_role(args: TokenStream, input: TokenStream) -> TokenStream {
 /// roles.
 #[proc_macro_attribute]
 pub fn has_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_any_role_check(args, input, false)
+    generate_any_role_check(
+        parse_macro_input!(args as HasAnyRoleArgs),
+        parse_macro_input!(input as Item),
+        false,
+    )
+    .into()
 }
 
 /// A procedural macro that ensures the parameter has any of the specified roles
@@ -238,7 +253,12 @@ pub fn has_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
 /// roles and requires authorization from the account.
 #[proc_macro_attribute]
 pub fn only_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_any_role_check(args, input, true)
+    generate_any_role_check(
+        parse_macro_input!(args as HasAnyRoleArgs),
+        parse_macro_input!(input as Item),
+        true,
+    )
+    .into()
 }
 
 /// A procedural macro that retrieves the owner from storage and requires
@@ -320,7 +340,7 @@ pub fn when_not_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn when_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-    insert_check(parse_macro_input!(item as Item), quote! { Self::when_not_paused}).into()
+    insert_check(parse_macro_input!(item as Item), quote! { Self::when_paused}).into()
 }
 
 /* UPGRADEABLE MACROS */
@@ -382,13 +402,23 @@ pub fn when_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Upgradeable)]
 pub fn upgradeable_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-
     derive_upgradeable(&input).into()
 }
 
-#[proc_macro_derive(UpgradeableMigratable)]
-pub fn upgradeable_migratable_derive(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
+/// Convert a trait into an trait extension type.
+#[proc_macro_attribute]
+pub fn make_ext(_: TokenStream, item: TokenStream) -> TokenStream {
+    let trait_input = parse_macro_input!(item as syn::ItemTrait);
+    let trait_ = trait_input.ident.clone();
+    let trait_ext = quote::format_ident!("{}Ext", trait_);
 
-    derive_upgradeable_migratable(&input).into()
+    let expanded = quote! {
+        #trait_input
+        pub struct #trait_ext<T: #trait_, N>(
+            core::marker::PhantomData<T>,
+            core::marker::PhantomData<N>,
+        );
+    };
+
+    TokenStream::from(expanded)
 }

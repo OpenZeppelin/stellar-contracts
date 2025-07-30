@@ -35,6 +35,7 @@ mod storage;
 mod test;
 
 use soroban_sdk::{contracterror, contracttrait, panic_with_error, Address, Env, Symbol};
+use stellar_macros::make_ext;
 
 pub use crate::ownable::storage::{OwnableStorageKey, Owner};
 
@@ -42,7 +43,8 @@ pub use crate::ownable::storage::{OwnableStorageKey, Owner};
 ///
 /// Provides functions to query ownership, initiate a transfer, or renounce
 /// ownership.
-#[contracttrait(default = Owner, is_extension = true)]
+#[contracttrait(default = Owner)]
+#[make_ext]
 pub trait Ownable {
     /// Returns `Some(Address)` if ownership is set, or `None` if ownership has
     /// been renounced.

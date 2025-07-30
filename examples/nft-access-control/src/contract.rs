@@ -2,10 +2,10 @@
 //!
 //! Demonstrates how can Access Control be utilized.
 
-use soroban_sdk::{contract, contractimpl, vec, Address, Env, String, Vec};
-use stellar_access::access_control::{set_admin, AccessControl};
-use stellar_macros::{default_impl, has_any_role, has_role, only_admin, only_any_role, only_role};
-use stellar_tokens::non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
+use soroban_sdk::{contract, contractimpl, contracttrait, vec, Address, Env, String, Vec};
+use stellar_access::AccessControl;
+use stellar_macros::{has_any_role, has_role, only_admin, only_any_role, only_role};
+use stellar_tokens::{NonFungibleBurnable, NonFungibleToken};
 
 #[contract]
 pub struct ExampleContract;
@@ -13,7 +13,7 @@ pub struct ExampleContract;
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, admin: Address) {
-        set_admin(e, &admin);
+        Self::init_admin(e, &admin);
         Self::set_metadata(
             e,
             String::from_str(e, "www.mytoken.com"),

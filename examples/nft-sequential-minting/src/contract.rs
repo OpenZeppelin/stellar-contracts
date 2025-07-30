@@ -3,7 +3,6 @@
 //! Demonstrates an example usage of the NFT default base implementation.
 
 use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env, String};
-
 use stellar_access::Ownable;
 use stellar_tokens::{NonFungibleBurnable, NonFungibleToken};
 

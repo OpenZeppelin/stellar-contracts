@@ -8,11 +8,9 @@
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttrait, symbol_short, Address, Env, String,
 };
-
 use stellar_access::AccessControl;
-
-use stellar_macros::{has_role, only_role};
-use stellar_tokens::{FungibleBlockList, FungibleBlockListExt, FungibleToken};
+use stellar_macros::has_role;
+use stellar_tokens::{fungible::blocklist::FungibleBlockListExt, FungibleBlockList, FungibleToken};
 
 #[contract]
 pub struct ExampleContract;
@@ -34,7 +32,7 @@ impl ExampleContract {
             String::from_str(e, "BLT"),
         );
 
-        Self::set_admin(e, &admin);
+        Self::init_admin(e, &admin);
 
         // create a role "manager" and grant it to `manager`
 
@@ -45,8 +43,10 @@ impl ExampleContract {
     }
 }
 
-#[contracttrait(ext = FungibleBlockListExt)]
-impl FungibleToken for ExampleContract {}
+#[contracttrait]
+impl FungibleToken for ExampleContract {
+    type Impl = FungibleBlockListExt<Self, FungibleToken!()>;
+}
 
 #[contracttrait]
 impl AccessControl for ExampleContract {}

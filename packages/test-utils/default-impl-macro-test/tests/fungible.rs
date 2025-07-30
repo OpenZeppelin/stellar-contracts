@@ -1,24 +1,24 @@
-use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
-use stellar_macros::default_impl;
-use stellar_tokens::fungible::{Base, FungibleToken};
+use soroban_sdk::{
+    contract, contractimpl, contracttrait, testutils::Address as _, Address, Env, String,
+};
+use stellar_tokens::FungibleToken;
 
 #[contract]
 pub struct ExampleContract;
 
-
 #[contracttrait]
-impl FungibleToken for ExampleContract {} ,
+impl FungibleToken for ExampleContract {}
+
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env) {
-        Base::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
+        Self::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
     }
 
     pub fn mint(e: &Env, to: Address, amount: i128) {
-        Base::internal_mint(e, &to, amount);
+        Self::internal_mint(e, &to, amount);
     }
 }
-
 
 fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {
     let address = e.register(ExampleContract, ());

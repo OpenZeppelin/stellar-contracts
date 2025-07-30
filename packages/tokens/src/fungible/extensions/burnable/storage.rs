@@ -4,6 +4,7 @@ use crate::fungible::{extensions::burnable::emit_burn, FTBase};
 
 impl super::FungibleBurnable for FTBase {
     type Impl = FTBase;
+
     /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.
     ///

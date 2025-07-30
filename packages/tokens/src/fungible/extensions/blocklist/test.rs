@@ -4,8 +4,8 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use super::{FungibleBlockList, FungibleBlockListExt};
 use crate::fungible::{
-    extensions::blocklist::storage::BlockList, extensions::burnable::FungibleBurnable, FTBase,
-    FungibleToken,
+    extensions::{blocklist::storage::BlockList, burnable::FungibleBurnable},
+    FTBase, FungibleToken,
 };
 
 #[contract]

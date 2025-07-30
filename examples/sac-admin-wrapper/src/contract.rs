@@ -1,7 +1,7 @@
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env};
-use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::{default_impl, only_admin, only_role};
-use stellar_tokens::fungible::{self as fungible, sac_admin_wrapper::SACAdminWrapper};
+use soroban_sdk::{contract, contractimpl, contracttrait, symbol_short, Address, Env};
+use stellar_access::AccessControl;
+use stellar_macros::{only_admin, only_role};
+use stellar_tokens::SACAdminWrapper;
 
 #[contract]
 pub struct ExampleContract;
@@ -15,7 +15,7 @@ impl ExampleContract {
         manager2: Address,
         sac: Address,
     ) {
-        <Self as AccessControl>::set_admin(e, &default_admin);
+        Self::init_admin(e, &default_admin);
 
         // create a role "manager" and grant it to `manager1`
         Self::grant_role_no_auth(e, &default_admin, &manager1, &symbol_short!("manager"));
@@ -37,17 +37,17 @@ impl SACAdminWrapper for ExampleContract {
         Self::Impl::set_admin(e, new_admin, _operator);
     }
 
-    #[has_role(operator, "manager")]
+    #[only_role(operator, "manager")]
     fn set_authorized(e: &Env, id: &Address, authorize: bool, operator: &Address) {
         Self::Impl::set_authorized(e, id, authorize, operator);
     }
 
-    #[has_role(operator, "manager")]
+    #[only_role(operator, "manager")]
     fn mint(e: &Env, to: &Address, amount: i128, operator: &Address) {
         Self::Impl::mint(e, to, amount, operator);
     }
 
-    #[has_role(operator, "manager")]
+    #[only_role(operator, "manager")]
     fn clawback(e: &Env, from: &Address, amount: i128, operator: &Address) {
         Self::Impl::clawback(e, from, amount, operator);
     }

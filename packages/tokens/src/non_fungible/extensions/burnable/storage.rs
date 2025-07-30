@@ -6,6 +6,7 @@ use crate::non_fungible::{
 
 impl NonFungibleBurnable for NFTBase {
     type Impl = Self;
+
     /// Destroys the token with `token_id` from `from`, ensuring ownership
     /// checks, and emits a `burn` event.
     ///

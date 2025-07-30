@@ -17,6 +17,7 @@ impl SACAdminWrapper for DefaultSacAdminWrapper {
     fn get_sac_address(e: &Env) -> soroban_sdk::Address {
         get_sac_address(e)
     }
+
     fn set_sac_address(e: &Env, sac_address: &Address) {
         set_sac_address(e, sac_address);
     }

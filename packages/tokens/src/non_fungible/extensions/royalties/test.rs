@@ -4,9 +4,8 @@ extern crate std;
 
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
-use crate::non_fungible::{extensions::enumerable::Enumerable, NFTBase};
-
 use super::NonFungibleRoyalties;
+use crate::non_fungible::{extensions::enumerable::Enumerable, NFTBase};
 
 #[contract]
 struct MockContract;

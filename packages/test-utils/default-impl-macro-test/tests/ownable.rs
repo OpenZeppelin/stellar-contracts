@@ -1,6 +1,6 @@
 use soroban_sdk::{
-    contract, contractimpl, contracttrait, contracttype, derive_contract, testutils::Address as _,
-    Address, Env, String,
+    contract, contractimpl, contracttrait, contracttype, testutils::Address as _, Address, Env,
+    String,
 };
 use stellar_access::Ownable;
 use stellar_macros::only_owner;
@@ -24,12 +24,12 @@ impl Ownable for ExampleContract {}
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
         Self::set_owner(e, &owner);
-        Base::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
+        Self::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
     }
 
     #[only_owner]
     pub fn mint(e: &Env, to: Address, amount: i128) {
-        Base::internal_mint(e, &to, amount);
+        Self::internal_mint(e, &to, amount);
     }
 }
 

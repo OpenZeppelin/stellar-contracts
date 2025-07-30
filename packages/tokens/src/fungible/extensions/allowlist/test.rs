@@ -3,8 +3,10 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::fungible::{
-    extensions::allowlist::{AllowList, FungibleAllowList, FungibleAllowListExt},
-    extensions::burnable::FungibleBurnable,
+    extensions::{
+        allowlist::{AllowList, FungibleAllowList, FungibleAllowListExt},
+        burnable::FungibleBurnable,
+    },
     FTBase, FungibleToken,
 };
 

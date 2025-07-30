@@ -65,7 +65,6 @@ pub mod storage;
 use soroban_sdk::{Address, Env, Symbol};
 pub use storage::Consecutive;
 
-
 mod test;
 
 // ################## EVENTS ##################

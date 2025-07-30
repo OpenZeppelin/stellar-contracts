@@ -4,7 +4,7 @@
 
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{FnArg, Ident, ItemFn, Pat, PatIdent, PatType, Type, TypePath, TypeReference};
+use syn::{FnArg, Ident, ItemFn, Pat, PatType, Type, TypePath};
 
 /// Parses the environment argument from the function signature
 pub fn parse_env_arg(input_fn: &ItemFn) -> TokenStream {
@@ -59,72 +59,8 @@ fn check_is_env(path: &TypePath, fn_name: &Ident) {
     }
 }
 
-/// Find the first parameter of type Address or &Address
-pub fn find_address_param(func: &ItemFn) -> Option<(proc_macro2::TokenStream, bool)> {
-    for arg in &func.sig.inputs {
-        if let FnArg::Typed(PatType { pat, ty, .. }) = arg {
-            if let Pat::Ident(PatIdent { ident, .. }) = &**pat {
-                match &**ty {
-                    // Check for &Address
-                    Type::Reference(TypeReference { elem, .. }) => {
-                        if is_address_type(elem) {
-                            return Some((quote! { #ident }, true));
-                        }
-                    }
-                    // Check for Address
-                    Type::Path(_) => {
-                        if is_address_type(ty) {
-                            return Some((quote! { #ident }, false));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-    }
-    None
-}
-
-fn is_address_type(ty: &Type) -> bool {
-    if let Type::Path(TypePath { path, .. }) = ty {
-        if path.segments.len() == 1 && path.segments[0].ident == "Address" {
-            return true;
-        }
-    }
-    false
-}
-
-/// Generates a function that enforces authorization for a specific role
-///
-/// This function is used by macros like `only_owner` and `only_admin` to
-/// generate code that checks authorization before executing the function body.
-///
-/// # Arguments
-///
-/// * `input_fn` - The function to wrap with authorization check
-/// * `auth_check_func` - The function to be called to enforce authorization
-///   (e.g., `stellar_access::ownable::enforce_owner_auth`)
-///
-/// # Returns
-///
-/// A TokenStream containing the function with authorization check added
-pub fn generate_auth_check(input_fn: &mut ItemFn, auth_check_func: TokenStream) {
-    // Get the environment parameter
-    let env_param = parse_env_arg(input_fn);
-
-    input_fn.block.stmts.insert(
-        0,
-        syn::parse_quote! {
-            #auth_check_func(#env_param);
-        },
-    );
-}
-
 pub fn insert_check(input_fn: syn::Item, auth_check_func: TokenStream) -> TokenStream {
-    let mut input_fn = match input_fn {
-        syn::Item::Fn(func) => func,
-        _ => return input_fn.to_token_stream(),
-    };
+    let syn::Item::Fn(mut input_fn) = input_fn else { return input_fn.to_token_stream() };
     // Get the environment parameter
     let env_param = parse_env_arg(&input_fn);
 
@@ -144,6 +80,85 @@ pub trait FunctionInsert: ToTokens {
 
 impl FunctionInsert for ItemFn {
     fn insert_stmts(&mut self, stmts: Vec<syn::Stmt>) {
-        self.block.stmts.splice(0..0, stmts.into_iter());
+        self.block.stmts.splice(0..0, stmts);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use syn::parse_quote;
+
+    use super::*;
+    use crate::{generate_any_role_check, HasAnyRoleArgs};
+
+    #[test]
+    fn only_admin() {
+        let auth_check_func = quote! { Self::enforce_admin_auth };
+        let input_fn = parse_quote! {
+            fn my_function(e: &Env) {
+                my_code();
+            }
+        };
+        // println!("{:#?}", check_env_arg(&input_fn));
+        // println!("{:#?}", parse_env(&input_fn));
+        let result = insert_check(input_fn, auth_check_func);
+        assert_eq!(
+            result.to_string(),
+            quote! {
+                fn my_function(e: &Env) {
+                    Self::enforce_admin_auth(e);
+                    my_code();
+                }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn test_insert_check() {
+        let auth_check_func = quote! { auth_check };
+        let input_fn = parse_quote! {
+            pub fn my_function(env: &Env) {
+                my_code();
+            }
+        };
+        let result = insert_check(input_fn, auth_check_func);
+        assert_eq!(
+            result.to_string(),
+            quote! {
+                pub fn my_function(env: &Env) {
+                    auth_check(env);
+                    my_code();
+                }
+            }
+            .to_string()
+        );
+    }
+
+    #[test]
+    fn has_any_role() {
+        let args = HasAnyRoleArgs {
+            param: parse_quote!(caller),
+            roles: vec![parse_quote!("admin"), parse_quote!("user")],
+        };
+        let input_fn = parse_quote! {
+            pub fn multi_role_action(e: &Env, caller: Address) -> String {
+                caller.require_auth();
+                String::from_str(e, "multi_role_action_success")
+            }
+        };
+        let result = generate_any_role_check(args, input_fn, false);
+        assert_eq!(
+            result.to_string(),
+            quote! {
+                pub fn multi_role_action(e: &Env, caller: Address) -> String {
+                    let has_any_role = ["admin" , "user"].iter().any(|role| <Self as AccessControl>::has_role(e, &caller, & soroban_sdk::Symbol::new(e , role)).is_some());
+                    assert!(has_any_role, "Account does not have any of the required roles");
+                    caller.require_auth();
+                    String::from_str(e, "multi_role_action_success")
+                }
+            }
+            .to_string()
+        );
     }
 }

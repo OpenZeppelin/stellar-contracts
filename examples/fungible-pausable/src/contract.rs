@@ -9,12 +9,9 @@
 //! [`stellar_fungible::fungible::FungibleToken`] and
 //! [`stellar_fungible::burnable::FungibleBurnable`].
 
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttrait, panic_with_error, symbol_short, Address,
-    Env, String, Symbol,
-};
-use stellar_access::Ownable;
-use stellar_contract_utils::Pausable;
+use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env, String};
+use stellar_access::{Ownable, OwnableExt};
+use stellar_contract_utils::{Pausable, PausableExt};
 use stellar_macros::when_not_paused;
 use stellar_tokens::{impl_token_interface, FungibleBurnable, FungibleToken};
 
@@ -39,14 +36,20 @@ impl ExampleContract {
 #[contracttrait]
 impl Ownable for ExampleContract {}
 
-#[contracttrait(ext = PausableExt)]
-impl FungibleToken for ExampleContract {}
+#[contracttrait]
+impl FungibleToken for ExampleContract {
+    type Impl = PausableExt<Self, FungibleToken!()>;
+}
 
-#[contracttrait(ext = PausableExt)]
-impl FungibleBurnable for ExampleContract {}
+#[contracttrait]
+impl FungibleBurnable for ExampleContract {
+    type Impl = PausableExt<Self, FungibleBurnable!()>;
+}
 
-#[contracttrait(ext = OwnableExt)]
-impl Pausable for ExampleContract {}
+#[contracttrait]
+impl Pausable for ExampleContract {
+    type Impl = OwnableExt<Self, Pausable!()>;
+}
 
 // NOTE: if your contract implements `FungibleToken` and `FungibleBurnable`,
 // and you also want your contract to implement

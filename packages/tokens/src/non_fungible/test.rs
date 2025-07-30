@@ -9,8 +9,10 @@ use soroban_sdk::{
 };
 use stellar_event_assertion::EventAssertion;
 
-use crate::non_fungible::{NFTStorageKey, NonFungibleToken};
-use crate::NFTBase;
+use crate::{
+    non_fungible::{NFTStorageKey, NonFungibleToken},
+    NFTBase,
+};
 
 #[contract]
 struct MockContract;

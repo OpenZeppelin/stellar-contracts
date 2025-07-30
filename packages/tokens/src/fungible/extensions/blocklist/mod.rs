@@ -4,6 +4,7 @@ mod storage;
 mod test;
 
 use soroban_sdk::{symbol_short, Address, Env};
+use stellar_macros::make_ext;
 pub use storage::*;
 
 /// BlockList Trait for Fungible Token
@@ -27,7 +28,8 @@ pub use storage::*;
 /// However, this parameter is omitted from the module functions, defined in
 /// "storage.rs", because the authorizations are to be handled in the access
 /// control helpers or directly implemented.
-#[soroban_sdk::contracttrait(default = BlockList, is_extension = true, extension_required = true)]
+#[soroban_sdk::contracttrait(default = BlockList)]
+#[make_ext]
 pub trait FungibleBlockList {
     /// Returns the blocked status of an account.
     ///

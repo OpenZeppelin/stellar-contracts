@@ -83,8 +83,6 @@ use soroban_sdk::Env;
 /// for a SAC.
 #[soroban_sdk::contracttrait(
     default = DefaultSacAdminWrapper,
-    is_extension = true,
-    extension_required = true
 )]
 pub trait SACAdminWrapper {
     /// Sets the administrator to the specified address `new_admin`.

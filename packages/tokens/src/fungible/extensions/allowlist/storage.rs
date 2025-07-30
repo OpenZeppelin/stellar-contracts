@@ -1,11 +1,14 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
-use crate::fungible::{
-    extensions::{
-        allowlist::{emit_user_allowed, emit_user_disallowed},
-        burnable::FungibleBurnable,
+use crate::{
+    fungible::{
+        extensions::{
+            allowlist::{emit_user_allowed, emit_user_disallowed},
+            burnable::FungibleBurnable,
+        },
+        FungibleToken, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
     },
-    FungibleToken, FungibleTokenError, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
+    FungibleTokenError,
 };
 
 pub struct AllowList;
@@ -19,6 +22,7 @@ pub enum AllowListStorageKey {
 
 impl super::FungibleAllowList for AllowList {
     type Impl = Self;
+
     fn allowed(e: &Env, account: &Address) -> bool {
         let key = AllowListStorageKey::Allowed(account.clone());
         if e.storage().persistent().has(&key) {

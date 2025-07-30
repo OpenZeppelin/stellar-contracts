@@ -5,13 +5,11 @@
 //! controlled token transfers by an admin who can allow or disallow specific
 //! accounts.
 
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, contracttrait, symbol_short, Address, Env, String};
 use stellar_access::AccessControl;
-use stellar_macros::{default_impl, only_role};
-use stellar_tokens::fungible::{
-    allowlist::{AllowList, FungibleAllowList},
-    burnable::FungibleBurnable,
-    Base, FungibleToken,
+use stellar_macros::has_role;
+use stellar_tokens::{
+    fungible::allowlist::FungibleAllowListExt, FungibleAllowList, FungibleBurnable, FungibleToken,
 };
 
 #[contract]
@@ -27,7 +25,7 @@ impl ExampleContract {
             String::from_str(e, "ALT"),
         );
 
-        Self::set_admin(e, &admin);
+        Self::init_admin(e, &admin);
 
         // create a role "manager" and grant it to `manager`
         Self::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
@@ -40,11 +38,15 @@ impl ExampleContract {
     }
 }
 
-#[contracttrait(ext = FungibleAllowListExt)]
-impl FungibleToken for ExampleContract {}
+#[contracttrait]
+impl FungibleToken for ExampleContract {
+    type Impl = FungibleAllowListExt<Self, FungibleToken!()>;
+}
 
-#[contracttrait(ext = FungibleAllowListExt)]
-impl FungibleBurnable for ExampleContract {}
+#[contracttrait]
+impl FungibleBurnable for ExampleContract {
+    type Impl = FungibleAllowListExt<Self, FungibleBurnable!()>;
+}
 
 #[contracttrait]
 impl AccessControl for ExampleContract {}

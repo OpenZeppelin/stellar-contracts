@@ -19,7 +19,6 @@ fn test_default_royalty() {
     e.mock_all_auths();
     let client = create_client(&e, &admin, &manager);
 
-
     // Mint a token
     let token_id = client.mint(&admin);
 
@@ -37,7 +36,6 @@ fn test_token_specific_royalty() {
     let royalty_receiver = Address::generate(&e);
     e.mock_all_auths();
     let client = create_client(&e, &admin, &manager);
-
 
     // Mint a token with specific royalty (5%)
     let token_id = client.mint_with_royalty(&admin, &royalty_receiver, &500);
@@ -64,7 +62,6 @@ fn test_zero_royalty() {
     let royalty_receiver = Address::generate(&e);
     e.mock_all_auths();
     let client = create_client(&e, &admin, &manager);
-
 
     // Mint a token with zero royalty
     let token_id = client.mint_with_royalty(&admin, &royalty_receiver, &0);

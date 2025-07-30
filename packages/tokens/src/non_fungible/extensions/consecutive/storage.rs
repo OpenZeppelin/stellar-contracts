@@ -16,6 +16,7 @@ pub struct Consecutive;
 
 impl NonFungibleBurnable for Consecutive {
     type Impl = Self;
+
     fn burn(e: &Env, from: &Address, token_id: u32) {
         from.require_auth();
 
@@ -35,6 +36,7 @@ impl NonFungibleBurnable for Consecutive {
 
 impl NonFungibleToken for Consecutive {
     type Impl = NFTBase;
+
     fn owner_of(e: &Env, token_id: u32) -> Address {
         Consecutive::owner_of(e, token_id)
     }
