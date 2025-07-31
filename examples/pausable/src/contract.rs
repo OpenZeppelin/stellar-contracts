@@ -14,8 +14,17 @@ use stellar_macros::{only_owner, when_not_paused, when_paused};
 
 #[contracttype]
 pub enum DataKey {
-    Owner,
     Counter,
+}
+
+impl DataKey {
+    pub fn set(&self, e: &Env, i: i32) {
+        e.storage().instance().set(self, &i);
+    }
+
+    pub fn get(&self, e: &Env) -> i32 {
+        unsafe { e.storage().instance().get(self).unwrap_unchecked() }
+    }
 }
 
 #[contract]
@@ -25,24 +34,19 @@ pub struct ExampleContract;
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
         Self::set_owner(e, &owner);
-        e.storage().instance().set(&DataKey::Counter, &0);
+        DataKey::Counter.set(e, 0);
     }
 
     #[when_not_paused]
     pub fn increment(e: &Env) -> i32 {
-        let mut counter: i32 =
-            e.storage().instance().get(&DataKey::Counter).expect("counter should be set");
-
-        counter += 1;
-
-        e.storage().instance().set(&DataKey::Counter, &counter);
-
+        let counter = DataKey::Counter.get(e) + 1;
+        DataKey::Counter.set(e, counter);
         counter
     }
 
     #[when_paused]
     pub fn emergency_reset(e: &Env) {
-        e.storage().instance().set(&DataKey::Counter, &0);
+        DataKey::Counter.set(e, 0);
     }
 }
 

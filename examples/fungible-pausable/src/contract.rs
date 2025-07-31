@@ -10,9 +10,9 @@
 //! [`stellar_fungible::burnable::FungibleBurnable`].
 
 use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env, String};
-use stellar_access::{Ownable, OwnableExt};
-use stellar_contract_utils::{Pausable, PausableExt};
-use stellar_macros::when_not_paused;
+use stellar_access::Ownable;
+use stellar_contract_utils::Pausable;
+use stellar_macros::{only_owner, when_not_paused};
 use stellar_tokens::{impl_token_interface, FungibleBurnable, FungibleToken};
 
 #[contract]
@@ -38,17 +38,41 @@ impl Ownable for ExampleContract {}
 
 #[contracttrait]
 impl FungibleToken for ExampleContract {
-    type Impl = PausableExt<Self, FungibleToken!()>;
+    #[when_not_paused]
+    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+        Self::Impl::transfer(e, from, to, amount);
+    }
+
+    #[when_not_paused]
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        Self::Impl::transfer_from(e, spender, from, to, amount);
+    }
 }
 
 #[contracttrait]
 impl FungibleBurnable for ExampleContract {
-    type Impl = PausableExt<Self, FungibleBurnable!()>;
+    #[when_not_paused]
+    fn burn(e: &Env, from: &Address, amount: i128) {
+        Self::Impl::burn(e, from, amount)
+    }
+
+    #[when_not_paused]
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        Self::Impl::burn_from(e, spender, from, amount)
+    }
 }
 
 #[contracttrait]
 impl Pausable for ExampleContract {
-    type Impl = OwnableExt<Self, Pausable!()>;
+    #[only_owner]
+    fn pause(e: &Env, caller: &Address) {
+        Self::Impl::pause(e, caller);
+    }
+
+    #[only_owner]
+    fn unpause(e: &Env, caller: &Address) {
+        Self::Impl::unpause(e, caller);
+    }
 }
 
 // NOTE: if your contract implements `FungibleToken` and `FungibleBurnable`,

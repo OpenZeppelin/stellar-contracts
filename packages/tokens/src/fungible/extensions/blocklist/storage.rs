@@ -1,11 +1,11 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use soroban_sdk::{contracttype, Address, Env};
 
 use crate::fungible::{
     extensions::{
         blocklist::{emit_user_blocked, emit_user_unblocked, FungibleBlockListExt},
         burnable::FungibleBurnable,
     },
-    FungibleToken, FungibleTokenError, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
+    FungibleToken, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
 pub struct BlockList;
@@ -78,26 +78,17 @@ impl<T: super::FungibleBlockList, N: FungibleToken> FungibleToken for FungibleBl
     type Impl = N;
 
     fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        if T::blocked(e, from) || T::blocked(e, to) {
-            panic_with_error!(e, FungibleTokenError::UserBlocked);
-        }
-
+        T::assert_not_blocked(e, &[from, to]);
         N::transfer(e, from, to, amount);
     }
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-        if T::blocked(e, from) || T::blocked(e, to) {
-            panic_with_error!(e, FungibleTokenError::UserBlocked);
-        }
-
+        T::assert_not_blocked(e, &[from, to]);
         N::transfer_from(e, spender, from, to, amount);
     }
 
     fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
-        if T::blocked(e, owner) {
-            panic_with_error!(e, FungibleTokenError::UserBlocked);
-        }
-
+        T::assert_not_blocked(e, &[owner]);
         N::approve(e, owner, spender, amount, live_until_ledger);
     }
 }
@@ -108,18 +99,12 @@ impl<T: super::FungibleBlockList, N: FungibleBurnable> FungibleBurnable
     type Impl = N;
 
     fn burn(e: &Env, from: &Address, amount: i128) {
-        if T::blocked(e, from) {
-            panic_with_error!(e, FungibleTokenError::UserBlocked);
-        }
-
+        T::assert_not_blocked(e, &[from]);
         N::burn(e, from, amount);
     }
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
-        if T::blocked(e, from) {
-            panic_with_error!(e, FungibleTokenError::UserBlocked);
-        }
-
+        T::assert_not_blocked(e, &[from]);
         N::burn_from(e, spender, from, amount);
     }
 }

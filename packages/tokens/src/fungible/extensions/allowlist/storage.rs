@@ -1,14 +1,11 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use soroban_sdk::{contracttype, Address, Env};
 
-use crate::{
-    fungible::{
-        extensions::{
-            allowlist::{emit_user_allowed, emit_user_disallowed},
-            burnable::FungibleBurnable,
-        },
-        FungibleToken, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
+use crate::fungible::{
+    extensions::{
+        allowlist::{emit_user_allowed, emit_user_disallowed},
+        burnable::FungibleBurnable,
     },
-    FungibleTokenError,
+    FungibleToken, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
 pub struct AllowList;
@@ -66,26 +63,17 @@ impl<T: super::FungibleAllowList, N: FungibleToken> crate::fungible::FungibleTok
     type Impl = N;
 
     fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        if !T::allowed(e, from) || !T::allowed(e, to) {
-            panic_with_error!(e, FungibleTokenError::UserNotAllowed);
-        }
-
+        T::assert_allowed(e, &[from, to]);
         N::transfer(e, from, to, amount);
     }
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-        if !T::allowed(e, from) || !T::allowed(e, to) {
-            panic_with_error!(e, FungibleTokenError::UserNotAllowed);
-        }
-
+        T::assert_allowed(e, &[from, to]);
         N::transfer_from(e, spender, from, to, amount);
     }
 
     fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
-        if !T::allowed(e, owner) {
-            panic_with_error!(e, FungibleTokenError::UserNotAllowed);
-        }
-
+        T::assert_allowed(e, &[owner]);
         N::approve(e, owner, spender, amount, live_until_ledger);
     }
 }
@@ -96,17 +84,12 @@ impl<T: super::FungibleAllowList, N: FungibleBurnable> FungibleBurnable
     type Impl = N;
 
     fn burn(e: &Env, from: &Address, amount: i128) {
-        if !T::allowed(e, from) {
-            panic_with_error!(e, FungibleTokenError::UserNotAllowed);
-        }
-
+        T::assert_allowed(e, &[from]);
         N::burn(e, from, amount);
     }
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
-        if !T::allowed(e, from) {
-            panic_with_error!(e, FungibleTokenError::UserNotAllowed);
-        }
+        T::assert_allowed(e, &[from]);
         N::burn_from(e, spender, from, amount);
     }
 }

@@ -3,7 +3,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{assert_with_error, symbol_short, Address, Env};
 use stellar_macros::make_ext;
 pub use storage::*;
 
@@ -66,6 +66,15 @@ pub trait FungibleBlockList {
     /// * topics - `["unblock", user: Address]`
     /// * data - `[]`
     fn unblock_user(e: &Env, user: &soroban_sdk::Address, operator: &soroban_sdk::Address);
+
+    #[internal]
+    fn assert_not_blocked(e: &Env, users: &[&soroban_sdk::Address]) {
+        assert_with_error!(
+            e,
+            users.iter().all(|u| !Self::blocked(e, u)),
+            crate::FungibleTokenError::UserBlocked
+        );
+    }
 }
 
 // ################## EVENTS ##################

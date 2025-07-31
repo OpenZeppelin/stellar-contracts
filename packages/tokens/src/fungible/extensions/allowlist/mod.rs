@@ -3,7 +3,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{assert_with_error, symbol_short, Address, Env};
 use stellar_macros::make_ext;
 pub use storage::AllowList;
 
@@ -66,6 +66,15 @@ pub trait FungibleAllowList {
     /// * topics - `["disallow", user: Address]`
     /// * data - `[]`
     fn disallow_user(e: &Env, user: &soroban_sdk::Address, operator: &soroban_sdk::Address);
+
+    #[internal]
+    fn assert_allowed(e: &Env, users: &[&Address]) {
+        assert_with_error!(
+            e,
+            users.iter().all(|user| Self::allowed(e, user)),
+            crate::FungibleTokenError::UserNotAllowed
+        )
+    }
 }
 
 // ################## EVENTS ##################

@@ -30,7 +30,7 @@ impl NonFungibleBurnable for NFTBase {
     /// Authorization for `from` is required.
     fn burn(e: &Env, from: &Address, token_id: u32) {
         from.require_auth();
-        NFTBase::update(e, Some(from), None, token_id);
+        Self::update(e, Some(from), None, token_id);
         emit_burn(e, from, token_id);
     }
 
@@ -60,8 +60,8 @@ impl NonFungibleBurnable for NFTBase {
     /// Authorization for `spender` is required.
     fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
         spender.require_auth();
-        NFTBase::check_spender_approval(e, spender, from, token_id);
-        NFTBase::update(e, Some(from), None, token_id);
+        Self::check_spender_approval(e, spender, from, token_id);
+        Self::update(e, Some(from), None, token_id);
         emit_burn(e, from, token_id);
     }
 }

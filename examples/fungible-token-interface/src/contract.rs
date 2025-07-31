@@ -18,28 +18,37 @@
 //! "examples/fungible-pausable" for better organization of the code,
 //! consistency and ease of inspection/debugging.
 
-use soroban_sdk::{contract, contractimpl, contracttrait, Address, Env, String};
-use stellar_access::{Ownable, OwnableExt};
-use stellar_contract_utils::{Pausable, PausableExt};
-use stellar_macros::when_not_paused;
-use stellar_tokens::{impl_token_interface, FungibleBurnable, FungibleToken};
+use soroban_sdk::{
+    contract, contractimpl, contracttrait, token::TokenInterface, Address, Env, String,
+};
+use stellar_access::Ownable;
+use stellar_contract_utils::Pausable;
+use stellar_macros::{only_owner, when_not_paused};
+use stellar_tokens::{FungibleBurnable, FungibleToken};
+
+type Base = FungibleToken!();
 
 #[contract]
-
 pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address, initial_supply: i128) {
-        Self::set_metadata(e, 18, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
         Self::set_owner(e, &owner);
-        Self::internal_mint(e, &owner, initial_supply);
+        Base::set_metadata(e, 18, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
+        Base::internal_mint(e, &owner, initial_supply);
+    }
+
+    /// `TokenInterface` doesn't require implementing `total_supply()` because
+    /// of the need for backwards compatibility with Stellar classic assets.
+    pub fn total_supply(e: &Env) -> i128 {
+        Base::total_supply(e)
     }
 
     #[when_not_paused]
+    #[only_owner]
     pub fn mint(e: &Env, account: Address, amount: i128) {
-        Self::enforce_owner_auth(e);
-        Self::internal_mint(e, &account, amount);
+        Base::internal_mint(e, &account, amount);
     }
 }
 
@@ -47,22 +56,61 @@ impl ExampleContract {
 impl Ownable for ExampleContract {}
 
 #[contracttrait]
-impl FungibleToken for ExampleContract {
-    type Impl = PausableExt<Self, FungibleToken!()>;
-}
-
-#[contracttrait]
-impl FungibleBurnable for ExampleContract {
-    type Impl = PausableExt<Self, FungibleBurnable!()>;
-}
-
-#[contracttrait]
 impl Pausable for ExampleContract {
-    type Impl = OwnableExt<Self, Pausable!()>;
+    #[only_owner]
+    fn pause(e: &Env, caller: &Address) {
+        Self::Impl::pause(e, caller);
+    }
+
+    #[only_owner]
+    fn unpause(e: &Env, caller: &Address) {
+        Self::Impl::unpause(e, caller);
+    }
 }
 
-// NOTE: if your contract implements `FungibleToken` and `FungibleBurnable`,
-// and you also want your contract to implement
-// `soroban_sdk::token::TokenInterface`, you can use the `impl_token_interface!`
-// macro to generate the boilerplate implementation.
-impl_token_interface!(ExampleContract);
+#[contractimpl]
+impl TokenInterface for ExampleContract {
+    fn balance(e: Env, account: Address) -> i128 {
+        Base::balance(&e, &account)
+    }
+
+    fn allowance(e: Env, owner: Address, spender: Address) -> i128 {
+        Base::allowance(&e, &owner, &spender)
+    }
+
+    #[when_not_paused]
+    fn transfer(e: Env, from: Address, to: Address, amount: i128) {
+        Base::transfer(&e, &from, &to, amount);
+    }
+
+    #[when_not_paused]
+    fn transfer_from(e: Env, spender: Address, from: Address, to: Address, amount: i128) {
+        Base::transfer_from(&e, &spender, &from, &to, amount);
+    }
+
+    fn approve(e: Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32) {
+        Base::approve(&e, &owner, &spender, amount, live_until_ledger);
+    }
+
+    #[when_not_paused]
+    fn burn(e: Env, from: Address, amount: i128) {
+        Base::burn(&e, &from, amount)
+    }
+
+    #[when_not_paused]
+    fn burn_from(e: Env, spender: Address, from: Address, amount: i128) {
+        Base::burn_from(&e, &spender, &from, amount)
+    }
+
+    fn decimals(e: Env) -> u32 {
+        Base::decimals(&e)
+    }
+
+    fn name(e: Env) -> String {
+        Base::name(&e)
+    }
+
+    fn symbol(e: Env) -> String {
+        Base::symbol(&e)
+    }
+}

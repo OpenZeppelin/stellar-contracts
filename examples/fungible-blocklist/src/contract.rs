@@ -5,22 +5,13 @@
 //! controlled token transfers by an admin who can block or unblock specific
 //! accounts.
 
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttrait, symbol_short, Address, Env, String,
-};
+use soroban_sdk::{contract, contractimpl, contracttrait, symbol_short, Address, Env, String};
 use stellar_access::AccessControl;
-use stellar_macros::has_role;
-use stellar_tokens::{fungible::blocklist::FungibleBlockListExt, FungibleBlockList, FungibleToken};
+use stellar_macros::only_role;
+use stellar_tokens::{FungibleBlockList, FungibleToken};
 
 #[contract]
 pub struct ExampleContract;
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum ExampleContractError {
-    Unauthorized = 1,
-}
 
 #[contractimpl]
 impl ExampleContract {
@@ -33,11 +24,8 @@ impl ExampleContract {
         );
 
         Self::init_admin(e, &admin);
-
         // create a role "manager" and grant it to `manager`
-
-        <Self as AccessControl>::grant_role(e, &admin, &manager, &symbol_short!("manager"));
-
+        Self::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
         // Mint initial supply to the admin
         Self::internal_mint(e, &admin, initial_supply);
     }
@@ -45,7 +33,20 @@ impl ExampleContract {
 
 #[contracttrait]
 impl FungibleToken for ExampleContract {
-    type Impl = FungibleBlockListExt<Self, FungibleToken!()>;
+    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+        Self::assert_not_blocked(e, &[from, to]);
+        Self::Impl::transfer(e, from, to, amount);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        Self::assert_not_blocked(e, &[from, to]);
+        Self::Impl::transfer_from(e, spender, from, to, amount);
+    }
+
+    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+        Self::assert_not_blocked(e, &[owner]);
+        Self::Impl::approve(e, owner, spender, amount, live_until_ledger);
+    }
 }
 
 #[contracttrait]
@@ -53,12 +54,12 @@ impl AccessControl for ExampleContract {}
 
 #[contracttrait]
 impl FungibleBlockList for ExampleContract {
-    #[has_role(operator, "manager")]
+    #[only_role(operator, "manager")]
     fn block_user(e: &Env, user: &Address, operator: &Address) {
         Self::Impl::block_user(e, user, operator)
     }
 
-    #[has_role(operator, "manager")]
+    #[only_role(operator, "manager")]
     fn unblock_user(e: &Env, user: &Address, operator: &Address) {
         Self::Impl::unblock_user(e, user, operator)
     }
