@@ -66,7 +66,6 @@
 use soroban_sdk::{contracterror, contracttrait, symbol_short, Address, Env, String, Symbol};
 
 mod extensions;
-mod overrides;
 mod storage;
 mod utils;
 

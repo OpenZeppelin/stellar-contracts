@@ -39,20 +39,18 @@ use soroban_sdk::{contracttrait, symbol_short, Address, Env};
 ///
 /// # Notes
 ///
-/// `#[contractimpl]` macro requires even the default implementations to be
-/// present under its scope. To not confuse the developers, we did not provide
-/// the default implementations here, but we are providing a macro to generate
-/// the default implementations for you.
+/// `#[contracttrait]` macro provides a default implementation and generates a
+/// `#[contractimpl]` with all the trait's methods forwarding them to `MyContract`.
 ///
 /// When implementing [`NonFungibleBurnable`] trait for your Smart Contract,
 /// you can follow the below example:
 ///
+/// ## Example
+///
 /// ```ignore
-/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
-/// #[contractimpl]
+/// #[contracttrait]
 /// impl NonFungibleBurnable for MyContract {
 ///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
-///     /* and the macro will generate all the missing default implementations for you */
 /// }
 /// ```
 #[contracttrait(default = NFTBase)]
@@ -61,7 +59,6 @@ pub trait NonFungibleBurnable {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `from` - The account whose token is destroyed.
     /// * `token_id` - The identifier of the token to burn.
     ///
@@ -83,7 +80,6 @@ pub trait NonFungibleBurnable {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `spender` - The account that is allowed to burn the token on behalf of
     ///   the owner.
     /// * `from` - The account whose token is destroyed.

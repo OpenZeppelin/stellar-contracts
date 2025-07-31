@@ -12,6 +12,16 @@ use crate::non_fungible::{
     TOKEN_TTL_THRESHOLD,
 };
 
+/// Consecutive implementation of the NonFungibleToken trait.
+/// ## Example
+///
+/// ```ignore
+/// #[contracttrait(default = Consecutive)]
+/// impl NonFungibleToken for MyContract {}
+///
+/// #[contracttrait(default = Consecutive)]
+/// impl NonFungibleBurnable for MyContract {}
+/// ```
 pub struct Consecutive;
 
 impl NonFungibleBurnable for Consecutive {
