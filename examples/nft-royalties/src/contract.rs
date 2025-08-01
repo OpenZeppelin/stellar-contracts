@@ -29,7 +29,7 @@ impl ExampleContract {
         Self::grant_role_no_auth(e, &admin, &admin, &symbol_short!("manager"));
 
         // Set default royalty for the entire collection (10%)
-        <Self as NonFungibleRoyalties>::set_default_royalty(e, &admin, 1000, &admin);
+        Self::set_default_royalty(e, admin.clone(), 1000, admin);
     }
 
     #[only_admin]
@@ -43,13 +43,7 @@ impl ExampleContract {
         // Mint token with sequential ID
         let token_id = Self::sequential_mint(e, &to);
         // Set token-specific royalty
-        <Self as NonFungibleRoyalties>::set_token_royalty(
-            e,
-            token_id,
-            &receiver,
-            basis_points,
-            &to,
-        );
+        Self::set_token_royalty(e, token_id, receiver, basis_points, to);
         token_id
     }
 }
