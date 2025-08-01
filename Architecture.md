@@ -162,6 +162,7 @@ The architecture supports optional extensions that can be mixed and matched. Bel
 - **Allowlist**: Whitelist-based access control
 - **Blocklist**: Blacklist-based access control
 - **Metadata**: Enhanced token information (name, symbol, decimals)
+- **Vault**: Asset deposit/withdrawal with share tokenization
 
 ## Storage Architecture
 
