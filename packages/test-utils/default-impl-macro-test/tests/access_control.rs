@@ -1,40 +1,31 @@
 use soroban_sdk::{
-    contract, contractimpl, contracttype, testutils::Address as _, Address, Env, String, Symbol,
+    contract, contractimpl, contracttrait, testutils::Address as _, Address, Env, String, Symbol,
 };
-use stellar_access::access_control::{set_admin, AccessControl};
-use stellar_macros::{default_impl, has_role};
-use stellar_tokens::fungible::{Base, FungibleToken};
-
-#[contracttype]
-pub enum DataKey {
-    Admin,
-}
+use stellar_access::AccessControl;
+use stellar_macros::has_role;
+use stellar_tokens::FungibleToken;
 
 #[contract]
 pub struct ExampleContract;
 
+#[contracttrait]
+impl FungibleToken for ExampleContract {}
+
+#[contracttrait]
+impl AccessControl for ExampleContract {}
+
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        set_admin(e, &owner);
-        Base::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
+        Self::init_admin(e, &owner);
+        Self::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
     }
 
     #[has_role(caller, "minter")]
     pub fn mint(e: &Env, caller: Address, to: Address, amount: i128) {
-        Base::mint(e, &to, amount);
+        Self::internal_mint(e, &to, amount);
     }
 }
-
-#[default_impl]
-#[contractimpl]
-impl FungibleToken for ExampleContract {
-    type ContractType = Base;
-}
-
-#[default_impl]
-#[contractimpl]
-impl AccessControl for ExampleContract {}
 
 fn create_client<'a>(e: &Env, owner: &Address) -> ExampleContractClient<'a> {
     let address = e.register(ExampleContract, (owner,));
