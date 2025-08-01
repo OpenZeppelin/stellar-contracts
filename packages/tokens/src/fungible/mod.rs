@@ -69,13 +69,14 @@
 
 mod extensions;
 mod impl_token_interface_macro;
+mod math;
 mod overrides;
 mod storage;
 mod utils;
 
 mod test;
 
-pub use extensions::{allowlist, blocklist, burnable, capped};
+pub use extensions::{allowlist, blocklist, burnable, capped, vault};
 pub use overrides::{Base, ContractOverrides};
 use soroban_sdk::{contracterror, symbol_short, Address, Env, String};
 pub use storage::{AllowanceData, AllowanceKey, StorageKey};
@@ -306,6 +307,20 @@ pub enum FungibleTokenError {
     UserNotAllowed = 113,
     /// The user is blocked and cannot perform this operation
     UserBlocked = 114,
+    /// Indicates access to uninitialized vault asset address
+    VaultAssetAddressNotSet = 115,
+    /// Indicates the amount is not a valid vault assets value.
+    VaultInvalidAssetsAmount = 116,
+    /// Indicates the amount is not a valid vault shares value.
+    VaultInvalidSharesAmount = 117,
+    /// Attempted to deposit more assets than the max amount for address.
+    VaultExceededMaxDeposit = 118,
+    /// Attempted to mint more shares than the max amount for address.
+    VaultExceededMaxMint = 119,
+    /// Attempted to withdraw more assets than the max amount for address.
+    VaultExceededMaxWithdraw = 120,
+    /// Attempted to redeem more shares than the max amount for address.
+    VaultExceededMaxRedeem = 121,
 }
 
 // ################## CONSTANTS ##################
