@@ -4,7 +4,7 @@ use super::{
     emit_claim_topic_added, emit_claim_topic_removed, emit_issuer_topics_updated,
     emit_trusted_issuer_added, emit_trusted_issuer_removed,
 };
-use crate::rwa::modules::claim_topics_and_issuers::{
+use crate::rwa::claim_topics_and_issuers::{
     ClaimTopicsAndIssuersError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD, ISSUERS_EXTEND_AMOUNT,
     ISSUERS_TTL_THRESHOLD, MAX_CLAIM_TOPICS, MAX_ISSUERS,
 };
