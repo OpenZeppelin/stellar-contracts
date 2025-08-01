@@ -22,14 +22,14 @@ impl ExampleContract {
             String::from_str(e, "RNFT"),
         );
 
-        // Set default royalty for the entire collection (10%)
-        <Self as NonFungibleRoyalties>::set_default_royalty(e, &admin, 1000, &admin);
-
         Self::init_admin(e, &admin);
 
         // create a role "manager" and grant it to `manager`
         Self::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
         Self::grant_role_no_auth(e, &admin, &admin, &symbol_short!("manager"));
+
+        // Set default royalty for the entire collection (10%)
+        <Self as NonFungibleRoyalties>::set_default_royalty(e, &admin, 1000, &admin);
     }
 
     #[only_admin]

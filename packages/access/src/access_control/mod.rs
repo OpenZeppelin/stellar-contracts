@@ -283,7 +283,7 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `role` - The role to set the admin for.fz
+    /// * `role` - The role to set the admin for.
     /// * `admin_role` - The new admin role.
     ///
     /// # Events
@@ -410,7 +410,7 @@ pub trait AccessControl {
                 caller,
                 &soroban_sdk::Symbol::new(e, role)).is_some()
             ),
-            AccessControlError::Unauthorized
+            AccessControlError::RoleNotHeld
         );
     }
 }

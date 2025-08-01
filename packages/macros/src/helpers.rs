@@ -151,8 +151,7 @@ mod test {
             result.to_string(),
             quote! {
                 pub fn multi_role_action(e: &Env, caller: Address) -> String {
-                    let has_any_role = ["admin" , "user"].iter().any(|role| <Self as AccessControl>::has_role(e, &caller, & soroban_sdk::Symbol::new(e , role)).is_some());
-                    assert!(has_any_role, "Account does not have any of the required roles");
+                    Self::assert_has_any_role(e, &caller, &["admin", "user"]);
                     caller.require_auth();
                     String::from_str(e, "multi_role_action_success")
                 }
