@@ -404,21 +404,3 @@ pub fn upgradeable_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     derive_upgradeable(&input).into()
 }
-
-/// Convert a trait into an trait extension type.
-#[proc_macro_attribute]
-pub fn make_ext(_: TokenStream, item: TokenStream) -> TokenStream {
-    let trait_input = parse_macro_input!(item as syn::ItemTrait);
-    let trait_ = trait_input.ident.clone();
-    let trait_ext = quote::format_ident!("{}Ext", trait_);
-
-    let expanded = quote! {
-        #trait_input
-        pub struct #trait_ext<T: #trait_, N>(
-            core::marker::PhantomData<T>,
-            core::marker::PhantomData<N>,
-        );
-    };
-
-    TokenStream::from(expanded)
-}

@@ -385,8 +385,8 @@ pub trait AccessControl {
     #[internal]
     fn remove_role_accounts_count_no_auth(e: &Env, role: &Symbol);
 
-    /// Removes the admin role for a specified role without performing authorization
-    /// checks.
+    /// Removes the admin role for a specified role without performing
+    /// authorization checks.
     ///
     /// # Arguments
     ///
@@ -394,8 +394,8 @@ pub trait AccessControl {
     ///
     /// # Security Warning
     ///
-    /// **IMPORTANT**: This function bypasses authorization checks and should only
-    /// be used:
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used:
     /// - In admin functions that implement their own authorization logic
     /// - When cleaning up unused roles
     #[internal]

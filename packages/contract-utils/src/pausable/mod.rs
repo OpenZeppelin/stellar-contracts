@@ -51,16 +51,13 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{contracterror, contracttrait, panic_with_error, symbol_short, Address, Env};
-use stellar_access::{Ownable, OwnableExt};
-use stellar_macros::make_ext;
+use soroban_sdk::{contracterror, contracttrait, panic_with_error, symbol_short, Env};
 
 pub use crate::pausable::storage::{
     pause, paused, unpause, when_not_paused, when_paused, PausableDefault,
 };
 
 #[contracttrait(default = PausableDefault)]
-#[make_ext]
 pub trait Pausable {
     /// Returns true if the contract is paused, and false otherwise.
     ///
@@ -206,18 +203,4 @@ pub fn emit_paused(e: &Env) {
 pub fn emit_unpaused(e: &Env) {
     let topics = (symbol_short!("unpaused"),);
     e.events().publish(topics, ())
-}
-
-impl<T: Ownable, N: Pausable> Pausable for OwnableExt<T, N> {
-    type Impl = N;
-
-    fn pause(e: &Env, caller: &Address) {
-        T::only_owner(e);
-        N::pause(e, caller);
-    }
-
-    fn unpause(e: &Env, caller: &Address) {
-        T::only_owner(e);
-        N::unpause(e, caller);
-    }
 }

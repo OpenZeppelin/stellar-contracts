@@ -35,13 +35,13 @@ use soroban_sdk::{contracttrait, symbol_short, Address, Env};
 ///     type Impl = Enumerable;
 /// }
 ///
-///
 /// ```
 ///
 /// # Notes
 ///
 /// `#[contracttrait]` macro provides a default implementation and generates a
-/// `#[contractimpl]` with all the trait's methods forwarding them to `MyContract`.
+/// `#[contractimpl]` with all the trait's methods forwarding them to
+/// `MyContract`.
 ///
 /// When implementing [`NonFungibleBurnable`] trait for your Smart Contract,
 /// you can follow the below example:

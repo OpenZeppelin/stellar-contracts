@@ -3,7 +3,6 @@ mod storage;
 mod test;
 
 use soroban_sdk::{symbol_short, Env};
-use stellar_macros::make_ext;
 
 /// Burnable Trait for Fungible Token
 ///
@@ -19,7 +18,6 @@ use stellar_macros::make_ext;
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
 #[soroban_sdk::contracttrait(default = FTBase)]
-#[make_ext]
 pub trait FungibleBurnable {
     /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.

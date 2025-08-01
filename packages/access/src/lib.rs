@@ -5,4 +5,4 @@ pub mod ownable;
 pub mod role_transfer;
 
 pub use access_control::{AccessControl, AccessControler};
-pub use ownable::{Ownable, OwnableExt, Owner};
+pub use ownable::{Ownable, Owner};

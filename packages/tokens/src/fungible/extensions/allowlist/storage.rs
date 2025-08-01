@@ -1,11 +1,8 @@
 use soroban_sdk::{contracttype, Address, Env};
 
 use crate::fungible::{
-    extensions::{
-        allowlist::{emit_user_allowed, emit_user_disallowed},
-        burnable::FungibleBurnable,
-    },
-    FungibleToken, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
+    extensions::allowlist::{emit_user_allowed, emit_user_disallowed},
+    ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
 pub struct AllowList;
@@ -58,42 +55,5 @@ impl super::FungibleAllowList for AllowList {
 
             emit_user_allowed(e, user);
         }
-    }
-}
-
-impl<T: super::FungibleAllowList, N: FungibleToken> crate::fungible::FungibleToken
-    for super::FungibleAllowListExt<T, N>
-{
-    type Impl = N;
-
-    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        T::assert_allowed(e, &[from, to]);
-        Self::Impl::transfer(e, from, to, amount);
-    }
-
-    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-        T::assert_allowed(e, &[from, to]);
-        Self::Impl::transfer_from(e, spender, from, to, amount);
-    }
-
-    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
-        T::assert_allowed(e, &[owner]);
-        Self::Impl::approve(e, owner, spender, amount, live_until_ledger);
-    }
-}
-
-impl<T: super::FungibleAllowList, N: FungibleBurnable> FungibleBurnable
-    for super::FungibleAllowListExt<T, N>
-{
-    type Impl = N;
-
-    fn burn(e: &Env, from: &Address, amount: i128) {
-        T::assert_allowed(e, &[from]);
-        Self::Impl::burn(e, from, amount);
-    }
-
-    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
-        T::assert_allowed(e, &[from]);
-        Self::Impl::burn_from(e, spender, from, amount);
     }
 }

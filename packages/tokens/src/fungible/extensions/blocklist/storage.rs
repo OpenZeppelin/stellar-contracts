@@ -1,11 +1,8 @@
 use soroban_sdk::{contracttype, Address, Env};
 
 use crate::fungible::{
-    extensions::{
-        blocklist::{emit_user_blocked, emit_user_unblocked, FungibleBlockListExt},
-        burnable::FungibleBurnable,
-    },
-    FungibleToken, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
+    extensions::blocklist::{emit_user_blocked, emit_user_unblocked},
+    ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
 pub struct BlockList;
@@ -72,39 +69,4 @@ impl super::FungibleBlockList for BlockList {
 pub enum BlockListStorageKey {
     /// Stores the blocked status of an account
     Blocked(Address),
-}
-
-impl<T: super::FungibleBlockList, N: FungibleToken> FungibleToken for FungibleBlockListExt<T, N> {
-    type Impl = N;
-
-    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        T::assert_not_blocked(e, &[from, to]);
-        N::transfer(e, from, to, amount);
-    }
-
-    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-        T::assert_not_blocked(e, &[from, to]);
-        N::transfer_from(e, spender, from, to, amount);
-    }
-
-    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
-        T::assert_not_blocked(e, &[owner]);
-        N::approve(e, owner, spender, amount, live_until_ledger);
-    }
-}
-
-impl<T: super::FungibleBlockList, N: FungibleBurnable> FungibleBurnable
-    for FungibleBlockListExt<T, N>
-{
-    type Impl = N;
-
-    fn burn(e: &Env, from: &Address, amount: i128) {
-        T::assert_not_blocked(e, &[from]);
-        N::burn(e, from, amount);
-    }
-
-    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
-        T::assert_not_blocked(e, &[from]);
-        N::burn_from(e, spender, from, amount);
-    }
 }

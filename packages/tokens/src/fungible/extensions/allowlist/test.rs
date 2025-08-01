@@ -4,17 +4,51 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
 use crate::fungible::{
     extensions::{
-        allowlist::{AllowList, FungibleAllowList, FungibleAllowListExt},
+        allowlist::{AllowList, FungibleAllowList},
         burnable::FungibleBurnable,
     },
     FTBase, FungibleToken,
 };
 
-type BurableAllowList = FungibleAllowListExt<AllowList, FTBase>;
-type FungibleTokenAllowList = FungibleAllowListExt<AllowList, FTBase>;
+impl FungibleToken for MockContract {
+    type Impl = FTBase;
+
+    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+        Self::assert_allowed(e, &[from, to]);
+        Self::Impl::transfer(e, from, to, amount);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        Self::assert_allowed(e, &[from, to]);
+        Self::Impl::transfer_from(e, spender, from, to, amount);
+    }
+
+    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+        Self::assert_allowed(e, &[owner]);
+        Self::Impl::approve(e, owner, spender, amount, live_until_ledger);
+    }
+}
+
+impl FungibleBurnable for MockContract {
+    type Impl = FTBase;
+
+    fn burn(e: &Env, from: &Address, amount: i128) {
+        Self::assert_allowed(e, &[from]);
+        Self::Impl::burn(e, from, amount);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        Self::assert_allowed(e, &[from]);
+        Self::Impl::burn_from(e, spender, from, amount);
+    }
+}
 
 #[contract]
 struct MockContract;
+
+impl FungibleAllowList for MockContract {
+    type Impl = AllowList;
+}
 
 #[test]
 fn allow_user_works() {
@@ -25,13 +59,13 @@ fn allow_user_works() {
 
     e.as_contract(&address, || {
         // Check initial state
-        assert!(!AllowList::allowed(&e, &user));
+        assert!(!MockContract::allowed(&e, &user));
 
         // Allow user
-        AllowList::allow_user(&e, &user, &user);
+        MockContract::allow_user(&e, &user, &user);
 
         // Verify user is allowed
-        assert!(AllowList::allowed(&e, &user));
+        assert!(MockContract::allowed(&e, &user));
     });
 }
 
@@ -44,8 +78,8 @@ fn disallow_user_works() {
 
     e.as_contract(&address, || {
         // Allow user first
-        AllowList::allow_user(&e, &user, &user);
-        assert!(AllowList::allowed(&e, &user));
+        MockContract::allow_user(&e, &user, &user);
+        assert!(MockContract::allowed(&e, &user));
     });
 
     e.as_contract(&address, || {
@@ -53,7 +87,7 @@ fn disallow_user_works() {
         AllowList::disallow_user(&e, &user, &user);
 
         // Verify user is not allowed
-        assert!(!AllowList::allowed(&e, &user));
+        assert!(!MockContract::allowed(&e, &user));
     });
 }
 
@@ -67,18 +101,18 @@ fn transfer_with_allowed_users_works() {
 
     e.as_contract(&address, || {
         // Allow both users
-        AllowList::allow_user(&e, &user1, &user1);
-        AllowList::allow_user(&e, &user2, &user1);
+        MockContract::allow_user(&e, &user1, &user1);
+        MockContract::allow_user(&e, &user2, &user1);
 
         // Mint tokens to user1
-        FTBase::internal_mint(&e, &user1, 100);
+        MockContract::internal_mint(&e, &user1, 100);
 
         // Transfer tokens from user1 to user2
-        FungibleTokenAllowList::transfer(&e, &user1, &user2, 50);
+        MockContract::transfer(&e, &user1, &user2, 50);
 
         // Verify balances
-        assert_eq!(FTBase::balance(&e, &user1), 50);
-        assert_eq!(FTBase::balance(&e, &user2), 50);
+        assert_eq!(MockContract::balance(&e, &user1), 50);
+        assert_eq!(MockContract::balance(&e, &user2), 50);
     });
 }
 
@@ -91,16 +125,16 @@ fn allowlist_burn_override_works() {
 
     e.as_contract(&address, || {
         // Allow user first
-        AllowList::allow_user(&e, &user, &user);
+        MockContract::allow_user(&e, &user, &user);
 
         // Mint tokens to user
-        FTBase::internal_mint(&e, &user, 100);
+        MockContract::internal_mint(&e, &user, 100);
 
         // Burn tokens from user
-        BurableAllowList::burn(&e, &user, 50);
+        MockContract::burn(&e, &user, 50);
 
         // Verify balance
-        assert_eq!(FTBase::balance(&e, &user), 50);
+        assert_eq!(MockContract::balance(&e, &user), 50);
     });
 }
 
@@ -114,19 +148,19 @@ fn allowlist_burn_from_override_works() {
 
     e.as_contract(&address, || {
         // Allow user1 first
-        AllowList::allow_user(&e, &user1, &user1);
+        MockContract::allow_user(&e, &user1, &user1);
 
         // Mint tokens to user1
-        FTBase::internal_mint(&e, &user1, 100);
+        MockContract::internal_mint(&e, &user1, 100);
 
         // Allow user2 to burn tokens from user1
-        FTBase::approve(&e, &user1, &user2, 50, 100);
+        MockContract::approve(&e, &user1, &user2, 50, 100);
 
         // Burn tokens from user1 by user2
-        BurableAllowList::burn_from(&e, &user2, &user1, 50);
+        MockContract::burn_from(&e, &user2, &user1, 50);
 
         // Verify balance
-        assert_eq!(FTBase::balance(&e, &user1), 50);
+        assert_eq!(MockContract::balance(&e, &user1), 50);
     });
 }
 
@@ -141,13 +175,13 @@ fn transfer_with_sender_not_allowed_panics() {
 
     e.as_contract(&address, || {
         // Allow only user2
-        AllowList::allow_user(&e, &user2, &user1);
+        MockContract::allow_user(&e, &user2, &user1);
 
         // Mint tokens to user1
-        FTBase::internal_mint(&e, &user1, 100);
+        MockContract::internal_mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 (not allowed) to user2
-        FungibleTokenAllowList::transfer(&e, &user1, &user2, 50);
+        MockContract::transfer(&e, &user1, &user2, 50);
     });
 }
 
@@ -162,13 +196,13 @@ fn transfer_with_receiver_not_allowed_panics() {
 
     e.as_contract(&address, || {
         // Allow only user1
-        AllowList::allow_user(&e, &user1, &user1);
+        MockContract::allow_user(&e, &user1, &user1);
 
         // Mint tokens to user1
-        FTBase::internal_mint(&e, &user1, 100);
+        MockContract::internal_mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 to user2 (not allowed)
-        FungibleTokenAllowList::transfer(&e, &user1, &user2, 50);
+        MockContract::transfer(&e, &user1, &user2, 50);
     });
 }
 
@@ -183,7 +217,7 @@ fn approve_with_owner_not_allowed_panics() {
 
     e.as_contract(&address, || {
         // Try to approve tokens from user1 (not allowed) to user2 (not allowed)
-        FungibleTokenAllowList::approve(&e, &user1, &user2, 50, 100);
+        MockContract::approve(&e, &user1, &user2, 50, 100);
     });
 }
 
@@ -197,10 +231,10 @@ fn burn_with_not_allowed_panics() {
 
     e.as_contract(&address, || {
         // Mint tokens to user
-        FTBase::internal_mint(&e, &user, 100);
+        MockContract::internal_mint(&e, &user, 100);
 
         // Try to burn tokens from user (not allowed)
-        BurableAllowList::burn(&e, &user, 50);
+        MockContract::burn(&e, &user, 50);
     });
 }
 
@@ -215,12 +249,12 @@ fn burn_from_with_not_allowed_panics() {
 
     e.as_contract(&address, || {
         // Mint tokens to user1
-        FTBase::internal_mint(&e, &user1, 100);
+        MockContract::internal_mint(&e, &user1, 100);
 
         // Allow user2 to burn tokens from user1
-        FTBase::approve(&e, &user1, &user2, 50, 100);
+        MockContract::approve(&e, &user1, &user2, 50, 100);
 
         // Try to burn tokens from user1 by user2 (not allowed)
-        BurableAllowList::burn_from(&e, &user2, &user1, 50);
+        MockContract::burn_from(&e, &user2, &user1, 50);
     });
 }

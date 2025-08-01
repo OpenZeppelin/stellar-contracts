@@ -4,7 +4,6 @@ mod storage;
 mod test;
 
 use soroban_sdk::{assert_with_error, symbol_short, Address, Env};
-use stellar_macros::make_ext;
 pub use storage::*;
 
 /// BlockList Trait for Fungible Token
@@ -29,7 +28,6 @@ pub use storage::*;
 /// "storage.rs", because the authorizations are to be handled in the access
 /// control helpers or directly implemented.
 #[soroban_sdk::contracttrait(default = BlockList)]
-#[make_ext]
 pub trait FungibleBlockList {
     /// Returns the blocked status of an account.
     ///
@@ -67,7 +65,8 @@ pub trait FungibleBlockList {
     /// Asserts that the provided users are not blocked.
     ///
     /// # Panics
-    /// If any of the provided users are blocked with error [`crate::FungibleTokenError::UserBlocked`]
+    /// If any of the provided users are blocked with error
+    /// [`crate::FungibleTokenError::UserBlocked`]
     ///
     /// # Arguments
     ///
