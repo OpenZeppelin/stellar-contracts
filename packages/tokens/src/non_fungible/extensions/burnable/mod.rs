@@ -22,19 +22,20 @@ use soroban_sdk::{contracttrait, symbol_short, Address, Env};
 /// `storage.rs` file.
 ///
 /// This approach lets us to implement the `NonFungibleBurnable` trait in a very
-/// flexible way based on the `ContractType` associated type from
+/// flexible way based on the `Impl` associated type from
 /// `NonFungibleToken`:
 ///
 /// ```ignore
-/// impl NonFungibleBurnable for ExampleContract {
-///     fn burn(e: &Env, from: Address, token_id: u32) {
-///         Self::ContractType::burn(e, &from, token_id);
-///     }
+/// #[contracttrait]
+/// impl NonFungibleBurnable for ExampleContract {}
+/// // Uses `NFTBase` as the default
 ///
-///     fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32) {
-///         Self::ContractType::burn_from(e, &spender, &from, token_id);
-///     }
+/// #[contracttrait]
+/// impl NonFungibleBurnable for ExampleContract {
+///     type Impl = Enumerable;
 /// }
+///
+///
 /// ```
 ///
 /// # Notes
@@ -51,6 +52,8 @@ use soroban_sdk::{contracttrait, symbol_short, Address, Env};
 /// #[contracttrait]
 /// impl NonFungibleBurnable for MyContract {
 ///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
+///     // Can also provide a different default implementation
+///     type Impl = Enumerable; // Or Consectutive
 /// }
 /// ```
 #[contracttrait(default = NFTBase)]

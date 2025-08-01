@@ -26,7 +26,6 @@ pub trait FungibleBurnable {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `from` - The account whose tokens are destroyed.
     /// * `amount` - The amount of tokens to burn.
     ///
@@ -48,7 +47,6 @@ pub trait FungibleBurnable {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `spender` - The address authorized to burn the tokens.
     /// * `from` - The account whose tokens are destroyed.
     /// * `amount` - The amount of tokens to burn.

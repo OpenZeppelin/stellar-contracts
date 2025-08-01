@@ -35,14 +35,7 @@ impl super::FungibleAllowList for AllowList {
     }
 
     fn allow_user(e: &Env, user: &Address, _operator: &Address) {
-        let key = AllowListStorageKey::Allowed(user.clone());
-
-        // if the user is not allowed, allow them
-        if !e.storage().persistent().has(&key) {
-            e.storage().persistent().set(&key, &());
-
-            emit_user_allowed(e, user);
-        }
+        Self::allow_user_no_auth(e, user);
     }
 
     fn disallow_user(e: &Env, user: &Address, _operator: &Address) {
@@ -55,6 +48,17 @@ impl super::FungibleAllowList for AllowList {
             emit_user_disallowed(e, user);
         }
     }
+
+    fn allow_user_no_auth(e: &Env, user: &soroban_sdk::Address) {
+        let key = AllowListStorageKey::Allowed(user.clone());
+
+        // if the user is not allowed, allow them
+        if !e.storage().persistent().has(&key) {
+            e.storage().persistent().set(&key, &());
+
+            emit_user_allowed(e, user);
+        }
+    }
 }
 
 impl<T: super::FungibleAllowList, N: FungibleToken> crate::fungible::FungibleToken
@@ -64,17 +68,17 @@ impl<T: super::FungibleAllowList, N: FungibleToken> crate::fungible::FungibleTok
 
     fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         T::assert_allowed(e, &[from, to]);
-        N::transfer(e, from, to, amount);
+        Self::Impl::transfer(e, from, to, amount);
     }
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         T::assert_allowed(e, &[from, to]);
-        N::transfer_from(e, spender, from, to, amount);
+        Self::Impl::transfer_from(e, spender, from, to, amount);
     }
 
     fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
         T::assert_allowed(e, &[owner]);
-        N::approve(e, owner, spender, amount, live_until_ledger);
+        Self::Impl::approve(e, owner, spender, amount, live_until_ledger);
     }
 }
 
@@ -85,11 +89,11 @@ impl<T: super::FungibleAllowList, N: FungibleBurnable> FungibleBurnable
 
     fn burn(e: &Env, from: &Address, amount: i128) {
         T::assert_allowed(e, &[from]);
-        N::burn(e, from, amount);
+        Self::Impl::burn(e, from, amount);
     }
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
         T::assert_allowed(e, &[from]);
-        N::burn_from(e, spender, from, amount);
+        Self::Impl::burn_from(e, spender, from, amount);
     }
 }

@@ -75,6 +75,9 @@ pub trait FungibleAllowList {
             crate::FungibleTokenError::UserNotAllowed
         )
     }
+
+    #[internal]
+    fn allow_user_no_auth(e: &Env, user: &soroban_sdk::Address);
 }
 
 // ################## EVENTS ##################

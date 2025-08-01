@@ -138,16 +138,10 @@ pub use utils::sequential;
 /// [`crate::extensions::enumerable::Enumerable::transfer`].
 #[contracttrait(default = NFTBase)]
 pub trait NonFungibleToken {
-    /// Helper type that allows us to override some of the functionality of the
-    /// base trait based on the extensions implemented. You should use
-    /// [`crate::NFTBase`] as the type if you are not using
-    /// [`crate::extensions::enumerable::Enumerable`] or
-    /// [`crate::extensions::consecutive::Consecutive`] extensions.
     /// Returns the number of tokens owned by `account`.
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `account` - The address for which the balance is being queried.
     fn balance(e: &Env, account: &soroban_sdk::Address) -> u32;
 

@@ -7,7 +7,7 @@
 
 use soroban_sdk::{contract, contractimpl, contracttrait, symbol_short, Address, Env, String};
 use stellar_access::AccessControl;
-use stellar_macros::has_role;
+use stellar_macros::only_role;
 use stellar_tokens::{FungibleAllowList, FungibleBurnable, FungibleToken};
 
 #[contract]
@@ -29,7 +29,7 @@ impl ExampleContract {
         Self::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
 
         // Allow the admin to transfer tokens
-        <Self as FungibleAllowList>::allow_user(e, &admin, &manager);
+        Self::allow_user_no_auth(e, &admin);
 
         // Mint initial supply to the admin
         Self::internal_mint(e, &admin, initial_supply);
@@ -72,12 +72,12 @@ impl AccessControl for ExampleContract {}
 
 #[contracttrait]
 impl FungibleAllowList for ExampleContract {
-    #[has_role(operator, "manager")]
+    #[only_role(operator, "manager")]
     fn allow_user(e: &Env, user: &Address, operator: &Address) {
         Self::Impl::allow_user(e, user, operator)
     }
 
-    #[has_role(operator, "manager")]
+    #[only_role(operator, "manager")]
     fn disallow_user(e: &Env, user: &Address, operator: &Address) {
         Self::Impl::disallow_user(e, user, operator)
     }

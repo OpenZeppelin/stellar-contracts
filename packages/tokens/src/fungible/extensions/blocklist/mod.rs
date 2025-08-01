@@ -35,7 +35,6 @@ pub trait FungibleBlockList {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to check the blocked status for.
     fn blocked(e: &Env, account: &soroban_sdk::Address) -> bool;
 
@@ -43,7 +42,6 @@ pub trait FungibleBlockList {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `user` - The address to block.
     /// * `operator` - The address authorizing the invocation.
     ///
@@ -57,7 +55,6 @@ pub trait FungibleBlockList {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `user` - The address to unblock.
     /// * `operator` - The address authorizing the invocation.
     ///
@@ -67,6 +64,14 @@ pub trait FungibleBlockList {
     /// * data - `[]`
     fn unblock_user(e: &Env, user: &soroban_sdk::Address, operator: &soroban_sdk::Address);
 
+    /// Asserts that the provided users are not blocked.
+    ///
+    /// # Panics
+    /// If any of the provided users are blocked with error [`crate::FungibleTokenError::UserBlocked`]
+    ///
+    /// # Arguments
+    ///
+    /// * `users` - The addresses to check if blocked.
     #[internal]
     fn assert_not_blocked(e: &Env, users: &[&soroban_sdk::Address]) {
         assert_with_error!(

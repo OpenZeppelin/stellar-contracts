@@ -60,10 +60,6 @@ pub use storage::Enumerable;
 #[contracttrait(default = Enumerable)]
 pub trait NonFungibleEnumerable {
     /// Returns the total amount of tokens stored by the contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
     fn total_supply(e: &Env) -> u32;
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
@@ -73,7 +69,6 @@ pub trait NonFungibleEnumerable {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `index` - Index of the token in the owner's local list.
     fn get_owner_token_id(e: &Env, owner: &soroban_sdk::Address, index: u32) -> u32;
@@ -91,7 +86,6 @@ pub trait NonFungibleEnumerable {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `index` - Index of the token in the global list.
     fn get_token_id(e: &Env, index: u32) -> u32;
 }

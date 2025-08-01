@@ -26,11 +26,8 @@ impl ExampleContract {
     pub fn increment(e: &Env) -> i32 {
         let mut counter: i32 =
             e.storage().instance().get(&DataKey::Counter).expect("counter should be set");
-
         counter += 1;
-
         e.storage().instance().set(&DataKey::Counter, &counter);
-
         counter
     }
 }

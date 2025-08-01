@@ -149,14 +149,9 @@ pub fn generate_any_role_check(
         quote! { #param_name.require_auth(); }
     });
 
-    let combined_checks = quote! {
-        let has_any_role = [#(#roles),*].iter().any(|role| <Self as AccessControl>::has_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, role)).is_some());
-        assert!(has_any_role, "Account does not have any of the required roles");
-    };
-
     input_fn
         .insert_stmts_to_token_stream(parse_quote! {
-                #combined_checks
+                Self::assert_has_any_role(#env_arg, #param_reference, &[#(#roles),*]);
                 #auth_check
         })
         .into()

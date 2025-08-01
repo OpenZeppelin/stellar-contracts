@@ -99,8 +99,7 @@ mod test {
                 my_code();
             }
         };
-        // println!("{:#?}", check_env_arg(&input_fn));
-        // println!("{:#?}", parse_env(&input_fn));
+
         let result = insert_check(input_fn, auth_check_func);
         assert_eq!(
             result.to_string(),

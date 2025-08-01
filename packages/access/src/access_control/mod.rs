@@ -90,7 +90,7 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{contracterror, contracttrait, Address, Env, Symbol};
+use soroban_sdk::{assert_with_error, contracterror, contracttrait, Address, Env, Symbol};
 
 pub use crate::access_control::storage::{AccessControlStorageKey, AccessControler};
 
@@ -390,7 +390,6 @@ pub trait AccessControl {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to Soroban environment.
     /// * `role` - The role to remove the admin for.
     ///
     /// # Security Warning
@@ -401,6 +400,19 @@ pub trait AccessControl {
     /// - When cleaning up unused roles
     #[internal]
     fn remove_role_admin_no_auth(e: &Env, role: &Symbol);
+
+    #[internal]
+    fn assert_has_any_role(e: &Env, caller: &Address, roles: &[&str]) {
+        assert_with_error!(
+            e,
+            roles.iter().any(|role| Self::has_role(
+                e,
+                caller,
+                &soroban_sdk::Symbol::new(e, role)).is_some()
+            ),
+            AccessControlError::Unauthorized
+        );
+    }
 }
 
 // ################## ERRORS ##################
