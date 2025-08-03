@@ -230,12 +230,15 @@ pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
         panic_with_error!(e, IRSError::CountryProfileNotFound)
     }
 
+    // can't overflow because of the check above
+    let last_index = count - 1;
+    // revert if no CountryProfile is left
+    if last_index == 0 {
+        panic_with_error!(e, IRSError::EmptyCountryProfiles)
+    }
+
     // If the profile to be deleted is not the last one,
     // move the last profile into its place to keep the list compact.
-    let last_index = count
-        .checked_sub(1)
-        // revert if no CountryProfile is left
-        .unwrap_or_else(|| panic_with_error!(e, IRSError::EmptyCountryProfiles));
     if index != last_index {
         let last_key = IRSStorageKey::CPEnumerable(CPEnumerableKey {
             account: account.clone(),
