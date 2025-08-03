@@ -11,11 +11,12 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// The specific type used for country profiles in this implementation.
     type CountryProfile: FromVal<Env, Val>;
 
+    /// Adds a new identity to an account with initial country profiles.
     fn add_identity(
         e: &Env,
         account: Address,
         identity: Address,
-        country_profile: Self::CountryProfile,
+        initial_profiles: Vec<Self::CountryProfile>,
         operator: Address,
     );
 
@@ -28,11 +29,11 @@ pub trait IdentityRegistryStorage: TokenBinder {
 
 /// Trait for managing multiple country profiles associated with an identity.
 pub trait CountryProfileManager: IdentityRegistryStorage {
-    /// Adds a new country profile to an account.
-    fn add_country_profile(
+    /// Adds new country profiles to an account.
+    fn add_country_profiles(
         e: &Env,
         account: Address,
-        country_profile: Self::CountryProfile,
+        country_profiles: Vec<Self::CountryProfile>,
         operator: Address,
     );
 
@@ -66,7 +67,7 @@ pub enum IRSError {
     IdentityAlreadyExists = 1,
     IdentityNotFound = 2,
     CountryProfileNotFound = 3,
-    NoCountryProfileLeft = 4,
+    EmptyCountryProfiles = 4,
 }
 
 // TODO: export one by one

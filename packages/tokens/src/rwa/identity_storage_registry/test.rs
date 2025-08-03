@@ -1,9 +1,9 @@
 #![cfg(test)]
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env};
+use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env};
 
-use super::storage::{self as irs, CountryInfo, CountryProfile};
+use super::storage::{self as irs, Country, CountryProfile};
 
 #[contract]
 struct MockContract;
@@ -16,17 +16,17 @@ fn add_identity_success() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-
-        let initial_profile = CountryProfile {
-            country: CountryInfo::Residence(840), // USA
+        let profile = CountryProfile {
+            country: Country::Residence(840), // USA
             valid_until: None,
         };
 
-        irs::add_identity(&e, &account, &identity, &initial_profile);
+        irs::add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
 
-        assert_eq!(irs::get_identity(&e, &account), identity);
+        let stored_identity = irs::get_identity(&e, &account);
+        assert_eq!(stored_identity, identity);
         assert_eq!(irs::get_country_profile_count(&e, &account), 1);
-        assert_eq!(irs::get_country_profile(&e, &account, 0), initial_profile);
+        assert_eq!(irs::get_country_profile(&e, &account, 0), profile);
     });
 }
 
@@ -39,13 +39,13 @@ fn add_identity_already_exists() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
+        let profile = CountryProfile {
+            country: Country::Residence(840), // USA
+            valid_until: None,
+        };
 
-        let initial_profile =
-            CountryProfile { country: CountryInfo::Residence(840), valid_until: None };
-
-        irs::add_identity(&e, &account, &identity, &initial_profile);
-        // Try to add it again
-        irs::add_identity(&e, &account, &identity, &initial_profile);
+        irs::add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
+        irs::add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
     });
 }
 
@@ -58,11 +58,12 @@ fn modify_identity_success() {
         let account = Address::generate(&e);
         let old_identity = Address::generate(&e);
         let new_identity = Address::generate(&e);
+        let profile = CountryProfile {
+            country: Country::Residence(840), // USA
+            valid_until: None,
+        };
 
-        let initial_profile =
-            CountryProfile { country: CountryInfo::Residence(840), valid_until: None };
-
-        irs::add_identity(&e, &account, &old_identity, &initial_profile);
+        irs::add_identity(&e, &account, &old_identity, &vec![&e, profile.clone()]);
         irs::modify_identity(&e, &account, &new_identity);
 
         assert_eq!(irs::get_identity(&e, &account), new_identity);
@@ -91,11 +92,12 @@ fn get_identity_success() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
+        let profile = CountryProfile {
+            country: Country::Residence(840), // USA
+            valid_until: None,
+        };
 
-        let initial_profile =
-            CountryProfile { country: CountryInfo::Residence(840), valid_until: None };
-
-        irs::add_identity(&e, &account, &identity, &initial_profile);
+        irs::add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
 
         assert_eq!(irs::get_identity(&e, &account), identity);
     });
@@ -122,16 +124,16 @@ fn remove_identity_success() {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
         let profile1 = CountryProfile {
-            country: CountryInfo::Residence(840), // USA
+            country: Country::Residence(840), // USA
             valid_until: None,
         };
         let profile2 = CountryProfile {
-            country: CountryInfo::Citizenship(276), // Germany
+            country: Country::Citizenship(276), // Germany
             valid_until: None,
         };
 
-        irs::add_identity(&e, &account, &identity, &profile1);
-        irs::add_country_profile(&e, &account, &profile2);
+        irs::add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
+        irs::add_country_profiles(&e, &account, &vec![&e, profile2.clone()]);
 
         assert_eq!(irs::get_country_profile_count(&e, &account), 2);
 
@@ -161,17 +163,11 @@ fn add_country_profile_success() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile1 = CountryProfile {
-            country: CountryInfo::Residence(840),
-            valid_until: None,
-        };
-        let profile2 = CountryProfile {
-            country: CountryInfo::Citizenship(276),
-            valid_until: None,
-        };
+        let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
+        let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
 
-        irs::add_identity(&e, &account, &identity, &profile1);
-        irs::add_country_profile(&e, &account, &profile2);
+        irs::add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
+        irs::add_country_profiles(&e, &account, &vec![&e, profile2.clone()]);
 
         assert_eq!(irs::get_country_profile_count(&e, &account), 2);
         assert_eq!(irs::get_country_profile(&e, &account, 1), profile2);
@@ -186,16 +182,14 @@ fn modify_country_profile_success() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let initial_profile = CountryProfile {
-            country: CountryInfo::Residence(840),
-            valid_until: None,
-        };
+        let initial_profile =
+            CountryProfile { country: Country::Residence(840), valid_until: None };
         let modified_profile = CountryProfile {
-            country: CountryInfo::Residence(276), // Germany
+            country: Country::Residence(276), // Germany
             valid_until: Some(12345),
         };
 
-        irs::add_identity(&e, &account, &identity, &initial_profile);
+        irs::add_identity(&e, &account, &identity, &vec![&e, initial_profile.clone()]);
         irs::modify_country_profile(&e, &account, 0, &modified_profile);
 
         assert_eq!(irs::get_country_profile(&e, &account, 0), modified_profile);
@@ -210,10 +204,8 @@ fn modify_country_profile_not_found() {
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
-        let modified_profile = CountryProfile {
-            country: CountryInfo::Residence(276),
-            valid_until: None,
-        };
+        let modified_profile =
+            CountryProfile { country: Country::Residence(276), valid_until: None };
         irs::modify_country_profile(&e, &account, 0, &modified_profile);
     });
 }
@@ -226,17 +218,11 @@ fn delete_country_profile_success() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile1 = CountryProfile {
-            country: CountryInfo::Residence(840),
-            valid_until: None,
-        };
-        let profile2 = CountryProfile {
-            country: CountryInfo::Citizenship(276),
-            valid_until: None,
-        };
+        let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
+        let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
 
-        irs::add_identity(&e, &account, &identity, &profile1);
-        irs::add_country_profile(&e, &account, &profile2);
+        irs::add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
+        irs::add_country_profiles(&e, &account, &vec![&e, profile2.clone()]);
 
         irs::delete_country_profile(&e, &account, 0);
 
@@ -265,17 +251,11 @@ fn get_country_profiles_success() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile1 = CountryProfile {
-            country: CountryInfo::Residence(840),
-            valid_until: None,
-        };
-        let profile2 = CountryProfile {
-            country: CountryInfo::Citizenship(276),
-            valid_until: None,
-        };
+        let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
+        let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
 
-        irs::add_identity(&e, &account, &identity, &profile1);
-        irs::add_country_profile(&e, &account, &profile2);
+        irs::add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
+        irs::add_country_profiles(&e, &account, &vec![&e, profile2.clone()]);
 
         let profiles = irs::get_country_profiles(&e, &account);
         assert_eq!(profiles.len(), 2);
@@ -293,17 +273,11 @@ fn recover_country_profiles_success() {
         let old_account = Address::generate(&e);
         let new_account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile1 = CountryProfile {
-            country: CountryInfo::Residence(840),
-            valid_until: None,
-        };
-        let profile2 = CountryProfile {
-            country: CountryInfo::Citizenship(276),
-            valid_until: None,
-        };
+        let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
+        let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
 
-        irs::add_identity(&e, &old_account, &identity, &profile1);
-        irs::add_country_profile(&e, &old_account, &profile2);
+        irs::add_identity(&e, &old_account, &identity, &vec![&e, profile1.clone()]);
+        irs::add_country_profiles(&e, &old_account, &vec![&e, profile2.clone()]);
 
         irs::recover_country_profiles(&e, &old_account, &new_account);
 

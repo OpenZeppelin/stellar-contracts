@@ -38,10 +38,10 @@ impl IdentityRegistryStorage for IdentityRegistryContract {
         e: &Env,
         account: Address,
         identity: Address,
-        initial_profile: CountryProfile,
+        initial_profiles: Vec<CountryProfile>,
         _operator: Address,
     ) {
-        irs::add_identity(e, &account, &identity, &initial_profile);
+        irs::add_identity(e, &account, &identity, &initial_profiles);
     }
 
     fn modify_identity(e: &Env, account: Address, new_identity: Address, _operator: Address) {
@@ -59,8 +59,13 @@ impl IdentityRegistryStorage for IdentityRegistryContract {
 
 #[contractimpl]
 impl CountryProfileManager for IdentityRegistryContract {
-    fn add_country_profile(e: &Env, account: Address, profile: CountryProfile, _operator: Address) {
-        irs::add_country_profile(e, &account, &profile);
+    fn add_country_profiles(
+        e: &Env,
+        account: Address,
+        profiles: Vec<CountryProfile>,
+        _operator: Address,
+    ) {
+        irs::add_country_profiles(e, &account, &profiles);
     }
 
     fn modify_country_profile(

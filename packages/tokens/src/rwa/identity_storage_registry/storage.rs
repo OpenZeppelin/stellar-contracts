@@ -42,7 +42,7 @@ pub type CountryCode = u32;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum CountryInfo {
+pub enum Country {
     /// Country of residence
     Residence(CountryCode),
     /// Country of citizenship
@@ -59,7 +59,7 @@ pub enum CountryInfo {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CountryProfile {
     /// Type of country relationship
-    pub country: CountryInfo,
+    pub country: Country,
     /// Optional validity period (e.g., for visas)
     pub valid_until: Option<u64>,
 }
@@ -84,17 +84,19 @@ pub fn add_identity(
     e: &Env,
     account: &Address,
     identity: &Address,
-    initial_profile: &CountryProfile,
+    initial_profiles: &Vec<CountryProfile>,
 ) {
+    if initial_profiles.is_empty() {
+        panic_with_error!(e, IRSError::EmptyCountryProfiles)
+    }
+
     let key = IRSStorageKey::Identity(account.clone());
-    // check if identity exists
     if e.storage().persistent().has(&key) {
         panic_with_error!(e, IRSError::IdentityAlreadyExists)
     }
     e.storage().persistent().set(&key, identity);
 
-    // Add the initial profile to the enumerable collection
-    add_country_profile(e, account, initial_profile);
+    add_country_profiles(e, account, initial_profiles);
 }
 
 pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
@@ -150,22 +152,6 @@ pub fn get_country_profile(e: &Env, account: &Address, index: u32) -> CountryPro
         .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound))
 }
 
-pub fn get_country_profile_by_country_info(
-    e: &Env,
-    account: &Address,
-    country_info: CountryInfo,
-) -> Vec<CountryProfile> {
-    let all_profiles = get_country_profiles(e, account);
-    let mut profiles: Vec<CountryProfile> = vec![e];
-
-    for profile in all_profiles.iter() {
-        if profile.country == country_info {
-            profiles.push_back(profile);
-        }
-    }
-    profiles
-}
-
 pub fn get_country_profile_count(e: &Env, account: &Address) -> u32 {
     e.storage().persistent().get(&IRSStorageKey::CPCount(account.clone())).unwrap_or_default()
 }
@@ -186,15 +172,20 @@ pub fn get_country_profiles(e: &Env, account: &Address) -> Vec<CountryProfile> {
     profiles
 }
 
-pub fn add_country_profile(e: &Env, account: &Address, profile: &CountryProfile) {
-    let count = get_country_profile_count(e, account);
-    let key = IRSStorageKey::CPEnumerable(CPEnumerableKey {
-        account: account.clone(),
-        index: count, // Use the current count as the index for the new profile
-    });
-    // TODO: extend
-    e.storage().persistent().set(&key, profile);
-    e.storage().persistent().set(&IRSStorageKey::CPCount(account.clone()), &(count + 1));
+pub fn add_country_profiles(e: &Env, account: &Address, profiles: &Vec<CountryProfile>) {
+    let count_key = IRSStorageKey::CPCount(account.clone());
+    let mut count = get_country_profile_count(e, account);
+
+    for profile in profiles.iter() {
+        let profile_key = IRSStorageKey::CPEnumerable(CPEnumerableKey {
+            account: account.clone(),
+            index: count, // Use the current count as the index for the new profile
+        });
+        // TODO: extend
+        e.storage().persistent().set(&profile_key, &profile);
+        count += 1;
+    }
+    e.storage().persistent().set(&count_key, &count);
 }
 
 pub fn modify_country_profile(e: &Env, account: &Address, index: u32, profile: &CountryProfile) {
@@ -210,7 +201,7 @@ pub fn modify_country_profile(e: &Env, account: &Address, index: u32, profile: &
 pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
     let count = get_country_profile_count(e, account);
     if index >= count {
-        panic_with_error!(e, IRSError::CountryProfileNotFound);
+        panic_with_error!(e, IRSError::CountryProfileNotFound)
     }
 
     // If the profile to be deleted is not the last one,
@@ -218,7 +209,7 @@ pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
     let last_index = count
         .checked_sub(1)
         // revert if no CountryProfile is left
-        .unwrap_or_else(|| panic_with_error!(e, IRSError::NoCountryProfileLeft));
+        .unwrap_or_else(|| panic_with_error!(e, IRSError::EmptyCountryProfiles));
     if index != last_index {
         let last_key = IRSStorageKey::CPEnumerable(CPEnumerableKey {
             account: account.clone(),
