@@ -35,7 +35,7 @@
 ///    "Country of Residence" profiles.
 use soroban_sdk::{contracttype, panic_with_error, vec, Address, Env, Symbol, Vec};
 
-use super::IRSError;
+use super::{IRSError, IDENTITY_EXTEND_AMOUNT, IDENTITY_TTL_THRESHOLD};
 
 /// ISO 3166-1 numeric country code
 pub type CountryCode = u32;
@@ -77,9 +77,6 @@ pub enum IRSStorageKey {
     CPCount(Address),              // account -> number of enumerable CountryProfile
 }
 
-// TODO: review unwraps
-// TODO: persistent TTL extends
-
 pub fn add_identity(
     e: &Env,
     account: &Address,
@@ -107,7 +104,6 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
         panic_with_error!(e, IRSError::IdentityNotFound)
     }
 
-    // TODO: extend
     e.storage().persistent().set(&key, new_identity);
 }
 
@@ -138,6 +134,13 @@ pub fn get_identity(e: &Env, account: &Address) -> Address {
     e.storage()
         .persistent()
         .get(&key)
+        .inspect(|_| {
+            e.storage().persistent().extend_ttl(
+                &key,
+                IDENTITY_TTL_THRESHOLD,
+                IDENTITY_EXTEND_AMOUNT,
+            )
+        })
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound))
 }
 
@@ -145,15 +148,32 @@ pub fn get_identity(e: &Env, account: &Address) -> Address {
 
 pub fn get_country_profile(e: &Env, account: &Address, index: u32) -> CountryProfile {
     let key = IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
-    // TODO: extend
     e.storage()
         .persistent()
         .get(&key)
+        .inspect(|_| {
+            e.storage().persistent().extend_ttl(
+                &key,
+                IDENTITY_TTL_THRESHOLD,
+                IDENTITY_EXTEND_AMOUNT,
+            )
+        })
         .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound))
 }
 
 pub fn get_country_profile_count(e: &Env, account: &Address) -> u32 {
-    e.storage().persistent().get(&IRSStorageKey::CPCount(account.clone())).unwrap_or_default()
+    let key = IRSStorageKey::CPCount(account.clone());
+    e.storage()
+        .persistent()
+        .get(&key)
+        .inspect(|_| {
+            e.storage().persistent().extend_ttl(
+                &key,
+                IDENTITY_TTL_THRESHOLD,
+                IDENTITY_EXTEND_AMOUNT,
+            )
+        })
+        .unwrap_or_default()
 }
 
 pub fn get_country_profiles(e: &Env, account: &Address) -> Vec<CountryProfile> {
@@ -161,11 +181,19 @@ pub fn get_country_profiles(e: &Env, account: &Address) -> Vec<CountryProfile> {
     let mut profiles: Vec<CountryProfile> = vec![e];
 
     for index in 0..count {
+        let key = IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
         let profile: CountryProfile = e
             .storage()
             .persistent()
-            .get(&IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index }))
-            .unwrap(); // Assuming the profile must exist if the count is correct.
+            .get(&key)
+            .inspect(|_| {
+                e.storage().persistent().extend_ttl(
+                    &key,
+                    IDENTITY_TTL_THRESHOLD,
+                    IDENTITY_EXTEND_AMOUNT,
+                )
+            })
+            .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound));
         profiles.push_back(profile);
     }
 
@@ -181,7 +209,6 @@ pub fn add_country_profiles(e: &Env, account: &Address, profiles: &Vec<CountryPr
             account: account.clone(),
             index: count, // Use the current count as the index for the new profile
         });
-        // TODO: extend
         e.storage().persistent().set(&profile_key, &profile);
         count += 1;
     }
@@ -194,7 +221,6 @@ pub fn modify_country_profile(e: &Env, account: &Address, index: u32, profile: &
     if !e.storage().persistent().has(&key) {
         panic_with_error!(e, IRSError::CountryProfileNotFound)
     }
-    // TODO: extend
     e.storage().persistent().set(&key, profile);
 }
 
@@ -215,12 +241,21 @@ pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
             account: account.clone(),
             index: last_index,
         });
-        // We can unwrap here because we know the profile exists.
-        let last_profile: CountryProfile = e.storage().persistent().get(&last_key).unwrap();
+        let last_profile: CountryProfile = e
+            .storage()
+            .persistent()
+            .get(&last_key)
+            .inspect(|_| {
+                e.storage().persistent().extend_ttl(
+                    &last_key,
+                    IDENTITY_TTL_THRESHOLD,
+                    IDENTITY_EXTEND_AMOUNT,
+                )
+            })
+            .unwrap_or_else(|| panic_with_error!(&e, IRSError::CountryProfileNotFound));
 
         let current_key =
             IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
-        // TODO: extend
         e.storage().persistent().set(&current_key, &last_profile);
     }
 
@@ -232,7 +267,6 @@ pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
     e.storage().persistent().remove(&key_to_remove);
 
     // Decrement the count
-    // TODO: extend
     e.storage().persistent().set(&IRSStorageKey::CPCount(account.clone()), &(count - 1));
 }
 

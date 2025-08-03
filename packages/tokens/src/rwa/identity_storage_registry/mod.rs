@@ -70,6 +70,12 @@ pub enum IRSError {
     EmptyCountryProfiles = 4,
 }
 
+// ################## CONSTANTS ##################
+
+const DAY_IN_LEDGERS: u32 = 17280;
+pub const IDENTITY_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const IDENTITY_TTL_THRESHOLD: u32 = IDENTITY_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
 // TODO: export one by one
 pub use storage::*;
 
