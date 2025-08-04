@@ -35,7 +35,11 @@
 ///    "Country of Residence" profiles.
 use soroban_sdk::{contracttype, panic_with_error, vec, Address, Env, Symbol, Vec};
 
-use super::{IRSError, IDENTITY_EXTEND_AMOUNT, IDENTITY_TTL_THRESHOLD};
+use super::{
+    emit_country_profile_event, emit_identity_modified, emit_identity_stored,
+    emit_identity_unstored, CountryProfileEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
+    IDENTITY_TTL_THRESHOLD,
+};
 
 /// ISO 3166-1 numeric country code
 pub type CountryCode = u32;
@@ -94,26 +98,32 @@ pub fn add_identity(
     e.storage().persistent().set(&key, identity);
 
     add_country_profiles(e, account, initial_profiles);
+
+    emit_identity_stored(e, account, identity);
 }
 
 pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
     let key = IRSStorageKey::Identity(account.clone());
 
-    // check if identity exists
-    if !e.storage().persistent().has(&key) {
-        panic_with_error!(e, IRSError::IdentityNotFound)
-    }
+    let old_identity: Address = e
+        .storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
 
     e.storage().persistent().set(&key, new_identity);
+
+    emit_identity_modified(e, &old_identity, new_identity);
 }
 
 pub fn remove_identity(e: &Env, account: &Address) {
     let key = IRSStorageKey::Identity(account.clone());
 
-    // check if identity exists
-    if !e.storage().persistent().has(&key) {
-        panic_with_error!(e, IRSError::IdentityNotFound)
-    }
+    let identity: Address = e
+        .storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
     e.storage().persistent().remove(&key);
 
     // Remove all associated country profiles
@@ -127,6 +137,8 @@ pub fn remove_identity(e: &Env, account: &Address) {
     // Remove the count
     let count_key = IRSStorageKey::CPCount(account.clone());
     e.storage().persistent().remove(&count_key);
+
+    emit_identity_unstored(e, account, &identity);
 }
 
 pub fn get_identity(e: &Env, account: &Address) -> Address {
@@ -210,6 +222,7 @@ pub fn add_country_profiles(e: &Env, account: &Address, profiles: &Vec<CountryPr
             index: count, // Use the current count as the index for the new profile
         });
         e.storage().persistent().set(&profile_key, &profile);
+        emit_country_profile_event(e, CountryProfileEvent::Added, account, &profile);
         count += 1;
     }
     e.storage().persistent().set(&count_key, &count);
@@ -222,15 +235,21 @@ pub fn modify_country_profile(e: &Env, account: &Address, index: u32, profile: &
         panic_with_error!(e, IRSError::CountryProfileNotFound)
     }
     e.storage().persistent().set(&key, profile);
+
+    emit_country_profile_event(e, CountryProfileEvent::Modified, account, profile);
 }
 
 pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
-    let count = get_country_profile_count(e, account);
-    if index >= count {
-        panic_with_error!(e, IRSError::CountryProfileNotFound)
-    }
+    let current_key =
+        IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
+    let profile_to_remove = e
+        .storage()
+        .persistent()
+        .get(&current_key)
+        .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound));
 
-    // can't overflow because of the check above
+    let count = get_country_profile_count(e, account);
+    // can't overflow because `profile_to_remove` would panic if count == 0
     let last_index = count - 1;
     // revert if no CountryProfile is left
     if last_index == 0 {
@@ -257,8 +276,6 @@ pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
             })
             .unwrap_or_else(|| panic_with_error!(&e, IRSError::CountryProfileNotFound));
 
-        let current_key =
-            IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
         e.storage().persistent().set(&current_key, &last_profile);
     }
 
@@ -271,37 +288,6 @@ pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
 
     // Decrement the count
     e.storage().persistent().set(&IRSStorageKey::CPCount(account.clone()), &(count - 1));
-}
 
-pub fn recover_country_profiles(e: &Env, old_account: &Address, new_account: &Address) {
-    let profiles = get_country_profiles(e, old_account);
-    let count = profiles.len();
-
-    if count == 0 {
-        return;
-    }
-
-    // Move profiles to the new account
-    for (i, profile) in profiles.iter().enumerate() {
-        let new_profile_key = IRSStorageKey::CPEnumerable(CPEnumerableKey {
-            account: new_account.clone(),
-            index: i as u32,
-        });
-        e.storage().persistent().set(&new_profile_key, &profile);
-    }
-
-    // Set the count for the new account
-    let new_count_key = IRSStorageKey::CPCount(new_account.clone());
-    e.storage().persistent().set(&new_count_key, &count);
-
-    // Remove all profiles from the old account
-    for i in 0..count {
-        let old_profile_key =
-            IRSStorageKey::CPEnumerable(CPEnumerableKey { account: old_account.clone(), index: i });
-        e.storage().persistent().remove(&old_profile_key);
-    }
-
-    // Remove the count for the old account
-    let old_count_key = IRSStorageKey::CPCount(old_account.clone());
-    e.storage().persistent().remove(&old_count_key);
+    emit_country_profile_event(e, CountryProfileEvent::Removed, account, &profile_to_remove);
 }

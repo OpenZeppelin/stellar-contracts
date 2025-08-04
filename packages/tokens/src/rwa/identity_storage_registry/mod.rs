@@ -1,8 +1,11 @@
-use soroban_sdk::{contracterror, Address, Env, FromVal, Val, Vec};
-
 mod storage;
+mod test;
 
 use crate::rwa::utils::token_binder::TokenBinder;
+use soroban_sdk::{contracterror, Address, Env, FromVal, Symbol, Val, Vec};
+
+// TODO: export one by one
+pub use storage::*;
 
 /// The core trait for managing basic identities.
 /// It is generic over a `CountryProfile` type, allowing implementers to define
@@ -76,7 +79,40 @@ const DAY_IN_LEDGERS: u32 = 17280;
 pub const IDENTITY_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const IDENTITY_TTL_THRESHOLD: u32 = IDENTITY_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
-// TODO: export one by one
-pub use storage::*;
+// ################## EVENTS ##################
 
-mod test;
+pub enum CountryProfileEvent {
+    Added,
+    Removed,
+    Modified,
+}
+
+pub fn emit_identity_stored(e: &Env, account: &Address, identity: &Address) {
+    let topics = (Symbol::new(e, "identity_stored"), account, identity);
+    e.events().publish(topics, ());
+}
+
+pub fn emit_identity_unstored(e: &Env, account: &Address, identity: &Address) {
+    e.events().publish((Symbol::new(e, "identity_unstored"), account, identity), ());
+}
+
+pub fn emit_identity_modified(e: &Env, old_identity: &Address, new_identity: &Address) {
+    let topics = (Symbol::new(e, "identity_modified"), old_identity, new_identity);
+    e.events().publish(topics, ());
+}
+
+pub fn emit_country_profile_event(
+    e: &Env,
+    event_type: CountryProfileEvent,
+    account: &Address,
+    profile: &CountryProfile,
+) {
+    let name = match event_type {
+        CountryProfileEvent::Added => Symbol::new(e, "country_added"),
+        CountryProfileEvent::Removed => Symbol::new(e, "country_removed"),
+        CountryProfileEvent::Modified => Symbol::new(e, "country_modified"),
+    };
+
+    let topics = (name, account, profile.clone());
+    e.events().publish(topics, ());
+}

@@ -265,31 +265,6 @@ fn get_country_profiles_success() {
 }
 
 #[test]
-fn recover_country_profiles_success() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let old_account = Address::generate(&e);
-        let new_account = Address::generate(&e);
-        let identity = Address::generate(&e);
-        let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
-        let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
-
-        irs::add_identity(&e, &old_account, &identity, &vec![&e, profile1.clone()]);
-        irs::add_country_profiles(&e, &old_account, &vec![&e, profile2.clone()]);
-
-        irs::recover_country_profiles(&e, &old_account, &new_account);
-
-        assert_eq!(irs::get_country_profile_count(&e, &old_account), 0);
-        let new_profiles = irs::get_country_profiles(&e, &new_account);
-        assert_eq!(new_profiles.len(), 2);
-        assert_eq!(new_profiles.get(0).unwrap(), profile1);
-        assert_eq!(new_profiles.get(1).unwrap(), profile2);
-    });
-}
-
-#[test]
 #[should_panic(expected = "Error(Contract, #4)")] // EmptyCountryProfiles
 fn add_identity_with_empty_profiles_panics() {
     let e = Env::default();
