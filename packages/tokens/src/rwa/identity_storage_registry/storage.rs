@@ -8,8 +8,8 @@
 /// - Category: `Residence`, Code: `840` (ISO 3166-1 for USA)
 /// - Category: `Citizenship`, Code: `276` (ISO 3166-1 for Germany)
 /// - Category: `SourceOfFunds`, Code: `792` (ISO 3166-1 for Turkey)
-/// - Category: A custom `Symbol` like `"TaxResidency"`, Code: `756`
-///   (ISO 3166-1 for Switzerland)
+/// - Category: A custom `Symbol` like `"TaxResidency"`, Code: `756` (ISO 3166-1
+///   for Switzerland)
 ///
 /// This flexible structure allows an account to hold multiple country profiles,
 /// such as having dual citizenship. Additionally, each profile can have an
@@ -44,6 +44,7 @@ use super::{
 /// ISO 3166-1 numeric country code
 pub type CountryCode = u32;
 
+/// Represents different types of country relationships.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Country {
@@ -59,6 +60,8 @@ pub enum Country {
     Custom(Symbol, CountryCode),
 }
 
+/// A country profile containing the country relationship and optional validity
+/// period.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CountryProfile {
@@ -68,19 +71,56 @@ pub struct CountryProfile {
     pub valid_until: Option<u64>,
 }
 
+/// Key structure for enumerable country profile storage.
 #[contracttype]
 pub struct CPEnumerableKey {
+    /// The account address that owns the country profile
     pub account: Address,
+    /// The index position of the country profile in the enumerable list
     pub index: u32,
 }
 
+/// Storage keys for the data associated with Identity Storage Registry.
 #[contracttype]
 pub enum IRSStorageKey {
-    Identity(Address),             // account -> Identity
-    CPEnumerable(CPEnumerableKey), // (account, index) -> CountryProfile
-    CPCount(Address),              // account -> number of enumerable CountryProfile
+    /// Maps account address to identity address
+    Identity(Address),
+    /// Maps (account, index) to a specific CountryProfile
+    CPEnumerable(CPEnumerableKey),
+    /// Maps account address to the count of country profiles
+    CPCount(Address),
 }
 
+/// Stores a new identity with a set of country profiles.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address to associate with the identity.
+/// * `identity` - The identity address to store.
+/// * `initial_profiles` - A vector of initial country profiles.
+///
+/// # Errors
+///
+/// * [`IRSError::EmptyCountryProfiles`] - If `initial_profiles` is empty.
+/// * [`IRSError::IdentityAlreadyExists`] - If an identity is already stored for
+///   the `account`.
+/// * refer to [`add_country_profiles`] errors.
+///
+/// # Events
+///
+/// * topics - `["identity_stored", account: Address, identity: Address]`
+/// * data - `[]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn add_identity(
     e: &Env,
     account: &Address,
@@ -102,6 +142,34 @@ pub fn add_identity(
     emit_identity_stored(e, account, identity);
 }
 
+/// Modifies an existing identity.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address whose identity is being modified.
+/// * `new_identity` - The new identity address.
+///
+/// # Errors
+///
+/// * [`IRSError::IdentityNotFound`] - If no identity is found for the
+///   `account`.
+///
+/// # Events
+///
+/// * topics - `["identity_modified", old_identity: Address, new_identity:
+///   Address]`
+/// * data - `[]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
     let key = IRSStorageKey::Identity(account.clone());
 
@@ -116,6 +184,32 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
     emit_identity_modified(e, &old_identity, new_identity);
 }
 
+/// Removes an identity and all associated country profiles.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address whose identity is being removed.
+///
+/// # Errors
+///
+/// * [`IRSError::IdentityNotFound`] - If no identity is found for the
+///   `account`.
+///
+/// # Events
+///
+/// * topics - `["identity_unstored", account: Address, identity: Address]`
+/// * data - `[]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn remove_identity(e: &Env, account: &Address) {
     let key = IRSStorageKey::Identity(account.clone());
 
@@ -141,6 +235,17 @@ pub fn remove_identity(e: &Env, account: &Address) {
     emit_identity_unstored(e, account, &identity);
 }
 
+/// Retrieves the stored identity for a given account.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address to query.
+///
+/// # Errors
+///
+/// * [`IRSError::IdentityNotFound`] - If no identity is found for the
+///   `account`.
 pub fn get_identity(e: &Env, account: &Address) -> Address {
     let key = IRSStorageKey::Identity(account.clone());
     e.storage()
@@ -158,6 +263,17 @@ pub fn get_identity(e: &Env, account: &Address) -> Address {
 
 // ================ Country Profile ===================
 
+/// Retrieves a specific country profile by its index.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address to query.
+/// * `index` - The index of the country profile to retrieve.
+///
+/// # Errors
+///
+/// * [`IRSError::CountryProfileNotFound`] - If the index is out of bounds.
 pub fn get_country_profile(e: &Env, account: &Address, index: u32) -> CountryProfile {
     let key = IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
     e.storage()
@@ -173,6 +289,12 @@ pub fn get_country_profile(e: &Env, account: &Address, index: u32) -> CountryPro
         .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound))
 }
 
+/// Retrieves the number of country profiles for a given account.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address to query.
 pub fn get_country_profile_count(e: &Env, account: &Address) -> u32 {
     let key = IRSStorageKey::CPCount(account.clone());
     e.storage()
@@ -188,6 +310,12 @@ pub fn get_country_profile_count(e: &Env, account: &Address) -> u32 {
         .unwrap_or_default()
 }
 
+/// Retrieves all country profiles for a given account.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address to query.
 pub fn get_country_profiles(e: &Env, account: &Address) -> Vec<CountryProfile> {
     let count = get_country_profile_count(e, account);
     let mut profiles: Vec<CountryProfile> = vec![e];
@@ -205,6 +333,8 @@ pub fn get_country_profiles(e: &Env, account: &Address) -> Vec<CountryProfile> {
                     IDENTITY_EXTEND_AMOUNT,
                 )
             })
+            // Unwrap should be always safe, if counting is done correctly,
+            // adding "else" for consistency
             .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound));
         profiles.push_back(profile);
     }
@@ -212,6 +342,29 @@ pub fn get_country_profiles(e: &Env, account: &Address) -> Vec<CountryProfile> {
     profiles
 }
 
+/// Adds multiple country profiles to an existing identity.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address to add profiles to.
+/// * `profiles` - A vector of country profiles to add.
+///
+/// # Events
+///
+/// Emits for each profile added:
+/// * topics - `["country_added", account: Address, profile: CountryProfile]`
+/// * data - `[]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn add_country_profiles(e: &Env, account: &Address, profiles: &Vec<CountryProfile>) {
     let count_key = IRSStorageKey::CPCount(account.clone());
     let mut count = get_country_profile_count(e, account);
@@ -228,6 +381,33 @@ pub fn add_country_profiles(e: &Env, account: &Address, profiles: &Vec<CountryPr
     e.storage().persistent().set(&count_key, &count);
 }
 
+/// Modifies an existing country profile by its index.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address whose profile is being modified.
+/// * `index` - The index of the profile to modify.
+/// * `profile` - The new country profile data.
+///
+/// # Errors
+///
+/// * [`IRSError::CountryProfileNotFound`] - If the index is out of bounds.
+///
+/// # Events
+///
+/// * topics - `["country_modified", account: Address, profile: CountryProfile]`
+/// * data - `[]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn modify_country_profile(e: &Env, account: &Address, index: u32, profile: &CountryProfile) {
     let key = IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
 
@@ -239,6 +419,35 @@ pub fn modify_country_profile(e: &Env, account: &Address, index: u32, profile: &
     emit_country_profile_event(e, CountryProfileEvent::Modified, account, profile);
 }
 
+/// Deletes a country profile by its index. This operation that swaps the
+/// profile to be deleted with the last profile in the list.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address whose profile is being deleted.
+/// * `index` - The index of the profile to delete.
+///
+/// # Errors
+///
+/// * [`IRSError::CountryProfileNotFound`] - If the index is out of bounds.
+/// * [`IRSError::EmptyCountryProfiles`] - If deleting the last profile is
+///   attempted.
+///
+/// # Events
+///
+/// * topics - `["country_removed", account: Address, profile: CountryProfile]`
+/// * data - `[]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
     let current_key =
         IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
@@ -249,9 +458,9 @@ pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
         .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound));
 
     let count = get_country_profile_count(e, account);
-    // can't overflow because `profile_to_remove` would panic if count == 0
+    // Can't overflow because `profile_to_remove` would panic if count == 0
     let last_index = count - 1;
-    // revert if no CountryProfile is left
+    // Revert if no CountryProfile is left
     if last_index == 0 {
         panic_with_error!(e, IRSError::EmptyCountryProfiles)
     }
