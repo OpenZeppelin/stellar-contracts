@@ -23,6 +23,22 @@ members = [
     "packages/macros",
     "packages/test-utils/*",
     "packages/tokens",
+
+    # Diamond Proxy
+    "packages/diamond-proxy/diamond-proxy-core",
+    # Main Contracts
+    "packages/diamond-proxy/contracts/diamond-proxy",
+    "packages/diamond-proxy/stellar-facet-macro",
+    "packages/diamond-proxy/contracts/stellar-diamond-factory",
+    "packages/diamond-proxy/contracts/diamond-manager",
+    # Test Utilities + Contracts
+    "packages/diamond-proxy/contracts/shared-storage",
+    "packages/diamond-proxy/contracts/test-utils/shared-storage-1",
+    "packages/diamond-proxy/contracts/test-utils/shared-storage-2",
+    # Build utils
+    "packages/diamond-proxy/build-utils",
+    # Test infrastructure
+    "packages/diamond-proxy/diamond-test-utils",
 ]
 exclude = ["examples/upgradeable/testdata"]
 
@@ -38,6 +54,7 @@ version = "0.4.1"
 
 [workspace.dependencies]
 soroban-sdk = "22.0.8"
+soroban-env-common = "22.1"
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
@@ -53,11 +70,25 @@ stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-tokens = { path = "packages/tokens" }
 stellar-macros = { path = "packages/macros" }
 
+# diamond proxy
+
+# Primary Workspace Members
+stellar-diamond-proxy-core = { path = "packages/diamond-proxy/diamond-proxy-core" }
+stellar-facet-macro = { path = "packages/diamond-proxy/stellar-facet-macro" }
+
+# Core contracts
+stellar-diamond-proxy = { path = "packages/diamond-proxy/contracts/diamond-proxy" }
+stellar-diamond-factory = { path = "packages/diamond-proxy/contracts/stellar-diamond-factory" }
+stellar-diamond-manager = { path = "packages/diamond-proxy/contracts/diamond-manager" }
+stellar-shared-storage = { path = "packages/diamond-proxy/ontracts/shared-storage" }
+
+# Build utils
+stellar-build-utils = { path = "packages/diamond-proxy/build-utils" }
+
 [profile.release]
 opt-level = "z"
 overflow-checks = true
 debug = 0
-strip = "symbols"
 debug-assertions = false
 panic = "abort"
 codegen-units = 1

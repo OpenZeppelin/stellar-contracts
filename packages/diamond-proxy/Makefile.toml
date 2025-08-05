@@ -1,0 +1,134 @@
+[config]
+default_to_workspace = false
+skip_core_tasks = true
+
+[tasks.clean]
+command = "cargo"
+args = ["clean"]
+
+[tasks.wasm]
+command = "cargo"
+description = "Build the WASM binary for tests and deployment"
+args = [
+    "build",
+    "--target",
+    "wasm32-unknown-unknown",
+    "--release",
+    "--package",
+    "${@}",
+]
+
+dependencies = ["install"]
+
+[tasks.install]
+command = "cargo"
+args = ["install", "--locked", "stellar-cli"]
+
+[tasks.optimize]
+command = "stellar"
+description = "Optimize the WASM binary for deployment"
+args = [
+    "contract",
+    "optimize",
+    "--wasm",
+    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/wasm32-unknown-unknown/release/${@}.wasm",
+    "--wasm-out",
+    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/wasm32-unknown-unknown/release/${@}.wasm",
+]
+dependencies = ["install"]
+
+[tasks.build-all-wasm]
+command = "cargo"
+args = [
+    "build",
+    "--release",
+    "--workspace",
+    "--exclude",
+    "diamond-test-utils",
+    "--target",
+    "wasm32-unknown-unknown",
+]
+
+[tasks.build-wasm-and-optimize]
+dependencies = ["install", "build-all-wasm"]
+script = '''
+#!@duckscript
+wasm_dir = set ${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/target/wasm32-unknown-unknown/release
+echo "Looking in directory: ${wasm_dir}"
+
+# Use glob to get .wasm files
+files = glob_array ${wasm_dir}/*.wasm
+array_length = array_length ${files}
+echo "Found ${array_length} WASM files"
+
+range = range 0 ${array_length}
+for i in ${range}
+    file = array_get ${files} ${i}
+    if not is_empty ${file}
+        exec --fail-on-error stellar contract optimize --wasm ${file} --wasm-out ${file}
+    end
+end
+'''
+
+[tasks.test]
+dependencies = ["build-wasm-and-optimize"]
+command = "cargo"
+args = ["test"]
+
+[tasks.deploy-testnet]
+dependencies = ["build-wasm-and-optimize"]
+description = "Deploy contract to testnet. E.g., cargo make deploy-testnet <contract_name>. Note that <contract_name> must match the wasm file name: target/wasm32-unknown-unknown/release/<contract_name>.wasm"
+script = '''
+#!@duckscript
+# Get the contract name from arguments
+contract = set ${1}
+if is_empty ${contract}
+    echo "Error: Please provide a contract name as an argument"
+    exit 1
+end
+
+# Check if keys exist and show addresses
+echo "Setting up testnet accounts..."
+
+# Try to get addresses, create keys if they don't exist
+alice_result = exec stellar keys address alice
+if is_empty ${alice_result.stdout}
+    echo "Creating alice account..."
+    exec --fail-on-error stellar keys generate --global alice --network testnet --fund
+else
+    echo "Using existing alice account"
+fi
+
+bob_result = exec stellar keys address bob
+if is_empty ${bob_result.stdout}
+    echo "Creating bob account..."
+    exec --fail-on-error stellar keys generate --global bob --network testnet --fund
+else
+    echo "Using existing bob account"
+fi
+
+carol_result = exec stellar keys address carol
+if is_empty ${carol_result.stdout}
+    echo "Creating carol account..."
+    exec --fail-on-error stellar keys generate --global carol --network testnet --fund
+else
+    echo "Using existing carol account"
+fi
+
+# Show addresses
+echo "\nTestnet addresses:"
+alice_addr = exec --fail-on-error stellar keys address alice
+bob_addr = exec --fail-on-error stellar keys address bob
+carol_addr = exec --fail-on-error stellar keys address carol
+echo "alice:  ${alice_addr.stdout}"
+echo "bob:    ${bob_addr.stdout}"
+echo "carol:  ${carol_addr.stdout}"
+
+# Deploy contract
+echo "\nDeploying contract..."
+wasm_path = set "target/wasm32-unknown-unknown/release/${contract}.wasm"
+exec --fail-on-error stellar contract deploy --wasm ${wasm_path} --source alice --network testnet --alias ${contract}
+
+echo "\n✅ Contract deployed successfully!"
+'''
+script_runner = "@duckscript"

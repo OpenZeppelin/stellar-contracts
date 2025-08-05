@@ -1,0 +1,17 @@
+[package]
+name = "stellar-facet-macro"
+version = "0.1.0"
+edition = "2021"
+description = "Procedural macros for Stellar facet contracts"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "2.0", features = ["full", "extra-traits"] }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+stellar-diamond-proxy-core = { workspace = true }
