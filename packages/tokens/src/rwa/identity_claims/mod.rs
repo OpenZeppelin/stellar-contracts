@@ -76,29 +76,7 @@ pub trait IdentityClaims {
     fn get_claim_ids_by_topic(e: &Env, topic: u32) -> Vec<BytesN<32>>;
 }
 
-/// Trait for validating claims issued by this identity to other identities.
-pub trait ClaimIssuer {
-    /// Validates whether a claim is valid for a given identity.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The Soroban environment.
-    /// * `identity` - The identity address the claim is about.
-    /// * `claim_topic` - The topic of the claim to validate.
-    /// * `signature` - The signature to validate.
-    /// * `data` - The claim data to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns true if the claim is valid, false otherwise.
-    fn is_claim_valid(
-        e: &Env,
-        identity: Address,
-        claim_topic: u32,
-        signature: Bytes,
-        data: Bytes,
-    ) -> bool;
-}
+// ################## ERRORS ##################
 
 // TODO: correct enumeration and move up to higher level
 #[contracterror]
@@ -106,7 +84,7 @@ pub trait ClaimIssuer {
 #[repr(u32)]
 pub enum ClaimsError {
     ClaimNotFound = 1,
-    InvalidSignature = 2,
+    ClaimNotValid = 2,
 }
 
 // ################## CONSTANTS ##################

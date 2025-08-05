@@ -27,6 +27,8 @@ use soroban_sdk::{
     contracttype, panic_with_error, vec, xdr::ToXdr, Address, Bytes, BytesN, Env, String, Vec,
 };
 
+use crate::rwa::claim_issuer::ClaimIssuerClient;
+
 use super::{
     emit_claim_event, ClaimEvent, ClaimsError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
 };
@@ -76,13 +78,12 @@ pub enum ClaimsStorageKey {
 ///
 /// # Events
 ///
-/// * topics - `["claim_added", claim_id: BytesN<32>, topic: u32]` for new
-///   claims
+/// * topics - `["claim_added", claim: Claim]` for new claims
 /// * data - `[]`
 ///
 /// OR:
 ///
-/// * topics - `["claim_changed", claim_id: BytesN<32>, topic: u32]` for updates
+/// * topics - `["claim_changed", claim: Claim]` for updates
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -100,6 +101,13 @@ pub fn add_claim(
     data: &Bytes,
     uri: &String,
 ) -> BytesN<32> {
+    let claim_issuer_client = ClaimIssuerClient::new(e, issuer);
+    let identity = e.current_contract_address();
+
+    if !claim_issuer_client.is_claim_valid(&identity, &topic, signature, data) {
+        panic_with_error!(e, ClaimsError::ClaimNotValid)
+    }
+
     let claim_id = generate_claim_id(e, issuer, topic);
 
     let claim_key = ClaimsStorageKey::Claim(claim_id.clone());
