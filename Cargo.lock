@@ -443,6 +443,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "diamond-test-utils"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-diamond-proxy-core",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1327,6 +1335,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "shared-storage-1"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-diamond-proxy-core",
+ "stellar-facet-macro",
+]
+
+[[package]]
+name = "shared-storage-2"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-diamond-proxy-core",
+ "stellar-facet-macro",
+]
+
+[[package]]
 name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1579,6 +1605,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-build-utils"
+version = "0.1.0"
+
+[[package]]
 name = "stellar-contract-utils"
 version = "0.4.1"
 dependencies = [
@@ -1600,11 +1630,58 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-diamond-factory"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-diamond-proxy-core",
+]
+
+[[package]]
+name = "stellar-diamond-manager"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-build-utils",
+ "stellar-diamond-proxy-core",
+]
+
+[[package]]
+name = "stellar-diamond-proxy"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "soroban-env-common",
+ "soroban-sdk",
+ "stellar-build-utils",
+ "stellar-diamond-proxy-core",
+]
+
+[[package]]
+name = "stellar-diamond-proxy-core"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-facet-macro",
+]
+
+[[package]]
 name = "stellar-event-assertion"
 version = "0.4.1"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
+]
+
+[[package]]
+name = "stellar-facet-macro"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "soroban-sdk",
+ "stellar-diamond-proxy-core",
+ "syn 2.0.96",
 ]
 
 [[package]]
@@ -1614,6 +1691,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.96",
+]
+
+[[package]]
+name = "stellar-shared-storage"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-diamond-proxy-core",
 ]
 
 [[package]]

@@ -1,0 +1,11 @@
+[package]
+name = "diamond-test-utils"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+stellar-diamond-proxy-core = { path = "../diamond-proxy-core" }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

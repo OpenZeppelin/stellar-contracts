@@ -24,3 +24,5 @@ docs/build
 htmlcov/
 lcov.info
 coverage/
+**/test_snapshots/
+.stellar-contracts

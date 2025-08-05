@@ -1,0 +1,17 @@
+[package]
+name = "stellar-diamond-manager"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+stellar-diamond-proxy-core = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+
+[build-dependencies]
+stellar-build-utils = { workspace = true }
