@@ -316,7 +316,7 @@ fn signature_data_structures() {
 }
 
 #[test]
-fn ed25519_verify_claim_with_data_message_building() {
+fn ed25519_verify_claim_message_building() {
     let e = Env::default();
 
     let identity = Address::generate(&e);
@@ -343,11 +343,7 @@ fn ed25519_verify_claim_with_data_message_building() {
 
     let signature_data = Ed25519SignatureData { public_key, signature };
 
-    assert!(Ed25519Verifier::verify_claim_with_data(
-        &e,
-        &identity,
-        claim_topic,
-        &claim_data,
-        &signature_data,
-    ))
+    assert!(
+        Ed25519Verifier::verify_claim(&e, &identity, claim_topic, &claim_data, &signature_data,)
+    )
 }

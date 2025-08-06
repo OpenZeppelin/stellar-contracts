@@ -1,9 +1,66 @@
+//! # Claim Issuer Module
+//!
+//! This module provides functionality for issuing and validating cryptographic
+//! claims about identities. It supports multiple signature schemes (Ed25519,
+//! Secp256k1, Secp256r1) and allows keys to be authorized either universally or
+//! for specific claim topics.
+//!
+//! ## Example Usage
+//!
+//! ```rust
+//! use soroban_sdk::{contract, contractimpl, Address, Bytes, Env};
+//! use stellar_tokens::rwa::claim_issuer::{
+//!     storage::{allow_key_for_claim_topic, is_claim_revoked, is_key_allowed_for_topic},
+//!     ClaimIssuer,
+//! };
+//!
+//! #[contract]
+//! pub struct MyContract;
+//!
+//! #[contractimpl]
+//! pub fn __constructor(e: Env, ed25519_key: Bytes) {
+//!     allow_key_for_claim_topic(&e, &ed25519_key, 42);
+//! }
+//!
+//! #[contractimpl]
+//! impl ClaimIssuer for MyContract {
+//!     fn is_claim_valid(
+//!         e: &Env,
+//!         identity: Address,
+//!         claim_topic: u32,
+//!         sig_data: Bytes,
+//!         claim_data: Bytes,
+//!     ) -> bool {
+//!         // Extract signature data and verify against stored key
+//!         let signature_data = Ed25519Verifier::extract_signature_data(e, &sig_data);
+//!
+//!         // Check if the public key is authorized for this topic
+//!         if !is_key_allowed_for_topic(e, &signature_data.public_key.to_bytes(), claim_topic) {
+//!             return false;
+//!         }
+//!
+//!         // Optionally check claim was not revoked.
+//!         if is_claim_revoked(e, &identity, claim_topic, &claim_data) {
+//!             return false;
+//!         }
+//!
+//!         // Verify the signature
+//!         Ed25519Verifier::verify_claim(
+//!             e,
+//!             &identity,
+//!             claim_topic,
+//!             &claim_data,
+//!             &signature_data,
+//!         )
+//!     }
+//! }
+//! ```
+
 mod storage;
 mod test;
 
-pub use storage::*;
-
 use soroban_sdk::{contractclient, contracterror, Address, Bytes, Env};
+pub use storage::*;
 
 /// Trait for validating claims issued by this identity to other identities.
 #[contractclient(name = "ClaimIssuerClient")]
@@ -39,7 +96,8 @@ pub trait SignatureVerifier {
     /// The signature data type for this signature scheme.
     type SignatureData;
 
-    /// Extracts and returns the parsed signature data from the raw signature bytes.
+    /// Extracts and returns the parsed signature data from the raw signature
+    /// bytes.
     ///
     /// # Arguments
     ///
@@ -52,7 +110,8 @@ pub trait SignatureVerifier {
     ///   invalid.
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData;
 
-    /// Validates a claim signature using the parsed signature data and returns true if valid.
+    /// Validates a claim signature using the parsed signature data and returns
+    /// true if valid.
     ///
     /// # Arguments
     ///
@@ -61,7 +120,7 @@ pub trait SignatureVerifier {
     /// * `claim_topic` - The topic of the claim to validate.
     /// * `claim_data` - The claim data to validate.
     /// * `signature_data` - The parsed signature data.
-    fn verify_claim_with_data(
+    fn verify_claim(
         e: &Env,
         identity: &Address,
         claim_topic: u32,

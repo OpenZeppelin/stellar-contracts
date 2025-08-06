@@ -12,6 +12,8 @@ pub enum ClaimIssuerStorageKey {
     UniversalKey(Bytes),
     /// Allows signing for a specific topic.
     TopicKey(Bytes, u32),
+    /// Tracks explicitly revoked claims
+    RevokedClaim(Address, u32, Bytes),
 }
 
 /// Signature data for Ed25519 scheme.
@@ -59,7 +61,7 @@ impl SignatureVerifier for Ed25519Verifier {
         Ed25519SignatureData { public_key, signature }
     }
 
-    fn verify_claim_with_data(
+    fn verify_claim(
         e: &Env,
         identity: &Address,
         claim_topic: u32,
@@ -102,7 +104,7 @@ impl SignatureVerifier for Secp256r1Verifier {
         Secp256r1SignatureData { public_key, signature }
     }
 
-    fn verify_claim_with_data(
+    fn verify_claim(
         e: &Env,
         identity: &Address,
         claim_topic: u32,
@@ -157,7 +159,7 @@ impl SignatureVerifier for Secp256k1Verifier {
         Secp256k1SignatureData { public_key, signature, recovery_id }
     }
 
-    fn verify_claim_with_data(
+    fn verify_claim(
         e: &Env,
         identity: &Address,
         claim_topic: u32,
@@ -273,6 +275,38 @@ pub fn is_key_allowed(e: &Env, public_key: &Bytes, claim_topic: u32) -> bool {
     is_key_allowed_for_topic(e, public_key, claim_topic)
 }
 
+/// Revokes a claim for a specific identity and claim topic.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `identity` - The identity address whose claim is being revoked.
+/// * `claim_topic` - The topic of the claim to revoke.
+pub fn set_claim_revocaton_status(
+    e: &Env,
+    identity: &Address,
+    claim_topic: u32,
+    claim_data: &Bytes,
+    revoked: bool,
+) {
+    let key =
+        ClaimIssuerStorageKey::RevokedClaim(identity.clone(), claim_topic, claim_data.clone());
+    e.storage().persistent().set(&key, &revoked);
+}
+
+/// Checks if a claim has been revoked for a specific identity and claim topic.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `identity` - The identity address to check.
+/// * `claim_topic` - The topic of the claim to check.
+pub fn is_claim_revoked(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> bool {
+    let key =
+        ClaimIssuerStorageKey::RevokedClaim(identity.clone(), claim_topic, claim_data.clone());
+    e.storage().persistent().get(&key).unwrap_or_default()
+}
+
 /// Builds and returns the message to verify for claim signature validation as Bytes.
 ///
 /// The message format is: identity || claim_topic || claim_data
@@ -283,7 +317,12 @@ pub fn is_key_allowed(e: &Env, public_key: &Bytes, claim_topic: u32) -> bool {
 /// * `identity` - The identity address the claim is about.
 /// * `claim_topic` - The topic of the claim to validate.
 /// * `claim_data` - The claim data to validate.
-fn build_claim_message(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> Bytes {
+pub fn build_claim_message(
+    e: &Env,
+    identity: &Address,
+    claim_topic: u32,
+    claim_data: &Bytes,
+) -> Bytes {
     let mut data = identity.to_xdr(e);
     data.extend_from_array(&claim_topic.to_be_bytes());
     data.append(claim_data);
@@ -297,7 +336,7 @@ fn build_claim_message(e: &Env, identity: &Address, claim_topic: u32, claim_data
 /// * `e` - The Soroban environment.
 /// * `data` - The Bytes object to extract from.
 /// * `r` - The range of bytes to extract.
-fn extract_from_bytes<const N: usize>(
+pub fn extract_from_bytes<const N: usize>(
     e: &Env,
     data: &Bytes,
     r: impl RangeBounds<u32>,

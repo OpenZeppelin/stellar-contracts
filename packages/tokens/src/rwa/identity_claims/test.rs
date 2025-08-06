@@ -1,9 +1,32 @@
 #![cfg(test)]
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Bytes, BytesN, Env, String};
+use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, String};
 
-use super::storage::{add_claim, get_claim, get_claim_ids_by_topic, remove_claim};
+use crate::rwa::{
+    claim_issuer::ClaimIssuer,
+    identity_claims::storage::{add_claim, get_claim, get_claim_ids_by_topic, remove_claim},
+};
+
+pub mod mock_claim_issuer {
+    use super::*;
+
+    #[contract]
+    pub struct Contract;
+
+    #[contractimpl]
+    impl ClaimIssuer for Contract {
+        fn is_claim_valid(
+            _e: &Env,
+            _identity: Address,
+            _claim_topic: u32,
+            _sig_data: Bytes,
+            _claim_data: Bytes,
+        ) -> bool {
+            true
+        }
+    }
+}
 
 #[contract]
 struct MockContract;
@@ -13,7 +36,7 @@ fn add_claim_success() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
-    let issuer = Address::generate(&e);
+    let issuer = e.register(mock_claim_issuer::Contract, ());
     let topic = 1u32;
     let scheme = 1u32;
     let signature = Bytes::from_array(&e, &[1, 2, 3, 4]);
@@ -45,7 +68,7 @@ fn update_existing_claim() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
-    let issuer = Address::generate(&e);
+    let issuer = e.register(mock_claim_issuer::Contract, ());
     let topic = 1u32;
     let scheme = 1u32;
     let signature1 = Bytes::from_array(&e, &[1, 2, 3, 4]);
@@ -83,7 +106,7 @@ fn multiple_claims_different_topics() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
-    let issuer = Address::generate(&e);
+    let issuer = e.register(mock_claim_issuer::Contract, ());
     let signature = Bytes::from_array(&e, &[1, 2, 3, 4]);
     let data = Bytes::from_array(&e, &[5, 6, 7, 8]);
     let uri = String::from_str(&e, "https://example.com");
@@ -117,8 +140,8 @@ fn multiple_issuers_same_topic() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
-    let issuer1 = Address::generate(&e);
-    let issuer2 = Address::generate(&e);
+    let issuer1 = e.register(mock_claim_issuer::Contract, ());
+    let issuer2 = e.register(mock_claim_issuer::Contract, ());
     let topic = 1u32;
     let signature = Bytes::from_array(&e, &[1, 2, 3, 4]);
     let data = Bytes::from_array(&e, &[5, 6, 7, 8]);
@@ -157,7 +180,7 @@ fn claim_removal() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
-    let issuer = Address::generate(&e);
+    let issuer = e.register(mock_claim_issuer::Contract, ());
     let topic = 1u32;
     let scheme = 1u32;
     let signature = Bytes::from_array(&e, &[1, 2, 3, 4]);
