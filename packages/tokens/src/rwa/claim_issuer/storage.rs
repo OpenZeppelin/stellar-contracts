@@ -2,7 +2,7 @@ use core::ops::RangeBounds;
 
 use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env};
 
-use crate::rwa::claim_issuer::ClaimIssuerError;
+use crate::rwa::claim_issuer::{ClaimIssuerError, SignatureVerifier};
 
 /// Storage keys for claim issuer key management.
 #[contracttype]
@@ -37,49 +37,6 @@ pub struct Secp256k1SignatureData {
     pub public_key: BytesN<65>,
     pub signature: BytesN<64>,
     pub recovery_id: u32,
-}
-
-/// Trait for signature verification schemes.
-///
-/// Each signature scheme implements this trait to provide a consistent
-/// interface for claim validation while allowing for scheme-specific
-/// implementation details.
-pub trait SignatureVerifier {
-    /// The signature data type for this signature scheme.
-    type SignatureData;
-
-    /// Extracts and returns the parsed signature data from the raw signature bytes.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The Soroban environment.
-    /// * `sig_data` - The signature data to parse.
-    ///
-    /// # Errors
-    ///
-    /// * [`ClaimIssuerError::SigDataMismatch`] - If signature data format is
-    ///   invalid.
-    fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData;
-
-    /// Validates a claim signature using the parsed signature data and returns true if valid.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The Soroban environment.
-    /// * `identity` - The identity address the claim is about.
-    /// * `claim_topic` - The topic of the claim to validate.
-    /// * `claim_data` - The claim data to validate.
-    /// * `signature_data` - The parsed signature data.
-    fn verify_claim_with_data(
-        e: &Env,
-        identity: &Address,
-        claim_topic: u32,
-        claim_data: &Bytes,
-        signature_data: &Self::SignatureData,
-    ) -> bool;
-
-    /// Returns the expected signature data length for this scheme.
-    fn expected_sig_data_len() -> u32;
 }
 
 /// Ed25519 signature verifier.

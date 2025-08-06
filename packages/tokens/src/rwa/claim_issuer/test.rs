@@ -3,11 +3,14 @@ extern crate std;
 use ed25519_dalek::{Signer, SigningKey, SECRET_KEY_LENGTH};
 use soroban_sdk::{contract, testutils::Address as _, xdr::ToXdr, Address, Bytes, BytesN, Env};
 
-use crate::rwa::claim_issuer::storage::{
-    allow_key, allow_key_for_claim_topic, is_key_allowed, is_key_allowed_for_topic,
-    is_key_universally_allowed, remove_key, remove_key_for_claim_topic, Ed25519SignatureData,
-    Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData,
-    Secp256r1Verifier, SignatureVerifier,
+use crate::rwa::claim_issuer::{
+    storage::{
+        allow_key, allow_key_for_claim_topic, is_key_allowed, is_key_allowed_for_topic,
+        is_key_universally_allowed, remove_key, remove_key_for_claim_topic, Ed25519SignatureData,
+        Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData,
+        Secp256r1Verifier,
+    },
+    SignatureVerifier,
 };
 
 #[contract]
@@ -60,29 +63,23 @@ fn create_secp256k1_test_data(e: &Env) -> (Bytes, Secp256k1SignatureData) {
 #[test]
 fn ed25519_extract_signature_data_success() {
     let e = Env::default();
-    let contract_id = e.register(MockContract, ());
 
-    e.as_contract(&contract_id, || {
-        let (sig_data, expected_data) = create_ed25519_test_data(&e);
+    let (sig_data, expected_data) = create_ed25519_test_data(&e);
 
-        let extracted_data = Ed25519Verifier::extract_signature_data(&e, &sig_data);
+    let extracted_data = Ed25519Verifier::extract_signature_data(&e, &sig_data);
 
-        assert_eq!(extracted_data.public_key, expected_data.public_key);
-        assert_eq!(extracted_data.signature, expected_data.signature);
-    });
+    assert_eq!(extracted_data.public_key, expected_data.public_key);
+    assert_eq!(extracted_data.signature, expected_data.signature);
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #1)")]
 fn ed25519_extract_signature_data_invalid_length() {
     let e = Env::default();
-    let contract_id = e.register(MockContract, ());
 
-    e.as_contract(&contract_id, || {
-        let invalid_sig_data = Bytes::from_array(&e, &[1u8; 50]); // Wrong length
+    let invalid_sig_data = Bytes::from_array(&e, &[1u8; 50]); // Wrong length
 
-        Ed25519Verifier::extract_signature_data(&e, &invalid_sig_data);
-    });
+    Ed25519Verifier::extract_signature_data(&e, &invalid_sig_data);
 }
 
 #[test]
@@ -93,29 +90,23 @@ fn ed25519_expected_sig_data_len() {
 #[test]
 fn secp256r1_extract_signature_data_success() {
     let e = Env::default();
-    let contract_id = e.register(MockContract, ());
 
-    e.as_contract(&contract_id, || {
-        let (sig_data, expected_data) = create_secp256r1_test_data(&e);
+    let (sig_data, expected_data) = create_secp256r1_test_data(&e);
 
-        let extracted_data = Secp256r1Verifier::extract_signature_data(&e, &sig_data);
+    let extracted_data = Secp256r1Verifier::extract_signature_data(&e, &sig_data);
 
-        assert_eq!(extracted_data.public_key, expected_data.public_key);
-        assert_eq!(extracted_data.signature, expected_data.signature);
-    });
+    assert_eq!(extracted_data.public_key, expected_data.public_key);
+    assert_eq!(extracted_data.signature, expected_data.signature);
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #1)")]
 fn secp256r1_extract_signature_data_invalid_length() {
     let e = Env::default();
-    let contract_id = e.register(MockContract, ());
 
-    e.as_contract(&contract_id, || {
-        let invalid_sig_data = Bytes::from_array(&e, &[1u8; 100]); // Wrong length
+    let invalid_sig_data = Bytes::from_array(&e, &[1u8; 100]); // Wrong length
 
-        Secp256r1Verifier::extract_signature_data(&e, &invalid_sig_data);
-    });
+    Secp256r1Verifier::extract_signature_data(&e, &invalid_sig_data);
 }
 
 #[test]
@@ -126,30 +117,22 @@ fn secp256r1_expected_sig_data_len() {
 #[test]
 fn secp256k1_extract_signature_data_success() {
     let e = Env::default();
-    let contract_id = e.register(MockContract, ());
+    let (sig_data, expected_data) = create_secp256k1_test_data(&e);
 
-    e.as_contract(&contract_id, || {
-        let (sig_data, expected_data) = create_secp256k1_test_data(&e);
+    let extracted_data = Secp256k1Verifier::extract_signature_data(&e, &sig_data);
 
-        let extracted_data = Secp256k1Verifier::extract_signature_data(&e, &sig_data);
-
-        assert_eq!(extracted_data.public_key, expected_data.public_key);
-        assert_eq!(extracted_data.signature, expected_data.signature);
-        assert_eq!(extracted_data.recovery_id, expected_data.recovery_id);
-    });
+    assert_eq!(extracted_data.public_key, expected_data.public_key);
+    assert_eq!(extracted_data.signature, expected_data.signature);
+    assert_eq!(extracted_data.recovery_id, expected_data.recovery_id);
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #1)")]
 fn secp256k1_extract_signature_data_invalid_length() {
     let e = Env::default();
-    let contract_id = e.register(MockContract, ());
+    let invalid_sig_data = Bytes::from_array(&e, &[1u8; 120]); // Wrong length
 
-    e.as_contract(&contract_id, || {
-        let invalid_sig_data = Bytes::from_array(&e, &[1u8; 120]); // Wrong length
-
-        Secp256k1Verifier::extract_signature_data(&e, &invalid_sig_data);
-    });
+    Secp256k1Verifier::extract_signature_data(&e, &invalid_sig_data);
 }
 
 #[test]
@@ -160,32 +143,27 @@ fn secp256k1_expected_sig_data_len() {
 #[test]
 fn secp256k1_recovery_id_extraction() {
     let e = Env::default();
-    let contract_id = e.register(MockContract, ());
+    let public_key = BytesN::<65>::from_array(&e, &[5u8; 65]);
+    let signature = BytesN::<64>::from_array(&e, &[6u8; 64]);
+    let recovery_id = 0x12345678u32; // Test specific recovery ID
 
-    e.as_contract(&contract_id, || {
-        let public_key = BytesN::<65>::from_array(&e, &[5u8; 65]);
-        let signature = BytesN::<64>::from_array(&e, &[6u8; 64]);
-        let recovery_id = 0x12345678u32; // Test specific recovery ID
+    let mut sig_data = Bytes::new(&e);
+    sig_data.append(&public_key.into());
+    sig_data.append(&signature.into());
+    sig_data.extend_from_array(&recovery_id.to_be_bytes());
 
-        let mut sig_data = Bytes::new(&e);
-        sig_data.append(&public_key.into());
-        sig_data.append(&signature.into());
-        sig_data.extend_from_array(&recovery_id.to_be_bytes());
+    let extracted_data = Secp256k1Verifier::extract_signature_data(&e, &sig_data);
 
-        let extracted_data = Secp256k1Verifier::extract_signature_data(&e, &sig_data);
-
-        assert_eq!(extracted_data.recovery_id, recovery_id);
-    });
+    assert_eq!(extracted_data.recovery_id, recovery_id);
 }
 
 #[test]
 fn universal_key_management() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
 
     e.as_contract(&contract_id, || {
-        let public_key = Bytes::from_array(&e, &[1u8; 32]);
-
         // Initially not allowed
         assert!(!is_key_universally_allowed(&e, &public_key));
 
@@ -203,11 +181,10 @@ fn universal_key_management() {
 fn topic_specific_key_management() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
+    let public_key = Bytes::from_array(&e, &[2u8; 32]);
+    let topic = 42u32;
 
     e.as_contract(&contract_id, || {
-        let public_key = Bytes::from_array(&e, &[2u8; 32]);
-        let topic = 42u32;
-
         // Initially not allowed
         assert!(!is_key_allowed_for_topic(&e, &public_key, topic));
 
@@ -228,12 +205,11 @@ fn topic_specific_key_management() {
 fn combined_key_authorization() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
+    let universal_key = Bytes::from_array(&e, &[3u8; 32]);
+    let topic_key = Bytes::from_array(&e, &[4u8; 32]);
+    let topic = 123u32;
 
     e.as_contract(&contract_id, || {
-        let universal_key = Bytes::from_array(&e, &[3u8; 32]);
-        let topic_key = Bytes::from_array(&e, &[4u8; 32]);
-        let topic = 123u32;
-
         allow_key(&e, &universal_key);
 
         allow_key_for_claim_topic(&e, &topic_key, topic);
@@ -256,13 +232,12 @@ fn combined_key_authorization() {
 fn multiple_topics_same_key() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
+    let public_key = Bytes::from_array(&e, &[6u8; 32]);
+    let topic1 = 100u32;
+    let topic2 = 200u32;
+    let topic3 = 300u32;
 
     e.as_contract(&contract_id, || {
-        let public_key = Bytes::from_array(&e, &[6u8; 32]);
-        let topic1 = 100u32;
-        let topic2 = 200u32;
-        let topic3 = 300u32;
-
         allow_key_for_claim_topic(&e, &public_key, topic1);
         allow_key_for_claim_topic(&e, &public_key, topic2);
 
@@ -284,11 +259,10 @@ fn multiple_topics_same_key() {
 fn universal_key_overrides_topic_specific() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
+    let public_key = Bytes::from_array(&e, &[7u8; 32]);
+    let topic = 500u32;
 
     e.as_contract(&contract_id, || {
-        let public_key = Bytes::from_array(&e, &[7u8; 32]);
-        let topic = 500u32;
-
         // First allow for specific topic
         allow_key_for_claim_topic(&e, &public_key, topic);
         assert!(is_key_allowed(&e, &public_key, topic));
@@ -309,42 +283,36 @@ fn universal_key_overrides_topic_specific() {
 #[test]
 fn signature_data_structures() {
     let e = Env::default();
-    let contract_id = e.register(MockContract, ());
+    // Test Ed25519 structure
+    let ed25519_key = BytesN::<32>::from_array(&e, &[1u8; 32]);
+    let ed25519_sig = BytesN::<64>::from_array(&e, &[2u8; 64]);
+    let ed25519_data =
+        Ed25519SignatureData { public_key: ed25519_key.clone(), signature: ed25519_sig.clone() };
+    assert_eq!(ed25519_data.public_key, ed25519_key);
+    assert_eq!(ed25519_data.signature, ed25519_sig);
 
-    e.as_contract(&contract_id, || {
-        // Test Ed25519 structure
-        let ed25519_key = BytesN::<32>::from_array(&e, &[1u8; 32]);
-        let ed25519_sig = BytesN::<64>::from_array(&e, &[2u8; 64]);
-        let ed25519_data = Ed25519SignatureData {
-            public_key: ed25519_key.clone(),
-            signature: ed25519_sig.clone(),
-        };
-        assert_eq!(ed25519_data.public_key, ed25519_key);
-        assert_eq!(ed25519_data.signature, ed25519_sig);
+    // Test Secp256r1 structure
+    let secp256r1_key = BytesN::<65>::from_array(&e, &[3u8; 65]);
+    let secp256r1_sig = BytesN::<64>::from_array(&e, &[4u8; 64]);
+    let secp256r1_data = Secp256r1SignatureData {
+        public_key: secp256r1_key.clone(),
+        signature: secp256r1_sig.clone(),
+    };
+    assert_eq!(secp256r1_data.public_key, secp256r1_key);
+    assert_eq!(secp256r1_data.signature, secp256r1_sig);
 
-        // Test Secp256r1 structure
-        let secp256r1_key = BytesN::<65>::from_array(&e, &[3u8; 65]);
-        let secp256r1_sig = BytesN::<64>::from_array(&e, &[4u8; 64]);
-        let secp256r1_data = Secp256r1SignatureData {
-            public_key: secp256r1_key.clone(),
-            signature: secp256r1_sig.clone(),
-        };
-        assert_eq!(secp256r1_data.public_key, secp256r1_key);
-        assert_eq!(secp256r1_data.signature, secp256r1_sig);
-
-        // Test Secp256k1 structure
-        let secp256k1_key = BytesN::<65>::from_array(&e, &[5u8; 65]);
-        let secp256k1_sig = BytesN::<64>::from_array(&e, &[6u8; 64]);
-        let recovery_id = 42u32;
-        let secp256k1_data = Secp256k1SignatureData {
-            public_key: secp256k1_key.clone(),
-            signature: secp256k1_sig.clone(),
-            recovery_id,
-        };
-        assert_eq!(secp256k1_data.public_key, secp256k1_key);
-        assert_eq!(secp256k1_data.signature, secp256k1_sig);
-        assert_eq!(secp256k1_data.recovery_id, recovery_id);
-    });
+    // Test Secp256k1 structure
+    let secp256k1_key = BytesN::<65>::from_array(&e, &[5u8; 65]);
+    let secp256k1_sig = BytesN::<64>::from_array(&e, &[6u8; 64]);
+    let recovery_id = 42u32;
+    let secp256k1_data = Secp256k1SignatureData {
+        public_key: secp256k1_key.clone(),
+        signature: secp256k1_sig.clone(),
+        recovery_id,
+    };
+    assert_eq!(secp256k1_data.public_key, secp256k1_key);
+    assert_eq!(secp256k1_data.signature, secp256k1_sig);
+    assert_eq!(secp256k1_data.recovery_id, recovery_id);
 }
 
 #[test]
