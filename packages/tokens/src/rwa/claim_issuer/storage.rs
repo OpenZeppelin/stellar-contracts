@@ -65,6 +65,16 @@ impl SignatureVerifier<32> for Ed25519Verifier {
         Ed25519SignatureData { public_key, signature }
     }
 
+    fn build_claim_digest(
+        e: &Env,
+        identity: &Address,
+        claim_topic: u32,
+        claim_data: &Bytes,
+    ) -> Hash<32> {
+        let claim_message = build_claim_message(e, identity, claim_topic, claim_data);
+        e.crypto().keccak256(&claim_message)
+    }
+
     fn verify_claim_digest(
         e: &Env,
         claim_digest: &Hash<32>,
@@ -100,6 +110,16 @@ impl SignatureVerifier<32> for Secp256r1Verifier {
         let signature: BytesN<64> = extract_from_bytes(e, sig_data, 65..129);
 
         Secp256r1SignatureData { public_key, signature }
+    }
+
+    fn build_claim_digest(
+        e: &Env,
+        identity: &Address,
+        claim_topic: u32,
+        claim_data: &Bytes,
+    ) -> Hash<32> {
+        let claim_message = build_claim_message(e, identity, claim_topic, claim_data);
+        e.crypto().keccak256(&claim_message)
     }
 
     fn verify_claim_digest(
@@ -148,6 +168,16 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
         ]);
 
         Secp256k1SignatureData { public_key, signature, recovery_id }
+    }
+
+    fn build_claim_digest(
+        e: &Env,
+        identity: &Address,
+        claim_topic: u32,
+        claim_data: &Bytes,
+    ) -> Hash<32> {
+        let claim_message = build_claim_message(e, identity, claim_topic, claim_data);
+        e.crypto().keccak256(&claim_message)
     }
 
     fn verify_claim_digest(

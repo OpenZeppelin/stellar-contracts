@@ -1,16 +1,24 @@
 //! # Claim Issuer Module
 //!
-//! This module provides functionality for issuing and validating cryptographic
-//! claims about identities. It supports multiple signature schemes (Ed25519,
-//! Secp256k1, Secp256r1) and allows keys to be authorized either universally or
-//! for specific claim topics.
+//! This module provides functionality for validating cryptographic claims
+//! about identities. The core `ClaimIssuer` trait is minimal, but the module
+//! offers a variety of optional features that can be integrated in any
+//! combination as needed:
+//!
+//! - **Multiple Signature Schemes**: Ed25519, Secp256k1, Secp256r1 support
+//! - **Flexible Key Authorization**: Universal (all topics) or topic-specific authorization
+//! - **Claim Revocation**: Digest-based revocation tracking with persistent storage
+//! - **Key Management**: Add, remove, and query key authorization status
 //!
 //! ## Example Usage
 //!
 //! ```rust
 //! use soroban_sdk::{contract, contractimpl, Address, Bytes, Env};
 //! use stellar_tokens::rwa::claim_issuer::{
-//!     storage::{allow_key_for_claim_topic, build_claim_message, is_claim_revoked, is_key_allowed_for_topic},
+//!     storage::{
+//!         allow_key_for_claim_topic, is_claim_revoked,
+//!         is_key_allowed_for_topic,
+//!     },
 //!     ClaimIssuer,
 //! };
 //!
@@ -38,20 +46,16 @@
 //!         if !is_key_allowed_for_topic(e, &signature_data.public_key.to_bytes(), claim_topic) {
 //!             return false;
 //!         }
-//!         let claim_message = build_claim_message(&identity, claim_topic, &claim_data);
-//!         let claim_digest = e.crypto().keccak256(&claim_message);
+//!         let claim_digest =
+//!             Ed25519Verifier::build_claim_digest(&identity, claim_topic, &claim_data);
 //!
 //!         // Optionally check claim was not revoked.
-//!         if is_claim_revoked(e, &identity, claim_topic, &claim_data) {
+//!         if is_claim_revoked(e, &claim_digest) {
 //!             return false;
 //!         }
 //!
 //!         // Verify the signature
-//!         Ed25519Verifier::verify_claim_digest(
-//!             e,
-//!             &claim_digest,
-//!             &signature_data,
-//!         )
+//!         Ed25519Verifier::verify_claim_digest(e, &claim_digest, &signature_data)
 //!     }
 //! }
 //! ```
@@ -59,8 +63,7 @@
 mod storage;
 mod test;
 
-use soroban_sdk::crypto::Hash;
-use soroban_sdk::{contractclient, contracterror, Address, Bytes, Env};
+use soroban_sdk::{contractclient, contracterror, crypto::Hash, Address, Bytes, Env};
 pub use storage::*;
 
 /// Trait for validating claims issued by this identity to other identities.
@@ -73,12 +76,9 @@ pub trait ClaimIssuer {
     /// * `e` - The Soroban environment.
     /// * `identity` - The identity address the claim is about.
     /// * `claim_topic` - The topic of the claim to validate.
-    /// * `sig_data` - The signature data.
+    /// * `sig_data` - The signature data as bytes: public key, signature and
+    ///   other data required by the concrete signature scheme.
     /// * `claim_data` - The claim data to validate.
-    ///
-    /// # Returns
-    ///
-    /// Returns true if the claim is valid, false otherwise.
     fn is_claim_valid(
         e: &Env,
         identity: Address,
@@ -110,6 +110,24 @@ pub trait SignatureVerifier<const N: usize> {
     /// * [`ClaimIssuerError::SigDataMismatch`] - If signature data format is
     ///   invalid.
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData;
+
+    /// Builds the message and hashes it to verify for claim signature
+    /// validation.
+    ///
+    /// The message format is: identity || claim_topic || claim_data
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `identity` - The identity address the claim is about.
+    /// * `claim_topic` - The topic of the claim to validate.
+    /// * `claim_data` - The claim data to validate.
+    fn build_claim_digest(
+        e: &Env,
+        identity: &Address,
+        claim_topic: u32,
+        claim_data: &Bytes,
+    ) -> Hash<N>;
 
     /// Validates a claim signature using the parsed signature data and returns
     /// true if valid.
