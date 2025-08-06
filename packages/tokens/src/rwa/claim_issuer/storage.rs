@@ -1,19 +1,21 @@
 use core::ops::RangeBounds;
 
-use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env};
+use soroban_sdk::{
+    contracttype, crypto::Hash, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env,
+};
 
 use crate::rwa::claim_issuer::{ClaimIssuerError, SignatureVerifier};
 
 /// Storage keys for claim issuer key management.
 #[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone)]
 pub enum ClaimIssuerStorageKey {
     /// Allows signing for all topics.
     UniversalKey(Bytes),
     /// Allows signing for a specific topic.
     TopicKey(Bytes, u32),
-    /// Tracks explicitly revoked claims
-    RevokedClaim(Address, u32, Bytes),
+    /// Tracks explicitly revoked claims by claim digest
+    RevokedClaim(BytesN<32>),
 }
 
 /// Signature data for Ed25519 scheme.
@@ -41,13 +43,15 @@ pub struct Secp256k1SignatureData {
     pub recovery_id: u32,
 }
 
+// ====================== SIGNITURE VERIFICATION =====================
+
 /// Ed25519 signature verifier.
 ///
 /// Expected signature data format: public_key (32 bytes) || signature (64
 /// bytes)
 pub struct Ed25519Verifier;
 
-impl SignatureVerifier for Ed25519Verifier {
+impl SignatureVerifier<32> for Ed25519Verifier {
     type SignatureData = Ed25519SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
@@ -61,19 +65,13 @@ impl SignatureVerifier for Ed25519Verifier {
         Ed25519SignatureData { public_key, signature }
     }
 
-    fn verify_claim(
+    fn verify_claim_digest(
         e: &Env,
-        identity: &Address,
-        claim_topic: u32,
-        claim_data: &Bytes,
+        claim_digest: &Hash<32>,
         signature_data: &Self::SignatureData,
     ) -> bool {
-        // Build the message to verify
-        let data = build_claim_message(e, identity, claim_topic, claim_data);
-
-        // For Ed25519, convert hash to Bytes
-        let msg_slice = e.crypto().keccak256(&data).to_array();
-        let msg = Bytes::from_array(e, &msg_slice);
+        // For Ed25519, convert hash digest to Bytes
+        let msg = Bytes::from_slice(e, &claim_digest.to_array());
 
         e.crypto().ed25519_verify(&signature_data.public_key, &msg, &signature_data.signature);
         true
@@ -90,7 +88,7 @@ impl SignatureVerifier for Ed25519Verifier {
 /// bytes)
 pub struct Secp256r1Verifier;
 
-impl SignatureVerifier for Secp256r1Verifier {
+impl SignatureVerifier<32> for Secp256r1Verifier {
     type SignatureData = Secp256r1SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
@@ -104,22 +102,15 @@ impl SignatureVerifier for Secp256r1Verifier {
         Secp256r1SignatureData { public_key, signature }
     }
 
-    fn verify_claim(
+    fn verify_claim_digest(
         e: &Env,
-        identity: &Address,
-        claim_topic: u32,
-        claim_data: &Bytes,
+        claim_digest: &Hash<32>,
         signature_data: &Self::SignatureData,
     ) -> bool {
-        // Build the message to verify
-        let data = build_claim_message(e, identity, claim_topic, claim_data);
-
-        // For Secp256r1, use the hash digest directly
-        let msg_digest = e.crypto().keccak256(&data);
-
+        // For Secp256r1, use the claim digest directly
         e.crypto().secp256r1_verify(
             &signature_data.public_key,
-            &msg_digest,
+            claim_digest,
             &signature_data.signature,
         );
         true
@@ -136,7 +127,7 @@ impl SignatureVerifier for Secp256r1Verifier {
 /// bytes) || recovery_id (4 bytes)
 pub struct Secp256k1Verifier;
 
-impl SignatureVerifier for Secp256k1Verifier {
+impl SignatureVerifier<32> for Secp256k1Verifier {
     type SignatureData = Secp256k1SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
@@ -159,22 +150,14 @@ impl SignatureVerifier for Secp256k1Verifier {
         Secp256k1SignatureData { public_key, signature, recovery_id }
     }
 
-    fn verify_claim(
+    fn verify_claim_digest(
         e: &Env,
-        identity: &Address,
-        claim_topic: u32,
-        claim_data: &Bytes,
+        claim_digest: &Hash<32>,
         signature_data: &Self::SignatureData,
     ) -> bool {
-        // Build the message to verify
-        let data = build_claim_message(e, identity, claim_topic, claim_data);
-
-        // For Secp256k1, use the hash digest directly
-        let msg_digest = e.crypto().keccak256(&data);
-
-        // Recover public key and compare
+        // For Secp256k1, recover public key and compare
         let recovered_key = e.crypto().secp256k1_recover(
-            &msg_digest,
+            claim_digest,
             &signature_data.signature,
             signature_data.recovery_id,
         );
@@ -185,6 +168,8 @@ impl SignatureVerifier for Secp256k1Verifier {
         133 // 65 bytes public key + 64 bytes signature + 4 bytes recovery_id
     }
 }
+
+// ====================== KEY MANAGEMENT =====================
 
 /// Allows a public key to sign claims universally (for all topics).
 ///
@@ -275,37 +260,36 @@ pub fn is_key_allowed(e: &Env, public_key: &Bytes, claim_topic: u32) -> bool {
     is_key_allowed_for_topic(e, public_key, claim_topic)
 }
 
-/// Revokes a claim for a specific identity and claim topic.
+// ====================== CLAIM REVOCATION =====================
+
+/// Sets the revocation status for a claim using its digest.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `identity` - The identity address whose claim is being revoked.
-/// * `claim_topic` - The topic of the claim to revoke.
-pub fn set_claim_revocaton_status(
-    e: &Env,
-    identity: &Address,
-    claim_topic: u32,
-    claim_data: &Bytes,
-    revoked: bool,
-) {
-    let key =
-        ClaimIssuerStorageKey::RevokedClaim(identity.clone(), claim_topic, claim_data.clone());
+/// * `claim_digest` - The hash digest of the claim message.
+/// * `revoked` - Whether the claim should be marked as revoked.
+pub fn set_claim_revoked(e: &Env, claim_digest: &Hash<32>, revoked: bool) {
+    let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest.to_bytes());
     e.storage().persistent().set(&key, &revoked);
 }
 
-/// Checks if a claim has been revoked for a specific identity and claim topic.
+/// Checks if a claim has been revoked using its digest.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `identity` - The identity address to check.
-/// * `claim_topic` - The topic of the claim to check.
-pub fn is_claim_revoked(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> bool {
-    let key =
-        ClaimIssuerStorageKey::RevokedClaim(identity.clone(), claim_topic, claim_data.clone());
+/// * `claim_digest` - The hash digest of the claim message to check.
+///
+/// # Returns
+///
+/// Returns `true` if the claim has been explicitly revoked, `false` otherwise.
+pub fn is_claim_revoked(e: &Env, claim_digest: &Hash<32>) -> bool {
+    let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest.to_bytes());
     e.storage().persistent().get(&key).unwrap_or_default()
 }
+
+// ====================== HELPERS =====================
 
 /// Builds and returns the message to verify for claim signature validation as Bytes.
 ///

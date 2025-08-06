@@ -5,10 +5,10 @@ use soroban_sdk::{contract, testutils::Address as _, xdr::ToXdr, Address, Bytes,
 
 use crate::rwa::claim_issuer::{
     storage::{
-        allow_key, allow_key_for_claim_topic, is_key_allowed, is_key_allowed_for_topic,
-        is_key_universally_allowed, remove_key, remove_key_for_claim_topic, Ed25519SignatureData,
-        Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData,
-        Secp256r1Verifier,
+        allow_key, allow_key_for_claim_topic, is_claim_revoked, is_key_allowed,
+        is_key_allowed_for_topic, is_key_universally_allowed, remove_key,
+        remove_key_for_claim_topic, set_claim_revoked, Ed25519SignatureData, Ed25519Verifier,
+        Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier,
     },
     SignatureVerifier,
 };
@@ -164,14 +164,11 @@ fn universal_key_management() {
     let public_key = Bytes::from_array(&e, &[1u8; 32]);
 
     e.as_contract(&contract_id, || {
-        // Initially not allowed
         assert!(!is_key_universally_allowed(&e, &public_key));
 
-        // Allow key
         allow_key(&e, &public_key);
         assert!(is_key_universally_allowed(&e, &public_key));
 
-        // Remove key
         remove_key(&e, &public_key);
         assert!(!is_key_universally_allowed(&e, &public_key));
     });
@@ -185,17 +182,13 @@ fn topic_specific_key_management() {
     let topic = 42u32;
 
     e.as_contract(&contract_id, || {
-        // Initially not allowed
         assert!(!is_key_allowed_for_topic(&e, &public_key, topic));
 
-        // Allow key for topic
         allow_key_for_claim_topic(&e, &public_key, topic);
         assert!(is_key_allowed_for_topic(&e, &public_key, topic));
 
-        // Should not be allowed for different topic
         assert!(!is_key_allowed_for_topic(&e, &public_key, topic + 1));
 
-        // Remove key for topic
         remove_key_for_claim_topic(&e, &public_key, topic);
         assert!(!is_key_allowed_for_topic(&e, &public_key, topic));
     });
@@ -214,15 +207,12 @@ fn combined_key_authorization() {
 
         allow_key_for_claim_topic(&e, &topic_key, topic);
 
-        // Universal key should be allowed for any topic
         assert!(is_key_allowed(&e, &universal_key, topic));
         assert!(is_key_allowed(&e, &universal_key, topic + 1));
 
-        // Topic-specific key should only be allowed for its topic
         assert!(is_key_allowed(&e, &topic_key, topic));
         assert!(!is_key_allowed(&e, &topic_key, topic + 1));
 
-        // Unknown key should not be allowed
         let unknown_key = Bytes::from_array(&e, &[5u8; 32]);
         assert!(!is_key_allowed(&e, &unknown_key, topic));
     });
@@ -241,15 +231,12 @@ fn multiple_topics_same_key() {
         allow_key_for_claim_topic(&e, &public_key, topic1);
         allow_key_for_claim_topic(&e, &public_key, topic2);
 
-        // Should be allowed for both topics
         assert!(is_key_allowed_for_topic(&e, &public_key, topic1));
         assert!(is_key_allowed_for_topic(&e, &public_key, topic2));
         assert!(!is_key_allowed_for_topic(&e, &public_key, topic3));
 
-        // Remove one topic
         remove_key_for_claim_topic(&e, &public_key, topic1);
 
-        // Should still be allowed for topic2 but not topic1
         assert!(!is_key_allowed_for_topic(&e, &public_key, topic1));
         assert!(is_key_allowed_for_topic(&e, &public_key, topic2));
     });
@@ -263,17 +250,14 @@ fn universal_key_overrides_topic_specific() {
     let topic = 500u32;
 
     e.as_contract(&contract_id, || {
-        // First allow for specific topic
         allow_key_for_claim_topic(&e, &public_key, topic);
         assert!(is_key_allowed(&e, &public_key, topic));
         assert!(!is_key_allowed(&e, &public_key, topic + 1));
 
-        // Then allow universally
         allow_key(&e, &public_key);
         assert!(is_key_allowed(&e, &public_key, topic));
         assert!(is_key_allowed(&e, &public_key, topic + 1)); // Now allowed for any topic
 
-        // Remove universal authorization
         remove_key(&e, &public_key);
         assert!(is_key_allowed(&e, &public_key, topic)); // Still allowed via topic-specific
         assert!(!is_key_allowed(&e, &public_key, topic + 1)); // No longer universal
@@ -336,14 +320,44 @@ fn ed25519_verify_claim_message_building() {
     let mut data = identity.clone().to_xdr(&e);
     data.extend_from_array(&claim_topic.to_be_bytes());
     data.append(&claim_data);
-    let digest = e.crypto().keccak256(&data).to_array();
+    let digest = e.crypto().keccak256(&data);
 
-    let sig = signing_key.sign(&digest).to_bytes();
+    let sig = signing_key.sign(&digest.to_array()).to_bytes();
     let signature = BytesN::<64>::from_array(&e, &sig);
 
     let signature_data = Ed25519SignatureData { public_key, signature };
 
-    assert!(
-        Ed25519Verifier::verify_claim(&e, &identity, claim_topic, &claim_data, &signature_data,)
-    )
+    assert!(Ed25519Verifier::verify_claim_digest(&e, &digest, &signature_data,))
+}
+
+// ====================== REVOCATION TESTS =====================
+
+#[test]
+fn set_and_check_claim_revocation() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let test_digest = e.crypto().keccak256(&Bytes::from_array(&e, &[1, 2, 3, 4]));
+
+    e.as_contract(&contract_id, || {
+        assert!(!is_claim_revoked(&e, &test_digest));
+
+        set_claim_revoked(&e, &test_digest, true);
+
+        assert!(is_claim_revoked(&e, &test_digest));
+    });
+}
+
+#[test]
+fn unrevoke_claim() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let test_digest = e.crypto().keccak256(&Bytes::from_array(&e, &[5, 6, 7, 8]));
+
+    e.as_contract(&contract_id, || {
+        set_claim_revoked(&e, &test_digest, true);
+        assert!(is_claim_revoked(&e, &test_digest));
+
+        set_claim_revoked(&e, &test_digest, false);
+        assert!(!is_claim_revoked(&e, &test_digest));
+    });
 }

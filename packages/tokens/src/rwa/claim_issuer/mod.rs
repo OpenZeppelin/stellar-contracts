@@ -10,7 +10,7 @@
 //! ```rust
 //! use soroban_sdk::{contract, contractimpl, Address, Bytes, Env};
 //! use stellar_tokens::rwa::claim_issuer::{
-//!     storage::{allow_key_for_claim_topic, is_claim_revoked, is_key_allowed_for_topic},
+//!     storage::{allow_key_for_claim_topic, build_claim_message, is_claim_revoked, is_key_allowed_for_topic},
 //!     ClaimIssuer,
 //! };
 //!
@@ -38,6 +38,8 @@
 //!         if !is_key_allowed_for_topic(e, &signature_data.public_key.to_bytes(), claim_topic) {
 //!             return false;
 //!         }
+//!         let claim_message = build_claim_message(&identity, claim_topic, &claim_data);
+//!         let claim_digest = e.crypto().keccak256(&claim_message);
 //!
 //!         // Optionally check claim was not revoked.
 //!         if is_claim_revoked(e, &identity, claim_topic, &claim_data) {
@@ -45,11 +47,9 @@
 //!         }
 //!
 //!         // Verify the signature
-//!         Ed25519Verifier::verify_claim(
+//!         Ed25519Verifier::verify_claim_digest(
 //!             e,
-//!             &identity,
-//!             claim_topic,
-//!             &claim_data,
+//!             &claim_digest,
 //!             &signature_data,
 //!         )
 //!     }
@@ -59,6 +59,7 @@
 mod storage;
 mod test;
 
+use soroban_sdk::crypto::Hash;
 use soroban_sdk::{contractclient, contracterror, Address, Bytes, Env};
 pub use storage::*;
 
@@ -92,7 +93,7 @@ pub trait ClaimIssuer {
 /// Each signature scheme implements this trait to provide a consistent
 /// interface for claim validation while allowing for scheme-specific
 /// implementation details.
-pub trait SignatureVerifier {
+pub trait SignatureVerifier<const N: usize> {
     /// The signature data type for this signature scheme.
     type SignatureData;
 
@@ -116,15 +117,11 @@ pub trait SignatureVerifier {
     /// # Arguments
     ///
     /// * `e` - The Soroban environment.
-    /// * `identity` - The identity address the claim is about.
-    /// * `claim_topic` - The topic of the claim to validate.
-    /// * `claim_data` - The claim data to validate.
+    /// * `claim_digest` - The hash digest of the claim message.
     /// * `signature_data` - The parsed signature data.
-    fn verify_claim(
+    fn verify_claim_digest(
         e: &Env,
-        identity: &Address,
-        claim_topic: u32,
-        claim_data: &Bytes,
+        claim_digest: &Hash<N>,
         signature_data: &Self::SignatureData,
     ) -> bool;
 
