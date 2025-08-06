@@ -63,7 +63,7 @@
 mod storage;
 mod test;
 
-use soroban_sdk::{contractclient, contracterror, crypto::Hash, Address, Bytes, Env};
+use soroban_sdk::{contractclient, contracterror, crypto::Hash, Address, Bytes, Env, Symbol};
 pub use storage::*;
 
 /// Trait for validating claims issued by this identity to other identities.
@@ -147,6 +147,58 @@ pub trait SignatureVerifier<const N: usize> {
     fn expected_sig_data_len() -> u32;
 }
 
+// ################## EVENTS ##################
+
+/// Event types for key management operations.
+pub enum KeyEvent {
+    /// Key was allowed for universal or topic-specific authorization.
+    Allowed,
+    /// Key was removed from universal or topic-specific authorization.
+    Removed,
+}
+
+/// Emits an event for a key authorization operation.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `event_type` - The type of key event.
+/// * `public_key` - The public key involved in the operation.
+/// * `claim_topic` - Optional claim topic for topic-specific operations.
+///
+/// # Events
+///
+/// * topics - `["key_allowed" | "key_removed", public_key: Bytes]`
+/// * data - `[claim_topic?: u32]`
+pub fn emit_key_event(e: &Env, event_type: KeyEvent, public_key: &Bytes, claim_topic: Option<u32>) {
+    let name = match event_type {
+        KeyEvent::Allowed => Symbol::new(e, "key_allowed"),
+        KeyEvent::Removed => Symbol::new(e, "key_removed"),
+    };
+
+    match claim_topic {
+        Some(topic) => e.events().publish((name, public_key.clone()), topic),
+        None => e.events().publish((name, public_key.clone()), ()),
+    }
+}
+
+/// Emits an event for a claim revocation operation.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `claim_digest` - The hash digest of the claim.
+/// * `revoked` - Whether the claim should be marked as revoked.
+///
+/// # Events
+///
+/// * topics - `["claim_revoked", claim_digest: Hash<32>, revoked: bool]`
+/// * data - `[]`
+pub fn emit_revocation_event(e: &Env, claim_digest: &Hash<32>, revoked: bool) {
+    let event_topics = (Symbol::new(e, "claim_revoked"), claim_digest.clone(), revoked);
+    e.events().publish(event_topics, ());
+}
+
 // ################## ERRORS ##################
 
 // TODO: correct enumeration and move up to higher level
@@ -156,3 +208,12 @@ pub trait SignatureVerifier<const N: usize> {
 pub enum ClaimIssuerError {
     SigDataMismatch = 1,
 }
+
+// ################## CONSTANTS ##################
+
+const DAY_IN_LEDGERS: u32 = 17280;
+pub const CLAIMS_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const CLAIMS_TTL_THRESHOLD: u32 = CLAIMS_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
+pub const KEYS_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const KEYS_TTL_THRESHOLD: u32 = KEYS_EXTEND_AMOUNT - DAY_IN_LEDGERS;

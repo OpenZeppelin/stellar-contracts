@@ -4,7 +4,10 @@ use soroban_sdk::{
     contracttype, crypto::Hash, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env,
 };
 
-use crate::rwa::claim_issuer::{ClaimIssuerError, SignatureVerifier};
+use crate::rwa::claim_issuer::{
+    emit_key_event, emit_revocation_event, ClaimIssuerError, KeyEvent, SignatureVerifier,
+    CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT, KEYS_TTL_THRESHOLD,
+};
 
 /// Storage keys for claim issuer key management.
 #[contracttype]
@@ -207,9 +210,15 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
 ///
 /// * `e` - The Soroban environment.
 /// * `public_key` - The public key to authorize.
+///
+/// # Events
+///
+/// * topics - `["key_allowed", public_key: Bytes]`
+/// * data - `[]`
 pub fn allow_key(e: &Env, public_key: &Bytes) {
     let key = ClaimIssuerStorageKey::UniversalKey(public_key.clone());
     e.storage().persistent().set(&key, &true);
+    emit_key_event(e, KeyEvent::Allowed, public_key, None);
 }
 
 /// Removes a public key from universal claim signing authorization.
@@ -218,9 +227,15 @@ pub fn allow_key(e: &Env, public_key: &Bytes) {
 ///
 /// * `e` - The Soroban environment.
 /// * `public_key` - The public key to remove authorization for.
+///
+/// # Events
+///
+/// * topics - `["key_removed", public_key: Bytes]`
+/// * data - `[]`
 pub fn remove_key(e: &Env, public_key: &Bytes) {
     let key = ClaimIssuerStorageKey::UniversalKey(public_key.clone());
     e.storage().persistent().remove(&key);
+    emit_key_event(e, KeyEvent::Removed, public_key, None);
 }
 
 /// Allows a public key to sign claims for a specific topic.
@@ -230,9 +245,15 @@ pub fn remove_key(e: &Env, public_key: &Bytes) {
 /// * `e` - The Soroban environment.
 /// * `public_key` - The public key to authorize.
 /// * `claim_topic` - The specific claim topic to authorize for.
+///
+/// # Events
+///
+/// * topics - `["key_allowed", public_key: Bytes]`
+/// * data - `[claim_topic: u32]`
 pub fn allow_key_for_claim_topic(e: &Env, public_key: &Bytes, claim_topic: u32) {
     let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
     e.storage().persistent().set(&key, &true);
+    emit_key_event(e, KeyEvent::Allowed, public_key, Some(claim_topic));
 }
 
 /// Removes a public key's authorization for a specific claim topic.
@@ -242,12 +263,19 @@ pub fn allow_key_for_claim_topic(e: &Env, public_key: &Bytes, claim_topic: u32) 
 /// * `e` - The Soroban environment.
 /// * `public_key` - The public key to remove authorization for.
 /// * `claim_topic` - The specific claim topic to remove authorization for.
+///
+/// # Events
+///
+/// * topics - `["key_removed", public_key: Bytes]`
+/// * data - `[claim_topic: u32]`
 pub fn remove_key_for_claim_topic(e: &Env, public_key: &Bytes, claim_topic: u32) {
     let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
     e.storage().persistent().remove(&key);
+    emit_key_event(e, KeyEvent::Removed, public_key, Some(claim_topic));
 }
 
-/// Checks if a public key has universal authorization to sign claims for all topics and returns true if authorized.
+/// Checks if a public key has universal authorization to sign claims for all
+/// topics and returns true if authorized.
 ///
 /// # Arguments
 ///
@@ -255,10 +283,16 @@ pub fn remove_key_for_claim_topic(e: &Env, public_key: &Bytes, claim_topic: u32)
 /// * `public_key` - The public key to check.
 pub fn is_key_universally_allowed(e: &Env, public_key: &Bytes) -> bool {
     let universal_key = ClaimIssuerStorageKey::UniversalKey(public_key.clone());
-    e.storage().persistent().has(&universal_key)
+    if e.storage().persistent().has(&universal_key) {
+        e.storage().persistent().extend_ttl(&universal_key, KEYS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT);
+        true
+    } else {
+        false
+    }
 }
 
-/// Checks if a public key is authorized for a specific claim topic and returns true if authorized.
+/// Checks if a public key is authorized for a specific claim topic and returns
+/// true if authorized.
 ///
 /// # Arguments
 ///
@@ -267,10 +301,16 @@ pub fn is_key_universally_allowed(e: &Env, public_key: &Bytes) -> bool {
 /// * `claim_topic` - The claim topic to check authorization for.
 pub fn is_key_allowed_for_topic(e: &Env, public_key: &Bytes, claim_topic: u32) -> bool {
     let topic_key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
-    e.storage().persistent().has(&topic_key)
+    if e.storage().persistent().has(&topic_key) {
+        e.storage().persistent().extend_ttl(&topic_key, KEYS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT);
+        true
+    } else {
+        false
+    }
 }
 
-/// Checks if a public key is allowed to sign claims for a specific topic and returns true if authorized universally or for the specific topic.
+/// Checks if a public key is allowed to sign claims for a specific topic and
+/// returns true if authorized universally or for the specific topic.
 ///
 /// This function checks both universal authorization and topic-specific
 /// authorization.
@@ -299,9 +339,16 @@ pub fn is_key_allowed(e: &Env, public_key: &Bytes, claim_topic: u32) -> bool {
 /// * `e` - The Soroban environment.
 /// * `claim_digest` - The hash digest of the claim message.
 /// * `revoked` - Whether the claim should be marked as revoked.
+///
+/// # Events
+///
+/// * topics - `["claim_revoked", claim_digest: Hash<32>, revoked: true]`
+/// * data - `[]`
 pub fn set_claim_revoked(e: &Env, claim_digest: &Hash<32>, revoked: bool) {
     let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest.to_bytes());
     e.storage().persistent().set(&key, &revoked);
+
+    emit_revocation_event(e, claim_digest, revoked);
 }
 
 /// Checks if a claim has been revoked using its digest.
@@ -310,18 +357,21 @@ pub fn set_claim_revoked(e: &Env, claim_digest: &Hash<32>, revoked: bool) {
 ///
 /// * `e` - The Soroban environment.
 /// * `claim_digest` - The hash digest of the claim message to check.
-///
-/// # Returns
-///
-/// Returns `true` if the claim has been explicitly revoked, `false` otherwise.
 pub fn is_claim_revoked(e: &Env, claim_digest: &Hash<32>) -> bool {
     let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest.to_bytes());
-    e.storage().persistent().get(&key).unwrap_or_default()
+    e.storage()
+        .persistent()
+        .get(&key)
+        .inspect(|_| {
+            e.storage().persistent().extend_ttl(&key, CLAIMS_TTL_THRESHOLD, CLAIMS_EXTEND_AMOUNT)
+        })
+        .unwrap_or_default()
 }
 
 // ====================== HELPERS =====================
 
-/// Builds and returns the message to verify for claim signature validation as Bytes.
+/// Builds and returns the message to verify for claim signature validation as
+/// Bytes.
 ///
 /// The message format is: identity || claim_topic || claim_data
 ///

@@ -59,7 +59,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ],
       [
@@ -117,5 +117,30 @@
       ]
     ]
   },
-  "events": []
+  "events": [
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "claim_revoked"
+              },
+              {
+                "bytes": "a6885b3731702da62e8e4a8f584ac46a7f6822f4e2ba50fba902f67b1588d23b"
+              },
+              {
+                "bool": true
+              }
+            ],
+            "data": "void"
+          }
+        }
+      },
+      "failed_call": false
+    }
+  ]
 }

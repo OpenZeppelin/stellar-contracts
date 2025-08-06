@@ -59,7 +59,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ],
       [
@@ -117,5 +117,54 @@
       ]
     ]
   },
-  "events": []
+  "events": [
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "claim_revoked"
+              },
+              {
+                "bytes": "d54dc8a51f33fb642aa12b83ba8f01129bdede0bb42d0079fa862029fe81bd05"
+              },
+              {
+                "bool": true
+              }
+            ],
+            "data": "void"
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000001",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "claim_revoked"
+              },
+              {
+                "bytes": "d54dc8a51f33fb642aa12b83ba8f01129bdede0bb42d0079fa862029fe81bd05"
+              },
+              {
+                "bool": false
+              }
+            ],
+            "data": "void"
+          }
+        }
+      },
+      "failed_call": false
+    }
+  ]
 }
