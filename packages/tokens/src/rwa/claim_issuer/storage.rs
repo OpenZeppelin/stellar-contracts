@@ -78,7 +78,7 @@ pub trait SignatureVerifier {
         signature_data: &Self::SignatureData,
     ) -> bool;
 
-    /// Returns the expected signature data length in bytes for this scheme.
+    /// Returns the expected signature data length for this scheme.
     fn expected_sig_data_len() -> u32;
 }
 
