@@ -15,8 +15,8 @@ pub trait ClaimIssuer {
     /// * `e` - The Soroban environment.
     /// * `identity` - The identity address the claim is about.
     /// * `claim_topic` - The topic of the claim to validate.
-    /// * `signature_data` - The signature (pub_key || signature) to validate.
-    /// * `data` - The claim data to validate.
+    /// * `sig_data` - The signature data.
+    /// * `claim_data` - The claim data to validate.
     ///
     /// # Returns
     ///
@@ -25,7 +25,7 @@ pub trait ClaimIssuer {
         e: &Env,
         identity: Address,
         claim_topic: u32,
-        signature_data: Bytes,
+        sig_data: Bytes,
         claim_data: Bytes,
     ) -> bool;
 }
