@@ -6,8 +6,10 @@
 //! combination as needed:
 //!
 //! - **Multiple Signature Schemes**: Ed25519, Secp256k1, Secp256r1 support
-//! - **Flexible Key Authorization**: Universal (all topics) or topic-specific authorization
-//! - **Claim Revocation**: Digest-based revocation tracking with persistent storage
+//! - **Flexible Key Authorization**: Universal (all topics) or topic-specific
+//!   authorization
+//! - **Claim Revocation**: Digest-based revocation tracking with persistent
+//!   storage
 //! - **Key Management**: Add, remove, and query key authorization status
 //!
 //! ## Example Usage
@@ -15,10 +17,7 @@
 //! ```rust
 //! use soroban_sdk::{contract, contractimpl, Address, Bytes, Env};
 //! use stellar_tokens::rwa::claim_issuer::{
-//!     storage::{
-//!         allow_key_for_claim_topic, is_claim_revoked,
-//!         is_key_allowed_for_topic,
-//!     },
+//!     storage::{allow_key_for_claim_topic, is_claim_revoked, is_key_allowed_for_topic},
 //!     ClaimIssuer,
 //! };
 //!
@@ -64,7 +63,12 @@ mod storage;
 mod test;
 
 use soroban_sdk::{contractclient, contracterror, crypto::Hash, Address, Bytes, Env, Symbol};
-pub use storage::*;
+pub use storage::{
+    allow_key, allow_key_for_claim_topic, is_claim_revoked, is_key_allowed,
+    is_key_allowed_for_topic, is_key_universally_allowed, remove_key, remove_key_for_claim_topic,
+    set_claim_revoked, ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier,
+    Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier,
+};
 
 /// Trait for validating claims issued by this identity to other identities.
 #[contractclient(name = "ClaimIssuerClient")]

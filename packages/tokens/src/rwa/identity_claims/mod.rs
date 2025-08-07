@@ -2,15 +2,16 @@ mod storage;
 mod test;
 
 use soroban_sdk::{contracterror, Address, Bytes, BytesN, Env, String, Symbol, Vec};
+pub use storage::{
+    add_claim, generate_claim_id, get_claim, get_claim_ids_by_topic, remove_claim, Claim,
+};
 
-// TODO: export one by one
-pub use storage::*;
-
-/// Core trait for managing on-chain identity claims, based on ERC-XXXX OnChainIdentity.
+/// Core trait for managing on-chain identity claims, based on ERC-XXXX
+/// OnChainIdentity.
 ///
-/// This trait provides functionality for adding, retrieving, and managing claims
-/// associated with an identity. Claims are attestations made by issuers about
-/// specific topics related to the identity.
+/// This trait provides functionality for adding, retrieving, and managing
+/// claims associated with an identity. Claims are attestations made by issuers
+/// about specific topics related to the identity.
 pub trait IdentityClaims {
     /// Adds a new claim to the identity or updates an existing one.
     ///
@@ -23,10 +24,6 @@ pub trait IdentityClaims {
     /// * `signature` - The cryptographic signature of the claim.
     /// * `data` - The claim data.
     /// * `uri` - Optional URI for additional claim information.
-    ///
-    /// # Returns
-    ///
-    /// Returns the unique claim ID (BytesN<32>).
     ///
     /// # Events
     ///
@@ -54,10 +51,6 @@ pub trait IdentityClaims {
     /// * `e` - The Soroban environment.
     /// * `claim_id` - The unique claim identifier.
     ///
-    /// # Returns
-    ///
-    /// Returns a tuple containing (topic, scheme, issuer, signature, data, uri).
-    ///
     /// # Errors
     ///
     /// * [`ClaimsError::ClaimNotFound`] - If the claim ID does not exist.
@@ -69,10 +62,6 @@ pub trait IdentityClaims {
     ///
     /// * `e` - The Soroban environment.
     /// * `topic` - The claim topic to filter by.
-    ///
-    /// # Returns
-    ///
-    /// Returns a vector of claim IDs associated with the topic.
     fn get_claim_ids_by_topic(e: &Env, topic: u32) -> Vec<BytesN<32>>;
 }
 

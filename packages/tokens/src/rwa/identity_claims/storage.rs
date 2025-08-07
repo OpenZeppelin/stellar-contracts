@@ -27,11 +27,10 @@ use soroban_sdk::{
     contracttype, panic_with_error, vec, xdr::ToXdr, Address, Bytes, BytesN, Env, String, Vec,
 };
 
-use crate::rwa::claim_issuer::ClaimIssuerClient;
-
 use super::{
     emit_claim_event, ClaimEvent, ClaimsError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
 };
+use crate::rwa::claim_issuer::ClaimIssuerClient;
 
 /// Represents a claim stored on-chain.
 #[contracttype]
@@ -71,10 +70,6 @@ pub enum ClaimsStorageKey {
 /// * `signature` - The cryptographic signature of the claim.
 /// * `data` - The claim data.
 /// * `uri` - Optional URI for additional claim information.
-///
-/// # Returns
-///
-/// Returns the unique claim ID.
 ///
 /// # Events
 ///
@@ -142,10 +137,6 @@ pub fn add_claim(
 /// * `e` - The Soroban environment.
 /// * `claim_id` - The unique claim identifier.
 ///
-/// # Returns
-///
-/// Returns a tuple containing (topic, scheme, issuer, signature, data, uri).
-///
 /// # Errors
 ///
 /// * [`ClaimsError::ClaimNotFound`] - If the claim ID does not exist.
@@ -170,10 +161,6 @@ pub fn get_claim(e: &Env, claim_id: &BytesN<32>) -> Claim {
 ///
 /// * `e` - The Soroban environment.
 /// * `topic` - The claim topic to filter by.
-///
-/// # Returns
-///
-/// Returns a vector of claim IDs associated with the topic.
 pub fn get_claim_ids_by_topic(e: &Env, topic: u32) -> Vec<BytesN<32>> {
     let key = ClaimsStorageKey::ClaimsByTopic(topic);
 
@@ -257,11 +244,7 @@ fn remove_claim_from_topic_index(e: &Env, topic: u32, claim_id: &BytesN<32>) {
 /// * `e` - The Soroban environment.
 /// * `issuer` - The claim issuer address.
 /// * `topic` - The claim topic.
-///
-/// # Returns
-///
-/// Returns a 32-byte claim ID.
-fn generate_claim_id(e: &Env, issuer: &Address, topic: u32) -> BytesN<32> {
+pub fn generate_claim_id(e: &Env, issuer: &Address, topic: u32) -> BytesN<32> {
     // Create a bytes representation of issuer + topic for hashing
 
     let mut data = issuer.to_xdr(e);
