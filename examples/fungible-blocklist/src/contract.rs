@@ -5,68 +5,67 @@
 //! controlled token transfers by an admin who can block or unblock specific
 //! accounts.
 
-use soroban_sdk::{contract, contracterror, contractimpl, symbol_short, Address, Env, String};
-use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::{default_impl, only_role};
-use stellar_tokens::fungible::{
-    blocklist::{BlockList, FungibleBlockList},
-    Base, FungibleToken,
-};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
+use stellar_access::{AccessControl, AccessControler};
+use stellar_macros::only_role;
+use stellar_tokens::{BlockList, FTBase, FungibleBlockList, FungibleToken};
 
 #[contract]
 pub struct ExampleContract;
 
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum ExampleContractError {
-    Unauthorized = 1,
-}
-
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, admin: Address, manager: Address, initial_supply: i128) {
-        Base::set_metadata(
+    pub fn __constructor(e: &Env, admin: &Address, manager: &Address, initial_supply: i128) {
+        Self::set_metadata(
             e,
             18,
             String::from_str(e, "BlockList Token"),
             String::from_str(e, "BLT"),
         );
 
-        access_control::set_admin(e, &admin);
-
+        Self::init_admin(e, admin);
         // create a role "manager" and grant it to `manager`
-
-        access_control::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
-
+        Self::grant_role_no_auth(e, admin, manager, &symbol_short!("manager"));
         // Mint initial supply to the admin
-        Base::mint(e, &admin, initial_supply);
+        Self::internal_mint(e, admin, initial_supply);
     }
 }
 
-#[default_impl]
 #[contractimpl]
 impl FungibleToken for ExampleContract {
-    type ContractType = BlockList;
+    type Impl = FTBase;
+    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+        Self::assert_not_blocked(e, &[from, to]);
+        Self::Impl::transfer(e, from, to, amount);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        Self::assert_not_blocked(e, &[from, to]);
+        Self::Impl::transfer_from(e, spender, from, to, amount);
+    }
+
+    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+        Self::assert_not_blocked(e, &[owner]);
+        Self::Impl::approve(e, owner, spender, amount, live_until_ledger);
+    }
+}
+
+#[contractimpl]
+impl AccessControl for ExampleContract {
+    type Impl = AccessControler;
 }
 
 #[contractimpl]
 impl FungibleBlockList for ExampleContract {
-    fn blocked(e: &Env, account: Address) -> bool {
-        BlockList::blocked(e, &account)
+    type Impl = BlockList;
+
+    #[only_role(operator, "manager")]
+    fn block_user(e: &Env, user: &Address, operator: &Address) {
+        Self::Impl::block_user(e, user, operator)
     }
 
     #[only_role(operator, "manager")]
-    fn block_user(e: &Env, user: Address, operator: Address) {
-        BlockList::block_user(e, &user)
-    }
-
-    #[only_role(operator, "manager")]
-    fn unblock_user(e: &Env, user: Address, operator: Address) {
-        BlockList::unblock_user(e, &user)
+    fn unblock_user(e: &Env, user: &Address, operator: &Address) {
+        Self::Impl::unblock_user(e, user, operator)
     }
 }
-
-#[default_impl]
-#[contractimpl]
-impl AccessControl for ExampleContract {}

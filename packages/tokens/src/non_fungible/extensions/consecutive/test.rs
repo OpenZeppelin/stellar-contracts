@@ -11,7 +11,7 @@ use crate::non_fungible::{
         storage::{NFTConsecutiveStorageKey, IDS_IN_ITEM},
         Consecutive,
     },
-    sequential, Base,
+    sequential, NFTBase, NonFungibleToken,
 };
 
 #[contract]
@@ -198,7 +198,7 @@ fn consecutive_batch_mint_works() {
         event_assert.assert_consecutive_mint(&owner, 0, 31_999);
 
         assert_eq!(sequential::next_token_id(&e), amount);
-        assert_eq!(Base::balance(&e, &owner), amount);
+        assert_eq!(NFTBase::balance(&e, &owner), amount);
 
         let _owner = e
             .storage()
@@ -213,7 +213,7 @@ fn consecutive_batch_mint_works() {
         // new mint
         let last_id = Consecutive::batch_mint(&e, &owner, amount);
         assert_eq!(last_id, 2 * amount - 1);
-        assert_eq!(Base::balance(&e, &owner), 2 * amount);
+        assert_eq!(NFTBase::balance(&e, &owner), 2 * amount);
         assert_eq!(Consecutive::owner_of(&e, 2 * amount - 1), owner);
     });
 }
@@ -298,11 +298,11 @@ fn consecutive_transfer_works() {
 
     e.as_contract(&address, || {
         Consecutive::batch_mint(&e, &owner, amount);
-        assert_eq!(Base::balance(&e, &owner), amount);
+        assert_eq!(NFTBase::balance(&e, &owner), amount);
 
         Consecutive::transfer(&e, &owner, &recipient, 50);
         assert_eq!(Consecutive::owner_of(&e, 50), recipient);
-        assert_eq!(Base::balance(&e, &recipient), 1);
+        assert_eq!(NFTBase::balance(&e, &recipient), 1);
 
         assert_eq!(Consecutive::owner_of(&e, 51), owner);
         assert_eq!(Consecutive::owner_of(&e, 49), owner);
@@ -346,7 +346,7 @@ fn consecutive_transfer_edge_works() {
     e.as_contract(&address, || {
         Consecutive::transfer(&e, &owner, &recipient, 99);
         assert_eq!(Consecutive::owner_of(&e, 99), recipient);
-        assert_eq!(Base::balance(&e, &recipient), 2);
+        assert_eq!(NFTBase::balance(&e, &recipient), 2);
     });
 }
 
@@ -364,12 +364,12 @@ fn consecutive_transfer_from_works() {
 
     e.as_contract(&address, || {
         Consecutive::batch_mint(&e, &owner, amount);
-        assert_eq!(Base::balance(&e, &owner), amount);
+        assert_eq!(NFTBase::balance(&e, &owner), amount);
 
         Consecutive::approve(&e, &owner, &spender, token_id, 100);
         Consecutive::transfer_from(&e, &spender, &owner, &recipient, token_id);
         assert_eq!(Consecutive::owner_of(&e, token_id), recipient);
-        assert_eq!(Base::balance(&e, &recipient), 1);
+        assert_eq!(NFTBase::balance(&e, &recipient), 1);
 
         assert_eq!(Consecutive::owner_of(&e, token_id + 1), owner);
 
@@ -393,10 +393,10 @@ fn consecutive_burn_works() {
 
     e.as_contract(&address, || {
         Consecutive::batch_mint(&e, &owner, amount);
-        assert_eq!(Base::balance(&e, &owner), amount);
+        assert_eq!(NFTBase::balance(&e, &owner), amount);
 
         Consecutive::burn(&e, &owner, token_id);
-        assert_eq!(Base::balance(&e, &owner), amount - 1);
+        assert_eq!(NFTBase::balance(&e, &owner), amount - 1);
 
         let _owner =
             e.storage().persistent().get::<_, Address>(&NFTConsecutiveStorageKey::Owner(token_id));
@@ -416,7 +416,7 @@ fn consecutive_burn_works() {
 
     e.as_contract(&address, || {
         Consecutive::burn(&e, &owner, 0);
-        assert_eq!(Base::balance(&e, &owner), amount - 2);
+        assert_eq!(NFTBase::balance(&e, &owner), amount - 2);
 
         let _owner =
             e.storage().persistent().get::<_, Address>(&NFTConsecutiveStorageKey::Owner(token_id));
@@ -441,7 +441,7 @@ fn consecutive_burn_from_works() {
         Consecutive::approve(&e, &owner, &spender, token_id, 100);
         Consecutive::burn_from(&e, &spender, &owner, token_id);
 
-        assert_eq!(Base::balance(&e, &owner), amount - 1);
+        assert_eq!(NFTBase::balance(&e, &owner), amount - 1);
         let burned = e
             .storage()
             .persistent()
@@ -510,7 +510,7 @@ fn consecutive_token_uri_works() {
         let base_uri = String::from_str(&e, "https://smth.com/");
         let collection_name = String::from_str(&e, "My NFT collection");
         let collection_symbol = String::from_str(&e, "NFT");
-        Base::set_metadata(
+        NFTBase::set_metadata(
             &e,
             base_uri.clone(),
             collection_name.clone(),
@@ -521,8 +521,8 @@ fn consecutive_token_uri_works() {
         let uri = Consecutive::token_uri(&e, 9);
 
         assert_eq!(uri, String::from_str(&e, "https://smth.com/9"));
-        assert_eq!(collection_name, Base::name(&e));
-        assert_eq!(collection_symbol, Base::symbol(&e));
+        assert_eq!(collection_name, NFTBase::name(&e));
+        assert_eq!(collection_symbol, NFTBase::symbol(&e));
     });
 }
 

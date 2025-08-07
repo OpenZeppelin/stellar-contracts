@@ -1,11 +1,26 @@
 use soroban_sdk::{contracttype, panic_with_error, token::StellarAssetClient, Address, Env};
 
-use crate::fungible::FungibleTokenError;
+use super::SACAdminWrapper;
+use crate::FungibleTokenError;
 
 /// Storage key for accessing the SAC address
 #[contracttype]
 pub enum SACAdminWrapperDataKey {
     Sac,
+}
+
+pub struct DefaultSacAdminWrapper;
+
+impl SACAdminWrapper for DefaultSacAdminWrapper {
+    type Impl = Self;
+
+    fn get_sac_address(e: &Env) -> soroban_sdk::Address {
+        get_sac_address(e)
+    }
+
+    fn set_sac_address(e: &Env, sac_address: &Address) {
+        set_sac_address(e, sac_address);
+    }
 }
 
 // ################## QUERY STATE ##################

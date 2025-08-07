@@ -5,7 +5,9 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
-use crate::non_fungible::{extensions::enumerable::Enumerable, Base, NFTStorageKey};
+use crate::non_fungible::{
+    extensions::enumerable::Enumerable, NFTBase, NFTStorageKey, NonFungibleToken,
+};
 
 #[contract]
 struct MockContract;
@@ -120,7 +122,7 @@ fn test_burn_from() {
     e.as_contract(&address, || {
         let token_id = 42;
         Enumerable::non_sequential_mint(&e, &owner, token_id);
-        Base::approve(&e, &owner, &spender, token_id, 1000);
+        NFTBase::approve(&e, &owner, &spender, token_id, 1000);
         Enumerable::burn_from(&e, &spender, &owner, token_id);
         assert_eq!(Enumerable::total_supply(&e), 0);
     });
@@ -247,7 +249,7 @@ fn test_enumerable_transfer_from() {
 
     e.as_contract(&address, || {
         let token_id = Enumerable::sequential_mint(&e, &owner);
-        Base::approve(&e, &owner, &spender, token_id, 1000);
+        NFTBase::approve(&e, &owner, &spender, token_id, 1000);
         Enumerable::transfer_from(&e, &spender, &owner, &recipient, token_id);
 
         assert_eq!(Enumerable::get_owner_token_id(&e, &recipient, 0), token_id);

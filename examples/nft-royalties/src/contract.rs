@@ -4,89 +4,88 @@
 //! setting and querying royalty information for NFTs following the ERC2981
 //! standard.
 
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
-use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::{default_impl, only_admin, only_role};
-use stellar_tokens::non_fungible::{royalties::NonFungibleRoyalties, Base, NonFungibleToken};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol};
+use stellar_access::{AccessControl, AccessControler};
+use stellar_macros::{only_admin, only_role};
+use stellar_tokens::{NFTBase, NonFungibleRoyalties, NonFungibleToken};
+
+const MANAGER: &Symbol = &symbol_short!("manager");
 
 #[contract]
 pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, admin: Address, manager: Address) {
-        Base::set_metadata(
+    pub fn __constructor(e: &Env, admin: &Address, manager: &Address) {
+        Self::set_metadata(
             e,
             String::from_str(e, "https://example.com/nft/"),
             String::from_str(e, "Royalty NFT"),
             String::from_str(e, "RNFT"),
         );
 
-        // Set default royalty for the entire collection (10%)
-        Base::set_default_royalty(e, &admin, 1000);
-
-        access_control::set_admin(e, &admin);
+        Self::init_admin(e, admin);
 
         // create a role "manager" and grant it to `manager`
-        access_control::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
+        Self::grant_role_no_auth(e, admin, manager, MANAGER);
+        Self::grant_role_no_auth(e, admin, admin, MANAGER);
+
+        // Set default royalty for the entire collection (10%)
+        Self::set_default_royalty(e, admin, 1000, admin);
     }
 
     #[only_admin]
     pub fn mint(e: &Env, to: Address) -> u32 {
         // Mint token with sequential ID
-        Base::sequential_mint(e, &to)
+        Self::sequential_mint(e, &to)
     }
 
-    #[only_admin]
-    pub fn mint_with_royalty(e: &Env, to: Address, receiver: Address, basis_points: u32) -> u32 {
+    // Don't need a check here since it is done in set_token_royalty
+    pub fn mint_with_royalty(e: &Env, to: &Address, receiver: &Address, basis_points: u32) -> u32 {
         // Mint token with sequential ID
-        let token_id = Base::sequential_mint(e, &to);
-
+        let token_id = Self::sequential_mint(e, &to);
         // Set token-specific royalty
-        Base::set_token_royalty(e, token_id, &receiver, basis_points);
-
+        Self::set_token_royalty(e, token_id, receiver, basis_points, to);
         token_id
-    }
-
-    pub fn get_royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
-        Base::royalty_info(e, token_id, sale_price)
     }
 }
 
-#[default_impl]
+#[contractimpl]
+impl AccessControl for ExampleContract {
+    type Impl = AccessControler;
+}
+
 #[contractimpl]
 impl NonFungibleToken for ExampleContract {
-    type ContractType = Base;
+    type Impl = NFTBase;
 }
 
 #[contractimpl]
 impl NonFungibleRoyalties for ExampleContract {
+    type Impl = NFTBase;
+
     #[only_role(operator, "manager")]
-    fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32, operator: Address) {
-        Base::set_default_royalty(e, &receiver, basis_points);
+    fn set_default_royalty(e: &Env, receiver: &Address, basis_points: u32, operator: &Address) {
+        Self::Impl::set_default_royalty(e, receiver, basis_points, operator);
     }
 
     #[only_role(operator, "manager")]
     fn set_token_royalty(
         e: &Env,
         token_id: u32,
-        receiver: Address,
+        receiver: &Address,
         basis_points: u32,
-        operator: Address,
+        operator: &Address,
     ) {
-        Base::set_token_royalty(e, token_id, &receiver, basis_points);
+        Self::Impl::set_token_royalty(e, token_id, receiver, basis_points, operator);
     }
 
     #[only_role(operator, "manager")]
-    fn remove_token_royalty(e: &Env, token_id: u32, operator: Address) {
-        Base::remove_token_royalty(e, token_id);
+    fn remove_token_royalty(e: &Env, token_id: u32, operator: &Address) {
+        Self::Impl::remove_token_royalty(e, token_id, operator);
     }
 
     fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
-        Base::royalty_info(e, token_id, sale_price)
+        Self::Impl::royalty_info(e, token_id, sale_price)
     }
 }
-
-#[default_impl]
-#[contractimpl]
-impl AccessControl for ExampleContract {}

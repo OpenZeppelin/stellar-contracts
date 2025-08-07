@@ -1,12 +1,10 @@
-pub mod storage;
+mod storage;
 
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{assert_with_error, symbol_short, Address, Env};
 pub use storage::AllowList;
-
-use crate::fungible::FungibleToken;
 
 /// AllowList Trait for Fungible Token
 ///
@@ -29,14 +27,15 @@ use crate::fungible::FungibleToken;
 /// However, this parameter is omitted from the module functions, defined in
 /// "storage.rs", because the authorizations are to be handled in the access
 /// control helpers or directly implemented.
-pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
+#[soroban_sdk::contracttrait(add_impl_type = true)]
+pub trait FungibleAllowList {
     /// Returns the allowed status of an account.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to check the allowed status for.
-    fn allowed(e: &Env, account: Address) -> bool;
+    fn allowed(e: &Env, account: &soroban_sdk::Address) -> bool;
 
     /// Allows a user to receive and transfer tokens.
     ///
@@ -50,7 +49,7 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * topics - `["allow", user: Address]`
     /// * data - `[]`
-    fn allow_user(e: &Env, user: Address, operator: Address);
+    fn allow_user(e: &Env, user: &soroban_sdk::Address, operator: &soroban_sdk::Address);
 
     /// Disallows a user from receiving and transferring tokens.
     ///
@@ -64,7 +63,19 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * topics - `["disallow", user: Address]`
     /// * data - `[]`
-    fn disallow_user(e: &Env, user: Address, operator: Address);
+    fn disallow_user(e: &Env, user: &soroban_sdk::Address, operator: &soroban_sdk::Address);
+
+    #[internal]
+    fn assert_allowed(e: &Env, users: &[&Address]) {
+        assert_with_error!(
+            e,
+            users.iter().all(|user| Self::allowed(e, user)),
+            crate::FungibleTokenError::UserNotAllowed
+        )
+    }
+
+    #[internal]
+    fn allow_user_no_auth(e: &Env, user: &soroban_sdk::Address);
 }
 
 // ################## EVENTS ##################

@@ -1,17 +1,17 @@
 mod access_control;
 mod default_impl_macro;
 mod helpers;
-mod pausable;
 mod upgradeable;
 
 use access_control::{generate_any_role_check, generate_role_check};
 use default_impl_macro::generate_default_impl;
 use helpers::*;
-use pausable::generate_pause_check;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, ItemFn};
+use syn::{parse_macro_input, DeriveInput, Item};
 use upgradeable::*;
+
+use crate::access_control::{HasAnyRoleArgs, HasRoleArgs};
 
 /* DEFAULT_IMPL_MACRO */
 
@@ -75,7 +75,6 @@ use upgradeable::*;
 #[proc_macro_attribute]
 pub fn default_impl(attrs: TokenStream, item: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
     generate_default_impl(item)
 }
 
@@ -104,14 +103,10 @@ pub fn default_impl(attrs: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
-    let input_fn = parse_macro_input!(input as ItemFn);
-
+    let input_fn = parse_macro_input!(input as Item);
     // Generate the function with the admin authorization check
-    let auth_check_path = quote! { stellar_access::access_control::enforce_admin_auth };
-    let expanded = generate_auth_check(&input_fn, auth_check_path);
-
-    TokenStream::from(expanded)
+    let auth_check_path = quote! { Self::enforce_admin_auth };
+    insert_check(input_fn, auth_check_path).into()
 }
 
 /// A procedural macro that ensures the parameter has the specified role.
@@ -151,7 +146,12 @@ pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_role_check(args, input, false)
+    generate_role_check(
+        parse_macro_input!(args as HasRoleArgs),
+        parse_macro_input!(input as Item),
+        false,
+    )
+    .into()
 }
 
 /// A procedural macro that ensures the parameter has the specified role and
@@ -187,7 +187,12 @@ pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
 /// ```
 #[proc_macro_attribute]
 pub fn only_role(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_role_check(args, input, true)
+    generate_role_check(
+        parse_macro_input!(args as HasRoleArgs),
+        parse_macro_input!(input as Item),
+        true,
+    )
+    .into()
 }
 
 /// A procedural macro that ensures the parameter has any of the specified
@@ -218,7 +223,12 @@ pub fn only_role(args: TokenStream, input: TokenStream) -> TokenStream {
 /// roles.
 #[proc_macro_attribute]
 pub fn has_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_any_role_check(args, input, false)
+    generate_any_role_check(
+        parse_macro_input!(args as HasAnyRoleArgs),
+        parse_macro_input!(input as Item),
+        false,
+    )
+    .into()
 }
 
 /// A procedural macro that ensures the parameter has any of the specified roles
@@ -243,7 +253,12 @@ pub fn has_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
 /// roles and requires authorization from the account.
 #[proc_macro_attribute]
 pub fn only_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
-    generate_any_role_check(args, input, true)
+    generate_any_role_check(
+        parse_macro_input!(args as HasAnyRoleArgs),
+        parse_macro_input!(input as Item),
+        true,
+    )
+    .into()
 }
 
 /// A procedural macro that retrieves the owner from storage and requires
@@ -271,14 +286,7 @@ pub fn only_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn only_owner(attrs: TokenStream, input: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
-    let input_fn = parse_macro_input!(input as ItemFn);
-
-    // Generate the function with the owner authorization check
-    let auth_check_path = quote! { stellar_access::ownable::enforce_owner_auth };
-    let expanded = generate_auth_check(&input_fn, auth_check_path);
-
-    TokenStream::from(expanded)
+    insert_check(parse_macro_input!(input as Item), quote! { Self::enforce_owner_auth}).into()
 }
 
 /// Adds a pause check at the beginning of the function that ensures the
@@ -304,8 +312,7 @@ pub fn only_owner(attrs: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn when_not_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
-    generate_pause_check(item, "when_not_paused")
+    insert_check(parse_macro_input!(item as Item), quote! { Self::when_not_paused}).into()
 }
 
 /* PAUSABLE MACROS */
@@ -333,8 +340,7 @@ pub fn when_not_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn when_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-
-    generate_pause_check(item, "when_paused")
+    insert_check(parse_macro_input!(item as Item), quote! { Self::when_paused}).into()
 }
 
 /* UPGRADEABLE MACROS */
@@ -396,13 +402,5 @@ pub fn when_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Upgradeable)]
 pub fn upgradeable_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
-
     derive_upgradeable(&input).into()
-}
-
-#[proc_macro_derive(UpgradeableMigratable)]
-pub fn upgradeable_migratable_derive(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-
-    derive_upgradeable_migratable(&input).into()
 }

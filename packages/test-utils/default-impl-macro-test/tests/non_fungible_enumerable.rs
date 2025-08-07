@@ -1,17 +1,27 @@
-use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
-use stellar_macros::default_impl;
-use stellar_tokens::non_fungible::{
-    enumerable::{Enumerable, NonFungibleEnumerable},
-    Base, NonFungibleToken,
+use soroban_sdk::{
+    contract, contractimpl, testutils::Address as _, Address, Env, String,
+};
+use stellar_tokens::{
+    non_fungible::enumerable::Enumerable, NonFungibleEnumerable, NonFungibleToken,
 };
 
 #[contract]
 pub struct ExampleContract;
 
 #[contractimpl]
+impl NonFungibleToken for ExampleContract {
+    type Impl = Enumerable;
+}
+
+#[contractimpl]
+impl NonFungibleEnumerable for ExampleContract {
+    type Impl = Enumerable;
+}
+
+#[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env) {
-        Base::set_metadata(
+        Self::set_metadata(
             e,
             String::from_str(e, "www.mytoken.com"),
             String::from_str(e, "My Token"),
@@ -23,16 +33,6 @@ impl ExampleContract {
         Enumerable::non_sequential_mint(e, &to, token_id);
     }
 }
-
-#[default_impl]
-#[contractimpl]
-impl NonFungibleToken for ExampleContract {
-    type ContractType = Enumerable;
-}
-
-#[default_impl]
-#[contractimpl]
-impl NonFungibleEnumerable for ExampleContract {}
 
 fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {
     let address = e.register(ExampleContract, ());

@@ -1,9 +1,8 @@
 mod storage;
-use crate::non_fungible::NonFungibleToken;
 
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{contracttrait, symbol_short, Address, Env};
 
 /// Burnable Trait for Non-Fungible Token
 ///
@@ -17,50 +16,52 @@ use soroban_sdk::{symbol_short, Address, Env};
 /// contract use cases.
 ///
 /// `storage.rs` file of this module provides the `NonFungibelBurnable` trait
-/// implementation for the `Base` contract type. For other contract types (eg.
-/// `Enumerable`, `Consecutive`), the overrides of the `NonFungibleBurnable`
-/// trait methods can be found in their respective `storage.rs` file.
+/// implementation for the `NFTBase` contract type. For other contract types
+/// (eg. `Enumerable`, `Consecutive`), the overrides of the
+/// `NonFungibleBurnable` trait methods can be found in their respective
+/// `storage.rs` file.
 ///
 /// This approach lets us to implement the `NonFungibleBurnable` trait in a very
-/// flexible way based on the `ContractType` associated type from
+/// flexible way based on the `Impl` associated type from
 /// `NonFungibleToken`:
 ///
 /// ```ignore
-/// impl NonFungibleBurnable for ExampleContract {
-///     fn burn(e: &Env, from: Address, token_id: u32) {
-///         Self::ContractType::burn(e, &from, token_id);
-///     }
+/// #[contracttrait]
+/// impl NonFungibleBurnable for ExampleContract {}
+/// // Uses `NFTBase` as the default
 ///
-///     fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32) {
-///         Self::ContractType::burn_from(e, &spender, &from, token_id);
-///     }
+/// #[contracttrait]
+/// impl NonFungibleBurnable for ExampleContract {
+///     type Impl = Enumerable;
 /// }
+///
 /// ```
 ///
 /// # Notes
 ///
-/// `#[contractimpl]` macro requires even the default implementations to be
-/// present under its scope. To not confuse the developers, we did not provide
-/// the default implementations here, but we are providing a macro to generate
-/// the default implementations for you.
+/// `#[contracttrait]` macro provides a default implementation and generates a
+/// `#[contractimpl]` with all the trait's methods forwarding them to
+/// `MyContract`.
 ///
 /// When implementing [`NonFungibleBurnable`] trait for your Smart Contract,
 /// you can follow the below example:
 ///
+/// ## Example
+///
 /// ```ignore
-/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
-/// #[contractimpl]
+/// #[contracttrait]
 /// impl NonFungibleBurnable for MyContract {
 ///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
-///     /* and the macro will generate all the missing default implementations for you */
+///     // Can also provide a different default implementation
+///     type Impl = Enumerable; // Or Consectutive
 /// }
 /// ```
-pub trait NonFungibleBurnable: NonFungibleToken {
+#[contracttrait(add_impl_type = true)]
+pub trait NonFungibleBurnable {
     /// Destroys the token with `token_id` from `from`.
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `from` - The account whose token is destroyed.
     /// * `token_id` - The identifier of the token to burn.
     ///
@@ -75,14 +76,13 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: u32]`
-    fn burn(e: &Env, from: Address, token_id: u32);
+    fn burn(e: &Env, from: &soroban_sdk::Address, token_id: u32);
 
     /// Destroys the token with `token_id` from `from`, by using `spender`s
     /// approval.
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `spender` - The account that is allowed to burn the token on behalf of
     ///   the owner.
     /// * `from` - The account whose token is destroyed.
@@ -101,7 +101,12 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: u32]`
-    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32);
+    fn burn_from(
+        e: &Env,
+        spender: &soroban_sdk::Address,
+        from: &soroban_sdk::Address,
+        token_id: u32,
+    );
 }
 
 // ################## EVENTS ##################
