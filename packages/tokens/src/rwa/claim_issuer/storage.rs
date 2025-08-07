@@ -46,7 +46,7 @@ pub struct Secp256k1SignatureData {
     pub recovery_id: u32,
 }
 
-// ====================== SIGNITURE VERIFICATION =====================
+// ====================== SIGNATURE VERIFICATION =====================
 
 /// Ed25519 signature verifier.
 ///
