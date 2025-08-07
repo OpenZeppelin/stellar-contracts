@@ -163,15 +163,14 @@ pub trait CountryProfileManager: IdentityRegistryStorage {
     fn get_country_profile(e: &Env, account: Address, index: u32) -> Self::CountryProfile;
 }
 
-// TODO: correct enumeration and move up to higher level
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum IRSError {
-    IdentityAlreadyExists = 1,
-    IdentityNotFound = 2,
-    CountryProfileNotFound = 3,
-    EmptyCountryProfiles = 4,
+    IdentityAlreadyExists = 320,
+    IdentityNotFound = 321,
+    CountryProfileNotFound = 322,
+    EmptyCountryProfiles = 323,
 }
 
 // ################## CONSTANTS ##################

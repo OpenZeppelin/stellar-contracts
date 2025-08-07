@@ -31,7 +31,7 @@ fn add_identity_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")] // IdentityAlreadyExists
+#[should_panic(expected = "Error(Contract, #320)")] // IdentityAlreadyExists
 fn add_identity_already_exists() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -71,7 +71,7 @@ fn modify_identity_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")] // IdentityNotFound
+#[should_panic(expected = "Error(Contract, #321)")] // IdentityNotFound
 fn modify_identity_not_found() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -104,7 +104,7 @@ fn get_identity_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")] // IdentityNotFound
+#[should_panic(expected = "Error(Contract, #321)")] // IdentityNotFound
 fn get_identity_not_found() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -144,7 +144,7 @@ fn remove_identity_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")] // IdentityNotFound
+#[should_panic(expected = "Error(Contract, #321)")] // IdentityNotFound
 fn remove_identity_not_found() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -197,7 +197,7 @@ fn modify_country_profile_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3)")] // CountryProfileNotFound
+#[should_panic(expected = "Error(Contract, #322)")] // CountryProfileNotFound
 fn modify_country_profile_not_found() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -232,7 +232,7 @@ fn delete_country_profile_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3)")] // CountryProfileNotFound
+#[should_panic(expected = "Error(Contract, #322)")] // CountryProfileNotFound
 fn delete_country_profile_not_found() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -265,7 +265,7 @@ fn get_country_profiles_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #4)")] // EmptyCountryProfiles
+#[should_panic(expected = "Error(Contract, #323)")] // EmptyCountryProfiles
 fn add_identity_with_empty_profiles_panics() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -319,7 +319,7 @@ fn delete_last_country_profile() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3)")]
+#[should_panic(expected = "Error(Contract, #322)")]
 fn delete_country_profile_0_panics() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -330,7 +330,7 @@ fn delete_country_profile_0_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3)")]
+#[should_panic(expected = "Error(Contract, #322)")]
 fn delete_country_profile_1_panics() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -341,7 +341,7 @@ fn delete_country_profile_1_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #4)")] // EmptyCountryProfiles
+#[should_panic(expected = "Error(Contract, #323)")] // EmptyCountryProfiles
 fn delete_last_country_profile_panics() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
