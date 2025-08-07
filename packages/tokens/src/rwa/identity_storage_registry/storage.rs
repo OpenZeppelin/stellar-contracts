@@ -27,15 +27,47 @@
 ///    an enumerable list.
 /// 2. **Efficient but Simple Indexing**: Profiles are stored by a simple index
 ///    (0, 1, 2, ...). When a profile is deleted, the last profile in the list
-///    is moved into its place to keep the list compact and gas-efficient. This
-///    means the index of a profile can change.
+///    is moved into its place to keep the list compact and resource-efficient.
+///    This means **the index of a profile can change**.
+///    * Note:  __This implementation follows the enumerability pattern of
+///      [`crate::non_fungible::extensions::enumerable`].__
 /// 3. **No Uniqueness Guarantee**: The storage layer itself does not check for
 ///    duplicate profiles. It is the responsibility of the contract implementing
 ///    the logic to ensure that, for example, an account does not have two
 ///    "Country of Residence" profiles.
+///
+/// # Example implementation of `CountryProfileManager` with uniqueness check
+///
+/// ```rust
+/// #[contractimpl]
+/// impl CountryProfileManager for MyContract {
+///     fn add_country_profiles(
+///         e: &Env,
+///         account: Address,
+///         country_profiles: Vec<Self::CountryProfile>,
+///         operator: Address,
+///     ) {
+///         let existing_profiles = get_country_profiles(e, &account);
+///
+///         // Check each new profile for duplicates
+///         for new_profile in country_profiles.iter() {
+///             for existing in existing_profiles.iter() {
+///                 // Maybe also check `valid_until`
+///                 if existing.country == new_profile.country {
+///                     panic_with_error!(e, Error::DuplicateCountryCategory);
+///                 }
+///             }
+///         }
+///
+///         // If no duplicates found, add all profiles
+///         add_country_profiles(e, &account, &country_profiles);
+///     }
+///     // other methods
+/// }
+/// ```
 use soroban_sdk::{contracttype, panic_with_error, vec, Address, Env, Symbol, Vec};
 
-use super::{
+use crate::rwa::identity_storage_registry::{
     emit_country_profile_event, emit_identity_modified, emit_identity_stored,
     emit_identity_unstored, CountryProfileEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
     IDENTITY_TTL_THRESHOLD,
@@ -333,9 +365,8 @@ pub fn get_country_profiles(e: &Env, account: &Address) -> Vec<CountryProfile> {
                     IDENTITY_EXTEND_AMOUNT,
                 )
             })
-            // Unwrap should be always safe, if counting is done correctly,
-            // adding "else" for consistency
-            .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound));
+            // Unwrap should be always safe, if counting is done correctly.
+            .expect("`CountryProfile` must be present");
         profiles.push_back(profile);
     }
 
