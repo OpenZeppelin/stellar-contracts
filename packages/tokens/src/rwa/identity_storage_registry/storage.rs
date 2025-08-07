@@ -27,15 +27,49 @@
 ///    an enumerable list.
 /// 2. **Efficient but Simple Indexing**: Profiles are stored by a simple index
 ///    (0, 1, 2, ...). When a profile is deleted, the last profile in the list
-///    is moved into its place to keep the list compact and gas-efficient. This
-///    means the index of a profile can change.
+///    is moved into its place to keep the list compact and resource-efficient.
+///    This means **the index of a profile can change**.
+///    * Note:  __This implementation follows the enumerability pattern of
+///      [`crate::non_fungible::extensions::enumerable`].__
 /// 3. **No Uniqueness Guarantee**: The storage layer itself does not check for
 ///    duplicate profiles. It is the responsibility of the contract implementing
 ///    the logic to ensure that, for example, an account does not have two
 ///    "Country of Residence" profiles.
-use soroban_sdk::{contracttype, panic_with_error, vec, Address, Env, Symbol, Vec};
+///
+/// # Example implementation of `CountryProfileManager` with uniqueness check
+///
+/// ```rust
+/// #[contractimpl]
+/// impl CountryProfileManager for MyContract {
+///     fn add_country_profiles(
+///         e: &Env,
+///         account: Address,
+///         country_profiles: Vec<Self::CountryProfile>,
+///         operator: Address,
+///     ) {
+///         let existing_profiles = get_country_profiles(e, &account);
+///
+///         // Check each new profile for duplicates
+///         for new_profile in country_profiles.iter() {
+///             for existing in existing_profiles.iter() {
+///                 // Maybe also check `valid_until`
+///                 if existing.country == new_profile.country {
+///                     panic_with_error!(e, Error::DuplicateCountryCategory);
+///                 }
+///             }
+///         }
+///
+///         // If no duplicates found, add all profiles
+///         add_country_profiles(e, &account, &country_profiles);
+///     }
+///     // other methods
+/// }
+/// ```
+use soroban_sdk::{
+    contracttype, panic_with_error, vec, Address, Env, Symbol, TryFromVal, Val, Vec,
+};
 
-use super::{
+use crate::rwa::identity_storage_registry::{
     emit_country_profile_event, emit_identity_modified, emit_identity_stored,
     emit_identity_unstored, CountryProfileEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
     IDENTITY_TTL_THRESHOLD,
@@ -213,10 +247,7 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
 pub fn remove_identity(e: &Env, account: &Address) {
     let key = IRSStorageKey::Identity(account.clone());
 
-    let identity: Address = e
-        .storage()
-        .persistent()
-        .get(&key)
+    let identity: Address = get_persistent_entry(e, &key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
     e.storage().persistent().remove(&key);
 
@@ -248,16 +279,7 @@ pub fn remove_identity(e: &Env, account: &Address) {
 ///   `account`.
 pub fn get_identity(e: &Env, account: &Address) -> Address {
     let key = IRSStorageKey::Identity(account.clone());
-    e.storage()
-        .persistent()
-        .get(&key)
-        .inspect(|_| {
-            e.storage().persistent().extend_ttl(
-                &key,
-                IDENTITY_TTL_THRESHOLD,
-                IDENTITY_EXTEND_AMOUNT,
-            )
-        })
+    get_persistent_entry(e, &key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound))
 }
 
@@ -276,16 +298,7 @@ pub fn get_identity(e: &Env, account: &Address) -> Address {
 /// * [`IRSError::CountryProfileNotFound`] - If the index is out of bounds.
 pub fn get_country_profile(e: &Env, account: &Address, index: u32) -> CountryProfile {
     let key = IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
-    e.storage()
-        .persistent()
-        .get(&key)
-        .inspect(|_| {
-            e.storage().persistent().extend_ttl(
-                &key,
-                IDENTITY_TTL_THRESHOLD,
-                IDENTITY_EXTEND_AMOUNT,
-            )
-        })
+    get_persistent_entry(e, &key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound))
 }
 
@@ -296,18 +309,7 @@ pub fn get_country_profile(e: &Env, account: &Address, index: u32) -> CountryPro
 /// * `e` - The Soroban environment.
 /// * `account` - The account address to query.
 pub fn get_country_profile_count(e: &Env, account: &Address) -> u32 {
-    let key = IRSStorageKey::CPCount(account.clone());
-    e.storage()
-        .persistent()
-        .get(&key)
-        .inspect(|_| {
-            e.storage().persistent().extend_ttl(
-                &key,
-                IDENTITY_TTL_THRESHOLD,
-                IDENTITY_EXTEND_AMOUNT,
-            )
-        })
-        .unwrap_or_default()
+    get_persistent_entry(e, &IRSStorageKey::CPCount(account.clone())).unwrap_or_default()
 }
 
 /// Retrieves all country profiles for a given account.
@@ -322,20 +324,9 @@ pub fn get_country_profiles(e: &Env, account: &Address) -> Vec<CountryProfile> {
 
     for index in 0..count {
         let key = IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
-        let profile: CountryProfile = e
-            .storage()
-            .persistent()
-            .get(&key)
-            .inspect(|_| {
-                e.storage().persistent().extend_ttl(
-                    &key,
-                    IDENTITY_TTL_THRESHOLD,
-                    IDENTITY_EXTEND_AMOUNT,
-                )
-            })
-            // Unwrap should be always safe, if counting is done correctly,
-            // adding "else" for consistency
-            .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound));
+        let profile: CountryProfile = get_persistent_entry(e, &key)
+            // Unwrap should be always safe, if counting is done correctly.
+            .expect("`CountryProfile` must be present");
         profiles.push_back(profile);
     }
 
@@ -449,16 +440,11 @@ pub fn modify_country_profile(e: &Env, account: &Address, index: u32, profile: &
 /// Using this function in public-facing methods may create significant security
 /// risks as it could allow unauthorized modifications.
 pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
-    let current_key =
-        IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
-    let profile_to_remove = e
-        .storage()
-        .persistent()
-        .get(&current_key)
-        .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound));
+    let profile_to_remove = get_country_profile(e, account, index);
 
     let count = get_country_profile_count(e, account);
-    // Can't overflow because `profile_to_remove` would panic if count == 0
+
+    // Can't overflow because `get_country_profile` would panic if count == 0
     let last_index = count - 1;
     // Revert if no CountryProfile is left
     if last_index == 0 {
@@ -476,15 +462,10 @@ pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
             .storage()
             .persistent()
             .get(&last_key)
-            .inspect(|_| {
-                e.storage().persistent().extend_ttl(
-                    &last_key,
-                    IDENTITY_TTL_THRESHOLD,
-                    IDENTITY_EXTEND_AMOUNT,
-                )
-            })
             .unwrap_or_else(|| panic_with_error!(&e, IRSError::CountryProfileNotFound));
 
+        let current_key =
+            IRSStorageKey::CPEnumerable(CPEnumerableKey { account: account.clone(), index });
         e.storage().persistent().set(&current_key, &last_profile);
     }
 
@@ -499,4 +480,17 @@ pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
     e.storage().persistent().set(&IRSStorageKey::CPCount(account.clone()), &(count - 1));
 
     emit_country_profile_event(e, CountryProfileEvent::Removed, account, &profile_to_remove);
+}
+
+/// Low-level function that tries to retrieve a persistent storage value and
+/// extend its TTL if the entry exists.
+///
+/// # Arguments
+///
+/// * `e` - The environment reference.
+/// * `key` - The key required to retrieve the underlying storage.
+fn get_persistent_entry<T: TryFromVal<Env, Val>>(e: &Env, key: &IRSStorageKey) -> Option<T> {
+    e.storage().persistent().get::<_, T>(key).inspect(|_| {
+        e.storage().persistent().extend_ttl(key, IDENTITY_TTL_THRESHOLD, IDENTITY_EXTEND_AMOUNT);
+    })
 }

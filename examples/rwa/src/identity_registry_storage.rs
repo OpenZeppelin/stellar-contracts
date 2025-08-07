@@ -1,5 +1,4 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, Vec};
-
 use stellar_tokens::rwa::{
     identity_storage_registry::{
         self as irs, CountryProfile, CountryProfileManager, IdentityRegistryStorage,

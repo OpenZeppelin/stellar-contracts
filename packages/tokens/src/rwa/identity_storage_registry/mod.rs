@@ -2,8 +2,11 @@ mod storage;
 mod test;
 
 use soroban_sdk::{contracterror, Address, Env, FromVal, Symbol, Val, Vec};
-// TODO: export one by one
-pub use storage::*;
+pub use storage::{
+    add_country_profiles, add_identity, delete_country_profile, get_country_profile,
+    get_country_profile_count, get_country_profiles, get_identity, modify_country_profile,
+    modify_identity, remove_identity, CountryProfile,
+};
 
 use crate::rwa::utils::token_binder::TokenBinder;
 
@@ -163,15 +166,21 @@ pub trait CountryProfileManager: IdentityRegistryStorage {
     fn get_country_profile(e: &Env, account: Address, index: u32) -> Self::CountryProfile;
 }
 
-// TODO: correct enumeration and move up to higher level
+// ################## ERRORS ##################
+
+/// Error codes for the Identity Registry Storage system.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum IRSError {
-    IdentityAlreadyExists = 1,
-    IdentityNotFound = 2,
-    CountryProfileNotFound = 3,
-    EmptyCountryProfiles = 4,
+    /// An identity already exists for the given account.
+    IdentityAlreadyExists = 320,
+    /// No identity found for the given account.
+    IdentityNotFound = 321,
+    /// Country profile not found at the specified index.
+    CountryProfileNotFound = 322,
+    /// Identity can't be with empty country profiles list.
+    EmptyCountryProfiles = 323,
 }
 
 // ################## CONSTANTS ##################
