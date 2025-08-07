@@ -1641,6 +1641,7 @@ dependencies = [
 name = "stellar-tokens"
 version = "0.4.1"
 dependencies = [
+ "ed25519-dalek",
  "soroban-sdk",
  "soroban-test-helpers",
  "stellar-event-assertion",
