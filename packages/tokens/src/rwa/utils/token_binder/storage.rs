@@ -7,11 +7,13 @@ use crate::rwa::utils::token_binder::{
 
 /// Storage keys for the token binder system.
 ///
-/// This implementation follows an enumerable pattern similar to the country profile storage:
+/// This implementation follows an enumerable pattern similar to the country
+/// profile storage:
 /// - Tokens are stored by index (0, 1, 2, ...)
 /// - A reverse mapping from token address to index is maintained
 /// - Total count is tracked separately
-/// - When a token is unbound, the last token is moved to fill the gap (swap-remove pattern)
+/// - When a token is unbound, the last token is moved to fill the gap
+///   (swap-remove pattern)
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum TokenBinderStorageKey {

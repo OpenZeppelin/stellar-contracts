@@ -1,7 +1,6 @@
 mod storage;
 mod test;
 use soroban_sdk::{contracterror, Address, Env, Symbol, Vec};
-
 pub use storage::{bind_token, linked_tokens, unbind_token};
 
 /// Trait for managing token bindings to periphery contracts.
