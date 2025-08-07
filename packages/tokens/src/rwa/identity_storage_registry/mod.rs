@@ -166,6 +166,8 @@ pub trait CountryProfileManager: IdentityRegistryStorage {
     fn get_country_profile(e: &Env, account: Address, index: u32) -> Self::CountryProfile;
 }
 
+// ################## ERRORS ##################
+
 /// Error codes for the Identity Registry Storage system.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
