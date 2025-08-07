@@ -1200,6 +1200,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rwa-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
