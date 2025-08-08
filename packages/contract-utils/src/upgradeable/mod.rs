@@ -76,7 +76,7 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{contractclient, Env};
+use soroban_sdk::Env;
 use stellar_access::Ownable;
 
 /// High-level trait for contract upgrades.
@@ -95,7 +95,6 @@ use stellar_access::Ownable;
 ///    - Derive it using `#[derive(Upgradeable)]`
 ///    - Provide access control by implementing [`UpgradeableInternal`] with
 ///      your custom logic
-#[contractclient(name = "UpgradeableClient")]
 #[soroban_sdk::contracttrait]
 pub trait Upgradeable: Ownable {
     /// Upgrades the contract by setting a new WASM bytecode. The

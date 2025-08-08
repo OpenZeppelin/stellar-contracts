@@ -37,7 +37,7 @@ categories = ["no-std", "wasm"]
 version = "0.4.1"
 
 [workspace.dependencies]
-soroban-sdk = { git = "https://github.com/ahalabs/rs-soroban-sdk", rev = "eac634485f8942679d1412423b2580558b75c3f0" }
+soroban-sdk = { git = "https://github.com/ahalabs/rs-soroban-sdk", rev = "d2c33fa0c12ed2539df55da853b61a6fee408de1" }
 #
 proc-macro2 = "1.0"
 proptest = "1"

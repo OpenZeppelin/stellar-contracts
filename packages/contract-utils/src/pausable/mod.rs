@@ -51,8 +51,7 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{contracterror, contracttrait, panic_with_error, symbol_short, Env};
-use stellar_access::Ownable;
+use soroban_sdk::{assert_with_error, contracterror, contracttrait, symbol_short, Env};
 
 pub use crate::pausable::storage::{
     pause, paused, unpause, when_not_paused, when_paused, PausableDefault,
@@ -127,26 +126,16 @@ pub trait Pausable {
 
     /// Helper to make a function callable only when the contract is NOT paused.
     ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
-    ///
     /// # Errors
     ///
     /// * [`PausableError::EnforcedPause`] - Occurs when the contract is already
     ///   in `Paused` state.
     #[internal]
     fn when_not_paused(e: &Env) {
-        if Self::paused(e) {
-            panic_with_error!(e, PausableError::EnforcedPause);
-        }
+        assert_with_error!(e, !Self::paused(e), PausableError::EnforcedPause);
     }
 
     /// Helper to make a function callable only when the contract is paused.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
     ///
     /// # Errors
     ///
@@ -154,11 +143,7 @@ pub trait Pausable {
     ///   in `Unpaused` state.
     #[internal]
     fn when_paused(e: &Env) {
-        if !Self::paused(e) {
-            {
-                e.panic_with_error(PausableError::ExpectedPause);
-            };
-        }
+        assert_with_error!(e, Self::paused(e), PausableError::ExpectedPause)
     }
 }
 
