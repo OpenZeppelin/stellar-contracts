@@ -53,7 +53,7 @@ use soroban_sdk::{contracttrait, symbol_short, Address, Env};
 /// impl NonFungibleBurnable for MyContract {
 ///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
 ///     // Can also provide a different default implementation
-///     type Impl = Enumerable; // Or Consectutive
+///     type Impl = Enumerable; // Or Consecutive
 /// }
 /// ```
 #[contracttrait(add_impl_type = true)]
