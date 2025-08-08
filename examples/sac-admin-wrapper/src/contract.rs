@@ -35,6 +35,7 @@ impl AccessControl for ExampleContract {
 #[contractimpl]
 impl SACAdminWrapper for ExampleContract {
     type Impl = DefaultSacAdminWrapper;
+
     #[only_admin]
     fn set_admin(e: &Env, new_admin: &Address, _operator: &Address) {
         Self::Impl::set_admin(e, new_admin, _operator);

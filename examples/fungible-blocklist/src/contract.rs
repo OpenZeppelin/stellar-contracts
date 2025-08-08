@@ -34,6 +34,7 @@ impl ExampleContract {
 #[contractimpl]
 impl FungibleToken for ExampleContract {
     type Impl = FTBase;
+
     fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         Self::assert_not_blocked(e, &[from, to]);
         Self::Impl::transfer(e, from, to, amount);

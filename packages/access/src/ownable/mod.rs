@@ -46,7 +46,6 @@ pub use crate::ownable::storage::{OwnableStorageKey, Owner};
 pub trait Ownable {
     /// Returns `Some(Address)` if ownership is set, or `None` if ownership has
     /// been renounced.
-    ///
     fn get_owner(e: &Env) -> Option<soroban_sdk::Address>;
 
     /// Initiates a 2-step ownership transfer to a new address.

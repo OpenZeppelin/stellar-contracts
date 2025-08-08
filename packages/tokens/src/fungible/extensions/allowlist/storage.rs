@@ -33,6 +33,7 @@ impl FungibleAllowList for AllowList {
             false
         }
     }
+
     fn allow_user_no_auth(e: &Env, user: &Address) {
         let key = AllowListStorageKey::Allowed(user.clone());
 

@@ -214,8 +214,8 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControllerror::RoleNotHeld`] - If the `caller` doesn't have the
-    ///   role.
+    /// * [`AccessControllerror::RoleNotHeld`] - If the `caller` doesn't have
+    ///   the role.
     /// * [`AccessControllerror::RoleIsEmpty`] - If the role has no members.
     ///
     /// # Events
@@ -347,8 +347,8 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControllerror::Unauthorized`] - If the caller does not have the
-    ///   specified role.
+    /// * [`AccessControllerror::Unauthorized`] - If the caller does not have
+    ///   the specified role.
     #[internal]
     fn ensure_role(e: &Env, caller: &soroban_sdk::Address, role: &soroban_sdk::Symbol) {
         if Self::has_role(e, caller, role).is_none() {

@@ -34,7 +34,6 @@ use soroban_sdk::{contracttrait, symbol_short, Address, Env};
 /// impl NonFungibleBurnable for ExampleContract {
 ///     type Impl = Enumerable;
 /// }
-///
 /// ```
 ///
 /// # Notes

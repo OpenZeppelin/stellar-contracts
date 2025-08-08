@@ -56,6 +56,7 @@ impl FungibleToken for ExampleContract {
 #[contractimpl]
 impl FungibleBurnable for ExampleContract {
     type Impl = FTBase;
+
     #[when_not_paused]
     fn burn(e: &Env, from: &Address, amount: i128) {
         Self::Impl::burn(e, from, amount)
