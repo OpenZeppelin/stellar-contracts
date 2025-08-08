@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, Env, Vec};
+use soroban_sdk::{contracterror, contracttype, Address, Env, String, Symbol, Vec};
 
 pub mod storage;
 
@@ -9,21 +9,25 @@ pub mod storage;
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum HookType {
-    /// Called after tokens are successfully transferred from one wallet to another.
-    /// Modules registered for this hook can update their state based on transfer events.
+    /// Called after tokens are successfully transferred from one wallet to
+    /// another. Modules registered for this hook can update their state
+    /// based on transfer events.
     Transfer,
 
     /// Called after tokens are successfully created/minted to a wallet.
-    /// Modules registered for this hook can update their state based on minting events.
+    /// Modules registered for this hook can update their state based on minting
+    /// events.
     Created,
 
     /// Called after tokens are successfully destroyed/burned from a wallet.
-    /// Modules registered for this hook can update their state based on burning events.
+    /// Modules registered for this hook can update their state based on burning
+    /// events.
     Destroyed,
 
-    /// Called during transfer validation to check if a transfer should be allowed.
-    /// Modules registered for this hook can implement transfer restrictions.
-    /// This is a READ-only operation and should not modify state.
+    /// Called during transfer validation to check if a transfer should be
+    /// allowed. Modules registered for this hook can implement transfer
+    /// restrictions. This is a READ-only operation and should not modify
+    /// state.
     CanTransfer,
 }
 
@@ -178,7 +182,8 @@ pub fn emit_module_added(e: &Env, hook: HookType, module: Address) {
     e.events().publish(topics, module)
 }
 
-/// Emits an event indicating a module has been removed from the compliance system.
+/// Emits an event indicating a module has been removed from the compliance
+/// system.
 ///
 /// # Arguments
 ///
@@ -197,10 +202,12 @@ pub fn emit_module_removed(e: &Env, hook: HookType, module: Address) {
 
 // ################## COMPLIANCE MODULE TRAIT ##################
 
-/// Trait for compliance modules that can be registered with the modular compliance system.
+/// Trait for compliance modules that can be registered with the modular
+/// compliance system.
 ///
-/// Modules implement this trait to provide specific compliance logic for different
-/// hook types. Each module only needs to implement the methods for hooks it registers for.
+/// Modules implement this trait to provide specific compliance logic for
+/// different hook types. Each module only needs to implement the methods for
+/// hooks it registers for.
 pub trait ComplianceModule {
     /// Called when tokens are transferred (for Transfer hook).
     ///

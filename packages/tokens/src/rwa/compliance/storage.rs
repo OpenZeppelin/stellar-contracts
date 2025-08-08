@@ -1,8 +1,8 @@
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, Map, Symbol, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol, Vec};
 
 use crate::rwa::compliance::{
-    Compliance, ComplianceError, ComplianceModule, HookType, COMPLIANCE_EXTEND_AMOUNT,
-    COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
+    emit_module_added, emit_module_removed, Compliance, ComplianceError, ComplianceModule,
+    HookType, COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
 };
 
 /// Storage keys for the modular compliance contract.
@@ -182,8 +182,9 @@ pub fn is_module_registered(e: &Env, hook: HookType, module: Address) -> bool {
 
 /// Executes all modules registered for the Transfer hook.
 ///
-/// Called after tokens are successfully transferred from one address to another.
-/// Only modules that have registered for the Transfer hook will be invoked.
+/// Called after tokens are successfully transferred from one address to
+/// another. Only modules that have registered for the Transfer hook will be
+/// invoked.
 ///
 /// # Arguments
 ///
@@ -196,7 +197,7 @@ pub fn is_module_registered(e: &Env, hook: HookType, module: Address) -> bool {
 ///
 /// Invokes `on_xfer(from, to, amount)` on each registered module.
 pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
-    let modules = Self::get_modules_for_hook(e, HookType::Transfer);
+    let modules = get_modules_for_hook(e, HookType::Transfer);
 
     // Call each registered module
     for module_address in modules.iter() {
@@ -220,7 +221,7 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
 ///
 /// Invokes `on_mint(to, amount)` on each registered module.
 pub fn created(e: &Env, to: Address, amount: i128) {
-    let modules = Self::get_modules_for_hook(e, HookType::Created);
+    let modules = get_modules_for_hook(e, HookType::Created);
 
     // Call each registered module
     for module_address in modules.iter() {
@@ -244,7 +245,7 @@ pub fn created(e: &Env, to: Address, amount: i128) {
 ///
 /// Invokes `on_burn(from, amount)` on each registered module.
 pub fn destroyed(e: &Env, from: Address, amount: i128) {
-    let modules = Self::get_modules_for_hook(e, HookType::Destroyed);
+    let modules = get_modules_for_hook(e, HookType::Destroyed);
 
     // Call each registered module
     for module_address in modules.iter() {
@@ -253,7 +254,8 @@ pub fn destroyed(e: &Env, from: Address, amount: i128) {
     }
 }
 
-/// Executes all modules registered for the CanTransfer hook to validate a transfer.
+/// Executes all modules registered for the CanTransfer hook to validate a
+/// transfer.
 ///
 /// Called during transfer validation to check if a transfer should be allowed.
 /// Only modules that have registered for the CanTransfer hook will be invoked.
@@ -277,7 +279,7 @@ pub fn destroyed(e: &Env, from: Address, amount: i128) {
 /// Stops execution and returns `false` on the first module that rejects.
 pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
     // This can be called by anyone for read-only checks
-    let modules = Self::get_modules_for_hook(e, HookType::CanTransfer);
+    let modules = get_modules_for_hook(e, HookType::CanTransfer);
 
     // Call each registered module and check if all return true
     for module_address in modules.iter() {
