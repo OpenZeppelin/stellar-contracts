@@ -3,8 +3,8 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
 use crate::{
     access_control::{
         emit_admin_renounced, emit_admin_transfer_completed, emit_admin_transfer_initiated,
-        emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControlError,
-        ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
+        emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControl,
+        AccessControlError, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
     },
     role_transfer::{accept_transfer, transfer_role},
 };
@@ -25,6 +25,111 @@ pub enum AccessControlStorageKey {
     RoleAdmin(Symbol),            // role -> the admin role
     Admin,
     PendingAdmin,
+}
+
+pub struct AccessControler;
+
+impl AccessControl for AccessControler {
+    type Impl = Self;
+
+    fn has_role(
+        e: &Env,
+        account: &soroban_sdk::Address,
+        role: &soroban_sdk::Symbol,
+    ) -> Option<u32> {
+        has_role(e, account, role)
+    }
+
+    fn get_role_member_count(e: &Env, role: &soroban_sdk::Symbol) -> u32 {
+        get_role_member_count(e, role)
+    }
+
+    fn get_role_member(e: &Env, role: &soroban_sdk::Symbol, index: u32) -> Address {
+        get_role_member(e, role, index)
+    }
+
+    fn get_role_admin(e: &Env, role: &soroban_sdk::Symbol) -> Option<soroban_sdk::Symbol> {
+        get_role_admin(e, role)
+    }
+
+    fn get_admin(e: &Env) -> Option<Address> {
+        get_admin(e)
+    }
+
+    fn grant_role(e: &Env, caller: &Address, account: &Address, role: &soroban_sdk::Symbol) {
+        grant_role(e, caller, account, role)
+    }
+
+    fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &soroban_sdk::Symbol) {
+        revoke_role(e, caller, account, role)
+    }
+
+    fn renounce_role(e: &Env, caller: &Address, role: &soroban_sdk::Symbol) {
+        renounce_role(e, caller, role)
+    }
+
+    fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32) {
+        transfer_admin_role(e, new_admin, live_until_ledger)
+    }
+
+    fn accept_admin_transfer(e: &Env) {
+        accept_admin_transfer(e)
+    }
+
+    fn set_role_admin(e: &Env, role: &soroban_sdk::Symbol, admin_role: &soroban_sdk::Symbol) {
+        set_role_admin(e, role, admin_role)
+    }
+
+    fn renounce_admin(e: &Env) {
+        renounce_admin(e)
+    }
+
+    fn init_admin(e: &Env, admin: &soroban_sdk::Address) {
+        set_admin(e, admin);
+    }
+
+    fn enforce_admin_auth(e: &Env) {
+        let Some(admin) = Self::get_admin(e) else {
+            soroban_sdk::panic_with_error!(e, AccessControlError::AdminNotSet);
+        };
+        admin.require_auth();
+    }
+
+    fn ensure_role(e: &Env, caller: &soroban_sdk::Address, role: &soroban_sdk::Symbol) {
+        if Self::has_role(e, caller, role).is_none() {
+            soroban_sdk::panic_with_error!(e, AccessControlError::Unauthorized);
+        }
+    }
+
+    fn ensure_if_admin_or_admin_role(
+        e: &Env,
+        caller: &soroban_sdk::Address,
+        role: &soroban_sdk::Symbol,
+    ) {
+        let is_admin = match Self::get_admin(e) {
+            Some(admin) => caller == &admin,
+            None => false,
+        };
+        let is_admin_role = match Self::get_role_admin(e, role) {
+            Some(admin_role) => Self::has_role(e, caller, &admin_role).is_some(),
+            None => false,
+        };
+        if !is_admin && !is_admin_role {
+            soroban_sdk::panic_with_error!(e, AccessControlError::Unauthorized);
+        }
+    }
+
+    fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
+        grant_role_no_auth(e, caller, account, role)
+    }
+
+    fn remove_role_accounts_count_no_auth(e: &Env, role: &Symbol) {
+        remove_role_accounts_count_no_auth(e, role)
+    }
+
+    fn remove_role_admin_no_auth(e: &Env, role: &Symbol) {
+        remove_role_admin_no_auth(e, role)
+    }
 }
 
 // ################## QUERY STATE ##################
@@ -492,20 +597,6 @@ pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
     emit_role_admin_changed(e, role, &previous_admin_role, admin_role);
 }
 
-/// Removes the admin role for a specified role without performing authorization
-/// checks.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `role` - The role to remove the admin for.
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should only
-/// be used:
-/// - In admin functions that implement their own authorization logic
-/// - When cleaning up unused roles
 pub fn remove_role_admin_no_auth(e: &Env, role: &Symbol) {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
 
@@ -575,27 +666,6 @@ pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
     };
 
     if !is_admin && !is_admin_role {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
-}
-
-/// Ensures that the caller has the specified role.
-/// This function is used to check if an account has a specific role.
-/// The main purpose of this function is to act as a helper for the
-/// `#[has_role]` macro.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller to check the role for.
-/// * `role` - The role to check for.
-///
-/// # Errors
-///
-/// * [`AccessControlError::Unauthorized`] - If the caller does not have the
-///   specified role.
-pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
-    if has_role(e, caller, role).is_none() {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
 }
