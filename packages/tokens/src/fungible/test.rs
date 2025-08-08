@@ -2,19 +2,19 @@
 
 extern crate std;
 
-#[allow(unused_imports)]
 use soroban_sdk::{
     contract, symbol_short,
     testutils::{
         storage::{Instance, Persistent},
-        Address as _, AuthorizedFunction, Events, Ledger,
+        Address as _, Events, Ledger,
     },
     vec, Address, Env, IntoVal, String,
 };
 use stellar_event_assertion::EventAssertion;
 
 use crate::fungible::{
-    Base, StorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
+    burnable::FungibleBurnable, FTBase, FungibleToken, StorageKey, BALANCE_EXTEND_AMOUNT,
+    INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
 };
 
 #[contract]
@@ -26,8 +26,8 @@ fn initial_state() {
     let address = e.register(MockContract, ());
     let account = Address::generate(&e);
     e.as_contract(&address, || {
-        assert_eq!(Base::total_supply(&e), 0);
-        assert_eq!(Base::balance(&e, &account), 0);
+        assert_eq!(FTBase::total_supply(&e), 0);
+        assert_eq!(FTBase::balance(&e, &account), 0);
     });
 }
 
@@ -69,8 +69,8 @@ fn approve_with_event() {
 
     e.as_contract(&address, || {
         let allowance_data = (50, 1000);
-        Base::approve(&e, &owner, &spender, allowance_data.0, allowance_data.1);
-        let allowance_val = Base::allowance(&e, &owner, &spender);
+        FTBase::approve(&e, &owner, &spender, allowance_data.0, allowance_data.1);
+        let allowance_val = FTBase::allowance(&e, &owner, &spender);
         assert_eq!(allowance_val, 50);
 
         let events = e.events().all();
@@ -103,10 +103,10 @@ fn approve_handles_expiry() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::approve(&e, &owner, &spender, 50, 2);
+        FTBase::approve(&e, &owner, &spender, 50, 2);
         e.ledger().set_sequence_number(3);
 
-        let expired_allowance = Base::allowance(&e, &owner, &spender);
+        let expired_allowance = FTBase::allowance(&e, &owner, &spender);
         assert_eq!(expired_allowance, 0);
     });
 }
@@ -120,11 +120,11 @@ fn spend_allowance_reduces_amount() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::approve(&e, &owner, &spender, 50, 1000);
+        FTBase::approve(&e, &owner, &spender, 50, 1000);
 
-        Base::spend_allowance(&e, &owner, &spender, 20);
+        FTBase::spend_allowance(&e, &owner, &spender, 20);
 
-        let updated_allowance = Base::allowance(&e, &owner, &spender);
+        let updated_allowance = FTBase::allowance(&e, &owner, &spender);
         assert_eq!(updated_allowance, 30);
     });
 }
@@ -139,8 +139,8 @@ fn spend_allowance_insufficient_allowance_fails() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::approve(&e, &owner, &spender, 10, 1000);
-        Base::spend_allowance(&e, &owner, &spender, 20);
+        FTBase::approve(&e, &owner, &spender, 10, 1000);
+        FTBase::spend_allowance(&e, &owner, &spender, 20);
     });
 }
 
@@ -153,7 +153,7 @@ fn spend_allowance_invalid_amount_fails() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::spend_allowance(&e, &owner, &spender, -1);
+        FTBase::spend_allowance(&e, &owner, &spender, -1);
     });
 }
 
@@ -167,7 +167,7 @@ fn set_allowance_with_expired_ledger_fails() {
 
     e.as_contract(&address, || {
         e.ledger().set_sequence_number(10);
-        Base::set_allowance(&e, &owner, &spender, 50, 5);
+        FTBase::set_allowance(&e, &owner, &spender, 50, 5);
     });
 }
 
@@ -181,7 +181,7 @@ fn set_allowance_with_greater_than_max_ledger_fails() {
 
     e.as_contract(&address, || {
         let ttl = e.storage().max_ttl() + 1;
-        Base::set_allowance(&e, &owner, &spender, 50, ttl);
+        FTBase::set_allowance(&e, &owner, &spender, 50, ttl);
     });
 }
 
@@ -194,7 +194,7 @@ fn set_allowance_with_neg_amount_fails() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::set_allowance(&e, &owner, &spender, -1, 5);
+        FTBase::set_allowance(&e, &owner, &spender, -1, 5);
     });
 }
 
@@ -207,14 +207,14 @@ fn set_allowance_with_zero_amount() {
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::set_allowance(&e, &owner, &spender, 0, 5);
-        let allowance_val = Base::allowance(&e, &owner, &spender);
+        FTBase::set_allowance(&e, &owner, &spender, 0, 5);
+        let allowance_val = FTBase::allowance(&e, &owner, &spender);
         assert_eq!(allowance_val, 0);
 
         // should pass for a past ledger
         e.ledger().set_sequence_number(10);
-        Base::set_allowance(&e, &owner2, &spender, 0, 5);
-        let allowance_val = Base::allowance(&e, &owner2, &spender);
+        FTBase::set_allowance(&e, &owner2, &spender, 0, 5);
+        let allowance_val = FTBase::allowance(&e, &owner2, &spender);
         assert_eq!(allowance_val, 0);
     });
 }
@@ -228,10 +228,10 @@ fn transfer_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 100);
-        Base::transfer(&e, &from, &recipient, 50);
-        assert_eq!(Base::balance(&e, &from), 50);
-        assert_eq!(Base::balance(&e, &recipient), 50);
+        FTBase::internal_mint(&e, &from, 100);
+        FTBase::transfer(&e, &from, &recipient, 50);
+        assert_eq!(FTBase::balance(&e, &from), 50);
+        assert_eq!(FTBase::balance(&e, &recipient), 50);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -249,9 +249,9 @@ fn transfer_zero_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::transfer(&e, &from, &recipient, 0);
-        assert_eq!(Base::balance(&e, &from), 0);
-        assert_eq!(Base::balance(&e, &recipient), 0);
+        FTBase::transfer(&e, &from, &recipient, 0);
+        assert_eq!(FTBase::balance(&e, &from), 0);
+        assert_eq!(FTBase::balance(&e, &recipient), 0);
 
         let events = e.events().all();
         assert_eq!(events.len(), 1);
@@ -267,7 +267,7 @@ fn extend_balance_ttl_thru_transfer() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 100);
+        FTBase::internal_mint(&e, &from, 100);
 
         let key = StorageKey::Balance(from.clone());
 
@@ -275,7 +275,7 @@ fn extend_balance_ttl_thru_transfer() {
         e.ledger().with_mut(|l| {
             l.sequence_number += ttl;
         });
-        Base::transfer(&e, &from, &recipient, 50);
+        FTBase::transfer(&e, &from, &recipient, 50);
         let ttl = e.storage().persistent().get_ttl(&key);
         assert_eq!(ttl, BALANCE_EXTEND_AMOUNT);
     });
@@ -291,17 +291,17 @@ fn approve_and_transfer_from() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &owner, 100);
-        Base::approve(&e, &owner, &spender, 50, 1000);
+        FTBase::internal_mint(&e, &owner, 100);
+        FTBase::approve(&e, &owner, &spender, 50, 1000);
 
-        let allowance_val = Base::allowance(&e, &owner, &spender);
+        let allowance_val = FTBase::allowance(&e, &owner, &spender);
         assert_eq!(allowance_val, 50);
 
-        Base::transfer_from(&e, &spender, &owner, &recipient, 30);
-        assert_eq!(Base::balance(&e, &owner), 70);
-        assert_eq!(Base::balance(&e, &recipient), 30);
+        FTBase::transfer_from(&e, &spender, &owner, &recipient, 30);
+        assert_eq!(FTBase::balance(&e, &owner), 70);
+        assert_eq!(FTBase::balance(&e, &recipient), 30);
 
-        let updated_allowance = Base::allowance(&e, &owner, &spender);
+        let updated_allowance = FTBase::allowance(&e, &owner, &spender);
         assert_eq!(updated_allowance, 20);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
@@ -322,8 +322,8 @@ fn transfer_insufficient_balance_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 50);
-        Base::transfer(&e, &from, &recipient, 100);
+        FTBase::internal_mint(&e, &from, 50);
+        FTBase::transfer(&e, &from, &recipient, 100);
     });
 }
 
@@ -338,9 +338,9 @@ fn transfer_from_insufficient_allowance_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &owner, 100);
-        Base::approve(&e, &owner, &spender, 30, 1000);
-        Base::transfer_from(&e, &spender, &owner, &recipient, 50);
+        FTBase::internal_mint(&e, &owner, 100);
+        FTBase::approve(&e, &owner, &spender, 30, 1000);
+        FTBase::transfer_from(&e, &spender, &owner, &recipient, 50);
     });
 }
 
@@ -352,10 +352,10 @@ fn update_transfers_between_accounts() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 100);
-        Base::update(&e, Some(&from), Some(&to), 50);
-        assert_eq!(Base::balance(&e, &from), 50);
-        assert_eq!(Base::balance(&e, &to), 50);
+        FTBase::internal_mint(&e, &from, 100);
+        FTBase::update(&e, Some(&from), Some(&to), 50);
+        assert_eq!(FTBase::balance(&e, &from), 50);
+        assert_eq!(FTBase::balance(&e, &to), 50);
     });
 }
 
@@ -366,9 +366,9 @@ fn update_mints_tokens() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::update(&e, None, Some(&to), 100);
-        assert_eq!(Base::balance(&e, &to), 100);
-        assert_eq!(Base::total_supply(&e), 100);
+        FTBase::update(&e, None, Some(&to), 100);
+        assert_eq!(FTBase::balance(&e, &to), 100);
+        assert_eq!(FTBase::total_supply(&e), 100);
     });
 }
 
@@ -379,10 +379,10 @@ fn update_burns_tokens() {
     let from = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 100);
-        Base::update(&e, Some(&from), None, 50);
-        assert_eq!(Base::balance(&e, &from), 50);
-        assert_eq!(Base::total_supply(&e), 50);
+        FTBase::internal_mint(&e, &from, 100);
+        FTBase::update(&e, Some(&from), None, 50);
+        assert_eq!(FTBase::balance(&e, &from), 50);
+        assert_eq!(FTBase::total_supply(&e), 50);
     });
 }
 
@@ -395,7 +395,7 @@ fn update_with_invalid_amount_panics() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::update(&e, Some(&from), Some(&to), -1);
+        FTBase::update(&e, Some(&from), Some(&to), -1);
     });
 }
 
@@ -407,8 +407,8 @@ fn update_overflow_panics() {
     let account = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &account, i128::MAX);
-        Base::update(&e, None, Some(&account), 1);
+        FTBase::internal_mint(&e, &account, i128::MAX);
+        FTBase::update(&e, None, Some(&account), 1);
     });
 }
 
@@ -421,8 +421,8 @@ fn update_with_insufficient_balance_panics() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 50);
-        Base::update(&e, Some(&from), Some(&to), 100);
+        FTBase::internal_mint(&e, &from, 50);
+        FTBase::update(&e, Some(&from), Some(&to), 100);
     });
 }
 
@@ -442,7 +442,7 @@ fn approve_requires_auth() {
     let expiration_ledger = 1000;
 
     e.as_contract(&address, || {
-        Base::approve(&e, &owner, &spender, amount, expiration_ledger);
+        FTBase::approve(&e, &owner, &spender, amount, expiration_ledger);
     });
 
     let auths = e.auths();
@@ -475,8 +475,8 @@ fn transfer_requires_auth() {
     let amount = 100;
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, amount);
-        Base::transfer(&e, &from, &to, amount);
+        FTBase::internal_mint(&e, &from, amount);
+        FTBase::transfer(&e, &from, &to, amount);
     });
 
     let auths = e.auths();
@@ -504,9 +504,9 @@ fn transfer_from_requires_auth() {
     let amount = 50;
 
     e.as_contract(&address, || {
-        Base::mint(&e, &owner, 100);
-        Base::approve(&e, &owner, &spender, amount, 1000);
-        Base::transfer_from(&e, &spender, &owner, &recipient, amount);
+        FTBase::internal_mint(&e, &owner, 100);
+        FTBase::approve(&e, &owner, &spender, amount, 1000);
+        FTBase::transfer_from(&e, &spender, &owner, &recipient, amount);
     });
 
     let auths = e.auths();
@@ -556,8 +556,8 @@ fn burn_requires_auth() {
     let amount = 50;
 
     e.as_contract(&address, || {
-        Base::mint(&e, &from, 100);
-        Base::burn(&e, &from, amount);
+        FTBase::internal_mint(&e, &from, 100);
+        FTBase::burn(&e, &from, amount);
     });
 
     let auths = e.auths();
@@ -584,9 +584,9 @@ fn burn_from_requires_auth() {
     let amount = 50;
 
     e.as_contract(&address, || {
-        Base::mint(&e, &owner, 100);
-        Base::approve(&e, &owner, &spender, amount, 1000);
-        Base::burn_from(&e, &spender, &owner, amount);
+        FTBase::internal_mint(&e, &owner, 100);
+        FTBase::approve(&e, &owner, &spender, amount, 1000);
+        FTBase::burn_from(&e, &spender, &owner, amount);
     });
 
     let auths = e.auths();
@@ -633,9 +633,9 @@ fn mint_works() {
     let address = e.register(MockContract, ());
     let account = Address::generate(&e);
     e.as_contract(&address, || {
-        Base::mint(&e, &account, 100);
-        assert_eq!(Base::balance(&e, &account), 100);
-        assert_eq!(Base::total_supply(&e), 100);
+        FTBase::internal_mint(&e, &account, 100);
+        assert_eq!(FTBase::balance(&e, &account), 100);
+        assert_eq!(FTBase::total_supply(&e), 100);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
@@ -662,8 +662,8 @@ fn mint_base_implementation_has_no_auth() {
 
     // This should NOT panic even without authorization
     e.as_contract(&address, || {
-        Base::mint(&e, &account, 100);
-        assert_eq!(Base::balance(&e, &account), 100);
+        FTBase::internal_mint(&e, &account, 100);
+        assert_eq!(FTBase::balance(&e, &account), 100);
     });
 }
 
@@ -677,11 +677,11 @@ fn set_and_get_metadata() {
         let test_name = String::from_str(&e, "Test Token");
         let test_symbol = String::from_str(&e, "TEST");
 
-        Base::set_metadata(&e, test_decimals, test_name.clone(), test_symbol.clone());
+        FTBase::set_metadata(&e, test_decimals, test_name.clone(), test_symbol.clone());
 
-        assert_eq!(Base::decimals(&e), test_decimals);
-        assert_eq!(Base::name(&e), test_name);
-        assert_eq!(Base::symbol(&e), test_symbol);
+        assert_eq!(FTBase::decimals(&e), test_decimals);
+        assert_eq!(FTBase::name(&e), test_name);
+        assert_eq!(FTBase::symbol(&e), test_symbol);
     });
 }
 
@@ -692,7 +692,7 @@ fn get_unset_metadata() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        Base::decimals(&e);
+        FTBase::decimals(&e);
     });
 }
 
@@ -702,22 +702,22 @@ fn metadata_update() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        Base::set_metadata(
+        FTBase::set_metadata(
             &e,
             6,
             String::from_str(&e, "Initial Name"),
             String::from_str(&e, "INI"),
         );
 
-        Base::set_metadata(
+        FTBase::set_metadata(
             &e,
             8,
             String::from_str(&e, "Updated Name"),
             String::from_str(&e, "UPD"),
         );
 
-        assert_eq!(Base::decimals(&e), 8);
-        assert_eq!(Base::name(&e), String::from_str(&e, "Updated Name"));
-        assert_eq!(Base::symbol(&e), String::from_str(&e, "UPD"));
+        assert_eq!(FTBase::decimals(&e), 8);
+        assert_eq!(FTBase::name(&e), String::from_str(&e, "Updated Name"));
+        assert_eq!(FTBase::symbol(&e), String::from_str(&e, "UPD"));
     });
 }

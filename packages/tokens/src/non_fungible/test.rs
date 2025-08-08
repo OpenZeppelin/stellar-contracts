@@ -9,7 +9,10 @@ use soroban_sdk::{
 };
 use stellar_event_assertion::EventAssertion;
 
-use crate::non_fungible::{Base, NFTStorageKey};
+use crate::{
+    non_fungible::{NFTStorageKey, NonFungibleToken},
+    NFTBase,
+};
 
 #[contract]
 struct MockContract;
@@ -24,27 +27,27 @@ fn metadata_works() {
         let base_uri = String::from_str(&e, "https://smth.com/");
         let collection_name = String::from_str(&e, "My NFT collection");
         let collection_symbol = String::from_str(&e, "NFT");
-        Base::set_metadata(&e, base_uri, collection_name.clone(), collection_symbol.clone());
+        NFTBase::set_metadata(&e, base_uri, collection_name.clone(), collection_symbol.clone());
 
         let token_id = 4294967295;
         e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
-        let uri = Base::token_uri(&e, token_id);
+        let uri = NFTBase::token_uri(&e, token_id);
 
         assert_eq!(uri, String::from_str(&e, "https://smth.com/4294967295"));
-        assert_eq!(collection_name, Base::name(&e));
-        assert_eq!(collection_symbol, Base::symbol(&e));
+        assert_eq!(collection_name, NFTBase::name(&e));
+        assert_eq!(collection_symbol, NFTBase::symbol(&e));
 
         // case token_id == 0
         let token_id = 0;
         e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
-        let uri = Base::token_uri(&e, token_id);
+        let uri = NFTBase::token_uri(&e, token_id);
 
         assert_eq!(uri, String::from_str(&e, "https://smth.com/0"));
 
         // case empty string as base_uri
         let empty_base_uri = String::from_str(&e, "");
-        Base::set_metadata(&e, empty_base_uri, collection_name, collection_symbol);
-        let empty_uri = Base::token_uri(&e, token_id);
+        NFTBase::set_metadata(&e, empty_base_uri, collection_name, collection_symbol);
+        let empty_uri = NFTBase::token_uri(&e, token_id);
 
         assert_eq!(empty_uri, String::from_str(&e, ""));
     });
@@ -57,7 +60,7 @@ fn get_metadata_should_panic_when_metadata_is_not_set() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let _ = Base::get_metadata(&e);
+        let _ = NFTBase::get_metadata(&e);
     });
 }
 
@@ -74,7 +77,7 @@ fn set_metadata_should_panic_when_base_uri_exceeds_max_length() {
         let symbol = String::from_str(&e, "TEST");
 
         // This should panic with BaseUriMaxLenExceeded error
-        Base::set_metadata(&e, too_long_base_uri, name, symbol);
+        NFTBase::set_metadata(&e, too_long_base_uri, name, symbol);
     });
 }
 
@@ -87,9 +90,9 @@ fn approve_for_all_works() {
     let operator = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::approve_for_all(&e, &owner, &operator, 1000);
+        NFTBase::approve_for_all(&e, &owner, &operator, 1000);
 
-        let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
+        let is_approved = NFTBase::is_approved_for_all(&e, &owner, &operator);
         assert!(is_approved);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
@@ -112,13 +115,13 @@ fn revoke_approve_for_all_works() {
 
         e.storage().temporary().set(&key, &(1000_u32));
 
-        let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
+        let is_approved = NFTBase::is_approved_for_all(&e, &owner, &operator);
         assert!(is_approved);
 
         // revoke approval
-        Base::approve_for_all(&e, &owner, &operator, 0);
+        NFTBase::approve_for_all(&e, &owner, &operator, 0);
 
-        let is_approved = Base::is_approved_for_all(&e, &owner, &operator);
+        let is_approved = NFTBase::is_approved_for_all(&e, &owner, &operator);
         assert!(!is_approved);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
@@ -139,9 +142,9 @@ fn approve_nft_works() {
     e.as_contract(&address, || {
         e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
 
-        Base::approve(&e, &owner, &approved, token_id, 1000);
+        NFTBase::approve(&e, &owner, &approved, token_id, 1000);
 
-        let approved_address = Base::get_approved(&e, token_id);
+        let approved_address = NFTBase::get_approved(&e, token_id);
         assert_eq!(approved_address, Some(approved.clone()));
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
@@ -163,12 +166,12 @@ fn approve_with_operator_works() {
     e.as_contract(&address, || {
         e.storage().persistent().set(&NFTStorageKey::Owner(token_id), &owner);
 
-        Base::approve_for_all(&e, &owner, &operator, 1000);
+        NFTBase::approve_for_all(&e, &owner, &operator, 1000);
 
         // approver is the operator on behalf of the owner
-        Base::approve(&e, &operator, &approved, token_id, 1000);
+        NFTBase::approve(&e, &operator, &approved, token_id, 1000);
 
-        let approved_address = Base::get_approved(&e, token_id);
+        let approved_address = NFTBase::get_approved(&e, token_id);
         assert_eq!(approved_address, Some(approved.clone()));
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
@@ -187,13 +190,13 @@ fn transfer_nft_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = NFTBase::sequential_mint(&e, &owner);
 
-        Base::transfer(&e, &owner, &recipient, token_id);
+        NFTBase::transfer(&e, &owner, &recipient, token_id);
 
-        assert_eq!(Base::balance(&e, &owner), 0);
-        assert_eq!(Base::balance(&e, &recipient), 1);
-        assert_eq!(Base::owner_of(&e, token_id), recipient);
+        assert_eq!(NFTBase::balance(&e, &owner), 0);
+        assert_eq!(NFTBase::balance(&e, &recipient), 1);
+        assert_eq!(NFTBase::owner_of(&e, token_id), recipient);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -212,17 +215,17 @@ fn transfer_from_nft_approved_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = NFTBase::sequential_mint(&e, &owner);
 
         // Approve the spender
-        Base::approve(&e, &owner, &spender, token_id, 1000);
+        NFTBase::approve(&e, &owner, &spender, token_id, 1000);
 
         // Transfer from the owner using the spender's approval
-        Base::transfer_from(&e, &spender, &owner, &recipient, token_id);
+        NFTBase::transfer_from(&e, &spender, &owner, &recipient, token_id);
 
-        assert_eq!(Base::balance(&e, &owner), 0);
-        assert_eq!(Base::balance(&e, &recipient), 1);
-        assert_eq!(Base::owner_of(&e, token_id), recipient);
+        assert_eq!(NFTBase::balance(&e, &owner), 0);
+        assert_eq!(NFTBase::balance(&e, &recipient), 1);
+        assert_eq!(NFTBase::owner_of(&e, token_id), recipient);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
@@ -242,17 +245,17 @@ fn transfer_from_nft_operator_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = NFTBase::sequential_mint(&e, &owner);
 
         // Approve the spender
-        Base::approve_for_all(&e, &owner, &spender, 1000);
+        NFTBase::approve_for_all(&e, &owner, &spender, 1000);
 
         // Transfer from the owner using the spender's approval
-        Base::transfer_from(&e, &spender, &owner, &recipient, token_id);
+        NFTBase::transfer_from(&e, &spender, &owner, &recipient, token_id);
 
-        assert_eq!(Base::balance(&e, &owner), 0);
-        assert_eq!(Base::balance(&e, &recipient), 1);
-        assert_eq!(Base::owner_of(&e, token_id), recipient);
+        assert_eq!(NFTBase::balance(&e, &owner), 0);
+        assert_eq!(NFTBase::balance(&e, &recipient), 1);
+        assert_eq!(NFTBase::owner_of(&e, token_id), recipient);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(3);
@@ -271,14 +274,14 @@ fn transfer_from_nft_owner_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = NFTBase::sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner without approval
-        Base::transfer_from(&e, &owner, &owner, &recipient, token_id);
+        NFTBase::transfer_from(&e, &owner, &owner, &recipient, token_id);
 
-        assert_eq!(Base::balance(&e, &owner), 0);
-        assert_eq!(Base::balance(&e, &recipient), 1);
-        assert_eq!(Base::owner_of(&e, token_id), recipient);
+        assert_eq!(NFTBase::balance(&e, &owner), 0);
+        assert_eq!(NFTBase::balance(&e, &recipient), 1);
+        assert_eq!(NFTBase::owner_of(&e, token_id), recipient);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -298,10 +301,10 @@ fn transfer_nft_invalid_owner_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = NFTBase::sequential_mint(&e, &owner);
 
         // Attempt to transfer without authorization
-        Base::transfer(&e, &unauthorized, &recipient, token_id);
+        NFTBase::transfer(&e, &unauthorized, &recipient, token_id);
     });
 }
 
@@ -316,10 +319,10 @@ fn transfer_from_nft_insufficient_approval_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = NFTBase::sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner without approval
-        Base::transfer_from(&e, &spender, &owner, &recipient, token_id);
+        NFTBase::transfer_from(&e, &spender, &owner, &recipient, token_id);
     });
 }
 
@@ -333,7 +336,7 @@ fn owner_of_non_existent_token_fails() {
 
     e.as_contract(&address, || {
         // Attempt to get the owner of a non-existent token
-        Base::owner_of(&e, non_existent_token_id);
+        NFTBase::owner_of(&e, non_existent_token_id);
     });
 }
 
@@ -347,12 +350,12 @@ fn approve_with_invalid_live_until_ledger_fails() {
     let approved = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = NFTBase::sequential_mint(&e, &owner);
 
         e.ledger().set_sequence_number(10);
 
         // Attempt to approve with an invalid live_until_ledger
-        Base::approve(&e, &owner, &approved, token_id, 1);
+        NFTBase::approve(&e, &owner, &approved, token_id, 1);
     });
 }
 
@@ -366,10 +369,10 @@ fn approve_with_invalid_approver_fails() {
     let invalid_approver = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = NFTBase::sequential_mint(&e, &owner);
 
         // Attempt to approve with an invalid approver
-        Base::approve(&e, &invalid_approver, &owner, token_id, 1000);
+        NFTBase::approve(&e, &invalid_approver, &owner, token_id, 1000);
     });
 }
 
@@ -383,12 +386,12 @@ fn update_with_math_overflow_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = NFTBase::sequential_mint(&e, &owner);
 
         e.storage().persistent().set(&NFTStorageKey::Balance(recipient.clone()), &u32::MAX);
 
         // Attempt to update which would cause a math overflow
-        Base::update(&e, Some(&owner), Some(&recipient), token_id);
+        NFTBase::update(&e, Some(&owner), Some(&recipient), token_id);
     });
 }
 
@@ -401,7 +404,7 @@ fn balance_of_non_existent_account_is_zero() {
 
     e.as_contract(&address, || {
         // Check balance of a non-existent account
-        let balance_value = Base::balance(&e, &non_existent_account);
+        let balance_value = NFTBase::balance(&e, &non_existent_account);
         assert_eq!(balance_value, 0);
     });
 }
@@ -418,13 +421,13 @@ fn transfer_from_incorrect_owner_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = NFTBase::sequential_mint(&e, &owner);
 
         // Approve the spender
-        Base::approve(&e, &owner, &spender, token_id, 1000);
+        NFTBase::approve(&e, &owner, &spender, token_id, 1000);
 
         // Attempt to transfer from an incorrect owner
-        Base::transfer_from(&e, &spender, &incorrect_owner, &recipient, token_id);
+        NFTBase::transfer_from(&e, &spender, &incorrect_owner, &recipient, token_id);
     });
 }
 
@@ -439,10 +442,10 @@ fn transfer_from_unauthorized_spender_fails() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &owner);
+        let token_id = NFTBase::sequential_mint(&e, &owner);
 
         // Attempt to transfer from the owner using an unauthorized spender
-        Base::transfer_from(&e, &unauthorized_spender, &owner, &recipient, token_id);
+        NFTBase::transfer_from(&e, &unauthorized_spender, &owner, &recipient, token_id);
     });
 }
 
@@ -453,8 +456,8 @@ fn mint_works() {
     let address = e.register(MockContract, ());
     let account = Address::generate(&e);
     e.as_contract(&address, || {
-        let token_id = Base::sequential_mint(&e, &account);
-        assert_eq!(Base::balance(&e, &account), 1);
+        let token_id = NFTBase::sequential_mint(&e, &account);
+        assert_eq!(NFTBase::balance(&e, &account), 1);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(1);
@@ -470,8 +473,8 @@ fn test_counter_works() {
     let owner = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let token_id1 = Base::sequential_mint(&e, &owner);
-        let token_id2 = Base::sequential_mint(&e, &owner);
+        let token_id1 = NFTBase::sequential_mint(&e, &owner);
+        let token_id2 = NFTBase::sequential_mint(&e, &owner);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
@@ -499,7 +502,7 @@ fn mint_base_implementation_has_no_auth() {
 
     // This should NOT panic even without authorization
     e.as_contract(&address, || {
-        Base::sequential_mint(&e, &account);
-        assert_eq!(Base::balance(&e, &account), 1);
+        NFTBase::sequential_mint(&e, &account);
+        assert_eq!(NFTBase::balance(&e, &account), 1);
     });
 }

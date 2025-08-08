@@ -3,18 +3,50 @@ use core::mem;
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, String, TryFromVal, Val, Vec};
 
 use crate::non_fungible::{
-    burnable::emit_burn,
+    burnable::{emit_burn, NonFungibleBurnable},
     emit_transfer,
     extensions::consecutive::emit_consecutive_mint,
     sequential::{self as sequential},
-    Base, ContractOverrides, NonFungibleTokenError, OWNERSHIP_EXTEND_AMOUNT,
+    NFTBase, NonFungibleToken, NonFungibleTokenError, OWNERSHIP_EXTEND_AMOUNT,
     OWNERSHIP_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT,
     TOKEN_TTL_THRESHOLD,
 };
 
+/// Consecutive implementation of the NonFungibleToken trait.
+/// ## Example
+///
+/// ```ignore
+/// #[contracttrait(add_impl_type = true)]
+/// impl NonFungibleToken for MyContract {}
+///
+/// #[contracttrait(add_impl_type = true)]
+/// impl NonFungibleBurnable for MyContract {}
+/// ```
 pub struct Consecutive;
 
-impl ContractOverrides for Consecutive {
+impl NonFungibleBurnable for Consecutive {
+    type Impl = Self;
+
+    fn burn(e: &Env, from: &Address, token_id: u32) {
+        from.require_auth();
+
+        Consecutive::update(e, Some(from), None, token_id);
+        emit_burn(e, from, token_id);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+        spender.require_auth();
+
+        NFTBase::check_spender_approval(e, spender, from, token_id);
+
+        Consecutive::update(e, Some(from), None, token_id);
+        emit_burn(e, from, token_id);
+    }
+}
+
+impl NonFungibleToken for Consecutive {
+    type Impl = NFTBase;
+
     fn owner_of(e: &Env, token_id: u32) -> Address {
         Consecutive::owner_of(e, token_id)
     }
@@ -36,6 +68,7 @@ impl ContractOverrides for Consecutive {
         approver: &Address,
         approved: &Address,
         token_id: u32,
+
         live_until_ledger: u32,
     ) {
         Consecutive::approve(e, approver, approved, token_id, live_until_ledger);
@@ -145,7 +178,7 @@ impl Consecutive {
     ///
     /// * [`NonFungibleTokenError::NonExistentToken`] - Occurs if the provided
     ///   `token_id` does not exist (burned or more than max).
-    /// * refer to [`Base::base_uri`] errors.
+    /// * refer to [`NFTBase::base_uri`] errors.
     pub fn token_uri(e: &Env, token_id: u32) -> String {
         let is_burned =
             Consecutive::get_persistent_entry(e, &NFTConsecutiveStorageKey::BurnedToken(token_id))
@@ -154,8 +187,8 @@ impl Consecutive {
             panic_with_error!(e, NonFungibleTokenError::NonExistentToken);
         }
 
-        let base_uri = Base::base_uri(e);
-        Base::compose_uri_for_token(e, base_uri, token_id)
+        let base_uri = NFTBase::base_uri(e);
+        NFTBase::compose_uri_for_token(e, base_uri, token_id)
     }
 
     // ################## CHANGE STATE ##################
@@ -173,7 +206,7 @@ impl Consecutive {
     ///
     /// * [`NonFungibleTokenError::InvalidAmount`] - If try to mint `0` or more
     ///   than `MAX_TOKENS_IN_BATCH`.
-    /// * refer to [`Base::increase_balance`] errors.
+    /// * refer to [`NFTBase::increase_balance`] errors.
     /// * refer to [`Consecutive::set_ownership_in_bucket`] errors.
     ///
     /// # Events
@@ -206,7 +239,7 @@ impl Consecutive {
 
         let first_id = sequential::increment_token_id(e, amount);
 
-        Base::increase_balance(e, to, amount);
+        NFTBase::increase_balance(e, to, amount);
         let last_id = first_id + amount - 1;
 
         Self::set_ownership_in_bucket(e, last_id);
@@ -259,7 +292,7 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::check_spender_approval`] errors.
+    /// * refer to [`NFTBase::check_spender_approval`] errors.
     /// * refer to [`Consecutive::update`] errors.
     ///
     /// # Events
@@ -273,7 +306,7 @@ impl Consecutive {
     pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
         spender.require_auth();
 
-        Base::check_spender_approval(e, spender, from, token_id);
+        NFTBase::check_spender_approval(e, spender, from, token_id);
 
         Consecutive::update(e, Some(from), None, token_id);
         emit_burn(e, from, token_id);
@@ -322,7 +355,7 @@ impl Consecutive {
     ///
     /// # Errors
     ///
-    /// * refer to [`Base::check_spender_approval`] errors.
+    /// * refer to [`NFTBase::check_spender_approval`] errors.
     /// * refer to [`Consecutive::update`] errors.
     ///
     /// # Events
@@ -338,7 +371,7 @@ impl Consecutive {
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
         spender.require_auth();
 
-        Base::check_spender_approval(e, spender, from, token_id);
+        NFTBase::check_spender_approval(e, spender, from, token_id);
 
         Consecutive::update(e, Some(from), Some(to), token_id);
         emit_transfer(e, from, to, token_id);
@@ -358,7 +391,7 @@ impl Consecutive {
     /// # Errors
     ///
     /// * refer to [`Consecutive::owner_of`] errors.
-    /// * refer to [`Base::approve_for_owner`] errors.
+    /// * refer to [`NFTBase::approve_for_owner`] errors.
     ///
     /// # Events
     ///
@@ -378,14 +411,14 @@ impl Consecutive {
         approver.require_auth();
 
         let owner = Consecutive::owner_of(e, token_id);
-        Base::approve_for_owner(e, &owner, approver, approved, token_id, live_until_ledger);
+        NFTBase::approve_for_owner(e, &owner, approver, approved, token_id, live_until_ledger);
     }
 
     /// Low-level function for handling transfers, mints and burns of an NFT,
     /// without handling authorization. Updates ownership records, adjusts
     /// balances, and clears existing approvals.
     ///
-    /// The difference with [`Base::update`] is that the
+    /// The difference with [`NFTBase::update`] is that the
     /// current function:
     /// 1. explicitly adds burned tokens to storage in
     ///    `NFTConsecutiveStorageKey::BurnedToken`,
@@ -403,8 +436,8 @@ impl Consecutive {
     /// * [`NonFungibleTokenError::IncorrectOwner`] - If the `from` address is
     ///   not the owner of the token.
     /// * refer to [`Consecutive::owner_of`] errors.
-    /// * refer to [`Base::decrease_balance`] errors.
-    /// * refer to [`Base::increase_balance`] errors.
+    /// * refer to [`NFTBase::decrease_balance`] errors.
+    /// * refer to [`NFTBase::increase_balance`] errors.
     /// * refer to [`Consecutive::set_ownership_in_bucket`] errors.
     pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, token_id: u32) {
         if let Some(from_address) = from {
@@ -415,7 +448,7 @@ impl Consecutive {
                 panic_with_error!(e, NonFungibleTokenError::IncorrectOwner);
             }
 
-            Base::decrease_balance(e, from_address, 1);
+            NFTBase::decrease_balance(e, from_address, 1);
 
             // Clear any existing approval
             let approval_key = NFTConsecutiveStorageKey::Approval(token_id);
@@ -431,7 +464,7 @@ impl Consecutive {
         }
 
         if let Some(to_address) = to {
-            Base::increase_balance(e, to_address, 1);
+            NFTBase::increase_balance(e, to_address, 1);
 
             // Set the new owner
             e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(token_id), to_address);

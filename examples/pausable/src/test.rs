@@ -2,7 +2,10 @@
 
 extern crate std;
 
-use soroban_sdk::{testutils::Address as _, Address, Env};
+use soroban_sdk::{
+    testutils::{Address as _, MockAuth, MockAuthInvoke},
+    Address, Env, IntoVal,
+};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
@@ -34,14 +37,22 @@ fn pause_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Unauthorized function call for address")]
 fn errors_pause_unauthorized() {
     let e = Env::default();
     let owner = Address::generate(&e);
     let user = Address::generate(&e);
     let client = create_client(&e, &owner);
 
-    e.mock_all_auths();
+    e.mock_auths(&[MockAuth {
+        address: &user,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "pause",
+            args: (&user,).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
     client.pause(&user);
 }
 
@@ -59,16 +70,35 @@ fn unpause_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Unauthorized function call for address")]
 fn errors_unpause_unauthorized() {
     let e = Env::default();
     let owner = Address::generate(&e);
     let user = Address::generate(&e);
     let client = create_client(&e, &owner);
 
-    e.mock_all_auths();
+    e.mock_auths(&[MockAuth {
+        address: &owner,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "pause",
+            args: (&owner,).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
     client.pause(&owner);
-    client.unpause(&user);
+
+    e.mock_auths(&[MockAuth {
+        address: &user,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "unpause",
+            args: (&owner,).into_val(&e),
+            sub_invokes: &[],
+        },
+    }]);
+
+    client.unpause(&owner);
 }
 
 #[test]

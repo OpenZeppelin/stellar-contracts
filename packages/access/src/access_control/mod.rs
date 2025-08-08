@@ -90,17 +90,11 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{contracterror, Address, Env, Symbol};
+use soroban_sdk::{assert_with_error, contracterror, contracttrait, Address, Env, Symbol};
 
-pub use crate::access_control::storage::{
-    accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
-    ensure_if_admin_or_admin_role, ensure_role, get_admin, get_role_admin, get_role_member,
-    get_role_member_count, grant_role, grant_role_no_auth, has_role, remove_from_role_enumeration,
-    remove_role_accounts_count_no_auth, remove_role_admin_no_auth, renounce_admin, renounce_role,
-    revoke_role, revoke_role_no_auth, set_admin, set_role_admin, set_role_admin_no_auth,
-    transfer_admin_role, AccessControlStorageKey,
-};
+pub use crate::access_control::storage::{AccessControlStorageKey, AccessController};
 
+#[contracttrait(add_impl_type = true)]
 pub trait AccessControl {
     /// Returns `Some(index)` if the account has the specified role,
     /// where `index` is the position of the account for that role,
@@ -112,7 +106,8 @@ pub trait AccessControl {
     /// * `e` - Access to Soroban environment.
     /// * `account` - The account to check.
     /// * `role` - The role to check for.
-    fn has_role(e: &Env, account: Address, role: Symbol) -> Option<u32>;
+    fn has_role(e: &Env, account: &soroban_sdk::Address, role: &soroban_sdk::Symbol)
+        -> Option<u32>;
 
     /// Returns the total number of accounts that have the specified role.
     /// If the role does not exist, returns 0.
@@ -121,7 +116,7 @@ pub trait AccessControl {
     ///
     /// * `e` - Access to Soroban environment.
     /// * `role` - The role to get the count for.
-    fn get_role_member_count(e: &Env, role: Symbol) -> u32;
+    fn get_role_member_count(e: &Env, role: &soroban_sdk::Symbol) -> u32;
 
     /// Returns the account at the specified index for a given role.
     ///
@@ -140,9 +135,9 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::IndexOutOfBounds`] - If the index is out of
+    /// * [`AccessControllerror::IndexOutOfBounds`] - If the index is out of
     ///   bounds for the role's member list.
-    fn get_role_member(e: &Env, role: Symbol, index: u32) -> Address;
+    fn get_role_member(e: &Env, role: &soroban_sdk::Symbol, index: u32) -> Address;
 
     /// Returns the admin role for a specific role.
     /// If no admin role is explicitly set, returns `None`.
@@ -151,7 +146,7 @@ pub trait AccessControl {
     ///
     /// * `e` - Access to Soroban environment.
     /// * `role` - The role to query the admin role for.
-    fn get_role_admin(e: &Env, role: Symbol) -> Option<Symbol>;
+    fn get_role_admin(e: &Env, role: &soroban_sdk::Symbol) -> Option<soroban_sdk::Symbol>;
 
     /// Returns the admin account.
     ///
@@ -172,14 +167,14 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::Unauthorized`] - If the caller does not have
+    /// * [`AccessControllerror::Unauthorized`] - If the caller does not have
     ///   enough privileges.
     ///
     /// # Events
     ///
     /// * topics - `["role_granted", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
-    fn grant_role(e: &Env, caller: Address, account: Address, role: Symbol);
+    fn grant_role(e: &Env, caller: &Address, account: &Address, role: &soroban_sdk::Symbol);
 
     /// Revokes a role from an account.
     /// To revoke your own role, please use [`AccessControl::renounce_role()`]
@@ -195,17 +190,17 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::Unauthorized`] - If the `caller` does not have
+    /// * [`AccessControllerror::Unauthorized`] - If the `caller` does not have
     ///   enough privileges.
-    /// * [`AccessControlError::RoleNotHeld`] - If the `account` doesn't have
+    /// * [`AccessControllerror::RoleNotHeld`] - If the `account` doesn't have
     ///   the role.
-    /// * [`AccessControlError::RoleIsEmpty`] - If the role has no members.
+    /// * [`AccessControllerror::RoleIsEmpty`] - If the role has no members.
     ///
     /// # Events
     ///
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
-    fn revoke_role(e: &Env, caller: Address, account: Address, role: Symbol);
+    fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &soroban_sdk::Symbol);
 
     /// Allows an account to renounce a role assigned to itself.
     /// Users can only renounce roles for their own account.
@@ -219,15 +214,15 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::RoleNotHeld`] - If the `caller` doesn't have the
-    ///   role.
-    /// * [`AccessControlError::RoleIsEmpty`] - If the role has no members.
+    /// * [`AccessControllerror::RoleNotHeld`] - If the `caller` doesn't have
+    ///   the role.
+    /// * [`AccessControllerror::RoleIsEmpty`] - If the role has no members.
     ///
     /// # Events
     ///
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
-    fn renounce_role(e: &Env, caller: Address, role: Symbol);
+    fn renounce_role(e: &Env, caller: &Address, role: &soroban_sdk::Symbol);
 
     /// Initiates the admin role transfer.
     /// Admin privileges for the current admin are not revoked until the
@@ -253,7 +248,7 @@ pub trait AccessControl {
     /// * [`crate::role_transfer::RoleTransferError::InvalidPendingAccount`] -
     ///   If the specified pending account is not the same as the provided `new`
     ///   address.
-    /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+    /// * [`AccessControllerror::AdminNotSet`] - If admin account is not set.
     ///
     /// # Events
     ///
@@ -263,7 +258,7 @@ pub trait AccessControl {
     /// # Notes
     ///
     /// * Authorization for the current admin is required.
-    fn transfer_admin_role(e: &Env, new_admin: Address, live_until_ledger: u32);
+    fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32);
 
     /// Completes the 2-step admin transfer.
     ///
@@ -280,7 +275,7 @@ pub trait AccessControl {
     ///
     /// * [`crate::role_transfer::RoleTransferError::NoPendingTransfer`] - If
     ///   there is no pending transfer to accept.
-    /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+    /// * [`AccessControllerror::AdminNotSet`] - If admin account is not set.
     fn accept_admin_transfer(e: &Env);
 
     /// Sets `admin_role` as the admin role of `role`.
@@ -298,12 +293,12 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+    /// * [`AccessControllerror::AdminNotSet`] - If admin account is not set.
     ///
     /// # Notes
     ///
     /// * Authorization for the current admin is required.
-    fn set_role_admin(e: &Env, role: Symbol, admin_role: Symbol);
+    fn set_role_admin(e: &Env, role: &soroban_sdk::Symbol, admin_role: &soroban_sdk::Symbol);
 
     /// Allows the current admin to renounce their role, making the contract
     /// permanently admin-less. This is useful for decentralization purposes
@@ -316,7 +311,7 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
+    /// * [`AccessControllerror::AdminNotSet`] - If no admin account is set.
     ///
     /// # Events
     ///
@@ -327,6 +322,97 @@ pub trait AccessControl {
     ///
     /// * Authorization for the current admin is required.
     fn renounce_admin(e: &Env);
+
+    #[internal]
+    fn init_admin(e: &Env, admin: &soroban_sdk::Address);
+
+    #[internal]
+    fn enforce_admin_auth(e: &Env) {
+        let Some(admin) = Self::get_admin(e) else {
+            soroban_sdk::panic_with_error!(e, AccessControllerror::AdminNotSet);
+        };
+        admin.require_auth();
+    }
+
+    /// Ensures that the caller has the specified role.
+    /// This function is used to check if an account has a specific role.
+    /// The main purpose of this function is to act as a helper for the
+    /// `#[has_role]` macro.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `caller` - The address of the caller to check the role for.
+    /// * `role` - The role to check for.
+    ///
+    /// # Errors
+    ///
+    /// * [`AccessControllerror::Unauthorized`] - If the caller does not have
+    ///   the specified role.
+    #[internal]
+    fn ensure_role(e: &Env, caller: &soroban_sdk::Address, role: &soroban_sdk::Symbol) {
+        if Self::has_role(e, caller, role).is_none() {
+            soroban_sdk::panic_with_error!(e, AccessControllerror::Unauthorized);
+        }
+    }
+
+    #[internal]
+    fn ensure_if_admin_or_admin_role(
+        e: &Env,
+        caller: &soroban_sdk::Address,
+        role: &soroban_sdk::Symbol,
+    ) {
+        // Check if caller is contract admin (if one is set)
+        let is_admin = match Self::get_admin(e) {
+            Some(admin) => caller == &admin,
+            None => false,
+        };
+
+        // Check if caller has admin role for the specified role
+        let is_admin_role = match Self::get_role_admin(e, role) {
+            Some(admin_role) => Self::has_role(e, caller, &admin_role).is_some(),
+            None => false,
+        };
+
+        if !is_admin && !is_admin_role {
+            soroban_sdk::panic_with_error!(e, AccessControllerror::Unauthorized);
+        }
+    }
+
+    #[internal]
+    fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol);
+
+    #[internal]
+    fn remove_role_accounts_count_no_auth(e: &Env, role: &Symbol);
+
+    /// Removes the admin role for a specified role without performing
+    /// authorization checks.
+    ///
+    /// # Arguments
+    ///
+    /// * `role` - The role to remove the admin for.
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used:
+    /// - In admin functions that implement their own authorization logic
+    /// - When cleaning up unused roles
+    #[internal]
+    fn remove_role_admin_no_auth(e: &Env, role: &Symbol);
+
+    #[internal]
+    fn assert_has_any_role(e: &Env, caller: &Address, roles: &[&str]) {
+        assert_with_error!(
+            e,
+            roles.iter().any(|role| Self::has_role(
+                e,
+                caller,
+                &soroban_sdk::Symbol::new(e, role)).is_some()
+            ),
+            AccessControllerror::RoleNotHeld
+        );
+    }
 }
 
 // ################## ERRORS ##################
@@ -334,7 +420,7 @@ pub trait AccessControl {
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
-pub enum AccessControlError {
+pub enum AccessControllerror {
     Unauthorized = 1210,
     AdminNotSet = 1211,
     IndexOutOfBounds = 1212,

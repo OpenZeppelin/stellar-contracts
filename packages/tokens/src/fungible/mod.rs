@@ -69,16 +69,14 @@
 
 mod extensions;
 mod impl_token_interface_macro;
-mod overrides;
 mod storage;
 mod utils;
 
 mod test;
 
 pub use extensions::{allowlist, blocklist, burnable, capped};
-pub use overrides::{Base, ContractOverrides};
-use soroban_sdk::{contracterror, symbol_short, Address, Env, String};
-pub use storage::{AllowanceData, AllowanceKey, StorageKey};
+use soroban_sdk::{contracterror, contracttrait, symbol_short, Address, Env};
+pub use storage::{AllowanceData, AllowanceKey, FTBase, StorageKey};
 pub use utils::{sac_admin_generic, sac_admin_wrapper};
 
 /// Vanilla Fungible Token Trait
@@ -97,7 +95,7 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// as a method in this trait because it is not a part of the SEP-41 standard,
 /// the function signature may change depending on the implementation.
 ///
-/// We do provide a function [`crate::fungible::Base::mint`] for minting to
+/// We do provide a function [`crate::fungible::FTBase::mint`] for minting to
 /// cover the general use case.
 ///
 /// # Notes
@@ -122,8 +120,8 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// ```
 ///
 /// This trait is implemented for the following Contract Types:
-/// * [`crate::fungible::Base`] (covering the vanilla case, and compatible with
-///   [`crate::fungible::burnable::FungibleBurnable`]) trait
+/// * [`crate::fungible::FTBase`] (covering the vanilla case, and compatible
+///   with [`crate::fungible::burnable::FungibleBurnable`]) trait
 /// * [`crate::fungible::allowlist::AllowList`] (enabling the compatibility and
 ///   overrides for [`crate::fungible::allowlist::FungibleAllowList`]) trait,
 ///   incompatible with [`crate::fungible::blocklist::BlockList`] trait.
@@ -131,20 +129,14 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 ///   overrides for [`crate::fungible::blocklist::FungibleBlockList`]) trait,
 ///   incompatible with [`crate::fungible::allowlist::AllowList`] trait.
 ///
-/// You can find the default implementations of this trait for `Base`,
+/// You can find the default implementations of this trait for `FTBase`,
 /// `Allowlist`, and `Blocklist` by navigating to:
 /// `ContractType::{method_name}`. For example, if you want to find how
 /// [`FungibleToken::transfer`] is implemented for the `Allowlist` contract
 /// type, you can find it using
 /// [`crate::fungible::allowlist::AllowList::transfer`].
+#[contracttrait(add_impl_type = true)]
 pub trait FungibleToken {
-    /// Helper type that allows us to override some of the functionality of the
-    /// base trait based on the extensions implemented. You should use
-    /// [`crate::fungible::Base`] as the type if you are not using
-    /// [`crate::fungible::allowlist::AllowList`] or
-    /// [`crate::fungible::blocklist::BlockList`] extensions.
-    type ContractType: ContractOverrides;
-
     /// Returns the total amount of tokens in circulation.
     ///
     /// # Arguments
@@ -158,7 +150,7 @@ pub trait FungibleToken {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address for which the balance is being queried.
-    fn balance(e: &Env, account: Address) -> i128;
+    fn balance(e: &Env, account: &soroban_sdk::Address) -> i128;
 
     /// Returns the amount of tokens a `spender` is allowed to spend on behalf
     /// of an `owner`.
@@ -168,7 +160,7 @@ pub trait FungibleToken {
     /// * `e` - Access to Soroban environment.
     /// * `owner` - The address holding the tokens.
     /// * `spender` - The address authorized to spend the tokens.
-    fn allowance(e: &Env, owner: Address, spender: Address) -> i128;
+    fn allowance(e: &Env, owner: &soroban_sdk::Address, spender: &soroban_sdk::Address) -> i128;
 
     /// Transfers `amount` of tokens from `from` to `to`.
     ///
@@ -189,7 +181,7 @@ pub trait FungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
-    fn transfer(e: &Env, from: Address, to: Address, amount: i128);
+    fn transfer(e: &Env, from: &soroban_sdk::Address, to: &soroban_sdk::Address, amount: i128);
 
     /// Transfers `amount` of tokens from `from` to `to` using the
     /// allowance mechanism. `amount` is then deducted from `spender`
@@ -216,7 +208,13 @@ pub trait FungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128);
+    fn transfer_from(
+        e: &Env,
+        spender: &soroban_sdk::Address,
+        from: &soroban_sdk::Address,
+        to: &soroban_sdk::Address,
+        amount: i128,
+    );
 
     /// Sets the amount of tokens a `spender` is allowed to spend on behalf of
     /// an `owner`. Overrides any existing allowance set between `spender` and
@@ -242,7 +240,13 @@ pub trait FungibleToken {
     ///
     /// * topics - `["approve", from: Address, spender: Address]`
     /// * data - `[amount: i128, live_until_ledger: u32]`
-    fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32);
+    fn approve(
+        e: &Env,
+        owner: &soroban_sdk::Address,
+        spender: &soroban_sdk::Address,
+        amount: i128,
+        live_until_ledger: u32,
+    );
 
     /// Returns the number of decimals used to represent amounts of this token.
     ///
@@ -256,14 +260,69 @@ pub trait FungibleToken {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    fn name(e: &Env) -> String;
+    fn name(e: &Env) -> soroban_sdk::String;
 
     /// Returns the symbol for this token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    fn symbol(e: &Env) -> String;
+    fn symbol(e: &Env) -> soroban_sdk::String;
+
+    // ### Internal Methods ###
+
+    /// Creates `amount` of tokens and assigns them to `to`. Updates
+    /// the total supply accordingly.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to` - The address receiving the new tokens.
+    /// * `amount` - The amount of tokens to mint.
+    ///
+    /// # Errors
+    ///
+    /// refer to [`update`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["mint", to: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// # Security Warning
+    ///
+    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+    ///
+    /// It is the responsibility of the implementer to establish appropriate
+    /// access controls to ensure that only authorized accounts can execute
+    /// minting operations. Failure to implement proper authorization could
+    /// lead to security vulnerabilities and unauthorized token creation.
+    ///
+    /// You probably want to do something like this (pseudo-code):
+    ///
+    /// ```ignore
+    /// let admin = read_administrator(e);
+    /// admin.require_auth();
+    /// ```
+    #[internal]
+    fn internal_mint(e: &Env, to: &soroban_sdk::Address, amount: i128);
+
+    /// Sets the token metadata such as decimals, name and symbol.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `decimals` - The number of decimals.
+    /// * `name` - The name of the token.
+    /// * `symbol` - The symbol of the token.
+    ///
+    /// # Notes
+    ///
+    /// **IMPORTANT**: This function lacks authorization controls. You want to
+    /// invoke it most likely from a constructor or from another function with
+    /// admin-only authorization.
+    #[internal]
+    fn set_metadata(e: &Env, decimals: u32, name: soroban_sdk::String, symbol: soroban_sdk::String);
 }
 
 // ################## ERRORS ##################

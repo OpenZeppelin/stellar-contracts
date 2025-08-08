@@ -3,8 +3,8 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
 use crate::{
     access_control::{
         emit_admin_renounced, emit_admin_transfer_completed, emit_admin_transfer_initiated,
-        emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControlError,
-        ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
+        emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControl,
+        AccessControllerror, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
     },
     role_transfer::{accept_transfer, transfer_role},
 };
@@ -25,6 +25,111 @@ pub enum AccessControlStorageKey {
     RoleAdmin(Symbol),            // role -> the admin role
     Admin,
     PendingAdmin,
+}
+
+pub struct AccessController;
+
+impl AccessControl for AccessController {
+    type Impl = Self;
+
+    fn has_role(
+        e: &Env,
+        account: &soroban_sdk::Address,
+        role: &soroban_sdk::Symbol,
+    ) -> Option<u32> {
+        has_role(e, account, role)
+    }
+
+    fn get_role_member_count(e: &Env, role: &soroban_sdk::Symbol) -> u32 {
+        get_role_member_count(e, role)
+    }
+
+    fn get_role_member(e: &Env, role: &soroban_sdk::Symbol, index: u32) -> Address {
+        get_role_member(e, role, index)
+    }
+
+    fn get_role_admin(e: &Env, role: &soroban_sdk::Symbol) -> Option<soroban_sdk::Symbol> {
+        get_role_admin(e, role)
+    }
+
+    fn get_admin(e: &Env) -> Option<Address> {
+        get_admin(e)
+    }
+
+    fn grant_role(e: &Env, caller: &Address, account: &Address, role: &soroban_sdk::Symbol) {
+        grant_role(e, caller, account, role)
+    }
+
+    fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &soroban_sdk::Symbol) {
+        revoke_role(e, caller, account, role)
+    }
+
+    fn renounce_role(e: &Env, caller: &Address, role: &soroban_sdk::Symbol) {
+        renounce_role(e, caller, role)
+    }
+
+    fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32) {
+        transfer_admin_role(e, new_admin, live_until_ledger)
+    }
+
+    fn accept_admin_transfer(e: &Env) {
+        accept_admin_transfer(e)
+    }
+
+    fn set_role_admin(e: &Env, role: &soroban_sdk::Symbol, admin_role: &soroban_sdk::Symbol) {
+        set_role_admin(e, role, admin_role)
+    }
+
+    fn renounce_admin(e: &Env) {
+        renounce_admin(e)
+    }
+
+    fn init_admin(e: &Env, admin: &soroban_sdk::Address) {
+        set_admin(e, admin);
+    }
+
+    fn enforce_admin_auth(e: &Env) {
+        let Some(admin) = Self::get_admin(e) else {
+            soroban_sdk::panic_with_error!(e, AccessControllerror::AdminNotSet);
+        };
+        admin.require_auth();
+    }
+
+    fn ensure_role(e: &Env, caller: &soroban_sdk::Address, role: &soroban_sdk::Symbol) {
+        if Self::has_role(e, caller, role).is_none() {
+            soroban_sdk::panic_with_error!(e, AccessControllerror::Unauthorized);
+        }
+    }
+
+    fn ensure_if_admin_or_admin_role(
+        e: &Env,
+        caller: &soroban_sdk::Address,
+        role: &soroban_sdk::Symbol,
+    ) {
+        let is_admin = match Self::get_admin(e) {
+            Some(admin) => caller == &admin,
+            None => false,
+        };
+        let is_admin_role = match Self::get_role_admin(e, role) {
+            Some(admin_role) => Self::has_role(e, caller, &admin_role).is_some(),
+            None => false,
+        };
+        if !is_admin && !is_admin_role {
+            soroban_sdk::panic_with_error!(e, AccessControllerror::Unauthorized);
+        }
+    }
+
+    fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
+        grant_role_no_auth(e, caller, account, role)
+    }
+
+    fn remove_role_accounts_count_no_auth(e: &Env, role: &Symbol) {
+        remove_role_accounts_count_no_auth(e, role)
+    }
+
+    fn remove_role_admin_no_auth(e: &Env, role: &Symbol) {
+        remove_role_admin_no_auth(e, role)
+    }
 }
 
 // ################## QUERY STATE ##################
@@ -84,7 +189,7 @@ pub fn get_role_member_count(e: &Env, role: &Symbol) -> u32 {
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::IndexOutOfBounds`] - If the indexing is out of
+/// * [`AccessControllerror::IndexOutOfBounds`] - If the indexing is out of
 ///   bounds.
 pub fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {
     let key = AccessControlStorageKey::RoleAccounts(RoleAccountKey { role: role.clone(), index });
@@ -93,7 +198,7 @@ pub fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {
         e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
         account
     } else {
-        panic_with_error!(e, AccessControlError::IndexOutOfBounds)
+        panic_with_error!(e, AccessControllerror::IndexOutOfBounds)
     }
 }
 
@@ -126,14 +231,14 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::AdminAlreadySet`] - If the admin is already set.
+/// * [`AccessControllerror::AdminAlreadySet`] - If the admin is already set.
 ///
 /// **IMPORTANT**: this function lacks authorization checks.
 /// It is expected to call this function only in the constructor!
 pub fn set_admin(e: &Env, admin: &Address) {
     // Check if admin is already set
     if e.storage().instance().has(&AccessControlStorageKey::Admin) {
-        panic_with_error!(e, AccessControlError::AdminAlreadySet);
+        panic_with_error!(e, AccessControllerror::AdminAlreadySet);
     }
     e.storage().instance().set(&AccessControlStorageKey::Admin, &admin);
 }
@@ -245,7 +350,7 @@ pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) 
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::RoleNotHeld`] - If the `account` doesn't have the
+/// * [`AccessControllerror::RoleNotHeld`] - If the `account` doesn't have the
 ///   role.
 /// * refer to [`remove_from_role_enumeration`] errors.
 ///
@@ -266,7 +371,7 @@ pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) 
 pub fn revoke_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
     // Check if account has the role
     if has_role(e, account, role).is_none() {
-        panic_with_error!(e, AccessControlError::RoleNotHeld);
+        panic_with_error!(e, AccessControllerror::RoleNotHeld);
     }
 
     remove_from_role_enumeration(e, account, role);
@@ -289,7 +394,7 @@ pub fn revoke_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::RoleNotHeld`] - If the `caller` doesn't have the
+/// * [`AccessControllerror::RoleNotHeld`] - If the `caller` doesn't have the
 ///   role.
 /// * refer to [`remove_from_role_enumeration`] errors.
 ///
@@ -306,7 +411,7 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 
     // Check if account has the role
     if has_role(e, caller, role).is_none() {
-        panic_with_error!(e, AccessControlError::RoleNotHeld);
+        panic_with_error!(e, AccessControllerror::RoleNotHeld);
     }
 
     remove_from_role_enumeration(e, caller, role);
@@ -334,7 +439,7 @@ pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+/// * [`AccessControllerror::AdminNotSet`] - If admin account is not set.
 /// * refer to [`transfer_role`] errors.
 ///
 /// # Events
@@ -361,7 +466,7 @@ pub fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32)
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+/// * [`AccessControllerror::AdminNotSet`] - If admin account is not set.
 /// * refer to [`accept_transfer`] errors.
 ///
 /// # Events
@@ -374,7 +479,7 @@ pub fn transfer_admin_role(e: &Env, new_admin: &Address, live_until_ledger: u32)
 /// * Authorization for the pending admin is required.
 pub fn accept_admin_transfer(e: &Env) {
     let Some(previous_admin) = get_admin(e) else {
-        panic_with_error!(e, AccessControlError::AdminNotSet);
+        panic_with_error!(e, AccessControllerror::AdminNotSet);
     };
 
     let new_admin =
@@ -399,14 +504,14 @@ pub fn accept_admin_transfer(e: &Env) {
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+/// * [`AccessControllerror::AdminNotSet`] - If admin account is not set.
 ///
 /// # Notes
 ///
 /// * Authorization for the current admin is required.
 pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
     let Some(admin) = get_admin(e) else {
-        panic_with_error!(e, AccessControlError::AdminNotSet);
+        panic_with_error!(e, AccessControllerror::AdminNotSet);
     };
     admin.require_auth();
 
@@ -424,7 +529,7 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
+/// * [`AccessControllerror::AdminNotSet`] - If no admin account is set.
 ///
 /// # Events
 ///
@@ -492,20 +597,6 @@ pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
     emit_role_admin_changed(e, role, &previous_admin_role, admin_role);
 }
 
-/// Removes the admin role for a specified role without performing authorization
-/// checks.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `role` - The role to remove the admin for.
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should only
-/// be used:
-/// - In admin functions that implement their own authorization logic
-/// - When cleaning up unused roles
 pub fn remove_role_admin_no_auth(e: &Env, role: &Symbol) {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
 
@@ -513,7 +604,7 @@ pub fn remove_role_admin_no_auth(e: &Env, role: &Symbol) {
     if e.storage().persistent().has(&key) {
         e.storage().persistent().remove(&key);
     } else {
-        panic_with_error!(e, AccessControlError::AdminRoleNotFound);
+        panic_with_error!(e, AccessControllerror::AdminRoleNotFound);
     }
 }
 
@@ -539,10 +630,10 @@ pub fn remove_role_accounts_count_no_auth(e: &Env, role: &Symbol) {
         if count == 0 {
             e.storage().persistent().remove(&count_key);
         } else {
-            panic_with_error!(e, AccessControlError::RoleCountIsNotZero);
+            panic_with_error!(e, AccessControllerror::RoleCountIsNotZero);
         }
     } else {
-        panic_with_error!(e, AccessControlError::RoleNotFound);
+        panic_with_error!(e, AccessControllerror::RoleNotFound);
     }
 }
 
@@ -559,7 +650,7 @@ pub fn remove_role_accounts_count_no_auth(e: &Env, role: &Symbol) {
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::Unauthorized`] - If the caller is neither the
+/// * [`AccessControllerror::Unauthorized`] - If the caller is neither the
 ///   contract admin nor has the admin role.
 pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
     // Check if caller is contract admin (if one is set)
@@ -575,28 +666,7 @@ pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
     };
 
     if !is_admin && !is_admin_role {
-        panic_with_error!(e, AccessControlError::Unauthorized);
-    }
-}
-
-/// Ensures that the caller has the specified role.
-/// This function is used to check if an account has a specific role.
-/// The main purpose of this function is to act as a helper for the
-/// `#[has_role]` macro.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller to check the role for.
-/// * `role` - The role to check for.
-///
-/// # Errors
-///
-/// * [`AccessControlError::Unauthorized`] - If the caller does not have the
-///   specified role.
-pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
-    if has_role(e, caller, role).is_none() {
-        panic_with_error!(e, AccessControlError::Unauthorized);
+        panic_with_error!(e, AccessControllerror::Unauthorized);
     }
 }
 
@@ -613,10 +683,10 @@ pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+/// * [`AccessControllerror::AdminNotSet`] - If admin account is not set.
 pub fn enforce_admin_auth(e: &Env) -> Address {
     let Some(admin) = get_admin(e) else {
-        panic_with_error!(e, AccessControlError::AdminNotSet);
+        panic_with_error!(e, AccessControllerror::AdminNotSet);
     };
 
     admin.require_auth();
@@ -658,15 +728,15 @@ pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
 ///
 /// # Errors
 ///
-/// * [`AccessControlError::RoleIsEmpty`] - If the role has no members.
-/// * [`AccessControlError::RoleNotHeld`] - If the `account` doesn't have the
+/// * [`AccessControllerror::RoleIsEmpty`] - If the role has no members.
+/// * [`AccessControllerror::RoleNotHeld`] - If the `account` doesn't have the
 ///   role.
 pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     // Get the current count of accounts with this role
     let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());
     let count = e.storage().persistent().get(&count_key).unwrap_or(0);
     if count == 0 {
-        panic_with_error!(e, AccessControlError::RoleIsEmpty);
+        panic_with_error!(e, AccessControllerror::RoleIsEmpty);
     }
 
     // Get the index of the account to remove
@@ -676,7 +746,7 @@ pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
         .storage()
         .persistent()
         .get::<_, u32>(&to_be_removed_has_role_key)
-        .unwrap_or_else(|| panic_with_error!(e, AccessControlError::RoleNotHeld));
+        .unwrap_or_else(|| panic_with_error!(e, AccessControllerror::RoleNotHeld));
 
     // Get the index of the last account for that role
     let last_index = count - 1;

@@ -1,9 +1,9 @@
 use soroban_sdk::{
     contract, contractimpl, contracttype, testutils::Address as _, Address, Env, String,
 };
-use stellar_access::ownable::{set_owner, Ownable};
-use stellar_macros::{default_impl, only_owner};
-use stellar_tokens::fungible::{Base, FungibleToken};
+use stellar_access::{Ownable, Owner};
+use stellar_macros::only_owner;
+use stellar_tokens::{FTBase, FungibleToken};
 
 #[contracttype]
 pub enum DataKey {
@@ -14,27 +14,27 @@ pub enum DataKey {
 pub struct ExampleContract;
 
 #[contractimpl]
+impl FungibleToken for ExampleContract {
+    type Impl = FTBase;
+}
+
+#[contractimpl]
+impl Ownable for ExampleContract {
+    type Impl = Owner;
+}
+
+#[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        set_owner(e, &owner);
-        Base::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
+        Self::set_owner(e, &owner);
+        Self::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
     }
 
     #[only_owner]
     pub fn mint(e: &Env, to: Address, amount: i128) {
-        Base::mint(e, &to, amount);
+        Self::internal_mint(e, &to, amount);
     }
 }
-
-#[default_impl]
-#[contractimpl]
-impl FungibleToken for ExampleContract {
-    type ContractType = Base;
-}
-
-#[default_impl]
-#[contractimpl]
-impl Ownable for ExampleContract {}
 
 fn create_client<'a>(e: &Env, owner: &Address) -> ExampleContractClient<'a> {
     let address = e.register(ExampleContract, (owner,));
@@ -45,7 +45,7 @@ fn create_client<'a>(e: &Env, owner: &Address) -> ExampleContractClient<'a> {
 fn default_impl_ownable() {
     let e = Env::default();
     let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let client: ExampleContractClient<'_> = create_client(&e, &owner);
 
     e.mock_all_auths();
 
