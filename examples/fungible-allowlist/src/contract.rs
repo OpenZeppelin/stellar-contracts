@@ -6,7 +6,7 @@
 //! accounts.
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
-use stellar_access::{AccessControl, AccessControler};
+use stellar_access::{AccessControl, AccessController};
 use stellar_macros::only_role;
 use stellar_tokens::{AllowList, FTBase, FungibleAllowList, FungibleBurnable, FungibleToken};
 
@@ -72,7 +72,7 @@ impl FungibleBurnable for ExampleContract {
 
 #[contractimpl]
 impl AccessControl for ExampleContract {
-    type Impl = AccessControler;
+    type Impl = AccessController;
 }
 
 #[contractimpl]

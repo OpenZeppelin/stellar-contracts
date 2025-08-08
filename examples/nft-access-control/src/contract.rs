@@ -3,7 +3,7 @@
 //! Demonstrates how can Access Control be utilized.
 
 use soroban_sdk::{contract, contractimpl, vec, Address, Env, String, Vec};
-use stellar_access::{AccessControl, AccessControler};
+use stellar_access::{AccessControl, AccessController};
 use stellar_macros::{has_any_role, has_role, only_admin, only_any_role, only_role};
 use stellar_tokens::{NFTBase, NonFungibleBurnable, NonFungibleToken};
 
@@ -56,7 +56,7 @@ impl NonFungibleToken for ExampleContract {
 
 #[contractimpl]
 impl AccessControl for ExampleContract {
-    type Impl = AccessControler;
+    type Impl = AccessController;
 }
 
 // for this contract, the `burn*` functions are only meant to be called by

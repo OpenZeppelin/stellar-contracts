@@ -92,7 +92,7 @@ mod test;
 
 use soroban_sdk::{assert_with_error, contracterror, contracttrait, Address, Env, Symbol};
 
-pub use crate::access_control::storage::{AccessControlStorageKey, AccessControler};
+pub use crate::access_control::storage::{AccessControlStorageKey, AccessController};
 
 #[contracttrait(add_impl_type = true)]
 pub trait AccessControl {
@@ -135,7 +135,7 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::IndexOutOfBounds`] - If the index is out of
+    /// * [`AccessControllerror::IndexOutOfBounds`] - If the index is out of
     ///   bounds for the role's member list.
     fn get_role_member(e: &Env, role: &soroban_sdk::Symbol, index: u32) -> Address;
 
@@ -167,7 +167,7 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::Unauthorized`] - If the caller does not have
+    /// * [`AccessControllerror::Unauthorized`] - If the caller does not have
     ///   enough privileges.
     ///
     /// # Events
@@ -190,11 +190,11 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::Unauthorized`] - If the `caller` does not have
+    /// * [`AccessControllerror::Unauthorized`] - If the `caller` does not have
     ///   enough privileges.
-    /// * [`AccessControlError::RoleNotHeld`] - If the `account` doesn't have
+    /// * [`AccessControllerror::RoleNotHeld`] - If the `account` doesn't have
     ///   the role.
-    /// * [`AccessControlError::RoleIsEmpty`] - If the role has no members.
+    /// * [`AccessControllerror::RoleIsEmpty`] - If the role has no members.
     ///
     /// # Events
     ///
@@ -214,9 +214,9 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::RoleNotHeld`] - If the `caller` doesn't have the
+    /// * [`AccessControllerror::RoleNotHeld`] - If the `caller` doesn't have the
     ///   role.
-    /// * [`AccessControlError::RoleIsEmpty`] - If the role has no members.
+    /// * [`AccessControllerror::RoleIsEmpty`] - If the role has no members.
     ///
     /// # Events
     ///
@@ -248,7 +248,7 @@ pub trait AccessControl {
     /// * [`crate::role_transfer::RoleTransferError::InvalidPendingAccount`] -
     ///   If the specified pending account is not the same as the provided `new`
     ///   address.
-    /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+    /// * [`AccessControllerror::AdminNotSet`] - If admin account is not set.
     ///
     /// # Events
     ///
@@ -275,7 +275,7 @@ pub trait AccessControl {
     ///
     /// * [`crate::role_transfer::RoleTransferError::NoPendingTransfer`] - If
     ///   there is no pending transfer to accept.
-    /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+    /// * [`AccessControllerror::AdminNotSet`] - If admin account is not set.
     fn accept_admin_transfer(e: &Env);
 
     /// Sets `admin_role` as the admin role of `role`.
@@ -293,7 +293,7 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
+    /// * [`AccessControllerror::AdminNotSet`] - If admin account is not set.
     ///
     /// # Notes
     ///
@@ -311,7 +311,7 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
+    /// * [`AccessControllerror::AdminNotSet`] - If no admin account is set.
     ///
     /// # Events
     ///
@@ -329,7 +329,7 @@ pub trait AccessControl {
     #[internal]
     fn enforce_admin_auth(e: &Env) {
         let Some(admin) = Self::get_admin(e) else {
-            soroban_sdk::panic_with_error!(e, AccessControlError::AdminNotSet);
+            soroban_sdk::panic_with_error!(e, AccessControllerror::AdminNotSet);
         };
         admin.require_auth();
     }
@@ -347,12 +347,12 @@ pub trait AccessControl {
     ///
     /// # Errors
     ///
-    /// * [`AccessControlError::Unauthorized`] - If the caller does not have the
+    /// * [`AccessControllerror::Unauthorized`] - If the caller does not have the
     ///   specified role.
     #[internal]
     fn ensure_role(e: &Env, caller: &soroban_sdk::Address, role: &soroban_sdk::Symbol) {
         if Self::has_role(e, caller, role).is_none() {
-            soroban_sdk::panic_with_error!(e, AccessControlError::Unauthorized);
+            soroban_sdk::panic_with_error!(e, AccessControllerror::Unauthorized);
         }
     }
 
@@ -375,7 +375,7 @@ pub trait AccessControl {
         };
 
         if !is_admin && !is_admin_role {
-            soroban_sdk::panic_with_error!(e, AccessControlError::Unauthorized);
+            soroban_sdk::panic_with_error!(e, AccessControllerror::Unauthorized);
         }
     }
 
@@ -410,7 +410,7 @@ pub trait AccessControl {
                 caller,
                 &soroban_sdk::Symbol::new(e, role)).is_some()
             ),
-            AccessControlError::RoleNotHeld
+            AccessControllerror::RoleNotHeld
         );
     }
 }
@@ -420,7 +420,7 @@ pub trait AccessControl {
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
-pub enum AccessControlError {
+pub enum AccessControllerror {
     Unauthorized = 1210,
     AdminNotSet = 1211,
     IndexOutOfBounds = 1212,

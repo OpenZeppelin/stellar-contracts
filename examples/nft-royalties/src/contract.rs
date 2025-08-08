@@ -5,7 +5,7 @@
 //! standard.
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol};
-use stellar_access::{AccessControl, AccessControler};
+use stellar_access::{AccessControl, AccessController};
 use stellar_macros::{only_admin, only_role};
 use stellar_tokens::{NFTBase, NonFungibleRoyalties, NonFungibleToken};
 
@@ -52,7 +52,7 @@ impl ExampleContract {
 
 #[contractimpl]
 impl AccessControl for ExampleContract {
-    type Impl = AccessControler;
+    type Impl = AccessController;
 }
 
 #[contractimpl]
