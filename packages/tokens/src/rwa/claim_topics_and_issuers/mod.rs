@@ -161,19 +161,19 @@ pub trait ClaimTopicsAndIssuers {
 #[repr(u32)]
 pub enum ClaimTopicsAndIssuersError {
     /// Indicates a non-existent claim topic.
-    ClaimTopicDoesNotExist = 340,
+    ClaimTopicDoesNotExist = 370,
     /// Indicates a non-existent trusted issuer.
-    IssuerDoesNotExist = 341,
+    IssuerDoesNotExist = 371,
     /// Indicates a claim topic already exists.
-    ClaimTopicAlreadyExists = 342,
+    ClaimTopicAlreadyExists = 372,
     /// Indicates a trusted issuer already exists.
-    IssuerAlreadyExists = 343,
+    IssuerAlreadyExists = 373,
     /// Indicates max claim topics limit is reached.
-    MaxClaimTopicsLimitReached = 344,
+    MaxClaimTopicsLimitReached = 374,
     /// Indicates max trusted issuers limit is reached.
-    MaxIssuersLimitReached = 345,
+    MaxIssuersLimitReached = 375,
     /// Indicates claim topics set provided for the issuer cannot be empty.
-    ClaimTopicsSetCannotBeEmpty = 346,
+    ClaimTopicsSetCannotBeEmpty = 376,
 }
 
 // ################## CONSTANTS ##################

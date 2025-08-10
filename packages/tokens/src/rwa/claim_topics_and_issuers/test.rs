@@ -54,7 +54,7 @@ fn add_multiple_claim_topics_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #342)")]
+#[should_panic(expected = "Error(Contract, #372)")]
 fn add_duplicate_claim_topic_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -75,7 +75,7 @@ fn add_duplicate_claim_topic_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #344)")]
+#[should_panic(expected = "Error(Contract, #374)")]
 fn add_claim_topic_exceeds_limit_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -115,7 +115,7 @@ fn remove_claim_topic_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #340)")]
+#[should_panic(expected = "Error(Contract, #370)")]
 fn remove_nonexistent_claim_topic_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -207,7 +207,7 @@ fn add_multiple_trusted_issuers_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #346)")]
+#[should_panic(expected = "Error(Contract, #376)")]
 fn add_trusted_issuer_empty_topics_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -221,7 +221,7 @@ fn add_trusted_issuer_empty_topics_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #344)")]
+#[should_panic(expected = "Error(Contract, #374)")]
 fn add_trusted_issuer_too_many_topics_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -240,7 +240,7 @@ fn add_trusted_issuer_too_many_topics_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #343)")]
+#[should_panic(expected = "Error(Contract, #373)")]
 fn add_duplicate_trusted_issuer_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -262,7 +262,7 @@ fn add_duplicate_trusted_issuer_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #345)")]
+#[should_panic(expected = "Error(Contract, #375)")]
 fn add_trusted_issuer_exceeds_limit_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -325,7 +325,7 @@ fn remove_trusted_issuer_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #341)")]
+#[should_panic(expected = "Error(Contract, #371)")]
 fn remove_nonexistent_trusted_issuer_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -489,7 +489,7 @@ fn update_issuer_claim_topics_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #346)")]
+#[should_panic(expected = "Error(Contract, #376)")]
 fn update_issuer_claim_topics_empty_topics_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -512,7 +512,7 @@ fn update_issuer_claim_topics_empty_topics_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #344)")]
+#[should_panic(expected = "Error(Contract, #374)")]
 fn update_issuer_claim_topics_too_many_topics_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -538,7 +538,7 @@ fn update_issuer_claim_topics_too_many_topics_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #341)")]
+#[should_panic(expected = "Error(Contract, #371)")]
 fn update_nonexistent_issuer_claim_topics_panics() {
     let e = Env::default();
     e.mock_all_auths();

@@ -1,8 +1,8 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol, Vec};
+use soroban_sdk::{contracttype, panic_with_error, vec, Address, Env, IntoVal, Symbol, Vec};
 
 use crate::rwa::compliance::{
-    emit_module_added, emit_module_removed, Compliance, ComplianceError, ComplianceModule,
-    HookType, COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
+    emit_module_added, emit_module_removed, ComplianceError, HookType, COMPLIANCE_EXTEND_AMOUNT,
+    COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
 };
 
 /// Storage keys for the modular compliance contract.
@@ -15,11 +15,57 @@ pub enum DataKey {
     ModuleRegistered(HookType, Address),
 }
 
+// ################## QUERY STATE ##################
+
+/// Returns all modules registered for a specific hook type.
+///
+/// Extends the TTL of the storage entry if it exists to ensure data
+/// availability for future operations.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `hook` - The hook type to query modules for.
+///
+/// # Returns
+///
+/// A vector of module addresses registered for the specified hook.
+/// Returns an empty vector if no modules are registered.
+pub fn get_modules_for_hook(e: &Env, hook: HookType) -> Vec<Address> {
+    let key = DataKey::HookModules(hook);
+    if let Some(existing_modules) = e.storage().persistent().get(&key) {
+        e.storage().persistent().extend_ttl(
+            &key,
+            COMPLIANCE_TTL_THRESHOLD,
+            COMPLIANCE_EXTEND_AMOUNT,
+        );
+        existing_modules
+    } else {
+        Vec::new(e)
+    }
+}
+
+/// Checks if a module is registered for a specific hook type.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `hook` - The hook type to check.
+/// * `module` - The address of the module to check.
+///
+/// # Returns
+///
+/// `true` if the module is registered for the hook, `false` otherwise.
+pub fn is_module_registered(e: &Env, hook: HookType, module: Address) -> bool {
+    let existence_key = DataKey::ModuleRegistered(hook, module);
+    e.storage().persistent().get::<_, ()>(&existence_key).is_some()
+}
+
 // ################## CHANGE STATE ##################
 
 /// Registers a compliance module for a specific hook type.
 ///
-/// This allows modules to opt-in to only the events they care about.
+/// This allows modules to opt-in to the events they care about.
 ///
 /// # Arguments
 ///
@@ -51,7 +97,7 @@ pub enum DataKey {
 pub fn add_module_to(e: &Env, hook: HookType, module: Address) {
     // Check if module is already registered
     let existence_key = DataKey::ModuleRegistered(hook.clone(), module.clone());
-    if e.storage().persistent().get(&existence_key).is_some() {
+    if e.storage().persistent().get::<_, ()>(&existence_key).is_some() {
         e.storage().persistent().extend_ttl(
             &existence_key,
             COMPLIANCE_TTL_THRESHOLD,
@@ -109,7 +155,7 @@ pub fn add_module_to(e: &Env, hook: HookType, module: Address) {
 pub fn remove_module_from(e: &Env, hook: HookType, module: Address) {
     // Check if module is registered
     let existence_key = DataKey::ModuleRegistered(hook.clone(), module.clone());
-    if e.storage().persistent().get(&existence_key).is_none() {
+    if e.storage().persistent().get::<_, ()>(&existence_key).is_none() {
         panic_with_error!(e, ComplianceError::ModuleNotRegistered);
     }
 
@@ -119,7 +165,7 @@ pub fn remove_module_from(e: &Env, hook: HookType, module: Address) {
         e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
 
     // Remove the module
-    let index = modules.iter().position(|x| x == module).expect("module exists");
+    let index = modules.iter().position(|x| x == module).expect("module exists") as u32;
     modules.remove(index);
 
     // Update storage
@@ -130,52 +176,6 @@ pub fn remove_module_from(e: &Env, hook: HookType, module: Address) {
 
     // Emit event
     emit_module_removed(e, hook, module);
-}
-
-// ################## QUERY STATE ##################
-
-/// Returns all modules registered for a specific hook type.
-///
-/// Extends the TTL of the storage entry if it exists to ensure data
-/// availability for future operations.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `hook` - The hook type to query modules for.
-///
-/// # Returns
-///
-/// A vector of module addresses registered for the specified hook.
-/// Returns an empty vector if no modules are registered.
-pub fn get_modules_for_hook(e: &Env, hook: HookType) -> Vec<Address> {
-    let key = DataKey::HookModules(hook);
-    if let Some(existing_modules) = e.storage().persistent().get(&key) {
-        e.storage().persistent().extend_ttl(
-            &key,
-            COMPLIANCE_TTL_THRESHOLD,
-            COMPLIANCE_EXTEND_AMOUNT,
-        );
-        existing_modules
-    } else {
-        Vec::new(e)
-    }
-}
-
-/// Checks if a module is registered for a specific hook type.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `hook` - The hook type to check.
-/// * `module` - The address of the module to check.
-///
-/// # Returns
-///
-/// `true` if the module is registered for the hook, `false` otherwise.
-pub fn is_module_registered(e: &Env, hook: HookType, module: Address) -> bool {
-    let existence_key = DataKey::ModuleRegistered(hook, module);
-    e.storage().persistent().get(&existence_key).is_some()
 }
 
 // ################## HOOK EXECUTION ##################
@@ -201,8 +201,11 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
 
     // Call each registered module
     for module_address in modules.iter() {
-        let _result: () =
-            e.invoke_contract(&module_address, &Symbol::from("on_transfer"), (from, to, amount));
+        let _result: () = e.invoke_contract(
+            &module_address,
+            &Symbol::new(e, "on_transfer"),
+            vec![&e, from.to_val(), to.to_val(), amount.into_val(e)],
+        );
     }
 }
 
@@ -220,13 +223,16 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
 /// # Cross-Contract Calls
 ///
 /// Invokes `on_mint(to, amount)` on each registered module.
-pub fn created(e: &Env, to: Address, amount: i128) {
+pub fn created(e: &Env, to: Address, amount: u32) {
     let modules = get_modules_for_hook(e, HookType::Created);
 
     // Call each registered module
     for module_address in modules.iter() {
-        let _result: () =
-            e.invoke_contract(&module_address, &Symbol::from("on_created"), (to, amount));
+        let _result: () = e.invoke_contract(
+            &module_address,
+            &Symbol::new(e, "on_created"),
+            vec![&e, to.to_val(), amount.into_val(e)],
+        );
     }
 }
 
@@ -249,8 +255,11 @@ pub fn destroyed(e: &Env, from: Address, amount: i128) {
 
     // Call each registered module
     for module_address in modules.iter() {
-        let _result: () =
-            e.invoke_contract(&module_address, &Symbol::from("on_destroyed"), (from, amount));
+        let _result: () = e.invoke_contract(
+            &module_address,
+            &Symbol::new(e, "on_destroyed"),
+            vec![&e, from.to_val(), amount.into_val(e)],
+        );
     }
 }
 
@@ -283,8 +292,11 @@ pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
 
     // Call each registered module and check if all return true
     for module_address in modules.iter() {
-        let result: bool =
-            e.invoke_contract(&module_address, &Symbol::from("can_transfer"), (from, to, amount));
+        let result: bool = e.invoke_contract(
+            &module_address,
+            &Symbol::new(e, "can_transfer"),
+            vec![&e, from.to_val(), to.to_val(), amount.into_val(e)],
+        );
 
         // If any module returns false, the entire check fails
         if !result {

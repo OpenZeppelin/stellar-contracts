@@ -2,6 +2,9 @@ use soroban_sdk::{contracterror, contracttype, Address, Env, String, Symbol, Vec
 
 pub mod storage;
 
+#[cfg(test)]
+mod test;
+
 /// Hook types for modular compliance system.
 ///
 /// Each hook type represents a specific event or validation point
@@ -42,7 +45,9 @@ pub enum HookType {
 /// pub trait Compliance       // ✅
 /// pub trait Compliance: RWA  // ❌
 /// ```
-pub trait Compliance: TokenBinder {
+pub trait Compliance {
+    // TODO: add `TokenBinder` bound when it is available
+
     /// Registers a compliance module for a specific hook type.
     ///
     /// # Arguments
@@ -149,11 +154,11 @@ pub trait Compliance: TokenBinder {
 #[repr(u32)]
 pub enum ComplianceError {
     /// Indicates a module is already registered for this hook.
-    ModuleAlreadyRegistered = 340,
+    ModuleAlreadyRegistered = 360,
     /// Indicates a module is not registered for this hook.
-    ModuleNotRegistered = 341,
+    ModuleNotRegistered = 361,
     /// Indicates a module bound is exceeded.
-    ModuleBoundExceeded = 342,
+    ModuleBoundExceeded = 362,
 }
 
 // ################## CONSTANTS ##################
@@ -217,10 +222,7 @@ pub trait ComplianceModule {
     /// * `from` - The address of the sender.
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens transferred.
-    fn on_transfer(e: &Env, from: Address, to: Address, amount: i128) {
-        // Default implementation does nothing
-        // Modules can override this if they register for Transfer hook
-    }
+    fn on_transfer(e: &Env, from: Address, to: Address, amount: i128);
 
     /// Called when tokens are created/minted (for Created hook).
     ///
@@ -229,10 +231,7 @@ pub trait ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `to` - The address receiving the tokens.
     /// * `amount` - The amount of tokens created.
-    fn on_created(e: &Env, to: Address, amount: i128) {
-        // Default implementation does nothing
-        // Modules can override this if they register for Created hook
-    }
+    fn on_created(e: &Env, to: Address, amount: i128);
 
     /// Called when tokens are destroyed/burned (for Destroyed hook).
     ///
@@ -241,10 +240,7 @@ pub trait ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `from` - The address from which tokens are burned.
     /// * `amount` - The amount of tokens destroyed.
-    fn on_destroyed(e: &Env, from: Address, amount: i128) {
-        // Default implementation does nothing
-        // Modules can override this if they register for Destroyed hook
-    }
+    fn on_destroyed(e: &Env, from: Address, amount: i128);
 
     /// Called to check if a transfer should be allowed (for CanTransfer hook).
     ///
@@ -260,11 +256,7 @@ pub trait ComplianceModule {
     /// # Returns
     ///
     /// `true` if the transfer should be allowed, `false` otherwise.
-    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
-        // Default implementation allows all transfers
-        // Modules can override this if they register for CanTransfer hook
-        true
-    }
+    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool;
 
     /// Returns the name of the module for identification purposes.
     ///
