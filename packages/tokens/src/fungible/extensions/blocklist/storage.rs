@@ -1,8 +1,11 @@
 use soroban_sdk::{contracttype, Address, Env};
 
-use crate::fungible::{
-    extensions::blocklist::{emit_user_blocked, emit_user_unblocked, FungibleBlockList},
-    FTBase, FungibleToken, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
+use crate::{
+    fungible::{
+        extensions::blocklist::{emit_user_blocked, emit_user_unblocked, FungibleBlockList},
+        FTBase, FungibleToken, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
+    },
+    FungibleBurnable,
 };
 
 pub struct BlockList;
@@ -80,6 +83,20 @@ impl FungibleToken for BlockList {
     fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
         Self::assert_not_blocked(e, &[owner]);
         Self::Impl::approve(e, owner, spender, amount, live_until_ledger);
+    }
+}
+
+impl FungibleBurnable for BlockList {
+    type Impl = FTBase;
+
+    fn burn(e: &Env, from: &Address, amount: i128) {
+        Self::assert_not_blocked(e, &[from]);
+        Self::Impl::burn(e, from, amount);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        Self::assert_not_blocked(e, &[from]);
+        Self::Impl::burn_from(e, spender, from, amount);
     }
 }
 
