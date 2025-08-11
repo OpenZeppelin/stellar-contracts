@@ -8,7 +8,7 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
 use stellar_access::{AccessControl, AccessController};
 use stellar_macros::only_role;
-use stellar_tokens::{AllowList, FTBase, FungibleAllowList, FungibleBurnable, FungibleToken};
+use stellar_tokens::{AllowList, FungibleAllowList, FungibleBurnable, FungibleToken};
 
 #[contract]
 pub struct ExampleContract;
@@ -38,37 +38,12 @@ impl ExampleContract {
 
 #[contractimpl]
 impl FungibleToken for ExampleContract {
-    type Impl = FTBase;
-
-    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        Self::assert_allowed(e, &[from, to]);
-        Self::Impl::transfer(e, from, to, amount);
-    }
-
-    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-        Self::assert_allowed(e, &[from, to]);
-        Self::Impl::transfer_from(e, spender, from, to, amount);
-    }
-
-    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
-        Self::assert_allowed(e, &[owner]);
-        Self::Impl::approve(e, owner, spender, amount, live_until_ledger);
-    }
+    type Impl = AllowList;
 }
 
 #[contractimpl]
 impl FungibleBurnable for ExampleContract {
-    type Impl = FTBase;
-
-    fn burn(e: &Env, from: &Address, amount: i128) {
-        Self::assert_allowed(e, &[from]);
-        Self::Impl::burn(e, from, amount);
-    }
-
-    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
-        Self::assert_allowed(e, &[from]);
-        Self::Impl::burn_from(e, spender, from, amount);
-    }
+    type Impl = AllowList;
 }
 
 #[contractimpl]

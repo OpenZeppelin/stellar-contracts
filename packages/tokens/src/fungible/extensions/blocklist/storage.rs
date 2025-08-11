@@ -1,13 +1,13 @@
 use soroban_sdk::{contracttype, Address, Env};
 
 use crate::fungible::{
-    extensions::blocklist::{emit_user_blocked, emit_user_unblocked},
-    ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
+    extensions::blocklist::{emit_user_blocked, emit_user_unblocked, FungibleBlockList},
+    FTBase, FungibleToken, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
 pub struct BlockList;
 
-impl super::FungibleBlockList for BlockList {
+impl FungibleBlockList for BlockList {
     type Impl = Self;
 
     /// Returns the blocked status of an account.
@@ -61,6 +61,25 @@ impl super::FungibleBlockList for BlockList {
             e.storage().persistent().remove(&key);
             emit_user_unblocked(e, user);
         }
+    }
+}
+
+impl FungibleToken for BlockList {
+    type Impl = FTBase;
+
+    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+        Self::assert_not_blocked(e, &[from, to]);
+        Self::Impl::transfer(e, from, to, amount);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        Self::assert_not_blocked(e, &[from, to]);
+        Self::Impl::transfer_from(e, spender, from, to, amount);
+    }
+
+    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+        Self::assert_not_blocked(e, &[owner]);
+        Self::Impl::approve(e, owner, spender, amount, live_until_ledger);
     }
 }
 

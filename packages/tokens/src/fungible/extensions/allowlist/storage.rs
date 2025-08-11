@@ -5,7 +5,7 @@ use crate::{
         extensions::allowlist::{emit_user_allowed, emit_user_disallowed},
         ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
     },
-    FungibleAllowList,
+    FTBase, FungibleAllowList, FungibleBurnable, FungibleToken,
 };
 
 pub struct AllowList;
@@ -58,5 +58,38 @@ impl FungibleAllowList for AllowList {
 
             emit_user_disallowed(e, user);
         }
+    }
+}
+
+impl FungibleToken for AllowList {
+    type Impl = FTBase;
+
+    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+        Self::assert_allowed(e, &[from, to]);
+        Self::Impl::transfer(e, from, to, amount);
+    }
+
+    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        Self::assert_allowed(e, &[from, to]);
+        Self::Impl::transfer_from(e, spender, from, to, amount);
+    }
+
+    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
+        Self::assert_allowed(e, &[owner]);
+        Self::Impl::approve(e, owner, spender, amount, live_until_ledger);
+    }
+}
+
+impl FungibleBurnable for AllowList {
+    type Impl = FTBase;
+
+    fn burn(e: &Env, from: &Address, amount: i128) {
+        Self::assert_allowed(e, &[from]);
+        Self::Impl::burn(e, from, amount);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        Self::assert_allowed(e, &[from]);
+        Self::Impl::burn_from(e, spender, from, amount);
     }
 }
