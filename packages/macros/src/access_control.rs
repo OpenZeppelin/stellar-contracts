@@ -149,10 +149,8 @@ pub fn generate_any_role_check(
         quote! { #param_name.require_auth(); }
     });
 
-    input_fn
-        .insert_stmts_to_token_stream(parse_quote! {
-                Self::assert_has_any_role(#env_arg, #param_reference, &[#(#roles),*]);
-                #auth_check
-        })
-        .into()
+    input_fn.insert_stmts_to_token_stream(parse_quote! {
+            Self::assert_has_any_role(#env_arg, #param_reference, &[#(#roles),*]);
+            #auth_check
+    })
 }
