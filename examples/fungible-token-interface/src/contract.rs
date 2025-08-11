@@ -53,25 +53,19 @@ impl Ownable for ExampleContract {
     type Impl = Owner;
 }
 
-pub struct OwnableExt<T: Ownable, N>(T, N);
+#[contractimpl]
+impl Pausable for ExampleContract {
+    type Impl = PausableDefault;
 
-impl<T: Ownable, N: Pausable> Pausable for OwnableExt<T, N> {
-    type Impl = N;
-
+    #[only_owner]
     fn pause(e: &Env, caller: &Address) {
-        T::only_owner(e);
         Self::Impl::pause(e, caller);
     }
 
+    #[only_owner]
     fn unpause(e: &Env, caller: &Address) {
-        T::only_owner(e);
         Self::Impl::unpause(e, caller);
     }
-}
-
-#[contractimpl]
-impl Pausable for ExampleContract {
-    type Impl = OwnableExt<Self, PausableDefault>;
 }
 
 #[contractimpl]

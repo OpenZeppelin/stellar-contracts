@@ -16,11 +16,15 @@ use crate::non_fungible::{
 /// ## Example
 ///
 /// ```ignore
-/// #[contracttrait(add_impl_type = true)]
-/// impl NonFungibleToken for MyContract {}
+/// #[contracttrait]
+/// impl NonFungibleToken for MyContract {
+///     type Impl = Consecutive;
+/// }
 ///
-/// #[contracttrait(add_impl_type = true)]
-/// impl NonFungibleBurnable for MyContract {}
+/// #[contracttrait]
+/// impl NonFungibleBurnable for MyContract  {
+///     type Impl = Consecutive;
+/// }
 /// ```
 pub struct Consecutive;
 

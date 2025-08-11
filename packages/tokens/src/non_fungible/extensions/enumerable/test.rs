@@ -6,7 +6,11 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
 use crate::non_fungible::{
-    extensions::enumerable::Enumerable, NFTBase, NFTStorageKey, NonFungibleToken,
+    extensions::{
+        burnable::NonFungibleBurnable,
+        enumerable::{Enumerable, NonFungibleEnumerable},
+    },
+    NFTBase, NFTStorageKey, NonFungibleToken,
 };
 
 #[contract]

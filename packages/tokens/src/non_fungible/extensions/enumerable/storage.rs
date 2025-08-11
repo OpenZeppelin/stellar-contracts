@@ -6,17 +6,21 @@ use crate::non_fungible::{
     OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
 
+/// Enumerable implementation of the NonFungibleToken trait.
+/// ## Example
+///
+/// ```ignore
+/// #[contracttrait]
+/// impl NonFungibleToken for MyContract {
+///     type Impl = Enumerable;
+/// }
+///
+/// #[contracttrait]
+/// impl NonFungibleBurnable for MyContract  {
+///     type Impl = Enumerable;
+/// }
+/// ```
 pub struct Enumerable;
-
-// impl ContractOverrides for Enumerable {
-//     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-//         Enumerable::transfer(e, from, to, token_id);
-//     }
-
-//     fn transfer_from(e: &Env, spender: &Address, from: &Address, to:
-// &Address, token_id: u32) {         Enumerable::transfer_from(e, spender,
-// from, to, token_id);     }
-// }
 
 #[contracttype]
 pub struct OwnerTokensKey {
@@ -39,15 +43,26 @@ impl NonFungibleEnumerable for Enumerable {
     type Impl = Self;
 
     fn total_supply(e: &Env) -> u32 {
-        Enumerable::total_supply(e)
+        e.storage().instance().get(&NFTEnumerableStorageKey::TotalSupply).unwrap_or(0)
     }
 
     fn get_owner_token_id(e: &Env, owner: &Address, index: u32) -> u32 {
-        Enumerable::get_owner_token_id(e, owner, index)
+        let key =
+            NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index });
+        let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
+            panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
+        };
+        e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
+        token_id
     }
 
     fn get_token_id(e: &Env, index: u32) -> u32 {
-        Enumerable::get_token_id(e, index)
+        let key = NFTEnumerableStorageKey::GlobalTokens(index);
+        let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
+            panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
+        };
+        e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
+        token_id
     }
 }
 
@@ -55,11 +70,21 @@ impl NonFungibleToken for Enumerable {
     type Impl = NFTBase;
 
     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-        Enumerable::transfer(e, from, to, token_id);
+        Self::Impl::transfer(e, from, to, token_id);
+
+        if from != to {
+            Self::remove_from_owner_enumeration(e, from, token_id);
+            Self::add_to_owner_enumeration(e, to, token_id);
+        }
     }
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
-        Enumerable::transfer_from(e, spender, from, to, token_id);
+        Self::Impl::transfer_from(e, spender, from, to, token_id);
+
+        if from != to {
+            Enumerable::remove_from_owner_enumeration(e, from, token_id);
+            Enumerable::add_to_owner_enumeration(e, to, token_id);
+        }
     }
 }
 
@@ -67,74 +92,19 @@ impl NonFungibleBurnable for Enumerable {
     type Impl = NFTBase;
 
     fn burn(e: &Env, from: &Address, token_id: u32) {
-        Enumerable::burn(e, from, token_id);
+        Self::Impl::burn(e, from, token_id);
+
+        Self::remove_from_enumerations(e, from, token_id);
     }
 
     fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
-        Enumerable::burn_from(e, spender, from, token_id);
+        Self::Impl::burn_from(e, spender, from, token_id);
+
+        Self::remove_from_enumerations(e, from, token_id);
     }
 }
 
 impl Enumerable {
-    // ################## QUERY STATE ##################
-
-    /// Returns the total amount of tokens stored by the contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    pub fn total_supply(e: &Env) -> u32 {
-        e.storage().instance().get(&NFTEnumerableStorageKey::TotalSupply).unwrap_or(0)
-    }
-
-    /// Returns the `token_id` owned by `owner` at a given `index` in the
-    /// owner's local list. Use along with [`NFTBase::balance`] to enumerate all
-    /// of `owner`'s tokens.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `owner` - Account of the token's owner.
-    /// * `index` - Index of the token in the owner's local list.
-    ///
-    /// # Errors
-    ///
-    /// * [`NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token
-    ///   ID is not found in the owner's enumeration.
-    pub fn get_owner_token_id(e: &Env, owner: &Address, index: u32) -> u32 {
-        let key =
-            NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index });
-        let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
-            panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
-        };
-        e.storage().persistent().extend_ttl(&key, OWNER_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT);
-
-        token_id
-    }
-
-    /// Returns the `token_id` at a given `index` in the global token list.
-    /// Use along with [`Enumerable::total_supply`] to enumerate all the tokens
-    /// in the contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `index` - Index of the token in the owner's local list.
-    ///
-    /// # Errors
-    ///
-    /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
-    ///   ID is not found in the global enumeration.
-    pub fn get_token_id(e: &Env, index: u32) -> u32 {
-        let key = NFTEnumerableStorageKey::GlobalTokens(index);
-        let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
-            panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
-        };
-        e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
-
-        token_id
-    }
-
     // ################## CHANGE STATE ##################
 
     /// Creates a token with the next available `token_id` and assigns it to
@@ -243,141 +213,6 @@ impl Enumerable {
         emit_mint(e, to, token_id);
 
         Enumerable::add_to_enumerations(e, to, token_id);
-    }
-
-    /// Destroys the token with `token_id` from `from`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The identifier of the token to burn.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`NFTBase::burn`] errors.
-    /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
-    /// * refer to [`Enumerable::remove_from_global_enumeration`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: u32]`
-    ///
-    /// # Notes
-    ///
-    /// This is a wrapper around [`NFTBase::burn`], that also
-    /// handles the storage updates for:
-    /// * total supply
-    /// * owner_tokens enumeration
-    /// * global_tokens enumeration
-    pub fn burn(e: &Env, from: &Address, token_id: u32) {
-        NFTBase::burn(e, from, token_id);
-
-        Enumerable::remove_from_enumerations(e, from, token_id);
-    }
-
-    /// Destroys the token with `token_id` from `from`, by using `spender`s
-    /// approval.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `spender` - The account that is allowed to burn the token on behalf of
-    ///   the owner.
-    /// * `from` - The account whose token is destroyed.
-    /// * `token_id` - The identifier of the token to burn.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`NFTBase::burn_from`] errors.
-    /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
-    /// * refer to [`Enumerable::remove_from_global_enumeration`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["burn", from: Address]`
-    /// * data - `[token_id: u32]`
-    ///
-    /// # Notes
-    ///
-    /// This is a wrapper around [`NFTBase::burn_from`], that also
-    /// handles the storage updates for:
-    /// * total supply
-    /// * owner_tokens enumeration
-    /// * global_tokens enumeration
-    pub fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
-        NFTBase::burn_from(e, spender, from, token_id);
-
-        Enumerable::remove_from_enumerations(e, from, token_id);
-    }
-
-    /// Transfers a non-fungible token (NFT), ensuring ownership checks.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The environment reference.
-    /// * `from` - The current owner's address.
-    /// * `to` - The recipient's address.
-    /// * `token_id` - The identifier of the token being transferred.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`NFTBase::transfer`] errors.
-    /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: u32]`
-    ///
-    /// # Notes
-    ///
-    /// This is a wrapper around [`NFTBase::transfer`], that also
-    /// handles the storage updates for:
-    /// * owner_tokens enumeration
-    pub fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-        NFTBase::transfer(e, from, to, token_id);
-
-        if from != to {
-            Enumerable::remove_from_owner_enumeration(e, from, token_id);
-            Enumerable::add_to_owner_enumeration(e, to, token_id);
-        }
-    }
-
-    /// Transfers a non-fungible token (NFT), ensuring ownership and approval
-    /// checks.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The environment reference.
-    /// * `spender` - The address attempting to transfer the token.
-    /// * `from` - The current owner's address.
-    /// * `to` - The recipient's address.
-    /// * `token_id` - The identifier of the token being transferred.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`NFTBase::transfer_from`] errors.
-    /// * refer to [`Enumerable::remove_from_owner_enumeration`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[token_id: u32]`
-    ///
-    /// # Notes
-    ///
-    /// This is a wrapper around [`NFTBase::transfer_from`], that also
-    /// handles the storage updates for:
-    /// * owner_tokens enumeration
-    pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
-        NFTBase::transfer_from(e, spender, from, to, token_id);
-
-        if from != to {
-            Enumerable::remove_from_owner_enumeration(e, from, token_id);
-            Enumerable::add_to_owner_enumeration(e, to, token_id);
-        }
     }
 
     // ################## LOW-LEVEL HELPERS ##################
