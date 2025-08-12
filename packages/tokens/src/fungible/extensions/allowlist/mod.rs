@@ -6,6 +6,8 @@ mod test;
 use soroban_sdk::{assert_with_error, symbol_short, Address, Env};
 pub use storage::AllowList;
 
+use crate::fungible::FungibleTokenError;
+
 /// AllowList Trait for Fungible Token
 ///
 /// The `FungibleAllowList` trait extends the `FungibleToken` trait to
@@ -70,7 +72,7 @@ pub trait FungibleAllowList {
         assert_with_error!(
             e,
             users.iter().all(|user| Self::allowed(e, user)),
-            crate::FungibleTokenError::UserNotAllowed
+            FungibleTokenError::UserNotAllowed
         )
     }
 

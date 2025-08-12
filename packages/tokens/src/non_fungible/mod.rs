@@ -72,6 +72,7 @@ mod utils;
 mod test;
 
 pub use extensions::{burnable, consecutive, enumerable, royalties};
+// ################## TRAIT ##################
 pub use storage::{ApprovalData, NFTBase, NFTStorageKey};
 pub use utils::sequential;
 // ################## TRAIT ##################

@@ -1,11 +1,10 @@
 use soroban_sdk::{contracttype, Address, Env};
 
-use crate::{
-    fungible::{
-        extensions::blocklist::{emit_user_blocked, emit_user_unblocked, FungibleBlockList},
-        FTBase, FungibleToken, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
-    },
-    FungibleBurnable,
+use crate::fungible::{
+    blocklist::FungibleBlockList,
+    burnable::FungibleBurnable,
+    extensions::blocklist::{emit_user_blocked, emit_user_unblocked},
+    FTBase, FungibleToken, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
 pub struct BlockList;

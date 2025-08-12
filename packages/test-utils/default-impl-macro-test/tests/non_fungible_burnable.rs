@@ -8,7 +8,7 @@
 //! control to sensitive operations is not taken into consideration!
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
-use stellar_tokens::{NFTBase, NonFungibleBurnable, NonFungibleToken};
+use stellar_tokens::non_fungible::{burnable::NonFungibleBurnable, NFTBase, NonFungibleToken};
 
 #[contract]
 pub struct ExampleContract;

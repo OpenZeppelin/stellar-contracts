@@ -1,7 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, token::StellarAssetClient, Address, Env};
 
 use super::SACAdminWrapper;
-use crate::FungibleTokenError;
+use crate::fungible::FungibleTokenError;
 
 /// Storage key for accessing the SAC address
 #[contracttype]

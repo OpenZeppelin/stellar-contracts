@@ -5,7 +5,7 @@
 use soroban_sdk::{contract, contractimpl, vec, Address, Env, String, Vec};
 use stellar_access::{AccessControl, AccessController};
 use stellar_macros::{has_any_role, has_role, only_admin, only_any_role, only_role};
-use stellar_tokens::{NFTBase, NonFungibleBurnable, NonFungibleToken};
+use stellar_tokens::non_fungible::{burnable::NonFungibleBurnable, NFTBase, NonFungibleToken};
 
 #[contract]
 pub struct ExampleContract;

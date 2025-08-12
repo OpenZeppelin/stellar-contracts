@@ -1,5 +1,5 @@
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
-use stellar_tokens::{FTBase, FungibleBurnable, FungibleToken};
+use stellar_tokens::fungible::{burnable::FungibleBurnable, FTBase, FungibleToken};
 
 #[contract]
 pub struct ExampleContract;

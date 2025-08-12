@@ -1,7 +1,7 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env};
 use stellar_access::{AccessControl, AccessController};
 use stellar_macros::{only_admin, only_role};
-use stellar_tokens::{DefaultSacAdminWrapper, SACAdminWrapper};
+use stellar_tokens::fungible::sac_admin_wrapper::{DefaultSacAdminWrapper, SACAdminWrapper};
 
 #[contract]
 pub struct ExampleContract;

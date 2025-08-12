@@ -4,7 +4,9 @@ mod storage;
 mod test;
 
 use soroban_sdk::{assert_with_error, symbol_short, Address, Env};
-pub use storage::*;
+pub use storage::BlockList;
+
+use crate::fungible::FungibleTokenError;
 
 /// BlockList Trait for Fungible Token
 ///
@@ -76,7 +78,7 @@ pub trait FungibleBlockList {
         assert_with_error!(
             e,
             users.iter().all(|u| !Self::blocked(e, u)),
-            crate::FungibleTokenError::UserBlocked
+            FungibleTokenError::UserBlocked
         );
     }
 }

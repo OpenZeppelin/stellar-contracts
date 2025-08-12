@@ -1,6 +1,7 @@
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
-use stellar_tokens::{
-    non_fungible::enumerable::Enumerable, NonFungibleEnumerable, NonFungibleToken,
+use stellar_tokens::non_fungible::{
+    enumerable::{Enumerable, NonFungibleEnumerable},
+    NonFungibleToken,
 };
 
 #[contract]

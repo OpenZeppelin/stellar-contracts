@@ -1,7 +1,7 @@
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String, Symbol};
 use stellar_access::{AccessControl, AccessController};
 use stellar_macros::has_role;
-use stellar_tokens::{FTBase, FungibleToken};
+use stellar_tokens::fungible::{FTBase, FungibleToken};
 
 #[contract]
 pub struct ExampleContract;

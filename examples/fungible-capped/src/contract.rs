@@ -8,8 +8,8 @@
 //! is not taken into consideration
 
 use soroban_sdk::{contract, contractimpl, Address, Env};
-use stellar_tokens::{
-    fungible::capped::{check_cap, set_cap},
+use stellar_tokens::fungible::{
+    capped::{check_cap, set_cap},
     FTBase, FungibleToken,
 };
 

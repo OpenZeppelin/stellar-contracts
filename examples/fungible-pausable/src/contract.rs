@@ -13,7 +13,10 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_access::{Ownable, Owner};
 use stellar_contract_utils::{Pausable, PausableDefault};
 use stellar_macros::{only_owner, when_not_paused};
-use stellar_tokens::{impl_token_interface, FTBase, FungibleBurnable, FungibleToken};
+use stellar_tokens::{
+    fungible::{burnable::FungibleBurnable, FTBase, FungibleToken},
+    impl_token_interface,
+};
 
 #[contract]
 pub struct ExampleContract;

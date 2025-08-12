@@ -7,7 +7,7 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol};
 use stellar_access::{AccessControl, AccessController};
 use stellar_macros::{only_admin, only_role};
-use stellar_tokens::{NFTBase, NonFungibleRoyalties, NonFungibleToken};
+use stellar_tokens::non_fungible::{royalties::NonFungibleRoyalties, NFTBase, NonFungibleToken};
 
 const MANAGER: &Symbol = &symbol_short!("manager");
 

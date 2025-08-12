@@ -3,7 +3,7 @@ use soroban_sdk::{
 };
 use stellar_access::{Ownable, Owner};
 use stellar_macros::only_owner;
-use stellar_tokens::{FTBase, FungibleToken};
+use stellar_tokens::fungible::{FTBase, FungibleToken};
 
 #[contracttype]
 pub enum DataKey {

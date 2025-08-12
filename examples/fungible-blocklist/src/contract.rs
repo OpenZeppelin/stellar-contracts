@@ -8,7 +8,10 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
 use stellar_access::{AccessControl, AccessController};
 use stellar_macros::only_role;
-use stellar_tokens::{BlockList, FungibleBlockList, FungibleToken};
+use stellar_tokens::fungible::{
+    blocklist::{BlockList, FungibleBlockList},
+    FungibleToken,
+};
 
 #[contract]
 pub struct ExampleContract;

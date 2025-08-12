@@ -5,10 +5,11 @@
 //! IDs owned by each account.
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_access::Owner;
-use stellar_tokens::{
-    non_fungible::enumerable::Enumerable, ownable::Ownable, NonFungibleBurnable,
-    NonFungibleEnumerable, NonFungibleToken,
+use stellar_access::{Ownable, Owner};
+use stellar_tokens::non_fungible::{
+    burnable::NonFungibleBurnable,
+    enumerable::{Enumerable, NonFungibleEnumerable},
+    NonFungibleToken,
 };
 
 #[contract]
