@@ -286,7 +286,7 @@ pub fn only_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn only_owner(attrs: TokenStream, input: TokenStream) -> TokenStream {
     assert!(attrs.is_empty(), "This macro does not accept any arguments");
-    insert_check(parse_macro_input!(input as Item), quote! { Self::enforce_owner_auth}).into()
+    insert_check(parse_macro_input!(input as Item), quote! { Self::only_owner}).into()
 }
 
 /// Adds a pause check at the beginning of the function that ensures the

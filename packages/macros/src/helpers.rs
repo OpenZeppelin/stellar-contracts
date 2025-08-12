@@ -53,7 +53,7 @@ fn check_env_arg(input_fn: &ItemFn) -> (Ident, bool) {
 }
 
 fn check_is_env(path: &TypePath, fn_name: &Ident) {
-    let is_env = path.path.segments.last().map(|seg| seg.ident == "Env").unwrap_or(false);
+    let is_env = path.path.segments.last().is_some_and(|seg| seg.ident == "Env");
     if !is_env {
         panic!("first argument of function '{fn_name}' must be Env or &Env",);
     }

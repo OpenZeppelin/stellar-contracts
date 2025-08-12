@@ -43,7 +43,7 @@ impl ExampleContract {
     // Don't need a check here since it is done in set_token_royalty
     pub fn mint_with_royalty(e: &Env, to: &Address, receiver: &Address, basis_points: u32) -> u32 {
         // Mint token with sequential ID
-        let token_id = Self::sequential_mint(e, &to);
+        let token_id = Self::sequential_mint(e, to);
         // Set token-specific royalty
         Self::set_token_royalty(e, token_id, receiver, basis_points, to);
         token_id
