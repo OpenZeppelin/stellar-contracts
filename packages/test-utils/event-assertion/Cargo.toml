@@ -10,6 +10,3 @@ version.workspace = true
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.soroban-sdk]
 workspace = true
 features = ["testutils"]
-
-[dependencies]
-stellar-tokens = { workspace = true }

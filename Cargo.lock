@@ -933,7 +933,6 @@ version = "0.4.1"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
- "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -953,7 +952,6 @@ version = "0.4.1"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
- "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -1293,6 +1291,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 name = "sac-admin-generic-example"
 version = "0.4.1"
 dependencies = [
+ "ed25519-dalek",
  "soroban-sdk",
  "stellar-tokens",
 ]
@@ -1693,7 +1692,6 @@ version = "0.4.1"
 dependencies = [
  "soroban-sdk",
  "stellar-event-assertion",
- "stellar-macros",
 ]
 
 [[package]]
@@ -1703,7 +1701,6 @@ dependencies = [
  "hex-literal 1.0.0",
  "proptest",
  "soroban-sdk",
- "stellar-access",
  "stellar-event-assertion",
  "stellar-macros",
 ]
@@ -1714,7 +1711,6 @@ version = "0.4.1"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
- "stellar-event-assertion",
  "stellar-macros",
  "stellar-tokens",
 ]
@@ -1724,7 +1720,6 @@ name = "stellar-event-assertion"
 version = "0.4.1"
 dependencies = [
  "soroban-sdk",
- "stellar-tokens",
 ]
 
 [[package]]
@@ -1753,9 +1748,7 @@ dependencies = [
  "soroban-sdk",
  "soroban-test-helpers",
  "stellar-access",
- "stellar-contract-utils",
  "stellar-event-assertion",
- "stellar-macros",
 ]
 
 [[package]]
@@ -1898,7 +1891,6 @@ name = "upgradeable-v1-example"
 version = "1.0.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access",
  "stellar-contract-utils",
  "stellar-macros",
 ]
@@ -1908,7 +1900,6 @@ name = "upgradeable-v2-example"
 version = "2.0.0"
 dependencies = [
  "soroban-sdk",
- "stellar-access",
  "stellar-contract-utils",
  "stellar-macros",
 ]
