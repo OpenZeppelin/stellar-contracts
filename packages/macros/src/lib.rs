@@ -404,3 +404,9 @@ pub fn upgradeable_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     derive_upgradeable(&input).into()
 }
+
+#[proc_macro_derive(UpgradeableMigratable)]
+pub fn upgradeable_migratable_derive(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    derive_upgradeable_migratable(&input).into()
+}
