@@ -91,6 +91,24 @@ pub trait RWA: Pausable {
     /// * `from` - The address holding the tokens.
     /// * `to` - The address receiving the tokens.
     /// * `amount` - The amount of tokens to transfer.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::InsufficientBalance`] - When the sender has insufficient
+    ///   balance.
+    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`RWAError::AddressFrozen`] - When either address is frozen.
+    /// * [`RWAError::InsufficientFreeTokens`] - When sender has insufficient
+    ///   unfrozen tokens.
+    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
+    ///   not configured.
+    /// * [`RWAError::AddressNotVerified`] - When either address is not
+    ///   verified.
+    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
+    ///   configured.
+    /// * [`RWAError::TransferNotCompliant`] - When the transfer violates
+    ///   compliance rules.
+    /// * [`PausableError::EnforcedPause`] - When the contract is paused.
     fn transfer(e: &Env, from: Address, to: Address, amount: i128);
 
     /// Transfers amount tokens from the from account to the to account using
@@ -104,6 +122,25 @@ pub trait RWA: Pausable {
     /// * `from` - The address holding the tokens.
     /// * `to` - The address receiving the tokens.
     /// * `amount` - The amount of tokens to transfer.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::InsufficientBalance`] - When the sender has insufficient
+    ///   balance.
+    /// * [`RWAError::InsufficientAllowance`] - When the spender has
+    ///   insufficient allowance.
+    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`RWAError::AddressFrozen`] - When any address is frozen.
+    /// * [`RWAError::InsufficientFreeTokens`] - When sender has insufficient
+    ///   unfrozen tokens.
+    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
+    ///   not configured.
+    /// * [`RWAError::AddressNotVerified`] - When any address is not verified.
+    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
+    ///   configured.
+    /// * [`RWAError::TransferNotCompliant`] - When the transfer violates
+    ///   compliance rules.
+    /// * [`PausableError::EnforcedPause`] - When the contract is paused.
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128);
 
     /// Sets amount as the allowance of spender over the caller's tokens.
@@ -116,6 +153,12 @@ pub trait RWA: Pausable {
     /// * `amount` - The amount of tokens to approve.
     /// * `live_until_ledger` - The ledger number until which the allowance is
     ///   valid.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`RWAError::InvalidLiveUntilLedger`] - When the live_until_ledger is
+    ///   invalid.
     fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32);
 
     /// Forces a transfer of tokens between two whitelisted wallets.
@@ -127,6 +170,13 @@ pub trait RWA: Pausable {
     /// * `from` - The address of the sender.
     /// * `to` - The address of the receiver.
     /// * `amount` - The number of tokens to transfer.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::InsufficientBalance`] - When the sender has insufficient
+    ///   balance.
+    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`RWAError::MathOverflow`] - When arithmetic operations overflow.
     fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128);
 
     /// Mints tokens to a wallet. Tokens can only be minted to verified
@@ -138,6 +188,17 @@ pub trait RWA: Pausable {
     /// * `e` - Access to the Soroban environment.
     /// * `to` - Address to mint the tokens to.
     /// * `amount` - Amount of tokens to mint.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`RWAError::MathOverflow`] - When arithmetic operations overflow.
+    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
+    ///   not configured.
+    /// * [`RWAError::AddressNotVerified`] - When the recipient address is not
+    ///   verified.
+    /// * [`RWAError::AddressFrozen`] - When the recipient address is frozen.
+    /// * [`PausableError::EnforcedPause`] - When the contract is paused.
     fn mint(e: &Env, to: Address, amount: i128);
 
     /// Burns tokens from a wallet.
@@ -148,6 +209,15 @@ pub trait RWA: Pausable {
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - Address to burn the tokens from.
     /// * `amount` - Amount of tokens to burn.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::InsufficientBalance`] - When the address has insufficient
+    ///   balance.
+    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`RWAError::MathOverflow`] - When arithmetic operations overflow.
+    /// * [`RWAError::AddressFrozen`] - When the address is frozen.
+    /// * [`PausableError::EnforcedPause`] - When the contract is paused.
     fn burn(e: &Env, user_address: Address, amount: i128);
 
     /// Recovery function used to force transfer tokens from a lost wallet
@@ -161,6 +231,14 @@ pub trait RWA: Pausable {
     /// * `new_wallet` - The newly provided wallet for token transfer.
     /// * `investor_onchain_id` - The onchain ID of the investor asking for
     ///   recovery.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
+    ///   not configured.
+    /// * [`RWAError::AddressNotVerified`] - When the new wallet is not
+    ///   verified.
+    /// * [`RWAError::RecoveryFailed`] - When recovery parameters are invalid.
     fn recovery_address(
         e: &Env,
         lost_wallet: Address,
@@ -171,18 +249,42 @@ pub trait RWA: Pausable {
     // ################## METADATA FUNCTIONS ##################
 
     /// Returns the name of the token.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
+    ///   initialized.
     fn name(e: &Env) -> Symbol;
 
     /// Returns the symbol of the token.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
+    ///   initialized.
     fn symbol(e: &Env) -> Symbol;
 
     /// Returns the number of decimals used to get its user representation.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
+    ///   initialized.
     fn decimals(e: &Env) -> u8;
 
     /// Returns the version of the token (T-REX version).
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
+    ///   initialized.
     fn version(e: &Env) -> Symbol;
 
     /// Returns the address of the onchain ID of the token.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::OnchainIdNotSet`] - When the onchain ID is not set.
     fn onchain_id(e: &Env) -> Address;
 
     /// Sets the token name. Only the owner can call this function.
@@ -191,6 +293,12 @@ pub trait RWA: Pausable {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `name` - The name of the token to set.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
+    ///   initialized.
+    /// * [`RWAError::EmptyValue`] - When the name is empty.
     fn set_name(e: &Env, name: Symbol);
 
     /// Sets the token symbol. Only the owner can call this function.
@@ -199,6 +307,12 @@ pub trait RWA: Pausable {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `symbol` - The token symbol to set.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
+    ///   initialized.
+    /// * [`RWAError::EmptyValue`] - When the symbol is empty.
     fn set_symbol(e: &Env, symbol: Symbol);
 
     /// Sets the onchain ID of the token. Only the owner can call this function.
@@ -207,6 +321,11 @@ pub trait RWA: Pausable {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `onchain_id` - The address of the onchain ID to set.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
+    ///   initialized.
     fn set_onchain_id(e: &Env, onchain_id: Address);
 
     // ################## UTILITY FUNCTIONS ##################
@@ -229,6 +348,12 @@ pub trait RWA: Pausable {
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - The address for which to freeze tokens.
     /// * `amount` - Amount of tokens to be frozen.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`RWAError::InsufficientBalance`] - When the address has insufficient
+    ///   balance.
     fn freeze_partial_tokens(e: &Env, user_address: Address, amount: i128);
 
     /// Unfreezes a specified amount of tokens for a given address.
@@ -239,6 +364,12 @@ pub trait RWA: Pausable {
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - The address for which to unfreeze tokens.
     /// * `amount` - Amount of tokens to be unfrozen.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`RWAError::InsufficientFreeTokens`] - When there are insufficient
+    ///   frozen tokens to unfreeze.
     fn unfreeze_partial_tokens(e: &Env, user_address: Address, amount: i128);
 
     /// Returns the freezing status of a wallet.
@@ -278,9 +409,19 @@ pub trait RWA: Pausable {
     fn set_compliance(e: &Env, compliance: Address);
 
     /// Returns the Identity Verifier linked to the token.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
+    ///   not set.
     fn identity_verifier(e: &Env) -> Address;
 
     /// Returns the Compliance contract linked to the token.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
+    ///   set.
     fn compliance(e: &Env) -> Address;
 
     // ################## BATCH OPERATIONS ##################
@@ -309,31 +450,23 @@ pub enum RWAError {
     /// Indicates access to uninitialized metadata.
     UnsetMetadata = 305,
     /// Indicates the address is frozen and cannot perform operations.
-    AddressFrozen = 307,
+    AddressFrozen = 306,
     /// Indicates insufficient free tokens (due to partial freezing).
-    InsufficientFreeTokens = 308,
+    InsufficientFreeTokens = 307,
     /// Indicates the identity verifier is not set.
-    IdentityVerifierNotSet = 309,
+    IdentityVerifierNotSet = 308,
     /// Indicates the compliance contract is not set.
-    ComplianceNotSet = 310,
+    ComplianceNotSet = 309,
     /// Indicates the address is not verified in the identity registry.
-    AddressNotVerified = 311,
+    AddressNotVerified = 310,
     /// Indicates the transfer does not comply with the compliance rules.
-    TransferNotCompliant = 312,
-    /// Indicates unauthorized access (not an agent or owner).
-    Unauthorized = 313,
+    TransferNotCompliant = 311,
     /// Indicates the onchain ID is not set.
-    OnchainIdNotSet = 314,
-    /// Indicates invalid recovery parameters.
-    InvalidRecoveryParams = 315,
+    OnchainIdNotSet = 312,
     /// Indicates recovery failed.
-    RecoveryFailed = 316,
-    /// Indicates mismatched array lengths in batch operations.
-    ArrayLengthMismatch = 317,
-    /// Indicates empty arrays in batch operations.
-    EmptyArrays = 318,
-    /// Indicates the maximum batch size was exceeded.
-    BatchSizeExceeded = 319,
+    RecoveryFailed = 313,
+    /// Indicates an empty value is provided.
+    EmptyValue = 314,
 }
 
 // ################## CONSTANTS ##################

@@ -551,6 +551,8 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i12
 /// # Errors
 ///
 /// * refer to [`update`] errors.
+/// * refer to [`validate_compliance`] errors.
+/// * refer to [`verify_identity`] errors.
 ///
 /// # Events
 ///
@@ -634,6 +636,7 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, a
 /// **IMPORTANT**: This function bypasses authorization and freezing checks.
 /// Should only be used by authorized compliance or admin functions.
 pub fn forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+    // TODO: check this and compare it with `update`
     if amount < 0 {
         panic_with_error!(e, RWAError::LessThanZero);
     }
@@ -747,7 +750,8 @@ pub fn burn(e: &Env, user_address: &Address, amount: i128) {
 
 /// Recovery function used to force transfer tokens from a lost wallet to a new
 /// wallet. This function transfers all tokens and clears frozen status from the
-/// lost wallet.
+/// lost wallet. Returns `true` if recovery was successful, `false` if no tokens
+/// to recover.
 ///
 /// # Arguments
 ///
@@ -756,10 +760,12 @@ pub fn burn(e: &Env, user_address: &Address, amount: i128) {
 /// * `new_wallet` - The address of the new wallet to receive the tokens.
 /// * `investor_onchain_id` - The onchain ID of the investor for verification.
 ///
-/// # Returns
+/// # Errors
 ///
-/// * `bool` - `true` if recovery was successful, `false` if no tokens to
-///   recover.
+/// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is not
+///   configured.
+/// * [`RWAError::AddressNotVerified`] - When the new wallet is not verified.
+/// * [`RWAError::RecoveryFailed`] - When recovery parameters are invalid.
 ///
 /// # Events
 ///
@@ -784,7 +790,7 @@ pub fn recovery_address(
     new_wallet: &Address,
     investor_onchain_id: &Address,
 ) -> bool {
-    // Verify identity verifier for the new wallet and investor onchain ID
+    // Verify identity for the new wallet and investor onchain ID
     verify_identity(e, new_wallet);
     verify_recovery_identity(e, lost_wallet, new_wallet, investor_onchain_id);
 
@@ -938,16 +944,21 @@ pub fn unfreeze_partial_tokens(e: &Env, user_address: &Address, amount: i128) {
 ///
 /// # Errors
 ///
-/// * refer to [`get_metadata`] and [`onchain_id`] errors.
+/// * [`RWAError::EmptyValue`] - When the name is empty.
+/// * refer to [`get_metadata`] errors.
 ///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks and should
 /// only be used internally or in admin functions that implement their own
 /// authorization logic.
-pub fn set_name(e: &Env, name: &Symbol) {
+pub fn set_name(e: &Env, name: Symbol) {
+    if name == symbol_short!("") {
+        panic_with_error!(e, RWAError::EmptyValue);
+    }
+
     let mut metadata = get_metadata(e);
-    metadata.name = name.clone();
+    metadata.name = name;
     e.storage().instance().set(&METADATA_KEY, &metadata);
 
     emit_token_information_updated(
@@ -975,16 +986,21 @@ pub fn set_name(e: &Env, name: &Symbol) {
 ///
 /// # Errors
 ///
-/// * refer to [`get_metadata`] and [`onchain_id`] errors.
+/// * [`RWAError::EmptyValue`] - When the symbol is empty.
+/// * refer to [`get_metadata`] errors.
 ///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks and should
 /// only be used internally or in admin functions that implement their own
 /// authorization logic.
-pub fn set_symbol(e: &Env, symbol: &Symbol) {
+pub fn set_symbol(e: &Env, symbol: Symbol) {
+    if symbol == symbol_short!("") {
+        panic_with_error!(e, RWAError::EmptyValue);
+    }
+
     let mut metadata = get_metadata(e);
-    metadata.symbol = symbol.clone();
+    metadata.symbol = symbol;
     e.storage().instance().set(&METADATA_KEY, &metadata);
 
     emit_token_information_updated(
@@ -1087,6 +1103,10 @@ pub fn set_compliance(e: &Env, compliance: &Address) {
 /// * `symbol` - The symbol of the token.
 /// * `version` - The version of the token.
 ///
+/// # Errors
+///
+/// * [`RWAError::EmptyValue`] - When the name, symbol, or version is empty.
+///
 /// # Notes
 ///
 /// This function is typically used during contract initialization to set
@@ -1098,12 +1118,16 @@ pub fn set_compliance(e: &Env, compliance: &Address) {
 /// only be used during contract initialization or in admin functions that
 /// implement their own authorization logic.
 pub fn set_metadata(e: &Env, decimals: u32, name: Symbol, symbol: Symbol, version: Symbol) {
+    let empty = symbol_short!("");
+    if name == empty || symbol == empty || version == empty {
+        panic_with_error!(e, RWAError::EmptyValue);
+    }
+
     let metadata = RWAMetadata { decimals, name, symbol, version };
     e.storage().instance().set(&METADATA_KEY, &metadata);
 }
 
-// ################## HELPER FUNCTIONS FOR CONTRACT INTEGRATION
-// ##################
+// ########## HELPER FUNCTIONS FOR CONTRACT INTEGRATION ##########
 
 /// Verifies that an address is registered and verified in the identity
 /// verifier.
@@ -1117,8 +1141,8 @@ pub fn set_metadata(e: &Env, decimals: u32, name: Symbol, symbol: Symbol, versio
 ///
 /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is not
 ///   configured.
-/// * [`RWAError::IdentityNotVerified`] - When the address is not verified in
-///   the identity verifier.
+/// * [`RWAError::AddressNotVerified`] - When the address is not verified in the
+///   identity verifier.
 ///
 /// # Notes
 ///
@@ -1135,7 +1159,7 @@ fn verify_identity(e: &Env, user_address: &Address) {
     // Call the identity verifier contract to verify the address
     let is_verified: bool = e.invoke_contract(
         &identity_verifier_addr,
-        &symbol_short!("is_verify"),
+        &Symbol::new(e, "is_verified"),
         Vec::from_array(e, [user_address.into_val(e)]),
     );
 
@@ -1175,7 +1199,7 @@ fn validate_compliance(e: &Env, from: &Address, to: &Address, amount: i128) {
     // Call the compliance contract to validate the transfer
     let can_transfer: bool = e.invoke_contract(
         &compliance_addr,
-        &symbol_short!("can_xfer"),
+        &Symbol::new(e, "can_transfer"),
         Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
     );
 
@@ -1197,8 +1221,7 @@ fn validate_compliance(e: &Env, from: &Address, to: &Address, amount: i128) {
 ///
 /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is not
 ///   configured.
-/// * [`RWAError::InvalidRecoveryParams`] - When recovery parameters are
-///   invalid.
+/// * [`RWAError::RecoveryFailed`] - When recovery parameters are invalid.
 ///
 /// # Notes
 ///
@@ -1220,7 +1243,7 @@ fn verify_recovery_identity(
     // Call the identity verifier contract to verify recovery eligibility
     let can_recover: bool = e.invoke_contract(
         &identity_verifier_addr,
-        &symbol_short!("can_recov"),
+        &Symbol::new(e, "can_recover"),
         Vec::from_array(
             e,
             [lost_wallet.into_val(e), new_wallet.into_val(e), investor_onchain_id.into_val(e)],
@@ -1228,6 +1251,6 @@ fn verify_recovery_identity(
     );
 
     if !can_recover {
-        panic_with_error!(e, RWAError::InvalidRecoveryParams);
+        panic_with_error!(e, RWAError::RecoveryFailed);
     }
 }
