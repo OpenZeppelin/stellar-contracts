@@ -1,13 +1,14 @@
 //! # Real World Asset (RWA) Token Contract Module
 //!
-//! Implements utilities for handling Real World Asset tokens in a Soroban contract.
-//! This module is based on the T-REX (Token for Regulated Exchanges) standard,
-//! providing comprehensive functionality for compliant security tokens.
+//! Implements utilities for handling Real World Asset tokens in a Soroban
+//! contract. This module is based on the T-REX (Token for Regulated Exchanges)
+//! standard, providing comprehensive functionality for compliant security
+//! tokens.
 //!
 //! ## Design Overview
 //!
-//! RWA tokens are security tokens that represent real-world assets and must comply
-//! with various regulations. This module provides:
+//! RWA tokens are security tokens that represent real-world assets and must
+//! comply with various regulations. This module provides:
 //!
 //! - **Identity Management**: Integration with identity registries for KYC/AML
 //! - **Compliance Framework**: Modular compliance rules and validation
@@ -17,23 +18,31 @@
 //!
 //! ## Key Features
 //!
-//! - **Regulatory Compliance**: Built-in support for compliance rules and identity verification
-//! - **Freezing Mechanisms**: Address-level and partial token freezing capabilities
+//! - **Regulatory Compliance**: Built-in support for compliance rules and
+//!   identity verification
+//! - **Freezing Mechanisms**: Address-level and partial token freezing
+//!   capabilities
 //! - **Recovery System**: Lost wallet recovery for verified investors
-//! - **Pausable Operations**: Emergency pause functionality for the entire token
-//! - **Agent-based Administration**: Role-based access control for administrative functions
+//! - **Pausable Operations**: Emergency pause functionality for the entire
+//!   token
+//! - **Agent-based Administration**: Role-based access control for
+//!   administrative functions
 //!
 //! ## Modules
 //!
-//! - **Claim Topics and Issuers**: Management of trusted claim issuers and topics
+//! - **Claim Topics and Issuers**: Management of trusted claim issuers and
+//!   topics
 //! - **Compliance**: Modular compliance rules and validation framework
 //! - **Identity Claims**: Integration with identity registries for KYC/AML
-//! - **Identity Verifier**: Add-on module for establishing the connection between RWA token and identity registry
-//! - **Identity Storage Registry**: Registry for storing all the information necessary for identities
+//! - **Identity Verifier**: Add-on module for establishing the connection
+//!   between RWA token and identity registry
+//! - **Identity Storage Registry**: Registry for storing all the information
+//!   necessary for identities
 
 pub mod storage;
 
-use soroban_sdk::{contracterror, Address, Env, String, Vec};
+use soroban_sdk::{contracterror, Address, Env, String, Symbol};
+use stellar_contract_utils::pausable::Pausable;
 
 /// Real World Asset Token Trait
 ///
@@ -49,7 +58,7 @@ use soroban_sdk::{contracterror, Address, Env, String, Vec};
 /// - Freezing mechanisms for regulatory enforcement
 /// - Recovery system for lost wallet scenarios
 /// - Administrative controls for token management
-pub trait RWA {
+pub trait RWA: Pausable {
     // ################## CORE TOKEN FUNCTIONS ##################
 
     /// Returns the total amount of tokens in existence.
@@ -61,16 +70,17 @@ pub trait RWA {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `id` - The address to query the balance of.
-    fn balance_of(e: &Env, id: &Address) -> i128;
+    fn balance_of(e: &Env, id: Address) -> i128;
 
-    /// Returns the amount which spender is still allowed to withdraw from owner.
+    /// Returns the amount which spender is still allowed to withdraw from
+    /// owner.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - The address of the account owning tokens.
     /// * `spender` - The address of the account able to transfer the tokens.
-    fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128;
+    fn allowance(e: &Env, owner: Address, spender: Address) -> i128;
 
     /// Transfers amount tokens from the caller's account to the to account.
     /// Requires compliance validation and identity verification.
@@ -81,10 +91,11 @@ pub trait RWA {
     /// * `from` - The address holding the tokens.
     /// * `to` - The address receiving the tokens.
     /// * `amount` - The amount of tokens to transfer.
-    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128);
+    fn transfer(e: &Env, from: Address, to: Address, amount: i128);
 
     /// Transfers amount tokens from the from account to the to account using
-    /// the allowance mechanism. Requires compliance validation and identity verification.
+    /// the allowance mechanism. Requires compliance validation and identity
+    /// verification.
     ///
     /// # Arguments
     ///
@@ -93,7 +104,7 @@ pub trait RWA {
     /// * `from` - The address holding the tokens.
     /// * `to` - The address receiving the tokens.
     /// * `amount` - The amount of tokens to transfer.
-    fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128);
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128);
 
     /// Sets amount as the allowance of spender over the caller's tokens.
     ///
@@ -103,8 +114,9 @@ pub trait RWA {
     /// * `owner` - The address of the account owning tokens.
     /// * `spender` - The address of the account able to transfer the tokens.
     /// * `amount` - The amount of tokens to approve.
-    /// * `live_until_ledger` - The ledger number until which the allowance is valid.
-    fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32);
+    /// * `live_until_ledger` - The ledger number until which the allowance is
+    ///   valid.
+    fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32);
 
     /// Forces a transfer of tokens between two whitelisted wallets.
     /// This function can only be called by an agent of the token.
@@ -115,17 +127,18 @@ pub trait RWA {
     /// * `from` - The address of the sender.
     /// * `to` - The address of the receiver.
     /// * `amount` - The number of tokens to transfer.
-    fn forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128);
+    fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128);
 
-    /// Mints tokens to a wallet. Tokens can only be minted to verified addresses.
-    /// This function can only be called by an agent of the token.
+    /// Mints tokens to a wallet. Tokens can only be minted to verified
+    /// addresses. This function can only be called by an agent of the
+    /// token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `to` - Address to mint the tokens to.
     /// * `amount` - Amount of tokens to mint.
-    fn mint(e: &Env, to: &Address, amount: i128);
+    fn mint(e: &Env, to: Address, amount: i128);
 
     /// Burns tokens from a wallet.
     /// This function can only be called by an agent of the token.
@@ -135,7 +148,7 @@ pub trait RWA {
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - Address to burn the tokens from.
     /// * `amount` - Amount of tokens to burn.
-    fn burn(e: &Env, user_address: &Address, amount: i128);
+    fn burn(e: &Env, user_address: Address, amount: i128);
 
     /// Recovery function used to force transfer tokens from a lost wallet
     /// to a new wallet for an investor.
@@ -146,12 +159,13 @@ pub trait RWA {
     /// * `e` - Access to the Soroban environment.
     /// * `lost_wallet` - The wallet that the investor lost.
     /// * `new_wallet` - The newly provided wallet for token transfer.
-    /// * `investor_onchain_id` - The onchain ID of the investor asking for recovery.
+    /// * `investor_onchain_id` - The onchain ID of the investor asking for
+    ///   recovery.
     fn recovery_address(
         e: &Env,
-        lost_wallet: &Address,
-        new_wallet: &Address,
-        investor_onchain_id: &Address,
+        lost_wallet: Address,
+        new_wallet: Address,
+        investor_onchain_id: Address,
     ) -> bool;
 
     // ################## METADATA FUNCTIONS ##################
@@ -177,7 +191,7 @@ pub trait RWA {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `name` - The name of the token to set.
-    fn set_name(e: &Env, name: &String);
+    fn set_name(e: &Env, name: String);
 
     /// Sets the token symbol. Only the owner can call this function.
     ///
@@ -185,7 +199,7 @@ pub trait RWA {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `symbol` - The token symbol to set.
-    fn set_symbol(e: &Env, symbol: &String);
+    fn set_symbol(e: &Env, symbol: String);
 
     /// Sets the onchain ID of the token. Only the owner can call this function.
     ///
@@ -193,21 +207,9 @@ pub trait RWA {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `onchain_id` - The address of the onchain ID to set.
-    fn set_onchain_id(e: &Env, onchain_id: &Address);
+    fn set_onchain_id(e: &Env, onchain_id: Address);
 
     // ################## UTILITY FUNCTIONS ##################
-
-    /// Pauses the token contract. When paused, investors cannot transfer tokens.
-    /// This function can only be called by an agent of the token.
-    fn pause(e: &Env);
-
-    /// Unpauses the token contract. When unpaused, investors can transfer tokens
-    /// if their wallet is not blocked and the amount is within free token limits.
-    /// This function can only be called by an agent of the token.
-    fn unpause(e: &Env);
-
-    /// Returns true if the contract is paused, false otherwise.
-    fn paused(e: &Env) -> bool;
 
     /// Sets the frozen status for an address.
     /// This function can only be called by an agent of the token.
@@ -217,7 +219,7 @@ pub trait RWA {
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - The address for which to update frozen status.
     /// * `freeze` - Frozen status of the address.
-    fn set_address_frozen(e: &Env, user_address: &Address, freeze: bool);
+    fn set_address_frozen(e: &Env, caller: Address, user_address: Address, freeze: bool);
 
     /// Freezes a specified amount of tokens for a given address.
     /// This function can only be called by an agent of the token.
@@ -227,7 +229,7 @@ pub trait RWA {
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - The address for which to freeze tokens.
     /// * `amount` - Amount of tokens to be frozen.
-    fn freeze_partial_tokens(e: &Env, user_address: &Address, amount: i128);
+    fn freeze_partial_tokens(e: &Env, user_address: Address, amount: i128);
 
     /// Unfreezes a specified amount of tokens for a given address.
     /// This function can only be called by an agent of the token.
@@ -237,7 +239,7 @@ pub trait RWA {
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - The address for which to unfreeze tokens.
     /// * `amount` - Amount of tokens to be unfrozen.
-    fn unfreeze_partial_tokens(e: &Env, user_address: &Address, amount: i128);
+    fn unfreeze_partial_tokens(e: &Env, user_address: Address, amount: i128);
 
     /// Returns the freezing status of a wallet.
     ///
@@ -245,7 +247,7 @@ pub trait RWA {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - The address of the wallet to check.
-    fn is_frozen(e: &Env, user_address: &Address) -> bool;
+    fn is_frozen(e: &Env, user_address: Address) -> bool;
 
     /// Returns the amount of tokens that are partially frozen on a wallet.
     ///
@@ -253,7 +255,7 @@ pub trait RWA {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - The address of the wallet to check.
-    fn get_frozen_tokens(e: &Env, user_address: &Address) -> i128;
+    fn get_frozen_tokens(e: &Env, user_address: Address) -> i128;
 
     // ################## COMPLIANCE AND IDENTITY FUNCTIONS ##################
 
@@ -264,7 +266,7 @@ pub trait RWA {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `identity_registry` - The address of the Identity Registry to set.
-    fn set_identity_registry(e: &Env, identity_registry: &Address);
+    fn set_identity_registry(e: &Env, identity_registry: Address);
 
     /// Sets the compliance contract of the token.
     /// Only the owner can call this function.
@@ -273,7 +275,7 @@ pub trait RWA {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `compliance` - The address of the compliance contract to set.
-    fn set_compliance(e: &Env, compliance: &Address);
+    fn set_compliance(e: &Env, compliance: Address);
 
     /// Returns the Identity Registry linked to the token.
     fn identity_registry(e: &Env) -> Address;
@@ -283,7 +285,9 @@ pub trait RWA {
 
     // ################## BATCH OPERATIONS ##################
 
-    // TODO: what is our strategy for batch operations? Will we have a batch version of each function, or will we craft a 'batcher` function? Leave it empty for now
+    // TODO: what is our strategy for batch operations? Will we have a batch version
+    // of each function, or will we craft a 'batcher` function? Leave it empty for
+    // now
 }
 
 // ################## ERRORS ##################
@@ -304,8 +308,6 @@ pub enum RWAError {
     MathOverflow = 304,
     /// Indicates access to uninitialized metadata.
     UnsetMetadata = 305,
-    /// Indicates the contract is paused and operations are not allowed.
-    ContractPaused = 306,
     /// Indicates the address is frozen and cannot perform operations.
     AddressFrozen = 307,
     /// Indicates insufficient free tokens (due to partial freezing).
@@ -346,7 +348,8 @@ pub const FROZEN_TTL_THRESHOLD: u32 = FROZEN_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 pub const INSTANCE_EXTEND_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
 pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
-/// Maximum number of addresses that can be processed in a single batch operation
+/// Maximum number of addresses that can be processed in a single batch
+/// operation
 pub const MAX_BATCH_SIZE: u32 = 100;
 
 // ################## EVENTS ##################
@@ -368,10 +371,10 @@ pub const MAX_BATCH_SIZE: u32 = 100;
 /// * data - `[decimals: u8, version: String, onchain_id: Address]`
 pub fn emit_token_information_updated(
     e: &Env,
-    name: &String,
-    symbol: &String,
-    decimals: u8,
-    version: &String,
+    name: &Symbol,
+    symbol: &Symbol,
+    decimals: u32,
+    version: &Symbol,
     onchain_id: &Address,
 ) {
     let topics = (soroban_sdk::symbol_short!("token_upd"), name, symbol);
@@ -483,38 +486,6 @@ pub fn emit_tokens_frozen(e: &Env, user_address: &Address, amount: i128) {
 pub fn emit_tokens_unfrozen(e: &Env, user_address: &Address, amount: i128) {
     let topics = (soroban_sdk::symbol_short!("tkn_unfrz"), user_address);
     e.events().publish(topics, amount)
-}
-
-/// Emits an event indicating the token has been paused.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `user_address` - The address of the wallet that called the pause function.
-///
-/// # Events
-///
-/// * topics - `["paused", user_address: Address]`
-/// * data - `[]`
-pub fn emit_paused(e: &Env, user_address: &Address) {
-    let topics = (soroban_sdk::symbol_short!("paused"), user_address);
-    e.events().publish(topics, ())
-}
-
-/// Emits an event indicating the token has been unpaused.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `user_address` - The address of the wallet that called the unpause function.
-///
-/// # Events
-///
-/// * topics - `["unpaused", user_address: Address]`
-/// * data - `[]`
-pub fn emit_unpaused(e: &Env, user_address: &Address) {
-    let topics = (soroban_sdk::symbol_short!("unpaused"), user_address);
-    e.events().publish(topics, ())
 }
 
 /// Emits an event indicating a transfer of tokens.

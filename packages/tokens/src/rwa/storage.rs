@@ -1,10 +1,10 @@
-use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env, String, Symbol};
+use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env, Symbol};
+use stellar_contract_utils::pausable::{paused, PausableError};
 
 use super::{
     emit_address_frozen, emit_approve, emit_burn, emit_compliance_added,
-    emit_identity_registry_added, emit_mint, emit_paused, emit_recovery_success,
-    emit_token_information_updated, emit_tokens_frozen, emit_tokens_unfrozen, emit_transfer,
-    emit_unpaused,
+    emit_identity_registry_added, emit_mint, emit_recovery_success, emit_token_information_updated,
+    emit_tokens_frozen, emit_tokens_unfrozen, emit_transfer,
 };
 use crate::rwa::{
     RWAError, ALLOWANCE_EXTEND_AMOUNT, ALLOWANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT,
@@ -13,9 +13,6 @@ use crate::rwa::{
 
 /// Storage key that maps to [`RWAMetadata`]
 pub const METADATA_KEY: Symbol = symbol_short!("METADATA");
-
-/// Storage key that maps to contract pause status
-pub const PAUSED_KEY: Symbol = symbol_short!("PAUSED");
 
 /// Storage key that maps to [`AllowanceData`]
 #[contracttype]
@@ -56,10 +53,10 @@ pub enum RWAStorageKey {
 /// Storage container for RWA token metadata
 #[contracttype]
 pub struct RWAMetadata {
-    pub decimals: u8,
-    pub name: String,
-    pub symbol: String,
-    pub version: String,
+    pub decimals: u32,
+    pub name: Symbol,
+    pub symbol: Symbol,
+    pub version: Symbol,
 }
 
 // ################## QUERY STATE ##################
@@ -107,15 +104,10 @@ pub fn balance_of(e: &Env, account: &Address) -> i128 {
 /// ledger number, as this indicates the entry has expired. In such cases,
 /// the allowance should be treated as `0`.
 pub fn allowance_data(e: &Env, owner: &Address, spender: &Address) -> AllowanceData {
-    let key = AllowanceKey { owner: owner.clone(), spender: spender.clone() };
-    if let Some(allowance) =
-        e.storage().temporary().get::<_, AllowanceData>(&RWAStorageKey::Allowance(key))
-    {
-        e.storage().temporary().extend_ttl(
-            &RWAStorageKey::Allowance(key),
-            ALLOWANCE_TTL_THRESHOLD,
-            ALLOWANCE_EXTEND_AMOUNT,
-        );
+    let key =
+        RWAStorageKey::Allowance(AllowanceKey { owner: owner.clone(), spender: spender.clone() });
+    if let Some(allowance) = e.storage().temporary().get::<_, AllowanceData>(&key) {
+        e.storage().temporary().extend_ttl(&key, ALLOWANCE_TTL_THRESHOLD, ALLOWANCE_EXTEND_AMOUNT);
         allowance
     } else {
         AllowanceData { amount: 0, live_until_ledger: 0 }
@@ -153,8 +145,8 @@ pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
 ///
 /// # Errors
 ///
-/// * [`RWAError::UnsetMetadata`] - When trying to access
-///   uninitialized metadata.
+/// * [`RWAError::UnsetMetadata`] - When trying to access uninitialized
+///   metadata.
 pub fn get_metadata(e: &Env) -> RWAMetadata {
     e.storage()
         .instance()
@@ -171,7 +163,7 @@ pub fn get_metadata(e: &Env) -> RWAMetadata {
 /// # Errors
 ///
 /// * refer to [`get_metadata`] errors.
-pub fn name(e: &Env) -> String {
+pub fn name(e: &Env) -> Symbol {
     get_metadata(e).name
 }
 
@@ -184,7 +176,7 @@ pub fn name(e: &Env) -> String {
 /// # Errors
 ///
 /// * refer to [`get_metadata`] errors.
-pub fn symbol(e: &Env) -> String {
+pub fn symbol(e: &Env) -> Symbol {
     get_metadata(e).symbol
 }
 
@@ -197,7 +189,7 @@ pub fn symbol(e: &Env) -> String {
 /// # Errors
 ///
 /// * refer to [`get_metadata`] errors.
-pub fn decimals(e: &Env) -> u8 {
+pub fn decimals(e: &Env) -> u32 {
     get_metadata(e).decimals
 }
 
@@ -210,7 +202,7 @@ pub fn decimals(e: &Env) -> u8 {
 /// # Errors
 ///
 /// * refer to [`get_metadata`] errors.
-pub fn version(e: &Env) -> String {
+pub fn version(e: &Env) -> Symbol {
     get_metadata(e).version
 }
 
@@ -238,7 +230,8 @@ pub fn onchain_id(e: &Env) -> Address {
 ///
 /// # Errors
 ///
-/// * [`RWAError::IdentityRegistryNotSet`] - When the identity registry is not set.
+/// * [`RWAError::IdentityRegistryNotSet`] - When the identity registry is not
+///   set.
 pub fn identity_registry(e: &Env) -> Address {
     e.storage()
         .instance()
@@ -260,15 +253,6 @@ pub fn compliance(e: &Env) -> Address {
         .instance()
         .get(&RWAStorageKey::Compliance)
         .unwrap_or_else(|| panic_with_error!(e, RWAError::ComplianceNotSet))
-}
-
-/// Returns true if the contract is paused, false otherwise.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-pub fn paused(e: &Env) -> bool {
-    e.storage().instance().get(&PAUSED_KEY).unwrap_or(false)
 }
 
 /// Returns the freezing status of a wallet.
@@ -293,7 +277,8 @@ pub fn is_frozen(e: &Env, user_address: &Address) -> bool {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `user_address` - The address of the wallet on which get_frozen_tokens is called.
+/// * `user_address` - The address of the wallet on which get_frozen_tokens is
+///   called.
 pub fn get_frozen_tokens(e: &Env, user_address: &Address) -> i128 {
     let key = RWAStorageKey::FrozenTokens(user_address.clone());
     if let Some(frozen_amount) = e.storage().persistent().get::<_, i128>(&key) {
@@ -315,7 +300,8 @@ pub fn get_free_tokens(e: &Env, user_address: &Address) -> i128 {
     let total_balance = balance_of(e, user_address);
     let frozen_tokens = get_frozen_tokens(e, user_address);
 
-    // frozen tokens cannot be greater than total balance, necessary checks are done in state changing functions
+    // frozen tokens cannot be greater than total balance, necessary checks are done
+    // in state changing functions
     total_balance - frozen_tokens
 }
 
@@ -331,8 +317,7 @@ pub fn get_free_tokens(e: &Env, user_address: &Address) -> i128 {
 /// * `owner` - The address holding the tokens.
 /// * `spender` - The address authorized to spend the tokens.
 /// * `amount` - The amount of tokens made available to `spender`.
-/// * `live_until_ledger` - The ledger number at which the allowance
-///   expires.
+/// * `live_until_ledger` - The ledger number at which the allowance expires.
 ///
 /// # Errors
 ///
@@ -346,10 +331,10 @@ pub fn get_free_tokens(e: &Env, user_address: &Address) -> i128 {
 /// # Notes
 ///
 /// * Authorization for `owner` is required.
-/// * Allowance is implicitly timebound by the maximum allowed storage TTL
-///   value which is a network parameter, i.e. one cannot set an allowance
-///   for a longer period. This behavior closely mirrors the functioning of
-///   the "Stellar Asset Contract" implementation for consistency reasons.
+/// * Allowance is implicitly timebound by the maximum allowed storage TTL value
+///   which is a network parameter, i.e. one cannot set an allowance for a
+///   longer period. This behavior closely mirrors the functioning of the
+///   "Stellar Asset Contract" implementation for consistency reasons.
 pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
     owner.require_auth();
     set_allowance(e, owner, spender, amount, live_until_ledger);
@@ -366,27 +351,26 @@ pub fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_u
 /// * `owner` - The address holding the tokens.
 /// * `spender` - The address authorized to spend the tokens.
 /// * `amount` - The amount of tokens made available to `spender`.
-/// * `live_until_ledger` - The ledger number at which the allowance
-///   expires. `live_until_ledger`` argument is implicitly bounded by the
-///   maximum allowed TTL extension for a temporary storage entry and
-///   specifying a higher value will cause the code to panic.
+/// * `live_until_ledger` - The ledger number at which the allowance expires.
+///   `live_until_ledger`` argument is implicitly bounded by the maximum allowed
+///   TTL extension for a temporary storage entry and specifying a higher value
+///   will cause the code to panic.
 ///
 /// # Errors
 ///
-/// * [`RWAError::InvalidLiveUntilLedger`] - Occurs when
-///   attempting to set `live_until_ledger` that is 1) greater than the
-///   maximum allowed or 2) less than the current ledger number and `amount`
-///   is greater than `0`.
+/// * [`RWAError::InvalidLiveUntilLedger`] - Occurs when attempting to set
+///   `live_until_ledger` that is 1) greater than the maximum allowed or 2) less
+///   than the current ledger number and `amount` is greater than `0`.
 /// * [`RWAError::LessThanZero`] - Occurs when `amount < 0`.
 ///
 /// # Notes
 ///
-/// * This function does not enforce authorization. Ensure that
-///   authorization is handled at a higher level.
-/// * Allowance is implicitly timebound by the maximum allowed storage TTL
-///   value which is a network parameter, i.e. one cannot set an allowance
-///   for a longer period. This behavior closely mirrors the functioning of
-///   the "Stellar Asset Contract" implementation for consistency reasons.
+/// * This function does not enforce authorization. Ensure that authorization is
+///   handled at a higher level.
+/// * Allowance is implicitly timebound by the maximum allowed storage TTL value
+///   which is a network parameter, i.e. one cannot set an allowance for a
+///   longer period. This behavior closely mirrors the functioning of the
+///   "Stellar Asset Contract" implementation for consistency reasons.
 pub fn set_allowance(
     e: &Env,
     owner: &Address,
@@ -430,13 +414,12 @@ pub fn set_allowance(
 /// * `e` - Access to Soroban environment.
 /// * `owner` - The address holding the tokens.
 /// * `spender` - The address authorized to spend the tokens.
-/// * `amount` - The amount of tokens to be deducted from `spender`s
-///   allowance.
+/// * `amount` - The amount of tokens to be deducted from `spender`s allowance.
 ///
 /// # Errors
 ///
-/// * [`RWAError::InsufficientAllowance`] - When attempting to
-///   transfer more tokens than `spender` current allowance.
+/// * [`RWAError::InsufficientAllowance`] - When attempting to transfer more
+///   tokens than `spender` current allowance.
 /// * [`RWAError::LessThanZero`] - Occurs when `amount < 0`.
 /// * also refer to [`set_allowance`] errors.
 ///
@@ -480,18 +463,20 @@ pub fn spend_allowance(e: &Env, owner: &Address, spender: &Address, amount: i128
 ///
 /// # Errors
 ///
-/// * [`RWAError::InsufficientBalance`] - When attempting to
-///   transfer more tokens than `from` current balance.
-/// * [`RWAError::InsufficientFreeTokens`] - When attempting to transfer frozen tokens.
+/// * [`RWAError::InsufficientBalance`] - When attempting to transfer more
+///   tokens than `from` current balance.
+/// * [`RWAError::InsufficientFreeTokens`] - When attempting to transfer frozen
+///   tokens.
 /// * [`RWAError::LessThanZero`] - When `amount < 0`.
 /// * [`RWAError::MathOverflow`] - When `total_supply` overflows.
-/// * [`RWAError::ContractPaused`] - When the contract is paused.
 /// * [`RWAError::AddressFrozen`] - When from or to address is frozen.
+/// * [`PausableError::EnforcedPause`] - When the contract is paused.
 ///
 /// # Notes
 ///
 /// This function does not enforce authorization or compliance checks.
-/// Ensure that authorization and compliance validation are handled at a higher level.
+/// Ensure that authorization and compliance validation are handled at a higher
+/// level.
 pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i128) {
     if amount < 0 {
         panic_with_error!(e, RWAError::LessThanZero);
@@ -499,7 +484,7 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i12
 
     // Check if contract is paused
     if paused(e) {
-        panic_with_error!(e, RWAError::ContractPaused);
+        panic_with_error!(e, PausableError::EnforcedPause);
     }
 
     // Check if addresses are frozen
@@ -623,7 +608,8 @@ pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, a
 ///
 /// # Errors
 ///
-/// * [`RWAError::InsufficientBalance`] - When attempting to transfer more tokens than available.
+/// * [`RWAError::InsufficientBalance`] - When attempting to transfer more
+///   tokens than available.
 /// * [`RWAError::LessThanZero`] - When `amount < 0`.
 ///
 /// # Events
@@ -710,7 +696,8 @@ pub fn mint(e: &Env, to: &Address, amount: i128) {
     emit_mint(e, to, amount);
 }
 
-/// Burns `amount` tokens from `user_address`. Updates the total supply accordingly.
+/// Burns `amount` tokens from `user_address`. Updates the total supply
+/// accordingly.
 ///
 /// # Arguments
 ///
@@ -750,8 +737,9 @@ pub fn burn(e: &Env, user_address: &Address, amount: i128) {
     emit_burn(e, user_address, amount);
 }
 
-/// Recovery function used to force transfer tokens from a lost wallet to a new wallet.
-/// This function transfers all tokens and clears frozen status from the lost wallet.
+/// Recovery function used to force transfer tokens from a lost wallet to a new
+/// wallet. This function transfers all tokens and clears frozen status from the
+/// lost wallet.
 ///
 /// # Arguments
 ///
@@ -762,19 +750,21 @@ pub fn burn(e: &Env, user_address: &Address, amount: i128) {
 ///
 /// # Returns
 ///
-/// * `bool` - `true` if recovery was successful, `false` if no tokens to recover.
+/// * `bool` - `true` if recovery was successful, `false` if no tokens to
+///   recover.
 ///
 /// # Events
 ///
 /// * topics - `["transfer", lost_wallet: Address, new_wallet: Address]`
 /// * data - `[amount: i128]`
-/// * topics - `["recovery", lost_wallet: Address, new_wallet: Address, investor_onchain_id: Address]`
+/// * topics - `["recovery", lost_wallet: Address, new_wallet: Address,
+///   investor_onchain_id: Address]`
 /// * data - `[]`
 ///
 /// # Notes
 ///
-/// This function automatically unfreezes all frozen tokens and clears the frozen
-/// status of the lost wallet before transferring.
+/// This function automatically unfreezes all frozen tokens and clears the
+/// frozen status of the lost wallet before transferring.
 ///
 /// # Security Warning
 ///
@@ -828,7 +818,8 @@ pub fn recovery_address(
 ///
 /// # Events
 ///
-/// * topics - `["freeze", user_address: Address, freeze: bool, caller: Address]`
+/// * topics - `["freeze", user_address: Address, freeze: bool, caller:
+///   Address]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -836,12 +827,10 @@ pub fn recovery_address(
 /// **IMPORTANT**: This function bypasses authorization checks and should
 /// only be used internally or in admin functions that implement their own
 /// authorization logic.
-pub fn set_address_frozen(e: &Env, user_address: &Address, freeze: bool) {
+pub fn set_address_frozen(e: &Env, caller: &Address, user_address: &Address, freeze: bool) {
     e.storage().persistent().set(&RWAStorageKey::AddressFrozen(user_address.clone()), &freeze);
 
-    // TODO: Add caller parameter to track who performed the action
-    let dummy_caller = Address::generate(e);
-    emit_address_frozen(e, user_address, freeze, &dummy_caller);
+    emit_address_frozen(e, user_address, freeze, caller);
 }
 
 /// Freezes a specified amount of tokens for a given address.
@@ -855,7 +844,8 @@ pub fn set_address_frozen(e: &Env, user_address: &Address, freeze: bool) {
 /// # Errors
 ///
 /// * [`RWAError::LessThanZero`] - When `amount < 0`.
-/// * [`RWAError::InsufficientBalance`] - When trying to freeze more tokens than available.
+/// * [`RWAError::InsufficientBalance`] - When trying to freeze more tokens than
+///   available.
 ///
 /// # Events
 ///
@@ -895,7 +885,8 @@ pub fn freeze_partial_tokens(e: &Env, user_address: &Address, amount: i128) {
 /// # Errors
 ///
 /// * [`RWAError::LessThanZero`] - When `amount < 0`.
-/// * [`RWAError::InsufficientFreeTokens`] - When trying to unfreeze more tokens than are frozen.
+/// * [`RWAError::InsufficientFreeTokens`] - When trying to unfreeze more tokens
+///   than are frozen.
 ///
 /// # Events
 ///
@@ -922,54 +913,6 @@ pub fn unfreeze_partial_tokens(e: &Env, user_address: &Address, amount: i128) {
     emit_tokens_unfrozen(e, user_address, amount);
 }
 
-/// Pauses the token contract, preventing most operations.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Events
-///
-/// * topics - `["paused", caller: Address]`
-/// * data - `[]`
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should
-/// only be used internally or in admin functions that implement their own
-/// authorization logic.
-pub fn pause(e: &Env) {
-    e.storage().instance().set(&PAUSED_KEY, &true);
-
-    // TODO: Add caller parameter
-    let dummy_caller = Address::generate(e);
-    emit_paused(e, &dummy_caller);
-}
-
-/// Unpauses the token contract, allowing normal operations to resume.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Events
-///
-/// * topics - `["unpaused", caller: Address]`
-/// * data - `[]`
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should
-/// only be used internally or in admin functions that implement their own
-/// authorization logic.
-pub fn unpause(e: &Env) {
-    e.storage().instance().set(&PAUSED_KEY, &false);
-
-    // TODO: Add caller parameter
-    let dummy_caller = Address::generate(e);
-    emit_unpaused(e, &dummy_caller);
-}
-
 /// Sets the token name.
 ///
 /// # Arguments
@@ -979,7 +922,8 @@ pub fn unpause(e: &Env) {
 ///
 /// # Events
 ///
-/// * topics - `["token_info", name: String, symbol: String, decimals: u8, version: String, onchain_id: Address]`
+/// * topics - `["token_info", name: Symbol, symbol: Symbol, decimals: u32,
+///   version: Symbol, onchain_id: Address]`
 /// * data - `[]`
 ///
 /// # Errors
@@ -991,7 +935,7 @@ pub fn unpause(e: &Env) {
 /// **IMPORTANT**: This function bypasses authorization checks and should
 /// only be used internally or in admin functions that implement their own
 /// authorization logic.
-pub fn set_name(e: &Env, name: &String) {
+pub fn set_name(e: &Env, name: &Symbol) {
     let mut metadata = get_metadata(e);
     metadata.name = name.clone();
     e.storage().instance().set(&METADATA_KEY, &metadata);
@@ -1015,7 +959,8 @@ pub fn set_name(e: &Env, name: &String) {
 ///
 /// # Events
 ///
-/// * topics - `["token_info", name: String, symbol: String, decimals: u8, version: String, onchain_id: Address]`
+/// * topics - `["token_info", name: Symbol, symbol: Symbol, decimals: u32,
+///   version: Symbol, onchain_id: Address]`
 /// * data - `[]`
 ///
 /// # Errors
@@ -1027,7 +972,7 @@ pub fn set_name(e: &Env, name: &String) {
 /// **IMPORTANT**: This function bypasses authorization checks and should
 /// only be used internally or in admin functions that implement their own
 /// authorization logic.
-pub fn set_symbol(e: &Env, symbol: &String) {
+pub fn set_symbol(e: &Env, symbol: &Symbol) {
     let mut metadata = get_metadata(e);
     metadata.symbol = symbol.clone();
     e.storage().instance().set(&METADATA_KEY, &metadata);
@@ -1051,7 +996,8 @@ pub fn set_symbol(e: &Env, symbol: &String) {
 ///
 /// # Events
 ///
-/// * topics - `["token_info", name: String, symbol: String, decimals: u8, version: String, onchain_id: Address]`
+/// * topics - `["token_info", name: Symbol, symbol: Symbol, decimals: u32,
+///   version: Symbol, onchain_id: Address]`
 /// * data - `[]`
 ///
 /// # Errors
@@ -1141,7 +1087,7 @@ pub fn set_compliance(e: &Env, compliance: &Address) {
 /// **IMPORTANT**: This function bypasses authorization checks and should
 /// only be used during contract initialization or in admin functions that
 /// implement their own authorization logic.
-pub fn set_metadata(e: &Env, decimals: u8, name: String, symbol: String, version: String) {
+pub fn set_metadata(e: &Env, decimals: u32, name: Symbol, symbol: Symbol, version: Symbol) {
     let metadata = RWAMetadata { decimals, name, symbol, version };
     e.storage().instance().set(&METADATA_KEY, &metadata);
 }
