@@ -34,8 +34,8 @@
 //!   topics
 //! - **Compliance**: Modular compliance rules and validation framework
 //! - **Identity Claims**: Integration with identity registries for KYC/AML
-//! - **Identity Verifier**: Add-on module for establishing the connection
-//!   between RWA token and identity registry
+//! - **Identity Verifier**: Trait for establishing the connection between RWA
+//!   token and identity registry
 //! - **Identity Storage Registry**: Registry for storing all the information
 //!   necessary for identities
 
@@ -259,14 +259,14 @@ pub trait RWA: Pausable {
 
     // ################## COMPLIANCE AND IDENTITY FUNCTIONS ##################
 
-    /// Sets the Identity Registry for the token.
+    /// Sets the Identity Verifier for the token.
     /// Only the owner can call this function.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `identity_registry` - The address of the Identity Registry to set.
-    fn set_identity_registry(e: &Env, identity_registry: Address);
+    /// * `identity_verifier` - The address of the Identity Verifier to set.
+    fn set_identity_verifier(e: &Env, identity_verifier: Address);
 
     /// Sets the compliance contract of the token.
     /// Only the owner can call this function.
@@ -277,8 +277,8 @@ pub trait RWA: Pausable {
     /// * `compliance` - The address of the compliance contract to set.
     fn set_compliance(e: &Env, compliance: Address);
 
-    /// Returns the Identity Registry linked to the token.
-    fn identity_registry(e: &Env) -> Address;
+    /// Returns the Identity Verifier linked to the token.
+    fn identity_verifier(e: &Env) -> Address;
 
     /// Returns the Compliance contract linked to the token.
     fn compliance(e: &Env) -> Address;
@@ -312,8 +312,8 @@ pub enum RWAError {
     AddressFrozen = 307,
     /// Indicates insufficient free tokens (due to partial freezing).
     InsufficientFreeTokens = 308,
-    /// Indicates the identity registry is not set.
-    IdentityRegistryNotSet = 309,
+    /// Indicates the identity verifier is not set.
+    IdentityVerifierNotSet = 309,
     /// Indicates the compliance contract is not set.
     ComplianceNotSet = 310,
     /// Indicates the address is not verified in the identity registry.
@@ -381,19 +381,19 @@ pub fn emit_token_information_updated(
     e.events().publish(topics, (decimals, version, onchain_id))
 }
 
-/// Emits an event indicating the Identity Registry has been set.
+/// Emits an event indicating the Identity Verifier has been set.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `identity_registry` - The address of the Identity Registry.
+/// * `identity_verifier` - The address of the Identity Verifier.
 ///
 /// # Events
 ///
-/// * topics - `["identity_registry_added", identity_registry: Address]`
+/// * topics - `["identity_verifier_added", identity_verifier: Address]`
 /// * data - `[]`
-pub fn emit_identity_registry_added(e: &Env, identity_registry: &Address) {
-    let topics = (soroban_sdk::symbol_short!("idreg_add"), identity_registry);
+pub fn emit_identity_verifier_added(e: &Env, identity_verifier: &Address) {
+    let topics = (soroban_sdk::symbol_short!("idreg_add"), identity_verifier);
     e.events().publish(topics, ())
 }
 

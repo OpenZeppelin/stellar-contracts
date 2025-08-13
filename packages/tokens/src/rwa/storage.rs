@@ -1,9 +1,11 @@
-use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{
+    contracttype, panic_with_error, symbol_short, Address, Env, IntoVal, Symbol, Vec,
+};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use super::{
     emit_address_frozen, emit_approve, emit_burn, emit_compliance_added,
-    emit_identity_registry_added, emit_mint, emit_recovery_success, emit_token_information_updated,
+    emit_identity_verifier_added, emit_mint, emit_recovery_success, emit_token_information_updated,
     emit_tokens_frozen, emit_tokens_unfrozen, emit_transfer,
 };
 use crate::rwa::{
@@ -42,8 +44,8 @@ pub enum RWAStorageKey {
     AddressFrozen(Address),
     /// Amount of tokens frozen for a specific address
     FrozenTokens(Address),
-    /// Identity Registry contract address
-    IdentityRegistry,
+    /// Identity Verifier contract address
+    IdentityVerifier,
     /// Compliance contract address
     Compliance,
     /// OnchainID contract address
@@ -222,7 +224,7 @@ pub fn onchain_id(e: &Env) -> Address {
         .unwrap_or_else(|| panic_with_error!(e, RWAError::OnchainIdNotSet))
 }
 
-/// Returns the Identity Registry linked to the token.
+/// Returns the Identity Verifier linked to the token.
 ///
 /// # Arguments
 ///
@@ -230,13 +232,13 @@ pub fn onchain_id(e: &Env) -> Address {
 ///
 /// # Errors
 ///
-/// * [`RWAError::IdentityRegistryNotSet`] - When the identity registry is not
+/// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is not
 ///   set.
-pub fn identity_registry(e: &Env) -> Address {
+pub fn identity_verifier(e: &Env) -> Address {
     e.storage()
         .instance()
-        .get(&RWAStorageKey::IdentityRegistry)
-        .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityRegistryNotSet))
+        .get(&RWAStorageKey::IdentityVerifier)
+        .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityVerifierNotSet))
 }
 
 /// Returns the Compliance contract linked to the token.
@@ -559,10 +561,15 @@ pub fn update(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: i12
 ///
 /// Authorization for `from` is required.
 pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-    // TODO: Add identity registry verification
-    // TODO: Add compliance validation
-
     from.require_auth();
+
+    // Verify identity verifier for both addresses
+    verify_identity(e, from);
+    verify_identity(e, to);
+
+    // Validate compliance rules for the transfer
+    validate_compliance(e, from, to, amount);
+
     update(e, Some(from), Some(to), amount);
     emit_transfer(e, from, to, amount);
 }
@@ -690,7 +697,8 @@ pub fn forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
 /// admin.require_auth();
 /// ```
 pub fn mint(e: &Env, to: &Address, amount: i128) {
-    // TODO: Add identity registry verification for the `to` address
+    // Verify identity verifier for the recipient address
+    verify_identity(e, to);
 
     update(e, None, Some(to), amount);
     emit_mint(e, to, amount);
@@ -776,7 +784,9 @@ pub fn recovery_address(
     new_wallet: &Address,
     investor_onchain_id: &Address,
 ) -> bool {
-    // TODO: Add identity registry verification
+    // Verify identity verifier for the new wallet and investor onchain ID
+    verify_identity(e, new_wallet);
+    verify_recovery_identity(e, lost_wallet, new_wallet, investor_onchain_id);
 
     let lost_balance = balance_of(e, lost_wallet);
     if lost_balance == 0 {
@@ -1023,16 +1033,16 @@ pub fn set_onchain_id(e: &Env, onchain_id: &Address) {
     );
 }
 
-/// Sets the Identity Registry for the token.
+/// Sets the Identity Verifier for the token.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `identity_registry` - The address of the identity registry contract.
+/// * `identity_verifier` - The address of the identity verifier contract.
 ///
 /// # Events
 ///
-/// * topics - `["id_reg_add", identity_registry: Address]`
+/// * topics - `["id_reg_add", identity_verifier: Address]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -1040,9 +1050,9 @@ pub fn set_onchain_id(e: &Env, onchain_id: &Address) {
 /// **IMPORTANT**: This function bypasses authorization checks and should
 /// only be used internally or in admin functions that implement their own
 /// authorization logic.
-pub fn set_identity_registry(e: &Env, identity_registry: &Address) {
-    e.storage().instance().set(&RWAStorageKey::IdentityRegistry, identity_registry);
-    emit_identity_registry_added(e, identity_registry);
+pub fn set_identity_verifier(e: &Env, identity_verifier: &Address) {
+    e.storage().instance().set(&RWAStorageKey::IdentityVerifier, identity_verifier);
+    emit_identity_verifier_added(e, identity_verifier);
 }
 
 /// Sets the compliance contract of the token.
@@ -1090,4 +1100,134 @@ pub fn set_compliance(e: &Env, compliance: &Address) {
 pub fn set_metadata(e: &Env, decimals: u32, name: Symbol, symbol: Symbol, version: Symbol) {
     let metadata = RWAMetadata { decimals, name, symbol, version };
     e.storage().instance().set(&METADATA_KEY, &metadata);
+}
+
+// ################## HELPER FUNCTIONS FOR CONTRACT INTEGRATION
+// ##################
+
+/// Verifies that an address is registered and verified in the identity
+/// verifier.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `user_address` - The address to verify.
+///
+/// # Errors
+///
+/// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is not
+///   configured.
+/// * [`RWAError::IdentityNotVerified`] - When the address is not verified in
+///   the identity verifier.
+///
+/// # Notes
+///
+/// This function calls the identity verifier contract to check if the address
+/// has a valid, verified identity. The identity verifier should implement a
+/// `is_verify` function that returns a boolean.
+fn verify_identity(e: &Env, user_address: &Address) {
+    let identity_verifier_addr =
+        match e.storage().instance().get::<_, Address>(&RWAStorageKey::IdentityVerifier) {
+            Some(addr) => addr,
+            None => panic_with_error!(e, RWAError::IdentityVerifierNotSet),
+        };
+
+    // Call the identity verifier contract to verify the address
+    let is_verified: bool = e.invoke_contract(
+        &identity_verifier_addr,
+        &symbol_short!("is_verify"),
+        Vec::from_array(e, [user_address.into_val(e)]),
+    );
+
+    if !is_verified {
+        panic_with_error!(e, RWAError::AddressNotVerified);
+    }
+}
+
+/// Validates compliance rules for a token transfer.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `from` - The address sending tokens.
+/// * `to` - The address receiving tokens.
+/// * `amount` - The amount of tokens being transferred.
+///
+/// # Errors
+///
+/// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
+///   configured.
+/// * [`RWAError::TransferNotCompliant`] - When the transfer violates compliance
+///   rules.
+///
+/// # Notes
+///
+/// This function calls the compliance contract to validate the transfer against
+/// configured compliance rules. The compliance contract should implement a
+/// `can_xfer` function that returns a boolean.
+fn validate_compliance(e: &Env, from: &Address, to: &Address, amount: i128) {
+    let compliance_addr = match e.storage().instance().get::<_, Address>(&RWAStorageKey::Compliance)
+    {
+        Some(addr) => addr,
+        None => panic_with_error!(e, RWAError::ComplianceNotSet),
+    };
+
+    // Call the compliance contract to validate the transfer
+    let can_transfer: bool = e.invoke_contract(
+        &compliance_addr,
+        &symbol_short!("can_xfer"),
+        Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
+    );
+
+    if !can_transfer {
+        panic_with_error!(e, RWAError::TransferNotCompliant);
+    }
+}
+
+/// Verifies recovery identity for wallet recovery operations.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `lost_wallet` - The address of the lost wallet.
+/// * `new_wallet` - The address of the new wallet.
+/// * `investor_onchain_id` - The onchain ID of the investor.
+///
+/// # Errors
+///
+/// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is not
+///   configured.
+/// * [`RWAError::InvalidRecoveryParams`] - When recovery parameters are
+///   invalid.
+///
+/// # Notes
+///
+/// This function calls the identity verifier contract to verify that the
+/// recovery operation is valid for the given investor onchain ID. The identity
+/// verifier should implement a `can_recov` function.
+fn verify_recovery_identity(
+    e: &Env,
+    lost_wallet: &Address,
+    new_wallet: &Address,
+    investor_onchain_id: &Address,
+) {
+    let identity_verifier_addr =
+        match e.storage().instance().get::<_, Address>(&RWAStorageKey::IdentityVerifier) {
+            Some(addr) => addr,
+            None => panic_with_error!(e, RWAError::IdentityVerifierNotSet),
+        };
+
+    // Call the identity verifier contract to verify recovery eligibility
+    let can_recover: bool = e.invoke_contract(
+        &identity_verifier_addr,
+        &symbol_short!("can_recov"),
+        Vec::from_array(
+            e,
+            [lost_wallet.into_val(e), new_wallet.into_val(e), investor_onchain_id.into_val(e)],
+        ),
+    );
+
+    if !can_recover {
+        panic_with_error!(e, RWAError::InvalidRecoveryParams);
+    }
 }
