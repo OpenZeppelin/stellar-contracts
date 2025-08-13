@@ -41,7 +41,7 @@
 
 pub mod storage;
 
-use soroban_sdk::{contracterror, Address, Env, String, Symbol};
+use soroban_sdk::{contracterror, Address, Env, Symbol};
 use stellar_contract_utils::pausable::Pausable;
 
 /// Real World Asset Token Trait
@@ -171,16 +171,16 @@ pub trait RWA: Pausable {
     // ################## METADATA FUNCTIONS ##################
 
     /// Returns the name of the token.
-    fn name(e: &Env) -> String;
+    fn name(e: &Env) -> Symbol;
 
     /// Returns the symbol of the token.
-    fn symbol(e: &Env) -> String;
+    fn symbol(e: &Env) -> Symbol;
 
     /// Returns the number of decimals used to get its user representation.
     fn decimals(e: &Env) -> u8;
 
     /// Returns the version of the token (T-REX version).
-    fn version(e: &Env) -> String;
+    fn version(e: &Env) -> Symbol;
 
     /// Returns the address of the onchain ID of the token.
     fn onchain_id(e: &Env) -> Address;
@@ -191,7 +191,7 @@ pub trait RWA: Pausable {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `name` - The name of the token to set.
-    fn set_name(e: &Env, name: String);
+    fn set_name(e: &Env, name: Symbol);
 
     /// Sets the token symbol. Only the owner can call this function.
     ///
@@ -199,7 +199,7 @@ pub trait RWA: Pausable {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `symbol` - The token symbol to set.
-    fn set_symbol(e: &Env, symbol: String);
+    fn set_symbol(e: &Env, symbol: Symbol);
 
     /// Sets the onchain ID of the token. Only the owner can call this function.
     ///
@@ -367,8 +367,8 @@ pub const MAX_BATCH_SIZE: u32 = 100;
 ///
 /// # Events
 ///
-/// * topics - `["token_info_updated", name: String, symbol: String]`
-/// * data - `[decimals: u8, version: String, onchain_id: Address]`
+/// * topics - `["token_info_updated", name: Symbol, symbol: Symbol]`
+/// * data - `[decimals: u8, version: Symbol, onchain_id: Address]`
 pub fn emit_token_information_updated(
     e: &Env,
     name: &Symbol,
