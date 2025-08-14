@@ -27,6 +27,8 @@ pub enum RWAStorageKey {
     Version,
 }
 
+// TODO: add compliance `destroyed`, `created`, `transferred` hook calls
+
 pub struct RWA;
 
 impl ContractOverrides for RWA {
@@ -234,7 +236,7 @@ impl RWA {
     ///
     /// # Errors
     ///
-    /// refer to [`update`] errors.
+    /// refer to [`Base::update`] errors.
     ///
     /// # Events
     ///
@@ -275,7 +277,7 @@ impl RWA {
     ///
     /// # Errors
     ///
-    /// * refer to [`update`] errors.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///

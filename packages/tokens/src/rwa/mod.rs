@@ -275,36 +275,26 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
 pub enum RWAError {
     /// Indicates an error related to insufficient balance for the operation.
     InsufficientBalance = 300,
-    /// Indicates a failure with the allowance mechanism.
-    InsufficientAllowance = 301,
-    /// Indicates an invalid value for live_until_ledger when setting allowance.
-    InvalidLiveUntilLedger = 302,
     /// Indicates an error when an input must be >= 0.
-    LessThanZero = 303,
-    /// Indicates overflow when performing mathematical operations.
-    MathOverflow = 304,
-    /// Indicates access to uninitialized metadata.
-    UnsetMetadata = 305,
+    LessThanZero = 301,
     /// Indicates the address is frozen and cannot perform operations.
-    AddressFrozen = 306,
+    AddressFrozen = 302,
     /// Indicates insufficient free tokens (due to partial freezing).
-    InsufficientFreeTokens = 307,
+    InsufficientFreeTokens = 303,
     /// Indicates the identity verifier is not set.
-    IdentityVerifierNotSet = 308,
+    IdentityVerifierNotSet = 304,
     /// Indicates the compliance contract is not set.
-    ComplianceNotSet = 309,
+    ComplianceNotSet = 305,
     /// Indicates the address is not verified in the identity registry.
-    AddressNotVerified = 310,
+    AddressNotVerified = 306,
     /// Indicates the transfer does not comply with the compliance rules.
-    TransferNotCompliant = 311,
+    TransferNotCompliant = 307,
     /// Indicates the onchain ID is not set.
-    OnchainIdNotSet = 312,
+    OnchainIdNotSet = 308,
     /// Indicates recovery failed.
-    RecoveryFailed = 313,
-    /// Indicates an empty value is provided.
-    EmptyValue = 314,
+    RecoveryFailed = 309,
     /// Indicates the version is not set.
-    VersionNotSet = 315,
+    VersionNotSet = 310,
 }
 
 // ################## CONSTANTS ##################
