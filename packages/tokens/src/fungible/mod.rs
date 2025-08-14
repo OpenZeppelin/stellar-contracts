@@ -69,7 +69,6 @@
 
 mod extensions;
 mod impl_token_interface_macro;
-mod math;
 mod overrides;
 mod storage;
 mod utils;
@@ -307,20 +306,24 @@ pub enum FungibleTokenError {
     UserNotAllowed = 113,
     /// The user is blocked and cannot perform this operation
     UserBlocked = 114,
-    /// Indicates access to uninitialized vault asset address
+    /// Indicates access to uninitialized vault asset address.
     VaultAssetAddressNotSet = 115,
+    /// Indicates that vault asset address is already set.
+    VaultAssetAddressAlreadySet = 116,
+    /// Indicates that vault virtual decimals offset is already set.
+    VaultVirtualDecimalsOffsetAlreadySet = 117,
     /// Indicates the amount is not a valid vault assets value.
-    VaultInvalidAssetsAmount = 116,
+    VaultInvalidAssetsAmount = 118,
     /// Indicates the amount is not a valid vault shares value.
-    VaultInvalidSharesAmount = 117,
+    VaultInvalidSharesAmount = 119,
     /// Attempted to deposit more assets than the max amount for address.
-    VaultExceededMaxDeposit = 118,
+    VaultExceededMaxDeposit = 120,
     /// Attempted to mint more shares than the max amount for address.
-    VaultExceededMaxMint = 119,
+    VaultExceededMaxMint = 121,
     /// Attempted to withdraw more assets than the max amount for address.
-    VaultExceededMaxWithdraw = 120,
+    VaultExceededMaxWithdraw = 122,
     /// Attempted to redeem more shares than the max amount for address.
-    VaultExceededMaxRedeem = 121,
+    VaultExceededMaxRedeem = 123,
 }
 
 // ################## CONSTANTS ##################

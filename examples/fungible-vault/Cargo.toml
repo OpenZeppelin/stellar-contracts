@@ -1,21 +1,21 @@
 [package]
-name = "stellar-tokens"
+name = "fungible-vault-example"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = true
+publish = false
 version.workspace = true
-description = "Fungible and NonFungible Tokens for the Stellar contracts."
 
 [lib]
-crate-type = ["lib", "cdylib"]
+crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+stellar-access = { workspace = true }
+stellar-macros = { workspace = true }
+stellar-tokens = { workspace = true }
 stellar-contract-utils = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-soroban-test-helpers = { workspace = true }
-stellar-event-assertion = { workspace = true }

@@ -7,6 +7,7 @@ members = [
     "examples/fungible-merkle-airdrop",
     "examples/fungible-pausable",
     "examples/fungible-token-interface",
+    "examples/fungible-vault",
     "examples/merkle-voting",
     "examples/nft-access-control",
     "examples/nft-consecutive",

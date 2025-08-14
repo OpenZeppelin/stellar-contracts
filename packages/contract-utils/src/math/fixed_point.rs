@@ -19,5 +19,3 @@ pub fn muldiv(e: &Env, x: i128, y: i128, denominator: i128, rounding: Rounding) 
         Rounding::Ceil => x.fixed_mul_ceil(e, &y, &denominator),
     }
 }
-
-// !! TODO: decide where to place math utils for re-use

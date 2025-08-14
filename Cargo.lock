@@ -639,6 +639,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fungible-vault-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1593,6 +1604,7 @@ version = "0.4.1"
 dependencies = [
  "hex-literal",
  "proptest",
+ "soroban-fixed-point-math",
  "soroban-sdk",
  "stellar-event-assertion",
 ]
@@ -1640,9 +1652,9 @@ dependencies = [
 name = "stellar-tokens"
 version = "0.4.1"
 dependencies = [
- "soroban-fixed-point-math",
  "soroban-sdk",
  "soroban-test-helpers",
+ "stellar-contract-utils",
  "stellar-event-assertion",
 ]
 
