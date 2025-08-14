@@ -43,86 +43,26 @@ pub mod storage;
 
 use soroban_sdk::{contracterror, Address, Env, Symbol};
 use stellar_contract_utils::pausable::Pausable;
+pub use storage::RWA;
 
 use crate::fungible::FungibleToken;
 
 /// Real World Asset Token Trait
 ///
-/// The `RWA` trait defines the core functionality for Real World Asset tokens,
-/// implementing the T-REX standard for regulated securities. It provides a
-/// comprehensive interface for managing compliant token transfers, identity
-/// verification, compliance rules, and administrative controls.
+/// The `RWAToken` trait defines the core functionality for Real World Asset
+/// tokens, implementing the T-REX standard for regulated securities. It
+/// provides a comprehensive interface for managing compliant token transfers,
+/// identity verification, compliance rules, and administrative controls.
 ///
-/// This trait extends basic token functionality with regulatory features
-/// required for security tokens, including:
+/// This trait extends basic fungible token functionality with regulatory
+/// features required for security tokens, including:
 /// - Identity registry integration for KYC/AML compliance
 /// - Modular compliance framework for transfer validation
 /// - Freezing mechanisms for regulatory enforcement
 /// - Recovery system for lost wallet scenarios
 /// - Administrative controls for token management
-pub trait RWA: Pausable + FungibleToken {
+pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     // ################## CORE TOKEN FUNCTIONS ##################
-
-    /// Transfers amount tokens from the caller's account to the to account.
-    /// Requires compliance validation and identity verification.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `from` - The address holding the tokens.
-    /// * `to` - The address receiving the tokens.
-    /// * `amount` - The amount of tokens to transfer.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::InsufficientBalance`] - When the sender has insufficient
-    ///   balance.
-    /// * [`RWAError::LessThanZero`] - When the amount is negative.
-    /// * [`RWAError::AddressFrozen`] - When either address is frozen.
-    /// * [`RWAError::InsufficientFreeTokens`] - When sender has insufficient
-    ///   unfrozen tokens.
-    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
-    ///   not configured.
-    /// * [`RWAError::AddressNotVerified`] - When either address is not
-    ///   verified.
-    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
-    ///   configured.
-    /// * [`RWAError::TransferNotCompliant`] - When the transfer violates
-    ///   compliance rules.
-    /// * [`PausableError::EnforcedPause`] - When the contract is paused.
-    fn transfer(e: &Env, from: Address, to: Address, amount: i128);
-
-    /// Transfers amount tokens from the from account to the to account using
-    /// the allowance mechanism. Requires compliance validation and identity
-    /// verification.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `spender` - The address performing the transfer.
-    /// * `from` - The address holding the tokens.
-    /// * `to` - The address receiving the tokens.
-    /// * `amount` - The amount of tokens to transfer.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::InsufficientBalance`] - When the sender has insufficient
-    ///   balance.
-    /// * [`RWAError::InsufficientAllowance`] - When the spender has
-    ///   insufficient allowance.
-    /// * [`RWAError::LessThanZero`] - When the amount is negative.
-    /// * [`RWAError::AddressFrozen`] - When any address is frozen.
-    /// * [`RWAError::InsufficientFreeTokens`] - When sender has insufficient
-    ///   unfrozen tokens.
-    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
-    ///   not configured.
-    /// * [`RWAError::AddressNotVerified`] - When any address is not verified.
-    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
-    ///   configured.
-    /// * [`RWAError::TransferNotCompliant`] - When the transfer violates
-    ///   compliance rules.
-    /// * [`PausableError::EnforcedPause`] - When the contract is paused.
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128);
 
     /// Forces a transfer of tokens between two whitelisted wallets.
     /// This function can only be called by an agent of the token.

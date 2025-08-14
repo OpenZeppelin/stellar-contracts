@@ -161,90 +161,6 @@ impl RWA {
 
     // ################## CHANGE STATE ##################
 
-    /// Transfers `amount` tokens from `from` to `to`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `from` - The address holding the tokens.
-    /// * `to` - The address receiving the tokens.
-    /// * `amount` - The amount of tokens to transfer.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`update`] errors.
-    /// * refer to [`validate_compliance`] errors.
-    /// * refer to [`verify_identity`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[amount: i128]`
-    ///
-    /// # Notes
-    ///
-    /// Authorization for `from` is required.
-    pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        from.require_auth();
-
-        // Check if contract is paused
-        if paused(e) {
-            panic_with_error!(e, PausableError::EnforcedPause);
-        }
-
-        // Check if addresses are frozen
-        if Self::is_frozen(e, from) {
-            panic_with_error!(e, RWAError::AddressFrozen);
-        }
-        if Self::is_frozen(e, to) {
-            panic_with_error!(e, RWAError::AddressFrozen);
-        }
-
-        // Check if there are enough free tokens (not frozen)
-        let free_tokens = Self::get_free_tokens(e, from);
-        if free_tokens < amount {
-            panic_with_error!(e, RWAError::InsufficientFreeTokens);
-        }
-
-        // Verify identity verifier for both addresses
-        Self::verify_identity(e, from);
-        Self::verify_identity(e, to);
-
-        // Validate compliance rules for the transfer
-        Self::validate_compliance(e, from, to, amount);
-
-        Base::update(e, Some(from), Some(to), amount);
-        emit_transfer(e, from, to, amount);
-    }
-
-    /// Transfers `amount` tokens from `from` to `to` on behalf of `spender`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `spender` - The address authorized to spend the tokens.
-    /// * `from` - The address holding the tokens.
-    /// * `to` - The address receiving the tokens.
-    /// * `amount` - The amount of tokens to transfer.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`spend_allowance`] and [`update`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[amount: i128]`
-    ///
-    /// # Notes
-    ///
-    /// Authorization for `spender` is required.
-    pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-        spender.require_auth();
-        Base::spend_allowance(e, from, spender, amount);
-        Self::transfer(e, from, to, amount);
-    }
-
     /// Forced transfer of `amount` tokens from `from` to `to`.
     /// This function can unfreeze tokens if needed for regulatory compliance.
     /// It bypasses paused state and frozen address checks.
@@ -777,5 +693,72 @@ impl RWA {
         if !can_recover {
             panic_with_error!(e, RWAError::RecoveryFailed);
         }
+    }
+
+    // ################## OVERRIDDEN FUNCTIONS ##################
+
+    /// This is a wrapper around [`Base::update()`] to enable
+    /// the compatibility across [`crate::fungible::FungibleToken`]
+    /// with [`crate::rwa::RWAToken`]
+    ///
+    /// The main differences are:
+    /// - checks for if the contract is paused
+    /// - checks for if the addresses are frozen
+    /// - checks for if the from address have enough free tokens (unfrozen
+    ///   tokens)
+    /// - enforces identity verification for both addresses
+    /// - enforces compliance rules for the transfer
+    ///
+    /// Please refer to [`Base::update`] for the inline documentation.
+    pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+        from.require_auth();
+
+        // Check if contract is paused
+        if paused(e) {
+            panic_with_error!(e, PausableError::EnforcedPause);
+        }
+
+        // Check if addresses are frozen
+        if Self::is_frozen(e, from) {
+            panic_with_error!(e, RWAError::AddressFrozen);
+        }
+        if Self::is_frozen(e, to) {
+            panic_with_error!(e, RWAError::AddressFrozen);
+        }
+
+        // Check if there are enough free tokens (not frozen)
+        let free_tokens = Self::get_free_tokens(e, from);
+        if free_tokens < amount {
+            panic_with_error!(e, RWAError::InsufficientFreeTokens);
+        }
+
+        // Verify identity verifier for both addresses
+        Self::verify_identity(e, from);
+        Self::verify_identity(e, to);
+
+        // Validate compliance rules for the transfer
+        Self::validate_compliance(e, from, to, amount);
+
+        Base::update(e, Some(from), Some(to), amount);
+        emit_transfer(e, from, to, amount);
+    }
+
+    /// This is a wrapper around [`Base::update()`] to enable
+    /// the compatibility across [`crate::fungible::FungibleToken`]
+    /// with [`crate::rwa::RWAToken`]
+    ///
+    /// The main differences are:
+    /// - checks for if the contract is paused
+    /// - checks for if the addresses are frozen
+    /// - checks for if the from address have enough free tokens (unfrozen
+    ///   tokens)
+    /// - enforces identity verification for both addresses
+    /// - enforces compliance rules for the transfer
+    ///
+    /// Please refer to [`Base::update`] for the inline documentation.
+    pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        spender.require_auth();
+        Base::spend_allowance(e, from, spender, amount);
+        Self::transfer(e, from, to, amount);
     }
 }
