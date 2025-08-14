@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, IntoVal, Symbol, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, IntoVal, Symbol, Val, Vec};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
@@ -223,6 +223,12 @@ impl RWA {
         e.storage().persistent().set(&StorageKey::Balance(from.clone()), &from_balance);
         e.storage().persistent().set(&StorageKey::Balance(to.clone()), &to_balance);
 
+        Self::trigger_compliance_hook(
+            e,
+            "transferred",
+            Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
+        );
+
         emit_transfer(e, from, to, amount);
     }
 
@@ -263,6 +269,15 @@ impl RWA {
         Self::verify_identity(e, to);
 
         Base::update(e, None, Some(to), amount);
+
+        Self::validate_compliance(e, None, to, amount);
+
+        Self::trigger_compliance_hook(
+            e,
+            "created",
+            Vec::from_array(e, [to.into_val(e), amount.into_val(e)]),
+        );
+
         emit_mint(e, to, amount);
     }
 
@@ -304,6 +319,13 @@ impl RWA {
         }
 
         Base::update(e, Some(user_address), None, amount);
+
+        Self::trigger_compliance_hook(
+            e,
+            "destroyed",
+            Vec::from_array(e, [user_address.into_val(e), amount.into_val(e)]),
+        );
+
         emit_burn(e, user_address, amount);
     }
 
@@ -592,11 +614,7 @@ impl RWA {
     /// address has a valid, verified identity. The identity verifier should
     /// implement a `is_verify` function that returns a boolean.
     fn verify_identity(e: &Env, user_address: &Address) {
-        let identity_verifier_addr =
-            match e.storage().instance().get::<_, Address>(&RWAStorageKey::IdentityVerifier) {
-                Some(addr) => addr,
-                None => panic_with_error!(e, RWAError::IdentityVerifierNotSet),
-            };
+        let identity_verifier_addr = Self::identity_verifier(e);
 
         // Call the identity verifier contract to verify the address
         let is_verified: bool = e.invoke_contract(
@@ -611,6 +629,7 @@ impl RWA {
     }
 
     /// Validates compliance rules for a token transfer.
+    /// Mint is also considered as a transfer, but burn is not.
     ///
     /// # Arguments
     ///
@@ -631,14 +650,9 @@ impl RWA {
     /// This function calls the compliance contract to validate the transfer
     /// against configured compliance rules. The compliance contract should
     /// implement a `can_xfer` function that returns a boolean.
-    fn validate_compliance(e: &Env, from: &Address, to: &Address, amount: i128) {
-        let compliance_addr =
-            match e.storage().instance().get::<_, Address>(&RWAStorageKey::Compliance) {
-                Some(addr) => addr,
-                None => panic_with_error!(e, RWAError::ComplianceNotSet),
-            };
+    fn validate_compliance(e: &Env, from: Option<&Address>, to: &Address, amount: i128) {
+        let compliance_addr = Self::compliance(e);
 
-        // Call the compliance contract to validate the transfer
         let can_transfer: bool = e.invoke_contract(
             &compliance_addr,
             &Symbol::new(e, "can_transfer"),
@@ -648,6 +662,11 @@ impl RWA {
         if !can_transfer {
             panic_with_error!(e, RWAError::TransferNotCompliant);
         }
+    }
+
+    fn trigger_compliance_hook(e: &Env, hook_name: &str, arguments: Vec<Val>) {
+        let compliance_addr = Self::compliance(e);
+        e.invoke_contract::<()>(&compliance_addr, &Symbol::new(e, hook_name), arguments);
     }
 
     /// Verifies recovery identity for wallet recovery operations.
@@ -676,11 +695,7 @@ impl RWA {
         new_wallet: &Address,
         investor_onchain_id: &Address,
     ) {
-        let identity_verifier_addr =
-            match e.storage().instance().get::<_, Address>(&RWAStorageKey::IdentityVerifier) {
-                Some(addr) => addr,
-                None => panic_with_error!(e, RWAError::IdentityVerifierNotSet),
-            };
+        let identity_verifier_addr = Self::identity_verifier(e);
 
         // Call the identity verifier contract to verify recovery eligibility
         let can_recover: bool = e.invoke_contract(
@@ -710,6 +725,7 @@ impl RWA {
     ///   tokens)
     /// - enforces identity verification for both addresses
     /// - enforces compliance rules for the transfer
+    /// - triggers `transferred` hook call from the compliance contract
     ///
     /// Please refer to [`Base::update`] for the inline documentation.
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
@@ -739,9 +755,16 @@ impl RWA {
         Self::verify_identity(e, to);
 
         // Validate compliance rules for the transfer
-        Self::validate_compliance(e, from, to, amount);
+        Self::validate_compliance(e, Some(from), to, amount);
 
         Base::update(e, Some(from), Some(to), amount);
+
+        Self::trigger_compliance_hook(
+            e,
+            "transferred",
+            Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
+        );
+
         emit_transfer(e, from, to, amount);
     }
 
@@ -749,15 +772,8 @@ impl RWA {
     /// the compatibility across [`crate::fungible::FungibleToken`]
     /// with [`crate::rwa::RWAToken`]
     ///
-    /// The main differences are:
-    /// - checks for if the contract is paused
-    /// - checks for if the addresses are frozen
-    /// - checks for if the from address have enough free tokens (unfrozen
-    ///   tokens)
-    /// - enforces identity verification for both addresses
-    /// - enforces compliance rules for the transfer
-    ///
-    /// Please refer to [`Base::update`] for the inline documentation.
+    /// Please refer to [`Base::update`] and [`Self::transfer`] for the inline
+    /// documentation.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         spender.require_auth();
         Base::spend_allowance(e, from, spender, amount);
