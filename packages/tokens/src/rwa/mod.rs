@@ -44,6 +44,8 @@ pub mod storage;
 use soroban_sdk::{contracterror, Address, Env, Symbol};
 use stellar_contract_utils::pausable::Pausable;
 
+use crate::fungible::FungibleToken;
+
 /// Real World Asset Token Trait
 ///
 /// The `RWA` trait defines the core functionality for Real World Asset tokens,
@@ -58,29 +60,8 @@ use stellar_contract_utils::pausable::Pausable;
 /// - Freezing mechanisms for regulatory enforcement
 /// - Recovery system for lost wallet scenarios
 /// - Administrative controls for token management
-pub trait RWA: Pausable {
+pub trait RWA: Pausable + FungibleToken {
     // ################## CORE TOKEN FUNCTIONS ##################
-
-    /// Returns the total amount of tokens in existence.
-    fn total_supply(e: &Env) -> i128;
-
-    /// Returns the balance of the specified address.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `id` - The address to query the balance of.
-    fn balance_of(e: &Env, id: Address) -> i128;
-
-    /// Returns the amount which spender is still allowed to withdraw from
-    /// owner.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `owner` - The address of the account owning tokens.
-    /// * `spender` - The address of the account able to transfer the tokens.
-    fn allowance(e: &Env, owner: Address, spender: Address) -> i128;
 
     /// Transfers amount tokens from the caller's account to the to account.
     /// Requires compliance validation and identity verification.
@@ -142,24 +123,6 @@ pub trait RWA: Pausable {
     ///   compliance rules.
     /// * [`PausableError::EnforcedPause`] - When the contract is paused.
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128);
-
-    /// Sets amount as the allowance of spender over the caller's tokens.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `owner` - The address of the account owning tokens.
-    /// * `spender` - The address of the account able to transfer the tokens.
-    /// * `amount` - The amount of tokens to approve.
-    /// * `live_until_ledger` - The ledger number until which the allowance is
-    ///   valid.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::LessThanZero`] - When the amount is negative.
-    /// * [`RWAError::InvalidLiveUntilLedger`] - When the live_until_ledger is
-    ///   invalid.
-    fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32);
 
     /// Forces a transfer of tokens between two whitelisted wallets.
     /// This function can only be called by an agent of the token.
@@ -246,90 +209,6 @@ pub trait RWA: Pausable {
         investor_onchain_id: Address,
     ) -> bool;
 
-    // ################## METADATA FUNCTIONS ##################
-
-    /// Returns the name of the token.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
-    ///   initialized.
-    fn name(e: &Env) -> Symbol;
-
-    /// Returns the symbol of the token.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
-    ///   initialized.
-    fn symbol(e: &Env) -> Symbol;
-
-    /// Returns the number of decimals used to get its user representation.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
-    ///   initialized.
-    fn decimals(e: &Env) -> u8;
-
-    /// Returns the version of the token (T-REX version).
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
-    ///   initialized.
-    fn version(e: &Env) -> Symbol;
-
-    /// Returns the address of the onchain ID of the token.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::OnchainIdNotSet`] - When the onchain ID is not set.
-    fn onchain_id(e: &Env) -> Address;
-
-    /// Sets the token name. Only the owner can call this function.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `name` - The name of the token to set.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
-    ///   initialized.
-    /// * [`RWAError::EmptyValue`] - When the name is empty.
-    fn set_name(e: &Env, name: Symbol);
-
-    /// Sets the token symbol. Only the owner can call this function.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `symbol` - The token symbol to set.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
-    ///   initialized.
-    /// * [`RWAError::EmptyValue`] - When the symbol is empty.
-    fn set_symbol(e: &Env, symbol: Symbol);
-
-    /// Sets the onchain ID of the token. Only the owner can call this function.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `onchain_id` - The address of the onchain ID to set.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
-    ///   initialized.
-    fn set_onchain_id(e: &Env, onchain_id: Address);
-
-    // ################## UTILITY FUNCTIONS ##################
-
     /// Sets the frozen status for an address.
     /// This function can only be called by an agent of the token.
     ///
@@ -387,6 +266,23 @@ pub trait RWA: Pausable {
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - The address of the wallet to check.
     fn get_frozen_tokens(e: &Env, user_address: Address) -> i128;
+
+    // ################## METADATA FUNCTIONS ##################
+
+    /// Returns the version of the token (T-REX version).
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
+    ///   initialized.
+    fn version(e: &Env) -> Symbol;
+
+    /// Returns the address of the onchain ID of the token.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::OnchainIdNotSet`] - When the onchain ID is not set.
+    fn onchain_id(e: &Env) -> Address;
 
     // ################## COMPLIANCE AND IDENTITY FUNCTIONS ##################
 
@@ -467,6 +363,8 @@ pub enum RWAError {
     RecoveryFailed = 313,
     /// Indicates an empty value is provided.
     EmptyValue = 314,
+    /// Indicates the version is not set.
+    VersionNotSet = 315,
 }
 
 // ################## CONSTANTS ##################
@@ -504,11 +402,11 @@ pub const MAX_BATCH_SIZE: u32 = 100;
 /// * data - `[decimals: u8, version: Symbol, onchain_id: Address]`
 pub fn emit_token_information_updated(
     e: &Env,
-    name: &Symbol,
-    symbol: &Symbol,
-    decimals: u32,
-    version: &Symbol,
-    onchain_id: &Address,
+    name: Option<&Symbol>,
+    symbol: Option<&Symbol>,
+    decimals: Option<u32>,
+    version: Option<&Symbol>,
+    onchain_id: Option<&Address>,
 ) {
     let topics = (soroban_sdk::symbol_short!("token_upd"), name, symbol);
     e.events().publish(topics, (decimals, version, onchain_id))
@@ -619,49 +517,6 @@ pub fn emit_tokens_frozen(e: &Env, user_address: &Address, amount: i128) {
 pub fn emit_tokens_unfrozen(e: &Env, user_address: &Address, amount: i128) {
     let topics = (soroban_sdk::symbol_short!("tkn_unfrz"), user_address);
     e.events().publish(topics, amount)
-}
-
-/// Emits an event indicating a transfer of tokens.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `from` - The address holding the tokens.
-/// * `to` - The address receiving the transferred tokens.
-/// * `amount` - The amount of tokens transferred.
-///
-/// # Events
-///
-/// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[amount: i128]`
-pub fn emit_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-    let topics = (soroban_sdk::symbol_short!("transfer"), from, to);
-    e.events().publish(topics, amount)
-}
-
-/// Emits an event indicating an allowance was set.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `owner` - The address holding the tokens.
-/// * `spender` - The address authorized to spend the tokens.
-/// * `amount` - The amount of tokens made available to spender.
-/// * `live_until_ledger` - The ledger number at which the allowance expires.
-///
-/// # Events
-///
-/// * topics - `["approve", owner: Address, spender: Address]`
-/// * data - `[amount: i128, live_until_ledger: u32]`
-pub fn emit_approve(
-    e: &Env,
-    owner: &Address,
-    spender: &Address,
-    amount: i128,
-    live_until_ledger: u32,
-) {
-    let topics = (soroban_sdk::symbol_short!("approve"), owner, spender);
-    e.events().publish(topics, (amount, live_until_ledger))
 }
 
 /// Emits an event indicating a mint of tokens.
