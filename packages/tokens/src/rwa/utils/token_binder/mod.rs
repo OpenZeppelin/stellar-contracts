@@ -9,7 +9,6 @@ pub use storage::{bind_token, linked_tokens, unbind_token};
 /// to periphery contracts requiring this, such as:
 /// - Identity Storage Registry
 /// - Compliance contracts
-/// - Claim Topics and Issuers Registry
 ///
 /// This binding mechanism allows tokens to be associated with regulatory and
 /// compliance infrastructure, enabling features like identity verification,
