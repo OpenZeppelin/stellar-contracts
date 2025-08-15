@@ -1,9 +1,9 @@
 #![cfg(test)]
-use soroban_sdk::{contract, testutils::Address as _, Address, Env};
+use soroban_sdk::{contract, testutils::Address as _, Address, Env, Vec};
 
 use crate::rwa::utils::token_binder::storage::{
-    bind_token, get_token_by_index, get_token_index, is_token_bound, linked_token_count,
-    linked_tokens, unbind_token,
+    bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound,
+    linked_token_count, linked_tokens, unbind_token,
 };
 
 #[contract]
@@ -17,6 +17,88 @@ fn linked_token_count_empty() {
     e.as_contract(&contract_id, || {
         let count = linked_token_count(&e);
         assert_eq!(count, 0);
+    });
+}
+
+#[test]
+fn bind_tokens_fits_current_bucket() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    let tokens = e.as_contract(&contract_id, || {
+        // batch smaller than BUCKET_SIZE * 2
+        let mut batch: Vec<Address> = Vec::new(&e);
+        for _ in 0..10u32 {
+            batch.push_back(Address::generate(&e));
+        }
+
+        bind_tokens(&e, &batch);
+
+        // verify
+        assert_eq!(linked_token_count(&e), 10);
+        for i in 0..10u32 {
+            assert_eq!(get_token_by_index(&e, i), batch.get(i).unwrap());
+        }
+
+        linked_tokens(&e)
+    });
+
+    assert_eq!(tokens.len(), 10);
+}
+
+#[test]
+fn bind_tokens_splits_across_two_buckets() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        // Pre-fill current bucket to BUCKET_SIZE - 5
+        for _ in 0..95u32 {
+            let t = Address::generate(&e);
+            bind_token(&e, &t);
+        }
+        assert_eq!(linked_token_count(&e), 95);
+
+        // Now bind a batch of 10 which should split: 5 in current, 5 in next
+        let mut batch: Vec<Address> = Vec::new(&e);
+        for _ in 0..10u32 {
+            batch.push_back(Address::generate(&e));
+        }
+
+        bind_tokens(&e, &batch);
+
+        // Validate counts
+        assert_eq!(linked_token_count(&e), 105);
+
+        // First 5 go at indices 95..99 (current bucket), next 5 at 100..104 (next bucket)
+        for i in 0..10u32 {
+            assert_eq!(get_token_by_index(&e, 95 + i), batch.get(i).unwrap());
+        }
+
+        // Spot-check full list end ordering
+        let all = linked_tokens(&e);
+        assert_eq!(all.len(), 105);
+        for i in 0..10u32 {
+            assert_eq!(all.get(95 + i).unwrap(), batch.get(i).unwrap());
+        }
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #334)")]
+fn bind_tokens_duplicates_should_panic() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let t1 = Address::generate(&e);
+    let t2 = Address::generate(&e);
+
+    e.as_contract(&contract_id, || {
+        let mut batch: Vec<Address> = Vec::new(&e);
+        batch.push_back(t1.clone());
+        batch.push_back(t2.clone());
+        batch.push_back(t1.clone()); // duplicate
+
+        bind_tokens(&e, &batch);
     });
 }
 

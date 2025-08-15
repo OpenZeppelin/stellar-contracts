@@ -12,6 +12,16 @@ pub struct IdentityRegistryContract;
 #[contractimpl]
 impl IdentityRegistryContract {
     pub fn __constructor(_e: Env, _admin: Address) {}
+
+    pub fn bind_tokens(e: &Env, tokens: Vec<Address>, operator: Address) {
+        // TODO: access control operator
+        operator.require_auth();
+        binder::bind_tokens(e, &tokens);
+    }
+
+    pub fn get_token_index(e: &Env, token: Address) -> u32 {
+        binder::get_token_index(e, &token)
+    }
 }
 
 #[contractimpl]
