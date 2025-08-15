@@ -41,7 +41,7 @@
 
 pub mod storage;
 
-use soroban_sdk::{contracterror, Address, Env, Symbol};
+use soroban_sdk::{contracterror, symbol_short, Address, Env, Symbol};
 use stellar_contract_utils::pausable::Pausable;
 pub use storage::RWA;
 
@@ -338,7 +338,7 @@ pub fn emit_token_information_updated(
     version: Option<&Symbol>,
     onchain_id: Option<&Address>,
 ) {
-    let topics = (soroban_sdk::symbol_short!("token_upd"), name, symbol);
+    let topics = (Symbol::new(e, "token_updated"), name, symbol);
     e.events().publish(topics, (decimals, version, onchain_id))
 }
 
@@ -354,7 +354,7 @@ pub fn emit_token_information_updated(
 /// * topics - `["identity_verifier_added", identity_verifier: Address]`
 /// * data - `[]`
 pub fn emit_identity_verifier_added(e: &Env, identity_verifier: &Address) {
-    let topics = (soroban_sdk::symbol_short!("idreg_add"), identity_verifier);
+    let topics = (Symbol::new(e, "identity_verifier_added"), identity_verifier);
     e.events().publish(topics, ())
 }
 
@@ -370,7 +370,7 @@ pub fn emit_identity_verifier_added(e: &Env, identity_verifier: &Address) {
 /// * topics - `["compliance_added", compliance: Address]`
 /// * data - `[]`
 pub fn emit_compliance_added(e: &Env, compliance: &Address) {
-    let topics = (soroban_sdk::symbol_short!("comp_add"), compliance);
+    let topics = (Symbol::new(e, "compliance_added"), compliance);
     e.events().publish(topics, ())
 }
 
@@ -393,7 +393,7 @@ pub fn emit_recovery_success(
     new_wallet: &Address,
     investor_onchain_id: &Address,
 ) {
-    let topics = (soroban_sdk::symbol_short!("recovery"), lost_wallet, new_wallet);
+    let topics = (symbol_short!("recovered"), lost_wallet, new_wallet);
     e.events().publish(topics, investor_onchain_id)
 }
 
@@ -411,7 +411,7 @@ pub fn emit_recovery_success(
 /// * topics - `["address_frozen", user_address: Address, is_frozen: bool]`
 /// * data - `[owner: Address]`
 pub fn emit_address_frozen(e: &Env, user_address: &Address, is_frozen: bool, owner: &Address) {
-    let topics = (soroban_sdk::symbol_short!("addr_frz"), user_address, is_frozen);
+    let topics = (Symbol::new(e, "address_frozen"), user_address, is_frozen);
     e.events().publish(topics, owner)
 }
 
@@ -428,7 +428,7 @@ pub fn emit_address_frozen(e: &Env, user_address: &Address, is_frozen: bool, own
 /// * topics - `["tokens_frozen", user_address: Address]`
 /// * data - `[amount: i128]`
 pub fn emit_tokens_frozen(e: &Env, user_address: &Address, amount: i128) {
-    let topics = (soroban_sdk::symbol_short!("tkn_frz"), user_address);
+    let topics = (Symbol::new(e, "tokens_frozen"), user_address);
     e.events().publish(topics, amount)
 }
 
@@ -445,7 +445,7 @@ pub fn emit_tokens_frozen(e: &Env, user_address: &Address, amount: i128) {
 /// * topics - `["tokens_unfrozen", user_address: Address]`
 /// * data - `[amount: i128]`
 pub fn emit_tokens_unfrozen(e: &Env, user_address: &Address, amount: i128) {
-    let topics = (soroban_sdk::symbol_short!("tkn_unfrz"), user_address);
+    let topics = (Symbol::new(e, "tokens_unfrozen"), user_address);
     e.events().publish(topics, amount)
 }
 
@@ -462,7 +462,7 @@ pub fn emit_tokens_unfrozen(e: &Env, user_address: &Address, amount: i128) {
 /// * topics - `["mint", to: Address]`
 /// * data - `[amount: i128]`
 pub fn emit_mint(e: &Env, to: &Address, amount: i128) {
-    let topics = (soroban_sdk::symbol_short!("mint"), to);
+    let topics = (symbol_short!("minted"), to);
     e.events().publish(topics, amount)
 }
 
@@ -479,6 +479,6 @@ pub fn emit_mint(e: &Env, to: &Address, amount: i128) {
 /// * topics - `["burn", from: Address]`
 /// * data - `[amount: i128]`
 pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
-    let topics = (soroban_sdk::symbol_short!("burn"), from);
+    let topics = (symbol_short!("burned"), from);
     e.events().publish(topics, amount)
 }
