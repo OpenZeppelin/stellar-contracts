@@ -7,7 +7,6 @@ use crate::rwa::utils::token_binder::{
 
 /// Storage keys for the token binder system.
 ///
-/// Bucketed storage for scalability and low read count:
 /// - Tokens are stored in buckets of 100 addresses each
 /// - Each bucket is a `Vec<Address>` stored under its bucket index
 /// - Total count is tracked separately
@@ -21,6 +20,8 @@ pub enum TokenBinderStorageKey {
     /// Total count of bound tokens
     TotalCount,
 }
+
+// ################## QUERY STATE ##################
 
 /// Returns the total number of tokens currently bound to this contract.
 ///
@@ -40,7 +41,7 @@ pub fn linked_token_count(e: &Env) -> u32 {
 ///
 /// # Errors
 ///
-/// * [`TokenBinderError::TokenNotFound`] - When `index` is out of bounds.
+/// * [`TokenBinderError::TokenNotFound`] - If `index` is out of bounds.
 pub fn get_token_by_index(e: &Env, index: u32) -> Address {
     let count = linked_token_count(e);
     if index >= count {
@@ -76,8 +77,7 @@ pub fn get_token_by_index(e: &Env, index: u32) -> Address {
 ///
 /// # Errors
 ///
-/// * [`TokenBinderError::TokenNotFound`] - When the token is not currently
-///   bound.
+/// * [`TokenBinderError::TokenNotFound`] - If the token is not currently bound.
 ///
 /// # Notes
 ///
@@ -163,6 +163,8 @@ pub fn linked_tokens(e: &Env) -> Vec<Address> {
     tokens
 }
 
+// ################## CHANGE STATE ##################
+
 /// Binds a single token address to the contract.
 ///
 /// If the token is already bound, this function panics.
@@ -174,13 +176,23 @@ pub fn linked_tokens(e: &Env) -> Vec<Address> {
 ///
 /// # Errors
 ///
-/// * [`TokenBinderError::TokenAlreadyBound`] - When the token is already bound.
-/// * [`TokenBinderError::MaxTokensReached`] - When capacity has been reached.
+/// * [`TokenBinderError::TokenAlreadyBound`] - If the token is already bound.
+/// * [`TokenBinderError::MaxTokensReached`] - If capacity has been reached.
 ///
 /// # Events
 ///
 /// * topics - `["token_bound", token: Address]`
 /// * data - `[]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn bind_token(e: &Env, token: &Address) {
     if is_token_bound(e, token) {
         panic_with_error!(e, TokenBinderError::TokenAlreadyBound)
@@ -217,12 +229,12 @@ pub fn bind_token(e: &Env, token: &Address) {
 ///
 /// # Errors
 ///
-/// * [`TokenBinderError::BindBatchTooLarge`] - When the batch size exceeds the
+/// * [`TokenBinderError::BindBatchTooLarge`] - If the batch size exceeds the
 ///   allowed limit.
-/// * [`TokenBinderError::MaxTokensReached`] - When capacity is exceeded.
-/// * [`TokenBinderError::BindBatchDuplicates`] - When the batch contains
+/// * [`TokenBinderError::MaxTokensReached`] - If capacity is exceeded.
+/// * [`TokenBinderError::BindBatchDuplicates`] - If the batch contains
 ///   duplicate addresses.
-/// * [`TokenBinderError::TokenAlreadyBound`] - When any token in the batch is
+/// * [`TokenBinderError::TokenAlreadyBound`] - If any token in the batch is
 ///   already bound.
 ///
 /// # Events
@@ -230,6 +242,16 @@ pub fn bind_token(e: &Env, token: &Address) {
 /// Emits per-token events as each token is bound:
 /// * topics - `["token_bound", token: Address]`
 /// * data - `[]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn bind_tokens(e: &Env, tokens: &Vec<Address>) {
     let mut count = linked_token_count(e);
 
@@ -296,13 +318,22 @@ pub fn bind_tokens(e: &Env, tokens: &Vec<Address>) {
 ///
 /// # Errors
 ///
-/// * [`TokenBinderError::TokenNotFound`] - When the token is not currently
-///   bound.
+/// * [`TokenBinderError::TokenNotFound`] - If the token is not currently bound.
 ///
 /// # Events
 ///
 /// * topics - `["token_unbound", token: Address]`
 /// * data - `[]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn unbind_token(e: &Env, token: &Address) {
     let token_index = get_token_index(e, token);
 
