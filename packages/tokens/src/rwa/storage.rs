@@ -1,4 +1,6 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, IntoVal, Symbol, Val, Vec};
+use soroban_sdk::{
+    contracttype, panic_with_error, Address, Env, IntoVal, String, Symbol, Val, Vec,
+};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
@@ -53,7 +55,7 @@ impl RWA {
     /// # Errors
     ///
     /// * [`RWAError::VersionNotSet`] - When the version is not set.
-    pub fn version(e: &Env) -> Symbol {
+    pub fn version(e: &Env) -> String {
         e.storage()
             .instance()
             .get(&RWAStorageKey::Version)

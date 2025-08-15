@@ -40,6 +40,7 @@
 //!   necessary for identities
 
 pub mod storage;
+pub mod test;
 
 use soroban_sdk::{contracterror, symbol_short, Address, Env, Symbol};
 use stellar_contract_utils::pausable::Pausable;
@@ -79,7 +80,6 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * [`RWAError::InsufficientBalance`] - When the sender has insufficient
     ///   balance.
     /// * [`RWAError::LessThanZero`] - When the amount is negative.
-    /// * [`RWAError::MathOverflow`] - When arithmetic operations overflow.
     fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128);
 
     /// Mints tokens to a wallet. Tokens can only be minted to verified
@@ -94,8 +94,6 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::LessThanZero`] - When the amount is negative.
-    /// * [`RWAError::MathOverflow`] - When arithmetic operations overflow.
     /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
     ///   not configured.
     /// * [`RWAError::AddressNotVerified`] - When the recipient address is not
@@ -115,12 +113,7 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::InsufficientBalance`] - When the address has insufficient
-    ///   balance.
-    /// * [`RWAError::LessThanZero`] - When the amount is negative.
-    /// * [`RWAError::MathOverflow`] - When arithmetic operations overflow.
     /// * [`RWAError::AddressFrozen`] - When the address is frozen.
-    /// * [`PausableError::EnforcedPause`] - When the contract is paused.
     fn burn(e: &Env, user_address: Address, amount: i128);
 
     /// Recovery function used to force transfer tokens from a lost wallet
@@ -329,13 +322,13 @@ pub const MAX_BATCH_SIZE: u32 = 100;
 /// # Events
 ///
 /// * topics - `["token_info_updated", name: Symbol, symbol: Symbol]`
-/// * data - `[decimals: u8, version: Symbol, onchain_id: Address]`
+/// * data - `[decimals: u8, version: &str, onchain_id: Address]`
 pub fn emit_token_information_updated(
     e: &Env,
     name: Option<&Symbol>,
     symbol: Option<&Symbol>,
     decimals: Option<u32>,
-    version: Option<&Symbol>,
+    version: Option<&str>,
     onchain_id: Option<&Address>,
 ) {
     let topics = (Symbol::new(e, "token_updated"), name, symbol);
