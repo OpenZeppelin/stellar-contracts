@@ -5,8 +5,6 @@ mod test;
 
 use soroban_sdk::{contracterror, Address, Env, Symbol, Vec};
 
-// TODO: add an `operator` argument so that we can apply RBAC
-
 /// Trait for managing claim topics and trusted issuers for RWA tokens.
 ///
 /// [`ClaimTopicsAndIssuers`] trait is not expected to be an extension to a RWA
@@ -23,33 +21,47 @@ pub trait ClaimTopicsAndIssuers {
 
     /// Adds a claim topic (for example: KYC=1, AML=2).
     ///
-    /// Only owner should be able to call this function.
+    /// Only an operator with sufficient permissions should be able to call this
+    /// function.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `claim_topic` - The claim topic index.
+    ///
+    /// # Errors
+    ///
+    /// * [`ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached`] - If the
+    ///   maximum number of claim topics is reached.
+    /// * [`ClaimTopicsAndIssuersError::ClaimTopicAlreadyExists`] - If the claim
+    ///   topic already exists.
     ///
     /// # Events
     ///
     /// * topics - `["claim_added", claim_topic: u32]`
     /// * data - `[]`
-    fn add_claim_topic(e: &Env, claim_topic: u32);
+    fn add_claim_topic(e: &Env, claim_topic: u32, operator: Address);
 
     /// Removes a claim topic (for example: KYC=1, AML=2).
     ///
-    /// Only owner should be able to call this function.
+    /// Only an operator with sufficient permissions should be able to call this
+    /// function.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `claim_topic` - The claim topic index.
     ///
+    /// # Errors
+    ///
+    /// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim
+    ///   topic does not exist.
+    ///
     /// # Events
     ///
     /// * topics - `["claim_removed", claim_topic: u32]`
     /// * data - `[]`
-    fn remove_claim_topic(e: &Env, claim_topic: u32);
+    fn remove_claim_topic(e: &Env, claim_topic: u32, operator: Address);
 
     /// Returns the claim topics for the security token.
     ///
@@ -62,41 +74,69 @@ pub trait ClaimTopicsAndIssuers {
 
     /// Registers a claim issuer contract as trusted claim issuer.
     ///
-    /// Only owner should be able to call this function.
+    /// Only an operator with sufficient permissions should be able to call this
+    /// function.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `trusted_issuer` - The claim issuer contract address of the trusted
-    ///   claim issuer. Should not be already registered.
+    ///   claim issuer.
     /// * `claim_topics` - The set of claim topics that the trusted issuer is
-    ///   allowed to emit. Should not be empty.
+    ///   allowed to emit.
+    ///
+    /// # Errors
+    ///
+    /// * [`ClaimTopicsAndIssuersError::ClaimTopicsSetCannotBeEmpty`] - If the
+    ///   claim topics set is empty.
+    /// * [`ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached`] - If the
+    ///   maximum number of claim topics is reached.
+    /// * [`ClaimTopicsAndIssuersError::MaxIssuersLimitReached`] - If the
+    ///   maximum number of issuers is reached.
+    /// * [`ClaimTopicsAndIssuersError::IssuerAlreadyExists`] - If the issuer
+    ///   already exists.
+    /// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim
+    ///   topic does not exist.
     ///
     /// # Events
     ///
     /// * topics - `["issuer_added", trusted_issuer: Address]`
     /// * data - `[claim_topics: Vec<u32>]`
-    fn add_trusted_issuer(e: &Env, trusted_issuer: &Address, claim_topics: &Vec<u32>);
+    fn add_trusted_issuer(
+        e: &Env,
+        trusted_issuer: Address,
+        claim_topics: Vec<u32>,
+        operator: Address,
+    );
 
     /// Removes the claim issuer contract of a trusted claim issuer.
     ///
-    /// Only owner should be able to call this function.
+    /// Only an operator with sufficient permissions should be able to call this
+    /// function.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `trusted_issuer` - The claim issuer to remove.
     ///
+    /// # Errors
+    ///
+    /// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted
+    ///   issuer does not exist.
+    /// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim
+    ///   topic does not exist.
+    ///
     /// # Events
     ///
     /// * topics - `["issuer_removed", trusted_issuer: Address]`
     /// * data - `[]`
-    fn remove_trusted_issuer(e: &Env, trusted_issuer: &Address);
+    fn remove_trusted_issuer(e: &Env, trusted_issuer: Address, operator: Address);
 
     /// Updates the set of claim topics that a trusted issuer is allowed to
     /// emit.
     ///
-    /// Only owner should be able to call this function.
+    /// Only an operator with sufficient permissions should be able to call this
+    /// function.
     ///
     /// # Arguments
     ///
@@ -105,11 +145,29 @@ pub trait ClaimTopicsAndIssuers {
     /// * `claim_topics` - The set of claim topics that the trusted issuer is
     ///   allowed to emit.
     ///
+    /// # Errors
+    ///
+    /// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted
+    ///   issuer does not exist.
+    /// * [`ClaimTopicsAndIssuersError::ClaimTopicsSetCannotBeEmpty`] - If the
+    ///   claim topics set is empty.
+    /// * [`ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached`] - If the
+    ///   maximum number of claim topics is reached.
+    /// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted
+    ///   issuer does not exist.
+    /// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim
+    ///   topic does not exist.
+    ///
     /// # Events
     ///
     /// * topics - `["topics_updated", trusted_issuer: Address]`
     /// * data - `[claim_topics: Vec<u32>]`
-    fn update_issuer_claim_topics(e: &Env, trusted_issuer: &Address, claim_topics: &Vec<u32>);
+    fn update_issuer_claim_topics(
+        e: &Env,
+        trusted_issuer: Address,
+        claim_topics: Vec<u32>,
+        operator: Address,
+    );
 
     /// Returns all the trusted claim issuers stored.
     ///
@@ -124,6 +182,11 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `claim_topic` - The claim topic to get the trusted issuers for.
+    ///
+    /// # Errors
+    ///
+    /// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim
+    ///   topic does not exist.
     fn get_trusted_issuers_for_claim_topic(e: &Env, claim_topic: u32) -> Vec<Address>;
 
     /// Checks if the claim issuer contract is trusted.
@@ -132,7 +195,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `issuer` - The address of the claim issuer contract.
-    fn is_trusted_issuer(e: &Env, issuer: &Address) -> bool;
+    fn is_trusted_issuer(e: &Env, issuer: Address) -> bool;
 
     /// Returns all the claim topics of trusted claim issuer.
     ///
@@ -140,7 +203,12 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `trusted_issuer` - The trusted issuer concerned.
-    fn get_trusted_issuer_claim_topics(e: &Env, trusted_issuer: &Address) -> Vec<u32>;
+    ///
+    /// # Errors
+    ///
+    /// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted
+    ///   issuer does not exist.
+    fn get_trusted_issuer_claim_topics(e: &Env, trusted_issuer: Address) -> Vec<u32>;
 
     /// Checks if the trusted claim issuer is allowed to emit a certain claim
     /// topic.
@@ -151,7 +219,12 @@ pub trait ClaimTopicsAndIssuers {
     /// * `issuer` - The address of the trusted issuer's claim issuer contract.
     /// * `claim_topic` - The claim topic that has to be checked to know if the
     ///   issuer is allowed to emit it.
-    fn has_claim_topic(e: &Env, issuer: &Address, claim_topic: u32) -> bool;
+    ///
+    /// # Errors
+    ///
+    /// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted
+    ///   issuer does not exist.
+    fn has_claim_topic(e: &Env, issuer: Address, claim_topic: u32) -> bool;
 }
 
 // ################## ERRORS ##################
@@ -200,7 +273,7 @@ pub const MAX_ISSUERS: u32 = 50;
 /// * topics - `["claim_added", claim_topic: u32]`
 /// * data - `[]`
 pub fn emit_claim_topic_added(e: &Env, claim_topic: u32) {
-    let topics = (Symbol::new(e, "claim_added"), claim_topic);
+    let topics = (Symbol::new(e, "claim_topic_added"), claim_topic);
     e.events().publish(topics, ())
 }
 
@@ -216,7 +289,7 @@ pub fn emit_claim_topic_added(e: &Env, claim_topic: u32) {
 /// * topics - `["claim_removed", claim_topic: u32]`
 /// * data - `[]`
 pub fn emit_claim_topic_removed(e: &Env, claim_topic: u32) {
-    let topics = (Symbol::new(e, "claim_removed"), claim_topic);
+    let topics = (Symbol::new(e, "claim_topic_removed"), claim_topic);
     e.events().publish(topics, ())
 }
 
@@ -235,7 +308,7 @@ pub fn emit_claim_topic_removed(e: &Env, claim_topic: u32) {
 /// * topics - `["issuer_added", trusted_issuer: Address]`
 /// * data - `[claim_topics: Vec<u32>]`
 pub fn emit_trusted_issuer_added(e: &Env, trusted_issuer: &Address, claim_topics: Vec<u32>) {
-    let topics = (Symbol::new(e, "issuer_added"), trusted_issuer);
+    let topics = (Symbol::new(e, "trusted_issuer_added"), trusted_issuer);
     e.events().publish(topics, claim_topics)
 }
 
@@ -252,7 +325,7 @@ pub fn emit_trusted_issuer_added(e: &Env, trusted_issuer: &Address, claim_topics
 /// * topics - `["issuer_removed", trusted_issuer: Address]`
 /// * data - `[]`
 pub fn emit_trusted_issuer_removed(e: &Env, trusted_issuer: &Address) {
-    let topics = (Symbol::new(e, "issuer_removed"), trusted_issuer);
+    let topics = (Symbol::new(e, "trusted_issuer_removed"), trusted_issuer);
     e.events().publish(topics, ())
 }
 

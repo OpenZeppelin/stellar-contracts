@@ -195,7 +195,7 @@ pub fn remove_module_from(e: &Env, hook: HookType, module: Address) {
 ///
 /// # Cross-Contract Calls
 ///
-/// Invokes `on_xfer(from, to, amount)` on each registered module.
+/// Invokes `on_transfer(from, to, amount)` on each registered module.
 pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
     let modules = get_modules_for_hook(e, HookType::Transfer);
 
@@ -222,7 +222,7 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
 ///
 /// # Cross-Contract Calls
 ///
-/// Invokes `on_mint(to, amount)` on each registered module.
+/// Invokes `on_created(to, amount)` on each registered module.
 pub fn created(e: &Env, to: Address, amount: u32) {
     let modules = get_modules_for_hook(e, HookType::Created);
 
@@ -249,7 +249,7 @@ pub fn created(e: &Env, to: Address, amount: u32) {
 ///
 /// # Cross-Contract Calls
 ///
-/// Invokes `on_burn(from, amount)` on each registered module.
+/// Invokes `on_destroyed(from, amount)` on each registered module.
 pub fn destroyed(e: &Env, from: Address, amount: i128) {
     let modules = get_modules_for_hook(e, HookType::Destroyed);
 
@@ -284,7 +284,7 @@ pub fn destroyed(e: &Env, from: Address, amount: i128) {
 ///
 /// # Cross-Contract Calls
 ///
-/// Invokes `can_xfer(from, to, amount)` on each registered module.
+/// Invokes `can_transfer(from, to, amount)` on each registered module.
 /// Stops execution and returns `false` on the first module that rejects.
 pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
     // This can be called by anyone for read-only checks

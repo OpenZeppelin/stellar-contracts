@@ -25,8 +25,8 @@ pub enum ClaimTopicsAndIssuersStorageKey {
 
 // ################## QUERY STATE ##################
 
-/// Returns the claim topics for the security token. Defaults to empty
-/// vector if no topics are stored.
+/// Returns all stored claim topics. Defaults to empty vector if no topics are
+/// stored.
 ///
 /// # Arguments
 ///
@@ -119,8 +119,12 @@ pub fn get_trusted_issuer_claim_topics(e: &Env, trusted_issuer: &Address) -> Vec
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `issuer` - The address of the trusted issuer's claim issuer contract.
-/// * `claim_topic` - The claim topic that has to be checked to know if the
-///   issuer is allowed to emit it.
+/// * `claim_topic` - The claim topic that has to be checked to determine
+///   whether the issuer is allowed to emit it.
+///
+/// # Errors
+///
+/// * refer to [`get_trusted_issuer_claim_topics`] errors.
 pub fn has_claim_topic(e: &Env, issuer: &Address, claim_topic: u32) -> bool {
     let issuer_topics = get_trusted_issuer_claim_topics(e, issuer);
     issuer_topics.contains(claim_topic)
@@ -246,7 +250,7 @@ pub fn remove_claim_topic(e: &Env, claim_topic: u32) {
 ///   number of issuers is reached.
 /// * [`ClaimTopicsAndIssuersError::IssuerAlreadyExists`] - If the issuer
 ///   already exists.
-/// * also refer to [`get_trusted_issuer_claim_topics`] errors.
+/// * also refer to [`get_trusted_issuers_for_claim_topic`] errors.
 ///
 /// # Events
 ///
@@ -316,6 +320,8 @@ pub fn add_trusted_issuer(e: &Env, trusted_issuer: &Address, claim_topics: &Vec<
 ///
 /// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted issuer
 ///   does not exist.
+/// * also refer to [`get_trusted_issuer_claim_topics`] errors.
+/// * also refer to [`get_trusted_issuers_for_claim_topic`] errors.
 ///
 /// # Events
 ///
@@ -385,6 +391,7 @@ pub fn remove_trusted_issuer(e: &Env, trusted_issuer: &Address) {
 /// * [`ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached`] - If the
 ///   maximum number of claim topics is reached.
 /// * also refer to [`get_trusted_issuer_claim_topics`] errors.
+/// * also refer to [`get_trusted_issuers_for_claim_topic`] errors.
 ///
 /// # Events
 ///
