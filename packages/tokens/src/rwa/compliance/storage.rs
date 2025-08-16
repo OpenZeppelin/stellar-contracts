@@ -1,8 +1,8 @@
-use soroban_sdk::{contracttype, panic_with_error, vec, Address, Env, IntoVal, Symbol, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 
 use crate::rwa::compliance::{
-    emit_module_added, emit_module_removed, ComplianceError, HookType, COMPLIANCE_EXTEND_AMOUNT,
-    COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
+    emit_module_added, emit_module_removed, ComplianceError, ComplianceModuleClient, HookType,
+    COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
 };
 
 /// Storage keys for the modular compliance contract.
@@ -199,13 +199,9 @@ pub fn remove_module_from(e: &Env, hook: HookType, module: Address) {
 pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
     let modules = get_modules_for_hook(e, HookType::Transfer);
 
-    // Call each registered module
     for module_address in modules.iter() {
-        let _result: () = e.invoke_contract(
-            &module_address,
-            &Symbol::new(e, "on_transfer"),
-            vec![&e, from.to_val(), to.to_val(), amount.into_val(e)],
-        );
+        let client = ComplianceModuleClient::new(e, &module_address);
+        client.on_transfer(&from, &to, &amount);
     }
 }
 
@@ -223,16 +219,12 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
 /// # Cross-Contract Calls
 ///
 /// Invokes `on_created(to, amount)` on each registered module.
-pub fn created(e: &Env, to: Address, amount: u32) {
+pub fn created(e: &Env, to: Address, amount: i128) {
     let modules = get_modules_for_hook(e, HookType::Created);
 
-    // Call each registered module
     for module_address in modules.iter() {
-        let _result: () = e.invoke_contract(
-            &module_address,
-            &Symbol::new(e, "on_created"),
-            vec![&e, to.to_val(), amount.into_val(e)],
-        );
+        let client = ComplianceModuleClient::new(e, &module_address);
+        client.on_created(&to, &amount);
     }
 }
 
@@ -253,13 +245,9 @@ pub fn created(e: &Env, to: Address, amount: u32) {
 pub fn destroyed(e: &Env, from: Address, amount: i128) {
     let modules = get_modules_for_hook(e, HookType::Destroyed);
 
-    // Call each registered module
     for module_address in modules.iter() {
-        let _result: () = e.invoke_contract(
-            &module_address,
-            &Symbol::new(e, "on_destroyed"),
-            vec![&e, from.to_val(), amount.into_val(e)],
-        );
+        let client = ComplianceModuleClient::new(e, &module_address);
+        client.on_destroyed(&from, &amount);
     }
 }
 
@@ -287,16 +275,11 @@ pub fn destroyed(e: &Env, from: Address, amount: i128) {
 /// Invokes `can_transfer(from, to, amount)` on each registered module.
 /// Stops execution and returns `false` on the first module that rejects.
 pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
-    // This can be called by anyone for read-only checks
     let modules = get_modules_for_hook(e, HookType::CanTransfer);
 
-    // Call each registered module and check if all return true
     for module_address in modules.iter() {
-        let result: bool = e.invoke_contract(
-            &module_address,
-            &Symbol::new(e, "can_transfer"),
-            vec![&e, from.to_val(), to.to_val(), amount.into_val(e)],
-        );
+        let client = ComplianceModuleClient::new(e, &module_address);
+        let result = client.can_transfer(&from, &to, &amount);
 
         // If any module returns false, the entire check fails
         if !result {

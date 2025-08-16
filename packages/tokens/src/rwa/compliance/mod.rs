@@ -1,4 +1,4 @@
-use soroban_sdk::{contracterror, contracttype, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{contractclient, contracterror, contracttype, Address, Env, String, Symbol, Vec};
 
 pub mod storage;
 
@@ -213,6 +213,7 @@ pub fn emit_module_removed(e: &Env, hook: HookType, module: Address) {
 /// Modules implement this trait to provide specific compliance logic for
 /// different hook types. Each module only needs to implement the methods for
 /// hooks it registers for.
+#[contractclient(name = "ComplianceModuleClient")]
 pub trait ComplianceModule {
     /// Called when tokens are transferred (for Transfer hook).
     ///
