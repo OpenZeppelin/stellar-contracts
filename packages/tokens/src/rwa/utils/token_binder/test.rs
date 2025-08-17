@@ -1,13 +1,14 @@
 #![cfg(test)]
 use soroban_sdk::{contract, testutils::Address as _, Address, Env, Vec};
 
-use crate::rwa::utils::token_binder::storage::{
-    bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound,
-    linked_token_count, linked_tokens, unbind_token,
-};
-use crate::rwa::utils::token_binder::{BUCKET_SIZE, MAX_TOKENS};
-
 use super::storage::TokenBinderStorageKey;
+use crate::rwa::utils::token_binder::{
+    storage::{
+        bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound,
+        linked_token_count, linked_tokens, unbind_token,
+    },
+    BUCKET_SIZE, MAX_TOKENS,
+};
 
 #[contract]
 struct MockContract;
@@ -86,7 +87,8 @@ fn bind_tokens_splits_across_two_buckets() {
         // Validate counts
         assert_eq!(linked_token_count(&e), 105);
 
-        // First 5 go at indices 95..99 (current bucket), next 5 at 100..104 (next bucket)
+        // First 5 go at indices 95..99 (current bucket), next 5 at 100..104 (next
+        // bucket)
         for i in 0..10u32 {
             assert_eq!(get_token_by_index(&e, 95 + i), batch.get(i).unwrap());
         }
