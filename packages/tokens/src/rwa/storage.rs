@@ -29,7 +29,8 @@ pub enum RWAStorageKey {
     Version,
 }
 
-// TODO: add compliance `destroyed`, `created`, `transferred` hook calls
+// TODO: change `invoke_contract` calls to `client` instead when `compliance`
+// and `identity_verifier` is merged
 
 pub struct RWA;
 

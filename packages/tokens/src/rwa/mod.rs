@@ -293,14 +293,8 @@ pub enum RWAError {
 // ################## CONSTANTS ##################
 
 const DAY_IN_LEDGERS: u32 = 17280;
-pub const BALANCE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
-pub const BALANCE_TTL_THRESHOLD: u32 = BALANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
-pub const ALLOWANCE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
-pub const ALLOWANCE_TTL_THRESHOLD: u32 = ALLOWANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 pub const FROZEN_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const FROZEN_TTL_THRESHOLD: u32 = FROZEN_EXTEND_AMOUNT - DAY_IN_LEDGERS;
-pub const INSTANCE_EXTEND_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
-pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 /// Maximum number of addresses that can be processed in a single batch
 /// operation

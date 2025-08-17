@@ -170,7 +170,20 @@ fn mint_with_identity_verification() {
     });
 }
 
-// TODO: mint without compliance should panic test
+#[test]
+#[should_panic(expected = "Error(Contract, #305)")]
+fn mint_without_compliance_fails() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let verifier = create_mock_identity_verifier(&e);
+        RWA::set_identity_verifier(&e, &verifier);
+        RWA::mint(&e, &to, 100);
+    });
+}
 
 #[test]
 #[should_panic(expected = "Error(Contract, #304)")]
