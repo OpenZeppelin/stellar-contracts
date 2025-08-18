@@ -15,7 +15,6 @@ use stellar_contract_utils::math::fixed_point::Rounding;
 /// TODO: describe trait, functions, arguments
 /// Public implementation details. Intended for external use.
 /// May be overridden to customize default behavior.
-
 pub trait FungibleVault: FungibleToken<ContractType = Vault> + FungibleVaultInternal {
     fn query_asset(e: &Env) -> Address;
     fn total_assets(e: &Env) -> i128;
@@ -37,7 +36,6 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> + FungibleVaultInte
 
 /// Internal implementation details. Not intended for external use.
 /// May be overridden to customize default behavior.
-
 pub trait FungibleVaultInternal {
     fn convert_to_shares_with_rounding(e: &Env, assets: i128, rounding: Rounding) -> i128;
     fn convert_to_assets_with_rounding(e: &Env, shares: i128, rounding: Rounding) -> i128;

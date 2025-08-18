@@ -25,7 +25,6 @@ pub enum VaultStorageKey {
 }
 
 /// TODO: describe functions, arguments, errors
-
 impl Vault {
     // ################## QUERY STATE ##################
 
@@ -37,7 +36,7 @@ impl Vault {
     }
 
     pub fn total_assets(e: &Env) -> i128 {
-        let token_client = token::Client::new(&e, &Self::query_asset(&e));
+        let token_client = token::Client::new(e, &Self::query_asset(e));
         token_client.balance(&e.current_contract_address())
     }
 
@@ -90,11 +89,11 @@ impl Vault {
         receiver: Address,
     ) -> i128 {
         caller.require_auth();
-        let max_assets = T::max_deposit(&e, receiver.clone());
+        let max_assets = T::max_deposit(e, receiver.clone());
         if assets > max_assets {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxDeposit);
         }
-        let shares: i128 = T::preview_deposit(&e, assets);
+        let shares: i128 = T::preview_deposit(e, assets);
         T::deposit_no_auth(e, &caller, &receiver, assets, shares);
         shares
     }
@@ -106,12 +105,12 @@ impl Vault {
         receiver: Address,
     ) -> i128 {
         caller.require_auth();
-        let max_shares = T::max_mint(&e, receiver.clone());
+        let max_shares = T::max_mint(e, receiver.clone());
         if shares > max_shares {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxMint);
         }
-        let assets: i128 = T::preview_mint(&e, shares);
-        T::deposit_no_auth(&e, &caller, &receiver, assets, shares);
+        let assets: i128 = T::preview_mint(e, shares);
+        T::deposit_no_auth(e, &caller, &receiver, assets, shares);
         assets
     }
 
@@ -123,12 +122,12 @@ impl Vault {
         owner: Address,
     ) -> i128 {
         caller.require_auth();
-        let max_assets = T::max_withdraw(&e, owner.clone());
+        let max_assets = T::max_withdraw(e, owner.clone());
         if assets > max_assets {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxWithdraw);
         }
-        let shares: i128 = T::preview_withdraw(&e, assets);
-        T::withdraw_no_auth(&e, &caller, &receiver, &owner, assets, shares);
+        let shares: i128 = T::preview_withdraw(e, assets);
+        T::withdraw_no_auth(e, &caller, &receiver, &owner, assets, shares);
         shares
     }
 
@@ -145,7 +144,7 @@ impl Vault {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxRedeem);
         }
         let assets = T::preview_redeem(e, shares);
-        T::withdraw_no_auth(&e, &caller, &receiver, &owner, assets, shares);
+        T::withdraw_no_auth(e, &caller, &receiver, &owner, assets, shares);
         assets
     }
 
@@ -155,15 +154,15 @@ impl Vault {
      * Decimals are computed by adding the decimal offset on top of the underlying asset's decimals.
      */
     pub fn decimals(e: &Env) -> u32 {
-        Self::get_underlying_asset_decimals(&e)
-            .checked_add(Self::get_decimals_offset(&e))
+        Self::get_underlying_asset_decimals(e)
+            .checked_add(Self::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow))
     }
 
     // ################## LOW-LEVEL HELPERS ##################
 
     /// **IMPORTANT**: This function bypasses authorization checks.
-    /// * We recommend using this function in the constructor of your smart contract.
+    /// We recommend using this function in the constructor of your smart contract.
     /// By design, the underlying asset address should be set once in the constructor
     /// and remain immutable thereafter. Consider combining with the Ownable admin pattern.
     pub fn set_asset(e: &Env, asset: Address) {
@@ -172,12 +171,12 @@ impl Vault {
             panic_with_error!(e, FungibleTokenError::VaultAssetAddressAlreadySet);
         }
         // Used to panic if non-existent asset address
-        let _ = token::Client::new(&e, &asset);
+        let _ = token::Client::new(e, &asset);
         e.storage().instance().set(&VaultStorageKey::AssetAddress, &asset);
     }
 
     /// **IMPORTANT**: This function bypasses authorization checks.
-    /// * We recommend using this function in the constructor of your smart contract.
+    /// We recommend using this function in the constructor of your smart contract.
     /// By design, the decimals offset should be set once in the constructor
     /// and remain immutable thereafter. Consider combining with the Ownable admin pattern.
     pub fn set_decimals_offset(e: &Env, offset: u32) {
@@ -205,7 +204,7 @@ impl Vault {
         }
         let x = assets;
         let pow = 10_i128
-            .checked_pow(Self::get_decimals_offset(&e))
+            .checked_pow(Self::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
         let y = T::total_supply(e)
             .checked_add(pow)
@@ -236,7 +235,7 @@ impl Vault {
             .checked_add(1_i128)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
         let pow = 10_i128
-            .checked_pow(Self::get_decimals_offset(&e))
+            .checked_pow(Self::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
         let denominator = T::total_supply(e)
             .checked_add(pow)
@@ -255,10 +254,11 @@ impl Vault {
         shares: i128,
     ) {
         // This function assumes prior authorization of the caller and validation of amounts.
-        let token_client = token::Client::new(&e, &Self::query_asset(&e));
+        let token_client = token::Client::new(e, &Self::query_asset(e));
+        // `safeTransfer` mechanism is not present in the base module, (will be provided as an extension)
         token_client.transfer(caller, &e.current_contract_address(), &assets);
         Base::mint(e, receiver, shares);
-        emit_deposit(e, &caller, &receiver, assets, shares);
+        emit_deposit(e, caller, receiver, assets, shares);
     }
 
     /**
@@ -274,12 +274,13 @@ impl Vault {
     ) {
         // This function assumes prior authorization of the caller and validation of amounts.
         if caller != owner {
-            Base::spend_allowance(e, &owner, &caller, shares);
+            Base::spend_allowance(e, owner, caller, shares);
         }
-        Base::update(e, Some(&owner), None, shares);
-        let token_client = token::Client::new(&e, &Self::query_asset(&e));
-        token_client.transfer(&e.current_contract_address(), &receiver, &assets);
-        emit_withdraw(e, &caller, &receiver, &owner, assets, shares);
+        Base::update(e, Some(owner), None, shares);
+        let token_client = token::Client::new(e, &Self::query_asset(e));
+        // `safeTransfer` mechanism is not present in the base module, (will be provided as an extension)
+        token_client.transfer(&e.current_contract_address(), receiver, &assets);
+        emit_withdraw(e, caller, receiver, owner, assets, shares);
     }
 
     /// The following document explains the importance and necessity of virtual decimals offset:
@@ -290,7 +291,7 @@ impl Vault {
     }
 
     pub fn get_underlying_asset_decimals(e: &Env) -> u32 {
-        let token_client = token::Client::new(&e, &Self::query_asset(&e));
+        let token_client = token::Client::new(e, &Self::query_asset(e));
         token_client.decimals()
     }
 }
