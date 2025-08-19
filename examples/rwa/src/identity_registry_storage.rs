@@ -102,8 +102,4 @@ impl CountryProfileManager for IdentityRegistryContract {
     fn get_country_profiles(e: &Env, account: Address) -> Vec<CountryProfile> {
         identity_storage::get_country_profiles(e, &account)
     }
-
-    fn get_country_profile_count(e: &Env, account: Address) -> u32 {
-        identity_storage::get_country_profile_count(e, &account)
-    }
 }

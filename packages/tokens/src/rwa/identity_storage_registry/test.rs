@@ -1,9 +1,16 @@
 #![cfg(test)]
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env};
+use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, Vec};
 
-use super::storage::{self as irs, Country, CountryProfile};
+use super::{
+    storage::{
+        add_country_profiles, add_identity, delete_country_profile, get_country_profile,
+        get_country_profiles, get_identity, modify_country_profile, modify_identity,
+        remove_identity, Country, CountryProfile,
+    },
+    MAX_COUNTRY_PROFILES,
+};
 
 #[contract]
 struct MockContract;
@@ -21,12 +28,12 @@ fn add_identity_success() {
             valid_until: None,
         };
 
-        irs::add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
+        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
 
-        let stored_identity = irs::get_identity(&e, &account);
+        let stored_identity = get_identity(&e, &account);
         assert_eq!(stored_identity, identity);
-        assert_eq!(irs::get_country_profile_count(&e, &account), 1);
-        assert_eq!(irs::get_country_profile(&e, &account, 0), profile);
+        assert_eq!(get_country_profiles(&e, &account).len(), 1);
+        assert_eq!(get_country_profile(&e, &account, 0), profile);
     });
 }
 
@@ -44,8 +51,8 @@ fn add_identity_already_exists() {
             valid_until: None,
         };
 
-        irs::add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
-        irs::add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
+        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
+        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
     });
 }
 
@@ -63,10 +70,10 @@ fn modify_identity_success() {
             valid_until: None,
         };
 
-        irs::add_identity(&e, &account, &old_identity, &vec![&e, profile.clone()]);
-        irs::modify_identity(&e, &account, &new_identity);
+        add_identity(&e, &account, &old_identity, &vec![&e, profile.clone()]);
+        modify_identity(&e, &account, &new_identity);
 
-        assert_eq!(irs::get_identity(&e, &account), new_identity);
+        assert_eq!(get_identity(&e, &account), new_identity);
     });
 }
 
@@ -80,7 +87,7 @@ fn modify_identity_not_found() {
         let account = Address::generate(&e);
         let new_identity = Address::generate(&e);
 
-        irs::modify_identity(&e, &account, &new_identity);
+        modify_identity(&e, &account, &new_identity);
     });
 }
 
@@ -97,9 +104,9 @@ fn get_identity_success() {
             valid_until: None,
         };
 
-        irs::add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
+        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
 
-        assert_eq!(irs::get_identity(&e, &account), identity);
+        assert_eq!(get_identity(&e, &account), identity);
     });
 }
 
@@ -111,11 +118,12 @@ fn get_identity_not_found() {
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
-        irs::get_identity(&e, &account);
+        get_identity(&e, &account);
     });
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #321)")] // IdentityNotFound
 fn remove_identity_success() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -123,23 +131,18 @@ fn remove_identity_success() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile1 = CountryProfile {
+        let profile = CountryProfile {
             country: Country::Residence(840), // USA
             valid_until: None,
         };
-        let profile2 = CountryProfile {
-            country: Country::Citizenship(276), // Germany
-            valid_until: None,
-        };
 
-        irs::add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
-        irs::add_country_profiles(&e, &account, &vec![&e, profile2.clone()]);
+        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
 
-        assert_eq!(irs::get_country_profile_count(&e, &account), 2);
+        assert_eq!(get_country_profiles(&e, &account).len(), 1);
 
-        irs::remove_identity(&e, &account);
+        remove_identity(&e, &account);
 
-        assert_eq!(irs::get_country_profile_count(&e, &account), 0);
+        get_identity(&e, &account);
     });
 }
 
@@ -151,7 +154,7 @@ fn remove_identity_not_found() {
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
-        irs::remove_identity(&e, &account);
+        remove_identity(&e, &account);
     });
 }
 
@@ -166,11 +169,11 @@ fn add_country_profile_success() {
         let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
         let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
 
-        irs::add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
-        irs::add_country_profiles(&e, &account, &vec![&e, profile2.clone()]);
+        add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
+        add_country_profiles(&e, &account, &vec![&e, profile2.clone()]);
 
-        assert_eq!(irs::get_country_profile_count(&e, &account), 2);
-        assert_eq!(irs::get_country_profile(&e, &account, 1), profile2);
+        assert_eq!(get_country_profiles(&e, &account).len(), 2);
+        assert_eq!(get_country_profile(&e, &account, 1), profile2);
     });
 }
 
@@ -189,10 +192,10 @@ fn modify_country_profile_success() {
             valid_until: Some(12345),
         };
 
-        irs::add_identity(&e, &account, &identity, &vec![&e, initial_profile.clone()]);
-        irs::modify_country_profile(&e, &account, 0, &modified_profile);
+        add_identity(&e, &account, &identity, &vec![&e, initial_profile.clone()]);
+        modify_country_profile(&e, &account, 0, &modified_profile);
 
-        assert_eq!(irs::get_country_profile(&e, &account, 0), modified_profile);
+        assert_eq!(get_country_profile(&e, &account, 0), modified_profile);
     });
 }
 
@@ -204,9 +207,10 @@ fn modify_country_profile_not_found() {
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
-        let modified_profile =
-            CountryProfile { country: Country::Residence(276), valid_until: None };
-        irs::modify_country_profile(&e, &account, 0, &modified_profile);
+        let identity = Address::generate(&e);
+        let profile = CountryProfile { country: Country::Residence(276), valid_until: None };
+        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
+        modify_country_profile(&e, &account, 1, &profile);
     });
 }
 
@@ -220,26 +224,22 @@ fn delete_country_profile_success() {
         let identity = Address::generate(&e);
         let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
         let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
+        let profile3 = CountryProfile { country: Country::Residence(4), valid_until: Some(123) };
 
-        irs::add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
-        irs::add_country_profiles(&e, &account, &vec![&e, profile2.clone()]);
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            &vec![&e, profile1.clone(), profile2.clone(), profile3.clone()],
+        );
 
-        irs::delete_country_profile(&e, &account, 0);
+        // Delete the second profile (at index 1)
+        delete_country_profile(&e, &account, 1);
 
-        assert_eq!(irs::get_country_profile_count(&e, &account), 1);
-        assert_eq!(irs::get_country_profile(&e, &account, 0), profile2);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #322)")] // CountryProfileNotFound
-fn delete_country_profile_not_found() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        irs::delete_country_profile(&e, &account, 0);
+        // Count should be 2, and profiles should have shifted left.
+        assert_eq!(get_country_profiles(&e, &account).len(), 2);
+        assert_eq!(get_country_profile(&e, &account, 0), profile1);
+        assert_eq!(get_country_profile(&e, &account, 1), profile3);
     });
 }
 
@@ -254,13 +254,26 @@ fn get_country_profiles_success() {
         let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
         let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
 
-        irs::add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
-        irs::add_country_profiles(&e, &account, &vec![&e, profile2.clone()]);
+        add_identity(&e, &account, &identity, &vec![&e, profile1.clone(), profile2.clone()]);
+        assert_eq!(get_country_profiles(&e, &account).len(), 2);
 
-        let profiles = irs::get_country_profiles(&e, &account);
-        assert_eq!(profiles.len(), 2);
-        assert_eq!(profiles.get(0).unwrap(), profile1);
-        assert_eq!(profiles.get(1).unwrap(), profile2);
+        // Deleting index 1 (the last profile)
+        delete_country_profile(&e, &account, 1);
+
+        assert_eq!(get_country_profiles(&e, &account).len(), 1);
+        assert_eq!(get_country_profile(&e, &account, 0), profile1);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #323)")] // EmptyCountryProfiles
+fn get_country_profiles_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        get_country_profiles(&e, &account);
     });
 }
 
@@ -273,7 +286,7 @@ fn add_identity_with_empty_profiles_panics() {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
 
-        irs::add_identity(&e, &account, &identity, &vec![&e]);
+        add_identity(&e, &account, &identity, &vec![&e]);
     });
 }
 
@@ -288,13 +301,13 @@ fn add_multiple_country_profiles() {
         let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
         let profile3 = CountryProfile { country: Country::Residence(4), valid_until: Some(123) };
 
-        irs::add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
-        irs::add_country_profiles(&e, &account, &vec![&e, profile2.clone(), profile3.clone()]);
+        add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
+        add_country_profiles(&e, &account, &vec![&e, profile2.clone(), profile3.clone()]);
 
-        assert_eq!(irs::get_country_profile_count(&e, &account), 3);
-        assert_eq!(irs::get_country_profile(&e, &account, 0), profile1);
-        assert_eq!(irs::get_country_profile(&e, &account, 1), profile2);
-        assert_eq!(irs::get_country_profile(&e, &account, 2), profile3);
+        assert_eq!(get_country_profiles(&e, &account).len(), 3);
+        assert_eq!(get_country_profile(&e, &account, 0), profile1);
+        assert_eq!(get_country_profile(&e, &account, 1), profile2);
+        assert_eq!(get_country_profile(&e, &account, 2), profile3);
     });
 }
 
@@ -308,35 +321,24 @@ fn delete_last_country_profile() {
         let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
         let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
 
-        irs::add_identity(&e, &account, &identity, &vec![&e, profile1.clone(), profile2.clone()]);
-        assert_eq!(irs::get_country_profile_count(&e, &account), 2);
+        add_identity(&e, &account, &identity, &vec![&e, profile1.clone(), profile2.clone()]);
+        assert_eq!(get_country_profiles(&e, &account).len(), 2);
 
-        irs::delete_country_profile(&e, &account, 0);
+        delete_country_profile(&e, &account, 1);
 
-        assert_eq!(irs::get_country_profile_count(&e, &account), 1);
-        assert_eq!(irs::get_country_profile(&e, &account, 0), profile2);
+        assert_eq!(get_country_profiles(&e, &account).len(), 1);
+        assert_eq!(get_country_profile(&e, &account, 0), profile1);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #322)")]
-fn delete_country_profile_0_panics() {
+#[should_panic(expected = "Error(Contract, #323)")] // EmptyCountryProfiles
+fn delete_country_profile_panics() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
-        irs::delete_country_profile(&e, &account, 0);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #322)")]
-fn delete_country_profile_1_panics() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        irs::delete_country_profile(&e, &account, 1);
+        delete_country_profile(&e, &account, 1);
     });
 }
 
@@ -350,7 +352,53 @@ fn delete_last_country_profile_panics() {
         let identity = Address::generate(&e);
         let profile = CountryProfile { country: Country::Residence(840), valid_until: None };
 
-        irs::add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
-        irs::delete_country_profile(&e, &account, 0);
+        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
+        delete_country_profile(&e, &account, 0);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #324)")] // MaxCountryProfilesReached
+fn add_identity_panics_if_too_many_profiles() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let mut profiles = Vec::new(&e);
+        for i in 0..=MAX_COUNTRY_PROFILES {
+            profiles
+                .push_back(CountryProfile { country: Country::Residence(i), valid_until: None });
+        }
+
+        add_identity(&e, &account, &identity, &profiles);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #324)")] // MaxCountryProfilesReached
+fn add_country_profiles_panics_if_too_many_profiles() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let mut initial_profiles = Vec::new(&e);
+        for i in 0..MAX_COUNTRY_PROFILES {
+            initial_profiles
+                .push_back(CountryProfile { country: Country::Residence(i), valid_until: None });
+        }
+
+        add_identity(&e, &account, &identity, &initial_profiles);
+
+        let mut new_profiles = Vec::new(&e);
+        new_profiles.push_back(CountryProfile {
+            country: Country::Residence(MAX_COUNTRY_PROFILES),
+            valid_until: None,
+        });
+
+        add_country_profiles(&e, &account, &new_profiles);
     });
 }

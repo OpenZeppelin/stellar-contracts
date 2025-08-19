@@ -4,8 +4,8 @@ mod test;
 use soroban_sdk::{contracterror, Address, Env, FromVal, Symbol, Val, Vec};
 pub use storage::{
     add_country_profiles, add_identity, delete_country_profile, get_country_profile,
-    get_country_profile_count, get_country_profiles, get_identity, modify_country_profile,
-    modify_identity, remove_identity, CountryProfile,
+    get_country_profiles, get_identity, modify_country_profile, modify_identity, remove_identity,
+    CountryProfile,
 };
 
 use crate::rwa::utils::token_binder::TokenBinder;
@@ -50,6 +50,11 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// # Events
     ///
     /// * topics - `["identity_unstored", account: Address, identity: Address]`
+    /// * data - `[]`
+    ///
+    /// Emits for each country profile removed:
+    /// * topics - `["country_removed", account: Address, profile:
+    ///   CountryProfile]`
     /// * data - `[]`
     fn remove_identity(e: &Env, account: Address, operator: Address);
 
@@ -148,14 +153,6 @@ pub trait CountryProfileManager: IdentityRegistryStorage {
     /// * `account` - The account address to query.
     fn get_country_profiles(e: &Env, account: Address) -> Vec<Self::CountryProfile>;
 
-    /// Retrieves the number of country profiles for a given account.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The Soroban environment.
-    /// * `account` - The account address to query.
-    fn get_country_profile_count(e: &Env, account: Address) -> u32;
-
     /// Retrieves a specific country profile by its index.
     ///
     /// # Arguments
@@ -181,6 +178,8 @@ pub enum IRSError {
     CountryProfileNotFound = 322,
     /// Identity can't be with empty country profiles list.
     EmptyCountryProfiles = 323,
+    /// The maximum number of country profiles has been reached.
+    MaxCountryProfilesReached = 324,
 }
 
 // ################## CONSTANTS ##################
@@ -188,6 +187,10 @@ pub enum IRSError {
 const DAY_IN_LEDGERS: u32 = 17280;
 pub const IDENTITY_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const IDENTITY_TTL_THRESHOLD: u32 = IDENTITY_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
+/// The maximum number of country profiles that can be associated with a single
+/// identity.
+pub const MAX_COUNTRY_PROFILES: u32 = 15;
 
 // ################## EVENTS ##################
 
