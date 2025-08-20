@@ -144,7 +144,8 @@ pub fn get_country_profile(e: &Env, account: &Address, index: u32) -> CountryPro
     profiles.get(index).unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound))
 }
 
-/// Retrieves all country profiles for a given account.
+/// Retrieves all country profiles for a given account. Returns an empty vector
+/// if not set.
 ///
 /// # Arguments
 ///
@@ -156,8 +157,7 @@ pub fn get_country_profile(e: &Env, account: &Address, index: u32) -> CountryPro
 /// * [`IRSError::EmptyCountryProfiles`] - If no country profiles are stored.
 pub fn get_country_profiles(e: &Env, account: &Address) -> Vec<CountryProfile> {
     let key = IRSStorageKey::CountryProfiles(account.clone());
-    get_persistent_entry(e, &key)
-        .unwrap_or_else(|| panic_with_error!(e, IRSError::EmptyCountryProfiles))
+    get_persistent_entry(e, &key).unwrap_or_else(|| Vec::new(e))
 }
 
 // ################## CHANGE STATE ##################
@@ -175,11 +175,17 @@ pub fn get_country_profiles(e: &Env, account: &Address) -> Vec<CountryProfile> {
 ///
 /// * [`IRSError::IdentityAlreadyExists`] - If an identity is already stored for
 ///   the `account`.
-/// * refer to [`add_country_profiles_internal`] errors.
+/// * [`IRSError::EmptyCountryProfiles`] - If `initial_profiles` is empty.
+/// * [`IRSError::MaxCountryProfilesReached`] - If the number of
+///   `initial_profiles` exceeds `MAX_COUNTRY_PROFILES`.
 ///
 /// # Events
 ///
 /// * topics - `["identity_stored", account: Address, identity: Address]`
+/// * data - `[]`
+///
+/// Emits for each country profile added:
+/// * topics - `["country_added", account: Address, profile: CountryProfile]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -197,6 +203,13 @@ pub fn add_identity(
     identity: &Address,
     initial_profiles: &Vec<CountryProfile>,
 ) {
+    if initial_profiles.is_empty() {
+        panic_with_error!(e, IRSError::EmptyCountryProfiles)
+    }
+    if initial_profiles.len() > MAX_COUNTRY_PROFILES {
+        panic_with_error!(e, IRSError::MaxCountryProfilesReached);
+    }
+
     let key = IRSStorageKey::Identity(account.clone());
     if e.storage().persistent().has(&key) {
         panic_with_error!(e, IRSError::IdentityAlreadyExists)
@@ -205,7 +218,9 @@ pub fn add_identity(
 
     emit_identity_stored(e, account, identity);
 
-    add_country_profiles_internal(e, account, initial_profiles);
+    e.storage()
+        .persistent()
+        .set(&IRSStorageKey::CountryProfiles(account.clone()), initial_profiles);
 
     for profile in initial_profiles.iter() {
         emit_country_profile_event(e, CountryProfileEvent::Added, account, &profile);
@@ -265,7 +280,6 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
 ///
 /// * [`IRSError::IdentityNotFound`] - If no identity is found for the
 ///   `account`.
-/// * refer to [`get_country_profiles`] errors.
 ///
 /// # Events
 ///
@@ -298,8 +312,10 @@ pub fn remove_identity(e: &Env, account: &Address) {
     emit_identity_unstored(e, account, &identity);
 
     // Remove all associated country profiles
-    let profiles = get_country_profiles(e, account);
-    e.storage().persistent().remove(&IRSStorageKey::CountryProfiles(account.clone()));
+    let profiles_key = IRSStorageKey::CountryProfiles(account.clone());
+    let profiles: Vec<CountryProfile> =
+        e.storage().persistent().get(&profiles_key).expect("country profiles must be already set");
+    e.storage().persistent().remove(&profiles_key);
 
     for profile in profiles {
         emit_country_profile_event(e, CountryProfileEvent::Removed, account, &profile);
@@ -316,8 +332,9 @@ pub fn remove_identity(e: &Env, account: &Address) {
 ///
 /// # Errors
 ///
-/// * refer to [`get_identity`] errors.
-/// * refer to [`add_country_profiles_internal`] errors.
+/// * [`IRSError::EmptyCountryProfiles`] - If `profiles` is empty.
+/// * [`IRSError::MaxCountryProfilesReached`] - If the number of country
+///   profiles exceeds `MAX_COUNTRY_PROFILES`.
 ///
 /// # Events
 ///
@@ -335,9 +352,21 @@ pub fn remove_identity(e: &Env, account: &Address) {
 /// Using this function in public-facing methods may create significant security
 /// risks as it could allow unauthorized modifications.
 pub fn add_country_profiles(e: &Env, account: &Address, profiles: &Vec<CountryProfile>) {
-    let _ = get_identity(e, account);
+    if profiles.is_empty() {
+        panic_with_error!(e, IRSError::EmptyCountryProfiles)
+    }
 
-    add_country_profiles_internal(e, account, profiles);
+    let mut existing_profiles: Vec<CountryProfile> =
+        get_persistent_entry(e, &IRSStorageKey::CountryProfiles(account.clone()))
+            .expect("country profiles must be already set");
+
+    existing_profiles.append(profiles);
+    if existing_profiles.len() > MAX_COUNTRY_PROFILES {
+        panic_with_error!(e, IRSError::MaxCountryProfilesReached);
+    }
+
+    let key = IRSStorageKey::CountryProfiles(account.clone());
+    e.storage().persistent().set(&key, &existing_profiles);
 
     for profile in profiles.iter() {
         emit_country_profile_event(e, CountryProfileEvent::Added, account, &profile);
@@ -356,7 +385,6 @@ pub fn add_country_profiles(e: &Env, account: &Address, profiles: &Vec<CountryPr
 /// # Errors
 ///
 /// * [`IRSError::CountryProfileNotFound`] - If the index is out of bounds.
-/// * refer to [`get_country_profiles`] errors.
 ///
 /// # Events
 ///
@@ -398,7 +426,6 @@ pub fn modify_country_profile(e: &Env, account: &Address, index: u32, profile: &
 /// * [`IRSError::CountryProfileNotFound`] - If the index is out of bounds.
 /// * [`IRSError::EmptyCountryProfiles`] - If attempting to delete the last
 ///   country profile.
-/// * refer to [`get_country_profiles`] errors.
 ///
 /// # Events
 ///
@@ -444,34 +471,4 @@ fn get_persistent_entry<T: TryFromVal<Env, Val>>(e: &Env, key: &IRSStorageKey) -
     e.storage().persistent().get::<_, T>(key).inspect(|_| {
         e.storage().persistent().extend_ttl(key, IDENTITY_TTL_THRESHOLD, IDENTITY_EXTEND_AMOUNT);
     })
-}
-
-/// Helper function to Add multiple country profiles without chaching whether
-/// identity already exists and without event emitting.
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-/// * `account` - The account address to add profiles to.
-/// * `profiles` - A vector of country profiles to add.
-///
-/// # Errors
-///
-/// * [`IRSError::EmptyCountryProfiles`] - If `profiles` is empty.
-/// * [`IRSError::MaxCountryProfilesReached`] - If the number of country
-///   profiles exceeds `MAX_COUNTRY_PROFILES`.
-fn add_country_profiles_internal(e: &Env, account: &Address, profiles: &Vec<CountryProfile>) {
-    if profiles.is_empty() {
-        panic_with_error!(e, IRSError::EmptyCountryProfiles)
-    }
-    let mut existing_profiles =
-        get_persistent_entry(e, &IRSStorageKey::CountryProfiles(account.clone()))
-            .unwrap_or_else(|| Vec::new(e));
-    if existing_profiles.len() + profiles.len() > MAX_COUNTRY_PROFILES {
-        panic_with_error!(e, IRSError::MaxCountryProfilesReached);
-    }
-    existing_profiles.append(profiles);
-
-    let key = IRSStorageKey::CountryProfiles(account.clone());
-    e.storage().persistent().set(&key, &existing_profiles);
 }

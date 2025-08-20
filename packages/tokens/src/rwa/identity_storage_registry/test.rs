@@ -266,14 +266,13 @@ fn get_country_profiles_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #323)")] // EmptyCountryProfiles
-fn get_country_profiles_panics() {
+fn get_empty_country_profiles() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
-        get_country_profiles(&e, &account);
+        assert_eq!(get_country_profiles(&e, &account).len(), 0);
     });
 }
 
@@ -332,7 +331,7 @@ fn delete_last_country_profile() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #323)")] // EmptyCountryProfiles
+#[should_panic(expected = "Error(Contract, #322)")] // CountryProfileNotFound
 fn delete_country_profile_panics() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
