@@ -64,7 +64,7 @@
 /// ```
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol, TryFromVal, Val, Vec};
 
-use crate::rwa::identity_storage_registry::{
+use crate::rwa::identity_registry_storage::{
     emit_country_profile_event, emit_identity_modified, emit_identity_stored,
     emit_identity_unstored, CountryProfileEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
     IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_PROFILES,
