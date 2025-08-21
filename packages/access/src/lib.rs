@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(deprecated)]
 
 pub mod access_control;
 pub mod ownable;

@@ -10,8 +10,8 @@
 //!
 //! Each module provides its own set of traits, functions, and extensions for
 //! working with the respective token type.
-
 #![no_std]
+#![allow(deprecated)]
 
 pub mod fungible;
 pub mod non_fungible;

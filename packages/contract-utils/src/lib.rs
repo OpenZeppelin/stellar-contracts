@@ -1,4 +1,5 @@
 #![no_std]
+#![allow(deprecated)]
 
 pub mod crypto;
 pub mod merkle_distributor;
