@@ -18,7 +18,9 @@
 //! "examples/fungible-pausable" for better organization of the code,
 //! consistency and ease of inspection/debugging.
 
-use soroban_sdk::{contract, contractimpl, token::TokenInterface, Address, Env, String};
+use soroban_sdk::{
+    contract, contractimpl, token::TokenInterface, Address, Env, MuxedAddress, String,
+};
 use stellar_access::{Ownable, Owner};
 use stellar_contract_utils::{Pausable, PausableDefault};
 use stellar_macros::{only_owner, when_not_paused};
@@ -79,8 +81,8 @@ impl TokenInterface for ExampleContract {
     }
 
     #[when_not_paused]
-    fn transfer(e: Env, from: Address, to: Address, amount: i128) {
-        FTBase::transfer(&e, &from, &to, amount);
+    fn transfer(e: Env, from: Address, to: MuxedAddress, amount: i128) {
+        FTBase::transfer(&e, &from, &to.address(), amount);
     }
 
     #[when_not_paused]

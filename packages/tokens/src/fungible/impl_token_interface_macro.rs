@@ -15,10 +15,10 @@ macro_rules! impl_token_interface {
             fn transfer(
                 env: soroban_sdk::Env,
                 from: soroban_sdk::Address,
-                to: soroban_sdk::Address,
+                to: soroban_sdk::MuxedAddress,
                 amount: i128,
             ) {
-                <Self as FungibleToken>::transfer(&env, &from, &to, amount)
+                <Self as FungibleToken>::transfer(&env, &from, &to.address(), amount)
             }
 
             fn transfer_from(

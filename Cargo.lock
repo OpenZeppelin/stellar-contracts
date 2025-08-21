@@ -1563,7 +1563,7 @@ dependencies = [
 [[package]]
 name = "soroban-ledger-snapshot"
 version = "23.0.0-rc.2.4"
-source = "git+https://github.com/ahalabs/rs-soroban-sdk?rev=d2c33fa0c12ed2539df55da853b61a6fee408de1#d2c33fa0c12ed2539df55da853b61a6fee408de1"
+source = "git+https://github.com/ahalabs/rs-soroban-sdk?rev=dfddbff7ef3e4f8f83f4b8a48a4e5c19be685dd9#dfddbff7ef3e4f8f83f4b8a48a4e5c19be685dd9"
 dependencies = [
  "serde",
  "serde_json",
@@ -1576,7 +1576,7 @@ dependencies = [
 [[package]]
 name = "soroban-sdk"
 version = "23.0.0-rc.2.4"
-source = "git+https://github.com/ahalabs/rs-soroban-sdk?rev=d2c33fa0c12ed2539df55da853b61a6fee408de1#d2c33fa0c12ed2539df55da853b61a6fee408de1"
+source = "git+https://github.com/ahalabs/rs-soroban-sdk?rev=dfddbff7ef3e4f8f83f4b8a48a4e5c19be685dd9#dfddbff7ef3e4f8f83f4b8a48a4e5c19be685dd9"
 dependencies = [
  "arbitrary",
  "bytes-lit",
@@ -1598,7 +1598,7 @@ dependencies = [
 [[package]]
 name = "soroban-sdk-macros"
 version = "23.0.0-rc.2.4"
-source = "git+https://github.com/ahalabs/rs-soroban-sdk?rev=d2c33fa0c12ed2539df55da853b61a6fee408de1#d2c33fa0c12ed2539df55da853b61a6fee408de1"
+source = "git+https://github.com/ahalabs/rs-soroban-sdk?rev=dfddbff7ef3e4f8f83f4b8a48a4e5c19be685dd9#dfddbff7ef3e4f8f83f4b8a48a4e5c19be685dd9"
 dependencies = [
  "darling",
  "heck",
@@ -1617,7 +1617,7 @@ dependencies = [
 [[package]]
 name = "soroban-spec"
 version = "23.0.0-rc.2.4"
-source = "git+https://github.com/ahalabs/rs-soroban-sdk?rev=d2c33fa0c12ed2539df55da853b61a6fee408de1#d2c33fa0c12ed2539df55da853b61a6fee408de1"
+source = "git+https://github.com/ahalabs/rs-soroban-sdk?rev=dfddbff7ef3e4f8f83f4b8a48a4e5c19be685dd9#dfddbff7ef3e4f8f83f4b8a48a4e5c19be685dd9"
 dependencies = [
  "base64",
  "stellar-xdr",
@@ -1628,7 +1628,7 @@ dependencies = [
 [[package]]
 name = "soroban-spec-rust"
 version = "23.0.0-rc.2.4"
-source = "git+https://github.com/ahalabs/rs-soroban-sdk?rev=d2c33fa0c12ed2539df55da853b61a6fee408de1#d2c33fa0c12ed2539df55da853b61a6fee408de1"
+source = "git+https://github.com/ahalabs/rs-soroban-sdk?rev=dfddbff7ef3e4f8f83f4b8a48a4e5c19be685dd9#dfddbff7ef3e4f8f83f4b8a48a4e5c19be685dd9"
 dependencies = [
  "prettyplease",
  "proc-macro2",
