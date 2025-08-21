@@ -1,7 +1,9 @@
 mod storage;
 mod test;
 use soroban_sdk::{contracterror, Address, Env, Symbol, Vec};
-pub use storage::{bind_token, linked_tokens, unbind_token};
+pub use storage::{
+    bind_token, bind_tokens, get_token_by_index, get_token_index, linked_tokens, unbind_token,
+};
 
 /// Trait for managing token bindings to periphery contracts.
 ///
@@ -9,7 +11,6 @@ pub use storage::{bind_token, linked_tokens, unbind_token};
 /// to periphery contracts requiring this, such as:
 /// - Identity Storage Registry
 /// - Compliance contracts
-/// - Claim Topics and Issuers Registry
 ///
 /// This binding mechanism allows tokens to be associated with regulatory and
 /// compliance infrastructure, enabling features like identity verification,
@@ -19,8 +20,21 @@ pub use storage::{bind_token, linked_tokens, unbind_token};
 ///
 /// The underlying storage uses an enumerable pattern for efficiency:
 /// - Tokens are indexed sequentially (0, 1, 2, ...)
-/// - Reverse mapping enables O(1) lookups by token address
 /// - Swap-remove pattern maintains compact storage when unbinding
+///
+/// Note that the storage module also exposes a batch binding helper
+/// `bind_tokens(e, tokens)` which is not part of this trait, so that client
+/// contracts can decide how to expose batch semantics in their own interfaces.
+///
+/// Implementation notes:
+/// - Token addresses are stored in buckets of 100 addresses each (`BUCKET_SIZE
+///   = 100`).
+/// - Up to 100 buckets are supported (`MAX_BUCKETS = 100`), allowing at most
+///   10,000 tokens bound to a single contract.
+/// - With Protocol 23, reading live Soroban state is inexpensive and read-entry
+///   limits per transaction have been removed. Lookups are therefore cheap, and
+///   we keep storage simple with no reverse mapping; functions like
+///   `get_token_index()` linearly scan buckets.
 pub trait TokenBinder {
     /// Returns all currently bound token addresses.
     ///
@@ -69,6 +83,12 @@ pub enum TokenBinderError {
     TokenNotFound = 330,
     /// Attempted to bind a token that is already bound.
     TokenAlreadyBound = 331,
+    /// Total token capacity (MAX_TOKENS) has been reached.
+    MaxTokensReached = 332,
+    /// Batch bind size exceeded.
+    BindBatchTooLarge = 333,
+    /// The batch contains duplicates.
+    BindBatchDuplicates = 334,
 }
 
 // ################## CONSTANTS ##################
@@ -76,6 +96,13 @@ pub enum TokenBinderError {
 const DAY_IN_LEDGERS: u32 = 17280;
 pub const TOKEN_BINDER_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const TOKEN_BINDER_TTL_THRESHOLD: u32 = TOKEN_BINDER_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
+/// Number of Token addresses in bucket
+pub const BUCKET_SIZE: u32 = 100;
+/// Max. number of buckets
+pub const MAX_BUCKETS: u32 = 100;
+/// Max. number of Token addresses
+pub const MAX_TOKENS: u32 = BUCKET_SIZE * MAX_BUCKETS; // 10_000
 
 // ################## EVENTS ##################
 
