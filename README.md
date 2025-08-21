@@ -1,5 +1,6 @@
 [![Coverage Status](https://codecov.io/gh/OpenZeppelin/openzeppelin-contracts/graph/badge.svg)](https://codecov.io/gh/OpenZeppelin/stellar-contracts)
 [![Docs](https://img.shields.io/badge/docs-%F0%9F%93%84-yellow)](https://docs.openzeppelin.com/stellar-contracts)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/OpenZeppelin/stellar-contracts)
 
 # OpenZeppelin Stellar Soroban Contracts
 
