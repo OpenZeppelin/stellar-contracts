@@ -57,8 +57,10 @@
 //! The system enforces strict type matching between identity types and country
 //! relations:
 //!
-//! - **Individual** identities can only have `CountryRelation::Individual` entries
-//! - **Organization** identities can only have `CountryRelation::Organization` entries
+//! - **Individual** identities can only have `CountryRelation::Individual`
+//!   entries
+//! - **Organization** identities can only have `CountryRelation::Organization`
+//!   entries
 //!
 //! This prevents logical inconsistencies like individuals having incorporation
 //! countries or organizations having citizenship.
@@ -71,13 +73,13 @@
 //! let country_data = vec![
 //!     CountryData {
 //!         country: CountryRelation::Individual(
-//!             IndividualCountryRelation::Residence(840) // USA
+//!             IndividualCountryRelation::Residence(840), // USA
 //!         ),
 //!         metadata: None,
 //!     },
 //!     CountryData {
 //!         country: CountryRelation::Individual(
-//!             IndividualCountryRelation::Citizenship(276) // Germany
+//!             IndividualCountryRelation::Citizenship(276), // Germany
 //!         ),
 //!         metadata: None,
 //!     },
@@ -92,13 +94,13 @@
 //! let country_data = vec![
 //!     CountryData {
 //!         country: CountryRelation::Organization(
-//!             OrganizationCountryRelation::Incorporation(840) // USA
+//!             OrganizationCountryRelation::Incorporation(840), // USA
 //!         ),
 //!         metadata: None,
 //!     },
 //!     CountryData {
 //!         country: CountryRelation::Organization(
-//!             OrganizationCountryRelation::OperatingJurisdiction(276) // Germany
+//!             OrganizationCountryRelation::OperatingJurisdiction(276), // Germany
 //!         ),
 //!         metadata: None,
 //!     },

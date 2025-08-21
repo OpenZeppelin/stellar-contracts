@@ -219,8 +219,8 @@ pub fn bind_token(e: &Env, token: &Address) {
 
 /// Binds multiple token addresses to the contract in a single batch.
 ///
-/// Tokens are appended in order across buckets, spilling into as many buckets
-/// as necessary.
+/// Tokens are appended in order across buckets, spilling into up to 3 buckets as the max. batch size is
+/// BUCKET_SIZE * 2.
 ///
 /// # Arguments
 ///

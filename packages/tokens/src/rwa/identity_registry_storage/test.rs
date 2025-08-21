@@ -676,7 +676,8 @@ fn add_country_data_entries_mismatch_fails() {
             &vec![&e, initial_country_data],
         );
 
-        // This should fail: trying to add organization country data to individual identity
+        // This should fail: trying to add organization country data to individual
+        // identity
         add_country_data_entries(&e, &account, &vec![&e, mismatched_country_data]);
     });
 }
@@ -708,7 +709,8 @@ fn modify_country_data_mismatch_fails() {
             &vec![&e, initial_country_data],
         );
 
-        // This should fail: trying to modify to organization country data on individual identity
+        // This should fail: trying to modify to organization country data on individual
+        // identity
         modify_country_data(&e, &account, 0, &mismatched_country_data);
     });
 }
