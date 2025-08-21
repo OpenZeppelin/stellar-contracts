@@ -13,8 +13,6 @@ use crate::rwa::claim_issuer::{
 #[contracttype]
 #[derive(Clone)]
 pub enum ClaimIssuerStorageKey {
-    /// Allows signing for all topics.
-    UniversalKey(Bytes),
     /// Allows signing for a specific topic.
     TopicKey(Bytes, u32),
     /// Tracks explicitly revoked claims by claim digest
@@ -204,40 +202,6 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
 
 // ====================== KEY MANAGEMENT =====================
 
-/// Allows a public key to sign claims universally (for all topics).
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-/// * `public_key` - The public key to authorize.
-///
-/// # Events
-///
-/// * topics - `["key_allowed", public_key: Bytes]`
-/// * data - `[]`
-pub fn allow_key(e: &Env, public_key: &Bytes) {
-    let key = ClaimIssuerStorageKey::UniversalKey(public_key.clone());
-    e.storage().persistent().set(&key, &true);
-    emit_key_event(e, KeyEvent::Allowed, public_key, None);
-}
-
-/// Removes a public key from universal claim signing authorization.
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-/// * `public_key` - The public key to remove authorization for.
-///
-/// # Events
-///
-/// * topics - `["key_removed", public_key: Bytes]`
-/// * data - `[]`
-pub fn remove_key(e: &Env, public_key: &Bytes) {
-    let key = ClaimIssuerStorageKey::UniversalKey(public_key.clone());
-    e.storage().persistent().remove(&key);
-    emit_key_event(e, KeyEvent::Removed, public_key, None);
-}
-
 /// Allows a public key to sign claims for a specific topic.
 ///
 /// # Arguments
@@ -250,7 +214,7 @@ pub fn remove_key(e: &Env, public_key: &Bytes) {
 ///
 /// * topics - `["key_allowed", public_key: Bytes]`
 /// * data - `[claim_topic: u32]`
-pub fn allow_key_for_claim_topic(e: &Env, public_key: &Bytes, claim_topic: u32) {
+pub fn allow_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
     let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
     e.storage().persistent().set(&key, &true);
     emit_key_event(e, KeyEvent::Allowed, public_key, Some(claim_topic));
@@ -268,52 +232,15 @@ pub fn allow_key_for_claim_topic(e: &Env, public_key: &Bytes, claim_topic: u32) 
 ///
 /// * topics - `["key_removed", public_key: Bytes]`
 /// * data - `[claim_topic: u32]`
-pub fn remove_key_for_claim_topic(e: &Env, public_key: &Bytes, claim_topic: u32) {
+pub fn remove_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
     let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
     e.storage().persistent().remove(&key);
     emit_key_event(e, KeyEvent::Removed, public_key, Some(claim_topic));
 }
 
-/// Checks if a public key has universal authorization to sign claims for all
-/// topics and returns true if authorized.
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-/// * `public_key` - The public key to check.
-pub fn is_key_universally_allowed(e: &Env, public_key: &Bytes) -> bool {
-    let universal_key = ClaimIssuerStorageKey::UniversalKey(public_key.clone());
-    if e.storage().persistent().has(&universal_key) {
-        e.storage().persistent().extend_ttl(&universal_key, KEYS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT);
-        true
-    } else {
-        false
-    }
-}
-
-/// Checks if a public key is authorized for a specific claim topic and returns
-/// true if authorized.
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-/// * `public_key` - The public key to check.
-/// * `claim_topic` - The claim topic to check authorization for.
-pub fn is_key_allowed_for_topic(e: &Env, public_key: &Bytes, claim_topic: u32) -> bool {
-    let topic_key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
-    if e.storage().persistent().has(&topic_key) {
-        e.storage().persistent().extend_ttl(&topic_key, KEYS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT);
-        true
-    } else {
-        false
-    }
-}
 
 /// Checks if a public key is allowed to sign claims for a specific topic and
-/// returns true if authorized universally or for the specific topic.
-///
-/// This function checks both universal authorization and topic-specific
-/// authorization.
+/// returns true if authorized for the specific topic.
 ///
 /// # Arguments
 ///
@@ -321,13 +248,13 @@ pub fn is_key_allowed_for_topic(e: &Env, public_key: &Bytes, claim_topic: u32) -
 /// * `public_key` - The public key to check.
 /// * `claim_topic` - The claim topic to check authorization for.
 pub fn is_key_allowed(e: &Env, public_key: &Bytes, claim_topic: u32) -> bool {
-    // Check universal authorization first
-    if is_key_universally_allowed(e, public_key) {
-        return true;
+    let topic_key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
+    if e.storage().persistent().has(&topic_key) {
+        e.storage().persistent().extend_ttl(&topic_key, KEYS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT);
+        true
+    } else {
+        false
     }
-
-    // Check topic-specific authorization
-    is_key_allowed_for_topic(e, public_key, claim_topic)
 }
 
 // ====================== CLAIM REVOCATION =====================

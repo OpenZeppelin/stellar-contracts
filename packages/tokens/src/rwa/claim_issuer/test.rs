@@ -5,10 +5,9 @@ use soroban_sdk::{contract, testutils::Address as _, xdr::ToXdr, Address, Bytes,
 
 use crate::rwa::claim_issuer::{
     storage::{
-        allow_key, allow_key_for_claim_topic, is_claim_revoked, is_key_allowed,
-        is_key_allowed_for_topic, is_key_universally_allowed, remove_key,
-        remove_key_for_claim_topic, set_claim_revoked, Ed25519SignatureData, Ed25519Verifier,
-        Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier,
+        allow_key, is_claim_revoked, is_key_allowed, remove_key, set_claim_revoked,
+        Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier,
+        Secp256r1SignatureData, Secp256r1Verifier,
     },
     SignatureVerifier,
 };
@@ -73,7 +72,7 @@ fn ed25519_extract_signature_data_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #350)")]
 fn ed25519_extract_signature_data_invalid_length() {
     let e = Env::default();
 
@@ -100,7 +99,7 @@ fn secp256r1_extract_signature_data_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #350)")]
 fn secp256r1_extract_signature_data_invalid_length() {
     let e = Env::default();
 
@@ -127,7 +126,7 @@ fn secp256k1_extract_signature_data_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #350)")]
 fn secp256k1_extract_signature_data_invalid_length() {
     let e = Env::default();
     let invalid_sig_data = Bytes::from_array(&e, &[1u8; 120]); // Wrong length
@@ -158,23 +157,6 @@ fn secp256k1_recovery_id_extraction() {
 }
 
 #[test]
-fn universal_key_management() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    let public_key = Bytes::from_array(&e, &[1u8; 32]);
-
-    e.as_contract(&contract_id, || {
-        assert!(!is_key_universally_allowed(&e, &public_key));
-
-        allow_key(&e, &public_key);
-        assert!(is_key_universally_allowed(&e, &public_key));
-
-        remove_key(&e, &public_key);
-        assert!(!is_key_universally_allowed(&e, &public_key));
-    });
-}
-
-#[test]
 fn topic_specific_key_management() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -182,39 +164,15 @@ fn topic_specific_key_management() {
     let topic = 42u32;
 
     e.as_contract(&contract_id, || {
-        assert!(!is_key_allowed_for_topic(&e, &public_key, topic));
+        assert!(!is_key_allowed(&e, &public_key, topic));
 
-        allow_key_for_claim_topic(&e, &public_key, topic);
-        assert!(is_key_allowed_for_topic(&e, &public_key, topic));
+        allow_key(&e, &public_key, topic);
+        assert!(is_key_allowed(&e, &public_key, topic));
 
-        assert!(!is_key_allowed_for_topic(&e, &public_key, topic + 1));
+        assert!(!is_key_allowed(&e, &public_key, topic + 1));
 
-        remove_key_for_claim_topic(&e, &public_key, topic);
-        assert!(!is_key_allowed_for_topic(&e, &public_key, topic));
-    });
-}
-
-#[test]
-fn combined_key_authorization() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    let universal_key = Bytes::from_array(&e, &[3u8; 32]);
-    let topic_key = Bytes::from_array(&e, &[4u8; 32]);
-    let topic = 123u32;
-
-    e.as_contract(&contract_id, || {
-        allow_key(&e, &universal_key);
-
-        allow_key_for_claim_topic(&e, &topic_key, topic);
-
-        assert!(is_key_allowed(&e, &universal_key, topic));
-        assert!(is_key_allowed(&e, &universal_key, topic + 1));
-
-        assert!(is_key_allowed(&e, &topic_key, topic));
-        assert!(!is_key_allowed(&e, &topic_key, topic + 1));
-
-        let unknown_key = Bytes::from_array(&e, &[5u8; 32]);
-        assert!(!is_key_allowed(&e, &unknown_key, topic));
+        remove_key(&e, &public_key, topic);
+        assert!(!is_key_allowed(&e, &public_key, topic));
     });
 }
 
@@ -228,39 +186,17 @@ fn multiple_topics_same_key() {
     let topic3 = 300u32;
 
     e.as_contract(&contract_id, || {
-        allow_key_for_claim_topic(&e, &public_key, topic1);
-        allow_key_for_claim_topic(&e, &public_key, topic2);
+        allow_key(&e, &public_key, topic1);
+        allow_key(&e, &public_key, topic2);
 
-        assert!(is_key_allowed_for_topic(&e, &public_key, topic1));
-        assert!(is_key_allowed_for_topic(&e, &public_key, topic2));
-        assert!(!is_key_allowed_for_topic(&e, &public_key, topic3));
+        assert!(is_key_allowed(&e, &public_key, topic1));
+        assert!(is_key_allowed(&e, &public_key, topic2));
+        assert!(!is_key_allowed(&e, &public_key, topic3));
 
-        remove_key_for_claim_topic(&e, &public_key, topic1);
+        remove_key(&e, &public_key, topic1);
 
-        assert!(!is_key_allowed_for_topic(&e, &public_key, topic1));
-        assert!(is_key_allowed_for_topic(&e, &public_key, topic2));
-    });
-}
-
-#[test]
-fn universal_key_overrides_topic_specific() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    let public_key = Bytes::from_array(&e, &[7u8; 32]);
-    let topic = 500u32;
-
-    e.as_contract(&contract_id, || {
-        allow_key_for_claim_topic(&e, &public_key, topic);
-        assert!(is_key_allowed(&e, &public_key, topic));
-        assert!(!is_key_allowed(&e, &public_key, topic + 1));
-
-        allow_key(&e, &public_key);
-        assert!(is_key_allowed(&e, &public_key, topic));
-        assert!(is_key_allowed(&e, &public_key, topic + 1)); // Now allowed for any topic
-
-        remove_key(&e, &public_key);
-        assert!(is_key_allowed(&e, &public_key, topic)); // Still allowed via topic-specific
-        assert!(!is_key_allowed(&e, &public_key, topic + 1)); // No longer universal
+        assert!(!is_key_allowed(&e, &public_key, topic1));
+        assert!(is_key_allowed(&e, &public_key, topic2));
     });
 }
 

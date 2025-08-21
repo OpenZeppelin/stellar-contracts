@@ -67,13 +67,15 @@ pub trait IdentityClaims {
 
 // ################## ERRORS ##################
 
-// TODO: correct enumeration and move up to higher level
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum ClaimsError {
-    ClaimNotFound = 1,
-    ClaimNotValid = 2,
+    /// Claim  ID does not exist.
+    ClaimNotFound = 340,
+    /// Claim Issuer cannot validate the claim (revokation, signature mismatch,
+    /// unauthorized signing key, etc.)
+    ClaimNotValid = 341,
 }
 
 // ################## CONSTANTS ##################

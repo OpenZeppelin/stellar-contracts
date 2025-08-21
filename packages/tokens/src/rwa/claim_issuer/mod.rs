@@ -6,18 +6,17 @@
 //! combination as needed:
 //!
 //! - **Multiple Signature Schemes**: Ed25519, Secp256k1, Secp256r1 support
-//! - **Flexible Key Authorization**: Universal (all topics) or topic-specific
-//!   authorization
+//! - **Topic-Specific Key Authorization**: Keys authorized for specific claim topics
 //! - **Claim Revocation**: Digest-based revocation tracking with persistent
 //!   storage
-//! - **Key Management**: Add, remove, and query key authorization status
+//! - **Key Management**: Add, remove and query
 //!
 //! ## Example Usage
 //!
 //! ```rust
 //! use soroban_sdk::{contract, contractimpl, Address, Bytes, Env};
 //! use stellar_tokens::rwa::claim_issuer::{
-//!     storage::{allow_key_for_claim_topic, is_claim_revoked, is_key_allowed_for_topic},
+//!     storage::{allow_key, is_claim_revoked, is_key_allowed},
 //!     ClaimIssuer,
 //! };
 //!
@@ -26,7 +25,7 @@
 //!
 //! #[contractimpl]
 //! pub fn __constructor(e: Env, ed25519_key: Bytes) {
-//!     allow_key_for_claim_topic(&e, &ed25519_key, 42);
+//!     allow_key(&e, &ed25519_key, 42);
 //! }
 //!
 //! #[contractimpl]
@@ -42,7 +41,7 @@
 //!         let signature_data = Ed25519Verifier::extract_signature_data(e, &sig_data);
 //!
 //!         // Check if the public key is authorized for this topic
-//!         if !is_key_allowed_for_topic(e, &signature_data.public_key.to_bytes(), claim_topic) {
+//!         if !is_key_allowed(e, &signature_data.public_key.to_bytes(), claim_topic) {
 //!             return false;
 //!         }
 //!         let claim_digest =
@@ -64,10 +63,9 @@ mod test;
 
 use soroban_sdk::{contractclient, contracterror, crypto::Hash, Address, Bytes, Env, Symbol};
 pub use storage::{
-    allow_key, allow_key_for_claim_topic, is_claim_revoked, is_key_allowed,
-    is_key_allowed_for_topic, is_key_universally_allowed, remove_key, remove_key_for_claim_topic,
-    set_claim_revoked, ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier,
-    Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier,
+    allow_key, is_claim_revoked, is_key_allowed, remove_key, set_claim_revoked,
+    ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
+    Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier,
 };
 
 /// Trait for validating claims issued by this identity to other identities.
@@ -124,7 +122,7 @@ pub trait SignatureVerifier<const N: usize> {
     ///
     /// * `e` - The Soroban environment.
     /// * `identity` - The identity address the claim is about.
-    /// * `claim_topic` - The topic of the claim to validate.
+    /// * `claim_topic` - The topic of the claim.
     /// * `claim_data` - The claim data to validate.
     fn build_claim_digest(
         e: &Env,
@@ -155,9 +153,9 @@ pub trait SignatureVerifier<const N: usize> {
 
 /// Event types for key management operations.
 pub enum KeyEvent {
-    /// Key was allowed for universal or topic-specific authorization.
+    /// Key was allowed for topic-specific authorization.
     Allowed,
-    /// Key was removed from universal or topic-specific authorization.
+    /// Key was removed from topic-specific authorization.
     Removed,
 }
 
@@ -205,12 +203,11 @@ pub fn emit_revocation_event(e: &Env, claim_digest: &Hash<32>, revoked: bool) {
 
 // ################## ERRORS ##################
 
-// TODO: correct enumeration and move up to higher level
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum ClaimIssuerError {
-    SigDataMismatch = 1,
+    SigDataMismatch = 350,
 }
 
 // ################## CONSTANTS ##################

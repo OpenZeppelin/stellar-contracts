@@ -164,7 +164,7 @@ fn multiple_issuers_same_topic() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #340)")]
 fn get_nonexistent_claim() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -209,7 +209,7 @@ fn claim_removal() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #340)")]
 fn remove_nonexistent_claim() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
