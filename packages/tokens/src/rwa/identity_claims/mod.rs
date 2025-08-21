@@ -73,7 +73,7 @@ pub trait IdentityClaims {
 pub enum ClaimsError {
     /// Claim  ID does not exist.
     ClaimNotFound = 340,
-    /// Claim Issuer cannot validate the claim (revokation, signature mismatch,
+    /// Claim Issuer cannot validate the claim (revocation, signature mismatch,
     /// unauthorized signing key, etc.)
     ClaimNotValid = 341,
 }

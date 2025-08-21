@@ -210,13 +210,39 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
 /// * `public_key` - The public key to authorize.
 /// * `claim_topic` - The specific claim topic to authorize for.
 ///
+/// # Errors
+///
+/// * [`ClaimIssuerError::KeyIsEmpty`] - If attempting to allow an empty key.
+/// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If the key is already allowed
+///   for this topic.
+///
 /// # Events
 ///
 /// * topics - `["key_allowed", public_key: Bytes]`
 /// * data - `[claim_topic: u32]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn allow_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
+    if public_key.is_empty() {
+        panic_with_error!(e, ClaimIssuerError::KeyIsEmpty)
+    }
+
     let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
+
+    if e.storage().persistent().has(&key) {
+        panic_with_error!(e, ClaimIssuerError::KeyAlreadyAllowed)
+    }
+
     e.storage().persistent().set(&key, &true);
+
     emit_key_event(e, KeyEvent::Allowed, public_key, Some(claim_topic));
 }
 
@@ -228,16 +254,35 @@ pub fn allow_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
 /// * `public_key` - The public key to remove authorization for.
 /// * `claim_topic` - The specific claim topic to remove authorization for.
 ///
+/// # Errors
+///
+/// * [`ClaimIssuerError::KeyNotFound`] - If the key is not found for this
+///   topic.
+///
 /// # Events
 ///
 /// * topics - `["key_removed", public_key: Bytes]`
 /// * data - `[claim_topic: u32]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn remove_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
     let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
+
+    if !e.storage().persistent().has(&key) {
+        panic_with_error!(e, ClaimIssuerError::KeyNotFound)
+    }
+
     e.storage().persistent().remove(&key);
     emit_key_event(e, KeyEvent::Removed, public_key, Some(claim_topic));
 }
-
 
 /// Checks if a public key is allowed to sign claims for a specific topic and
 /// returns true if authorized for the specific topic.
@@ -271,6 +316,16 @@ pub fn is_key_allowed(e: &Env, public_key: &Bytes, claim_topic: u32) -> bool {
 ///
 /// * topics - `["claim_revoked", claim_digest: Hash<32>, revoked: true]`
 /// * data - `[]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
 pub fn set_claim_revoked(e: &Env, claim_digest: &Hash<32>, revoked: bool) {
     let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest.to_bytes());
     e.storage().persistent().set(&key, &revoked);

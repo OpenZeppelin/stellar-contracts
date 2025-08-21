@@ -6,7 +6,8 @@
 //! combination as needed:
 //!
 //! - **Multiple Signature Schemes**: Ed25519, Secp256k1, Secp256r1 support
-//! - **Topic-Specific Key Authorization**: Keys authorized for specific claim topics
+//! - **Topic-Specific Key Authorization**: Keys authorized for specific claim
+//!   topics
 //! - **Claim Revocation**: Digest-based revocation tracking with persistent
 //!   storage
 //! - **Key Management**: Add, remove and query
@@ -207,7 +208,14 @@ pub fn emit_revocation_event(e: &Env, claim_digest: &Hash<32>, revoked: bool) {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum ClaimIssuerError {
+    /// Signature data length does not match the expected scheme.
     SigDataMismatch = 350,
+    /// The provided key is empty.
+    KeyIsEmpty = 351,
+    /// The key is already allowed for the specified topic.
+    KeyAlreadyAllowed = 352,
+    /// The specified key was not found in the allowed keys.
+    KeyNotFound = 353,
 }
 
 // ################## CONSTANTS ##################

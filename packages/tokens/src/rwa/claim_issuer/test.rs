@@ -297,3 +297,125 @@ fn unrevoke_claim() {
         assert!(!is_claim_revoked(&e, &test_digest));
     });
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #352)")]
+fn allow_key_already_allowed() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let public_key = Bytes::from_array(&e, &[7u8; 32]);
+    let topic = 999u32;
+
+    e.as_contract(&contract_id, || {
+        // Add key first time
+        allow_key(&e, &public_key, topic);
+
+        // Try to add same key again - should panic with KeyAlreadyAllowed
+        allow_key(&e, &public_key, topic);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #353)")]
+fn remove_key_not_found() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let public_key = Bytes::from_array(&e, &[8u8; 32]);
+    let topic = 888u32;
+
+    e.as_contract(&contract_id, || {
+        // Try to remove non-existent key - should panic with KeyNotFound
+        remove_key(&e, &public_key, topic);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #351)")]
+fn empty_key_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let empty_key = Bytes::new(&e);
+    let topic = 123u32;
+
+    e.as_contract(&contract_id, || {
+        // Test with empty key
+        allow_key(&e, &empty_key, topic);
+    });
+}
+
+#[test]
+fn revocation_edge_cases() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        // Test with different digest types
+        let digest1 = e.crypto().keccak256(&Bytes::new(&e));
+        let digest2 = e.crypto().keccak256(&Bytes::from_array(&e, &[0u8; 1000]));
+
+        // Test revoking non-existent claim
+        assert!(!is_claim_revoked(&e, &digest1));
+
+        // Test setting revocation multiple times
+        set_claim_revoked(&e, &digest1, true);
+        set_claim_revoked(&e, &digest1, true); // Should not error
+        assert!(is_claim_revoked(&e, &digest1));
+
+        // Test unrevoking non-revoked claim
+        set_claim_revoked(&e, &digest2, false);
+        assert!(!is_claim_revoked(&e, &digest2));
+
+        // Test multiple digests independently
+        set_claim_revoked(&e, &digest2, true);
+        assert!(is_claim_revoked(&e, &digest1));
+        assert!(is_claim_revoked(&e, &digest2));
+
+        set_claim_revoked(&e, &digest1, false);
+        assert!(!is_claim_revoked(&e, &digest1));
+        assert!(is_claim_revoked(&e, &digest2));
+    });
+}
+
+#[test]
+fn signature_verifier_build_claim_digest_consistency() {
+    let e = Env::default();
+
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
+
+    // All verifiers should produce the same digest for the same inputs
+    let ed25519_digest =
+        Ed25519Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
+    let secp256r1_digest =
+        Secp256r1Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
+    let secp256k1_digest =
+        Secp256k1Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
+
+    assert_eq!(ed25519_digest, secp256r1_digest);
+    assert_eq!(secp256r1_digest, secp256k1_digest);
+}
+
+#[test]
+fn signature_verifier_different_inputs_different_digests() {
+    let e = Env::default();
+
+    let identity1 = Address::generate(&e);
+    let identity2 = Address::generate(&e);
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
+
+    // Different identities should produce different digests
+    let digest1 = Ed25519Verifier::build_claim_digest(&e, &identity1, 1u32, &claim_data).to_bytes();
+    let digest2 = Ed25519Verifier::build_claim_digest(&e, &identity2, 1u32, &claim_data).to_bytes();
+    assert_ne!(digest1, digest2);
+
+    // Different topics should produce different digests
+    let digest3 = Ed25519Verifier::build_claim_digest(&e, &identity1, 2u32, &claim_data).to_bytes();
+    assert_ne!(digest1, digest3);
+
+    // Different data should produce different digests
+    let different_data = Bytes::from_array(&e, &[4, 5, 6]);
+    let digest4 =
+        Ed25519Verifier::build_claim_digest(&e, &identity1, 1u32, &different_data).to_bytes();
+    assert_ne!(digest1, digest4);
+}
