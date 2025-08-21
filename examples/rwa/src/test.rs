@@ -6,16 +6,21 @@ use soroban_sdk::{testutils::Address as _, vec, Address, Env};
 
 use crate::identity_registry_storage::{IdentityRegistryContract, IdentityRegistryContractClient};
 
-fn create_client<'a>(e: &Env, owner: &Address) -> IdentityRegistryContractClient<'a> {
-    let address = e.register(IdentityRegistryContract, (owner,));
+fn create_client<'a>(
+    e: &Env,
+    admin: &Address,
+    manager: &Address,
+) -> IdentityRegistryContractClient<'a> {
+    let address = e.register(IdentityRegistryContract, (admin, manager));
     IdentityRegistryContractClient::new(e, &address)
 }
 
 #[test]
 fn bind_max() {
     let e = Env::default();
-    let owner = Address::generate(&e);
-    let client = create_client(&e, &owner);
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
     e.mock_all_auths();
 
     let mut tokens = vec![&e];
@@ -24,6 +29,6 @@ fn bind_max() {
         tokens.push_back(token.clone());
     }
 
-    client.bind_tokens(&tokens, &owner);
+    client.bind_tokens(&tokens, &manager);
     assert_eq!(client.linked_tokens().len(), 200)
 }
