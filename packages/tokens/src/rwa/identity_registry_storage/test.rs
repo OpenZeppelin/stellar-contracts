@@ -1,15 +1,16 @@
 #![cfg(test)]
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, Vec};
+use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, Map, String, Symbol, Vec};
 
 use super::{
     storage::{
-        add_country_profiles, add_identity, delete_country_profile, get_country_profile,
-        get_country_profiles, get_identity, modify_country_profile, modify_identity,
-        remove_identity, Country, CountryProfile,
+        add_country_data_entries, add_identity, delete_country_data, get_country_data,
+        get_country_data_entries, get_identity, get_identity_profile, modify_country_data,
+        modify_identity, remove_identity, CountryData, CountryRelation, IdentityType,
+        IndividualCountryRelation, OrganizationCountryRelation,
     },
-    MAX_COUNTRY_PROFILES,
+    MAX_COUNTRY_ENTRIES,
 };
 
 #[contract]
@@ -23,17 +24,26 @@ fn add_identity_success() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile = CountryProfile {
-            country: Country::Residence(840), // USA
-            valid_until: None,
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)), // USA
+            metadata: None,
         };
 
-        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
 
         let stored_identity = get_identity(&e, &account);
         assert_eq!(stored_identity, identity);
-        assert_eq!(get_country_profiles(&e, &account).len(), 1);
-        assert_eq!(get_country_profile(&e, &account, 0), profile);
+
+        let profile = get_identity_profile(&e, &account);
+        assert_eq!(profile.identity_type, IdentityType::Individual);
+        assert_eq!(profile.countries.len(), 1);
+        assert_eq!(get_country_data(&e, &account, 0), country_data);
     });
 }
 
@@ -46,13 +56,25 @@ fn add_identity_already_exists() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile = CountryProfile {
-            country: Country::Residence(840), // USA
-            valid_until: None,
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)), // USA
+            metadata: None,
         };
 
-        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
-        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
     });
 }
 
@@ -65,12 +87,18 @@ fn modify_identity_success() {
         let account = Address::generate(&e);
         let old_identity = Address::generate(&e);
         let new_identity = Address::generate(&e);
-        let profile = CountryProfile {
-            country: Country::Residence(840), // USA
-            valid_until: None,
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)), // USA
+            metadata: None,
         };
 
-        add_identity(&e, &account, &old_identity, &vec![&e, profile.clone()]);
+        add_identity(
+            &e,
+            &account,
+            &old_identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
         modify_identity(&e, &account, &new_identity);
 
         assert_eq!(get_identity(&e, &account), new_identity);
@@ -99,12 +127,18 @@ fn get_identity_success() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile = CountryProfile {
-            country: Country::Residence(840), // USA
-            valid_until: None,
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)), // USA
+            metadata: None,
         };
 
-        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
 
         assert_eq!(get_identity(&e, &account), identity);
     });
@@ -131,14 +165,20 @@ fn remove_identity_success() {
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile = CountryProfile {
-            country: Country::Residence(840), // USA
-            valid_until: None,
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)), // USA
+            metadata: None,
         };
 
-        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
 
-        assert_eq!(get_country_profiles(&e, &account).len(), 1);
+        assert_eq!(get_country_data_entries(&e, &account).len(), 1);
 
         remove_identity(&e, &account);
 
@@ -159,245 +199,579 @@ fn remove_identity_not_found() {
 }
 
 #[test]
-fn add_country_profile_success() {
+fn add_country_data_entries_success() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
-        let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
-
-        add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
-        add_country_profiles(&e, &account, &vec![&e, profile2.clone()]);
-
-        assert_eq!(get_country_profiles(&e, &account).len(), 2);
-        assert_eq!(get_country_profile(&e, &account, 1), profile2);
-    });
-}
-
-#[test]
-fn modify_country_profile_success() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let identity = Address::generate(&e);
-        let initial_profile =
-            CountryProfile { country: Country::Residence(840), valid_until: None };
-        let modified_profile = CountryProfile {
-            country: Country::Residence(276), // Germany
-            valid_until: Some(12345),
+        let country_data1 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
         };
-
-        add_identity(&e, &account, &identity, &vec![&e, initial_profile.clone()]);
-        modify_country_profile(&e, &account, 0, &modified_profile);
-
-        assert_eq!(get_country_profile(&e, &account, 0), modified_profile);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #322)")] // CountryProfileNotFound
-fn modify_country_profile_not_found() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let identity = Address::generate(&e);
-        let profile = CountryProfile { country: Country::Residence(276), valid_until: None };
-        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
-        modify_country_profile(&e, &account, 1, &profile);
-    });
-}
-
-#[test]
-fn delete_country_profile_success() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let identity = Address::generate(&e);
-        let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
-        let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
-        let profile3 = CountryProfile { country: Country::Residence(4), valid_until: Some(123) };
+        let country_data2 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Citizenship(276)),
+            metadata: None,
+        };
 
         add_identity(
             &e,
             &account,
             &identity,
-            &vec![&e, profile1.clone(), profile2.clone(), profile3.clone()],
+            IdentityType::Individual,
+            &vec![&e, country_data1.clone()],
+        );
+        add_country_data_entries(&e, &account, &vec![&e, country_data2.clone()]);
+
+        assert_eq!(get_country_data_entries(&e, &account).len(), 2);
+        assert_eq!(get_country_data(&e, &account, 1), country_data2);
+    });
+}
+
+#[test]
+fn modify_country_data_success() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let initial_country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+        let mut metadata = Map::new(&e);
+        metadata.set(Symbol::new(&e, "valid_until"), String::from_str(&e, "12345"));
+        let modified_country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(276)), // Germany
+            metadata: Some(metadata),
+        };
+
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, initial_country_data.clone()],
+        );
+        modify_country_data(&e, &account, 0, &modified_country_data);
+
+        assert_eq!(get_country_data(&e, &account, 0), modified_country_data);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #322)")] // CountryDataNotFound
+fn modify_country_data_not_found() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(276)),
+            metadata: None,
+        };
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+        modify_country_data(&e, &account, 1, &country_data);
+    });
+}
+
+#[test]
+fn delete_country_data_success() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let country_data1 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+        let country_data2 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Citizenship(276)),
+            metadata: None,
+        };
+        let mut metadata = Map::new(&e);
+        metadata.set(Symbol::new(&e, "valid_until"), String::from_str(&e, "123"));
+        let country_data3 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(4)),
+            metadata: Some(metadata),
+        };
+
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data1.clone(), country_data2.clone(), country_data3.clone()],
         );
 
-        // Delete the second profile (at index 1)
-        delete_country_profile(&e, &account, 1);
+        // Delete the second country data (at index 1)
+        delete_country_data(&e, &account, 1);
 
-        // Count should be 2, and profiles should have shifted left.
-        assert_eq!(get_country_profiles(&e, &account).len(), 2);
-        assert_eq!(get_country_profile(&e, &account, 0), profile1);
-        assert_eq!(get_country_profile(&e, &account, 1), profile3);
+        // Count should be 2, and country data should have shifted left.
+        assert_eq!(get_country_data_entries(&e, &account).len(), 2);
+        assert_eq!(get_country_data(&e, &account, 0), country_data1);
+        assert_eq!(get_country_data(&e, &account, 1), country_data3);
     });
 }
 
 #[test]
-fn get_country_profiles_success() {
+fn get_country_data_entries_success() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
-        let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
+        let country_data1 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+        let country_data2 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Citizenship(276)),
+            metadata: None,
+        };
 
-        add_identity(&e, &account, &identity, &vec![&e, profile1.clone(), profile2.clone()]);
-        assert_eq!(get_country_profiles(&e, &account).len(), 2);
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data1.clone(), country_data2.clone()],
+        );
+        assert_eq!(get_country_data_entries(&e, &account).len(), 2);
 
-        // Deleting index 1 (the last profile)
-        delete_country_profile(&e, &account, 1);
+        // Deleting index 1 (the last country data)
+        delete_country_data(&e, &account, 1);
 
-        assert_eq!(get_country_profiles(&e, &account).len(), 1);
-        assert_eq!(get_country_profile(&e, &account, 0), profile1);
+        assert_eq!(get_country_data_entries(&e, &account).len(), 1);
+        assert_eq!(get_country_data(&e, &account, 0), country_data1);
     });
 }
 
 #[test]
-fn get_empty_country_profiles() {
+fn get_empty_country_data_list() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
-        assert_eq!(get_country_profiles(&e, &account).len(), 0);
+        assert_eq!(get_country_data_entries(&e, &account).len(), 0);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #323)")] // EmptyCountryProfiles
-fn add_identity_with_empty_profiles_panics() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let identity = Address::generate(&e);
-
-        add_identity(&e, &account, &identity, &vec![&e]);
-    });
-}
-
-#[test]
-fn add_multiple_country_profiles() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let identity = Address::generate(&e);
-        let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
-        let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
-        let profile3 = CountryProfile { country: Country::Residence(4), valid_until: Some(123) };
-
-        add_identity(&e, &account, &identity, &vec![&e, profile1.clone()]);
-        add_country_profiles(&e, &account, &vec![&e, profile2.clone(), profile3.clone()]);
-
-        assert_eq!(get_country_profiles(&e, &account).len(), 3);
-        assert_eq!(get_country_profile(&e, &account, 0), profile1);
-        assert_eq!(get_country_profile(&e, &account, 1), profile2);
-        assert_eq!(get_country_profile(&e, &account, 2), profile3);
-    });
-}
-
-#[test]
-fn delete_last_country_profile() {
+fn add_multiple_country_data() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile1 = CountryProfile { country: Country::Residence(840), valid_until: None };
-        let profile2 = CountryProfile { country: Country::Citizenship(276), valid_until: None };
+        let country_data1 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+        let country_data2 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Citizenship(276)),
+            metadata: None,
+        };
+        let mut metadata = Map::new(&e);
+        metadata.set(Symbol::new(&e, "valid_until"), String::from_str(&e, "123"));
+        let country_data3 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(4)),
+            metadata: Some(metadata),
+        };
 
-        add_identity(&e, &account, &identity, &vec![&e, profile1.clone(), profile2.clone()]);
-        assert_eq!(get_country_profiles(&e, &account).len(), 2);
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data1.clone()],
+        );
+        add_country_data_entries(
+            &e,
+            &account,
+            &vec![&e, country_data2.clone(), country_data3.clone()],
+        );
 
-        delete_country_profile(&e, &account, 1);
-
-        assert_eq!(get_country_profiles(&e, &account).len(), 1);
-        assert_eq!(get_country_profile(&e, &account, 0), profile1);
+        assert_eq!(get_country_data_entries(&e, &account).len(), 3);
+        assert_eq!(get_country_data(&e, &account, 0), country_data1);
+        assert_eq!(get_country_data(&e, &account, 1), country_data2);
+        assert_eq!(get_country_data(&e, &account, 2), country_data3);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #322)")] // CountryProfileNotFound
-fn delete_country_profile_panics() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        delete_country_profile(&e, &account, 1);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #323)")] // EmptyCountryProfiles
-fn delete_last_country_profile_panics() {
+fn delete_last_country_data() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let profile = CountryProfile { country: Country::Residence(840), valid_until: None };
+        let country_data1 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+        let country_data2 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Citizenship(276)),
+            metadata: None,
+        };
 
-        add_identity(&e, &account, &identity, &vec![&e, profile.clone()]);
-        delete_country_profile(&e, &account, 0);
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data1.clone(), country_data2.clone()],
+        );
+        assert_eq!(get_country_data_entries(&e, &account).len(), 2);
+
+        delete_country_data(&e, &account, 1);
+
+        assert_eq!(get_country_data_entries(&e, &account).len(), 1);
+        assert_eq!(get_country_data(&e, &account, 0), country_data1);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #324)")] // MaxCountryProfilesReached
-fn add_identity_panics_if_too_many_profiles() {
+#[should_panic(expected = "Error(Contract, #321)")]
+fn delete_country_data_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        delete_country_data(&e, &account, 1);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #323)")]
+fn delete_last_country_data_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+        delete_country_data(&e, &account, 0);
+    });
+}
+
+#[test]
+fn organization_country_relations_work_correctly() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let mut profiles = Vec::new(&e);
-        for i in 0..=MAX_COUNTRY_PROFILES {
-            profiles
-                .push_back(CountryProfile { country: Country::Residence(i), valid_until: None });
+        let incorporation_data = CountryData {
+            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(840)), // USA
+            metadata: None,
+        };
+        let operating_data = CountryData {
+            country: CountryRelation::Organization(
+                OrganizationCountryRelation::OperatingJurisdiction(276),
+            ), // Germany
+            metadata: None,
+        };
+        let tax_data = CountryData {
+            country: CountryRelation::Organization(OrganizationCountryRelation::TaxJurisdiction(
+                756,
+            )), // Switzerland
+            metadata: None,
+        };
+
+        // Create organization identity with incorporation data
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Organization,
+            &vec![&e, incorporation_data.clone()],
+        );
+
+        // Add more organization country data
+        add_country_data_entries(&e, &account, &vec![&e, operating_data.clone(), tax_data.clone()]);
+
+        // Verify all data is stored correctly
+        let profile = get_identity_profile(&e, &account);
+        assert_eq!(profile.identity_type, IdentityType::Organization);
+        assert_eq!(profile.countries.len(), 3);
+        assert_eq!(get_country_data(&e, &account, 0), incorporation_data);
+        assert_eq!(get_country_data(&e, &account, 1), operating_data);
+        assert_eq!(get_country_data(&e, &account, 2), tax_data);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #324)")]
+fn add_identity_panics_if_too_many_country_data() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let mut country_data_list = Vec::new(&e);
+        for i in 0..=MAX_COUNTRY_ENTRIES {
+            country_data_list.push_back(CountryData {
+                country: CountryRelation::Individual(IndividualCountryRelation::Residence(i)),
+                metadata: None,
+            });
         }
 
-        add_identity(&e, &account, &identity, &profiles);
+        add_identity(&e, &account, &identity, IdentityType::Individual, &country_data_list);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #324)")] // MaxCountryProfilesReached
-fn add_country_profiles_panics_if_too_many_profiles() {
+#[should_panic(expected = "Error(Contract, #324)")]
+fn add_country_data_entries_panics_if_too_many() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let mut initial_profiles = Vec::new(&e);
-        for i in 0..MAX_COUNTRY_PROFILES {
-            initial_profiles
-                .push_back(CountryProfile { country: Country::Residence(i), valid_until: None });
+        let mut initial_country_data = Vec::new(&e);
+        for i in 0..MAX_COUNTRY_ENTRIES {
+            initial_country_data.push_back(CountryData {
+                country: CountryRelation::Individual(IndividualCountryRelation::Residence(i)),
+                metadata: None,
+            });
         }
 
-        add_identity(&e, &account, &identity, &initial_profiles);
+        add_identity(&e, &account, &identity, IdentityType::Individual, &initial_country_data);
 
-        let mut new_profiles = Vec::new(&e);
-        new_profiles.push_back(CountryProfile {
-            country: Country::Residence(MAX_COUNTRY_PROFILES),
-            valid_until: None,
+        let mut new_country_data = Vec::new(&e);
+        new_country_data.push_back(CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(
+                MAX_COUNTRY_ENTRIES,
+            )),
+            metadata: None,
         });
 
-        add_country_profiles(&e, &account, &new_profiles);
+        add_country_data_entries(&e, &account, &new_country_data);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #325)")]
+fn add_identity_individual_with_organization_country_fails() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(840)),
+            metadata: None,
+        };
+
+        // This should fail: Individual identity with Organization country relation
+        add_identity(&e, &account, &identity, IdentityType::Individual, &vec![&e, country_data]);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #325)")]
+fn add_identity_organization_with_individual_country_fails() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+
+        // This should fail: Organization identity with Individual country relation
+        add_identity(&e, &account, &identity, IdentityType::Organization, &vec![&e, country_data]);
+    });
+}
+
+#[test]
+fn add_identity_organization_with_organization_country_succeeds() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(840)),
+            metadata: None,
+        };
+
+        // This should succeed: Organization identity with Organization country relation
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Organization,
+            &vec![&e, country_data.clone()],
+        );
+
+        let stored_identity = get_identity(&e, &account);
+        assert_eq!(stored_identity, identity);
+
+        let profile = get_identity_profile(&e, &account);
+        assert_eq!(profile.identity_type, IdentityType::Organization);
+        assert_eq!(profile.countries.len(), 1);
+        assert_eq!(get_country_data(&e, &account, 0), country_data);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #325)")]
+fn add_country_data_entries_mismatch_fails() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let initial_country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+        let mismatched_country_data = CountryData {
+            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(276)),
+            metadata: None,
+        };
+
+        // First create an individual identity
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, initial_country_data],
+        );
+
+        // This should fail: trying to add organization country data to individual identity
+        add_country_data_entries(&e, &account, &vec![&e, mismatched_country_data]);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #325)")]
+fn modify_country_data_mismatch_fails() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let initial_country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+        let mismatched_country_data = CountryData {
+            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(276)),
+            metadata: None,
+        };
+
+        // First create an individual identity
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, initial_country_data],
+        );
+
+        // This should fail: trying to modify to organization country data on individual identity
+        modify_country_data(&e, &account, 0, &mismatched_country_data);
+    });
+}
+
+#[test]
+fn modify_country_data_matching_type_succeeds() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let initial_country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+        let modified_country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Citizenship(276)),
+            metadata: None,
+        };
+
+        // First create an individual identity
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, initial_country_data],
+        );
+
+        // This should succeed: modifying to another individual country relation
+        modify_country_data(&e, &account, 0, &modified_country_data);
+
+        assert_eq!(get_country_data(&e, &account, 0), modified_country_data);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #325)")]
+fn mixed_country_relations_in_single_call_fails() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let individual_country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+        let organization_country_data = CountryData {
+            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(276)),
+            metadata: None,
+        };
+
+        // This should fail: mixed country relation types in initial data
+
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, individual_country_data, organization_country_data],
+        );
     });
 }

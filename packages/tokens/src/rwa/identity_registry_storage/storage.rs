@@ -1,103 +1,153 @@
-/// # How Country Profiles Work
+/// # How Country Data Work
 ///
 /// Instead of a simple, single country code, this system treats an account's
-/// jurisdictional ties as a collection of "Country Profiles." Each profile
-/// represents a single piece of jurisdictional data, pairing a **category**
-/// with a **numeric code**. For example:
+/// jurisdictional ties as a collection of "Country Data." Each country data
+/// represents a single piece of jurisdictional data, pairing a **relationship
+/// type** with a **numeric country code**. For example:
 ///
-/// - Category: `Residence`, Code: `840` (ISO 3166-1 for USA)
-/// - Category: `Citizenship`, Code: `276` (ISO 3166-1 for Germany)
-/// - Category: `SourceOfFunds`, Code: `792` (ISO 3166-1 for Turkey)
-/// - Category: A custom `Symbol` like `"TaxResidency"`, Code: `756` (ISO 3166-1
-///   for Switzerland)
+/// For Individual identities:
+/// - `Residence(840)` - Country of residence: USA
+/// - `Citizenship(276)` - Country of citizenship: Germany
+/// - `SourceOfFunds(792)` - Source of funds: Turkey
 ///
-/// This flexible structure allows an account to hold multiple country profiles,
-/// such as having dual citizenship. Additionally, each profile can have an
-/// optional expiration date, which is useful for time-limited documents like
-/// visas or permits.
+/// For Organization identities:
+/// - `Incorporation(840)` - Country of incorporation: USA
+/// - `OperatingJurisdiction(276)` - Operating jurisdiction: Germany
+/// - `TaxJurisdiction(756)` - Tax jurisdiction: Switzerland
+/// - `Custom("Subsidiary".into(), 792)` - Custom subsidiary location: Turkey
+///
+/// This flexible structure allows an account to hold multiple country
+/// relationships, such as an individual having dual citizenship or an
+/// organization operating across multiple jurisdictions. The system enforces
+/// type matching between the identity type and country relation types.
 ///
 /// When a new identity is registered for an account, it must be created with at
-/// least one initial country profile. Afterward, more profiles can be added (up
-/// to MAX_COUNTRY_PROFILES), modified, or removed as needed.
+/// least one initial country data. Afterward, more country data can be added
+/// (up to MAX_COUNTRY_ENTRIES), modified, or removed as needed.
 ///
-/// # Assumptions
+/// ## Assumptions
 ///
-/// 1. **All Profiles are Equal**: The system treats the initial profile and any
-///    subsequently added profiles the same way. They are all stored together in
-///    an enumerable list.
-/// 2. **Efficient but Simple Indexing**: Profiles are stored by a simple index
-///    (0, 1, 2, ...). When a profile is deleted, all subsequent profiles are
-///    shifted to the left to fill the gap.
+/// 1. **All Country Data are Equal**: The system treats the initial country
+///    data and any subsequently added country data the same way. They are all
+///    stored together in an enumerable list.
+/// 2. **Efficient but Simple Indexing**: Country data are stored by a simple
+///    index (0, 1, 2, ...). When a country data is deleted, all subsequent
+///    country data are shifted to the left to fill the gap.
 /// 3. **No Uniqueness Guarantee**: The storage layer itself does not check for
-///    duplicate profiles. It is the responsibility of the contract implementing
-///    the logic to ensure that, for example, an account does not have two
-///    "Country of Residence" profiles.
+///    duplicate country data. It is the responsibility of the contract
+///    implementing the logic to ensure that, for example, an account does not
+///    have two "Country of Residence" country data.
+/// 4. **Country Data Type Matching**: All country data entries must match the
+///    identity's type (Individual or Organization). Individual identities can
+///    only have IndividualCountryRelation entries, while Organization
+///    identities can only have OrganizationCountryRelation entries.
 ///
-/// # Example implementation of `CountryProfileManager` with uniqueness check
+/// ### Example implementation of `CountryDataManager` with uniqueness check
 ///
 /// ```rust
 /// #[contractimpl]
-/// impl CountryProfileManager for MyContract {
-///     fn add_country_profiles(
+/// impl CountryDataManager for MyContract {
+///     fn add_country_data_entries(
 ///         e: &Env,
 ///         account: Address,
-///         country_profiles: Vec<Self::CountryProfile>,
+///         country_entries: Vec<Self::CountryData>,
 ///         operator: Address,
 ///     ) {
-///         let existing_profiles = get_country_profiles(e, &account);
+///         let existing = get_country_data_entries(e, &account);
 ///
-///         // Check each new profile for duplicates
-///         for new_profile in country_profiles.iter() {
-///             for existing in existing_profiles.iter() {
-///                 // Maybe also check `valid_until`
-///                 if existing.country == new_profile.country {
-///                     panic_with_error!(e, Error::DuplicateCountryCategory);
+///         // Check each new entries for duplicates
+///         for new_entry in country_entries.iter() {
+///             for existing in existing.iter() {
+///                 // Maybe also check validity from metadata
+///                 if existing.country == new_entry.country {
+///                     panic_with_error!(e, Error::DuplicateCountryData);
 ///                 }
 ///             }
 ///         }
 ///
-///         // If no duplicates found, add all profiles
-///         add_country_profiles(e, &account, &country_profiles);
+///         // If no duplicates found, add all entries
+///         add_country_data_entries(e, &account, &country_entries);
 ///     }
 ///     // other methods
 /// }
 /// ```
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol, TryFromVal, Val, Vec};
+use soroban_sdk::{
+    contracttype, panic_with_error, vec, Address, Env, Map, String, Symbol, TryFromVal, Val, Vec,
+};
 
 use crate::rwa::identity_registry_storage::{
-    emit_country_profile_event, emit_identity_modified, emit_identity_stored,
-    emit_identity_unstored, CountryProfileEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
-    IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_PROFILES,
+    emit_country_data_event, emit_identity_modified, emit_identity_stored, emit_identity_unstored,
+    CountryDataEvent, IRSError, IDENTITY_EXTEND_AMOUNT, IDENTITY_TTL_THRESHOLD,
+    MAX_COUNTRY_ENTRIES,
 };
 
 /// ISO 3166-1 numeric country code
 pub type CountryCode = u32;
 
-/// Represents different types of country relationships.
+/// Represents the type of identity holder
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Country {
+pub enum IdentityType {
+    Individual,
+    Organization,
+}
+
+/// Represents different types of country relationships for individuals
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum IndividualCountryRelation {
     /// Country of residence
     Residence(CountryCode),
     /// Country of citizenship
     Citizenship(CountryCode),
     /// Country where funds originate
     SourceOfFunds(CountryCode),
-    /// Country of entity registration (for businesses)
-    EntityJurisdiction(CountryCode),
+    /// Tax residency (can differ from residence)
+    TaxResidency(CountryCode),
     /// Custom country type for future extensions
     Custom(Symbol, CountryCode),
 }
 
-/// A country profile containing the country relationship and optional validity
-/// period.
+/// Represents different types of country relationships for organizations
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CountryProfile {
+pub enum OrganizationCountryRelation {
+    /// Country of incorporation/registration
+    Incorporation(CountryCode),
+    /// Countries where organization operates
+    OperatingJurisdiction(CountryCode),
+    /// Tax jurisdiction
+    TaxJurisdiction(CountryCode),
+    /// Country where funds originate
+    SourceOfFunds(CountryCode),
+    /// Custom country type for future extensions
+    Custom(Symbol, CountryCode),
+}
+
+/// Unified country relationship that can be either individual or organizational
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CountryRelation {
+    Individual(IndividualCountryRelation),
+    Organization(OrganizationCountryRelation),
+}
+
+/// A country data containing the country relationship and optional metadata
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CountryData {
     /// Type of country relationship
-    pub country: Country,
-    /// Optional validity period (e.g., for visas)
-    pub valid_until: Option<u64>,
+    pub country: CountryRelation,
+    /// Optional metadata (e.g., visa type, validity period)
+    pub metadata: Option<Map<Symbol, String>>,
+}
+
+/// Complete identity profile containing identity type and country data
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentityProfile {
+    pub identity_type: IdentityType,
+    pub countries: Vec<CountryData>,
 }
 
 /// Storage keys for the data associated with Identity Storage Registry.
@@ -105,8 +155,8 @@ pub struct CountryProfile {
 pub enum IRSStorageKey {
     /// Maps account address to identity address
     Identity(Address),
-    /// Maps an account to a vector of its country profiles.
-    CountryProfiles(Address),
+    /// Maps an account to its complete identity profile
+    IdentityProfile(Address),
 }
 
 // ################## QUERY STATE ##################
@@ -128,64 +178,87 @@ pub fn get_identity(e: &Env, account: &Address) -> Address {
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound))
 }
 
-/// Retrieves a specific country profile by its index.
+/// Retrieves the complete identity profile for a given account.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
 /// * `account` - The account address to query.
-/// * `index` - The index of the country profile to retrieve.
 ///
 /// # Errors
 ///
-/// * [`IRSError::CountryProfileNotFound`] - If the index is out of bounds.
-pub fn get_country_profile(e: &Env, account: &Address, index: u32) -> CountryProfile {
-    let profiles = get_country_profiles(e, account);
-    profiles.get(index).unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound))
+/// * [`IRSError::IdentityNotFound`] - If no identity profile is found for the
+///   account.
+pub fn get_identity_profile(e: &Env, account: &Address) -> IdentityProfile {
+    let key = IRSStorageKey::IdentityProfile(account.clone());
+    get_persistent_entry(e, &key)
+        .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound))
 }
 
-/// Retrieves all country profiles for a given account. Returns an empty vector
-/// if not set.
+/// Retrieves a specific country data entry by its index.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
 /// * `account` - The account address to query.
+/// * `index` - The index of the country data to retrieve.
 ///
 /// # Errors
 ///
-/// * [`IRSError::EmptyCountryProfiles`] - If no country profiles are stored.
-pub fn get_country_profiles(e: &Env, account: &Address) -> Vec<CountryProfile> {
-    let key = IRSStorageKey::CountryProfiles(account.clone());
-    get_persistent_entry(e, &key).unwrap_or_else(|| Vec::new(e))
+/// * [`IRSError::CountryDataNotFound`] - If the index is out of bounds.
+pub fn get_country_data(e: &Env, account: &Address, index: u32) -> CountryData {
+    let profile = get_identity_profile(e, account);
+    profile
+        .countries
+        .get(index)
+        .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryDataNotFound))
+}
+
+/// Retrieves all country data for a given account. Returns an empty vector if
+/// not set.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `account` - The account address to query.
+pub fn get_country_data_entries(e: &Env, account: &Address) -> Vec<CountryData> {
+    match get_persistent_entry::<IdentityProfile>(
+        e,
+        &IRSStorageKey::IdentityProfile(account.clone()),
+    ) {
+        Some(profile) => profile.countries,
+        None => Vec::new(e),
+    }
 }
 
 // ################## CHANGE STATE ##################
 
-/// Stores a new identity with a set of country profiles.
+/// Stores a new identity with a complete identity profile.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
 /// * `account` - The account address to associate with the identity.
 /// * `identity` - The identity address to store.
-/// * `initial_profiles` - A vector of initial country profiles.
+/// * `identity_type` - The type of identity (Individual or Organization).
+/// * `initial_countries` - A vector of initial country data.
 ///
 /// # Errors
 ///
 /// * [`IRSError::IdentityAlreadyExists`] - If an identity is already stored for
 ///   the `account`.
-/// * [`IRSError::EmptyCountryProfiles`] - If `initial_profiles` is empty.
-/// * [`IRSError::MaxCountryProfilesReached`] - If the number of
-///   `initial_profiles` exceeds `MAX_COUNTRY_PROFILES`.
+/// * [`IRSError::EmptyCountryList`] - If `initial_countries` is empty.
+/// * [`IRSError::MaxCountryEntriesReached`] - If the number of
+///   `initial_countries` exceeds `MAX_COUNTRY_ENTRIES`.
+/// * refer to [`validate_country_relations`] errors.
 ///
 /// # Events
 ///
 /// * topics - `["identity_stored", account: Address, identity: Address]`
 /// * data - `[]`
 ///
-/// Emits for each country profile added:
-/// * topics - `["country_added", account: Address, profile: CountryProfile]`
+/// Emits for each country data added:
+/// * topics - `["country_added", account: Address, country_data: CountryData]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -201,29 +274,33 @@ pub fn add_identity(
     e: &Env,
     account: &Address,
     identity: &Address,
-    initial_profiles: &Vec<CountryProfile>,
+    identity_type: IdentityType,
+    initial_countries: &Vec<CountryData>,
 ) {
-    if initial_profiles.is_empty() {
-        panic_with_error!(e, IRSError::EmptyCountryProfiles)
+    if initial_countries.is_empty() {
+        panic_with_error!(e, IRSError::EmptyCountryList)
     }
-    if initial_profiles.len() > MAX_COUNTRY_PROFILES {
-        panic_with_error!(e, IRSError::MaxCountryProfilesReached);
+    if initial_countries.len() > MAX_COUNTRY_ENTRIES {
+        panic_with_error!(e, IRSError::MaxCountryEntriesReached);
     }
 
-    let key = IRSStorageKey::Identity(account.clone());
-    if e.storage().persistent().has(&key) {
+    // Validate that country relations match the identity type
+    validate_country_relations(e, &identity_type, initial_countries);
+
+    let identity_key = IRSStorageKey::Identity(account.clone());
+    if e.storage().persistent().has(&identity_key) {
         panic_with_error!(e, IRSError::IdentityAlreadyExists)
     }
-    e.storage().persistent().set(&key, identity);
+    e.storage().persistent().set(&identity_key, identity);
 
     emit_identity_stored(e, account, identity);
 
-    e.storage()
-        .persistent()
-        .set(&IRSStorageKey::CountryProfiles(account.clone()), initial_profiles);
+    let profile = IdentityProfile { identity_type, countries: initial_countries.clone() };
 
-    for profile in initial_profiles.iter() {
-        emit_country_profile_event(e, CountryProfileEvent::Added, account, &profile);
+    e.storage().persistent().set(&IRSStorageKey::IdentityProfile(account.clone()), &profile);
+
+    for country_data in initial_countries.iter() {
+        emit_country_data_event(e, CountryDataEvent::Added, account, &country_data);
     }
 }
 
@@ -269,7 +346,7 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
     emit_identity_modified(e, &old_identity, new_identity);
 }
 
-/// Removes an identity and all associated country profiles.
+/// Removes an identity and all associated country data.
 ///
 /// # Arguments
 ///
@@ -286,8 +363,9 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
 /// * topics - `["identity_unstored", account: Address, identity: Address]`
 /// * data - `[]`
 ///
-/// Emits for each country profile removed:
-/// * topics - `["country_removed", account: Address, profile: CountryProfile]`
+/// Emits for each country data removed:
+/// * topics - `["country_removed", account: Address, country_relation:
+///   CountryRelation]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -300,46 +378,48 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
 /// Using this function in public-facing methods may create significant security
 /// risks as it could allow unauthorized modifications.
 pub fn remove_identity(e: &Env, account: &Address) {
-    let key = IRSStorageKey::Identity(account.clone());
+    let identity_key = IRSStorageKey::Identity(account.clone());
 
     let identity: Address = e
         .storage()
         .persistent()
-        .get(&key)
+        .get(&identity_key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
-    e.storage().persistent().remove(&key);
+    e.storage().persistent().remove(&identity_key);
 
     emit_identity_unstored(e, account, &identity);
 
-    // Remove all associated country profiles
-    let profiles_key = IRSStorageKey::CountryProfiles(account.clone());
-    let profiles: Vec<CountryProfile> =
-        e.storage().persistent().get(&profiles_key).expect("country profiles must be already set");
-    e.storage().persistent().remove(&profiles_key);
+    // Remove all associated identity profile
+    let profile_key = IRSStorageKey::IdentityProfile(account.clone());
+    let profile: IdentityProfile =
+        e.storage().persistent().get(&profile_key).expect("identity profile must be already set");
+    e.storage().persistent().remove(&profile_key);
 
-    for profile in profiles {
-        emit_country_profile_event(e, CountryProfileEvent::Removed, account, &profile);
+    for country_data in profile.countries {
+        emit_country_data_event(e, CountryDataEvent::Removed, account, &country_data);
     }
 }
 
-/// Adds multiple country profiles to an existing identity.
+/// Adds multiple country data entries to an existing identity.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `account` - The account address to add profiles to.
-/// * `profiles` - A vector of country profiles to add.
+/// * `account` - The account address to add country data to.
+/// * `country_data_list` - A vector of country data to add.
 ///
 /// # Errors
 ///
-/// * [`IRSError::EmptyCountryProfiles`] - If `profiles` is empty.
-/// * [`IRSError::MaxCountryProfilesReached`] - If the number of country
-///   profiles exceeds `MAX_COUNTRY_PROFILES`.
+/// * [`IRSError::EmptyCountryList`] - If `country_data_list` is empty.
+/// * [`IRSError::MaxCountryEntriesReached`] - If the number of country data
+///   entries exceeds `MAX_COUNTRY_ENTRIES`.
+/// * refer to [`validate_country_relations`] errors.
 ///
 /// # Events
 ///
-/// Emits for each profile added:
-/// * topics - `["country_added", account: Address, profile: CountryProfile]`
+/// Emits for each country data added:
+/// * topics - `["country_added", account: Address, country_relation:
+///   CountryRelation]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -351,44 +431,49 @@ pub fn remove_identity(e: &Env, account: &Address) {
 ///
 /// Using this function in public-facing methods may create significant security
 /// risks as it could allow unauthorized modifications.
-pub fn add_country_profiles(e: &Env, account: &Address, profiles: &Vec<CountryProfile>) {
-    if profiles.is_empty() {
-        panic_with_error!(e, IRSError::EmptyCountryProfiles)
+pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &Vec<CountryData>) {
+    if country_data_list.is_empty() {
+        panic_with_error!(e, IRSError::EmptyCountryList)
     }
 
-    let mut existing_profiles: Vec<CountryProfile> =
-        get_persistent_entry(e, &IRSStorageKey::CountryProfiles(account.clone()))
-            .expect("country profiles must be already set");
+    let mut profile: IdentityProfile =
+        get_persistent_entry(e, &IRSStorageKey::IdentityProfile(account.clone()))
+            .expect("identity profile must be already set");
 
-    existing_profiles.append(profiles);
-    if existing_profiles.len() > MAX_COUNTRY_PROFILES {
-        panic_with_error!(e, IRSError::MaxCountryProfilesReached);
+    // Validate that country relations match the identity type
+    validate_country_relations(e, &profile.identity_type, country_data_list);
+
+    profile.countries.append(country_data_list);
+    if profile.countries.len() > MAX_COUNTRY_ENTRIES {
+        panic_with_error!(e, IRSError::MaxCountryEntriesReached);
     }
 
-    let key = IRSStorageKey::CountryProfiles(account.clone());
-    e.storage().persistent().set(&key, &existing_profiles);
+    let key = IRSStorageKey::IdentityProfile(account.clone());
+    e.storage().persistent().set(&key, &profile);
 
-    for profile in profiles.iter() {
-        emit_country_profile_event(e, CountryProfileEvent::Added, account, &profile);
+    for country_data in country_data_list.iter() {
+        emit_country_data_event(e, CountryDataEvent::Added, account, &country_data);
     }
 }
 
-/// Modifies an existing country profile by its index.
+/// Modifies an existing country data entry by its index.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `account` - The account address whose profile is being modified.
-/// * `index` - The index of the profile to modify.
-/// * `profile` - The new country profile data.
+/// * `account` - The account address whose country data is being modified.
+/// * `index` - The index of the country data to modify.
+/// * `country_data` - The new country data.
 ///
 /// # Errors
 ///
-/// * [`IRSError::CountryProfileNotFound`] - If the index is out of bounds.
+/// * [`IRSError::CountryDataNotFound`] - If the index is out of bounds.
+/// * refer to [`validate_country_relations`] errors.
 ///
 /// # Events
 ///
-/// * topics - `["country_modified", account: Address, profile: CountryProfile]`
+/// * topics - `["country_modified", account: Address, country_relation:
+///   CountryRelation]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -400,36 +485,40 @@ pub fn add_country_profiles(e: &Env, account: &Address, profiles: &Vec<CountryPr
 ///
 /// Using this function in public-facing methods may create significant security
 /// risks as it could allow unauthorized modifications.
-pub fn modify_country_profile(e: &Env, account: &Address, index: u32, profile: &CountryProfile) {
-    let mut profiles = get_country_profiles(e, account);
-    if index >= profiles.len() {
-        panic_with_error!(e, IRSError::CountryProfileNotFound);
+pub fn modify_country_data(e: &Env, account: &Address, index: u32, country_data: &CountryData) {
+    let mut profile = get_identity_profile(e, account);
+    if index >= profile.countries.len() {
+        panic_with_error!(e, IRSError::CountryDataNotFound);
     }
-    profiles.set(index, profile.clone());
 
-    let key = IRSStorageKey::CountryProfiles(account.clone());
-    e.storage().persistent().set(&key, &profiles);
+    // Validate that the new country relation matches the identity type
+    validate_country_relations(e, &profile.identity_type, &vec![e, country_data.clone()]);
+    profile.countries.set(index, country_data.clone());
 
-    emit_country_profile_event(e, CountryProfileEvent::Modified, account, profile);
+    let key = IRSStorageKey::IdentityProfile(account.clone());
+    e.storage().persistent().set(&key, &profile);
+
+    emit_country_data_event(e, CountryDataEvent::Modified, account, country_data);
 }
 
-/// Deletes a country profile by its index.
+/// Deletes a country data entry by its index.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `account` - The account address whose profile is being deleted.
-/// * `index` - The index of the profile to delete.
+/// * `account` - The account address whose country data is being deleted.
+/// * `index` - The index of the country data to delete.
 ///
 /// # Errors
 ///
-/// * [`IRSError::CountryProfileNotFound`] - If the index is out of bounds.
-/// * [`IRSError::EmptyCountryProfiles`] - If attempting to delete the last
-///   country profile.
+/// * [`IRSError::CountryDataNotFound`] - If the index is out of bounds.
+/// * [`IRSError::EmptyCountryList`] - If attempting to delete the last country
+///   data entry.
 ///
 /// # Events
 ///
-/// * topics - `["country_removed", account: Address, profile: CountryProfile]`
+/// * topics - `["country_removed", account: Address, country_relation:
+///   CountryRelation]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -441,23 +530,60 @@ pub fn modify_country_profile(e: &Env, account: &Address, index: u32, profile: &
 ///
 /// Using this function in public-facing methods may create significant security
 /// risks as it could allow unauthorized modifications.
-pub fn delete_country_profile(e: &Env, account: &Address, index: u32) {
-    let mut profiles = get_country_profiles(e, account);
+pub fn delete_country_data(e: &Env, account: &Address, index: u32) {
+    let mut profile = get_identity_profile(e, account);
 
-    if profiles.len() == 1 {
-        panic_with_error!(e, IRSError::EmptyCountryProfiles)
+    if profile.countries.len() == 1 {
+        panic_with_error!(e, IRSError::EmptyCountryList)
     }
 
-    let profile_to_remove = profiles
+    let country_data_to_remove = profile
+        .countries
         .get(index)
-        .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryProfileNotFound));
+        .unwrap_or_else(|| panic_with_error!(e, IRSError::CountryDataNotFound));
 
-    profiles.remove(index);
+    profile.countries.remove(index);
 
-    let key = IRSStorageKey::CountryProfiles(account.clone());
-    e.storage().persistent().set(&key, &profiles);
+    let key = IRSStorageKey::IdentityProfile(account.clone());
+    e.storage().persistent().set(&key, &profile);
 
-    emit_country_profile_event(e, CountryProfileEvent::Removed, account, &profile_to_remove);
+    emit_country_data_event(e, CountryDataEvent::Removed, account, &country_data_to_remove);
+}
+
+// ################## HELPERS ##################
+
+/// Validates that country relations match the identity type.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `identity_type` - The type of identity (Individual or Organization).
+/// * `country_data_list` - The list of country data to validate.
+///
+/// # Errors
+///
+/// * [`IRSError::CountryRelationMismatch`] - If any country relation doesn't
+///   match the identity type.
+pub fn validate_country_relations(
+    e: &Env,
+    identity_type: &IdentityType,
+    country_data_list: &Vec<CountryData>,
+) {
+    for country_data in country_data_list.iter() {
+        match (identity_type, &country_data.country) {
+            (IdentityType::Individual, CountryRelation::Individual(_)) => {
+                // Valid: Individual identity with individual country relation
+            }
+            (IdentityType::Organization, CountryRelation::Organization(_)) => {
+                // Valid: Organization identity with organization country
+                // relation
+            }
+            _ => {
+                // Invalid: Mismatched identity type and country relation
+                panic_with_error!(e, IRSError::CountryRelationMismatch);
+            }
+        }
+    }
 }
 
 /// Helper function that tries to retrieve a persistent storage value and
