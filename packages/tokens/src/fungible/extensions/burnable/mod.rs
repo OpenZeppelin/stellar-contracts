@@ -2,9 +2,7 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
-
-use crate::fungible::FungibleToken;
+use soroban_sdk::{symbol_short, Env};
 
 /// Burnable Trait for Fungible Token
 ///
@@ -19,13 +17,13 @@ use crate::fungible::FungibleToken;
 /// Excluding the `burn` functionality from the `[FungibleToken]` trait
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
-pub trait FungibleBurnable: FungibleToken {
+#[soroban_sdk::contracttrait(add_impl_type = true)]
+pub trait FungibleBurnable {
     /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `from` - The account whose tokens are destroyed.
     /// * `amount` - The amount of tokens to burn.
     ///
@@ -40,14 +38,13 @@ pub trait FungibleBurnable: FungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[amount: i128]`
-    fn burn(e: &Env, from: Address, amount: i128);
+    fn burn(e: &Env, from: &soroban_sdk::Address, amount: i128);
 
     /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `spender` - The address authorized to burn the tokens.
     /// * `from` - The account whose tokens are destroyed.
     /// * `amount` - The amount of tokens to burn.
@@ -65,7 +62,12 @@ pub trait FungibleBurnable: FungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[amount: i128]`
-    fn burn_from(e: &Env, spender: Address, from: Address, amount: i128);
+    fn burn_from(
+        e: &Env,
+        spender: &soroban_sdk::Address,
+        from: &soroban_sdk::Address,
+        amount: i128,
+    );
 }
 
 // ################## EVENTS ##################
@@ -82,7 +84,7 @@ pub trait FungibleBurnable: FungibleToken {
 ///
 /// * topics - `["burn", from: Address]`
 /// * data - `[amount: i128]`
-pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
+pub fn emit_burn(e: &Env, from: &soroban_sdk::Address, amount: i128) {
     let topics = (symbol_short!("burn"), from);
     e.events().publish(topics, amount)
 }

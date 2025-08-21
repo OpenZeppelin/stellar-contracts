@@ -76,7 +76,7 @@ mod storage;
 
 mod test;
 
-use soroban_sdk::{contractclient, contracterror, Address, BytesN, Env, FromVal, Val};
+use soroban_sdk::{contracterror, contracttrait, Address, BytesN, Env, FromVal, Val};
 
 pub use crate::upgradeable::storage::{
     can_complete_migration, complete_migration, enable_migration, ensure_can_complete_migration,
@@ -98,8 +98,8 @@ pub use crate::upgradeable::storage::{
 ///    - Derive it using `#[derive(Upgradeable)]`
 ///    - Provide access control by implementing [`UpgradeableInternal`] with
 ///      your custom logic
-#[contractclient(name = "UpgradeableClient")]
-pub trait Upgradeable {
+#[contracttrait]
+pub trait Upgradeable: UpgradeableInternal {
     /// Upgrades the contract by setting a new WASM bytecode. The
     /// contract will only be upgraded after the invocation has
     /// successfully completed.

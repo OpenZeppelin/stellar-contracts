@@ -40,8 +40,8 @@ fn test_sac_generic() {
     let sac = e.register_stellar_asset_contract_v2(issuer.clone());
     let sac_client = StellarAssetClient::new(&e, &sac.address());
 
-    // Register the account contract, passing in the two signers (public keys) to
-    // the constructor.
+    // Register the account contract, passing in the two signers (publickeys) to
+    // // the constructor.
     let new_admin = e.register(
         SacAdminExampleContract,
         (

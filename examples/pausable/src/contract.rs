@@ -7,23 +7,24 @@
 //! Counter can be incremented only when `unpaused` and reset only when
 //! `paused`.
 
-use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env,
-};
-use stellar_contract_utils::pausable::{self as pausable, Pausable};
-use stellar_macros::{when_not_paused, when_paused};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
+use stellar_access::{Ownable, Owner};
+use stellar_contract_utils::{Pausable, PausableDefault};
+use stellar_macros::{only_owner, when_not_paused, when_paused};
 
 #[contracttype]
 pub enum DataKey {
-    Owner,
     Counter,
 }
 
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum ExampleContractError {
-    Unauthorized = 1,
+impl DataKey {
+    pub fn set(&self, e: &Env, i: i32) {
+        e.storage().instance().set(self, &i);
+    }
+
+    pub fn get(&self, e: &Env) -> i32 {
+        unsafe { e.storage().instance().get(self).unwrap_unchecked() }
+    }
 }
 
 #[contract]
@@ -32,59 +33,39 @@ pub struct ExampleContract;
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        e.storage().instance().set(&DataKey::Owner, &owner);
-        e.storage().instance().set(&DataKey::Counter, &0);
+        Self::set_owner(e, &owner);
+        DataKey::Counter.set(e, 0);
     }
 
     #[when_not_paused]
     pub fn increment(e: &Env) -> i32 {
-        let mut counter: i32 =
-            e.storage().instance().get(&DataKey::Counter).expect("counter should be set");
-
-        counter += 1;
-
-        e.storage().instance().set(&DataKey::Counter, &counter);
-
+        let counter = DataKey::Counter.get(e) + 1;
+        DataKey::Counter.set(e, counter);
         counter
     }
 
     #[when_paused]
     pub fn emergency_reset(e: &Env) {
-        e.storage().instance().set(&DataKey::Counter, &0);
+        DataKey::Counter.set(e, 0);
     }
 }
 
 #[contractimpl]
+impl Ownable for ExampleContract {
+    type Impl = Owner;
+}
+
+#[contractimpl]
 impl Pausable for ExampleContract {
-    fn paused(e: &Env) -> bool {
-        pausable::paused(e)
+    type Impl = PausableDefault;
+
+    #[only_owner]
+    fn pause(e: &Env, caller: &soroban_sdk::Address) {
+        Self::Impl::pause(e, caller)
     }
 
-    fn pause(e: &Env, caller: Address) {
-        // When `ownable` module is available,
-        // the following checks should be equivalent to:
-        // `ownable::only_owner(&e);`
-        caller.require_auth();
-        let owner: Address =
-            e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
-        if owner != caller {
-            panic_with_error!(e, ExampleContractError::Unauthorized);
-        }
-
-        pausable::pause(e);
-    }
-
-    fn unpause(e: &Env, caller: Address) {
-        // When `ownable` module is available,
-        // the following checks should be equivalent to:
-        // `ownable::only_owner(&e);`
-        caller.require_auth();
-        let owner: Address =
-            e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
-        if owner != caller {
-            panic_with_error!(e, ExampleContractError::Unauthorized);
-        }
-
-        pausable::unpause(e);
+    #[only_owner]
+    fn unpause(e: &Env, caller: &soroban_sdk::Address) {
+        Self::Impl::unpause(e, caller)
     }
 }

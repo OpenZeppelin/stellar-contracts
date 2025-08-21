@@ -65,17 +65,6 @@ pub mod storage;
 use soroban_sdk::{Address, Env, Symbol};
 pub use storage::Consecutive;
 
-use crate::non_fungible::NonFungibleToken;
-
-/// Consecutive Marker Trait for Non-Fungible Token
-///
-/// # Notes
-///
-/// The `consecutive` extension provides its own business logic for creating and
-/// destroying tokens. Therefore, this trait is INCOMPATIBLE with the
-/// `Enumerable` extension.
-pub trait NonFungibleConsecutive: NonFungibleToken<ContractType = Consecutive> {}
-
 mod test;
 
 // ################## EVENTS ##################
