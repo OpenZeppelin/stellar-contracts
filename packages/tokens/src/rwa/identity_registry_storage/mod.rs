@@ -7,11 +7,13 @@
 //!
 //! ## Overview
 //!
-//! The Identity Registry Storage system is designed to handle complex
-//! jurisdictional relationships for accounts in a blockchain environment.
+//! Each user account interacting with RWA tokens must be linked to an identity
+//! contract that stores compliance-related data and other regulatory
+//! information. The Identity Registry Storage system is designed to handle
+//! those together with complex jurisdictional relationships for accounts.
 //! Instead of simple country codes, it uses a sophisticated model that pairs
-//! relationship types with country codes, ensuring data integrity through
-//! type matching.
+//! relationship types with country codes, ensuring data integrity through type
+//! matching.
 //!
 //! ## Core Components
 //!
