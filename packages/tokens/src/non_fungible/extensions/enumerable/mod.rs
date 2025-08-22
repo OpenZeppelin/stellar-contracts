@@ -39,8 +39,6 @@ use crate::non_fungible::NonFungibleToken;
 /// 2. Enumerability can also be offloaded to off-chain services. This extension
 ///    exists for the use-cases where the enumeration is required as an on-chain
 ///    operation.
-/// 3. A similar enumerability pattern is applied in
-///    [`crate::rwa::identity_registry_storage`].
 ///
 /// # Notes
 ///
