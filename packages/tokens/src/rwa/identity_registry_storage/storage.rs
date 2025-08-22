@@ -14,7 +14,8 @@
 /// - `Incorporation(840)` - Country of incorporation: USA
 /// - `OperatingJurisdiction(276)` - Operating jurisdiction: Germany
 /// - `TaxJurisdiction(756)` - Tax jurisdiction: Switzerland
-/// - `Custom("Subsidiary".into(), 792)` - Custom subsidiary location: Turkey
+/// - `Custom(Symbol::new(e, "Subsidiary"), 792)` - Custom subsidiary location:
+///   Turkey
 ///
 /// This flexible structure allows an account to hold multiple country
 /// relationships, such as an individual having dual citizenship or an
@@ -66,7 +67,7 @@
 ///         }
 ///
 ///         // If no duplicates found, add all entries
-///         add_country_data_entries(e, &account, &country_entries);
+///         identity_registry_storage::add_country_data_entries(e, &account, &country_entries);
 ///     }
 ///     // other methods
 /// }
@@ -162,6 +163,10 @@ pub enum IRSStorageKey {
 // ################## QUERY STATE ##################
 
 /// Retrieves the stored identity for a given account.
+///
+/// Each user account interacting with the RWA token must be linked to an
+/// identity contract that stores compliance-related data and other regulatory
+/// information.
 ///
 /// # Arguments
 ///
@@ -401,6 +406,8 @@ pub fn remove_identity(e: &Env, account: &Address) {
 }
 
 /// Adds multiple country data entries to an existing identity.
+///
+/// Does not check for duplicate country data entries.
 ///
 /// # Arguments
 ///
