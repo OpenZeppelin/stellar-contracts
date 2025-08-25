@@ -189,7 +189,8 @@ pub trait ClaimTopicsAndIssuers {
     ///   topic does not exist.
     fn get_claim_topic_issuers(e: &Env, claim_topic: u32) -> Vec<Address>;
 
-    /// Returns all the claim topics and their corresponding trusted issuers as a Mapping.
+    /// Returns all the claim topics and their corresponding trusted issuers as
+    /// a Mapping.
     ///
     /// # Arguments
     ///
