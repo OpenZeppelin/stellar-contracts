@@ -113,7 +113,8 @@ impl RWA {
             .unwrap_or_else(|| panic_with_error!(e, RWAError::ComplianceNotSet))
     }
 
-    /// Returns the freezing status of a wallet.
+    /// Returns the freezing status of a wallet. Frozen wallets cannot send or
+    /// receive funds.
     ///
     /// # Arguments
     ///
@@ -181,7 +182,7 @@ impl RWA {
     ///
     /// * [`RWAError::InsufficientBalance`] - When attempting to transfer more
     ///   tokens than available.
-    /// * [`RWAError::LessThanZero`] - When `amount < 0`.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///
@@ -199,11 +200,7 @@ impl RWA {
     /// **IMPORTANT**: This function bypasses authorization and freezing checks.
     /// Should only be used by authorized compliance or admin functions.
     pub fn forced_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        if amount < 0 {
-            panic_with_error!(e, RWAError::LessThanZero);
-        }
-
-        let mut from_balance = Base::balance(e, from);
+        let from_balance = Base::balance(e, from);
         if from_balance < amount {
             panic_with_error!(e, RWAError::InsufficientBalance);
         }
@@ -219,12 +216,7 @@ impl RWA {
             emit_tokens_unfrozen(e, from, tokens_to_unfreeze);
         }
 
-        // Update balances directly (bypassing paused/frozen checks)
-        from_balance -= amount;
-        let to_balance = Base::balance(e, to) + amount;
-
-        e.storage().persistent().set(&StorageKey::Balance(from.clone()), &from_balance);
-        e.storage().persistent().set(&StorageKey::Balance(to.clone()), &to_balance);
+        Base::update(e, Some(from), Some(to), amount);
 
         Self::trigger_compliance_hook(
             e,
@@ -245,6 +237,8 @@ impl RWA {
     ///
     /// # Errors
     ///
+    /// refer to [`RWA::verify_identity`] errors.
+    /// refer to [`RWA::validate_compliance`] errors.
     /// refer to [`Base::update`] errors.
     ///
     /// # Events
@@ -413,7 +407,8 @@ impl RWA {
         true
     }
 
-    /// Sets the frozen status for an address.
+    /// Sets the frozen status for an address. Frozen wallets cannot send or
+    /// receive funds.
     ///
     /// # Arguments
     ///
@@ -652,7 +647,7 @@ impl RWA {
     ///
     /// This function calls the compliance contract to validate the transfer
     /// against configured compliance rules. The compliance contract should
-    /// implement a `can_xfer` function that returns a boolean.
+    /// implement a `can_transfer` function that returns a boolean.
     fn validate_compliance(e: &Env, from: Option<&Address>, to: &Address, amount: i128) {
         let compliance_addr = Self::compliance(e);
 

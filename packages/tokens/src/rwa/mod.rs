@@ -25,8 +25,9 @@
 //! - **Recovery System**: Lost wallet recovery for verified investors
 //! - **Pausable Operations**: Emergency pause functionality for the entire
 //!   token
-//! - **Agent-based Administration**: Role-based access control for
-//!   administrative functions
+//! - **RBAC**: Role-based access control allows to define and set custom
+//!   privileges for the administrative functions based on the needs of the
+//!   token/project.
 //!
 //! ## Modules
 //!
@@ -66,11 +67,14 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     // ################## CORE TOKEN FUNCTIONS ##################
 
     /// Forces a transfer of tokens between two whitelisted wallets.
-    /// This function can only be called by an agent of the token.
+    /// This function can only be called by the operator with necessary
+    /// privileges. RBAC checks are expected to be enforced on the
+    /// `operator`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    /// * `operator` - The address of the operator.
     /// * `from` - The address of the sender.
     /// * `to` - The address of the receiver.
     /// * `amount` - The number of tokens to transfer.
@@ -80,15 +84,17 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * [`RWAError::InsufficientBalance`] - When the sender has insufficient
     ///   balance.
     /// * [`RWAError::LessThanZero`] - When the amount is negative.
-    fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128);
+    fn forced_transfer(e: &Env, operator: Address, from: Address, to: Address, amount: i128);
 
     /// Mints tokens to a wallet. Tokens can only be minted to verified
-    /// addresses. This function can only be called by an agent of the
-    /// token.
+    /// addresses. This function can only be called by the operator with
+    /// necessary privileges. RBAC checks are expected to be enforced on the
+    /// `operator`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    /// * `operator` - The address of the operator.
     /// * `to` - Address to mint the tokens to.
     /// * `amount` - Amount of tokens to mint.
     ///
@@ -100,10 +106,12 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///   verified.
     /// * [`RWAError::AddressFrozen`] - When the recipient address is frozen.
     /// * [`PausableError::EnforcedPause`] - When the contract is paused.
-    fn mint(e: &Env, to: Address, amount: i128);
+    fn mint(e: &Env, operator: Address, to: Address, amount: i128);
 
     /// Burns tokens from a wallet.
-    /// This function can only be called by an agent of the token.
+    /// This function can only be called by the operator with necessary
+    /// privileges. RBAC checks are expected to be enforced on the
+    /// `operator`.
     ///
     /// # Arguments
     ///
@@ -118,11 +126,14 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
 
     /// Recovery function used to force transfer tokens from a lost wallet
     /// to a new wallet for an investor.
-    /// This function can only be called by an agent of the token.
+    /// This function can only be called by the operator with necessary
+    /// privileges. RBAC checks are expected to be enforced on the
+    /// `operator`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    /// * `operator` - The address of the operator.
     /// * `lost_wallet` - The wallet that the investor lost.
     /// * `new_wallet` - The newly provided wallet for token transfer.
     /// * `investor_onchain_id` - The onchain ID of the investor asking for
@@ -137,27 +148,34 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * [`RWAError::RecoveryFailed`] - When recovery parameters are invalid.
     fn recovery_address(
         e: &Env,
+        operator: Address,
         lost_wallet: Address,
         new_wallet: Address,
         investor_onchain_id: Address,
     ) -> bool;
 
-    /// Sets the frozen status for an address.
-    /// This function can only be called by an agent of the token.
+    /// Sets the frozen status for an address. Frozen addresses cannot send or
+    /// receive tokens. This function can only be called by the operator
+    /// with necessary privileges. RBAC checks are expected to be enforced
+    /// on the `operator`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    /// * `operator` - The address of the operator.
     /// * `user_address` - The address for which to update frozen status.
     /// * `freeze` - Frozen status of the address.
-    fn set_address_frozen(e: &Env, caller: Address, user_address: Address, freeze: bool);
+    fn set_address_frozen(e: &Env, operator: Address, user_address: Address, freeze: bool);
 
     /// Freezes a specified amount of tokens for a given address.
-    /// This function can only be called by an agent of the token.
+    /// This function can only be called by the operator with necessary
+    /// privileges. RBAC checks are expected to be enforced on the
+    /// `operator`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    /// * `operator` - The address of the operator.
     /// * `user_address` - The address for which to freeze tokens.
     /// * `amount` - Amount of tokens to be frozen.
     ///
@@ -166,14 +184,17 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * [`RWAError::LessThanZero`] - When the amount is negative.
     /// * [`RWAError::InsufficientBalance`] - When the address has insufficient
     ///   balance.
-    fn freeze_partial_tokens(e: &Env, user_address: Address, amount: i128);
+    fn freeze_partial_tokens(e: &Env, operator: Address, user_address: Address, amount: i128);
 
     /// Unfreezes a specified amount of tokens for a given address.
-    /// This function can only be called by an agent of the token.
+    /// This function can only be called by the operator with necessary
+    /// privileges. RBAC checks are expected to be enforced on the
+    /// `operator`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    /// * `operator` - The address of the operator.
     /// * `user_address` - The address for which to unfreeze tokens.
     /// * `amount` - Amount of tokens to be unfrozen.
     ///
@@ -182,7 +203,7 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * [`RWAError::LessThanZero`] - When the amount is negative.
     /// * [`RWAError::InsufficientFreeTokens`] - When there are insufficient
     ///   frozen tokens to unfreeze.
-    fn unfreeze_partial_tokens(e: &Env, user_address: Address, amount: i128);
+    fn unfreeze_partial_tokens(e: &Env, operator: Address, user_address: Address, amount: i128);
 
     /// Returns the freezing status of a wallet.
     ///
@@ -220,22 +241,28 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     // ################## COMPLIANCE AND IDENTITY FUNCTIONS ##################
 
     /// Sets the Identity Verifier for the token.
-    /// Only the owner can call this function.
+    /// This function can only be called by the operator with necessary
+    /// privileges. RBAC checks are expected to be enforced on the
+    /// `operator`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    /// * `operator` - The address of the operator.
     /// * `identity_verifier` - The address of the Identity Verifier to set.
-    fn set_identity_verifier(e: &Env, identity_verifier: Address);
+    fn set_identity_verifier(e: &Env, operator: Address, identity_verifier: Address);
 
     /// Sets the compliance contract of the token.
-    /// Only the owner can call this function.
+    /// This function can only be called by the operator with necessary
+    /// privileges. RBAC checks are expected to be enforced on the
+    /// `operator`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    /// * `operator` - The address of the operator.
     /// * `compliance` - The address of the compliance contract to set.
-    fn set_compliance(e: &Env, compliance: Address);
+    fn set_compliance(e: &Env, operator: Address, compliance: Address);
 
     /// Returns the Identity Verifier linked to the token.
     ///
@@ -255,9 +282,7 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
 
     // ################## BATCH OPERATIONS ##################
 
-    // TODO: what is our strategy for batch operations? Will we have a batch version
-    // of each function, or will we craft a 'batcher` function? Leave it empty for
-    // now
+    // TODO: will be determined in the future
 }
 
 // ################## ERRORS ##################
@@ -391,7 +416,7 @@ pub fn emit_recovery_success(
 /// * `e` - Access to the Soroban environment.
 /// * `user_address` - The wallet address that is affected.
 /// * `is_frozen` - The freezing status of the wallet.
-/// * `owner` - The address of the agent who called the function.
+/// * `owner` - The address of the who called the function.
 ///
 /// # Events
 ///
