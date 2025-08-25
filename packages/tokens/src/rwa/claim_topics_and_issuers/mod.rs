@@ -187,7 +187,7 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim
     ///   topic does not exist.
-    fn get_trusted_issuers_for_claim_topic(e: &Env, claim_topic: u32) -> Vec<Address>;
+    fn get_claim_topic_issuers(e: &Env, claim_topic: u32) -> Vec<Address>;
 
     /// Checks if the claim issuer contract is trusted.
     ///
