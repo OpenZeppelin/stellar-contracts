@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, Address, Env, Symbol, Vec};
+use soroban_sdk::{contracterror, Address, Env, Map, Symbol, Vec};
 
 /// Trait for managing claim topics and trusted issuers for RWA tokens.
 ///
@@ -188,6 +188,13 @@ pub trait ClaimTopicsAndIssuers {
     /// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim
     ///   topic does not exist.
     fn get_claim_topic_issuers(e: &Env, claim_topic: u32) -> Vec<Address>;
+
+    /// Returns all the claim topics and their corresponding trusted issuers as a Mapping.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn get_claim_topics_and_issuers(e: &Env) -> Map<u32, Vec<Address>>;
 
     /// Checks if the claim issuer contract is trusted.
     ///

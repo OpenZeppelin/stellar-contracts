@@ -170,7 +170,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "claim_added"
+                "symbol": "claim_topic_added"
               },
               {
                 "u32": 1

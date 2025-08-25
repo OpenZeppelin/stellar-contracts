@@ -2960,7 +2960,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "claim_added"
+                "symbol": "claim_topic_added"
               },
               {
                 "u32": 1
@@ -2981,7 +2981,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
@@ -3008,7 +3008,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
@@ -3035,7 +3035,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -3062,7 +3062,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
@@ -3089,7 +3089,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4"
@@ -3116,7 +3116,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOLZM"
@@ -3143,7 +3143,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
@@ -3170,7 +3170,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
@@ -3197,7 +3197,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAX5"
@@ -3224,7 +3224,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXI7N"
@@ -3251,7 +3251,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAYRE5"
@@ -3278,7 +3278,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2ZMN"
@@ -3305,7 +3305,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4BV5"
@@ -3332,7 +3332,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA6J5N"
@@ -3359,7 +3359,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABB6KO"
@@ -3386,7 +3386,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABDWC6"
@@ -3413,7 +3413,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABFO3O"
@@ -3440,7 +3440,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABHGT6"
@@ -3467,7 +3467,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABI7IO"
@@ -3494,7 +3494,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABKXA6"
@@ -3521,7 +3521,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABMPZO"
@@ -3548,7 +3548,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABOHR6"
@@ -3575,7 +3575,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABR4OP"
@@ -3602,7 +3602,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABTUG7"
@@ -3629,7 +3629,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABVM7P"
@@ -3656,7 +3656,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABXEX7"
@@ -3683,7 +3683,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABY5MP"
@@ -3710,7 +3710,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB2VE7"
@@ -3737,7 +3737,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4N5P"
@@ -3764,7 +3764,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB6FV7"
@@ -3791,7 +3791,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACBKTY"
@@ -3818,7 +3818,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACDC3I"
@@ -3845,7 +3845,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACF2CY"
@@ -3872,7 +3872,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACHSKI"
@@ -3899,7 +3899,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACILRY"
@@ -3926,7 +3926,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACKDZI"
@@ -3953,7 +3953,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACM3AY"
@@ -3980,7 +3980,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACOTII"
@@ -4007,7 +4007,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACRIXZ"
@@ -4034,7 +4034,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACTA7J"
@@ -4061,7 +4061,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACVYGZ"
@@ -4088,7 +4088,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACXQOJ"
@@ -4115,7 +4115,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACYJVZ"
@@ -4142,7 +4142,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC2B5J"
@@ -4169,7 +4169,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC4ZEZ"
@@ -4196,7 +4196,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC6RMJ"
@@ -4223,7 +4223,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADBG3K"
@@ -4250,7 +4250,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADDOT2"
@@ -4277,7 +4277,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADFWKK"
@@ -4304,7 +4304,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADH6C2"

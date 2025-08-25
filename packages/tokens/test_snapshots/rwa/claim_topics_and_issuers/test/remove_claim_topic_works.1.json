@@ -170,7 +170,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "claim_added"
+                "symbol": "claim_topic_added"
               },
               {
                 "u32": 1
@@ -191,7 +191,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "claim_added"
+                "symbol": "claim_topic_added"
               },
               {
                 "u32": 2
@@ -212,7 +212,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "claim_removed"
+                "symbol": "claim_topic_removed"
               },
               {
                 "u32": 1

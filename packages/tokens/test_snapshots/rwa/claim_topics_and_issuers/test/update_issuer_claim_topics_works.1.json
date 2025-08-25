@@ -479,7 +479,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "claim_added"
+                "symbol": "claim_topic_added"
               },
               {
                 "u32": 1
@@ -500,7 +500,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "claim_added"
+                "symbol": "claim_topic_added"
               },
               {
                 "u32": 2
@@ -521,7 +521,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "claim_added"
+                "symbol": "claim_topic_added"
               },
               {
                 "u32": 3
@@ -542,7 +542,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "claim_added"
+                "symbol": "claim_topic_added"
               },
               {
                 "u32": 4
@@ -563,7 +563,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "claim_added"
+                "symbol": "claim_topic_added"
               },
               {
                 "u32": 5
@@ -584,7 +584,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "issuer_added"
+                "symbol": "trusted_issuer_added"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"

@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map, Vec};
 
 use super::{
     emit_claim_topic_added, emit_claim_topic_removed, emit_issuer_topics_updated,
@@ -69,7 +69,7 @@ pub fn get_trusted_issuers(e: &Env) -> Vec<Address> {
 ///
 /// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim
 ///   topic does not exist.
-pub fn get_trusted_issuers_for_claim_topic(e: &Env, claim_topic: u32) -> Vec<Address> {
+pub fn get_claim_topic_issuers(e: &Env, claim_topic: u32) -> Vec<Address> {
     let key = ClaimTopicsAndIssuersStorageKey::ClaimTopicIssuers(claim_topic);
     if let Some(topic_issuers) = e.storage().persistent().get::<_, Vec<Address>>(&key) {
         e.storage().persistent().extend_ttl(&key, ISSUERS_TTL_THRESHOLD, ISSUERS_EXTEND_AMOUNT);
@@ -77,17 +77,6 @@ pub fn get_trusted_issuers_for_claim_topic(e: &Env, claim_topic: u32) -> Vec<Add
     } else {
         panic_with_error!(e, ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist);
     }
-}
-
-/// Checks if the claim issuer contract is trusted.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `issuer` - The address of the claim issuer contract.
-pub fn is_trusted_issuer(e: &Env, issuer: &Address) -> bool {
-    let trusted_issuers = get_trusted_issuers(e);
-    trusted_issuers.contains(issuer)
 }
 
 /// Returns all the claim topics of trusted claim issuer. Defaults to empty
@@ -110,6 +99,32 @@ pub fn get_trusted_issuer_claim_topics(e: &Env, trusted_issuer: &Address) -> Vec
     } else {
         panic_with_error!(e, ClaimTopicsAndIssuersError::IssuerDoesNotExist);
     }
+}
+
+/// Returns all the claim topics and their corresponding trusted issuers.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+pub fn get_claim_topics_and_issuers(e: &Env) -> Map<u32, Vec<Address>> {
+    let mut claim_topics_and_issuers = Map::new(e);
+    let claim_topics = get_claim_topics(e);
+    for claim_topic in claim_topics {
+        let issuers = get_claim_topic_issuers(e, claim_topic);
+        claim_topics_and_issuers.set(claim_topic, issuers);
+    }
+    claim_topics_and_issuers
+}
+
+/// Checks if the claim issuer contract is trusted.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `issuer` - The address of the claim issuer contract.
+pub fn is_trusted_issuer(e: &Env, issuer: &Address) -> bool {
+    let trusted_issuers = get_trusted_issuers(e);
+    trusted_issuers.contains(issuer)
 }
 
 /// Checks if the trusted claim issuer is allowed to emit a certain claim
@@ -250,7 +265,7 @@ pub fn remove_claim_topic(e: &Env, claim_topic: u32) {
 ///   number of issuers is reached.
 /// * [`ClaimTopicsAndIssuersError::IssuerAlreadyExists`] - If the issuer
 ///   already exists.
-/// * also refer to [`get_trusted_issuers_for_claim_topic`] errors.
+/// * also refer to [`get_claim_topic_issuers`] errors.
 ///
 /// # Events
 ///
@@ -298,7 +313,7 @@ pub fn add_trusted_issuer(e: &Env, trusted_issuer: &Address, claim_topics: &Vec<
 
     // Update reverse mapping: claim topic -> issuers
     for topic in claim_topics.iter() {
-        let mut topic_issuers = get_trusted_issuers_for_claim_topic(e, topic);
+        let mut topic_issuers = get_claim_topic_issuers(e, topic);
 
         // This is a new issuer, so we don't need to check if it already exists
         topic_issuers.push_back(trusted_issuer.clone());
@@ -321,7 +336,7 @@ pub fn add_trusted_issuer(e: &Env, trusted_issuer: &Address, claim_topics: &Vec<
 /// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted issuer
 ///   does not exist.
 /// * also refer to [`get_trusted_issuer_claim_topics`] errors.
-/// * also refer to [`get_trusted_issuers_for_claim_topic`] errors.
+/// * also refer to [`get_claim_topic_issuers`] errors.
 ///
 /// # Events
 ///
@@ -356,7 +371,7 @@ pub fn remove_trusted_issuer(e: &Env, trusted_issuer: &Address) {
 
         // Update reverse mapping: remove issuer from claim topic -> issuers
         for topic in issuer_topics.iter() {
-            let mut topic_issuers = get_trusted_issuers_for_claim_topic(e, topic);
+            let mut topic_issuers = get_claim_topic_issuers(e, topic);
             if let Some(issuer_index) =
                 topic_issuers.iter().position(|addr| addr == *trusted_issuer)
             {
@@ -391,7 +406,7 @@ pub fn remove_trusted_issuer(e: &Env, trusted_issuer: &Address) {
 /// * [`ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached`] - If the
 ///   maximum number of claim topics is reached.
 /// * also refer to [`get_trusted_issuer_claim_topics`] errors.
-/// * also refer to [`get_trusted_issuers_for_claim_topic`] errors.
+/// * also refer to [`get_claim_topic_issuers`] errors.
 ///
 /// # Events
 ///
@@ -454,7 +469,7 @@ pub fn update_issuer_claim_topics(e: &Env, trusted_issuer: &Address, claim_topic
 
     // Remove issuer from topics that are no longer assigned
     for topic_to_remove in topics_to_remove {
-        let mut topic_issuers = get_trusted_issuers_for_claim_topic(e, topic_to_remove);
+        let mut topic_issuers = get_claim_topic_issuers(e, topic_to_remove);
         if let Some(index) = topic_issuers.iter().position(|addr| addr == *trusted_issuer) {
             topic_issuers.remove(index as u32);
             let topic_key = ClaimTopicsAndIssuersStorageKey::ClaimTopicIssuers(topic_to_remove);
@@ -464,7 +479,7 @@ pub fn update_issuer_claim_topics(e: &Env, trusted_issuer: &Address, claim_topic
 
     // Add issuer to new topics
     for topic_to_add in topics_to_add {
-        let mut topic_issuers = get_trusted_issuers_for_claim_topic(e, topic_to_add);
+        let mut topic_issuers = get_claim_topic_issuers(e, topic_to_add);
         // We are sure that the issuer is not in the list, because `topics_to_add` only
         // consists of the difference between old and new topics
         topic_issuers.push_back(trusted_issuer.clone());

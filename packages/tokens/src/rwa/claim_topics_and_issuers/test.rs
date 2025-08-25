@@ -3,9 +3,10 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env, Vec};
 
 use crate::rwa::claim_topics_and_issuers::storage::{
-    add_claim_topic, add_trusted_issuer, get_claim_topics, get_trusted_issuer_claim_topics,
-    get_trusted_issuers, get_trusted_issuers_for_claim_topic, has_claim_topic, is_trusted_issuer,
-    remove_claim_topic, remove_trusted_issuer, update_issuer_claim_topics,
+    add_claim_topic, add_trusted_issuer, get_claim_topic_issuers, get_claim_topics,
+    get_claim_topics_and_issuers, get_trusted_issuer_claim_topics, get_trusted_issuers,
+    has_claim_topic, is_trusted_issuer, remove_claim_topic, remove_trusted_issuer,
+    update_issuer_claim_topics,
 };
 
 #[contract]
@@ -317,7 +318,7 @@ fn remove_trusted_issuer_works() {
         assert!(issuers.contains(&issuer2));
 
         // Verify issuer's claim topics were removed
-        let issuer_topics = get_trusted_issuers_for_claim_topic(&e, 1);
+        let issuer_topics = get_claim_topic_issuers(&e, 1);
         assert_eq!(issuer_topics.len(), 1);
         assert!(!issuer_topics.contains(&issuer1));
         assert!(issuer_topics.contains(&issuer2));
@@ -354,7 +355,7 @@ fn remove_nonexistent_trusted_issuer_panics() {
 }
 
 #[test]
-fn get_trusted_issuers_for_claim_topic_works() {
+fn get_claim_topic_issuers_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
@@ -385,21 +386,21 @@ fn get_trusted_issuers_for_claim_topic_works() {
         add_trusted_issuer(&e, &issuer3, &topics3);
 
         // Check topic 1 issuers (should have issuer1 and issuer2)
-        let topic1_issuers = get_trusted_issuers_for_claim_topic(&e, 1);
+        let topic1_issuers = get_claim_topic_issuers(&e, 1);
         assert_eq!(topic1_issuers.len(), 2);
         assert!(topic1_issuers.contains(&issuer1));
         assert!(topic1_issuers.contains(&issuer2));
         assert!(!topic1_issuers.contains(&issuer3));
 
         // // Check topic 2 issuers (should have issuer1 and issuer3)
-        let topic2_issuers = get_trusted_issuers_for_claim_topic(&e, 2);
+        let topic2_issuers = get_claim_topic_issuers(&e, 2);
         assert_eq!(topic2_issuers.len(), 2);
         assert!(topic2_issuers.contains(&issuer1));
         assert!(!topic2_issuers.contains(&issuer2));
         assert!(topic2_issuers.contains(&issuer3));
 
         // // Check topic 3 issuers (should have only issuer2)
-        let topic3_issuers = get_trusted_issuers_for_claim_topic(&e, 3);
+        let topic3_issuers = get_claim_topic_issuers(&e, 3);
         assert_eq!(topic3_issuers.len(), 1);
         assert!(!topic3_issuers.contains(&issuer1));
         assert!(topic3_issuers.contains(&issuer2));
@@ -480,10 +481,10 @@ fn update_issuer_claim_topics_works() {
         assert!(issuer_topics.contains(5)); // new
 
         // Verify reverse mappings are updated
-        let topic1_issuers = get_trusted_issuers_for_claim_topic(&e, 1);
+        let topic1_issuers = get_claim_topic_issuers(&e, 1);
         assert!(!topic1_issuers.contains(&issuer)); // should be removed
 
-        let topic4_issuers = get_trusted_issuers_for_claim_topic(&e, 4);
+        let topic4_issuers = get_claim_topic_issuers(&e, 4);
         assert!(topic4_issuers.contains(&issuer)); // should be added
     });
 }
@@ -592,13 +593,13 @@ fn complex_scenario_works() {
         assert_eq!(get_trusted_issuers(&e).len(), 3);
 
         // Check KYC issuers
-        let kyc_issuers = get_trusted_issuers_for_claim_topic(&e, 1);
+        let kyc_issuers = get_claim_topic_issuers(&e, 1);
         assert_eq!(kyc_issuers.len(), 2);
         assert!(kyc_issuers.contains(&issuer1));
         assert!(kyc_issuers.contains(&issuer3));
 
         // Check accreditation issuers
-        let accred_issuers = get_trusted_issuers_for_claim_topic(&e, 3);
+        let accred_issuers = get_claim_topic_issuers(&e, 3);
         assert_eq!(accred_issuers.len(), 2);
         assert!(accred_issuers.contains(&issuer2));
         assert!(accred_issuers.contains(&issuer3));
@@ -609,7 +610,7 @@ fn complex_scenario_works() {
         update_issuer_claim_topics(&e, &issuer1, &kyc_only);
 
         // Verify AML issuers updated
-        let aml_issuers = get_trusted_issuers_for_claim_topic(&e, 2);
+        let aml_issuers = get_claim_topic_issuers(&e, 2);
         assert_eq!(aml_issuers.len(), 1);
         assert!(!aml_issuers.contains(&issuer1));
         assert!(aml_issuers.contains(&issuer3));
@@ -618,12 +619,159 @@ fn complex_scenario_works() {
         remove_trusted_issuer(&e, &issuer2);
 
         // Verify accreditation issuers updated
-        let accred_issuers = get_trusted_issuers_for_claim_topic(&e, 3);
+        let accred_issuers = get_claim_topic_issuers(&e, 3);
         assert_eq!(accred_issuers.len(), 1);
         assert!(!accred_issuers.contains(&issuer2));
         assert!(accred_issuers.contains(&issuer3));
 
         // Final state check
         assert_eq!(get_trusted_issuers(&e).len(), 2);
+    });
+}
+
+#[test]
+fn get_claim_topics_and_issuers_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let issuer1 = Address::generate(&e);
+    let issuer2 = Address::generate(&e);
+    let issuer3 = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Test empty state
+        let result = get_claim_topics_and_issuers(&e);
+        assert!(result.is_empty());
+
+        // Add claim topics
+        add_claim_topic(&e, 1); // KYC
+        add_claim_topic(&e, 2); // AML
+        add_claim_topic(&e, 3); // Accreditation
+
+        // Test with topics but no issuers
+        let result = get_claim_topics_and_issuers(&e);
+        assert_eq!(result.len(), 3);
+        assert!(result.get(1).unwrap().is_empty());
+        assert!(result.get(2).unwrap().is_empty());
+        assert!(result.get(3).unwrap().is_empty());
+
+        // Add issuers with different topic combinations
+        let mut kyc_aml = Vec::new(&e);
+        kyc_aml.push_back(1);
+        kyc_aml.push_back(2);
+        add_trusted_issuer(&e, &issuer1, &kyc_aml);
+
+        let mut accreditation_only = Vec::new(&e);
+        accreditation_only.push_back(3);
+        add_trusted_issuer(&e, &issuer2, &accreditation_only);
+
+        let mut all_topics = Vec::new(&e);
+        all_topics.push_back(1);
+        all_topics.push_back(2);
+        all_topics.push_back(3);
+        add_trusted_issuer(&e, &issuer3, &all_topics);
+
+        // Test complete mapping
+        let result = get_claim_topics_and_issuers(&e);
+        assert_eq!(result.len(), 3);
+
+        // Verify topic 1 (KYC) has only issuer1 and issuer3
+        let topic1_issuers = result.get(1).unwrap();
+        assert_eq!(topic1_issuers.len(), 2);
+        assert!(topic1_issuers.contains(&issuer1));
+        assert!(topic1_issuers.contains(&issuer3));
+        assert!(!topic1_issuers.contains(&issuer2));
+
+        // Verify topic 2 (AML) has only issuer1 and issuer3
+        let topic2_issuers = result.get(2).unwrap();
+        assert_eq!(topic2_issuers.len(), 2);
+        assert!(topic2_issuers.contains(&issuer1));
+        assert!(topic2_issuers.contains(&issuer3));
+        assert!(!topic2_issuers.contains(&issuer2));
+
+        // Verify topic 3 (Accreditation) has only issuer2 and issuer3
+        let topic3_issuers = result.get(3).unwrap();
+        assert_eq!(topic3_issuers.len(), 2);
+        assert!(!topic3_issuers.contains(&issuer1));
+        assert!(topic3_issuers.contains(&issuer2));
+        assert!(topic3_issuers.contains(&issuer3));
+
+        // Update issuer1 to only handle KYC
+        let mut kyc_only = Vec::new(&e);
+        kyc_only.push_back(1);
+        update_issuer_claim_topics(&e, &issuer1, &kyc_only);
+
+        // Verify updated mapping
+        let result = get_claim_topics_and_issuers(&e);
+
+        // Topic 1 should still have both issuers
+        let topic1_issuers = result.get(1).unwrap();
+        assert_eq!(topic1_issuers.len(), 2);
+        assert!(topic1_issuers.contains(&issuer1));
+        assert!(topic1_issuers.contains(&issuer3));
+
+        // Topic 2 should now only have issuer3
+        let topic2_issuers = result.get(2).unwrap();
+        assert_eq!(topic2_issuers.len(), 1);
+        assert!(!topic2_issuers.contains(&issuer1));
+        assert!(topic2_issuers.contains(&issuer3));
+
+        // Remove issuer2
+        remove_trusted_issuer(&e, &issuer2);
+
+        // Verify final mapping
+        let result = get_claim_topics_and_issuers(&e);
+
+        // Topic 3 should now only have issuer3
+        let topic3_issuers = result.get(3).unwrap();
+        assert_eq!(topic3_issuers.len(), 1);
+        assert!(!topic3_issuers.contains(&issuer2));
+        assert!(topic3_issuers.contains(&issuer3));
+    });
+}
+
+#[test]
+fn get_claim_topics_and_issuers_empty_state_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        // Test completely empty state
+        let result = get_claim_topics_and_issuers(&e);
+        assert!(result.is_empty());
+    });
+}
+
+#[test]
+fn get_claim_topics_and_issuers_single_topic_multiple_issuers_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let issuer1 = Address::generate(&e);
+    let issuer2 = Address::generate(&e);
+    let issuer3 = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Add single claim topic
+        add_claim_topic(&e, 1);
+
+        // Add multiple issuers for the same topic
+        let mut topic1 = Vec::new(&e);
+        topic1.push_back(1);
+
+        add_trusted_issuer(&e, &issuer1, &topic1);
+        add_trusted_issuer(&e, &issuer2, &topic1);
+        add_trusted_issuer(&e, &issuer3, &topic1);
+
+        // Verify mapping
+        let result = get_claim_topics_and_issuers(&e);
+        assert_eq!(result.len(), 1);
+
+        let topic1_issuers = result.get(1).unwrap();
+        assert_eq!(topic1_issuers.len(), 3);
+        assert!(topic1_issuers.contains(&issuer1));
+        assert!(topic1_issuers.contains(&issuer2));
+        assert!(topic1_issuers.contains(&issuer3));
     });
 }
