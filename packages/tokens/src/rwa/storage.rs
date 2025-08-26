@@ -773,7 +773,6 @@ impl RWA {
     /// Please refer to [`Base::update`] and [`Self::transfer`] for the inline
     /// documentation.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-        spender.require_auth();
         Base::spend_allowance(e, from, spender, amount);
         Self::transfer(e, from, to, amount);
     }
