@@ -67,11 +67,6 @@ fn add_duplicate_claim_topic_panics() {
 
         // Try to add the same topic again
         add_claim_topic(&e, 1);
-
-        // Verify only one instance exists
-        let topics = get_claim_topics(&e);
-        assert_eq!(topics.len(), 1);
-        assert!(topics.contains(1));
     });
 }
 
@@ -345,12 +340,6 @@ fn remove_nonexistent_trusted_issuer_panics() {
 
         // Try to remove a non-existent issuer
         remove_trusted_issuer(&e, &issuer2);
-
-        // Verify original issuer still exists
-        assert!(is_trusted_issuer(&e, &issuer1));
-        let issuers = get_trusted_issuers(&e);
-        assert_eq!(issuers.len(), 1);
-        assert!(issuers.contains(&issuer1));
     });
 }
 
@@ -773,5 +762,32 @@ fn get_claim_topics_and_issuers_single_topic_multiple_issuers_works() {
         assert!(topic1_issuers.contains(&issuer1));
         assert!(topic1_issuers.contains(&issuer2));
         assert!(topic1_issuers.contains(&issuer3));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #370)")]
+fn get_claim_topic_issuers_nonexistent_topic_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        // Try to get issuers for a claim topic that doesn't exist
+        get_claim_topic_issuers(&e, 999);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #371)")]
+fn get_trusted_issuer_claim_topics_nonexistent_issuer_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let nonexistent_issuer = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Try to get claim topics for an issuer that doesn't exist
+        get_trusted_issuer_claim_topics(&e, &nonexistent_issuer);
     });
 }
