@@ -14,11 +14,13 @@
 //!
 //! ### **What** - Context Rules  
 //! - Rules define authorization requirements for specific contexts (contract
-//!   calls, deployments)
+//!   calls, deployments).
+//! - Each rule must contain at least one signer or one policy and can have an
+//!   optional expiration (`valid_until`) defined by a ledger sequence.
 //! - Multiple rules can exist for the same context type with different signer
-//!   sets and thresholds
+//!   sets and policies.
 //! - Context types: `Default` (any context), `CallContract(Address)`,
-//!   `CreateContract(BytesN<32>)`
+//!   `CreateContract(BytesN<32>)`.
 //! - Each rule specifies required signers and optional policies
 //!
 //! ### **How** - Policies
@@ -46,16 +48,17 @@
 //!
 //! When verifying a context with provided signers:
 //!
-//! I. Get all rules for the specific context type, plus default rules
-//! II. For each rule (start from the last stored):
-//!     1. Identify authenticated signers out of all stored signers
-//!     2.a. If there are policies, verify they can be enforced
-//!         - If all policies can be satisfied, return success
-//!         - Otherwise, move to the next rule
+//! I. Get all non-expired rules for the specific context type, plus default
+//! rules. II. For each rule (iteration starts from the last-stored, which
+//! prevails in    case of conflicting non-expired rules):
+//!     1. Identify authenticated signers out of all stored signers.
+//!     2.a. If there are policies, verify they can be enforced:
+//!         - If all policies can be satisfied, return success.
+//!         - Otherwise, move to the next rule.
 //!     2.b. If there are no policies:
-//!         - Return success only if all signers are authenticated
-//!         - Otherwise, move to the next rule
-//! III. If no rule satisfies above conditions, authorization fails
+//!         - Return success only if all signers are authenticated.
+//!         - Otherwise, move to the next rule.
+//! III. If no rule satisfies the above conditions, authorization fails.
 //!
 //! ## Benefits
 //!
@@ -186,7 +189,8 @@ pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signatures: &Signatur
                 }
             }
             Signer::Native(addr) => {
-                addr.require_auth_for_args((signature_payload.clone(),).into_val(e))
+                let args = (signature_payload.clone(),).into_val(e);
+                addr.require_auth_for_args(args)
             }
         }
     }
