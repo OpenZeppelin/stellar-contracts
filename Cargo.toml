@@ -18,6 +18,7 @@ members = [
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
     "examples/upgradeable/*",
+    "packages/accounts",
     "packages/access",
     "packages/contract-utils",
     "packages/macros",

@@ -1579,6 +1579,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-accounts"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "soroban-test-helpers",
+ "stellar-event-assertion",
+]
+
+[[package]]
 name = "stellar-contract-utils"
 version = "0.4.1"
 dependencies = [
