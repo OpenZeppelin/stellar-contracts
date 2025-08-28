@@ -1,6 +1,14 @@
 #![cfg(test)]
 extern crate std;
-use ed25519_dalek::{Signer, SigningKey, SECRET_KEY_LENGTH};
+use ed25519_dalek::{Signer as Ed25519Signer, SigningKey};
+use k256::{
+    ecdsa::SigningKey as Secp256k1SigningKey, elliptic_curve::sec1::ToEncodedPoint,
+    SecretKey as Secp256k1SecretKey,
+};
+use p256::{
+    ecdsa::{Signature as Secp256r1Signature, SigningKey as Secp256r1SigningKey},
+    SecretKey as Secp256r1SecretKey,
+};
 use soroban_sdk::{contract, testutils::Address as _, xdr::ToXdr, Address, Bytes, BytesN, Env};
 
 use crate::rwa::claim_issuer::{
@@ -243,7 +251,7 @@ fn ed25519_verify_claim_message_building() {
     let claim_topic = 42u32;
     let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
 
-    let secret_key: [u8; SECRET_KEY_LENGTH] = [
+    let secret_key: [u8; 32] = [
         157, 97, 177, 157, 239, 253, 90, 96, 186, 132, 74, 244, 146, 236, 44, 196, 68, 73, 197,
         105, 123, 50, 105, 25, 112, 59, 172, 3, 28, 174, 127, 96,
     ];
@@ -266,7 +274,132 @@ fn ed25519_verify_claim_message_building() {
     assert!(Ed25519Verifier::verify_claim_digest(&e, &digest, &signature_data,))
 }
 
-// ====================== REVOCATION TESTS =====================
+#[test]
+fn secp256k1_verify_claim_digest_success() {
+    let e = Env::default();
+
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
+
+    let secret_key_bytes: [u8; 32] = [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+        26, 27, 28, 29, 30, 31, 32,
+    ];
+    let secret_key = Secp256k1SecretKey::from_slice(&secret_key_bytes).unwrap();
+    let signing_key = Secp256k1SigningKey::from(&secret_key);
+
+    let pubkey = secret_key.public_key().to_encoded_point(false).to_bytes().to_vec();
+
+    let mut pubkey_slice = [0u8; 65];
+    pubkey_slice.copy_from_slice(&pubkey);
+    let public_key: BytesN<65> = BytesN::from_array(&e, &pubkey_slice);
+
+    let mut data = identity.clone().to_xdr(&e);
+    data.extend_from_array(&claim_topic.to_be_bytes());
+    data.append(&claim_data);
+    let digest = e.crypto().keccak256(&data);
+
+    let (signature, recovery_id) =
+        signing_key.sign_prehash_recoverable(&digest.to_array()).unwrap();
+
+    let sig_slice = signature.to_bytes();
+    let mut sig = [0u8; 64];
+    sig.copy_from_slice(sig_slice.as_slice());
+
+    let signature_data = Secp256k1SignatureData {
+        public_key,
+        signature: BytesN::from_array(&e, &sig),
+        recovery_id: recovery_id.to_byte() as u32,
+    };
+
+    assert!(Secp256k1Verifier::verify_claim_digest(&e, &digest, &signature_data));
+}
+
+//#[test]
+//fn secp256r1_verify_claim_digest_success() {
+//let e = Env::default();
+
+//let identity = Address::generate(&e);
+//let claim_topic = 42u32;
+//let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
+
+//let secret_key_bytes: [u8; 32] = [
+//33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
+// 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
+//];
+//let secret_key = Secp256r1SecretKey::from_slice(&secret_key_bytes).unwrap();
+//let signing_key = Secp256r1SigningKey::from(&secret_key);
+
+//let pubkey =
+// secret_key.public_key().to_encoded_point(false).to_bytes().to_vec();
+
+//let mut pubkey_slice = [0u8; 65];
+//pubkey_slice.copy_from_slice(&pubkey);
+//let public_key: BytesN<65> = BytesN::from_array(&e, &pubkey_slice);
+
+//let mut data = identity.clone().to_xdr(&e);
+//data.extend_from_array(&claim_topic.to_be_bytes());
+//data.append(&claim_data);
+//let digest = e.crypto().keccak256(&data);
+
+//let signature: Secp256r1Signature = signing_key.sign(&digest.to_array());
+
+//let sig_slice = signature.normalize_s().unwrap().to_bytes();
+//let mut sig = [0u8; 64];
+//sig.copy_from_slice(sig_slice.as_slice());
+
+//let signature_data =
+//Secp256r1SignatureData { public_key, signature: BytesN::from_array(&e, &sig)
+// };
+
+//assert!(Secp256r1Verifier::verify_claim_digest(&e, &digest,
+// &signature_data));
+//}
+
+#[test]
+fn signature_verifier_build_claim_digest_consistency() {
+    let e = Env::default();
+
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
+
+    // All verifiers should produce the same digest for the same inputs
+    let ed25519_digest =
+        Ed25519Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
+    let secp256r1_digest =
+        Secp256r1Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
+    let secp256k1_digest =
+        Secp256k1Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
+
+    assert_eq!(ed25519_digest, secp256r1_digest);
+    assert_eq!(secp256r1_digest, secp256k1_digest);
+}
+
+#[test]
+fn signature_verifier_different_inputs_different_digests() {
+    let e = Env::default();
+
+    let identity1 = Address::generate(&e);
+    let identity2 = Address::generate(&e);
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
+
+    // Different identities should produce different digests
+    let digest1 = Ed25519Verifier::build_claim_digest(&e, &identity1, 1u32, &claim_data).to_bytes();
+    let digest2 = Ed25519Verifier::build_claim_digest(&e, &identity2, 1u32, &claim_data).to_bytes();
+    assert_ne!(digest1, digest2);
+
+    // Different topics should produce different digests
+    let digest3 = Ed25519Verifier::build_claim_digest(&e, &identity1, 2u32, &claim_data).to_bytes();
+    assert_ne!(digest1, digest3);
+
+    // Different data should produce different digests
+    let different_data = Bytes::from_array(&e, &[4, 5, 6]);
+    let digest4 =
+        Ed25519Verifier::build_claim_digest(&e, &identity1, 1u32, &different_data).to_bytes();
+    assert_ne!(digest1, digest4);
+}
 
 #[test]
 fn set_and_check_claim_revocation() {
@@ -374,48 +507,4 @@ fn revocation_edge_cases() {
         assert!(!is_claim_revoked(&e, &digest1));
         assert!(is_claim_revoked(&e, &digest2));
     });
-}
-
-#[test]
-fn signature_verifier_build_claim_digest_consistency() {
-    let e = Env::default();
-
-    let identity = Address::generate(&e);
-    let claim_topic = 42u32;
-    let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
-
-    // All verifiers should produce the same digest for the same inputs
-    let ed25519_digest =
-        Ed25519Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
-    let secp256r1_digest =
-        Secp256r1Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
-    let secp256k1_digest =
-        Secp256k1Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
-
-    assert_eq!(ed25519_digest, secp256r1_digest);
-    assert_eq!(secp256r1_digest, secp256k1_digest);
-}
-
-#[test]
-fn signature_verifier_different_inputs_different_digests() {
-    let e = Env::default();
-
-    let identity1 = Address::generate(&e);
-    let identity2 = Address::generate(&e);
-    let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
-
-    // Different identities should produce different digests
-    let digest1 = Ed25519Verifier::build_claim_digest(&e, &identity1, 1u32, &claim_data).to_bytes();
-    let digest2 = Ed25519Verifier::build_claim_digest(&e, &identity2, 1u32, &claim_data).to_bytes();
-    assert_ne!(digest1, digest2);
-
-    // Different topics should produce different digests
-    let digest3 = Ed25519Verifier::build_claim_digest(&e, &identity1, 2u32, &claim_data).to_bytes();
-    assert_ne!(digest1, digest3);
-
-    // Different data should produce different digests
-    let different_data = Bytes::from_array(&e, &[4, 5, 6]);
-    let digest4 =
-        Ed25519Verifier::build_claim_digest(&e, &identity1, 1u32, &different_data).to_bytes();
-    assert_ne!(digest1, digest4);
 }
