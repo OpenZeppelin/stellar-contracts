@@ -1,4 +1,4 @@
-//! Fungible Vault Example Contract.
+//! Tokenized Vault Example Contract.
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_macros::default_impl;
