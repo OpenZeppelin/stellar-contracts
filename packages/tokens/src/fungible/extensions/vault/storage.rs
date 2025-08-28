@@ -1,7 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
 
 use crate::fungible::{
-    vault::{emit_deposit, emit_withdraw, FungibleVault},
+    vault::{emit_deposit, emit_withdraw},
     Base, ContractOverrides, FungibleTokenError,
 };
 
@@ -36,85 +36,75 @@ impl Vault {
     }
 
     pub fn total_assets(e: &Env) -> i128 {
-        let token_client = token::Client::new(e, &Self::query_asset(e));
+        let token_client = token::Client::new(e, &Vault::query_asset(e));
         token_client.balance(&e.current_contract_address())
     }
 
-    pub fn convert_to_shares<T: FungibleVault>(e: &Env, assets: i128) -> i128 {
-        T::convert_to_shares_with_rounding(e, assets, Rounding::Floor)
+    pub fn convert_to_shares(e: &Env, assets: i128) -> i128 {
+        Vault::convert_to_shares_with_rounding(e, assets, Rounding::Floor)
     }
 
-    pub fn convert_to_assets<T: FungibleVault>(e: &Env, shares: i128) -> i128 {
-        T::convert_to_assets_with_rounding(e, shares, Rounding::Floor)
+    pub fn convert_to_assets(e: &Env, shares: i128) -> i128 {
+        Vault::convert_to_assets_with_rounding(e, shares, Rounding::Floor)
     }
 
     pub fn max_deposit(_e: &Env, _receiver: Address) -> i128 {
         i128::MAX
     }
 
-    pub fn preview_deposit<T: FungibleVault>(e: &Env, assets: i128) -> i128 {
-        T::convert_to_shares_with_rounding(e, assets, Rounding::Floor)
+    pub fn preview_deposit(e: &Env, assets: i128) -> i128 {
+        Vault::convert_to_shares_with_rounding(e, assets, Rounding::Floor)
     }
 
     pub fn max_mint(_e: &Env, _receiver: Address) -> i128 {
         i128::MAX
     }
 
-    pub fn preview_mint<T: FungibleVault>(e: &Env, shares: i128) -> i128 {
-        T::convert_to_assets_with_rounding(e, shares, Rounding::Ceil)
+    pub fn preview_mint(e: &Env, shares: i128) -> i128 {
+        Vault::convert_to_assets_with_rounding(e, shares, Rounding::Ceil)
     }
 
-    pub fn max_withdraw<T: FungibleVault>(e: &Env, owner: Address) -> i128 {
-        T::convert_to_assets_with_rounding(e, T::balance(e, owner), Rounding::Floor)
+    pub fn max_withdraw(e: &Env, owner: Address) -> i128 {
+        Vault::convert_to_assets_with_rounding(e, Vault::balance(e, &owner), Rounding::Floor)
     }
 
-    pub fn preview_withdraw<T: FungibleVault>(e: &Env, assets: i128) -> i128 {
-        T::convert_to_shares_with_rounding(e, assets, Rounding::Ceil)
+    pub fn preview_withdraw(e: &Env, assets: i128) -> i128 {
+        Vault::convert_to_shares_with_rounding(e, assets, Rounding::Ceil)
     }
 
-    pub fn max_redeem<T: FungibleVault>(e: &Env, owner: Address) -> i128 {
-        T::balance(e, owner)
+    pub fn max_redeem(e: &Env, owner: Address) -> i128 {
+        Vault::balance(e, &owner)
     }
 
-    pub fn preview_redeem<T: FungibleVault>(e: &Env, shares: i128) -> i128 {
-        T::convert_to_assets_with_rounding(e, shares, Rounding::Floor)
+    pub fn preview_redeem(e: &Env, shares: i128) -> i128 {
+        Vault::convert_to_assets_with_rounding(e, shares, Rounding::Floor)
     }
 
     // ################## CHANGE STATE ##################
 
-    pub fn deposit<T: FungibleVault>(
-        e: &Env,
-        assets: i128,
-        caller: Address,
-        receiver: Address,
-    ) -> i128 {
+    pub fn deposit(e: &Env, assets: i128, caller: Address, receiver: Address) -> i128 {
         caller.require_auth();
-        let max_assets = T::max_deposit(e, receiver.clone());
+        let max_assets = Vault::max_deposit(e, receiver.clone());
         if assets > max_assets {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxDeposit);
         }
-        let shares: i128 = T::preview_deposit(e, assets);
-        T::deposit_no_auth(e, &caller, &receiver, assets, shares);
+        let shares: i128 = Vault::preview_deposit(e, assets);
+        Vault::deposit_no_auth(e, &caller, &receiver, assets, shares);
         shares
     }
 
-    pub fn mint<T: FungibleVault>(
-        e: &Env,
-        shares: i128,
-        caller: Address,
-        receiver: Address,
-    ) -> i128 {
+    pub fn mint(e: &Env, shares: i128, caller: Address, receiver: Address) -> i128 {
         caller.require_auth();
-        let max_shares = T::max_mint(e, receiver.clone());
+        let max_shares = Vault::max_mint(e, receiver.clone());
         if shares > max_shares {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxMint);
         }
-        let assets: i128 = T::preview_mint(e, shares);
-        T::deposit_no_auth(e, &caller, &receiver, assets, shares);
+        let assets: i128 = Vault::preview_mint(e, shares);
+        Vault::deposit_no_auth(e, &caller, &receiver, assets, shares);
         assets
     }
 
-    pub fn withdraw<T: FungibleVault>(
+    pub fn withdraw(
         e: &Env,
         assets: i128,
         caller: Address,
@@ -122,16 +112,16 @@ impl Vault {
         owner: Address,
     ) -> i128 {
         caller.require_auth();
-        let max_assets = T::max_withdraw(e, owner.clone());
+        let max_assets = Vault::max_withdraw(e, owner.clone());
         if assets > max_assets {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxWithdraw);
         }
-        let shares: i128 = T::preview_withdraw(e, assets);
-        T::withdraw_no_auth(e, &caller, &receiver, &owner, assets, shares);
+        let shares: i128 = Vault::preview_withdraw(e, assets);
+        Vault::withdraw_no_auth(e, &caller, &receiver, &owner, assets, shares);
         shares
     }
 
-    pub fn redeem<T: FungibleVault>(
+    pub fn redeem(
         e: &Env,
         shares: i128,
         caller: Address,
@@ -139,12 +129,12 @@ impl Vault {
         owner: Address,
     ) -> i128 {
         caller.require_auth();
-        let max_shares = T::max_redeem(e, owner.clone());
+        let max_shares = Vault::max_redeem(e, owner.clone());
         if shares > max_shares {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxRedeem);
         }
-        let assets = T::preview_redeem(e, shares);
-        T::withdraw_no_auth(e, &caller, &receiver, &owner, assets, shares);
+        let assets = Vault::preview_redeem(e, shares);
+        Vault::withdraw_no_auth(e, &caller, &receiver, &owner, assets, shares);
         assets
     }
 
@@ -154,8 +144,8 @@ impl Vault {
      * Decimals are computed by adding the decimal offset on top of the underlying asset's decimals.
      */
     pub fn decimals(e: &Env) -> u32 {
-        Self::get_underlying_asset_decimals(e)
-            .checked_add(Self::get_decimals_offset(e))
+        Vault::get_underlying_asset_decimals(e)
+            .checked_add(Vault::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow))
     }
 
@@ -191,11 +181,7 @@ impl Vault {
      * Internal conversion function (from assets to shares) with support for rounding direction.
      * assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() + 1, rounding)
      */
-    pub fn convert_to_shares_with_rounding<T: FungibleVault>(
-        e: &Env,
-        assets: i128,
-        rounding: Rounding,
-    ) -> i128 {
+    pub fn convert_to_shares_with_rounding(e: &Env, assets: i128, rounding: Rounding) -> i128 {
         if assets < 0 {
             panic_with_error!(e, FungibleTokenError::VaultInvalidAssetsAmount);
         }
@@ -206,10 +192,10 @@ impl Vault {
         let pow = 10_i128
             .checked_pow(Self::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
-        let y = T::total_supply(e)
+        let y = Vault::total_supply(e)
             .checked_add(pow)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
-        let denominator = T::total_assets(e)
+        let denominator = Vault::total_assets(e)
             .checked_add(1_i128)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
         muldiv(e, x, y, denominator, rounding)
@@ -219,11 +205,7 @@ impl Vault {
      * Internal conversion function (from shares to assets) with support for rounding direction.
      * shares.mulDiv(totalAssets() + 1, totalSupply() + 10 ** _decimalsOffset(), rounding)
      */
-    pub fn convert_to_assets_with_rounding<T: FungibleVault>(
-        e: &Env,
-        shares: i128,
-        rounding: Rounding,
-    ) -> i128 {
+    pub fn convert_to_assets_with_rounding(e: &Env, shares: i128, rounding: Rounding) -> i128 {
         if shares < 0 {
             panic_with_error!(e, FungibleTokenError::VaultInvalidSharesAmount);
         }
@@ -231,13 +213,13 @@ impl Vault {
             return 0;
         }
         let x = shares;
-        let y = T::total_assets(e)
+        let y = Vault::total_assets(e)
             .checked_add(1_i128)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
         let pow = 10_i128
             .checked_pow(Self::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
-        let denominator = T::total_supply(e)
+        let denominator = Vault::total_supply(e)
             .checked_add(pow)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
         muldiv(e, x, y, denominator, rounding)
@@ -277,7 +259,7 @@ impl Vault {
             Base::spend_allowance(e, owner, caller, shares);
         }
         Base::update(e, Some(owner), None, shares);
-        let token_client = token::Client::new(e, &Self::query_asset(e));
+        let token_client = token::Client::new(e, &Vault::query_asset(e));
         // `safeTransfer` mechanism is not present in the base module, (will be provided as an extension)
         token_client.transfer(&e.current_contract_address(), receiver, &assets);
         emit_withdraw(e, caller, receiver, owner, assets, shares);
@@ -291,7 +273,7 @@ impl Vault {
     }
 
     pub fn get_underlying_asset_decimals(e: &Env) -> u32 {
-        let token_client = token::Client::new(e, &Self::query_asset(e));
+        let token_client = token::Client::new(e, &Vault::query_asset(e));
         token_client.decimals()
     }
 }

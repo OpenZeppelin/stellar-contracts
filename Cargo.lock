@@ -644,7 +644,6 @@ version = "0.4.1"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
- "stellar-contract-utils",
  "stellar-macros",
  "stellar-tokens",
 ]

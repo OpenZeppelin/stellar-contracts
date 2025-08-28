@@ -9,13 +9,10 @@ pub use storage::Vault;
 
 use crate::fungible::FungibleToken;
 
-use stellar_contract_utils::math::fixed_point::Rounding;
-
 /// Vault Trait for Fungible Token
 /// TODO: describe trait, functions, arguments
-/// Public implementation details. Intended for external use.
 /// May be overridden to customize default behavior.
-pub trait FungibleVault: FungibleToken<ContractType = Vault> + FungibleVaultInternal {
+pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     fn query_asset(e: &Env) -> Address;
     fn total_assets(e: &Env) -> i128;
     fn convert_to_shares(e: &Env, assets: i128) -> i128;
@@ -32,22 +29,6 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> + FungibleVaultInte
     fn max_redeem(e: &Env, owner: Address) -> i128;
     fn preview_redeem(e: &Env, shares: i128) -> i128;
     fn redeem(e: &Env, shares: i128, caller: Address, receiver: Address, owner: Address) -> i128;
-}
-
-/// Internal implementation details. Not intended for external use.
-/// May be overridden to customize default behavior.
-pub trait FungibleVaultInternal {
-    fn convert_to_shares_with_rounding(e: &Env, assets: i128, rounding: Rounding) -> i128;
-    fn convert_to_assets_with_rounding(e: &Env, shares: i128, rounding: Rounding) -> i128;
-    fn deposit_no_auth(e: &Env, caller: &Address, receiver: &Address, assets: i128, shares: i128);
-    fn withdraw_no_auth(
-        e: &Env,
-        caller: &Address,
-        receiver: &Address,
-        owner: &Address,
-        assets: i128,
-        shares: i128,
-    );
 }
 
 // ################## EVENTS ##################
