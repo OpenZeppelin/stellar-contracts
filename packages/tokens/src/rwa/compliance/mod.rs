@@ -46,8 +46,6 @@ pub enum HookType {
 /// pub trait Compliance: RWA  // ❌
 /// ```
 pub trait Compliance {
-    // TODO: add `TokenBinder` bound when it is available
-
     /// Registers a compliance module for a specific hook type.
     ///
     /// # Arguments
