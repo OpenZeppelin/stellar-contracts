@@ -2,7 +2,7 @@ use soroban_sdk::{
     auth::{Context, CustomAccountInterface},
     contract, contractimpl,
     crypto::Hash,
-    Address, Env, FromVal, String, Val, Vec,
+    Address, Env, FromVal, String, Symbol, Val, Vec,
 };
 use storage::{
     add_context_rule, authenticate, enforce_policy, get_context_rule, get_context_rules,
@@ -44,6 +44,16 @@ pub trait SmartAccount {
     //fn remove_signer(e: &Env, signer: Signer, context_rule_id: u32);
 }
 
+// Simple execution entry-point to call arbitrary contracts.
+//
+// Most likely to be used to call owned
+// stateful polciies, and as direct contract-to-contract invocations are always
+// authorized, that's a way to avoid re-entry when the policy need to auth back
+// its owner.
+pub trait ExecutationEntry: CustomAccountInterface {
+    fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>);
+}
+
 #[contract]
 pub struct SmartAccountContract;
 
@@ -73,8 +83,9 @@ impl CustomAccountInterface for SmartAccountContract {
             validated_contexts.push_back(get_validated_context(&e, &context, &signatures.0.keys()));
         }
 
-        // after collecting validated context rules and authenticated signers, call for every policy
-        // `PolicyClient::on_enforce` to trigger the state-changing effects if any
+        // after collecting validated context rules and authenticated signers, call for
+        // every policy `PolicyClient::on_enforce` to trigger the state-changing
+        // effects if any
         for (rule, context, authenticated_signers) in validated_contexts.iter() {
             let ContextRule { signers, policies, .. } = rule;
             for policy in policies.iter() {
@@ -108,5 +119,14 @@ impl SmartAccount for SmartAccountContract {
         e.current_contract_address().require_auth();
 
         add_context_rule(e, &context_rule_type, &context_rule_val);
+    }
+}
+
+#[contractimpl]
+impl ExecutationEntry for SmartAccountContract {
+    fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>) {
+        e.current_contract_address().require_auth();
+
+        e.invoke_contract::<()>(&target, &target_fn, target_args);
     }
 }
