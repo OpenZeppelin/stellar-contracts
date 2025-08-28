@@ -40,8 +40,10 @@
 //! - **Identity Storage Registry**: Registry for storing all the information
 //!   necessary for identities
 
+pub mod identity_registry_storage;
 pub mod storage;
 pub mod test;
+pub mod utils;
 
 use soroban_sdk::{contracterror, symbol_short, Address, Env, Symbol};
 use stellar_contract_utils::pausable::Pausable;
