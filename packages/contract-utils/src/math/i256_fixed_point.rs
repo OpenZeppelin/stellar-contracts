@@ -26,6 +26,18 @@ SOFTWARE.
 
 use soroban_sdk::{Env, I256};
 
+use crate::math::soroban_fixed_point::SorobanFixedPoint;
+
+impl SorobanFixedPoint for I256 {
+    fn fixed_mul_floor(&self, env: &Env, y: &I256, denominator: &I256) -> I256 {
+        mul_div_floor(env, &self, y, denominator)
+    }
+
+    fn fixed_mul_ceil(&self, env: &Env, y: &I256, denominator: &I256) -> I256 {
+        mul_div_ceil(env, &self, y, denominator)
+    }
+}
+
 /// Performs floor(x * y / z)
 pub(crate) fn mul_div_floor(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
     let zero = I256::from_i32(env, 0);
