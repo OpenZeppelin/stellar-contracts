@@ -19,16 +19,22 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     fn convert_to_assets(e: &Env, shares: i128) -> i128;
     fn max_deposit(e: &Env, receiver: Address) -> i128;
     fn preview_deposit(e: &Env, assets: i128) -> i128;
-    fn deposit(e: &Env, assets: i128, caller: Address, receiver: Address) -> i128;
+    fn deposit(e: &Env, assets: i128, receiver: Address, operator: Address) -> i128;
     fn max_mint(e: &Env, receiver: Address) -> i128;
     fn preview_mint(e: &Env, shares: i128) -> i128;
-    fn mint(e: &Env, shares: i128, caller: Address, receiver: Address) -> i128;
+    fn mint(e: &Env, shares: i128, receiver: Address, operator: Address) -> i128;
     fn max_withdraw(e: &Env, owner: Address) -> i128;
     fn preview_withdraw(e: &Env, assets: i128) -> i128;
-    fn withdraw(e: &Env, assets: i128, caller: Address, receiver: Address, owner: Address) -> i128;
+    fn withdraw(
+        e: &Env,
+        assets: i128,
+        receiver: Address,
+        owner: Address,
+        operator: Address,
+    ) -> i128;
     fn max_redeem(e: &Env, owner: Address) -> i128;
     fn preview_redeem(e: &Env, shares: i128) -> i128;
-    fn redeem(e: &Env, shares: i128, caller: Address, receiver: Address, owner: Address) -> i128;
+    fn redeem(e: &Env, shares: i128, receiver: Address, owner: Address, operator: Address) -> i128;
 }
 
 // ################## EVENTS ##################

@@ -84,25 +84,25 @@ impl Vault {
 
     /// **IMPORTANT**: This function bypasses authorization checks by design.
     /// Consider combining with the Ownable or Access Control pattern.
-    pub fn deposit(e: &Env, assets: i128, caller: Address, receiver: Address) -> i128 {
+    pub fn deposit(e: &Env, assets: i128, receiver: Address, operator: Address) -> i128 {
         let max_assets = Vault::max_deposit(e, receiver.clone());
         if assets > max_assets {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxDeposit);
         }
         let shares: i128 = Vault::preview_deposit(e, assets);
-        Vault::deposit_no_auth(e, &caller, &receiver, assets, shares);
+        Vault::deposit_no_auth(e, &receiver, assets, shares, &operator);
         shares
     }
 
     /// **IMPORTANT**: This function bypasses authorization checks by design.
     /// Consider combining with the Ownable or Access Control pattern.
-    pub fn mint(e: &Env, shares: i128, caller: Address, receiver: Address) -> i128 {
+    pub fn mint(e: &Env, shares: i128, receiver: Address, operator: Address) -> i128 {
         let max_shares = Vault::max_mint(e, receiver.clone());
         if shares > max_shares {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxMint);
         }
         let assets: i128 = Vault::preview_mint(e, shares);
-        Vault::deposit_no_auth(e, &caller, &receiver, assets, shares);
+        Vault::deposit_no_auth(e, &receiver, assets, shares, &operator);
         assets
     }
 
@@ -111,16 +111,16 @@ impl Vault {
     pub fn withdraw(
         e: &Env,
         assets: i128,
-        caller: Address,
         receiver: Address,
         owner: Address,
+        operator: Address,
     ) -> i128 {
         let max_assets = Vault::max_withdraw(e, owner.clone());
         if assets > max_assets {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxWithdraw);
         }
         let shares: i128 = Vault::preview_withdraw(e, assets);
-        Vault::withdraw_no_auth(e, &caller, &receiver, &owner, assets, shares);
+        Vault::withdraw_no_auth(e, &receiver, &owner, assets, shares, &operator);
         shares
     }
 
@@ -129,16 +129,16 @@ impl Vault {
     pub fn redeem(
         e: &Env,
         shares: i128,
-        caller: Address,
         receiver: Address,
         owner: Address,
+        operator: Address,
     ) -> i128 {
         let max_shares = Vault::max_redeem(e, owner.clone());
         if shares > max_shares {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxRedeem);
         }
         let assets = Vault::preview_redeem(e, shares);
-        Vault::withdraw_no_auth(e, &caller, &receiver, &owner, assets, shares);
+        Vault::withdraw_no_auth(e, &receiver, &owner, assets, shares, &operator);
         assets
     }
 
@@ -236,17 +236,17 @@ impl Vault {
      */
     pub fn deposit_no_auth(
         e: &Env,
-        caller: &Address,
         receiver: &Address,
         assets: i128,
         shares: i128,
+        operator: &Address,
     ) {
-        // This function assumes prior authorization of the caller and validation of amounts.
+        // This function assumes prior authorization of the operator and validation of amounts.
         let token_client = token::Client::new(e, &Self::query_asset(e));
         // `safeTransfer` mechanism is not present in the base module, (will be provided as an extension)
-        token_client.transfer(caller, &e.current_contract_address(), &assets);
+        token_client.transfer(operator, &e.current_contract_address(), &assets);
         Base::mint(e, receiver, shares);
-        emit_deposit(e, caller, receiver, assets, shares);
+        emit_deposit(e, operator, receiver, assets, shares);
     }
 
     /**
@@ -254,21 +254,21 @@ impl Vault {
      */
     pub fn withdraw_no_auth(
         e: &Env,
-        caller: &Address,
         receiver: &Address,
         owner: &Address,
         assets: i128,
         shares: i128,
+        operator: &Address,
     ) {
-        // This function assumes prior authorization of the caller and validation of amounts.
-        if caller != owner {
-            Base::spend_allowance(e, owner, caller, shares);
+        // This function assumes prior authorization of the operator and validation of amounts.
+        if operator != owner {
+            Base::spend_allowance(e, owner, operator, shares);
         }
         Base::update(e, Some(owner), None, shares);
         let token_client = token::Client::new(e, &Vault::query_asset(e));
         // `safeTransfer` mechanism is not present in the base module, (will be provided as an extension)
         token_client.transfer(&e.current_contract_address(), receiver, &assets);
-        emit_withdraw(e, caller, receiver, owner, assets, shares);
+        emit_withdraw(e, operator, receiver, owner, assets, shares);
     }
 
     /// The following document explains the importance and necessity of virtual decimals offset:
