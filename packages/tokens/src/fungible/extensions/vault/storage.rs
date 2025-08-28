@@ -82,8 +82,9 @@ impl Vault {
 
     // ################## CHANGE STATE ##################
 
+    /// **IMPORTANT**: This function bypasses authorization checks by design.
+    /// Consider combining with the Ownable or Access Control pattern.
     pub fn deposit(e: &Env, assets: i128, caller: Address, receiver: Address) -> i128 {
-        caller.require_auth();
         let max_assets = Vault::max_deposit(e, receiver.clone());
         if assets > max_assets {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxDeposit);
@@ -93,8 +94,9 @@ impl Vault {
         shares
     }
 
+    /// **IMPORTANT**: This function bypasses authorization checks by design.
+    /// Consider combining with the Ownable or Access Control pattern.
     pub fn mint(e: &Env, shares: i128, caller: Address, receiver: Address) -> i128 {
-        caller.require_auth();
         let max_shares = Vault::max_mint(e, receiver.clone());
         if shares > max_shares {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxMint);
@@ -104,6 +106,8 @@ impl Vault {
         assets
     }
 
+    /// **IMPORTANT**: This function bypasses authorization checks by design.
+    /// Consider combining with the Ownable or Access Control pattern.
     pub fn withdraw(
         e: &Env,
         assets: i128,
@@ -111,7 +115,6 @@ impl Vault {
         receiver: Address,
         owner: Address,
     ) -> i128 {
-        caller.require_auth();
         let max_assets = Vault::max_withdraw(e, owner.clone());
         if assets > max_assets {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxWithdraw);
@@ -121,6 +124,8 @@ impl Vault {
         shares
     }
 
+    /// **IMPORTANT**: This function bypasses authorization checks by design.
+    /// Consider combining with the Ownable or Access Control pattern.
     pub fn redeem(
         e: &Env,
         shares: i128,
@@ -128,7 +133,6 @@ impl Vault {
         receiver: Address,
         owner: Address,
     ) -> i128 {
-        caller.require_auth();
         let max_shares = Vault::max_redeem(e, owner.clone());
         if shares > max_shares {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxRedeem);
@@ -151,10 +155,11 @@ impl Vault {
 
     // ################## LOW-LEVEL HELPERS ##################
 
-    /// **IMPORTANT**: This function bypasses authorization checks.
+    /// **IMPORTANT**: This function bypasses authorization checks by design.
     /// We recommend using this function in the constructor of your smart contract.
     /// By design, the underlying asset address should be set once in the constructor
-    /// and remain immutable thereafter. Consider combining with the Ownable admin pattern.
+    /// and remain immutable thereafter.
+    /// Consider combining with the Ownable or Access Control pattern.
     pub fn set_asset(e: &Env, asset: Address) {
         // Check if asset is already set
         if e.storage().instance().has(&VaultStorageKey::AssetAddress) {
@@ -165,10 +170,11 @@ impl Vault {
         e.storage().instance().set(&VaultStorageKey::AssetAddress, &asset);
     }
 
-    /// **IMPORTANT**: This function bypasses authorization checks.
+    /// **IMPORTANT**: This function bypasses authorization checks by design.
     /// We recommend using this function in the constructor of your smart contract.
     /// By design, the decimals offset should be set once in the constructor
-    /// and remain immutable thereafter. Consider combining with the Ownable admin pattern.
+    /// and remain immutable thereafter.
+    /// Consider combining with the Ownable or Access Control pattern.
     pub fn set_decimals_offset(e: &Env, offset: u32) {
         // Check if virtual decimals offset is already set
         if e.storage().instance().has(&VaultStorageKey::VirtualDecimalsOffset) {
