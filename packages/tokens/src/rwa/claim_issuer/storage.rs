@@ -196,7 +196,11 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
     }
 
     fn expected_sig_data_len() -> u32 {
-        133 // 65 bytes public key + 64 bytes signature + 4 bytes recovery_id
+        // 65 bytes public key + 64 bytes signature + 4 bytes recovery_id;
+        //
+        // `recovery_id` usually fits in a single byte, but the argument in
+        // `secp256k1_recover` is u32, that's why expecting here 4 bytes
+        133
     }
 }
 
