@@ -49,8 +49,9 @@
 //! When verifying a context with provided signers:
 //!
 //! I. Get all non-expired rules for the specific context type, plus default
-//! rules. II. For each rule (iteration starts from the last-stored, which
-//! prevails in    case of conflicting non-expired rules):
+//! rules.
+//! II. For each rule (iteration starts from the last-stored, which prevails in
+//! case of conflicting non-expired rules):
 //!     1. Identify authenticated signers out of all stored signers.
 //!     2.a. If there are policies, verify they can be enforced:
 //!         - If all policies can be satisfied, return success.
@@ -196,7 +197,11 @@ pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signatures: &Signatur
     }
 }
 
-pub fn verify_context(e: &Env, context: &Context, all_signers: &Vec<Signer>) {
+pub fn get_validated_context(
+    e: &Env,
+    context: &Context,
+    all_signers: &Vec<Signer>,
+) -> (ContextRule, Context, Vec<Signer>) {
     let context_rules = match context.clone() {
         Context::Contract(ContractContext { contract, .. }) => {
             get_valid_context_rules(e, ContextRuleType::CallContract(contract))
@@ -212,13 +217,13 @@ pub fn verify_context(e: &Env, context: &Context, all_signers: &Vec<Signer>) {
     };
 
     for context_rule in context_rules.iter() {
-        let ContextRule { signers: rule_signers, policies, .. } = context_rule;
+        let ContextRule { signers: rule_signers, policies, .. } = context_rule.clone();
 
         let authenticated_signers = get_authenticated_signers(e, &rule_signers, all_signers);
         if policies.is_empty() {
             // if no policies, return only if all rule signers are authenticated
             if rule_signers.len() == authenticated_signers.len() {
-                return;
+                return (context_rule, context.clone(), authenticated_signers.clone());
             }
         } else {
             // otherwise, only if all policies can be enforced
@@ -229,7 +234,7 @@ pub fn verify_context(e: &Env, context: &Context, all_signers: &Vec<Signer>) {
                 &rule_signers,
                 &authenticated_signers,
             ) {
-                return;
+                return (context_rule, context.clone(), authenticated_signers.clone());
             }
         }
     }
@@ -258,6 +263,21 @@ pub fn can_enforce_all_policies(
     true
 }
 
+pub fn enforce_policy(
+    e: &Env,
+    policy: &Address,
+    context: &Context,
+    rule_signers: &Vec<Signer>,
+    matched_signers: &Vec<Signer>,
+) {
+    PolicyClient::new(e, policy).on_enforce(
+        &e.current_contract_address(),
+        context,
+        rule_signers,
+        matched_signers,
+    );
+}
+
 pub fn get_authenticated_signers(
     e: &Env,
     rule_signers: &Vec<Signer>,
@@ -273,35 +293,42 @@ pub fn get_authenticated_signers(
 }
 
 fn get_valid_context_rules(e: &Env, context_key: ContextRuleType) -> Vec<ContextRule> {
-    // TODO: reverse so that it starts from the last one and then add defaults
-    let mut ids = e
+    let matched_ids = e
         .storage()
         .persistent()
-        .get(&SmartAccountStorageKey::ContextRuleIds(context_key.clone()))
+        .get(&SmartAccountStorageKey::ContextRuleIds(context_key))
         .unwrap_or(Vec::new(e));
-    // append defaults so that there is always a fallback
-    ids.append(
-        &e.storage()
-            .persistent()
-            .get(&SmartAccountStorageKey::ContextRuleIds(context_key.clone()))
-            .unwrap_or(Vec::new(e)),
-    );
 
-    let mut rules = Vec::new(e);
-    for id in ids.iter() {
-        let rule = e
-            .storage()
-            .persistent()
-            .get::<_, ContextRule>(&SmartAccountStorageKey::ContextRule(id))
-            .unwrap();
+    let default_ids = e
+        .storage()
+        .persistent()
+        .get(&SmartAccountStorageKey::ContextRuleIds(ContextRuleType::Default))
+        .unwrap_or(Vec::new(e));
 
-        match rule.valid_until {
-            // skip if expired
-            Some(seq) if seq < e.ledger().sequence() => continue,
-            _ => rules.push_back(rule),
+    let get_rules = |ids: Vec<u32>| -> Vec<ContextRule> {
+        let mut rules = Vec::new(e);
+        for id in ids.iter() {
+            if let Some(rule) = e
+                .storage()
+                .persistent()
+                .get::<_, ContextRule>(&SmartAccountStorageKey::ContextRule(id))
+            {
+                match rule.valid_until {
+                    // skip if expired
+                    Some(seq) if seq < e.ledger().sequence() => continue,
+                    // push front so that we start from the last added when iterating
+                    _ => rules.push_front(rule),
+                }
+            }
         }
-    }
-    rules
+        rules
+    };
+
+    let mut final_rules = get_rules(matched_ids);
+    // append defaults so that there is always a fallback
+    final_rules.append(&get_rules(default_ids));
+
+    final_rules
 }
 
 pub fn add_context_rule(
