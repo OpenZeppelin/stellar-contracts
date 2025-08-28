@@ -212,14 +212,19 @@ pub fn remove_claim(e: &Env, claim_id: &BytesN<32>) {
     emit_claim_event(e, ClaimEvent::Removed, &claim);
 }
 
-/// Removes a claim ID from the topic index.
+/// Low-level function to remove a claim ID from the topic index.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
 /// * `topic` - The claim topic.
 /// * `claim_id` - The claim ID to remove.
-fn remove_claim_from_topic_index(e: &Env, topic: u32, claim_id: &BytesN<32>) {
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function should include proper authorization checks.
+/// Only the claim issuer or identity owner should be able to remove claims.
+pub fn remove_claim_from_topic_index(e: &Env, topic: u32, claim_id: &BytesN<32>) {
     let key = ClaimsStorageKey::ClaimsByTopic(topic);
     let mut claim_ids: Vec<BytesN<32>> =
         e.storage().persistent().get(&key).unwrap_or_else(|| vec![e]);

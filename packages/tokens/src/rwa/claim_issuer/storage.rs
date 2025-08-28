@@ -247,7 +247,7 @@ pub fn allow_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
 
     e.storage().persistent().set(&key, &true);
 
-    emit_key_event(e, KeyEvent::Allowed, public_key, Some(claim_topic));
+    emit_key_event(e, KeyEvent::Allowed, public_key, claim_topic);
 }
 
 /// Removes a public key's authorization for a specific claim topic.
@@ -285,7 +285,7 @@ pub fn remove_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
     }
 
     e.storage().persistent().remove(&key);
-    emit_key_event(e, KeyEvent::Removed, public_key, Some(claim_topic));
+    emit_key_event(e, KeyEvent::Removed, public_key, claim_topic);
 }
 
 /// Checks if a public key is allowed to sign claims for a specific topic and

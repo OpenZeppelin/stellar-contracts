@@ -1,14 +1,19 @@
 #![cfg(test)]
 extern crate std;
 
-use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, String};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Bytes, BytesN, Env, String, Vec};
 
 use crate::rwa::{
     claim_issuer::ClaimIssuer,
-    identity_claims::storage::{add_claim, get_claim, get_claim_ids_by_topic, remove_claim},
+    identity_claims::storage::{
+        add_claim, get_claim, get_claim_ids_by_topic, remove_claim, remove_claim_from_topic_index,
+        ClaimsStorageKey,
+    },
 };
 
 pub mod mock_claim_issuer {
+    use soroban_sdk::symbol_short;
+
     use super::*;
 
     #[contract]
@@ -17,13 +22,13 @@ pub mod mock_claim_issuer {
     #[contractimpl]
     impl ClaimIssuer for Contract {
         fn is_claim_valid(
-            _e: &Env,
+            e: &Env,
             _identity: Address,
             _claim_topic: u32,
             _sig_data: Bytes,
             _claim_data: Bytes,
         ) -> bool {
-            true
+            e.storage().persistent().get(&symbol_short!("valid")).unwrap_or(true)
         }
     }
 }
@@ -31,17 +36,24 @@ pub mod mock_claim_issuer {
 #[contract]
 struct MockContract;
 
+// Helper function to create common test data
+fn setup_test_data(e: &Env) -> (Address, u32, u32, Bytes, Bytes, String) {
+    let issuer = e.register(mock_claim_issuer::Contract, ());
+    let topic = 1u32;
+    let scheme = 1u32;
+    let signature = Bytes::from_array(e, &[1, 2, 3, 4]);
+    let data = Bytes::from_array(e, &[5, 6, 7, 8]);
+    let uri = String::from_str(e, "https://example.com");
+
+    (issuer, topic, scheme, signature, data, uri)
+}
+
 #[test]
 fn add_claim_success() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
-    let issuer = e.register(mock_claim_issuer::Contract, ());
-    let topic = 1u32;
-    let scheme = 1u32;
-    let signature = Bytes::from_array(&e, &[1, 2, 3, 4]);
-    let data = Bytes::from_array(&e, &[5, 6, 7, 8]);
-    let uri = String::from_str(&e, "https://example.com");
+    let (issuer, topic, scheme, signature, data, uri) = setup_test_data(&e);
 
     e.as_contract(&contract_id, || {
         let claim_id = add_claim(&e, topic, scheme, &issuer, &signature, &data, &uri);
@@ -64,15 +76,29 @@ fn add_claim_success() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #341)")]
+fn add_claim_fails() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    let (issuer, topic, scheme, signature, data, uri) = setup_test_data(&e);
+
+    e.as_contract(&issuer, || {
+        // Set mock claim issuer to return false
+        e.storage().persistent().set(&symbol_short!("valid"), &false);
+    });
+
+    e.as_contract(&contract_id, || {
+        add_claim(&e, topic, scheme, &issuer, &signature, &data, &uri);
+    });
+}
+
+#[test]
 fn update_existing_claim() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
-    let issuer = e.register(mock_claim_issuer::Contract, ());
-    let topic = 1u32;
-    let scheme = 1u32;
-    let signature1 = Bytes::from_array(&e, &[1, 2, 3, 4]);
-    let data1 = Bytes::from_array(&e, &[5, 6, 7, 8]);
+    let (issuer, topic, scheme, signature1, data1, _) = setup_test_data(&e);
     let uri1 = String::from_str(&e, "https://example1.com");
 
     e.as_contract(&contract_id, || {
@@ -106,16 +132,13 @@ fn multiple_claims_different_topics() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
-    let issuer = e.register(mock_claim_issuer::Contract, ());
-    let signature = Bytes::from_array(&e, &[1, 2, 3, 4]);
-    let data = Bytes::from_array(&e, &[5, 6, 7, 8]);
-    let uri = String::from_str(&e, "https://example.com");
+    let (issuer, _, scheme, signature, data, uri) = setup_test_data(&e);
 
     e.as_contract(&contract_id, || {
         // Add claims for different topics
-        let claim_id1 = add_claim(&e, 1u32, 1u32, &issuer, &signature, &data, &uri);
-        let claim_id2 = add_claim(&e, 2u32, 1u32, &issuer, &signature, &data, &uri);
-        let claim_id3 = add_claim(&e, 1u32, 1u32, &issuer, &signature, &data, &uri);
+        let claim_id1 = add_claim(&e, 1u32, scheme, &issuer, &signature, &data, &uri);
+        let claim_id2 = add_claim(&e, 2u32, scheme, &issuer, &signature, &data, &uri);
+        let claim_id3 = add_claim(&e, 1u32, scheme, &issuer, &signature, &data, &uri);
 
         // claim_id1 and claim_id3 should be the same (same issuer + topic)
         assert_eq!(claim_id1, claim_id3);
@@ -140,17 +163,13 @@ fn multiple_issuers_same_topic() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
-    let issuer1 = e.register(mock_claim_issuer::Contract, ());
+    let (issuer1, topic, scheme, signature, data, uri) = setup_test_data(&e);
     let issuer2 = e.register(mock_claim_issuer::Contract, ());
-    let topic = 1u32;
-    let signature = Bytes::from_array(&e, &[1, 2, 3, 4]);
-    let data = Bytes::from_array(&e, &[5, 6, 7, 8]);
-    let uri = String::from_str(&e, "https://example.com");
 
     e.as_contract(&contract_id, || {
         // Add claims from different issuers for the same topic
-        let claim_id1 = add_claim(&e, topic, 1u32, &issuer1, &signature, &data, &uri);
-        let claim_id2 = add_claim(&e, topic, 1u32, &issuer2, &signature, &data, &uri);
+        let claim_id1 = add_claim(&e, topic, scheme, &issuer1, &signature, &data, &uri);
+        let claim_id2 = add_claim(&e, topic, scheme, &issuer2, &signature, &data, &uri);
 
         // Should be different claim IDs
         assert_ne!(claim_id1, claim_id2);
@@ -180,12 +199,7 @@ fn claim_removal() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
-    let issuer = e.register(mock_claim_issuer::Contract, ());
-    let topic = 1u32;
-    let scheme = 1u32;
-    let signature = Bytes::from_array(&e, &[1, 2, 3, 4]);
-    let data = Bytes::from_array(&e, &[5, 6, 7, 8]);
-    let uri = String::from_str(&e, "https://example.com");
+    let (issuer, topic, scheme, signature, data, uri) = setup_test_data(&e);
     e.as_contract(&contract_id, || {
         // Add a claim
         let claim_id = add_claim(&e, topic, scheme, &issuer, &signature, &data, &uri);
@@ -217,5 +231,62 @@ fn remove_nonexistent_claim() {
 
     e.as_contract(&contract_id, || {
         remove_claim(&e, &fake_claim_id);
+    });
+}
+
+#[test]
+fn remove_claim_from_topic_index_when_empty() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    let (issuer, topic, scheme, signature, data, uri) = setup_test_data(&e);
+
+    e.as_contract(&contract_id, || {
+        // Add a single claim
+        let claim_id = add_claim(&e, topic, scheme, &issuer, &signature, &data, &uri);
+
+        // Verify claim is in topic index
+        let claim_ids = get_claim_ids_by_topic(&e, topic);
+        assert_eq!(claim_ids.len(), 1);
+
+        // Remove the claim from topic index
+        remove_claim_from_topic_index(&e, topic, &claim_id);
+
+        // Verify storage key should be removed
+        assert!(e
+            .storage()
+            .persistent()
+            .get::<_, Vec<BytesN<32>>>(&ClaimsStorageKey::ClaimsByTopic(topic))
+            .is_none())
+    });
+}
+
+#[test]
+fn remove_claim_from_topic_index_when_not_empty() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    let (issuer1, topic, scheme, signature, data, uri) = setup_test_data(&e);
+    let issuer2 = e.register(mock_claim_issuer::Contract, ());
+
+    e.as_contract(&contract_id, || {
+        // Add two claims from different issuers for the same topic
+        let claim_id1 = add_claim(&e, topic, scheme, &issuer1, &signature, &data, &uri);
+        let claim_id2 = add_claim(&e, topic, scheme, &issuer2, &signature, &data, &uri);
+
+        // Verify both claims are in topic index
+        let claim_ids = get_claim_ids_by_topic(&e, topic);
+        assert_eq!(claim_ids.len(), 2);
+        assert!(claim_ids.contains(&claim_id1));
+        assert!(claim_ids.contains(&claim_id2));
+
+        // Remove one claim from topic index
+        remove_claim_from_topic_index(&e, topic, &claim_id1);
+
+        // Verify only one claim remains in topic index
+        let claim_ids_after = get_claim_ids_by_topic(&e, topic);
+        assert_eq!(claim_ids_after.len(), 1);
+        assert!(!claim_ids_after.contains(&claim_id1));
+        assert!(claim_ids_after.contains(&claim_id2));
     });
 }

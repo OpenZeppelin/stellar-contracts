@@ -160,7 +160,7 @@ pub enum KeyEvent {
     Removed,
 }
 
-/// Emits an event for a key authorization operation.
+/// Emits an event for allowing or removing keys.
 ///
 /// # Arguments
 ///
@@ -172,17 +172,13 @@ pub enum KeyEvent {
 /// # Events
 ///
 /// * topics - `["key_allowed" | "key_removed", public_key: Bytes]`
-/// * data - `[claim_topic?: u32]`
-pub fn emit_key_event(e: &Env, event_type: KeyEvent, public_key: &Bytes, claim_topic: Option<u32>) {
+/// * data - `[claim_topic: u32]`
+pub fn emit_key_event(e: &Env, event_type: KeyEvent, public_key: &Bytes, claim_topic: u32) {
     let name = match event_type {
         KeyEvent::Allowed => Symbol::new(e, "key_allowed"),
         KeyEvent::Removed => Symbol::new(e, "key_removed"),
     };
-
-    match claim_topic {
-        Some(topic) => e.events().publish((name, public_key.clone()), topic),
-        None => e.events().publish((name, public_key.clone()), ()),
-    }
+    e.events().publish((name, public_key.clone()), claim_topic);
 }
 
 /// Emits an event for a claim revocation operation.
