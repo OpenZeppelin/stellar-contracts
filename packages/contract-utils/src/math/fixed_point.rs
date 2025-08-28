@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, Env};
 
-use soroban_fixed_point_math::SorobanFixedPoint;
+use crate::math::soroban_fixed_point::SorobanFixedPoint;
 
 #[contracttype]
 pub enum Rounding {
@@ -11,7 +11,6 @@ pub enum Rounding {
 /**
  * Calculates x * y / denominator with full precision, following the selected rounding direction.
  * Throws if result overflows a i128 or denominator is zero (handles phantom overflow).
- * Relies on https://github.com/script3/soroban-fixed-point-math/ math library.
  */
 pub fn muldiv(e: &Env, x: i128, y: i128, denominator: i128, rounding: Rounding) -> i128 {
     match rounding {
