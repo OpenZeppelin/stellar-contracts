@@ -6,7 +6,10 @@ use k256::{
     SecretKey as Secp256k1SecretKey,
 };
 use p256::{
-    ecdsa::{Signature as Secp256r1Signature, SigningKey as Secp256r1SigningKey},
+    ecdsa::{
+        signature::hazmat::PrehashSigner, Signature as Secp256r1Signature,
+        SigningKey as Secp256r1SigningKey,
+    },
     SecretKey as Secp256r1SecretKey,
 };
 use soroban_sdk::{contract, testutils::Address as _, xdr::ToXdr, Address, Bytes, BytesN, Env};
@@ -316,46 +319,43 @@ fn secp256k1_verify_claim_digest_success() {
     assert!(Secp256k1Verifier::verify_claim_digest(&e, &digest, &signature_data));
 }
 
-//#[test]
-//fn secp256r1_verify_claim_digest_success() {
-//let e = Env::default();
+#[test]
+fn secp256r1_verify_claim_digest_success() {
+    let e = Env::default();
 
-//let identity = Address::generate(&e);
-//let claim_topic = 42u32;
-//let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
 
-//let secret_key_bytes: [u8; 32] = [
-//33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51,
-// 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64,
-//];
-//let secret_key = Secp256r1SecretKey::from_slice(&secret_key_bytes).unwrap();
-//let signing_key = Secp256r1SigningKey::from(&secret_key);
+    let secret_key_bytes: [u8; 32] = [
+        33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
+        56, 57, 58, 59, 60, 61, 62, 63, 64,
+    ];
+    let secret_key = Secp256r1SecretKey::from_slice(&secret_key_bytes).unwrap();
+    let signing_key = Secp256r1SigningKey::from(&secret_key);
 
-//let pubkey =
-// secret_key.public_key().to_encoded_point(false).to_bytes().to_vec();
+    let pubkey = secret_key.public_key().to_encoded_point(false).to_bytes().to_vec();
 
-//let mut pubkey_slice = [0u8; 65];
-//pubkey_slice.copy_from_slice(&pubkey);
-//let public_key: BytesN<65> = BytesN::from_array(&e, &pubkey_slice);
+    let mut pubkey_slice = [0u8; 65];
+    pubkey_slice.copy_from_slice(&pubkey);
+    let public_key: BytesN<65> = BytesN::from_array(&e, &pubkey_slice);
 
-//let mut data = identity.clone().to_xdr(&e);
-//data.extend_from_array(&claim_topic.to_be_bytes());
-//data.append(&claim_data);
-//let digest = e.crypto().keccak256(&data);
+    let mut data = identity.clone().to_xdr(&e);
+    data.extend_from_array(&claim_topic.to_be_bytes());
+    data.append(&claim_data);
+    let digest = e.crypto().keccak256(&data);
 
-//let signature: Secp256r1Signature = signing_key.sign(&digest.to_array());
+    let signature: Secp256r1Signature = signing_key.sign_prehash(&digest.to_array()).unwrap();
 
-//let sig_slice = signature.normalize_s().unwrap().to_bytes();
-//let mut sig = [0u8; 64];
-//sig.copy_from_slice(sig_slice.as_slice());
+    let sig_slice = signature.normalize_s().unwrap_or(signature).to_bytes();
+    let mut sig = [0u8; 64];
+    sig.copy_from_slice(&sig_slice);
 
-//let signature_data =
-//Secp256r1SignatureData { public_key, signature: BytesN::from_array(&e, &sig)
-// };
+    let signature_data =
+        Secp256r1SignatureData { public_key, signature: BytesN::from_array(&e, &sig) };
 
-//assert!(Secp256r1Verifier::verify_claim_digest(&e, &digest,
-// &signature_data));
-//}
+    assert!(Secp256r1Verifier::verify_claim_digest(&e, &digest, &signature_data));
+}
 
 #[test]
 fn signature_verifier_build_claim_digest_consistency() {
