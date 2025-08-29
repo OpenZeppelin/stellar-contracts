@@ -58,6 +58,7 @@ impl FungibleBurnable for MyContract {}
 - **Capped**: Set maximum supply limits
 - **Allowlist**: Restrict transfers to approved addresses
 - **Blocklist**: Prevent transfers from/to blocked addresses
+- **Vault**: Enable deposit/withdrawal of underlying assets in exchange for vault shares
 
 ### Non-Fungible
 

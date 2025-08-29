@@ -643,6 +643,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fungible-vault-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
