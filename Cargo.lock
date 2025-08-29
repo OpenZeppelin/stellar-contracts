@@ -407,6 +407,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f55bf8e7b65898637379c1b74eb1551107c8294ed26d855ceb9fd1a09cfc9bc0"
 dependencies = [
  "const-oid",
+ "pem-rfc7468",
  "zeroize",
 ]
 
@@ -471,6 +472,7 @@ dependencies = [
  "elliptic-curve",
  "rfc6979",
  "signature",
+ "spki",
 ]
 
 [[package]]
@@ -516,6 +518,8 @@ dependencies = [
  "ff",
  "generic-array",
  "group",
+ "pem-rfc7468",
+ "pkcs8",
  "rand_core",
  "sec1",
  "subtle",
@@ -821,7 +825,9 @@ dependencies = [
  "cfg-if",
  "ecdsa",
  "elliptic-curve",
+ "once_cell",
  "sha2",
+ "signature",
 ]
 
 [[package]]
@@ -1008,6 +1014,15 @@ dependencies = [
  "soroban-sdk",
  "stellar-contract-utils",
  "stellar-macros",
+]
+
+[[package]]
+name = "pem-rfc7468"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88b39c9bfcfc231068454382784bb460aae594343fb030d46e9f50a645418412"
+dependencies = [
+ "base64ct",
 ]
 
 [[package]]
@@ -1243,6 +1258,7 @@ dependencies = [
  "base16ct",
  "der",
  "generic-array",
+ "pkcs8",
  "subtle",
  "zeroize",
 ]
@@ -1641,8 +1657,12 @@ dependencies = [
 name = "stellar-tokens"
 version = "0.4.1"
 dependencies = [
+ "ed25519-dalek",
+ "k256",
+ "p256",
  "soroban-sdk",
  "soroban-test-helpers",
+ "stellar-contract-utils",
  "stellar-event-assertion",
 ]
 
