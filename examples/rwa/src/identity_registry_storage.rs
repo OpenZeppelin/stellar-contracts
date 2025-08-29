@@ -14,8 +14,8 @@ pub struct IdentityRegistryContract;
 
 #[contractimpl]
 impl IdentityRegistryContract {
-    // TODO: rename the below constructor to just `__constructor` when `#[contractimpl]` macro is
-    // updated in the next Stellar release
+    // TODO: rename the below constructor to just `__constructor` when
+    // `#[contractimpl]` macro is updated in the next Stellar release
     pub fn __constructor_identity(e: &Env, admin: Address, manager: Address) {
         access_control::set_admin(e, &admin);
         access_control::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
