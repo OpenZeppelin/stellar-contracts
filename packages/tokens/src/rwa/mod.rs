@@ -41,6 +41,8 @@
 //!   necessary for identities
 
 pub mod claim_issuer;
+pub mod claim_topics_and_issuers;
+pub mod compliance;
 pub mod identity_claims;
 pub mod identity_registry_storage;
 pub mod storage;
