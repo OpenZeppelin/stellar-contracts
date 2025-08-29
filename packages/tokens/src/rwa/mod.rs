@@ -40,6 +40,8 @@
 //! - **Identity Storage Registry**: Registry for storing all the information
 //!   necessary for identities
 
+pub mod claim_issuer;
+pub mod identity_claims;
 pub mod identity_registry_storage;
 pub mod storage;
 pub mod test;
