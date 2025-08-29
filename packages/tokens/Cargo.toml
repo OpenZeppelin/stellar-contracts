@@ -13,6 +13,7 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+stellar-contract-utils = { workspace = true }
 
 [dev-dependencies]
 ed25519-dalek = { workspace = true }
