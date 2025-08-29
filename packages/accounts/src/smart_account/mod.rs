@@ -50,7 +50,7 @@ pub trait SmartAccount {
 // stateful polciies, and as direct contract-to-contract invocations are always
 // authorized, that's a way to avoid re-entry when the policy need to auth back
 // its owner.
-pub trait ExecutationEntry: CustomAccountInterface {
+pub trait ExecutionEntry: CustomAccountInterface {
     fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>);
 }
 
@@ -123,7 +123,7 @@ impl SmartAccount for SmartAccountContract {
 }
 
 #[contractimpl]
-impl ExecutationEntry for SmartAccountContract {
+impl ExecutionEntry for SmartAccountContract {
     fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>) {
         e.current_contract_address().require_auth();
 
