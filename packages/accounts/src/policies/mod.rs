@@ -21,7 +21,7 @@ pub trait Policy {
 
     // this serves as a hook and can trigger state changes and must be authorized by
     // the smart account (`source.require_auth()`)
-    fn on_enforce(
+    fn enforce(
         e: &Env,
         source: Address,
         context: Context,

@@ -137,7 +137,7 @@ impl Policy for WeightedThresholdPolicy {
 
     /// Enforce the weighted multisig policy
     /// This implementation is stateless but could track enforcement history
-    fn on_enforce(
+    fn enforce(
         e: &Env,
         source: Address,
         _context: Context,

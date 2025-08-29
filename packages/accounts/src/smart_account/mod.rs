@@ -39,7 +39,7 @@ pub trait SmartAccount {
     //fn modify_context_rule(e: &Env, context_rule_id: u32, context_rule_val:
     // Self::ContextRuleVal);
 
-    // do we need those at all, given there's `modify_context_rule`
+    // do we need those at all here, given there's `modify_context_rule`
     //fn add_signer(e: &Env, signer: Signer, context_rule_id: u32);
     //fn remove_signer(e: &Env, signer: Signer, context_rule_id: u32);
 }

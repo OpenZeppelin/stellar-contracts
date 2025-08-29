@@ -8,7 +8,7 @@
 //! ### **Who** - Signers
 //! - **Native Signers**: Soroban native `Address` that use built-in signature
 //!   verification
-//! - **External Signers**: Raw public key bytes paired with external verifier
+//! - **Delegated Signers**: Raw public key bytes paired with external verifier
 //!   contracts for custom cryptographic verification (e.g., different signature
 //!   schemes)
 //!
@@ -38,11 +38,10 @@
 //! being granted, not the underlying keys.
 //!
 //! ### Multiple Rules Per Context
-//! Different signer groups can have different authorization requirements for
-//! the same context:
-//! - Admin group: 2-of-3 threshold for contract calls
-//! - User group: 3-of-5 threshold for the same contract calls
-//! - Emergency group: 1-of-1 with additional policy constraints
+//! Different authorization requirements for the same context:
+//! - Admin config: 2-of-3 threshold for contract calls
+//! - User config: 3-of-5 threshold for the same contract calls
+//! - Emergency config: 1-of-1 with additional policy constraints
 //!
 //! ## Authorization Matching Algorithm
 //!
@@ -105,7 +104,7 @@ pub enum SmartAccountError {
     ContextRuleNotFound = 0,
     ConflictingContextRule = 1,
     UnverifiedContext = 2,
-    ExternalVerificationFailed = 3,
+    DelegatedVerificationFailed = 3,
 }
 
 #[contracttype]
@@ -119,7 +118,7 @@ pub enum SmartAccountStorageKey {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Signer {
     Native(Address),
-    External(Address, Bytes),
+    Delegated(Address, Bytes),
 }
 
 #[contracttype]
@@ -180,13 +179,13 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
 pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signatures: &Signatures) {
     for (signer, sig) in signatures.0.iter() {
         match signer {
-            Signer::External(verifier, pub_key) => {
+            Signer::Delegated(verifier, pub_key) => {
                 let hash = Bytes::from_array(e, &signature_payload.to_bytes().to_array());
                 let mut sig_data = Bytes::new(e);
                 sig_data.append(&pub_key);
                 sig_data.append(&sig);
                 if !VerifierClient::new(e, &verifier).verify(&hash, &sig_data) {
-                    panic_with_error!(e, SmartAccountError::ExternalVerificationFailed)
+                    panic_with_error!(e, SmartAccountError::DelegatedVerificationFailed)
                 }
             }
             Signer::Native(addr) => {
@@ -203,9 +202,10 @@ pub fn get_validated_context(
     all_signers: &Vec<Signer>,
 ) -> (ContextRule, Context, Vec<Signer>) {
     let context_rules = match context.clone() {
+        #[rustfmt::skip]
         Context::Contract(ContractContext { contract, .. }) => {
             get_valid_context_rules(e, ContextRuleType::CallContract(contract))
-        }
+        },
         Context::CreateContractHostFn(CreateContractHostFnContext {
             executable: ContractExecutable::Wasm(wasm),
             ..
@@ -270,7 +270,7 @@ pub fn enforce_policy(
     rule_signers: &Vec<Signer>,
     matched_signers: &Vec<Signer>,
 ) {
-    PolicyClient::new(e, policy).on_enforce(
+    PolicyClient::new(e, policy).enforce(
         &e.current_contract_address(),
         context,
         rule_signers,
