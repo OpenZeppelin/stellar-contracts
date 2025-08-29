@@ -81,7 +81,7 @@ impl WeightedThresholdPolicy {
     }
 
     /// Get the current configuration
-    pub fn get_config(e: Env) -> WeightedThresholdConfig {
+    pub fn get_config(e: &Env) -> WeightedThresholdConfig {
         e.storage()
             .persistent()
             .get(&WeightedThresholdStorageKey::Config)
@@ -89,7 +89,7 @@ impl WeightedThresholdPolicy {
     }
 
     /// Calculate total weight for a set of signers
-    pub fn calculate_weight(e: Env, signers: Vec<Signer>) -> u32 {
+    pub fn calculate_weight(e: &Env, signers: Vec<Signer>) -> u32 {
         let config = Self::get_config(e);
         let mut total_weight: u32 = 0;
 
@@ -121,17 +121,9 @@ impl Policy for WeightedThresholdPolicy {
             );
 
         if let Some(config) = config {
-            let mut total_weight: u32 = 0;
-
-            for signer in authenticated_signers.iter() {
-                if let Some(weight) = config.signer_weights.get(signer.clone()) {
-                    total_weight += weight;
-                }
-            }
-
-            total_weight >= config.threshold
+            Self::calculate_weight(e, authenticated_signers) >= config.threshold
         } else {
-            false // No configuration found
+            false
         }
     }
 
@@ -163,15 +155,7 @@ impl Policy for WeightedThresholdPolicy {
             )
             .unwrap_or_else(|| panic_with_error!(e, WeightedThresholdError::ConfigNotFound));
 
-        let mut total_weight: u32 = 0;
-
-        for signer in authenticated_signers.iter() {
-            if let Some(weight) = config.signer_weights.get(signer.clone()) {
-                total_weight += weight;
-            }
-        }
-
-        if total_weight < config.threshold {
+        if Self::calculate_weight(e, authenticated_signers) < config.threshold {
             panic_with_error!(e, WeightedThresholdError::InsufficientWeight);
         }
     }

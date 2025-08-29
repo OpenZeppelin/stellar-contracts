@@ -58,7 +58,7 @@
 //!     2.b. If there are no policies:
 //!         - Return success only if all signers are authenticated.
 //!         - Otherwise, move to the next rule.
-//! III. If no rule satisfies the above conditions, authorization fails.
+//! III. If no context rule satisfies the above conditions, authorization fails.
 //!
 //! ## Benefits
 //!
