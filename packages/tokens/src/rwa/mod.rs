@@ -377,10 +377,6 @@ const DAY_IN_LEDGERS: u32 = 17280;
 pub const FROZEN_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const FROZEN_TTL_THRESHOLD: u32 = FROZEN_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
-/// Maximum number of addresses that can be processed in a single batch
-/// operation
-pub const MAX_BATCH_SIZE: u32 = 100;
-
 // ################## EVENTS ##################
 
 /// Emits an event indicating token information has been updated.
@@ -408,38 +404,6 @@ pub fn emit_token_information_updated(
 ) {
     let topics = (Symbol::new(e, "token_updated"), name, symbol);
     e.events().publish(topics, (decimals, version, onchain_id))
-}
-
-/// Emits an event indicating the Identity Verifier has been set.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `identity_verifier` - The address of the Identity Verifier.
-///
-/// # Events
-///
-/// * topics - `["identity_verifier_added", identity_verifier: Address]`
-/// * data - `[]`
-pub fn emit_identity_verifier_added(e: &Env, identity_verifier: &Address) {
-    let topics = (Symbol::new(e, "identity_verifier_added"), identity_verifier);
-    e.events().publish(topics, ())
-}
-
-/// Emits an event indicating the Compliance contract has been set.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `compliance` - The address of the Compliance contract.
-///
-/// # Events
-///
-/// * topics - `["compliance_added", compliance: Address]`
-/// * data - `[]`
-pub fn emit_compliance_added(e: &Env, compliance: &Address) {
-    let topics = (Symbol::new(e, "compliance_added"), compliance);
-    e.events().publish(topics, ())
 }
 
 /// Emits an event indicating a successful recovery.
@@ -551,6 +515,38 @@ pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
     e.events().publish(topics, amount)
 }
 
+/// Emits an event indicating the Identity Verifier has been set.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `identity_verifier` - The address of the Identity Verifier.
+///
+/// # Events
+///
+/// * topics - `["identity_verifier_set", identity_verifier: Address]`
+/// * data - `[]`
+pub fn emit_identity_verifier_set(e: &Env, identity_verifier: &Address) {
+    let topics = (Symbol::new(e, "identity_verifier_set"), identity_verifier);
+    e.events().publish(topics, ())
+}
+
+/// Emits an event indicating the Compliance contract has been set.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `compliance` - The address of the Compliance contract.
+///
+/// # Events
+///
+/// * topics - `["compliance_set", compliance: Address]`
+/// * data - `[]`
+pub fn emit_compliance_set(e: &Env, compliance: &Address) {
+    let topics = (Symbol::new(e, "compliance_set"), compliance);
+    e.events().publish(topics, ())
+}
+
 /// Emits an event indicating the Claim Topics and Issuers contract has been
 /// set.
 ///
@@ -562,11 +558,11 @@ pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
 ///
 /// # Events
 ///
-/// * topics - `["claim_topics_issuers_added", claim_topics_and_issuers:
+/// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers:
 ///   Address]`
 /// * data - `[]`
-pub fn emit_claim_topics_and_issuers_added(e: &Env, claim_topics_and_issuers: &Address) {
-    let topics = (Symbol::new(e, "claim_topics_issuers_added"), claim_topics_and_issuers);
+pub fn emit_claim_topics_and_issuers_set(e: &Env, claim_topics_and_issuers: &Address) {
+    let topics = (Symbol::new(e, "claim_topics_issuers_set"), claim_topics_and_issuers);
     e.events().publish(topics, ())
 }
 
@@ -581,10 +577,10 @@ pub fn emit_claim_topics_and_issuers_added(e: &Env, claim_topics_and_issuers: &A
 ///
 /// # Events
 ///
-/// * topics - `["identity_registry_storage_added", identity_registry_storage:
+/// * topics - `["identity_registry_storage_set", identity_registry_storage:
 ///   Address]`
 /// * data - `[]`
-pub fn emit_identity_registry_storage_added(e: &Env, identity_registry_storage: &Address) {
-    let topics = (Symbol::new(e, "identity_registry_storage_added"), identity_registry_storage);
+pub fn emit_identity_registry_storage_set(e: &Env, identity_registry_storage: &Address) {
+    let topics = (Symbol::new(e, "identity_registry_storage_set"), identity_registry_storage);
     e.events().publish(topics, ())
 }

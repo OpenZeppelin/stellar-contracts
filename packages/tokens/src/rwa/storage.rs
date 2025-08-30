@@ -6,8 +6,8 @@ use stellar_contract_utils::pausable::{paused, PausableError};
 use crate::{
     fungible::{emit_transfer, Base, ContractOverrides, StorageKey},
     rwa::{
-        emit_address_frozen, emit_burn, emit_claim_topics_and_issuers_added, emit_compliance_added,
-        emit_identity_registry_storage_added, emit_identity_verifier_added, emit_mint,
+        emit_address_frozen, emit_burn, emit_claim_topics_and_issuers_set, emit_compliance_set,
+        emit_identity_registry_storage_set, emit_identity_verifier_set, emit_mint,
         emit_recovery_success, emit_token_information_updated, emit_tokens_frozen,
         emit_tokens_unfrozen, RWAError, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
@@ -592,7 +592,7 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - `["id_reg_add", identity_verifier: Address]`
+    /// * topics - `["identity_verifier_set", identity_verifier: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -602,7 +602,7 @@ impl RWA {
     /// authorization logic.
     pub fn set_identity_verifier(e: &Env, identity_verifier: &Address) {
         e.storage().instance().set(&RWAStorageKey::IdentityVerifier, identity_verifier);
-        emit_identity_verifier_added(e, identity_verifier);
+        emit_identity_verifier_set(e, identity_verifier);
     }
 
     /// Sets the compliance contract of the token.
@@ -614,7 +614,7 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - `["comp_add", compliance: Address]`
+    /// * topics - `["compliance_set", compliance: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -624,7 +624,7 @@ impl RWA {
     /// authorization logic.
     pub fn set_compliance(e: &Env, compliance: &Address) {
         e.storage().instance().set(&RWAStorageKey::Compliance, compliance);
-        emit_compliance_added(e, compliance);
+        emit_compliance_set(e, compliance);
     }
 
     /// Sets the claim topics and issuers contract of the token.
@@ -637,7 +637,7 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - `["claim_topics_issuers_add", claim_topics_and_issuers:
+    /// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers:
     ///   Address]`
     /// * data - `[]`
     ///
@@ -648,7 +648,7 @@ impl RWA {
     /// authorization logic.
     pub fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: &Address) {
         e.storage().instance().set(&RWAStorageKey::ClaimTopicsAndIssuers, claim_topics_and_issuers);
-        emit_claim_topics_and_issuers_added(e, claim_topics_and_issuers);
+        emit_claim_topics_and_issuers_set(e, claim_topics_and_issuers);
     }
 
     /// Sets the identity registry storage contract of the token.
@@ -661,7 +661,7 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - `["identity_registry_storage_add", identity_registry_storage:
+    /// * topics - `["identity_registry_storage_set", identity_registry_storage:
     ///   Address]`
     /// * data - `[]`
     ///
@@ -674,7 +674,7 @@ impl RWA {
         e.storage()
             .instance()
             .set(&RWAStorageKey::IdentityRegistryStorage, identity_registry_storage);
-        emit_identity_registry_storage_added(e, identity_registry_storage);
+        emit_identity_registry_storage_set(e, identity_registry_storage);
     }
 
     // ########## HELPER FUNCTIONS FOR CONTRACT INTEGRATION ##########
