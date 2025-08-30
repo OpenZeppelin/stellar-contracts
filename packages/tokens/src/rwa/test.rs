@@ -786,32 +786,6 @@ fn unfreeze_partial_tokens_negative_amount_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #309)")]
-fn recovery_address_fails_when_can_recover_returns_false() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockRWAContract, ());
-    let lost_wallet = Address::generate(&e);
-    let new_wallet = Address::generate(&e);
-    let investor_id =
-        Address::from_str(&e, "GC65CUPW2IMTJJY6CII7F3OBPVG4YGASEPBBLM4V3LBKX62P6LA24OFV");
-
-    e.as_contract(&address, || {
-        // SETUP with verifier that denies recovery
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
-
-        // Mint tokens to lost wallet
-        RWA::mint(&e, &lost_wallet, 100);
-
-        // Try recovery - should fail with RecoveryFailed error
-        RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
-    });
-}
-
-#[test]
 #[should_panic(expected = "Error(Contract, #302)")]
 fn transfer_fails_when_from_address_frozen() {
     let e = Env::default();

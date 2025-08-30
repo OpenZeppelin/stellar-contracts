@@ -371,9 +371,8 @@ impl RWA {
         new_wallet: &Address,
         investor_onchain_id: &Address,
     ) -> bool {
-        // Verify identity for the new wallet and investor onchain ID
+        // Verify identity for the new wallet
         Self::verify_identity(e, new_wallet);
-        Self::verify_recovery_identity(e, lost_wallet, new_wallet, investor_onchain_id);
 
         let lost_balance = Base::balance(e, lost_wallet);
         if lost_balance == 0 {
@@ -665,49 +664,6 @@ impl RWA {
     fn trigger_compliance_hook(e: &Env, hook_name: &str, arguments: Vec<Val>) {
         let compliance_addr = Self::compliance(e);
         e.invoke_contract::<()>(&compliance_addr, &Symbol::new(e, hook_name), arguments);
-    }
-
-    /// Verifies recovery identity for wallet recovery operations.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `lost_wallet` - The address of the lost wallet.
-    /// * `new_wallet` - The address of the new wallet.
-    /// * `investor_onchain_id` - The onchain ID of the investor.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
-    ///   not configured.
-    /// * [`RWAError::RecoveryFailed`] - When recovery parameters are invalid.
-    ///
-    /// # Notes
-    ///
-    /// This function calls the identity verifier contract to verify that the
-    /// recovery operation is valid for the given investor onchain ID. The
-    /// identity verifier should implement a `can_recov` function.
-    fn verify_recovery_identity(
-        e: &Env,
-        lost_wallet: &Address,
-        new_wallet: &Address,
-        investor_onchain_id: &Address,
-    ) {
-        let identity_verifier_addr = Self::identity_verifier(e);
-
-        // Call the identity verifier contract to verify recovery eligibility
-        let can_recover: bool = e.invoke_contract(
-            &identity_verifier_addr,
-            &Symbol::new(e, "can_recover"),
-            Vec::from_array(
-                e,
-                [lost_wallet.into_val(e), new_wallet.into_val(e), investor_onchain_id.into_val(e)],
-            ),
-        );
-
-        if !can_recover {
-            panic_with_error!(e, RWAError::RecoveryFailed);
-        }
     }
 
     // ################## OVERRIDDEN FUNCTIONS ##################
