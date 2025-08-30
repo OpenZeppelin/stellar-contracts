@@ -157,6 +157,52 @@ fn get_unset_compliance_fails() {
 }
 
 #[test]
+fn set_and_get_claim_topics_and_issuers() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+
+    e.as_contract(&address, || {
+        let claim_topics_and_issuers = Address::generate(&e);
+        RWA::set_claim_topics_and_issuers(&e, &claim_topics_and_issuers);
+        assert_eq!(RWA::claim_topics_and_issuers(&e), claim_topics_and_issuers);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #311)")]
+fn get_unset_claim_topics_and_issuers_fails() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+
+    e.as_contract(&address, || {
+        RWA::claim_topics_and_issuers(&e);
+    });
+}
+
+#[test]
+fn set_and_get_identity_registry_storage() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+
+    e.as_contract(&address, || {
+        let identity_registry_storage = Address::generate(&e);
+        RWA::set_identity_registry_storage(&e, &identity_registry_storage);
+        assert_eq!(RWA::identity_registry_storage(&e), identity_registry_storage);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #312)")]
+fn get_unset_identity_registry_storage_fails() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+
+    e.as_contract(&address, || {
+        RWA::identity_registry_storage(&e);
+    });
+}
+
+#[test]
 fn mint_with_identity_verification() {
     let e = Env::default();
     e.mock_all_auths();

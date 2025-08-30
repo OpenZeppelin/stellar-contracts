@@ -6,8 +6,9 @@ use stellar_contract_utils::pausable::{paused, PausableError};
 use crate::{
     fungible::{emit_transfer, Base, ContractOverrides, StorageKey},
     rwa::{
-        emit_address_frozen, emit_burn, emit_compliance_added, emit_identity_verifier_added,
-        emit_mint, emit_recovery_success, emit_token_information_updated, emit_tokens_frozen,
+        emit_address_frozen, emit_burn, emit_claim_topics_and_issuers_added, emit_compliance_added,
+        emit_identity_registry_storage_added, emit_identity_verifier_added, emit_mint,
+        emit_recovery_success, emit_token_information_updated, emit_tokens_frozen,
         emit_tokens_unfrozen, RWAError, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
 };
@@ -27,6 +28,10 @@ pub enum RWAStorageKey {
     OnchainId,
     /// Version of the token
     Version,
+    /// Claim Topics and Issuers contract address
+    ClaimTopicsAndIssuers,
+    /// Identity Registry Storage contract address
+    IdentityRegistryStorage,
 }
 
 // TODO: change `invoke_contract` calls to `client` instead when `compliance`
@@ -111,6 +116,40 @@ impl RWA {
             .instance()
             .get(&RWAStorageKey::Compliance)
             .unwrap_or_else(|| panic_with_error!(e, RWAError::ComplianceNotSet))
+    }
+
+    /// Returns the Claim Topics and Issuers contract linked to the token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::ClaimTopicsAndIssuersNotSet`] - When the claim topics and
+    ///   issuers contract is not set.
+    pub fn claim_topics_and_issuers(e: &Env) -> Address {
+        e.storage()
+            .instance()
+            .get(&RWAStorageKey::ClaimTopicsAndIssuers)
+            .unwrap_or_else(|| panic_with_error!(e, RWAError::ClaimTopicsAndIssuersNotSet))
+    }
+
+    /// Returns the Identity Registry Storage contract linked to the token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::IdentityRegistryStorageNotSet`] - When the identity
+    ///   registry storage contract is not set.
+    pub fn identity_registry_storage(e: &Env) -> Address {
+        e.storage()
+            .instance()
+            .get(&RWAStorageKey::IdentityRegistryStorage)
+            .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityRegistryStorageNotSet))
     }
 
     /// Returns the freezing status of a wallet. Frozen wallets cannot send or
@@ -586,6 +625,56 @@ impl RWA {
     pub fn set_compliance(e: &Env, compliance: &Address) {
         e.storage().instance().set(&RWAStorageKey::Compliance, compliance);
         emit_compliance_added(e, compliance);
+    }
+
+    /// Sets the claim topics and issuers contract of the token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `claim_topics_and_issuers` - The address of the claim topics and
+    ///   issuers contract.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["claim_topics_issuers_add", claim_topics_and_issuers:
+    ///   Address]`
+    /// * data - `[]`
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used internally or in admin functions that implement their own
+    /// authorization logic.
+    pub fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: &Address) {
+        e.storage().instance().set(&RWAStorageKey::ClaimTopicsAndIssuers, claim_topics_and_issuers);
+        emit_claim_topics_and_issuers_added(e, claim_topics_and_issuers);
+    }
+
+    /// Sets the identity registry storage contract of the token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `identity_registry_storage` - The address of the identity registry
+    ///   storage contract.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["identity_registry_storage_add", identity_registry_storage:
+    ///   Address]`
+    /// * data - `[]`
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used internally or in admin functions that implement their own
+    /// authorization logic.
+    pub fn set_identity_registry_storage(e: &Env, identity_registry_storage: &Address) {
+        e.storage()
+            .instance()
+            .set(&RWAStorageKey::IdentityRegistryStorage, identity_registry_storage);
+        emit_identity_registry_storage_added(e, identity_registry_storage);
     }
 
     // ########## HELPER FUNCTIONS FOR CONTRACT INTEGRATION ##########

@@ -270,6 +270,36 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * `compliance` - The address of the compliance contract to set.
     fn set_compliance(e: &Env, operator: Address, compliance: Address);
 
+    /// Sets the claim topics and issuers contract of the token.
+    /// This function can only be called by the operator with necessary
+    /// privileges. RBAC checks are expected to be enforced on the
+    /// `operator`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `operator` - The address of the operator.
+    /// * `claim_topics_and_issuers` - The address of the claim topics and
+    ///   issuers contract to set.
+    fn set_claim_topics_and_issuers(e: &Env, operator: Address, claim_topics_and_issuers: Address);
+
+    /// Sets the identity registry storage contract of the token.
+    /// This function can only be called by the operator with necessary
+    /// privileges. RBAC checks are expected to be enforced on the
+    /// `operator`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `operator` - The address of the operator.
+    /// * `identity_registry_storage` - The address of the identity registry
+    ///   storage contract to set.
+    fn set_identity_registry_storage(
+        e: &Env,
+        operator: Address,
+        identity_registry_storage: Address,
+    );
+
     /// Returns the Identity Verifier linked to the token.
     ///
     /// # Errors
@@ -285,6 +315,22 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
     ///   set.
     fn compliance(e: &Env) -> Address;
+
+    /// Returns the Claim Topics and Issuers contract linked to the token.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::ClaimTopicsAndIssuersNotSet`] - When the claim topics and
+    ///   issuers contract is not set.
+    fn claim_topics_and_issuers(e: &Env) -> Address;
+
+    /// Returns the Identity Registry Storage contract linked to the token.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::IdentityRegistryStorageNotSet`] - When the identity
+    ///   registry storage contract is not set.
+    fn identity_registry_storage(e: &Env) -> Address;
 
     // ################## BATCH OPERATIONS ##################
 
@@ -319,6 +365,10 @@ pub enum RWAError {
     RecoveryFailed = 309,
     /// Indicates the version is not set.
     VersionNotSet = 310,
+    /// Indicates the claim topics and issuers contract is not set.
+    ClaimTopicsAndIssuersNotSet = 311,
+    /// Indicates the identity registry storage contract is not set.
+    IdentityRegistryStorageNotSet = 312,
 }
 
 // ################## CONSTANTS ##################
@@ -499,4 +549,42 @@ pub fn emit_mint(e: &Env, to: &Address, amount: i128) {
 pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
     let topics = (symbol_short!("burned"), from);
     e.events().publish(topics, amount)
+}
+
+/// Emits an event indicating the Claim Topics and Issuers contract has been
+/// set.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `claim_topics_and_issuers` - The address of the Claim Topics and Issuers
+///   contract.
+///
+/// # Events
+///
+/// * topics - `["claim_topics_issuers_added", claim_topics_and_issuers:
+///   Address]`
+/// * data - `[]`
+pub fn emit_claim_topics_and_issuers_added(e: &Env, claim_topics_and_issuers: &Address) {
+    let topics = (Symbol::new(e, "claim_topics_issuers_added"), claim_topics_and_issuers);
+    e.events().publish(topics, ())
+}
+
+/// Emits an event indicating the Identity Registry Storage contract has been
+/// set.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `identity_registry_storage` - The address of the Identity Registry Storage
+///   contract.
+///
+/// # Events
+///
+/// * topics - `["identity_registry_storage_added", identity_registry_storage:
+///   Address]`
+/// * data - `[]`
+pub fn emit_identity_registry_storage_added(e: &Env, identity_registry_storage: &Address) {
+    let topics = (Symbol::new(e, "identity_registry_storage_added"), identity_registry_storage);
+    e.events().publish(topics, ())
 }
