@@ -33,13 +33,12 @@ use crate::non_fungible::NonFungibleToken;
 ///
 /// # Notes
 ///
-/// Enumerable trait has its own business logic for creating and destroying
-/// tokens. Therefore, this trait is INCOMPATIBLE with the
-/// `Consecutive` extension.
-///
-/// Note that, `Enumerable` trait can also be offloaded to off-chain services.
-/// This extension exists for the use-cases where the enumeration is required as
-/// an on-chain operation.
+/// 1. The `Enumerable` trait has its own business logic for creating and
+///    destroying tokens. Therefore, this trait is INCOMPATIBLE with the
+///    `Consecutive` extension.
+/// 2. Enumerability can also be offloaded to off-chain services. This extension
+///    exists for the use-cases where the enumeration is required as an on-chain
+///    operation.
 ///
 /// # Notes
 ///
@@ -77,6 +76,11 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `index` - Index of the token in the owner's local list.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::non_fungible::NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token
+    ///   ID is not found in the owner's enumeration.
     fn get_owner_token_id(e: &Env, owner: Address, index: u32) -> u32;
 
     /// Returns the `token_id` at a given `index` in the global token list.
@@ -94,5 +98,10 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `index` - Index of the token in the global list.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::non_fungible::NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
+    ///   ID is not found in the global enumeration.
     fn get_token_id(e: &Env, index: u32) -> u32;
 }
