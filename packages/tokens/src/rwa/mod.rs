@@ -116,10 +116,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
-    ///   not configured.
-    /// * [`RWAError::AddressNotVerified`] - When the recipient address is not
-    ///   verified.
+    /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
+    ///   recipient address cannot be verified.
     /// * [`RWAError::AddressFrozen`] - When the recipient address is frozen.
     /// * [`PausableError::EnforcedPause`] - When the contract is paused.
     fn mint(e: &Env, to: Address, amount: i128, operator: Address);
@@ -171,11 +169,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
-    ///   not configured.
-    /// * [`RWAError::AddressNotVerified`] - When the new wallet is not
-    ///   verified.
-    /// * [`RWAError::RecoveryFailed`] - When recovery parameters are invalid.
+    /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
+    ///   new wallet cannot be verified.
     fn recovery_address(
         e: &Env,
         lost_wallet: Address,
@@ -285,23 +280,6 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
 
     // ################## COMPLIANCE AND IDENTITY FUNCTIONS ##################
 
-    /// Sets the Identity Verifier for the token.
-    /// This function can only be called by the operator with necessary
-    /// privileges. RBAC checks are expected to be enforced on the
-    /// `operator`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `identity_verifier` - The address of the Identity Verifier to set.
-    /// * `operator` - The address of the operator.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["identity_verifier_set", identity_verifier: Address]`
-    /// * data - `[]`
-    fn set_identity_verifier(e: &Env, identity_verifier: Address, operator: Address);
-
     /// Sets the compliance contract of the token.
     /// This function can only be called by the operator with necessary
     /// privileges. RBAC checks are expected to be enforced on the
@@ -327,12 +305,14 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `claim_topics_and_issuers` - The address of the claim topics and issuers contract to set.
+    /// * `claim_topics_and_issuers` - The address of the claim topics and
+    ///   issuers contract to set.
     /// * `operator` - The address of the operator.
     ///
     /// # Events
     ///
-    /// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers: Address]`
+    /// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers:
+    ///   Address]`
     /// * data - `[]`
     fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: Address, operator: Address);
 
@@ -350,21 +330,14 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Events
     ///
-    /// * topics - `["identity_registry_storage_set", identity_registry_storage: Address]`
+    /// * topics - `["identity_registry_storage_set", identity_registry_storage:
+    ///   Address]`
     /// * data - `[]`
     fn set_identity_registry_storage(
         e: &Env,
         identity_registry_storage: Address,
         operator: Address,
     );
-
-    /// Returns the Identity Verifier linked to the token.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
-    ///   not set.
-    fn identity_verifier(e: &Env) -> Address;
 
     /// Returns the Compliance contract linked to the token.
     ///
@@ -409,24 +382,20 @@ pub enum RWAError {
     AddressFrozen = 302,
     /// Indicates insufficient free tokens (due to partial freezing).
     InsufficientFreeTokens = 303,
-    /// Indicates the identity verifier is not set.
-    IdentityVerifierNotSet = 304,
-    /// Indicates the compliance contract is not set.
-    ComplianceNotSet = 305,
-    /// Indicates the address is not verified in the identity registry.
-    AddressNotVerified = 306,
+    /// Indicates an identty cannot be verified.
+    IdentityVefificationFailed = 304,
     /// Indicates the transfer does not comply with the compliance rules.
-    TransferNotCompliant = 307,
+    TransferNotCompliant = 305,
+    /// Indicates the compliance contract is not set.
+    ComplianceNotSet = 306,
     /// Indicates the onchain ID is not set.
-    OnchainIdNotSet = 308,
-    /// Indicates recovery failed.
-    RecoveryFailed = 309,
+    OnchainIdNotSet = 307,
     /// Indicates the version is not set.
-    VersionNotSet = 310,
+    VersionNotSet = 308,
     /// Indicates the claim topics and issuers contract is not set.
-    ClaimTopicsAndIssuersNotSet = 311,
+    ClaimTopicsAndIssuersNotSet = 309,
     /// Indicates the identity registry storage contract is not set.
-    IdentityRegistryStorageNotSet = 312,
+    IdentityRegistryStorageNotSet = 310,
 }
 
 // ################## CONSTANTS ##################
@@ -573,22 +542,6 @@ pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
     e.events().publish(topics, amount)
 }
 
-/// Emits an event indicating the Identity Verifier has been set.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `identity_verifier` - The address of the Identity Verifier.
-///
-/// # Events
-///
-/// * topics - `["identity_verifier_set", identity_verifier: Address]`
-/// * data - `[]`
-pub fn emit_identity_verifier_set(e: &Env, identity_verifier: &Address) {
-    let topics = (Symbol::new(e, "identity_verifier_set"), identity_verifier);
-    e.events().publish(topics, ())
-}
-
 /// Emits an event indicating the Compliance contract has been set.
 ///
 /// # Arguments
@@ -616,8 +569,7 @@ pub fn emit_compliance_set(e: &Env, compliance: &Address) {
 ///
 /// # Events
 ///
-/// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers:
-///   Address]`
+/// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers: Address]`
 /// * data - `[]`
 pub fn emit_claim_topics_and_issuers_set(e: &Env, claim_topics_and_issuers: &Address) {
     let topics = (Symbol::new(e, "claim_topics_issuers_set"), claim_topics_and_issuers);

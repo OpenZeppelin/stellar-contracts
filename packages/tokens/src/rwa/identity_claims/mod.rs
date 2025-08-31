@@ -1,7 +1,9 @@
 mod storage;
 mod test;
 
-use soroban_sdk::{contracterror, Address, Bytes, BytesN, Env, String, Symbol, Vec};
+use soroban_sdk::{
+    contractclient, contracterror, Address, Bytes, BytesN, Env, String, Symbol, Vec,
+};
 pub use storage::{
     add_claim, generate_claim_id, get_claim, get_claim_ids_by_topic, remove_claim, Claim,
 };
@@ -12,6 +14,7 @@ pub use storage::{
 /// This trait provides functionality for adding, retrieving, and managing
 /// claims associated with an identity. Claims are attestations made by issuers
 /// about specific topics related to the identity.
+#[contractclient(name = "IdentityClaimsClient")]
 pub trait IdentityClaims {
     /// Adds a new claim to the identity or updates an existing one.
     ///
