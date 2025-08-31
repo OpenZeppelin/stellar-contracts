@@ -38,7 +38,7 @@ pub enum RWAStorageKey {
 }
 
 // TODO: change `invoke_contract` calls to `client` instead when `compliance`
-// and `identity_verifier` is merged
+// is merged
 
 // We need to declare an `IdentityRegistryStorageClient` here, instead of
 // importing one from the dedicated module, as the trait there can't be used
@@ -379,7 +379,6 @@ impl RWA {
     /// admin.require_auth();
     /// ```
     pub fn mint(e: &Env, to: &Address, amount: i128) {
-        // Verify identity verifier for the recipient address
         Self::verify_identity(e, to);
 
         Base::update(e, None, Some(to), amount);
@@ -465,8 +464,8 @@ impl RWA {
     ///
     /// * topics - `["transfer", lost_wallet: Address, new_wallet: Address]`
     /// * data - `[amount: i128]`
-    /// * topics - `["recovery", lost_wallet: Address, new_wallet: Address,
-    ///   investor_onchain_id: Address]`
+    /// * topics - `["recovery_success", lost_wallet: Address, new_wallet:
+    ///   Address, investor_onchain_id: Address]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -531,8 +530,8 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - `["freeze", user_address: Address, freeze: bool, caller:
-    ///   Address]`
+    /// * topics - `["address_frozen", user_address: Address, is_frozen: bool,
+    ///   caller: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -642,10 +641,6 @@ impl RWA {
     /// * topics - `["token_info", name: Symbol, symbol: Symbol, decimals: u32,
     ///   version: Symbol, onchain_id: Address]`
     /// * data - `[]`
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`Base::get_metadata`] errors.
     ///
     /// # Security Warning
     ///
@@ -773,7 +768,6 @@ impl RWA {
             panic_with_error!(e, RWAError::InsufficientFreeTokens);
         }
 
-        // Verify identity verifier for both addresses
         Self::verify_identity(e, from);
         Self::verify_identity(e, to);
 

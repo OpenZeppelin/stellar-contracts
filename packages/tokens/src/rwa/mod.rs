@@ -85,16 +85,16 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * `amount` - The number of tokens to transfer.
     /// * `operator` - The address of the operator.
     ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[amount: i128]`
-    ///
     /// # Errors
     ///
     /// * [`RWAError::InsufficientBalance`] - When the sender has insufficient
     ///   balance.
     /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `[amount: i128]`
     fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, operator: Address);
 
     /// Mints tokens to a wallet. Tokens can only be minted to verified
@@ -109,17 +109,17 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * `amount` - Amount of tokens to mint.
     /// * `operator` - The address of the operator.
     ///
-    /// # Events
-    ///
-    /// * topics - `["mint", to: Address]`
-    /// * data - `[amount: i128]`
-    ///
     /// # Errors
     ///
     /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
     ///   recipient address cannot be verified.
     /// * [`RWAError::AddressFrozen`] - When the recipient address is frozen.
     /// * [`PausableError::EnforcedPause`] - When the contract is paused.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["mint", to: Address]`
+    /// * data - `[amount: i128]`
     fn mint(e: &Env, to: Address, amount: i128, operator: Address);
 
     /// Burns tokens from a wallet.
@@ -134,14 +134,14 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * `amount` - Amount of tokens to burn.
     /// * `operator` - The address of the operator.
     ///
+    /// # Errors
+    ///
+    /// * [`RWAError::AddressFrozen`] - When the address is frozen.
+    ///
     /// # Events
     ///
     /// * topics - `["burn", user_address: Address]`
     /// * data - `[amount: i128]`
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::AddressFrozen`] - When the address is frozen.
     fn burn(e: &Env, user_address: Address, amount: i128, operator: Address);
 
     /// Recovery function used to force transfer tokens from a lost wallet
@@ -159,6 +159,11 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///   recovery.
     /// * `operator` - The address of the operator.
     ///
+    /// # Errors
+    ///
+    /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
+    ///   new wallet cannot be verified.
+    ///
     /// # Events
     ///
     /// * topics - `["transfer", lost_wallet: Address, new_wallet: Address]`
@@ -166,11 +171,6 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * topics - `["recovery", lost_wallet: Address, new_wallet: Address,
     ///   investor_onchain_id: Address]`
     /// * data - `[]`
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
-    ///   new wallet cannot be verified.
     fn recovery_address(
         e: &Env,
         lost_wallet: Address,
@@ -193,8 +193,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Events
     ///
-    /// * topics - `["address_frozen", user_address: Address, freeze: bool]`
-    /// * data - `[operator: Address]`
+    /// * topics - `["address_frozen", user_address: Address, is_frozen: bool,
+    ///   operator: Address]`
+    /// * data - `[]`
     fn set_address_frozen(e: &Env, user_address: Address, freeze: bool, operator: Address);
 
     /// Freezes a specified amount of tokens for a given address.
@@ -209,16 +210,16 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * `amount` - Amount of tokens to be frozen.
     /// * `operator` - The address of the operator.
     ///
-    /// # Events
-    ///
-    /// * topics - `["tokens_frozen", user_address: Address]`
-    /// * data - `[amount: i128]`
-    ///
     /// # Errors
     ///
     /// * [`RWAError::LessThanZero`] - When the amount is negative.
     /// * [`RWAError::InsufficientBalance`] - When the address has insufficient
     ///   balance.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["tokens_frozen", user_address: Address]`
+    /// * data - `[amount: i128]`
     fn freeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
 
     /// Unfreezes a specified amount of tokens for a given address.
@@ -233,16 +234,16 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * `amount` - Amount of tokens to be unfrozen.
     /// * `operator` - The address of the operator.
     ///
-    /// # Events
-    ///
-    /// * topics - `["tokens_unfrozen", user_address: Address]`
-    /// * data - `[amount: i128]`
-    ///
     /// # Errors
     ///
     /// * [`RWAError::LessThanZero`] - When the amount is negative.
     /// * [`RWAError::InsufficientFreeTokens`] - When there are insufficient
     ///   frozen tokens to unfreeze.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["tokens_unfrozen", user_address: Address]`
+    /// * data - `[amount: i128]`
     fn unfreeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
 
     /// Returns the freezing status of a wallet.
@@ -267,8 +268,7 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::UnsetMetadata`] - When the token metadata is not
-    ///   initialized.
+    /// * [`RWAError::VersionNotSet`] - When the token version is not set.
     fn version(e: &Env) -> Symbol;
 
     /// Returns the address of the onchain ID of the token.
@@ -362,10 +362,6 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * [`RWAError::IdentityRegistryStorageNotSet`] - When the identity
     ///   registry storage contract is not set.
     fn identity_registry_storage(e: &Env) -> Address;
-
-    // ################## BATCH OPERATIONS ##################
-
-    // TODO: will be determined in the future
 }
 
 // ################## ERRORS ##################
@@ -463,15 +459,16 @@ pub fn emit_recovery_success(
 /// * `e` - Access to the Soroban environment.
 /// * `user_address` - The wallet address that is affected.
 /// * `is_frozen` - The freezing status of the wallet.
-/// * `owner` - The address of the who called the function.
+/// * `caller` - The address of the who called the function.
 ///
 /// # Events
 ///
-/// * topics - `["address_frozen", user_address: Address, is_frozen: bool]`
-/// * data - `[owner: Address]`
-pub fn emit_address_frozen(e: &Env, user_address: &Address, is_frozen: bool, owner: &Address) {
-    let topics = (Symbol::new(e, "address_frozen"), user_address, is_frozen);
-    e.events().publish(topics, owner)
+/// * topics - `["address_frozen", user_address: Address, is_frozen: bool,
+///   caller: Address]`
+/// * data - `[]`
+pub fn emit_address_frozen(e: &Env, user_address: &Address, is_frozen: bool, caller: &Address) {
+    let topics = (Symbol::new(e, "address_frozen"), user_address, is_frozen, caller);
+    e.events().publish(topics, ())
 }
 
 /// Emits an event indicating tokens have been frozen.
