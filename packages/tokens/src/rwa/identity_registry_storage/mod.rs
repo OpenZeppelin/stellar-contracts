@@ -139,8 +139,7 @@
 //! - All operations require proper authorization (handled by implementer)
 //! - Metadata can be used to provide additional context for mixed relation
 //!   types
-
-//! mod storage;
+mod storage;
 mod test;
 
 use soroban_sdk::{contracterror, Address, Env, FromVal, Symbol, Val, Vec};
@@ -152,7 +151,6 @@ pub use storage::{
 };
 
 use crate::rwa::utils::token_binder::TokenBinder;
-mod storage;
 
 /// The core trait for managing basic identities. It is generic over a
 /// `CountryData` type, allowing implementers to define what constitutes a
