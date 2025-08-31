@@ -12,8 +12,29 @@
 //! information. The Identity Registry Storage system is designed to handle
 //! those together with complex jurisdictional relationships for accounts.
 //! Instead of simple country codes, it uses a sophisticated model that pairs
-//! relationship types with country codes, ensuring data integrity through type
-//! matching.
+//! relationship types with country codes.
+//!
+//! ## Flexible Country Relations
+//!
+//! The system supports flexible mixing of country relationship types to
+//! accommodate complex regulatory requirements:
+//!
+//! - **Individual** identities can have both individual and organizational
+//!   country relations
+//! - **Organization** identities can include country data for key individuals
+//!   (KYB requirements)
+//!
+//! This flexibility supports Know-Your-Business (KYB) processes where
+//! organizations must provide jurisdictional information about:
+//! - Ultimate Beneficial Owners (UBOs)
+//! - Key management personnel
+//! - Authorized signatories
+//! - Board members and directors
+//!
+//! For example, a US-incorporated company might need to track:
+//! - `Incorporation(840)` - Company incorporated in USA
+//! - `Residence(276)` - CEO resides in Germany
+//! - `Citizenship(756)` - CFO is a Swiss citizen
 //!
 //! ## Core Components
 //!
@@ -54,22 +75,9 @@
 //! }
 //! ```
 //!
-//! ## Type Safety and Validation
-//!
-//! The system enforces strict type matching between identity types and country
-//! relations:
-//!
-//! - **Individual** identities can only have `CountryRelation::Individual`
-//!   entries
-//! - **Organization** identities can only have `CountryRelation::Organization`
-//!   entries
-//!
-//! This prevents logical inconsistencies like individuals having incorporation
-//! countries or organizations having citizenship.
-//!
 //! ## Usage Patterns
 //!
-//! ### Creating an Identity
+//! ### Individual Identity
 //! ```rust
 //! // Individual with residence and citizenship
 //! let country_data = vec![
@@ -90,21 +98,35 @@
 //! add_identity(&env, &account, &identity, IdentityType::Individual, &country_data);
 //! ```
 //!
-//! ### Organization Example
+//! ### Organization with KYB Data
 //! ```rust
-//! // Organization with incorporation and operating jurisdictions
+//! // Organization including individual data for KYB compliance
 //! let country_data = vec![
+//!     // Corporate data
 //!     CountryData {
 //!         country: CountryRelation::Organization(
 //!             OrganizationCountryRelation::Incorporation(840), // USA
 //!         ),
-//!         metadata: None,
+//!         metadata: Some(metadata_map!("entity_type" => "Corporation")),
 //!     },
 //!     CountryData {
 //!         country: CountryRelation::Organization(
 //!             OrganizationCountryRelation::OperatingJurisdiction(276), // Germany
 //!         ),
 //!         metadata: None,
+//!     },
+//!     // Individual data for KYB (Ultimate Beneficial Owner)
+//!     CountryData {
+//!         country: CountryRelation::Individual(
+//!             IndividualCountryRelation::Residence(756), // Switzerland
+//!         ),
+//!         metadata: Some(metadata_map!("role" => "UBO", "name" => "John Doe")),
+//!     },
+//!     CountryData {
+//!         country: CountryRelation::Individual(
+//!             IndividualCountryRelation::Citizenship(250), // France
+//!         ),
+//!         metadata: Some(metadata_map!("role" => "CEO", "name" => "Jane Smith")),
 //!     },
 //! ];
 //!
@@ -114,20 +136,23 @@
 //!
 //! - Maximum 15 country data entries per identity
 //! - At least one country data entry required per identity
-//! - Country relations must match identity type
+//! - All operations require proper authorization (handled by implementer)
+//! - Metadata can be used to provide additional context for mixed relation
+//!   types
 
-mod storage;
+//! mod storage;
 mod test;
 
 use soroban_sdk::{contracterror, Address, Env, FromVal, Symbol, Val, Vec};
 pub use storage::{
     add_country_data_entries, add_identity, delete_country_data, get_country_data,
     get_country_data_entries, get_identity, modify_country_data, modify_identity, remove_identity,
-    validate_country_relations, CountryData, CountryRelation, IdentityProfile, IdentityType,
-    IndividualCountryRelation, OrganizationCountryRelation,
+    CountryData, CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
+    OrganizationCountryRelation,
 };
 
 use crate::rwa::utils::token_binder::TokenBinder;
+mod storage;
 
 /// The core trait for managing basic identities. It is generic over a
 /// `CountryData` type, allowing implementers to define what constitutes a
@@ -301,8 +326,6 @@ pub enum IRSError {
     EmptyCountryList = 323,
     /// The maximum number of country entries has been reached.
     MaxCountryEntriesReached = 324,
-    /// Country relation type doesn't match the identity type.
-    CountryRelationMismatch = 325,
 }
 
 // ################## CONSTANTS ##################
