@@ -14,7 +14,6 @@
 //! - **Compliance Framework**: Modular compliance rules and validation
 //! - **Transfer Controls**: Sophisticated transfer restrictions and validations
 //! - **Token Lifecycle**: Minting, burning, freezing, and recovery mechanisms
-//! - **Batch Operations**: Efficient bulk operations for administrative tasks
 //!
 //! ## Key Features
 //!
@@ -35,8 +34,6 @@
 //!   topics
 //! - **Compliance**: Modular compliance rules and validation framework
 //! - **Identity Claims**: Integration with identity registries for KYC/AML
-//! - **Identity Verifier**: Trait for establishing the connection between RWA
-//!   token and identity registry
 //! - **Identity Storage Registry**: Registry for storing all the information
 //!   necessary for identities
 
@@ -51,7 +48,7 @@ pub mod utils;
 
 use soroban_sdk::{contracterror, symbol_short, Address, Env, Symbol};
 use stellar_contract_utils::pausable::Pausable;
-pub use storage::RWA;
+pub use storage::{RWAStorageKey, RWA};
 
 use crate::fungible::FungibleToken;
 
@@ -378,7 +375,7 @@ pub enum RWAError {
     AddressFrozen = 302,
     /// Indicates insufficient free tokens (due to partial freezing).
     InsufficientFreeTokens = 303,
-    /// Indicates an identty cannot be verified.
+    /// Indicates an identity cannot be verified.
     IdentityVefificationFailed = 304,
     /// Indicates the transfer does not comply with the compliance rules.
     TransferNotCompliant = 305,

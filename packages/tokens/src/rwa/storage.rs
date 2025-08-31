@@ -46,8 +46,9 @@ pub enum RWAStorageKey {
 // not supported by the `#[contractclient]` macro.
 // Another option would have been to use `e.invoke_contract`, but we stick with
 // the above choice for consistency reasons.
+#[allow(unused)]
 #[contractclient(name = "IdentityRegistryStorageClient")]
-pub trait IdentityRegistryStorage {
+trait IdentityRegistryStorage {
     fn stored_identity(e: &Env, user_address: Address) -> Address;
 }
 
