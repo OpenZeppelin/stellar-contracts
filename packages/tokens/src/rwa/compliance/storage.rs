@@ -314,7 +314,7 @@ pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
 /// Invokes `can_create(to, amount)` on each registered module.
 /// Stops execution and returns `false` on the first module that rejects.
 pub fn can_create(e: &Env, to: Address, amount: i128) -> bool {
-    let modules = get_modules_for_hook(e, ComplianceHook::CanTransfer);
+    let modules = get_modules_for_hook(e, ComplianceHook::CanCreate);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
