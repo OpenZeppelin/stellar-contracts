@@ -11,11 +11,11 @@ mod test;
 /// where compliance modules can be executed.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub enum HookType {
+pub enum ComplianceHook {
     /// Called after tokens are successfully transferred from one wallet to
     /// another. Modules registered for this hook can update their state
     /// based on transfer events.
-    Transfer,
+    Transferred,
 
     /// Called after tokens are successfully created/minted to a wallet.
     /// Modules registered for this hook can update their state based on minting
@@ -47,22 +47,26 @@ pub enum HookType {
 /// ```
 pub trait Compliance {
     /// Registers a compliance module for a specific hook type.
+    /// Only the operator can register modules.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `hook` - The type of hook to register the module for.
     /// * `module` - The address of the compliance module contract.
-    fn add_module_to(e: &Env, hook: HookType, module: Address);
+    /// * `operator` - The address of the operator that can add/remove modules.
+    fn add_module_to(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Deregisters a compliance module from a specific hook type.
+    /// Only the operator can deregister modules.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `hook` - The type of hook to deregister the module from.
     /// * `module` - The address of the compliance module contract.
-    fn remove_module_from(e: &Env, hook: HookType, module: Address);
+    /// * `operator` - The address of the operator that can add/remove modules.
+    fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Gets all modules registered for a specific hook type.
     ///
@@ -74,7 +78,7 @@ pub trait Compliance {
     /// # Returns
     ///
     /// A vector of module addresses registered for the specified hook.
-    fn get_modules_for_hook(e: &Env, hook: HookType) -> Vec<Address>;
+    fn get_modules_for_hook(e: &Env, hook: ComplianceHook) -> Vec<Address>;
 
     /// Checks if a module is registered for a specific hook type.
     ///
@@ -87,7 +91,7 @@ pub trait Compliance {
     /// # Returns
     ///
     /// `true` if the module is registered for the hook, `false` otherwise.
-    fn is_module_registered(e: &Env, hook: HookType, module: Address) -> bool;
+    fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool;
 
     /// Called whenever tokens are transferred from one wallet to another.
     ///
@@ -180,7 +184,7 @@ pub const MAX_MODULES: u32 = 20;
 ///
 /// * topics - `["module_added", hook: u32]`
 /// * data - `[module: Address]`
-pub fn emit_module_added(e: &Env, hook: HookType, module: Address) {
+pub fn emit_module_added(e: &Env, hook: ComplianceHook, module: Address) {
     let topics = (Symbol::new(e, "module_added"), hook.clone());
     e.events().publish(topics, module)
 }
@@ -198,7 +202,7 @@ pub fn emit_module_added(e: &Env, hook: HookType, module: Address) {
 ///
 /// * topics - `["module_removed", hook: u32]`
 /// * data - `[module: Address]`
-pub fn emit_module_removed(e: &Env, hook: HookType, module: Address) {
+pub fn emit_module_removed(e: &Env, hook: ComplianceHook, module: Address) {
     let topics = (Symbol::new(e, "module_removed"), hook.clone());
     e.events().publish(topics, module)
 }

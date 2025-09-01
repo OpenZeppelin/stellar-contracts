@@ -399,31 +399,20 @@ pub const FROZEN_TTL_THRESHOLD: u32 = FROZEN_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 // ################## EVENTS ##################
 
-/// Emits an event indicating token information has been updated.
+/// Emits an event indicating token onchain_id has been updated.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `name` - The new name of the token.
-/// * `symbol` - The new symbol of the token.
-/// * `decimals` - The decimals of the token.
-/// * `version` - The version of the token.
 /// * `onchain_id` - The address of the onchain ID.
 ///
 /// # Events
 ///
-/// * topics - `["token_info_updated", name: Symbol, symbol: Symbol]`
-/// * data - `[decimals: u8, version: &str, onchain_id: Address]`
-pub fn emit_token_information_updated(
-    e: &Env,
-    name: Option<&Symbol>,
-    symbol: Option<&Symbol>,
-    decimals: Option<u32>,
-    version: Option<&str>,
-    onchain_id: Option<&Address>,
-) {
-    let topics = (Symbol::new(e, "token_updated"), name, symbol);
-    e.events().publish(topics, (decimals, version, onchain_id))
+/// * topics - `["token_onchain_id_updated", onchain_id: Address]`
+/// * data - `[]`
+pub fn emit_token_onchain_id_updated(e: &Env, onchain_id: &Address) {
+    let topics = (Symbol::new(e, "token_onchain_id_updated"), onchain_id);
+    e.events().publish(topics, ())
 }
 
 /// Emits an event indicating a successful recovery.

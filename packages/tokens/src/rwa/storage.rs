@@ -11,12 +11,24 @@ use super::{
 use crate::{
     fungible::{emit_transfer, Base, ContractOverrides, StorageKey},
     rwa::{
-        emit_address_frozen, emit_burn, emit_claim_topics_and_issuers_set, emit_compliance_set,
-        emit_identity_registry_storage_set, emit_mint, emit_recovery_success,
-        emit_token_information_updated, emit_tokens_frozen, emit_tokens_unfrozen, RWAError,
-        FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
+        compliance::ComplianceHook, emit_address_frozen, emit_burn,
+        emit_claim_topics_and_issuers_set, emit_compliance_set, emit_identity_registry_storage_set,
+        emit_mint, emit_recovery_success, emit_token_onchain_id_updated, emit_tokens_frozen,
+        emit_tokens_unfrozen, RWAError, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
 };
+
+impl ComplianceHook {
+    /// Convert the enum to its corresponding method name string
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ComplianceHook::Transferred => "transferred",
+            ComplianceHook::Created => "created",
+            ComplianceHook::Destroyed => "destroyed",
+            ComplianceHook::CanTransfer => "can_transfer",
+        }
+    }
+}
 
 /// Storage keys for the data associated with `RWA` token
 #[contracttype]
@@ -338,7 +350,7 @@ impl RWA {
 
         Self::trigger_compliance_hook(
             e,
-            "transferred",
+            ComplianceHook::Transferred,
             Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
         );
 
@@ -388,7 +400,7 @@ impl RWA {
 
         Self::trigger_compliance_hook(
             e,
-            "created",
+            ComplianceHook::Created,
             Vec::from_array(e, [to.into_val(e), amount.into_val(e)]),
         );
 
@@ -436,7 +448,7 @@ impl RWA {
 
         Self::trigger_compliance_hook(
             e,
-            "destroyed",
+            ComplianceHook::Destroyed,
             Vec::from_array(e, [user_address.into_val(e), amount.into_val(e)]),
         );
 
@@ -651,7 +663,7 @@ impl RWA {
     pub fn set_onchain_id(e: &Env, onchain_id: &Address) {
         e.storage().instance().set(&RWAStorageKey::OnchainId, onchain_id);
 
-        emit_token_information_updated(e, None, None, None, None, Some(onchain_id));
+        emit_token_onchain_id_updated(e, onchain_id);
     }
 
     /// Sets the compliance contract of the token.
@@ -726,9 +738,9 @@ impl RWA {
         emit_identity_registry_storage_set(e, identity_registry_storage);
     }
 
-    fn trigger_compliance_hook(e: &Env, hook_name: &str, arguments: Vec<Val>) {
+    fn trigger_compliance_hook(e: &Env, hook: ComplianceHook, arguments: Vec<Val>) {
         let compliance_addr = Self::compliance(e);
-        e.invoke_contract::<()>(&compliance_addr, &Symbol::new(e, hook_name), arguments);
+        e.invoke_contract::<()>(&compliance_addr, &Symbol::new(e, hook.as_str()), arguments);
     }
 
     // ################## OVERRIDDEN FUNCTIONS ##################
@@ -779,7 +791,7 @@ impl RWA {
 
         Self::trigger_compliance_hook(
             e,
-            "transferred",
+            ComplianceHook::Transferred,
             Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
         );
 
@@ -826,7 +838,7 @@ impl RWA {
 
         let can_transfer: bool = e.invoke_contract(
             &compliance_addr,
-            &Symbol::new(e, "can_transfer"),
+            &Symbol::new(e, ComplianceHook::CanTransfer.as_str()),
             Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
         );
 

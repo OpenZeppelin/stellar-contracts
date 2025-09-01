@@ -1,18 +1,18 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 
 use crate::rwa::compliance::{
-    emit_module_added, emit_module_removed, ComplianceError, ComplianceModuleClient, HookType,
-    COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
+    emit_module_added, emit_module_removed, ComplianceError, ComplianceHook,
+    ComplianceModuleClient, COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
 };
 
 /// Storage keys for the modular compliance contract.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum DataKey {
-    /// Maps HookType -> Vec<Address> for registered modules
-    HookModules(HookType),
+    /// Maps ComplianceHook -> Vec<Address> for registered modules
+    HookModules(ComplianceHook),
     /// Existence check for a module registered for a specific hook type.
-    ModuleRegistered(HookType, Address),
+    ModuleRegistered(ComplianceHook, Address),
 }
 
 // ################## QUERY STATE ##################
@@ -31,7 +31,7 @@ pub enum DataKey {
 ///
 /// A vector of module addresses registered for the specified hook.
 /// Returns an empty vector if no modules are registered.
-pub fn get_modules_for_hook(e: &Env, hook: HookType) -> Vec<Address> {
+pub fn get_modules_for_hook(e: &Env, hook: ComplianceHook) -> Vec<Address> {
     let key = DataKey::HookModules(hook);
     if let Some(existing_modules) = e.storage().persistent().get(&key) {
         e.storage().persistent().extend_ttl(
@@ -56,7 +56,7 @@ pub fn get_modules_for_hook(e: &Env, hook: HookType) -> Vec<Address> {
 /// # Returns
 ///
 /// `true` if the module is registered for the hook, `false` otherwise.
-pub fn is_module_registered(e: &Env, hook: HookType, module: Address) -> bool {
+pub fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool {
     let existence_key = DataKey::ModuleRegistered(hook, module);
     e.storage().persistent().get::<_, ()>(&existence_key).is_some()
 }
@@ -75,7 +75,7 @@ pub fn is_module_registered(e: &Env, hook: HookType, module: Address) -> bool {
 ///
 /// # Events
 ///
-/// * topics - `["module_added", hook: HookType, module: Address]`
+/// * topics - `["module_added", hook: ComplianceHook, module: Address]`
 /// * data - `[]`
 ///
 /// # Errors
@@ -94,7 +94,7 @@ pub fn is_module_registered(e: &Env, hook: HookType, module: Address) -> bool {
 ///
 /// Using this function in public-facing methods creates significant
 /// security risks as it could allow unauthorized module registration.
-pub fn add_module_to(e: &Env, hook: HookType, module: Address) {
+pub fn add_module_to(e: &Env, hook: ComplianceHook, module: Address) {
     // Check if module is already registered
     let existence_key = DataKey::ModuleRegistered(hook.clone(), module.clone());
     if e.storage().persistent().get::<_, ()>(&existence_key).is_some() {
@@ -135,7 +135,7 @@ pub fn add_module_to(e: &Env, hook: HookType, module: Address) {
 ///
 /// # Events
 ///
-/// * topics - `["module_removed", hook: HookType, module: Address]`
+/// * topics - `["module_removed", hook: ComplianceHook, module: Address]`
 /// * data - `[]`
 ///
 /// # Errors
@@ -152,7 +152,7 @@ pub fn add_module_to(e: &Env, hook: HookType, module: Address) {
 ///
 /// Using this function in public-facing methods creates significant
 /// security risks as it could allow unauthorized module removal.
-pub fn remove_module_from(e: &Env, hook: HookType, module: Address) {
+pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
     // Check if module is registered
     let existence_key = DataKey::ModuleRegistered(hook.clone(), module.clone());
     if e.storage().persistent().get::<_, ()>(&existence_key).is_none() {
@@ -197,7 +197,7 @@ pub fn remove_module_from(e: &Env, hook: HookType, module: Address) {
 ///
 /// Invokes `on_transfer(from, to, amount)` on each registered module.
 pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
-    let modules = get_modules_for_hook(e, HookType::Transfer);
+    let modules = get_modules_for_hook(e, ComplianceHook::Transferred);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
@@ -220,7 +220,7 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
 ///
 /// Invokes `on_created(to, amount)` on each registered module.
 pub fn created(e: &Env, to: Address, amount: i128) {
-    let modules = get_modules_for_hook(e, HookType::Created);
+    let modules = get_modules_for_hook(e, ComplianceHook::Created);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
@@ -243,7 +243,7 @@ pub fn created(e: &Env, to: Address, amount: i128) {
 ///
 /// Invokes `on_destroyed(from, amount)` on each registered module.
 pub fn destroyed(e: &Env, from: Address, amount: i128) {
-    let modules = get_modules_for_hook(e, HookType::Destroyed);
+    let modules = get_modules_for_hook(e, ComplianceHook::Destroyed);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
@@ -275,7 +275,7 @@ pub fn destroyed(e: &Env, from: Address, amount: i128) {
 /// Invokes `can_transfer(from, to, amount)` on each registered module.
 /// Stops execution and returns `false` on the first module that rejects.
 pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
-    let modules = get_modules_for_hook(e, HookType::CanTransfer);
+    let modules = get_modules_for_hook(e, ComplianceHook::CanTransfer);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
