@@ -331,7 +331,8 @@ impl RWA {
 
         Base::update(e, Some(from), Some(to), amount);
 
-        let compliance_client = Self::get_compliance_client(e);
+        let compliance_addr = Self::compliance(e);
+        let compliance_client = ComplianceClient::new(e, &compliance_addr);
         compliance_client.transferred(from, to, &amount);
 
         emit_transfer(e, from, to, amount);
@@ -378,7 +379,8 @@ impl RWA {
 
         Self::validate_mint_compliance(e, to, amount);
 
-        let compliance_client = Self::get_compliance_client(e);
+        let compliance_addr = Self::compliance(e);
+        let compliance_client = ComplianceClient::new(e, &compliance_addr);
         compliance_client.created(to, &amount);
 
         emit_mint(e, to, amount);
@@ -423,7 +425,8 @@ impl RWA {
 
         Base::update(e, Some(user_address), None, amount);
 
-        let compliance_client = Self::get_compliance_client(e);
+        let compliance_addr = Self::compliance(e);
+        let compliance_client = ComplianceClient::new(e, &compliance_addr);
         compliance_client.destroyed(user_address, &amount);
 
         emit_burn(e, user_address, amount);
@@ -758,7 +761,8 @@ impl RWA {
 
         Base::update(e, Some(from), Some(to), amount);
 
-        let compliance_client = Self::get_compliance_client(e);
+        let compliance_addr = Self::compliance(e);
+        let compliance_client = ComplianceClient::new(e, &compliance_addr);
         compliance_client.transferred(from, to, &amount);
 
         emit_transfer(e, from, to, amount);
@@ -799,7 +803,8 @@ impl RWA {
     /// against configured compliance rules. The compliance contract should
     /// implement a `can_transfer` function that returns a boolean.
     fn validate_transfer_compliance(e: &Env, from: &Address, to: &Address, amount: i128) {
-        let compliance_client = Self::get_compliance_client(e);
+        let compliance_addr = Self::compliance(e);
+        let compliance_client = ComplianceClient::new(e, &compliance_addr);
         let can_transfer: bool = compliance_client.can_transfer(from, to, &amount);
 
         if !can_transfer {
@@ -829,25 +834,12 @@ impl RWA {
     /// contract should implement a `can_create` function that returns a
     /// boolean.
     fn validate_mint_compliance(e: &Env, to: &Address, amount: i128) {
-        let compliance_client = Self::get_compliance_client(e);
+        let compliance_addr = Self::compliance(e);
+        let compliance_client = ComplianceClient::new(e, &compliance_addr);
         let can_create: bool = compliance_client.can_create(to, &amount);
 
         if !can_create {
             panic_with_error!(e, RWAError::TransferNotCompliant);
         }
-    }
-
-    /// Returns a new Compliance Client
-    ///
-    /// # Arguments
-    ///
-    /// `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * refer to [`Self::compliance()`] errors
-    fn get_compliance_client(e: &Env) -> ComplianceClient {
-        let compliance_addr = Self::compliance(e);
-        ComplianceClient::new(e, &compliance_addr)
     }
 }
