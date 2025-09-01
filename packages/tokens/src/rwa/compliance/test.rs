@@ -4,7 +4,7 @@ use soroban_sdk::{contract, contractimpl, testutils::Address as _, vec, Address,
 
 use crate::rwa::compliance::{
     storage::{
-        add_module_to, can_transfer, created, destroyed, get_modules_for_hook,
+        add_module_to, can_create, can_transfer, created, destroyed, get_modules_for_hook,
         is_module_registered, remove_module_from, transferred,
     },
     ComplianceHook, MAX_MODULES,
@@ -336,6 +336,11 @@ impl MockComplianceModule {
         // Mock implementation - returns true for even amounts, false for odd amounts
         amount % 2 == 0
     }
+
+    pub fn can_create(_env: Env, _to: Address, amount: i128) -> bool {
+        // Mock implementation - returns true for even amounts, false for odd amounts
+        amount % 2 == 0
+    }
 }
 
 #[test]
@@ -451,26 +456,51 @@ fn can_transfer_returns_false_when_module_rejects() {
 }
 
 #[test]
-fn can_transfer_multiple_modules_all_must_pass() {
+fn can_create_hook_execution_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let contract_address = e.register(MockContract, ());
+    let module_address = e.register(MockComplianceModule, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        // Test with no modules registered - should return true
+        let amount = 1000i128;
+        assert!(can_create(&e, to.clone(), amount));
+
+        // Add module to CanCreate hook
+        add_module_to(&e, ComplianceHook::CanCreate, module_address.clone());
+
+        // Execute can_create hook with even amount - should return true
+        let even_amount = 1000i128;
+        assert!(can_create(&e, to.clone(), even_amount));
+
+        // Execute can_create hook with odd amount - should return false
+        let odd_amount = 1001i128;
+        assert!(!can_create(&e, to.clone(), odd_amount));
+    });
+}
+
+#[test]
+fn can_create_multiple_modules_all_must_pass() {
     let e = Env::default();
     e.mock_all_auths();
     let contract_address = e.register(MockContract, ());
     let module1 = e.register(MockComplianceModule, ());
     let module2 = e.register(MockComplianceModule, ());
-    let from = Address::generate(&e);
     let to = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        // Add two identical modules to CanTransfer hook
-        add_module_to(&e, ComplianceHook::CanTransfer, module1);
-        add_module_to(&e, ComplianceHook::CanTransfer, module2);
+        // Add two identical modules to CanCreate hook
+        add_module_to(&e, ComplianceHook::CanCreate, module1);
+        add_module_to(&e, ComplianceHook::CanCreate, module2);
 
         // Test with even amount - both modules should return true, so result is true
         let even_amount = 1000i128;
-        assert!(can_transfer(&e, from.clone(), to.clone(), even_amount));
+        assert!(can_create(&e, to.clone(), even_amount));
 
         // Test with odd amount - both modules should return false, so result is false
         let odd_amount = 1001i128;
-        assert!(!can_transfer(&e, from, to, odd_amount));
+        assert!(!can_create(&e, to, odd_amount));
     });
 }
