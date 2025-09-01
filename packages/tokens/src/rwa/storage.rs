@@ -1,6 +1,4 @@
-use soroban_sdk::{
-    contractclient, contracttype, panic_with_error, Address, Env, IntoVal, String, Symbol, Val, Vec,
-};
+use soroban_sdk::{contractclient, contracttype, panic_with_error, Address, Env, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use super::{
@@ -11,24 +9,12 @@ use super::{
 use crate::{
     fungible::{emit_transfer, Base, ContractOverrides, StorageKey},
     rwa::{
-        compliance::ComplianceHook, emit_address_frozen, emit_burn,
+        compliance::ComplianceClient, emit_address_frozen, emit_burn,
         emit_claim_topics_and_issuers_set, emit_compliance_set, emit_identity_registry_storage_set,
         emit_mint, emit_recovery_success, emit_token_onchain_id_updated, emit_tokens_frozen,
         emit_tokens_unfrozen, RWAError, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
 };
-
-impl ComplianceHook {
-    /// Convert the enum to its corresponding method name string
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ComplianceHook::Transferred => "transferred",
-            ComplianceHook::Created => "created",
-            ComplianceHook::Destroyed => "destroyed",
-            ComplianceHook::CanTransfer => "can_transfer",
-        }
-    }
-}
 
 /// Storage keys for the data associated with `RWA` token
 #[contracttype]
@@ -48,9 +34,6 @@ pub enum RWAStorageKey {
     /// Identity Registry Storage contract address
     IdentityRegistryStorage,
 }
-
-// TODO: change `invoke_contract` calls to `client` instead when `compliance`
-// is merged
 
 // We need to declare an `IdentityRegistryStorageClient` here, instead of
 // importing one from the dedicated module, as the trait there can't be used
@@ -253,7 +236,7 @@ impl RWA {
                 if Self::validate_claim(e, &claim, claim_topic, &issuer, &investor_onchain_id) {
                     break;
                 } else if is_last {
-                    panic_with_error!(e, RWAError::IdentityVefificationFailed);
+                    panic_with_error!(e, RWAError::IdentityVerificationFailed);
                 }
             }
         }
@@ -348,11 +331,8 @@ impl RWA {
 
         Base::update(e, Some(from), Some(to), amount);
 
-        Self::trigger_compliance_hook(
-            e,
-            ComplianceHook::Transferred,
-            Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
-        );
+        let compliance_client = Self::get_compliance_client(e);
+        compliance_client.transferred(from, to, &amount);
 
         emit_transfer(e, from, to, amount);
     }
@@ -396,13 +376,10 @@ impl RWA {
 
         Base::update(e, None, Some(to), amount);
 
-        Self::validate_compliance(e, None, to, amount);
+        Self::validate_mint_compliance(e, to, amount);
 
-        Self::trigger_compliance_hook(
-            e,
-            ComplianceHook::Created,
-            Vec::from_array(e, [to.into_val(e), amount.into_val(e)]),
-        );
+        let compliance_client = Self::get_compliance_client(e);
+        compliance_client.created(to, &amount);
 
         emit_mint(e, to, amount);
     }
@@ -446,11 +423,8 @@ impl RWA {
 
         Base::update(e, Some(user_address), None, amount);
 
-        Self::trigger_compliance_hook(
-            e,
-            ComplianceHook::Destroyed,
-            Vec::from_array(e, [user_address.into_val(e), amount.into_val(e)]),
-        );
+        let compliance_client = Self::get_compliance_client(e);
+        compliance_client.destroyed(user_address, &amount);
 
         emit_burn(e, user_address, amount);
     }
@@ -738,11 +712,6 @@ impl RWA {
         emit_identity_registry_storage_set(e, identity_registry_storage);
     }
 
-    fn trigger_compliance_hook(e: &Env, hook: ComplianceHook, arguments: Vec<Val>) {
-        let compliance_addr = Self::compliance(e);
-        e.invoke_contract::<()>(&compliance_addr, &Symbol::new(e, hook.as_str()), arguments);
-    }
-
     // ################## OVERRIDDEN FUNCTIONS ##################
 
     /// This is a wrapper around [`Base::update()`] to enable
@@ -785,15 +754,12 @@ impl RWA {
         Self::verify_identity(e, to);
 
         // Validate compliance rules for the transfer
-        Self::validate_compliance(e, Some(from), to, amount);
+        Self::validate_transfer_compliance(e, from, to, amount);
 
         Base::update(e, Some(from), Some(to), amount);
 
-        Self::trigger_compliance_hook(
-            e,
-            ComplianceHook::Transferred,
-            Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
-        );
+        let compliance_client = Self::get_compliance_client(e);
+        compliance_client.transferred(from, to, &amount);
 
         emit_transfer(e, from, to, amount);
     }
@@ -812,7 +778,6 @@ impl RWA {
     // ########## HELPER FUNCTIONS ##########
 
     /// Validates compliance rules for a token transfer.
-    /// Mint is also considered as a transfer, but burn is not.
     ///
     /// # Arguments
     ///
@@ -833,17 +798,56 @@ impl RWA {
     /// This function calls the compliance contract to validate the transfer
     /// against configured compliance rules. The compliance contract should
     /// implement a `can_transfer` function that returns a boolean.
-    fn validate_compliance(e: &Env, from: Option<&Address>, to: &Address, amount: i128) {
-        let compliance_addr = Self::compliance(e);
-
-        let can_transfer: bool = e.invoke_contract(
-            &compliance_addr,
-            &Symbol::new(e, ComplianceHook::CanTransfer.as_str()),
-            Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
-        );
+    fn validate_transfer_compliance(e: &Env, from: &Address, to: &Address, amount: i128) {
+        let compliance_client = Self::get_compliance_client(e);
+        let can_transfer: bool = compliance_client.can_transfer(from, to, &amount);
 
         if !can_transfer {
             panic_with_error!(e, RWAError::TransferNotCompliant);
         }
+    }
+
+    /// Validates compliance rules for a mint operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to` - The address receiving tokens.
+    /// * `amount` - The amount of tokens being created.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
+    ///   configured.
+    /// * [`RWAError::MintNotCompliant`] - When the mint operation violates
+    ///   compliance rules.
+    ///
+    /// # Notes
+    ///
+    /// This function calls the compliance contract to validate the mint
+    /// operation against configured compliance rules. The compliance
+    /// contract should implement a `can_create` function that returns a
+    /// boolean.
+    fn validate_mint_compliance(e: &Env, to: &Address, amount: i128) {
+        let compliance_client = Self::get_compliance_client(e);
+        let can_create: bool = compliance_client.can_create(to, &amount);
+
+        if !can_create {
+            panic_with_error!(e, RWAError::TransferNotCompliant);
+        }
+    }
+
+    /// Returns a new Compliance Client
+    ///
+    /// # Arguments
+    ///
+    /// `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`Self::compliance()`] errors
+    fn get_compliance_client(e: &Env) -> ComplianceClient {
+        let compliance_addr = Self::compliance(e);
+        ComplianceClient::new(e, &compliance_addr)
     }
 }

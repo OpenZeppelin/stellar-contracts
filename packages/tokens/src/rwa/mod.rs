@@ -376,19 +376,21 @@ pub enum RWAError {
     /// Indicates insufficient free tokens (due to partial freezing).
     InsufficientFreeTokens = 303,
     /// Indicates an identity cannot be verified.
-    IdentityVefificationFailed = 304,
+    IdentityVerificationFailed = 304,
     /// Indicates the transfer does not comply with the compliance rules.
     TransferNotCompliant = 305,
+    /// Indicates the mint operation does not comply with the compliance rules.
+    MintNotCompliant = 306,
     /// Indicates the compliance contract is not set.
-    ComplianceNotSet = 306,
+    ComplianceNotSet = 307,
     /// Indicates the onchain ID is not set.
-    OnchainIdNotSet = 307,
+    OnchainIdNotSet = 308,
     /// Indicates the version is not set.
-    VersionNotSet = 308,
+    VersionNotSet = 309,
     /// Indicates the claim topics and issuers contract is not set.
-    ClaimTopicsAndIssuersNotSet = 309,
+    ClaimTopicsAndIssuersNotSet = 310,
     /// Indicates the identity registry storage contract is not set.
-    IdentityRegistryStorageNotSet = 310,
+    IdentityRegistryStorageNotSet = 311,
 }
 
 // ################## CONSTANTS ##################

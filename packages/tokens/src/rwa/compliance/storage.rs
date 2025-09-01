@@ -290,3 +290,42 @@ pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
     // All modules passed (or no modules registered)
     true
 }
+
+/// Executes all modules registered for the CanCreate hook to validate a
+/// mint operation.
+///
+/// Called during mint validation to check if a mint operation should be
+/// allowed. Only modules that have registered for the CanCreate hook will be
+/// invoked. This is a read-only operation and should not modify state.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `to` - The address that would receive tokens.
+/// * `amount` - The amount of tokens to be transferred.
+///
+/// # Returns
+///
+/// `true` if all registered modules allow the mint, `false` if any module
+/// rejects it. Returns `true` if no modules are registered for this hook.
+///
+/// # Cross-Contract Calls
+///
+/// Invokes `can_create(to, amount)` on each registered module.
+/// Stops execution and returns `false` on the first module that rejects.
+pub fn can_create(e: &Env, to: Address, amount: i128) -> bool {
+    let modules = get_modules_for_hook(e, ComplianceHook::CanTransfer);
+
+    for module_address in modules.iter() {
+        let client = ComplianceModuleClient::new(e, &module_address);
+        let result = client.can_create(&to, &amount);
+
+        // If any module returns false, the entire check fails
+        if !result {
+            return false;
+        }
+    }
+
+    // All modules passed (or no modules registered)
+    true
+}

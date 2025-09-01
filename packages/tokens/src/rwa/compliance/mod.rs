@@ -32,6 +32,12 @@ pub enum ComplianceHook {
     /// restrictions. This is a READ-only operation and should not modify
     /// state.
     CanTransfer,
+
+    /// Called during mint validation to check if a mint operation should be
+    /// allowed. Modules registered for this hook can implement transfer
+    /// restrictions. This is a READ-only operation and should not modify
+    /// state.
+    CanCreate,
 }
 
 /// Trait for implementing custom compliance logic to RWA tokens.
@@ -45,6 +51,7 @@ pub enum ComplianceHook {
 /// pub trait Compliance       // ✅
 /// pub trait Compliance: RWA  // ❌
 /// ```
+#[contractclient(name = "ComplianceClient")]
 pub trait Compliance {
     /// Registers a compliance module for a specific hook type.
     /// Only the operator can register modules.
@@ -130,7 +137,7 @@ pub trait Compliance {
     /// * `amount` - The amount of tokens involved in the burn.
     fn destroyed(e: &Env, from: Address, amount: i128);
 
-    /// Checks that the transfer is compliant.
+    /// Checks whether the transfer is compliant.
     ///
     /// This function calls all modules registered for the `CanTransfer` hook.
     /// If any module returns `false`, the entire check fails.
@@ -147,6 +154,23 @@ pub trait Compliance {
     ///
     /// `true` if all registered modules allow the transfer, `false` otherwise.
     fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool;
+
+    /// Checks whether the mint operation is compliant.
+    ///
+    /// This function calls all modules registered for the `CanCreate` hook.
+    /// If any module returns `false`, the entire check fails.
+    /// This is a READ-only function and should not modify state.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to` - The address of the receiver.
+    /// * `amount` - The amount of tokens involved in the transfer.
+    ///
+    /// # Returns
+    ///
+    /// `true` if all registered modules allow the transfer, `false` otherwise.
+    fn can_create(e: &Env, to: Address, amount: i128) -> bool;
 }
 
 // ################## ERRORS ##################
@@ -260,6 +284,22 @@ pub trait ComplianceModule {
     ///
     /// `true` if the transfer should be allowed, `false` otherwise.
     fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool;
+
+    /// Called to check if a mint operation should be allowed (for CanCreate
+    /// hook).
+    ///
+    /// This is a read-only function and should not modify state.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to` - The address of the receiver.
+    /// * `amount` - The amount of tokens to mint.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the mint operation should be allowed, `false` otherwise.
+    fn can_create(e: &Env, to: Address, amount: i128) -> bool;
 
     /// Returns the name of the module for identification purposes.
     ///
