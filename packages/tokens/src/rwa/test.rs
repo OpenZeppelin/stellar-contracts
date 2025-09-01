@@ -2,36 +2,69 @@
 
 extern crate std;
 
-use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
+use soroban_sdk::{
+    contract, contractimpl, map, symbol_short, testutils::Address as _, vec, Address, Bytes, Env,
+    Map, String, Vec,
+};
 
+use super::{claim_issuer::ClaimIssuer, identity_claims::Claim};
 use crate::{
     fungible::ContractOverrides,
     rwa::{storage::RWAStorageKey, RWA},
 };
 
-// Mock Identity Verifier Contract
 #[contract]
-struct MockIdentityVerifier;
+pub struct MockIdentityRegistryStorage;
 
 #[contractimpl]
-impl MockIdentityVerifier {
-    pub fn is_verified(_e: Env, _address: Address) -> bool {
-        true // Always return true for testing
+impl MockIdentityRegistryStorage {
+    pub fn stored_identity(e: &Env, _account: Address) -> Address {
+        e.storage().persistent().get(&symbol_short!("stored_id")).unwrap()
     }
+}
 
-    pub fn can_recover(
-        e: Env,
-        _lost_wallet: Address,
-        _new_wallet: Address,
-        investor_id: Address,
+#[contract]
+pub struct MockClaimTopicsAndIssuers;
+
+#[contractimpl]
+impl MockClaimTopicsAndIssuers {
+    pub fn get_claim_topics_and_issuers(e: &Env) -> Map<u32, Vec<Address>> {
+        let issuers = e.storage().persistent().get(&symbol_short!("issuers")).unwrap();
+        map![e, (1u32, issuers)]
+    }
+}
+
+#[contract]
+pub struct MockIdentityClaims;
+
+#[contractimpl]
+impl MockIdentityClaims {
+    pub fn get_claim(e: &Env, _claim_id: soroban_sdk::BytesN<32>) -> Claim {
+        let default = Claim {
+            topic: 1u32,
+            scheme: 1u32,
+            issuer: Address::generate(e),
+            signature: Bytes::from_array(e, &[1, 2, 3, 4]),
+            data: Bytes::from_array(e, &[5, 6, 7, 8]),
+            uri: soroban_sdk::String::from_str(e, "https://example.com"),
+        };
+        e.storage().persistent().get(&symbol_short!("claim")).unwrap_or(default)
+    }
+}
+
+#[contract]
+pub struct MockClaimIssuer;
+
+#[contractimpl]
+impl ClaimIssuer for MockClaimIssuer {
+    fn is_claim_valid(
+        e: &Env,
+        _identity: Address,
+        _claim_topic: u32,
+        _sig_data: Bytes,
+        _claim_data: Bytes,
     ) -> bool {
-        // block specific investor for mock
-        if investor_id.to_string()
-            == String::from_str(&e, "GC65CUPW2IMTJJY6CII7F3OBPVG4YGASEPBBLM4V3LBKX62P6LA24OFV")
-        {
-            return false;
-        }
-        true
+        e.storage().persistent().get(&symbol_short!("claim_ok")).unwrap_or(true)
     }
 }
 
@@ -41,8 +74,8 @@ struct MockCompliance;
 
 #[contractimpl]
 impl MockCompliance {
-    pub fn can_transfer(_e: Env, _from: Option<Address>, _to: Address, _amount: i128) -> bool {
-        true // Always return true for testing
+    pub fn can_transfer(e: Env, _from: Option<Address>, _to: Address, _amount: i128) -> bool {
+        e.storage().persistent().get(&symbol_short!("compliant")).unwrap_or(true)
     }
 
     pub fn transferred(_e: Env, _from: Address, _to: Address, _amount: i128) {}
@@ -55,14 +88,52 @@ impl MockCompliance {
 #[contract]
 struct MockRWAContract;
 
-// Helper function to create a mock identity verifier contract
-fn create_mock_identity_verifier(e: &Env) -> Address {
-    e.register(MockIdentityVerifier, ())
+fn construct_claim(e: &Env, issuer: &Address, topic: u32) -> Claim {
+    Claim {
+        topic,
+        scheme: 1u32,
+        issuer: issuer.clone(),
+        signature: Bytes::from_array(e, &[1, 2, 3, 4]),
+        data: Bytes::from_array(e, &[5, 6, 7, 8]),
+        uri: soroban_sdk::String::from_str(e, "https://example.com"),
+    }
 }
 
-// Helper function to create a mock compliance contract
-fn create_mock_compliance(e: &Env) -> Address {
-    e.register(MockCompliance, ())
+fn set_and_return_verification_contracts(e: &Env) -> (Address, Address, Address, Address) {
+    let identity = e.register(MockIdentityClaims, ());
+    let issuer = e.register(MockClaimIssuer, ());
+    let irs = e.register(MockIdentityRegistryStorage, ());
+    let cti = e.register(MockClaimTopicsAndIssuers, ());
+
+    e.as_contract(&irs, || {
+        // Set up storage with mock contract addresses
+        e.storage().persistent().set(&symbol_short!("stored_id"), &identity);
+    });
+    e.as_contract(&identity, || {
+        let claim = construct_claim(e, &issuer, 1);
+        e.storage().persistent().set(&symbol_short!("claim"), &claim);
+    });
+
+    e.as_contract(&cti, || {
+        // Set up storage with mock contract addresses
+        e.storage().persistent().set(&symbol_short!("issuers"), &vec![&e, issuer.clone()]);
+    });
+
+    RWA::set_claim_topics_and_issuers(e, &cti);
+    RWA::set_identity_registry_storage(e, &irs);
+
+    (identity, issuer, irs, cti)
+}
+
+fn set_and_return_compliance(e: &Env) -> Address {
+    let compliance = e.register(MockCompliance, ());
+    RWA::set_compliance(e, &compliance);
+    compliance
+}
+
+fn setup_all_contracts(e: &Env) {
+    let _ = set_and_return_verification_contracts(e);
+    let _ = set_and_return_compliance(e);
 }
 
 #[test]
@@ -77,7 +148,7 @@ fn get_version() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #310)")]
+#[should_panic(expected = "Error(Contract, #308)")]
 fn get_unset_version_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
@@ -100,36 +171,13 @@ fn set_and_get_onchain_id() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #308)")]
+#[should_panic(expected = "Error(Contract, #307)")]
 fn get_unset_onchain_id_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
 
     e.as_contract(&address, || {
         RWA::onchain_id(&e);
-    });
-}
-
-#[test]
-fn set_and_get_identity_verifier() {
-    let e = Env::default();
-    let address = e.register(MockRWAContract, ());
-
-    e.as_contract(&address, || {
-        let verifier = Address::generate(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        assert_eq!(RWA::identity_verifier(&e), verifier);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #304)")]
-fn get_unset_identity_verifier_fails() {
-    let e = Env::default();
-    let address = e.register(MockRWAContract, ());
-
-    e.as_contract(&address, || {
-        RWA::identity_verifier(&e);
     });
 }
 
@@ -146,7 +194,7 @@ fn set_and_get_compliance() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #305)")]
+#[should_panic(expected = "Error(Contract, #306)")]
 fn get_unset_compliance_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
@@ -157,18 +205,59 @@ fn get_unset_compliance_fails() {
 }
 
 #[test]
-fn mint_with_identity_verification() {
+fn set_and_get_claim_topics_and_issuers() {
     let e = Env::default();
-    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+
+    e.as_contract(&address, || {
+        let claim_topics_and_issuers = Address::generate(&e);
+        RWA::set_claim_topics_and_issuers(&e, &claim_topics_and_issuers);
+        assert_eq!(RWA::claim_topics_and_issuers(&e), claim_topics_and_issuers);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #309)")]
+fn get_unset_claim_topics_and_issuers_fails() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+
+    e.as_contract(&address, || {
+        RWA::claim_topics_and_issuers(&e);
+    });
+}
+
+#[test]
+fn set_and_get_identity_registry_storage() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+
+    e.as_contract(&address, || {
+        let identity_registry_storage = Address::generate(&e);
+        RWA::set_identity_registry_storage(&e, &identity_registry_storage);
+        assert_eq!(RWA::identity_registry_storage(&e), identity_registry_storage);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #310)")]
+fn get_unset_identity_registry_storage_fails() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+
+    e.as_contract(&address, || {
+        RWA::identity_registry_storage(&e);
+    });
+}
+
+#[test]
+fn mint_tokens() {
+    let e = Env::default();
     let address = e.register(MockRWAContract, ());
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &to, 100);
         assert_eq!(RWA::balance(&e, &to), 100);
@@ -177,46 +266,158 @@ fn mint_with_identity_verification() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #305)")]
-fn mint_without_compliance_fails() {
+#[should_panic(expected = "Error(Contract, #304)")]
+fn mint_fails_when_not_same_claim_topic() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let verifier = create_mock_identity_verifier(&e);
-        RWA::set_identity_verifier(&e, &verifier);
+        let (identity, issuer, ..) = set_and_return_verification_contracts(&e);
+        e.as_contract(&identity, || {
+            let claim = construct_claim(&e, &issuer, 2);
+            e.storage().persistent().set(&symbol_short!("claim"), &claim);
+        });
+
+        set_and_return_compliance(&e);
+
         RWA::mint(&e, &to, 100);
     });
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #304)")]
-fn mint_without_identity_verifier_fails() {
+fn mint_fails_when_not_same_issuers() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
+        let (identity, ..) = set_and_return_verification_contracts(&e);
+        let other_issuer = e.register(MockClaimIssuer, ());
+        e.as_contract(&identity, || {
+            let claim = construct_claim(&e, &other_issuer, 1);
+            e.storage().persistent().set(&symbol_short!("claim"), &claim);
+        });
+
+        set_and_return_compliance(&e);
+
         RWA::mint(&e, &to, 100);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #304)")]
+fn mint_fails_when_claim_not_valid() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let (_, claim_issuer, ..) = set_and_return_verification_contracts(&e);
+        e.as_contract(&claim_issuer, || {
+            e.storage().persistent().set(&symbol_short!("claim_ok"), &false)
+        });
+
+        set_and_return_compliance(&e);
+
+        RWA::mint(&e, &to, 100);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #304)")]
+fn mint_fails_with_claim_issuer_conversion_error() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let (_, claim_issuer, ..) = set_and_return_verification_contracts(&e);
+        // Claim issuer returns invalid data, u32 instead of bool
+        e.as_contract(&claim_issuer, || {
+            e.storage().persistent().set(&symbol_short!("claim_ok"), &12u32)
+        });
+
+        set_and_return_compliance(&e);
+
+        RWA::mint(&e, &to, 100);
+    });
+}
+
+#[test]
+fn mint_with_two_claim_issuers() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let (identity, claim_issuer, _, cti) = set_and_return_verification_contracts(&e);
+
+        // First claim issuer returns invalid data, u32 instead of bool
+        e.as_contract(&claim_issuer, || {
+            e.storage().persistent().set(&symbol_short!("claim_ok"), &12u32)
+        });
+
+        // Second claim issuer returns claim is valid
+        let claim_issuer_2 = e.register(MockClaimIssuer, ());
+        e.as_contract(&identity, || {
+            let claim = construct_claim(&e, &claim_issuer_2, 1);
+            e.storage().persistent().set(&symbol_short!("claim"), &claim);
+        });
+        e.as_contract(&cti, || {
+            e.storage()
+                .persistent()
+                .set(&symbol_short!("issuers"), &vec![&e, claim_issuer.clone(), claim_issuer_2]);
+        });
+
+        set_and_return_compliance(&e);
+
+        RWA::mint(&e, &to, 100);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #306)")]
+fn mint_without_compliance_fails() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        set_and_return_verification_contracts(&e);
+        RWA::mint(&e, &to, 100);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #305)")]
+fn mint_fails_when_not_compliant() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+
+    let failing_compliance = e.register(MockCompliance, ());
+    e.as_contract(&failing_compliance, || {
+        e.storage().persistent().set(&symbol_short!("compliant"), &false);
+    });
+
+    e.as_contract(&address, || {
+        set_and_return_verification_contracts(&e);
+        RWA::set_compliance(&e, &failing_compliance);
+
+        RWA::mint(&e, &from, 100);
     });
 }
 
 #[test]
 fn burn_tokens() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let account = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &account, 100);
         assert_eq!(RWA::balance(&e, &account), 100);
@@ -232,7 +433,6 @@ fn burn_tokens() {
 #[should_panic(expected = "Error(Contract, #100)")]
 fn burn_insufficient_balance_fails() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let account = Address::generate(&e);
 
@@ -244,17 +444,12 @@ fn burn_insufficient_balance_fails() {
 #[test]
 fn forced_transfer() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // mint tokens
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &from, 100);
 
@@ -268,7 +463,6 @@ fn forced_transfer() {
 #[test]
 fn address_freezing() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let caller = Address::generate(&e);
     let user = Address::generate(&e);
@@ -290,16 +484,11 @@ fn address_freezing() {
 #[test]
 fn partial_token_freezing() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &user, 100);
 
@@ -320,16 +509,11 @@ fn partial_token_freezing() {
 #[should_panic(expected = "Error(Contract, #300)")]
 fn freeze_more_than_balance_fails() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &user, 50);
         RWA::freeze_partial_tokens(&e, &user, 100); // Should fail
@@ -340,16 +524,11 @@ fn freeze_more_than_balance_fails() {
 #[should_panic(expected = "Error(Contract, #303)")]
 fn unfreeze_more_than_frozen_fails() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &user, 100);
         RWA::freeze_partial_tokens(&e, &user, 30);
@@ -360,18 +539,13 @@ fn unfreeze_more_than_frozen_fails() {
 #[test]
 fn recovery_address() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
     let investor_id = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         // Mint tokens to lost wallet
         RWA::mint(&e, &lost_wallet, 100);
@@ -390,15 +564,13 @@ fn recovery_address() {
 #[test]
 fn recovery_with_zero_balance_returns_false() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
     let investor_id = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let verifier = create_mock_identity_verifier(&e);
-        RWA::set_identity_verifier(&e, &verifier);
+        setup_all_contracts(&e);
 
         // No tokens in lost wallet
         let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
@@ -410,16 +582,11 @@ fn recovery_with_zero_balance_returns_false() {
 #[should_panic(expected = "Error(Contract, #103)")]
 fn negative_amount_mint_fails() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &user, -100);
     });
@@ -434,10 +601,7 @@ fn transfer_with_compliance_and_identity_checks() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         // Mint and transfer
         RWA::mint(&e, &from, 100);
@@ -457,11 +621,7 @@ fn contract_overrides_transfer() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &from, 100);
 
@@ -483,11 +643,7 @@ fn contract_overrides_transfer_from() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &owner, 100);
 
@@ -509,17 +665,12 @@ fn contract_overrides_transfer_from() {
 #[should_panic(expected = "Error(Contract, #300)")]
 fn forced_transfer_insufficient_balance_fails() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &from, 50);
 
@@ -532,17 +683,12 @@ fn forced_transfer_insufficient_balance_fails() {
 #[test]
 fn forced_transfer_with_token_unfreezing() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &from, 100);
 
@@ -569,17 +715,12 @@ fn forced_transfer_with_token_unfreezing() {
 #[test]
 fn forced_transfer_without_unfreezing_needed() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &from, 100);
 
@@ -606,17 +747,12 @@ fn forced_transfer_without_unfreezing_needed() {
 #[test]
 fn forced_transfer_exact_unfreezing() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &from, 100);
 
@@ -641,18 +777,13 @@ fn forced_transfer_exact_unfreezing() {
 #[test]
 fn recovery_address_with_frozen_tokens() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
     let investor_id = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         // Mint tokens and freeze some
         RWA::mint(&e, &lost_wallet, 100);
@@ -673,7 +804,6 @@ fn recovery_address_with_frozen_tokens() {
 #[test]
 fn recovery_address_with_frozen_address() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
@@ -681,11 +811,7 @@ fn recovery_address_with_frozen_address() {
     let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         // Mint tokens and freeze the address
         RWA::mint(&e, &lost_wallet, 100);
@@ -706,7 +832,6 @@ fn recovery_address_with_frozen_address() {
 #[test]
 fn recovery_address_with_both_frozen_tokens_and_address() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
@@ -714,11 +839,7 @@ fn recovery_address_with_both_frozen_tokens_and_address() {
     let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         // Mint tokens, freeze some tokens, and freeze the address
         RWA::mint(&e, &lost_wallet, 100);
@@ -744,16 +865,11 @@ fn recovery_address_with_both_frozen_tokens_and_address() {
 #[should_panic(expected = "Error(Contract, #301)")]
 fn freeze_partial_tokens_negative_amount_fails() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &user, 100);
 
@@ -766,48 +882,17 @@ fn freeze_partial_tokens_negative_amount_fails() {
 #[should_panic(expected = "Error(Contract, #301)")]
 fn unfreeze_partial_tokens_negative_amount_fails() {
     let e = Env::default();
-    e.mock_all_auths();
     let address = e.register(MockRWAContract, ());
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &user, 100);
         RWA::freeze_partial_tokens(&e, &user, 50);
 
         // Try to unfreeze negative amount - should fail
         RWA::unfreeze_partial_tokens(&e, &user, -10);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #309)")]
-fn recovery_address_fails_when_can_recover_returns_false() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let address = e.register(MockRWAContract, ());
-    let lost_wallet = Address::generate(&e);
-    let new_wallet = Address::generate(&e);
-    let investor_id =
-        Address::from_str(&e, "GC65CUPW2IMTJJY6CII7F3OBPVG4YGASEPBBLM4V3LBKX62P6LA24OFV");
-
-    e.as_contract(&address, || {
-        // SETUP with verifier that denies recovery
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
-
-        // Mint tokens to lost wallet
-        RWA::mint(&e, &lost_wallet, 100);
-
-        // Try recovery - should fail with RecoveryFailed error
-        RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
     });
 }
 
@@ -822,11 +907,7 @@ fn transfer_fails_when_from_address_frozen() {
     let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &from, 100);
 
@@ -849,11 +930,7 @@ fn transfer_fails_when_to_address_frozen() {
     let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &from, 100);
 
@@ -875,11 +952,7 @@ fn transfer_fails_when_insufficient_free_tokens() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        // SETUP
-        let verifier = create_mock_identity_verifier(&e);
-        let compliance = create_mock_compliance(&e);
-        RWA::set_identity_verifier(&e, &verifier);
-        RWA::set_compliance(&e, &compliance);
+        setup_all_contracts(&e);
 
         RWA::mint(&e, &from, 100);
 

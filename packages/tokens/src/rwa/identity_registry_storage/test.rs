@@ -580,146 +580,9 @@ fn add_country_data_entries_panics_if_too_many() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #325)")]
-fn add_identity_individual_with_organization_country_fails() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let identity = Address::generate(&e);
-        let country_data = CountryData {
-            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(840)),
-            metadata: None,
-        };
-
-        // This should fail: Individual identity with Organization country relation
-        add_identity(&e, &account, &identity, IdentityType::Individual, &vec![&e, country_data]);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #325)")]
-fn add_identity_organization_with_individual_country_fails() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let identity = Address::generate(&e);
-        let country_data = CountryData {
-            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
-            metadata: None,
-        };
-
-        // This should fail: Organization identity with Individual country relation
-        add_identity(&e, &account, &identity, IdentityType::Organization, &vec![&e, country_data]);
-    });
-}
-
-#[test]
-fn add_identity_organization_with_organization_country_succeeds() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let identity = Address::generate(&e);
-        let country_data = CountryData {
-            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(840)),
-            metadata: None,
-        };
-
-        // This should succeed: Organization identity with Organization country relation
-        add_identity(
-            &e,
-            &account,
-            &identity,
-            IdentityType::Organization,
-            &vec![&e, country_data.clone()],
-        );
-
-        let stored_identity = get_identity(&e, &account);
-        assert_eq!(stored_identity, identity);
-
-        let profile = get_identity_profile(&e, &account);
-        assert_eq!(profile.identity_type, IdentityType::Organization);
-        assert_eq!(profile.countries.len(), 1);
-        assert_eq!(get_country_data(&e, &account, 0), country_data);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #325)")]
-fn add_country_data_entries_mismatch_fails() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let identity = Address::generate(&e);
-        let initial_country_data = CountryData {
-            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
-            metadata: None,
-        };
-        let mismatched_country_data = CountryData {
-            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(276)),
-            metadata: None,
-        };
-
-        // First create an individual identity
-        add_identity(
-            &e,
-            &account,
-            &identity,
-            IdentityType::Individual,
-            &vec![&e, initial_country_data],
-        );
-
-        // This should fail: trying to add organization country data to individual
-        // identity
-        add_country_data_entries(&e, &account, &vec![&e, mismatched_country_data]);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #325)")]
-fn modify_country_data_mismatch_fails() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    e.as_contract(&contract_id, || {
-        let account = Address::generate(&e);
-        let identity = Address::generate(&e);
-        let initial_country_data = CountryData {
-            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
-            metadata: None,
-        };
-        let mismatched_country_data = CountryData {
-            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(276)),
-            metadata: None,
-        };
-
-        // First create an individual identity
-        add_identity(
-            &e,
-            &account,
-            &identity,
-            IdentityType::Individual,
-            &vec![&e, initial_country_data],
-        );
-
-        // This should fail: trying to modify to organization country data on individual
-        // identity
-        modify_country_data(&e, &account, 0, &mismatched_country_data);
-    });
-}
-
-#[test]
 fn modify_country_data_matching_type_succeeds() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
-
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
@@ -749,31 +612,35 @@ fn modify_country_data_matching_type_succeeds() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #325)")]
-fn mixed_country_relations_in_single_call_fails() {
+fn mixed_country_relations_succeeds() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
         let identity = Address::generate(&e);
-        let individual_country_data = CountryData {
-            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+        let incorporation_data = CountryData {
+            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(840)),
             metadata: None,
         };
-        let organization_country_data = CountryData {
-            country: CountryRelation::Organization(OrganizationCountryRelation::Incorporation(276)),
+        let individual_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(276)),
             metadata: None,
         };
 
-        // This should fail: mixed country relation types in initial data
-
+        // This should succeed: mixed country relation types for KYB compliance
         add_identity(
             &e,
             &account,
             &identity,
-            IdentityType::Individual,
-            &vec![&e, individual_country_data, organization_country_data],
+            IdentityType::Organization,
+            &vec![&e, incorporation_data.clone(), individual_data.clone()],
         );
+
+        let profile = get_identity_profile(&e, &account);
+        assert_eq!(profile.identity_type, IdentityType::Organization);
+        assert_eq!(profile.countries.len(), 2);
+        assert_eq!(get_country_data(&e, &account, 0), incorporation_data);
+        assert_eq!(get_country_data(&e, &account, 1), individual_data);
     });
 }

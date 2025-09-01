@@ -17,16 +17,49 @@
 /// - `Custom(Symbol::new(e, "Subsidiary"), 792)` - Custom subsidiary location:
 ///   Turkey
 ///
+/// ## Flexible Country Relations
+///
 /// This flexible structure allows an account to hold multiple country
-/// relationships, such as an individual having dual citizenship or an
-/// organization operating across multiple jurisdictions. The system enforces
-/// type matching between the identity type and country relation types.
+/// relationships and supports mixing of individual and organizational country
+/// relations to accommodate Know-Your-Business (KYB) requirements.
+///
+/// **Examples of mixed relations:**
+/// - Organizations can include individual country data for Ultimate Beneficial
+///   Owners (UBOs), key management personnel, or authorized signatories
+/// - Individual identities can include organizational relationships when
+///   relevant for compliance
+///
+/// **KYB Example for a US Corporation:**
+/// ```rust
+/// let kyb_country_data = vec![
+///     // Corporate data
+///     CountryData {
+///         country: CountryRelation::Organization(
+///             OrganizationCountryRelation::Incorporation(840) // USA
+///         ),
+///         metadata: Some(metadata_map!("entity_type" => "Corporation")),
+///     },
+///     // UBO individual data
+///     CountryData {
+///         country: CountryRelation::Individual(
+///             IndividualCountryRelation::Residence(276) // Germany
+///         ),
+///         metadata: Some(metadata_map!("role" => "UBO", "name" => "John Doe")),
+///     },
+///     CountryData {
+///         country: CountryRelation::Individual(
+///             IndividualCountryRelation::Citizenship(756) // Switzerland
+///         ),
+///         metadata: Some(metadata_map!("role" => "CEO", "ownership" => "25%")),
+///     },
+/// ];
+/// ```
 ///
 /// When a new identity is registered for an account, it must be created with at
 /// least one initial country data. Afterward, more country data can be added
 /// (up to MAX_COUNTRY_ENTRIES), modified, or removed as needed.
 ///
-/// ## Assumptions
+/// ## Design Principles
 ///
 /// 1. **All Country Data are Equal**: The system treats the initial country
 ///    data and any subsequently added country data the same way. They are all
@@ -38,10 +71,11 @@
 ///    duplicate country data. It is the responsibility of the contract
 ///    implementing the logic to ensure that, for example, an account does not
 ///    have two "Country of Residence" country data.
-/// 4. **Country Data Type Matching**: All country data entries must match the
-///    identity's type (Individual or Organization). Individual identities can
-///    only have IndividualCountryRelation entries, while Organization
-///    identities can only have OrganizationCountryRelation entries.
+/// 4. **Flexible Relation Types**: Country data entries can mix individual and
+///    organizational relations within the same identity to support complex
+///    regulatory requirements like KYB processes.
+/// 5. **Metadata Context**: Use the optional metadata field to provide context
+///    for mixed relation types (e.g., role, name, ownership percentage).
 ///
 /// ### Example implementation of `CountryDataManager` with uniqueness check
 ///
@@ -73,7 +107,7 @@
 /// }
 /// ```
 use soroban_sdk::{
-    contracttype, panic_with_error, vec, Address, Env, Map, String, Symbol, TryFromVal, Val, Vec,
+    contracttype, panic_with_error, Address, Env, Map, String, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::rwa::identity_registry_storage::{
@@ -255,7 +289,6 @@ pub fn get_country_data_entries(e: &Env, account: &Address) -> Vec<CountryData> 
 /// * [`IRSError::EmptyCountryList`] - If `initial_countries` is empty.
 /// * [`IRSError::MaxCountryEntriesReached`] - If the number of
 ///   `initial_countries` exceeds `MAX_COUNTRY_ENTRIES`.
-/// * refer to [`validate_country_relations`] errors.
 ///
 /// # Events
 ///
@@ -288,9 +321,6 @@ pub fn add_identity(
     if initial_countries.len() > MAX_COUNTRY_ENTRIES {
         panic_with_error!(e, IRSError::MaxCountryEntriesReached);
     }
-
-    // Validate that country relations match the identity type
-    validate_country_relations(e, &identity_type, initial_countries);
 
     let identity_key = IRSStorageKey::Identity(account.clone());
     if e.storage().persistent().has(&identity_key) {
@@ -420,7 +450,6 @@ pub fn remove_identity(e: &Env, account: &Address) {
 /// * [`IRSError::EmptyCountryList`] - If `country_data_list` is empty.
 /// * [`IRSError::MaxCountryEntriesReached`] - If the number of country data
 ///   entries exceeds `MAX_COUNTRY_ENTRIES`.
-/// * refer to [`validate_country_relations`] errors.
 ///
 /// # Events
 ///
@@ -447,9 +476,6 @@ pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &
         get_persistent_entry(e, &IRSStorageKey::IdentityProfile(account.clone()))
             .expect("identity profile must be already set");
 
-    // Validate that country relations match the identity type
-    validate_country_relations(e, &profile.identity_type, country_data_list);
-
     profile.countries.append(country_data_list);
     if profile.countries.len() > MAX_COUNTRY_ENTRIES {
         panic_with_error!(e, IRSError::MaxCountryEntriesReached);
@@ -475,7 +501,6 @@ pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &
 /// # Errors
 ///
 /// * [`IRSError::CountryDataNotFound`] - If the index is out of bounds.
-/// * refer to [`validate_country_relations`] errors.
 ///
 /// # Events
 ///
@@ -498,8 +523,6 @@ pub fn modify_country_data(e: &Env, account: &Address, index: u32, country_data:
         panic_with_error!(e, IRSError::CountryDataNotFound);
     }
 
-    // Validate that the new country relation matches the identity type
-    validate_country_relations(e, &profile.identity_type, &vec![e, country_data.clone()]);
     profile.countries.set(index, country_data.clone());
 
     let key = IRSStorageKey::IdentityProfile(account.clone());
@@ -558,40 +581,6 @@ pub fn delete_country_data(e: &Env, account: &Address, index: u32) {
 }
 
 // ################## HELPERS ##################
-
-/// Validates that country relations match the identity type.
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-/// * `identity_type` - The type of identity (Individual or Organization).
-/// * `country_data_list` - The list of country data to validate.
-///
-/// # Errors
-///
-/// * [`IRSError::CountryRelationMismatch`] - If any country relation doesn't
-///   match the identity type.
-pub fn validate_country_relations(
-    e: &Env,
-    identity_type: &IdentityType,
-    country_data_list: &Vec<CountryData>,
-) {
-    for country_data in country_data_list.iter() {
-        match (identity_type, &country_data.country) {
-            (IdentityType::Individual, CountryRelation::Individual(_)) => {
-                // Valid: Individual identity with individual country relation
-            }
-            (IdentityType::Organization, CountryRelation::Organization(_)) => {
-                // Valid: Organization identity with organization country
-                // relation
-            }
-            _ => {
-                // Invalid: Mismatched identity type and country relation
-                panic_with_error!(e, IRSError::CountryRelationMismatch);
-            }
-        }
-    }
-}
 
 /// Helper function that tries to retrieve a persistent storage value and
 /// extend its TTL if the entry exists.

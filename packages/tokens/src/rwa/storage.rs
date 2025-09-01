@@ -1,14 +1,20 @@
 use soroban_sdk::{
-    contracttype, panic_with_error, Address, Env, IntoVal, String, Symbol, Val, Vec,
+    contractclient, contracttype, panic_with_error, Address, Env, IntoVal, String, Symbol, Val, Vec,
 };
 use stellar_contract_utils::pausable::{paused, PausableError};
 
+use super::{
+    claim_issuer::ClaimIssuerClient,
+    claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
+    identity_claims::{generate_claim_id, Claim, IdentityClaimsClient},
+};
 use crate::{
     fungible::{emit_transfer, Base, ContractOverrides, StorageKey},
     rwa::{
-        emit_address_frozen, emit_burn, emit_compliance_added, emit_identity_verifier_added,
-        emit_mint, emit_recovery_success, emit_token_information_updated, emit_tokens_frozen,
-        emit_tokens_unfrozen, RWAError, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
+        emit_address_frozen, emit_burn, emit_claim_topics_and_issuers_set, emit_compliance_set,
+        emit_identity_registry_storage_set, emit_mint, emit_recovery_success,
+        emit_token_information_updated, emit_tokens_frozen, emit_tokens_unfrozen, RWAError,
+        FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
 };
 
@@ -19,18 +25,32 @@ pub enum RWAStorageKey {
     AddressFrozen(Address),
     /// Amount of tokens frozen for a specific address
     FrozenTokens(Address),
-    /// Identity Verifier contract address
-    IdentityVerifier,
     /// Compliance contract address
     Compliance,
     /// OnchainID contract address
     OnchainId,
     /// Version of the token
     Version,
+    /// Claim Topics and Issuers contract address
+    ClaimTopicsAndIssuers,
+    /// Identity Registry Storage contract address
+    IdentityRegistryStorage,
 }
 
 // TODO: change `invoke_contract` calls to `client` instead when `compliance`
-// and `identity_verifier` is merged
+// is merged
+
+// We need to declare an `IdentityRegistryStorageClient` here, instead of
+// importing one from the dedicated module, as the trait there can't be used
+// with `#[contractclient]` macro, because it has an associated type, which is
+// not supported by the `#[contractclient]` macro.
+// Another option would have been to use `e.invoke_contract`, but we stick with
+// the above choice for consistency reasons.
+#[allow(unused)]
+#[contractclient(name = "IdentityRegistryStorageClient")]
+trait IdentityRegistryStorage {
+    fn stored_identity(e: &Env, user_address: Address) -> Address;
+}
 
 pub struct RWA;
 
@@ -79,23 +99,6 @@ impl RWA {
             .unwrap_or_else(|| panic_with_error!(e, RWAError::OnchainIdNotSet))
     }
 
-    /// Returns the Identity Verifier linked to the token.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
-    ///   not set.
-    pub fn identity_verifier(e: &Env) -> Address {
-        e.storage()
-            .instance()
-            .get(&RWAStorageKey::IdentityVerifier)
-            .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityVerifierNotSet))
-    }
-
     /// Returns the Compliance contract linked to the token.
     ///
     /// # Arguments
@@ -111,6 +114,40 @@ impl RWA {
             .instance()
             .get(&RWAStorageKey::Compliance)
             .unwrap_or_else(|| panic_with_error!(e, RWAError::ComplianceNotSet))
+    }
+
+    /// Returns the Claim Topics and Issuers contract linked to the token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::ClaimTopicsAndIssuersNotSet`] - When the claim topics and
+    ///   issuers contract is not set.
+    pub fn claim_topics_and_issuers(e: &Env) -> Address {
+        e.storage()
+            .instance()
+            .get(&RWAStorageKey::ClaimTopicsAndIssuers)
+            .unwrap_or_else(|| panic_with_error!(e, RWAError::ClaimTopicsAndIssuersNotSet))
+    }
+
+    /// Returns the Identity Registry Storage contract linked to the token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::IdentityRegistryStorageNotSet`] - When the identity
+    ///   registry storage contract is not set.
+    pub fn identity_registry_storage(e: &Env) -> Address {
+        e.storage()
+            .instance()
+            .get(&RWAStorageKey::IdentityRegistryStorage)
+            .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityRegistryStorageNotSet))
     }
 
     /// Returns the freezing status of a wallet. Frozen wallets cannot send or
@@ -163,6 +200,87 @@ impl RWA {
         // frozen tokens cannot be greater than total balance, necessary checks are done
         // in state changing functions
         total_balance - frozen_tokens
+    }
+
+    /// Verifies that the identity of an user address has the required valid
+    /// claims.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user_address` - The user address to verify.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
+    ///   user address cannot be verified.
+    pub fn verify_identity(e: &Env, user_address: &Address) {
+        let irs_addr = Self::identity_registry_storage(e);
+        let irs_client = IdentityRegistryStorageClient::new(e, &irs_addr);
+
+        let investor_onchain_id = irs_client.stored_identity(user_address);
+        let identity_client = IdentityClaimsClient::new(e, &investor_onchain_id);
+
+        let cti_addr = Self::claim_topics_and_issuers(e);
+        let cti_client = ClaimTopicsAndIssuersClient::new(e, &cti_addr);
+
+        let topics_and_issuers = cti_client.get_claim_topics_and_issuers();
+
+        for (claim_topic, issuers) in topics_and_issuers.iter() {
+            let issuers_with_claim_ids = issuers.iter().enumerate().map(|(i, issuer)| {
+                (
+                    issuer.clone(),
+                    generate_claim_id(e, &issuer, claim_topic),
+                    i as u32 == issuers.len() - 1,
+                )
+            });
+
+            for (issuer, claim_id, is_last) in issuers_with_claim_ids {
+                let claim: Claim = identity_client.get_claim(&claim_id);
+
+                if Self::validate_claim(e, &claim, claim_topic, &issuer, &investor_onchain_id) {
+                    break;
+                } else if is_last {
+                    panic_with_error!(e, RWAError::IdentityVefificationFailed);
+                }
+            }
+        }
+    }
+
+    /// Validates a claim against the expected topic and issuer.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `claim` - The claim to validate.
+    /// * `claim_topic` - The expected claim topic.
+    /// * `issuer` - The issuer address.
+    /// * `investor_onchain_id` - The onchain ID of the investor
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if the claim is valid, `false` otherwise.
+    pub fn validate_claim(
+        e: &Env,
+        claim: &Claim,
+        claim_topic: u32,
+        issuer: &Address,
+        investor_onchain_id: &Address,
+    ) -> bool {
+        if claim.topic == claim_topic && claim.issuer == *issuer {
+            let validation = ClaimIssuerClient::new(e, issuer).try_is_claim_valid(
+                investor_onchain_id,
+                &claim_topic,
+                &claim.signature,
+                &claim.data,
+            );
+            match validation {
+                Ok(Ok(is_valid)) => is_valid,
+                _ => false,
+            }
+        } else {
+            false
+        }
     }
 
     // ################## CHANGE STATE ##################
@@ -262,7 +380,6 @@ impl RWA {
     /// admin.require_auth();
     /// ```
     pub fn mint(e: &Env, to: &Address, amount: i128) {
-        // Verify identity verifier for the recipient address
         Self::verify_identity(e, to);
 
         Base::update(e, None, Some(to), amount);
@@ -296,12 +413,12 @@ impl RWA {
     /// * topics - `["burn", user_address: Address]`
     /// * data - `[amount: i128]`
     ///
-    /// # Notes
+    /// # Security Warning
     ///
-    /// Authorization for `user_address` is required.
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used internally or in admin functions that implement their own
+    /// authorization logic.
     pub fn burn(e: &Env, user_address: &Address, amount: i128) {
-        user_address.require_auth();
-
         // Check if we need to unfreeze tokens to complete the burn
         let free_tokens = Self::get_free_tokens(e, user_address);
         if free_tokens < amount {
@@ -341,18 +458,15 @@ impl RWA {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
-    ///   not configured.
-    /// * [`RWAError::AddressNotVerified`] - When the new wallet is not
-    ///   verified.
-    /// * [`RWAError::RecoveryFailed`] - When recovery parameters are invalid.
+    /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
+    ///   new wallet cannot be verified.
     ///
     /// # Events
     ///
     /// * topics - `["transfer", lost_wallet: Address, new_wallet: Address]`
     /// * data - `[amount: i128]`
-    /// * topics - `["recovery", lost_wallet: Address, new_wallet: Address,
-    ///   investor_onchain_id: Address]`
+    /// * topics - `["recovery_success", lost_wallet: Address, new_wallet:
+    ///   Address, investor_onchain_id: Address]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -371,9 +485,8 @@ impl RWA {
         new_wallet: &Address,
         investor_onchain_id: &Address,
     ) -> bool {
-        // Verify identity for the new wallet and investor onchain ID
+        // Verify identity for the new wallet
         Self::verify_identity(e, new_wallet);
-        Self::verify_recovery_identity(e, lost_wallet, new_wallet, investor_onchain_id);
 
         let lost_balance = Base::balance(e, lost_wallet);
         if lost_balance == 0 {
@@ -418,8 +531,8 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - `["freeze", user_address: Address, freeze: bool, caller:
-    ///   Address]`
+    /// * topics - `["address_frozen", user_address: Address, is_frozen: bool,
+    ///   caller: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -530,10 +643,6 @@ impl RWA {
     ///   version: Symbol, onchain_id: Address]`
     /// * data - `[]`
     ///
-    /// # Errors
-    ///
-    /// * refer to [`Base::get_metadata`] errors.
-    ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: This function bypasses authorization checks and should
@@ -545,28 +654,6 @@ impl RWA {
         emit_token_information_updated(e, None, None, None, None, Some(onchain_id));
     }
 
-    /// Sets the Identity Verifier for the token.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `identity_verifier` - The address of the identity verifier contract.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["id_reg_add", identity_verifier: Address]`
-    /// * data - `[]`
-    ///
-    /// # Security Warning
-    ///
-    /// **IMPORTANT**: This function bypasses authorization checks and should
-    /// only be used internally or in admin functions that implement their own
-    /// authorization logic.
-    pub fn set_identity_verifier(e: &Env, identity_verifier: &Address) {
-        e.storage().instance().set(&RWAStorageKey::IdentityVerifier, identity_verifier);
-        emit_identity_verifier_added(e, identity_verifier);
-    }
-
     /// Sets the compliance contract of the token.
     ///
     /// # Arguments
@@ -576,7 +663,7 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - `["comp_add", compliance: Address]`
+    /// * topics - `["compliance_set", compliance: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -586,128 +673,62 @@ impl RWA {
     /// authorization logic.
     pub fn set_compliance(e: &Env, compliance: &Address) {
         e.storage().instance().set(&RWAStorageKey::Compliance, compliance);
-        emit_compliance_added(e, compliance);
+        emit_compliance_set(e, compliance);
     }
 
-    // ########## HELPER FUNCTIONS FOR CONTRACT INTEGRATION ##########
-
-    /// Verifies that an address is registered and verified in the identity
-    /// verifier.
+    /// Sets the claim topics and issuers contract of the token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `user_address` - The address to verify.
+    /// * `claim_topics_and_issuers` - The address of the claim topics and
+    ///   issuers contract.
     ///
-    /// # Errors
+    /// # Events
     ///
-    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
-    ///   not configured.
-    /// * [`RWAError::AddressNotVerified`] - When the address is not verified in
-    ///   the identity verifier.
+    /// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers:
+    ///   Address]`
+    /// * data - `[]`
     ///
-    /// # Notes
+    /// # Security Warning
     ///
-    /// This function calls the identity verifier contract to check if the
-    /// address has a valid, verified identity. The identity verifier should
-    /// implement a `is_verify` function that returns a boolean.
-    fn verify_identity(e: &Env, user_address: &Address) {
-        let identity_verifier_addr = Self::identity_verifier(e);
-
-        // Call the identity verifier contract to verify the address
-        let is_verified: bool = e.invoke_contract(
-            &identity_verifier_addr,
-            &Symbol::new(e, "is_verified"),
-            Vec::from_array(e, [user_address.into_val(e)]),
-        );
-
-        if !is_verified {
-            panic_with_error!(e, RWAError::AddressNotVerified);
-        }
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used internally or in admin functions that implement their own
+    /// authorization logic.
+    pub fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: &Address) {
+        e.storage().instance().set(&RWAStorageKey::ClaimTopicsAndIssuers, claim_topics_and_issuers);
+        emit_claim_topics_and_issuers_set(e, claim_topics_and_issuers);
     }
 
-    /// Validates compliance rules for a token transfer.
-    /// Mint is also considered as a transfer, but burn is not.
+    /// Sets the identity registry storage contract of the token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `from` - The address sending tokens.
-    /// * `to` - The address receiving tokens.
-    /// * `amount` - The amount of tokens being transferred.
+    /// * `identity_registry_storage` - The address of the identity registry
+    ///   storage contract.
     ///
-    /// # Errors
+    /// # Events
     ///
-    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
-    ///   configured.
-    /// * [`RWAError::TransferNotCompliant`] - When the transfer violates
-    ///   compliance rules.
+    /// * topics - `["identity_registry_storage_set", identity_registry_storage:
+    ///   Address]`
+    /// * data - `[]`
     ///
-    /// # Notes
+    /// # Security Warning
     ///
-    /// This function calls the compliance contract to validate the transfer
-    /// against configured compliance rules. The compliance contract should
-    /// implement a `can_transfer` function that returns a boolean.
-    fn validate_compliance(e: &Env, from: Option<&Address>, to: &Address, amount: i128) {
-        let compliance_addr = Self::compliance(e);
-
-        let can_transfer: bool = e.invoke_contract(
-            &compliance_addr,
-            &Symbol::new(e, "can_transfer"),
-            Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
-        );
-
-        if !can_transfer {
-            panic_with_error!(e, RWAError::TransferNotCompliant);
-        }
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used internally or in admin functions that implement their own
+    /// authorization logic.
+    pub fn set_identity_registry_storage(e: &Env, identity_registry_storage: &Address) {
+        e.storage()
+            .instance()
+            .set(&RWAStorageKey::IdentityRegistryStorage, identity_registry_storage);
+        emit_identity_registry_storage_set(e, identity_registry_storage);
     }
 
     fn trigger_compliance_hook(e: &Env, hook_name: &str, arguments: Vec<Val>) {
         let compliance_addr = Self::compliance(e);
         e.invoke_contract::<()>(&compliance_addr, &Symbol::new(e, hook_name), arguments);
-    }
-
-    /// Verifies recovery identity for wallet recovery operations.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `lost_wallet` - The address of the lost wallet.
-    /// * `new_wallet` - The address of the new wallet.
-    /// * `investor_onchain_id` - The onchain ID of the investor.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier is
-    ///   not configured.
-    /// * [`RWAError::RecoveryFailed`] - When recovery parameters are invalid.
-    ///
-    /// # Notes
-    ///
-    /// This function calls the identity verifier contract to verify that the
-    /// recovery operation is valid for the given investor onchain ID. The
-    /// identity verifier should implement a `can_recov` function.
-    fn verify_recovery_identity(
-        e: &Env,
-        lost_wallet: &Address,
-        new_wallet: &Address,
-        investor_onchain_id: &Address,
-    ) {
-        let identity_verifier_addr = Self::identity_verifier(e);
-
-        // Call the identity verifier contract to verify recovery eligibility
-        let can_recover: bool = e.invoke_contract(
-            &identity_verifier_addr,
-            &Symbol::new(e, "can_recover"),
-            Vec::from_array(
-                e,
-                [lost_wallet.into_val(e), new_wallet.into_val(e), investor_onchain_id.into_val(e)],
-            ),
-        );
-
-        if !can_recover {
-            panic_with_error!(e, RWAError::RecoveryFailed);
-        }
     }
 
     // ################## OVERRIDDEN FUNCTIONS ##################
@@ -748,7 +769,6 @@ impl RWA {
             panic_with_error!(e, RWAError::InsufficientFreeTokens);
         }
 
-        // Verify identity verifier for both addresses
         Self::verify_identity(e, from);
         Self::verify_identity(e, to);
 
@@ -775,5 +795,43 @@ impl RWA {
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         Base::spend_allowance(e, from, spender, amount);
         Self::transfer(e, from, to, amount);
+    }
+
+    // ########## HELPER FUNCTIONS ##########
+
+    /// Validates compliance rules for a token transfer.
+    /// Mint is also considered as a transfer, but burn is not.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The address sending tokens.
+    /// * `to` - The address receiving tokens.
+    /// * `amount` - The amount of tokens being transferred.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
+    ///   configured.
+    /// * [`RWAError::TransferNotCompliant`] - When the transfer violates
+    ///   compliance rules.
+    ///
+    /// # Notes
+    ///
+    /// This function calls the compliance contract to validate the transfer
+    /// against configured compliance rules. The compliance contract should
+    /// implement a `can_transfer` function that returns a boolean.
+    fn validate_compliance(e: &Env, from: Option<&Address>, to: &Address, amount: i128) {
+        let compliance_addr = Self::compliance(e);
+
+        let can_transfer: bool = e.invoke_contract(
+            &compliance_addr,
+            &Symbol::new(e, "can_transfer"),
+            Vec::from_array(e, [from.into_val(e), to.into_val(e), amount.into_val(e)]),
+        );
+
+        if !can_transfer {
+            panic_with_error!(e, RWAError::TransferNotCompliant);
+        }
     }
 }
