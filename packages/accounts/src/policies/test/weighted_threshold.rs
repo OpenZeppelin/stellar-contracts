@@ -39,7 +39,7 @@ fn install_success() {
 
         install(&e, &params, &smart_account);
 
-        assert_eq!(get_thershold(&e, &smart_account), 75);
+        assert_eq!(get_threshold(&e, &smart_account), 75);
         let stored_weights = get_signer_weights(&e, &smart_account);
         assert_eq!(stored_weights.len(), 2);
     });
@@ -344,7 +344,7 @@ fn set_threshold_success() {
 
     e.as_contract(&address, || {
         set_threshold(&e, 100, &smart_account);
-        assert_eq!(get_thershold(&e, &smart_account), 100);
+        assert_eq!(get_threshold(&e, &smart_account), 100);
     });
 }
 
@@ -429,7 +429,7 @@ fn uninstall_success() {
         install(&e, &params, &smart_account);
 
         // Verify it's installed
-        assert_eq!(get_thershold(&e, &smart_account), 75);
+        assert_eq!(get_threshold(&e, &smart_account), 75);
     });
 
     e.as_contract(&address, || {

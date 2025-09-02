@@ -47,7 +47,7 @@ pub enum WeightedThresholdStorageKey {
 
 // ################## QUERY STATE ##################
 
-pub fn get_thershold(e: &Env, smart_account: &Address) -> u32 {
+pub fn get_threshold(e: &Env, smart_account: &Address) -> u32 {
     e.storage()
         .persistent()
         .get(&WeightedThresholdStorageKey::Threshold(smart_account.clone()))
