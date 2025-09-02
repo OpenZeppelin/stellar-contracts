@@ -108,6 +108,7 @@ pub enum SmartAccountError {
 }
 
 #[contracttype]
+#[allow(clippy::enum_variant_names)]
 pub enum SmartAccountStorageKey {
     ContextRule(u32),                // -> ContextRule
     ContextRuleIds(ContextRuleType), // -> ids per context type
@@ -251,10 +252,10 @@ pub fn can_enforce_all_policies(
     for policy in policies.iter() {
         // policies are all or nothing
         if !PolicyClient::new(e, &policy).can_enforce(
-            &e.current_contract_address(),
             context,
             rule_signers,
             matched_signers,
+            &e.current_contract_address(),
         ) {
             return false;
         }
@@ -325,10 +326,10 @@ pub fn enforce_policy(
     matched_signers: &Vec<Signer>,
 ) {
     PolicyClient::new(e, policy).enforce(
-        &e.current_contract_address(),
         context,
         rule_signers,
         matched_signers,
+        &e.current_contract_address(),
     );
 }
 

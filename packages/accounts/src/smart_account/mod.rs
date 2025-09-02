@@ -1,17 +1,16 @@
+mod storage;
+mod test;
 use soroban_sdk::{
     auth::{Context, CustomAccountInterface},
     contract, contractimpl,
     crypto::Hash,
     Address, Env, FromVal, String, Symbol, Val, Vec,
 };
-use storage::{
+pub use storage::{
     add_context_rule, authenticate, enforce_policy, get_context_rule, get_context_rules,
     get_validated_context, modify_context_rule, remove_context_rule, ContextRule, ContextRuleType,
     ContextRuleVal, Signatures, Signer, SmartAccountError,
 };
-
-pub mod storage;
-mod test;
 
 // provide user defined types to generalize the interface
 pub trait SmartAccount {
