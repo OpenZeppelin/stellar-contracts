@@ -54,7 +54,7 @@ pub enum WebAuthnError {
     KeyDataInvalid = 0,
     SignaturePayloadInvalid = 1,
     SignatureFormatInvalid = 2,
-    CleintDataTooLong = 3,
+    ClientDataTooLong = 3,
     JsonParseError = 4,
     TypeFieldInvalid = 5,
     ChallengeInvalid = 6,
@@ -191,7 +191,7 @@ pub fn verify(e: &Env, signature_payload: &Bytes, key_data: &Bytes, sig_data: &B
     //
     // https://www.w3.org/TR/webauthn-2/#client-data
     if client_data.len() > CLIENT_DATA_MAX_LEN as u32 {
-        panic_with_error!(e, WebAuthnError::CleintDataTooLong)
+        panic_with_error!(e, WebAuthnError::ClientDataTooLong)
     }
 
     let client_data_json = client_data.to_buffer::<CLIENT_DATA_MAX_LEN>();
