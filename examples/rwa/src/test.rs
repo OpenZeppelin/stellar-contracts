@@ -8,10 +8,10 @@ use crate::identity_registry_storage::{IdentityRegistryContract, IdentityRegistr
 
 fn create_client<'a>(
     e: &Env,
-    admin: &Address,
-    manager: &Address,
+    _admin: &Address,
+    _manager: &Address,
 ) -> IdentityRegistryContractClient<'a> {
-    let address = e.register(IdentityRegistryContract, (admin, manager));
+    let address = e.register(IdentityRegistryContract, ());
     IdentityRegistryContractClient::new(e, &address)
 }
 
@@ -23,6 +23,10 @@ fn bind_max() {
     let client = create_client(&e, &admin, &manager);
     e.mock_all_auths();
 
+    // TODO: remove this and move the constructor arguments to `create_client` when
+    // `#[contract_impl]` is updated
+    client.constructor(&admin, &manager);
+
     let mut tokens = vec![&e];
     for _ in 0..200 {
         let token = Address::generate(&e);
@@ -32,3 +36,5 @@ fn bind_max() {
     client.bind_tokens(&tokens, &manager);
     assert_eq!(client.linked_tokens().len(), 200)
 }
+
+// TODO: add test for checking `recovery_address` fails when contract is paused
