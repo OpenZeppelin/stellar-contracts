@@ -177,14 +177,11 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
 }
 
 pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signatures: &Signatures) {
-    for (signer, sig) in signatures.0.iter() {
+    for (signer, sig_data) in signatures.0.iter() {
         match signer {
-            Signer::Delegated(verifier, pub_key) => {
-                let hash = Bytes::from_array(e, &signature_payload.to_bytes().to_array());
-                let mut sig_data = Bytes::new(e);
-                sig_data.append(&pub_key);
-                sig_data.append(&sig);
-                if !VerifierClient::new(e, &verifier).verify(&hash, &sig_data) {
+            Signer::Delegated(verifier, key_data) => {
+                let sig_payload = Bytes::from_array(e, &signature_payload.to_bytes().to_array());
+                if !VerifierClient::new(e, &verifier).verify(&sig_payload, &key_data, &sig_data) {
                     panic_with_error!(e, SmartAccountError::DelegatedVerificationFailed)
                 }
             }
