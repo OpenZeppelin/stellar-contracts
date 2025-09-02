@@ -318,6 +318,32 @@ pub fn can_enforce_all_policies(
     true
 }
 
+pub fn do_check_auth(
+    e: Env,
+    signature_payload: Hash<32>,
+    signatures: Signatures,
+    auth_contexts: Vec<Context>,
+) -> Result<(), SmartAccountError> {
+    authenticate(&e, &signature_payload, &signatures);
+
+    let mut validated_contexts = Vec::new(&e);
+    for context in auth_contexts.iter() {
+        validated_contexts.push_back(get_validated_context(&e, &context, &signatures.0.keys()));
+    }
+
+    // After collecting validated context rules and authenticated signers, call for
+    // every policy `PolicyClient::enforce` to trigger the state-changing
+    // effects if any.
+    for (rule, context, authenticated_signers) in validated_contexts.iter() {
+        let ContextRule { signers, policies, .. } = rule;
+        for policy in policies.iter() {
+            enforce_policy(&e, &policy, &context, &signers, &authenticated_signers);
+        }
+    }
+
+    Ok(())
+}
+
 // ################## CHANGE STATE ##################
 
 pub fn enforce_policy(

@@ -6,6 +6,7 @@ use soroban_sdk::{
     crypto::Hash,
     Address, Env, FromVal, String, Symbol, Val, Vec,
 };
+use storage::do_check_auth;
 pub use storage::{
     add_context_rule, authenticate, enforce_policy, get_context_rule, get_context_rules,
     get_validated_context, modify_context_rule, remove_context_rule, ContextRule, ContextRuleType,
@@ -71,24 +72,7 @@ impl CustomAccountInterface for SmartAccountContract {
         signatures: Signatures,
         auth_contexts: Vec<Context>,
     ) -> Result<(), Self::Error> {
-        authenticate(&e, &signature_payload, &signatures);
-
-        let mut validated_contexts = Vec::new(&e);
-        for context in auth_contexts.iter() {
-            validated_contexts.push_back(get_validated_context(&e, &context, &signatures.0.keys()));
-        }
-
-        // After collecting validated context rules and authenticated signers, call for
-        // every policy `PolicyClient::enforce` to trigger the state-changing
-        // effects if any.
-        for (rule, context, authenticated_signers) in validated_contexts.iter() {
-            let ContextRule { signers, policies, .. } = rule;
-            for policy in policies.iter() {
-                enforce_policy(&e, &policy, &context, &signers, &authenticated_signers);
-            }
-        }
-
-        Ok(())
+        do_check_auth(e, signature_payload, signatures, auth_contexts)
     }
 }
 
