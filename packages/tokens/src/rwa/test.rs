@@ -74,8 +74,12 @@ struct MockCompliance;
 
 #[contractimpl]
 impl MockCompliance {
-    pub fn can_transfer(e: Env, _from: Option<Address>, _to: Address, _amount: i128) -> bool {
-        e.storage().persistent().get(&symbol_short!("compliant")).unwrap_or(true)
+    pub fn can_transfer(e: Env, _from: Address, _to: Address, _amount: i128) -> bool {
+        e.storage().persistent().get(&symbol_short!("tx_ok")).unwrap_or(true)
+    }
+
+    pub fn can_create(e: Env, _to: Address, _amount: i128) -> bool {
+        e.storage().persistent().get(&symbol_short!("mint_ok")).unwrap_or(true)
     }
 
     pub fn transferred(_e: Env, _from: Address, _to: Address, _amount: i128) {}
@@ -148,7 +152,7 @@ fn get_version() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #308)")]
+#[should_panic(expected = "Error(Contract, #309)")]
 fn get_unset_version_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
@@ -171,7 +175,7 @@ fn set_and_get_onchain_id() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #307)")]
+#[should_panic(expected = "Error(Contract, #308)")]
 fn get_unset_onchain_id_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
@@ -194,7 +198,7 @@ fn set_and_get_compliance() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #306)")]
+#[should_panic(expected = "Error(Contract, #307)")]
 fn get_unset_compliance_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
@@ -217,7 +221,7 @@ fn set_and_get_claim_topics_and_issuers() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #309)")]
+#[should_panic(expected = "Error(Contract, #310)")]
 fn get_unset_claim_topics_and_issuers_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
@@ -240,7 +244,7 @@ fn set_and_get_identity_registry_storage() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #310)")]
+#[should_panic(expected = "Error(Contract, #311)")]
 fn get_unset_identity_registry_storage_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
@@ -378,7 +382,7 @@ fn mint_with_two_claim_issuers() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #306)")]
+#[should_panic(expected = "Error(Contract, #307)")]
 fn mint_without_compliance_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
@@ -399,7 +403,7 @@ fn mint_fails_when_not_compliant() {
 
     let failing_compliance = e.register(MockCompliance, ());
     e.as_contract(&failing_compliance, || {
-        e.storage().persistent().set(&symbol_short!("compliant"), &false);
+        e.storage().persistent().set(&symbol_short!("mint_ok"), &false);
     });
 
     e.as_contract(&address, || {

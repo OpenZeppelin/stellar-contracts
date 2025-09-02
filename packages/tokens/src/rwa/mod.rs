@@ -376,19 +376,21 @@ pub enum RWAError {
     /// Indicates insufficient free tokens (due to partial freezing).
     InsufficientFreeTokens = 303,
     /// Indicates an identity cannot be verified.
-    IdentityVefificationFailed = 304,
+    IdentityVerificationFailed = 304,
     /// Indicates the transfer does not comply with the compliance rules.
     TransferNotCompliant = 305,
+    /// Indicates the mint operation does not comply with the compliance rules.
+    MintNotCompliant = 306,
     /// Indicates the compliance contract is not set.
-    ComplianceNotSet = 306,
+    ComplianceNotSet = 307,
     /// Indicates the onchain ID is not set.
-    OnchainIdNotSet = 307,
+    OnchainIdNotSet = 308,
     /// Indicates the version is not set.
-    VersionNotSet = 308,
+    VersionNotSet = 309,
     /// Indicates the claim topics and issuers contract is not set.
-    ClaimTopicsAndIssuersNotSet = 309,
+    ClaimTopicsAndIssuersNotSet = 310,
     /// Indicates the identity registry storage contract is not set.
-    IdentityRegistryStorageNotSet = 310,
+    IdentityRegistryStorageNotSet = 311,
 }
 
 // ################## CONSTANTS ##################
@@ -399,31 +401,20 @@ pub const FROZEN_TTL_THRESHOLD: u32 = FROZEN_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 // ################## EVENTS ##################
 
-/// Emits an event indicating token information has been updated.
+/// Emits an event indicating token onchain_id has been updated.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `name` - The new name of the token.
-/// * `symbol` - The new symbol of the token.
-/// * `decimals` - The decimals of the token.
-/// * `version` - The version of the token.
 /// * `onchain_id` - The address of the onchain ID.
 ///
 /// # Events
 ///
-/// * topics - `["token_info_updated", name: Symbol, symbol: Symbol]`
-/// * data - `[decimals: u8, version: &str, onchain_id: Address]`
-pub fn emit_token_information_updated(
-    e: &Env,
-    name: Option<&Symbol>,
-    symbol: Option<&Symbol>,
-    decimals: Option<u32>,
-    version: Option<&str>,
-    onchain_id: Option<&Address>,
-) {
-    let topics = (Symbol::new(e, "token_updated"), name, symbol);
-    e.events().publish(topics, (decimals, version, onchain_id))
+/// * topics - `["token_onchain_id_updated", onchain_id: Address]`
+/// * data - `[]`
+pub fn emit_token_onchain_id_updated(e: &Env, onchain_id: &Address) {
+    let topics = (Symbol::new(e, "token_onchain_id_updated"), onchain_id);
+    e.events().publish(topics, ())
 }
 
 /// Emits an event indicating a successful recovery.
