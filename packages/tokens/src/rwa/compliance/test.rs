@@ -4,10 +4,10 @@ use soroban_sdk::{contract, contractimpl, testutils::Address as _, vec, Address,
 
 use crate::rwa::compliance::{
     storage::{
-        add_module_to, can_transfer, created, destroyed, get_modules_for_hook,
+        add_module_to, can_create, can_transfer, created, destroyed, get_modules_for_hook,
         is_module_registered, remove_module_from, transferred,
     },
-    HookType, MAX_MODULES,
+    ComplianceHook, MAX_MODULES,
 };
 
 #[contract]
@@ -22,16 +22,16 @@ fn add_module_to_works() {
 
     e.as_contract(&address, || {
         // Check initial state
-        assert!(!is_module_registered(&e, HookType::Transfer, module.clone()));
-        let modules = get_modules_for_hook(&e, HookType::Transfer);
+        assert!(!is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
+        let modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         assert!(modules.is_empty());
 
         // Add module
-        add_module_to(&e, HookType::Transfer, module.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module.clone());
 
         // Verify module is registered
-        assert!(is_module_registered(&e, HookType::Transfer, module.clone()));
-        let modules = get_modules_for_hook(&e, HookType::Transfer);
+        assert!(is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
+        let modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         assert_eq!(modules.len(), 1);
         assert_eq!(modules.get(0).unwrap(), module);
     });
@@ -48,16 +48,16 @@ fn add_multiple_modules_to_same_hook_works() {
 
     e.as_contract(&address, || {
         // Add multiple modules to the same hook
-        add_module_to(&e, HookType::Transfer, module1.clone());
-        add_module_to(&e, HookType::Transfer, module2.clone());
-        add_module_to(&e, HookType::Transfer, module3.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module1.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module2.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module3.clone());
 
         // Verify all modules are registered
-        assert!(is_module_registered(&e, HookType::Transfer, module1.clone()));
-        assert!(is_module_registered(&e, HookType::Transfer, module2.clone()));
-        assert!(is_module_registered(&e, HookType::Transfer, module3.clone()));
+        assert!(is_module_registered(&e, ComplianceHook::Transferred, module1.clone()));
+        assert!(is_module_registered(&e, ComplianceHook::Transferred, module2.clone()));
+        assert!(is_module_registered(&e, ComplianceHook::Transferred, module3.clone()));
 
-        let modules = get_modules_for_hook(&e, HookType::Transfer);
+        let modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         assert_eq!(modules.len(), 3);
     });
 }
@@ -71,21 +71,21 @@ fn add_module_to_different_hooks_works() {
 
     e.as_contract(&address, || {
         // Add same module to different hooks
-        add_module_to(&e, HookType::Transfer, module.clone());
-        add_module_to(&e, HookType::Created, module.clone());
-        add_module_to(&e, HookType::CanTransfer, module.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module.clone());
+        add_module_to(&e, ComplianceHook::Created, module.clone());
+        add_module_to(&e, ComplianceHook::CanTransfer, module.clone());
 
         // Verify module is registered for all hooks
-        assert!(is_module_registered(&e, HookType::Transfer, module.clone()));
-        assert!(is_module_registered(&e, HookType::Created, module.clone()));
-        assert!(is_module_registered(&e, HookType::CanTransfer, module.clone()));
-        assert!(!is_module_registered(&e, HookType::Destroyed, module.clone()));
+        assert!(is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
+        assert!(is_module_registered(&e, ComplianceHook::Created, module.clone()));
+        assert!(is_module_registered(&e, ComplianceHook::CanTransfer, module.clone()));
+        assert!(!is_module_registered(&e, ComplianceHook::Destroyed, module.clone()));
 
         // Verify each hook has the module
-        let transfer_modules = get_modules_for_hook(&e, HookType::Transfer);
-        let created_modules = get_modules_for_hook(&e, HookType::Created);
-        let can_transfer_modules = get_modules_for_hook(&e, HookType::CanTransfer);
-        let destroyed_modules = get_modules_for_hook(&e, HookType::Destroyed);
+        let transfer_modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
+        let created_modules = get_modules_for_hook(&e, ComplianceHook::Created);
+        let can_transfer_modules = get_modules_for_hook(&e, ComplianceHook::CanTransfer);
+        let destroyed_modules = get_modules_for_hook(&e, ComplianceHook::Destroyed);
 
         assert_eq!(transfer_modules.len(), 1);
         assert_eq!(created_modules.len(), 1);
@@ -104,10 +104,10 @@ fn add_module_already_registered_panics() {
 
     e.as_contract(&address, || {
         // Add module first time
-        add_module_to(&e, HookType::Transfer, module.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module.clone());
 
         // Try to add the same module again - should panic
-        add_module_to(&e, HookType::Transfer, module.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module.clone());
     });
 }
 
@@ -120,17 +120,17 @@ fn remove_module_from_works() {
 
     e.as_contract(&address, || {
         // Add module first
-        add_module_to(&e, HookType::Transfer, module.clone());
-        assert!(is_module_registered(&e, HookType::Transfer, module.clone()));
+        add_module_to(&e, ComplianceHook::Transferred, module.clone());
+        assert!(is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
     });
 
     e.as_contract(&address, || {
         // Remove module
-        remove_module_from(&e, HookType::Transfer, module.clone());
+        remove_module_from(&e, ComplianceHook::Transferred, module.clone());
 
         // Verify module is no longer registered
-        assert!(!is_module_registered(&e, HookType::Transfer, module.clone()));
-        let modules = get_modules_for_hook(&e, HookType::Transfer);
+        assert!(!is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
+        let modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         assert!(modules.is_empty());
     });
 }
@@ -146,19 +146,19 @@ fn remove_module_from_multiple_modules_works() {
 
     e.as_contract(&address, || {
         // Add multiple modules
-        add_module_to(&e, HookType::Transfer, module1.clone());
-        add_module_to(&e, HookType::Transfer, module2.clone());
-        add_module_to(&e, HookType::Transfer, module3.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module1.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module2.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module3.clone());
 
         // Remove middle module
-        remove_module_from(&e, HookType::Transfer, module2.clone());
+        remove_module_from(&e, ComplianceHook::Transferred, module2.clone());
 
         // Verify correct modules remain
-        assert!(is_module_registered(&e, HookType::Transfer, module1.clone()));
-        assert!(!is_module_registered(&e, HookType::Transfer, module2.clone()));
-        assert!(is_module_registered(&e, HookType::Transfer, module3.clone()));
+        assert!(is_module_registered(&e, ComplianceHook::Transferred, module1.clone()));
+        assert!(!is_module_registered(&e, ComplianceHook::Transferred, module2.clone()));
+        assert!(is_module_registered(&e, ComplianceHook::Transferred, module3.clone()));
 
-        let modules = get_modules_for_hook(&e, HookType::Transfer);
+        let modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         assert_eq!(modules.len(), 2);
     });
 }
@@ -173,7 +173,7 @@ fn remove_module_not_registered_panics() {
 
     e.as_contract(&address, || {
         // Try to remove module that was never added - should panic
-        remove_module_from(&e, HookType::Transfer, module.clone());
+        remove_module_from(&e, ComplianceHook::Transferred, module.clone());
     });
 }
 
@@ -185,7 +185,7 @@ fn get_modules_for_hook_empty_returns_empty_vec() {
 
     e.as_contract(&address, || {
         // Get modules for hook with no registered modules
-        let modules = get_modules_for_hook(&e, HookType::Transfer);
+        let modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         assert!(modules.is_empty());
     });
 }
@@ -199,10 +199,10 @@ fn is_module_registered_false_for_unregistered() {
 
     e.as_contract(&address, || {
         // Check unregistered module
-        assert!(!is_module_registered(&e, HookType::Transfer, module.clone()));
-        assert!(!is_module_registered(&e, HookType::Created, module.clone()));
-        assert!(!is_module_registered(&e, HookType::Destroyed, module.clone()));
-        assert!(!is_module_registered(&e, HookType::CanTransfer, module.clone()));
+        assert!(!is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
+        assert!(!is_module_registered(&e, ComplianceHook::Created, module.clone()));
+        assert!(!is_module_registered(&e, ComplianceHook::Destroyed, module.clone()));
+        assert!(!is_module_registered(&e, ComplianceHook::CanTransfer, module.clone()));
     });
 }
 
@@ -215,19 +215,19 @@ fn hook_isolation_works() {
 
     e.as_contract(&address, || {
         // Add module to Transfer hook only
-        add_module_to(&e, HookType::Transfer, module.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module.clone());
 
         // Verify module is only registered for Transfer hook
-        assert!(is_module_registered(&e, HookType::Transfer, module.clone()));
-        assert!(!is_module_registered(&e, HookType::Created, module.clone()));
-        assert!(!is_module_registered(&e, HookType::Destroyed, module.clone()));
-        assert!(!is_module_registered(&e, HookType::CanTransfer, module.clone()));
+        assert!(is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
+        assert!(!is_module_registered(&e, ComplianceHook::Created, module.clone()));
+        assert!(!is_module_registered(&e, ComplianceHook::Destroyed, module.clone()));
+        assert!(!is_module_registered(&e, ComplianceHook::CanTransfer, module.clone()));
 
         // Verify only Transfer hook has modules
-        assert_eq!(get_modules_for_hook(&e, HookType::Transfer).len(), 1);
-        assert_eq!(get_modules_for_hook(&e, HookType::Created).len(), 0);
-        assert_eq!(get_modules_for_hook(&e, HookType::Destroyed).len(), 0);
-        assert_eq!(get_modules_for_hook(&e, HookType::CanTransfer).len(), 0);
+        assert_eq!(get_modules_for_hook(&e, ComplianceHook::Transferred).len(), 1);
+        assert_eq!(get_modules_for_hook(&e, ComplianceHook::Created).len(), 0);
+        assert_eq!(get_modules_for_hook(&e, ComplianceHook::Destroyed).len(), 0);
+        assert_eq!(get_modules_for_hook(&e, ComplianceHook::CanTransfer).len(), 0);
     });
 }
 
@@ -242,12 +242,12 @@ fn module_order_preserved() {
 
     e.as_contract(&address, || {
         // Add modules in specific order
-        add_module_to(&e, HookType::Transfer, module1.clone());
-        add_module_to(&e, HookType::Transfer, module2.clone());
-        add_module_to(&e, HookType::Transfer, module3.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module1.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module2.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module3.clone());
 
         // Verify order is preserved
-        let modules = get_modules_for_hook(&e, HookType::Transfer);
+        let modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         assert_eq!(modules.len(), 3);
         assert_eq!(modules.get(0).unwrap(), module1);
         assert_eq!(modules.get(1).unwrap(), module2);
@@ -266,10 +266,10 @@ fn all_hook_types_work() {
         // Test all hook types
         let hook_types = vec![
             &e,
-            HookType::Transfer,
-            HookType::Created,
-            HookType::Destroyed,
-            HookType::CanTransfer,
+            ComplianceHook::Transferred,
+            ComplianceHook::Created,
+            ComplianceHook::Destroyed,
+            ComplianceHook::CanTransfer,
         ];
 
         for hook_type in hook_types.iter() {
@@ -305,12 +305,12 @@ fn add_module_exceeds_max_modules_panics() {
         // Add MAX_MODULES (20) modules
         (0..MAX_MODULES).for_each(|_| {
             let module = Address::generate(&e);
-            add_module_to(&e, HookType::Transfer, module);
+            add_module_to(&e, ComplianceHook::Transferred, module);
         });
 
         // Try to add one more module - should panic with ModuleBoundExceeded
         let extra_module = Address::generate(&e);
-        add_module_to(&e, HookType::Transfer, extra_module);
+        add_module_to(&e, ComplianceHook::Transferred, extra_module);
     });
 }
 
@@ -336,6 +336,11 @@ impl MockComplianceModule {
         // Mock implementation - returns true for even amounts, false for odd amounts
         amount % 2 == 0
     }
+
+    pub fn can_create(_env: Env, _to: Address, amount: i128) -> bool {
+        // Mock implementation - returns true for even amounts, false for odd amounts
+        amount % 2 == 0
+    }
 }
 
 #[test]
@@ -350,7 +355,7 @@ fn transferred_hook_execution_works() {
 
     e.as_contract(&contract_address, || {
         // Add module to Transfer hook
-        add_module_to(&e, HookType::Transfer, module_address.clone());
+        add_module_to(&e, ComplianceHook::Transferred, module_address.clone());
 
         // Execute transferred hook - should not panic
         transferred(&e, from.clone(), to.clone(), amount);
@@ -371,7 +376,7 @@ fn created_hook_execution_works() {
 
     e.as_contract(&contract_address, || {
         // Add module to Created hook
-        add_module_to(&e, HookType::Created, module_address.clone());
+        add_module_to(&e, ComplianceHook::Created, module_address.clone());
 
         // Execute created hook - should not panic
         created(&e, to.clone(), amount);
@@ -393,7 +398,7 @@ fn destroyed_hook_execution_works() {
 
     e.as_contract(&contract_address, || {
         // Add module to Destroyed hook
-        add_module_to(&e, HookType::Destroyed, module_address.clone());
+        add_module_to(&e, ComplianceHook::Destroyed, module_address.clone());
 
         // Execute destroyed hook - should not panic
         destroyed(&e, from.clone(), amount);
@@ -419,7 +424,7 @@ fn can_transfer_hook_execution_works() {
         assert!(can_transfer(&e, from.clone(), to.clone(), amount));
 
         // Add module to CanTransfer hook
-        add_module_to(&e, HookType::CanTransfer, module_address.clone());
+        add_module_to(&e, ComplianceHook::CanTransfer, module_address.clone());
 
         // Execute can_transfer hook with even amount - should return true
         let even_amount = 1000i128;
@@ -442,7 +447,7 @@ fn can_transfer_returns_false_when_module_rejects() {
 
     e.as_contract(&contract_address, || {
         // Add module to CanTransfer hook
-        add_module_to(&e, HookType::CanTransfer, module_address);
+        add_module_to(&e, ComplianceHook::CanTransfer, module_address);
 
         // Execute can_transfer hook with odd amount - should return false
         let odd_amount = 1001i128;
@@ -451,26 +456,51 @@ fn can_transfer_returns_false_when_module_rejects() {
 }
 
 #[test]
-fn can_transfer_multiple_modules_all_must_pass() {
+fn can_create_hook_execution_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let contract_address = e.register(MockContract, ());
+    let module_address = e.register(MockComplianceModule, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        // Test with no modules registered - should return true
+        let amount = 1000i128;
+        assert!(can_create(&e, to.clone(), amount));
+
+        // Add module to CanCreate hook
+        add_module_to(&e, ComplianceHook::CanCreate, module_address.clone());
+
+        // Execute can_create hook with even amount - should return true
+        let even_amount = 1000i128;
+        assert!(can_create(&e, to.clone(), even_amount));
+
+        // Execute can_create hook with odd amount - should return false
+        let odd_amount = 1001i128;
+        assert!(!can_create(&e, to.clone(), odd_amount));
+    });
+}
+
+#[test]
+fn can_create_multiple_modules_all_must_pass() {
     let e = Env::default();
     e.mock_all_auths();
     let contract_address = e.register(MockContract, ());
     let module1 = e.register(MockComplianceModule, ());
     let module2 = e.register(MockComplianceModule, ());
-    let from = Address::generate(&e);
     let to = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        // Add two identical modules to CanTransfer hook
-        add_module_to(&e, HookType::CanTransfer, module1);
-        add_module_to(&e, HookType::CanTransfer, module2);
+        // Add two identical modules to CanCreate hook
+        add_module_to(&e, ComplianceHook::CanCreate, module1);
+        add_module_to(&e, ComplianceHook::CanCreate, module2);
 
         // Test with even amount - both modules should return true, so result is true
         let even_amount = 1000i128;
-        assert!(can_transfer(&e, from.clone(), to.clone(), even_amount));
+        assert!(can_create(&e, to.clone(), even_amount));
 
         // Test with odd amount - both modules should return false, so result is false
         let odd_amount = 1001i128;
-        assert!(!can_transfer(&e, from, to, odd_amount));
+        assert!(!can_create(&e, to, odd_amount));
     });
 }

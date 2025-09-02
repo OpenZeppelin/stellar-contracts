@@ -11,11 +11,11 @@ mod test;
 /// where compliance modules can be executed.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub enum HookType {
+pub enum ComplianceHook {
     /// Called after tokens are successfully transferred from one wallet to
     /// another. Modules registered for this hook can update their state
     /// based on transfer events.
-    Transfer,
+    Transferred,
 
     /// Called after tokens are successfully created/minted to a wallet.
     /// Modules registered for this hook can update their state based on minting
@@ -32,6 +32,12 @@ pub enum HookType {
     /// restrictions. This is a READ-only operation and should not modify
     /// state.
     CanTransfer,
+
+    /// Called during mint validation to check if a mint operation should be
+    /// allowed. Modules registered for this hook can implement transfer
+    /// restrictions. This is a READ-only operation and should not modify
+    /// state.
+    CanCreate,
 }
 
 /// Trait for implementing custom compliance logic to RWA tokens.
@@ -45,24 +51,29 @@ pub enum HookType {
 /// pub trait Compliance       // ✅
 /// pub trait Compliance: RWA  // ❌
 /// ```
+#[contractclient(name = "ComplianceClient")]
 pub trait Compliance {
     /// Registers a compliance module for a specific hook type.
+    /// Only the operator can register modules.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `hook` - The type of hook to register the module for.
     /// * `module` - The address of the compliance module contract.
-    fn add_module_to(e: &Env, hook: HookType, module: Address);
+    /// * `operator` - The address of the operator that can add/remove modules.
+    fn add_module_to(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Deregisters a compliance module from a specific hook type.
+    /// Only the operator can deregister modules.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `hook` - The type of hook to deregister the module from.
     /// * `module` - The address of the compliance module contract.
-    fn remove_module_from(e: &Env, hook: HookType, module: Address);
+    /// * `operator` - The address of the operator that can add/remove modules.
+    fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Gets all modules registered for a specific hook type.
     ///
@@ -74,7 +85,7 @@ pub trait Compliance {
     /// # Returns
     ///
     /// A vector of module addresses registered for the specified hook.
-    fn get_modules_for_hook(e: &Env, hook: HookType) -> Vec<Address>;
+    fn get_modules_for_hook(e: &Env, hook: ComplianceHook) -> Vec<Address>;
 
     /// Checks if a module is registered for a specific hook type.
     ///
@@ -87,7 +98,7 @@ pub trait Compliance {
     /// # Returns
     ///
     /// `true` if the module is registered for the hook, `false` otherwise.
-    fn is_module_registered(e: &Env, hook: HookType, module: Address) -> bool;
+    fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool;
 
     /// Called whenever tokens are transferred from one wallet to another.
     ///
@@ -126,7 +137,7 @@ pub trait Compliance {
     /// * `amount` - The amount of tokens involved in the burn.
     fn destroyed(e: &Env, from: Address, amount: i128);
 
-    /// Checks that the transfer is compliant.
+    /// Checks whether the transfer is compliant.
     ///
     /// This function calls all modules registered for the `CanTransfer` hook.
     /// If any module returns `false`, the entire check fails.
@@ -143,6 +154,23 @@ pub trait Compliance {
     ///
     /// `true` if all registered modules allow the transfer, `false` otherwise.
     fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool;
+
+    /// Checks whether the mint operation is compliant.
+    ///
+    /// This function calls all modules registered for the `CanCreate` hook.
+    /// If any module returns `false`, the entire check fails.
+    /// This is a READ-only function and should not modify state.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to` - The address of the receiver.
+    /// * `amount` - The amount of tokens involved in the transfer.
+    ///
+    /// # Returns
+    ///
+    /// `true` if all registered modules allow the transfer, `false` otherwise.
+    fn can_create(e: &Env, to: Address, amount: i128) -> bool;
 }
 
 // ################## ERRORS ##################
@@ -180,7 +208,7 @@ pub const MAX_MODULES: u32 = 20;
 ///
 /// * topics - `["module_added", hook: u32]`
 /// * data - `[module: Address]`
-pub fn emit_module_added(e: &Env, hook: HookType, module: Address) {
+pub fn emit_module_added(e: &Env, hook: ComplianceHook, module: Address) {
     let topics = (Symbol::new(e, "module_added"), hook.clone());
     e.events().publish(topics, module)
 }
@@ -198,7 +226,7 @@ pub fn emit_module_added(e: &Env, hook: HookType, module: Address) {
 ///
 /// * topics - `["module_removed", hook: u32]`
 /// * data - `[module: Address]`
-pub fn emit_module_removed(e: &Env, hook: HookType, module: Address) {
+pub fn emit_module_removed(e: &Env, hook: ComplianceHook, module: Address) {
     let topics = (Symbol::new(e, "module_removed"), hook.clone());
     e.events().publish(topics, module)
 }
@@ -256,6 +284,22 @@ pub trait ComplianceModule {
     ///
     /// `true` if the transfer should be allowed, `false` otherwise.
     fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool;
+
+    /// Called to check if a mint operation should be allowed (for CanCreate
+    /// hook).
+    ///
+    /// This is a read-only function and should not modify state.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to` - The address of the receiver.
+    /// * `amount` - The amount of tokens to mint.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the mint operation should be allowed, `false` otherwise.
+    fn can_create(e: &Env, to: Address, amount: i128) -> bool;
 
     /// Returns the name of the module for identification purposes.
     ///
