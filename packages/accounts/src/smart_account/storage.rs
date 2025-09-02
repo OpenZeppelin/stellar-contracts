@@ -105,6 +105,8 @@ pub enum SmartAccountError {
     ConflictingContextRule = 1,
     UnverifiedContext = 2,
     DelegatedVerificationFailed = 3,
+    NoSignersAndPolicies = 4,
+    PastValidUntil = 5,
 }
 
 #[contracttype]
@@ -337,7 +339,7 @@ pub fn add_context_rule(
     e: &Env,
     context_rule_type: &ContextRuleType,
     context_rule_val: &ContextRuleVal,
-) {
+) -> ContextRule {
     let mut id =
         e.storage().persistent().get(&SmartAccountStorageKey::ContextRuleNextId).unwrap_or(0u32);
     let mut same_key_ids: Vec<u32> = e
@@ -347,8 +349,16 @@ pub fn add_context_rule(
         .unwrap_or(Vec::new(e));
 
     let ContextRuleVal { signers, policies, name, valid_until } = context_rule_val.clone();
-    // check signers.len or policies.len > 0
+    // check signers or policies > 0
+    if signers.is_empty() && policies.is_empty() {
+        panic_with_error!(e, SmartAccountError::NoSignersAndPolicies)
+    }
     // check valid_until
+    if let Some(valid_until) = valid_until {
+        if valid_until < e.ledger().sequence() {
+            panic_with_error!(e, SmartAccountError::PastValidUntil)
+        }
+    }
     let rule = ContextRule {
         id,
         context_type: context_rule_type.clone(),
@@ -367,15 +377,15 @@ pub fn add_context_rule(
 
     id += 1;
     e.storage().persistent().set(&SmartAccountStorageKey::ContextRuleNextId, &id);
+
+    rule
 }
 
 // cannot modify id and context_type
-pub fn modify_context_rule(e: &Env, id: u32, context_rule_val: &ContextRuleVal) {
+pub fn modify_context_rule(e: &Env, id: u32, context_rule_val: &ContextRuleVal) -> ContextRule {
     let existing_rule = get_context_rule(e, id);
 
     let ContextRuleVal { signers, policies, name, valid_until } = context_rule_val.clone();
-    // check signers.len or policies.len > 0
-    // check valid_until
     let modified_rule = ContextRule {
         id,
         context_type: existing_rule.context_type,
@@ -385,7 +395,20 @@ pub fn modify_context_rule(e: &Env, id: u32, context_rule_val: &ContextRuleVal) 
         valid_until,
     };
 
+    // check signers or policies > 0
+    if modified_rule.signers.is_empty() && modified_rule.policies.is_empty() {
+        panic_with_error!(e, SmartAccountError::NoSignersAndPolicies)
+    }
+    // check valid_until
+    if let Some(valid_until) = modified_rule.valid_until {
+        if valid_until < e.ledger().sequence() {
+            panic_with_error!(e, SmartAccountError::PastValidUntil)
+        }
+    }
+
     e.storage().persistent().set(&SmartAccountStorageKey::ContextRule(id), &modified_rule);
+
+    modified_rule
 }
 
 pub fn remove_context_rule(e: &Env, id: u32) {

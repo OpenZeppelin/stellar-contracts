@@ -29,11 +29,15 @@ pub trait SmartAccount {
         e: &Env,
         context_rule_type: Self::ContextRuleType,
         context_rule_val: Self::ContextRuleVal,
-    );
+    ) -> Self::ContextRule;
+
+    fn modify_context_rule(
+        e: &Env,
+        context_rule_id: u32,
+        context_rule_val: Self::ContextRuleVal,
+    ) -> Self::ContextRule;
 
     fn remove_context_rule(e: &Env, context_rule_id: u32);
-
-    fn modify_context_rule(e: &Env, context_rule_id: u32, context_rule_val: Self::ContextRuleVal);
 }
 
 // Simple execution entry-point to call arbitrary contracts.
@@ -106,16 +110,20 @@ impl SmartAccount for SmartAccountContract {
         e: &Env,
         context_rule_type: Self::ContextRuleType,
         context_rule_val: Self::ContextRuleVal,
-    ) {
+    ) -> ContextRule {
         e.current_contract_address().require_auth();
 
-        add_context_rule(e, &context_rule_type, &context_rule_val);
+        add_context_rule(e, &context_rule_type, &context_rule_val)
     }
 
-    fn modify_context_rule(e: &Env, context_rule_id: u32, context_rule_val: Self::ContextRuleVal) {
+    fn modify_context_rule(
+        e: &Env,
+        context_rule_id: u32,
+        context_rule_val: Self::ContextRuleVal,
+    ) -> ContextRule {
         e.current_contract_address().require_auth();
 
-        modify_context_rule(e, context_rule_id, &context_rule_val);
+        modify_context_rule(e, context_rule_id, &context_rule_val)
     }
 
     fn remove_context_rule(e: &Env, context_rule_id: u32) {

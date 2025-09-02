@@ -1,42 +1,44 @@
 #![cfg(test)]
+extern crate std;
 
-//extern crate std;
+use soroban_sdk::{
+    auth::Context, contract, contractimpl, symbol_short, testutils::Address as _, Address, Bytes,
+    Env, Vec,
+};
 
-//use soroban_sdk::{contract, testutils::Address as _, Address, Bytes, Env,
-// Vec};
+use super::storage::Signer;
 
-//use super::storage::Signer;
+#[contract]
+struct MockPolicyContract;
 
-//#[contract]
-//struct MockContract;
+#[contractimpl]
+impl MockPolicyContract {
+    pub fn can_enforce(
+        e: &Env,
+        _context: Context,
+        _context_rule_signers: Vec<Signer>,
+        _authenticated_signers: Vec<Signer>,
+        _smart_account: Address,
+    ) -> bool {
+        e.storage().persistent().get(&symbol_short!("enforce")).unwrap_or(true)
+    }
 
-//fn create_test_signers(e: &Env) -> (Vec<Signer>, Vec<Signer>) {
-//let addr1 = Address::generate(e);
-//let addr2 = Address::generate(e);
-//let addr3 = Address::generate(e);
-//let addr4 = Address::generate(e);
+    fn enforce(
+        _e: &Env,
+        _context: Context,
+        _context_rule_signers: Vec<Signer>,
+        _authenticated_signers: Vec<Signer>,
+        _smart_account: Address,
+    ) {
+    }
+}
 
-//let verifier_addr = Address::generate(e);
-//let pub_key = Bytes::from_array(e, &[1, 2, 3, 4]);
+#[contract]
+struct MockVerifierContract;
 
-//let rule_signers = Vec::from_array(
-//e,
-//[
-//Signer::Native(addr1.clone()),
-//Signer::Native(addr2.clone()),
-//Signer::Delegated(verifier_addr.clone(), pub_key.clone()),
-//],
-//);
-
-//let provided_signers = Vec::from_array(
-//e,
-//[
-//Signer::Native(addr1.clone()),
-//Signer::Native(addr3.clone()),
-//Signer::Delegated(verifier_addr.clone(), pub_key.clone()),
-//Signer::Native(addr4.clone()),
-//],
-//);
-
-//(rule_signers, provided_signers)
-//}
+#[contractimpl]
+impl MockVerifierContract {
+    pub fn verify(e: &Env, _hash: Bytes, _key_data: Bytes, _sig_data: Bytes) -> bool {
+        e.storage().persistent().get(&symbol_short!("verify")).unwrap_or(true)
+    }
+}
