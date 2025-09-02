@@ -4,6 +4,7 @@ use crate::verifiers::utils::extract_from_bytes;
 
 // TODO: proper enumeration
 #[contracterror]
+#[repr(u32)]
 pub enum Ed25519Error {
     KeyDataInvalid = 0,
     SignatureFormatInvalid = 1,

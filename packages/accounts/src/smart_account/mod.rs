@@ -1,4 +1,4 @@
-mod storage;
+pub mod storage;
 mod test;
 use soroban_sdk::{
     auth::{Context, CustomAccountInterface},

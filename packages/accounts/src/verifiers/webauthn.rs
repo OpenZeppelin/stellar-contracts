@@ -50,6 +50,7 @@ pub const AUTHENTICATOR_DATA_MIN_LEN: usize = 37;
 
 // TODO: proper enumeration
 #[contracterror]
+#[repr(u32)]
 pub enum WebAuthnError {
     KeyDataInvalid = 0,
     SignaturePayloadInvalid = 1,

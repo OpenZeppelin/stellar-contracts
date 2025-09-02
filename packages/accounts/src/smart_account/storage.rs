@@ -103,7 +103,7 @@ use crate::{policies::PolicyClient, verifiers::VerifierClient};
 pub enum SmartAccountError {
     ContextRuleNotFound = 0,
     ConflictingContextRule = 1,
-    UnverifiedContext = 2,
+    UnvalidatedContext = 2,
     DelegatedVerificationFailed = 3,
     NoSignersAndPolicies = 4,
     PastValidUntil = 5,
@@ -181,21 +181,57 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
     rules
 }
 
-pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signatures: &Signatures) {
-    for (signer, sig_data) in signatures.0.iter() {
-        match signer {
-            Signer::Delegated(verifier, key_data) => {
-                let sig_payload = Bytes::from_array(e, &signature_payload.to_bytes().to_array());
-                if !VerifierClient::new(e, &verifier).verify(&sig_payload, &key_data, &sig_data) {
-                    panic_with_error!(e, SmartAccountError::DelegatedVerificationFailed)
+pub fn get_valid_context_rules(e: &Env, context_key: ContextRuleType) -> Vec<ContextRule> {
+    let matched_ids = e
+        .storage()
+        .persistent()
+        .get(&SmartAccountStorageKey::ContextRuleIds(context_key))
+        .unwrap_or(Vec::new(e));
+
+    let default_ids = e
+        .storage()
+        .persistent()
+        .get(&SmartAccountStorageKey::ContextRuleIds(ContextRuleType::Default))
+        .unwrap_or(Vec::new(e));
+
+    let get_rules = |ids: Vec<u32>| -> Vec<ContextRule> {
+        let mut rules = Vec::new(e);
+        for id in ids.iter() {
+            if let Some(rule) = e
+                .storage()
+                .persistent()
+                .get::<_, ContextRule>(&SmartAccountStorageKey::ContextRule(id))
+            {
+                match rule.valid_until {
+                    // skip if expired
+                    Some(seq) if seq < e.ledger().sequence() => continue,
+                    // push front so that we start from the last added when iterating
+                    _ => rules.push_front(rule),
                 }
             }
-            Signer::Native(addr) => {
-                let args = (signature_payload.clone(),).into_val(e);
-                addr.require_auth_for_args(args)
-            }
+        }
+        rules
+    };
+
+    let mut final_rules = get_rules(matched_ids);
+    // append defaults so that there is always a fallback
+    final_rules.append(&get_rules(default_ids));
+
+    final_rules
+}
+
+pub fn get_authenticated_signers(
+    e: &Env,
+    rule_signers: &Vec<Signer>,
+    all_signers: &Vec<Signer>,
+) -> Vec<Signer> {
+    let mut authenticated = Vec::new(e);
+    for rule_signer in rule_signers.iter() {
+        if all_signers.contains(&rule_signer) {
+            authenticated.push_back(rule_signer);
         }
     }
+    authenticated
 }
 
 pub fn get_validated_context(
@@ -241,7 +277,24 @@ pub fn get_validated_context(
         }
     }
 
-    panic_with_error!(e, SmartAccountError::UnverifiedContext)
+    panic_with_error!(e, SmartAccountError::UnvalidatedContext)
+}
+
+pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signatures: &Signatures) {
+    for (signer, sig_data) in signatures.0.iter() {
+        match signer {
+            Signer::Delegated(verifier, key_data) => {
+                let sig_payload = Bytes::from_array(e, &signature_payload.to_bytes().to_array());
+                if !VerifierClient::new(e, &verifier).verify(&sig_payload, &key_data, &sig_data) {
+                    panic_with_error!(e, SmartAccountError::DelegatedVerificationFailed)
+                }
+            }
+            Signer::Native(addr) => {
+                let args = (signature_payload.clone(),).into_val(e);
+                addr.require_auth_for_args(args)
+            }
+        }
+    }
 }
 
 pub fn can_enforce_all_policies(
@@ -263,59 +316,6 @@ pub fn can_enforce_all_policies(
         }
     }
     true
-}
-
-pub fn get_authenticated_signers(
-    e: &Env,
-    rule_signers: &Vec<Signer>,
-    all_signers: &Vec<Signer>,
-) -> Vec<Signer> {
-    let mut authenticated = Vec::new(e);
-    for rule_signer in rule_signers.iter() {
-        if all_signers.contains(&rule_signer) {
-            authenticated.push_back(rule_signer);
-        }
-    }
-    authenticated
-}
-
-fn get_valid_context_rules(e: &Env, context_key: ContextRuleType) -> Vec<ContextRule> {
-    let matched_ids = e
-        .storage()
-        .persistent()
-        .get(&SmartAccountStorageKey::ContextRuleIds(context_key))
-        .unwrap_or(Vec::new(e));
-
-    let default_ids = e
-        .storage()
-        .persistent()
-        .get(&SmartAccountStorageKey::ContextRuleIds(ContextRuleType::Default))
-        .unwrap_or(Vec::new(e));
-
-    let get_rules = |ids: Vec<u32>| -> Vec<ContextRule> {
-        let mut rules = Vec::new(e);
-        for id in ids.iter() {
-            if let Some(rule) = e
-                .storage()
-                .persistent()
-                .get::<_, ContextRule>(&SmartAccountStorageKey::ContextRule(id))
-            {
-                match rule.valid_until {
-                    // skip if expired
-                    Some(seq) if seq < e.ledger().sequence() => continue,
-                    // push front so that we start from the last added when iterating
-                    _ => rules.push_front(rule),
-                }
-            }
-        }
-        rules
-    };
-
-    let mut final_rules = get_rules(matched_ids);
-    // append defaults so that there is always a fallback
-    final_rules.append(&get_rules(default_ids));
-
-    final_rules
 }
 
 // ################## CHANGE STATE ##################
