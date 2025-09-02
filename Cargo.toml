@@ -18,6 +18,7 @@ members = [
     "examples/rwa",
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
+    "examples/smart-account",
     "examples/upgradeable/*",
     "packages/accounts",
     "packages/access",
@@ -54,6 +55,7 @@ serde-json-core = { version = "0.6.0", default-features = false }
 
 # members
 stellar-access = { path = "packages/access" }
+stellar-accounts = { path = "packages/accounts" }
 stellar-contract-utils = { path = "packages/contract-utils" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-tokens = { path = "packages/tokens" }
