@@ -30,10 +30,11 @@ extern crate std;
 
 #[cfg(test)]
 mod test_soroban_fixed_point {
-    use crate::math::soroban_fixed_point::SorobanFixedPoint;
     use soroban_sdk::Env;
 
-    /********** fixed_mul_floor **********/
+    use crate::math::soroban_fixed_point::SorobanFixedPoint;
+
+    /********** fixed_mul_floor ********* */
 
     #[test]
     fn test_fixed_mul_floor_rounds_down() {
@@ -71,7 +72,7 @@ mod test_soroban_fixed_point {
         assert_eq!(result, 170_141_183_460_469_231_731 * 10i128.pow(9));
     }
 
-    /********** fixed_mul_ceil **********/
+    /********** fixed_mul_ceil ********* */
 
     #[test]
     fn test_fixed_mul_ceil_rounds_up() {
@@ -125,10 +126,11 @@ mod test_soroban_fixed_point {
 #[cfg(test)]
 mod tests {
 
-    /********** fixed_mul_floor **********/
+    /********** fixed_mul_floor ********* */
+
+    use soroban_sdk::{Env, I256};
 
     use crate::math::soroban_fixed_point::SorobanFixedPoint;
-    use soroban_sdk::{Env, I256};
 
     #[test]
     fn test_fixed_mul_floor_rounds_down() {
@@ -172,14 +174,15 @@ mod tests {
     fn test_fixed_mul_floor_phantom_overflow() {
         let env = Env::default();
         let x: I256 = I256::from_i128(&env, i128::MAX);
-        // 256 bit max ~= 5.8e76, 128 bit max ~= 1.7e38, need to multiply by at least 10^39
+        // 256 bit max ~= 5.8e76, 128 bit max ~= 1.7e38, need to multiply by at least
+        // 10^39
         let y: I256 = I256::from_i128(&env, 10i128.pow(39));
         let denominator: I256 = I256::from_i128(&env, 10i128.pow(18));
 
         x.fixed_mul_floor(&env, &y, &denominator);
     }
 
-    /********** fixed_mul_ceil **********/
+    /********** fixed_mul_ceil ********* */
 
     #[test]
     fn test_fixed_mul_ceil_rounds_up() {
@@ -223,7 +226,8 @@ mod tests {
     fn test_fixed_mul_ceil_phantom_overflow() {
         let env = Env::default();
         let x: I256 = I256::from_i128(&env, i128::MAX);
-        // 256 bit max ~= 5.8e76, 128 bit max ~= 1.7e38, need to multiply by at least 10^39
+        // 256 bit max ~= 5.8e76, 128 bit max ~= 1.7e38, need to multiply by at least
+        // 10^39
         let y: I256 = I256::from_i128(&env, 10i128.pow(39));
         let denominator: I256 = I256::from_i128(&env, 10i128.pow(18));
 

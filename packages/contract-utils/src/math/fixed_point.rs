@@ -9,8 +9,9 @@ pub enum Rounding {
 }
 
 /**
- * Calculates x * y / denominator with full precision, following the selected rounding direction.
- * Throws if result overflows a i128 or denominator is zero (handles phantom overflow).
+ * Calculates x * y / denominator with full precision, following the
+ * selected rounding direction. Throws if result overflows a i128 or
+ * denominator is zero (handles phantom overflow).
  */
 pub fn muldiv(e: &Env, x: i128, y: i128, denominator: i128, rounding: Rounding) -> i128 {
     match rounding {
