@@ -153,6 +153,8 @@ pub struct ContextRule {
     pub valid_until: Option<u32>,
 }
 
+// ################## QUERY STATE ##################
+
 pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
     e.storage()
         .persistent()
@@ -260,21 +262,6 @@ pub fn can_enforce_all_policies(
     true
 }
 
-pub fn enforce_policy(
-    e: &Env,
-    policy: &Address,
-    context: &Context,
-    rule_signers: &Vec<Signer>,
-    matched_signers: &Vec<Signer>,
-) {
-    PolicyClient::new(e, policy).enforce(
-        &e.current_contract_address(),
-        context,
-        rule_signers,
-        matched_signers,
-    );
-}
-
 pub fn get_authenticated_signers(
     e: &Env,
     rule_signers: &Vec<Signer>,
@@ -328,6 +315,23 @@ fn get_valid_context_rules(e: &Env, context_key: ContextRuleType) -> Vec<Context
     final_rules
 }
 
+// ################## CHANGE STATE ##################
+
+pub fn enforce_policy(
+    e: &Env,
+    policy: &Address,
+    context: &Context,
+    rule_signers: &Vec<Signer>,
+    matched_signers: &Vec<Signer>,
+) {
+    PolicyClient::new(e, policy).enforce(
+        &e.current_contract_address(),
+        context,
+        rule_signers,
+        matched_signers,
+    );
+}
+
 pub fn add_context_rule(
     e: &Env,
     context_rule_type: &ContextRuleType,
@@ -362,4 +366,37 @@ pub fn add_context_rule(
 
     id += 1;
     e.storage().persistent().set(&SmartAccountStorageKey::ContextRuleNextId, &id);
+}
+
+// cannot modify id and context_type
+pub fn modify_context_rule(e: &Env, id: u32, context_rule_val: &ContextRuleVal) {
+    let existing_rule = get_context_rule(e, id);
+
+    let ContextRuleVal { signers, policies, name, valid_until } = context_rule_val.clone();
+    // check signers.len or policies.len > 0
+    // check valid_until
+    let modified_rule = ContextRule {
+        id,
+        context_type: existing_rule.context_type,
+        name,
+        signers,
+        policies,
+        valid_until,
+    };
+
+    e.storage().persistent().set(&SmartAccountStorageKey::ContextRule(id), &modified_rule);
+}
+
+pub fn remove_context_rule(e: &Env, id: u32) {
+    let context_rule = get_context_rule(e, id);
+
+    e.storage().persistent().remove(&SmartAccountStorageKey::ContextRule(id));
+
+    let ids_key = SmartAccountStorageKey::ContextRuleIds(context_rule.context_type);
+    let mut ids = e.storage().persistent().get::<_, Vec<u32>>(&ids_key).unwrap_or(Vec::new(e));
+
+    if let Some(pos) = ids.iter().rposition(|i| i == id) {
+        ids.remove(pos as u32);
+        e.storage().persistent().set(&ids_key, &ids);
+    }
 }

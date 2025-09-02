@@ -6,8 +6,8 @@ use soroban_sdk::{
 };
 use storage::{
     add_context_rule, authenticate, enforce_policy, get_context_rule, get_context_rules,
-    get_validated_context, ContextRule, ContextRuleType, ContextRuleVal, Signatures, Signer,
-    SmartAccountError,
+    get_validated_context, modify_context_rule, remove_context_rule, ContextRule, ContextRuleType,
+    ContextRuleVal, Signatures, Signer, SmartAccountError,
 };
 
 pub mod storage;
@@ -32,24 +32,16 @@ pub trait SmartAccount {
         context_rule_val: Self::ContextRuleVal,
     );
 
-    // TODO
-    //fn remove_context_rule(e: &Env, context_rule_id: u32);
+    fn remove_context_rule(e: &Env, context_rule_id: u32);
 
-    // TODO
-    //fn modify_context_rule(e: &Env, context_rule_id: u32, context_rule_val:
-    // Self::ContextRuleVal);
-
-    // do we need those at all here, given there's `modify_context_rule`
-    //fn add_signer(e: &Env, signer: Signer, context_rule_id: u32);
-    //fn remove_signer(e: &Env, signer: Signer, context_rule_id: u32);
+    fn modify_context_rule(e: &Env, context_rule_id: u32, context_rule_val: Self::ContextRuleVal);
 }
 
 // Simple execution entry-point to call arbitrary contracts.
 //
-// Most likely to be used to call owned
-// stateful polciies, and as direct contract-to-contract invocations are always
-// authorized, that's a way to avoid re-entry when the policy need to auth back
-// its owner.
+// Most likely to be used to call owned stateful polciies, and as direct
+// contract-to-contract invocations are always authorized, that's a way to avoid
+// re-entry when the policy need to auth back its owner.
 pub trait ExecutionEntry: CustomAccountInterface {
     fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>);
 }
@@ -83,9 +75,9 @@ impl CustomAccountInterface for SmartAccountContract {
             validated_contexts.push_back(get_validated_context(&e, &context, &signatures.0.keys()));
         }
 
-        // after collecting validated context rules and authenticated signers, call for
-        // every policy `PolicyClient::on_enforce` to trigger the state-changing
-        // effects if any
+        // After collecting validated context rules and authenticated signers, call for
+        // every policy `PolicyClient::enforce` to trigger the state-changing
+        // effects if any.
         for (rule, context, authenticated_signers) in validated_contexts.iter() {
             let ContextRule { signers, policies, .. } = rule;
             for policy in policies.iter() {
@@ -119,6 +111,18 @@ impl SmartAccount for SmartAccountContract {
         e.current_contract_address().require_auth();
 
         add_context_rule(e, &context_rule_type, &context_rule_val);
+    }
+
+    fn modify_context_rule(e: &Env, context_rule_id: u32, context_rule_val: Self::ContextRuleVal) {
+        e.current_contract_address().require_auth();
+
+        modify_context_rule(e, context_rule_id, &context_rule_val);
+    }
+
+    fn remove_context_rule(e: &Env, context_rule_id: u32) {
+        e.current_contract_address().require_auth();
+
+        remove_context_rule(e, context_rule_id);
     }
 }
 
