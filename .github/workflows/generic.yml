@@ -23,6 +23,12 @@ env:
   CARGO_TERM_COLOR: always
   # Remove unnecessary WASM build artifacts
   WASM_BUILD_CLEAN_TARGET: 1
+  # # stripping symbols and optimizing for binary size
+  # RUSTFLAGS: -C strip=symbols -C opt-level=s
+  # # Enable sscache
+  # RUSTC_WRAPPER: "sccache"
+  # SCCACHE_GHA_ENABLED: "true"
+  # SCCACHE_CACHE_SIZE: "50GB"
 
 jobs:
   clippy-fmt-test:
@@ -38,12 +44,18 @@ jobs:
       - name: git checkout
         uses: actions/checkout@v4
 
+      # - name: Run sccache
+      #   uses: mozilla-actions/sccache-action@v0.0.8
+
       - name: install rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable, nightly
           components: clippy, rustfmt, llvm-tools-preview
           target: wasm32-unknown-unknown, wasm32v1-none
+
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov
 
       - name: Check format
         run: cargo +nightly fmt --all -- --check
@@ -57,3 +69,13 @@ jobs:
       - name: Check tests
         run: cargo test
 
+      - name: Run tests with coverage
+        run: cargo llvm-cov --workspace --lcov --fail-under-lines 90 --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: OpenZeppelin/stellar-contracts
+          verbose: true
