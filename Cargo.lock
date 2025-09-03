@@ -2092,3 +2092,8 @@ dependencies = [
  "quote",
  "syn 2.0.96",
 ]
+
+[[patch.unused]]
+name = "soroban-sdk"
+version = "23.0.0-rc.3"
+source = "git+https://github.com/stellar/rs-soroban-sdk.git?branch=allow-coexisting-contractimpls-with-same-names#8c8c82b5d70f2802383aaa0582ed5f0de984e989"

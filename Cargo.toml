@@ -71,3 +71,6 @@ lto = true
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true
+
+[patch.crates-io]
+soroban-sdk = { git = "https://github.com/stellar/rs-soroban-sdk.git", branch = "allow-coexisting-contractimpls-with-same-names" }

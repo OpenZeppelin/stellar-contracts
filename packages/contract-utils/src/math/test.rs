@@ -24,11 +24,8 @@ SOFTWARE.
 // Based on the Soroban fixed-point mathematics library
 // Original implementation: https://github.com/script3/soroban-fixed-point-math
 
-#![cfg(test)]
-
 extern crate std;
 
-#[cfg(test)]
 mod test_soroban_fixed_point {
     use soroban_sdk::Env;
 
