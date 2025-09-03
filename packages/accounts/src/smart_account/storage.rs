@@ -467,7 +467,7 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: String) -> ContextRule {
 pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32>) -> ContextRule {
     let existing_rule = get_context_rule(e, id);
 
-    // check valid_until
+    // Check valid_until
     if let Some(valid_until) = valid_until {
         if valid_until < e.ledger().sequence() {
             panic_with_error!(e, SmartAccountError::PastValidUntil)

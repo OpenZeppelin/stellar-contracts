@@ -1,5 +1,5 @@
 pub mod storage;
-//mod test;
+mod test;
 use soroban_sdk::{auth::CustomAccountInterface, Address, Env, Map, String, Symbol, Val, Vec};
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, get_context_rule, get_context_rules,
