@@ -15,6 +15,7 @@ pub use crate::smart_account::Signer;
 #[derive(Clone, Debug, PartialEq)]
 pub struct SimpleThresholdInstallParams {
     pub threshold: u32,
+    pub signers_count: u32,
 }
 
 #[contracterror]
@@ -77,11 +78,11 @@ pub fn enforce(
     }
 }
 
-pub fn set_threshold(e: &Env, threshold: u32, smart_account: &Address) {
+pub fn set_threshold(e: &Env, threshold: u32, signers_count: u32, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    if threshold == 0 {
+    if threshold == 0 || threshold > signers_count {
         panic_with_error!(e, SimpleThresholdError::InvalidThreshold)
     }
 
@@ -95,7 +96,7 @@ pub fn install(e: &Env, params: &SimpleThresholdInstallParams, smart_account: &A
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    if params.threshold == 0 {
+    if params.threshold == 0 || params.threshold > params.signers_count {
         panic_with_error!(e, SimpleThresholdError::InvalidThreshold)
     }
 

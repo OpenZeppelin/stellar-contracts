@@ -60,7 +60,7 @@ impl ThresholdPolicyContract {
     }
 
     /// Set a new threshold for a smart account
-    pub fn set_threshold(e: Env, threshold: u32, smart_account: Address) {
-        simple_threshold::set_threshold(&e, threshold, &smart_account)
+    pub fn set_threshold(e: Env, threshold: u32, signers_count: u32, smart_account: Address) {
+        simple_threshold::set_threshold(&e, signers_count, threshold, &smart_account)
     }
 }

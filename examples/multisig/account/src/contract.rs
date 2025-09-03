@@ -1,6 +1,6 @@
 use soroban_sdk::{
     auth::{Context, CustomAccountInterface},
-    contract, contracterror, contractimpl,
+    contract, contractimpl,
     crypto::Hash,
     Address, Env, Map, String, Symbol, Val, Vec,
 };
@@ -10,12 +10,6 @@ use stellar_accounts::smart_account::{
     update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType,
     ExecutionEntryPoint, Signatures, Signer, SmartAccount, SmartAccountError,
 };
-
-#[contracterror]
-#[repr(u32)]
-pub enum MultisigError {
-    NoSignersAndPolicies = 0,
-}
 
 #[contract]
 pub struct MultisigContract;

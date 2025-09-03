@@ -32,7 +32,7 @@ fn install_success() {
 
     e.as_contract(&address, || {
         let (_, _, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2 };
+        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
 
         install(&e, &params, &smart_account);
 
@@ -50,7 +50,7 @@ fn install_zero_threshold_fails() {
     e.mock_all_auths();
 
     e.as_contract(&address, || {
-        let params = SimpleThresholdInstallParams { threshold: 0 }; // Invalid
+        let params = SimpleThresholdInstallParams { threshold: 0, signers_count: 3 }; // Invalid
 
         install(&e, &params, &smart_account);
     });
@@ -66,7 +66,7 @@ fn can_enforce_sufficient_signers() {
 
     e.as_contract(&address, || {
         let (addr1, addr2, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2 };
+        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
 
         install(&e, &params, &smart_account);
 
@@ -102,7 +102,7 @@ fn can_enforce_insufficient_signers() {
 
     e.as_contract(&address, || {
         let (addr1, _, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2 };
+        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
 
         install(&e, &params, &smart_account);
 
@@ -167,7 +167,7 @@ fn enforce_success() {
         let (addr1, addr2, _) = create_test_signers(&e);
         let authenticated_signers =
             Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
-        let params = SimpleThresholdInstallParams { threshold: 2 };
+        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
 
         install(&e, &params, &smart_account);
 
@@ -199,13 +199,13 @@ fn set_threshold_success() {
 
     e.as_contract(&address, || {
         let (_, _, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2 };
+        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 2 };
 
         install(&e, &params, &smart_account);
     });
 
     e.as_contract(&address, || {
-        set_threshold(&e, 3, &smart_account);
+        set_threshold(&e, 3, 3, &smart_account);
         assert_eq!(get_threshold(&e, &smart_account), 3);
     });
 }
@@ -221,13 +221,13 @@ fn set_threshold_zero_fails() {
 
     e.as_contract(&address, || {
         let (_, _, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2 };
+        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
 
         install(&e, &params, &smart_account);
     });
 
     e.as_contract(&address, || {
-        set_threshold(&e, 0, &smart_account); // Invalid threshold
+        set_threshold(&e, 0, 3, &smart_account); // Invalid threshold
     });
 }
 
@@ -241,7 +241,7 @@ fn uninstall_success() {
 
     e.as_contract(&address, || {
         let (_, _, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2 };
+        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
 
         install(&e, &params, &smart_account);
 

@@ -8,7 +8,6 @@ pub use storage::{
     Signatures, Signer, SmartAccountError,
 };
 
-// provide user defined types to generalize the interface
 pub trait SmartAccount: CustomAccountInterface {
     fn get_context_rule(e: &Env, context_rule_id: u32) -> ContextRule;
 
