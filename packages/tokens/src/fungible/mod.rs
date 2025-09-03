@@ -124,14 +124,22 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 ///   with [`crate::fungible::burnable::FungibleBurnable`]) trait
 /// * [`crate::fungible::allowlist::AllowList`] (enabling the compatibility and
 ///   overrides for [`crate::fungible::allowlist::FungibleAllowList`]) trait,
-///   incompatible with [`crate::fungible::blocklist::BlockList`] trait.
+///   incompatible with [`crate::fungible::blocklist::BlockList`] trait and
+///   [`crate::rwa::RWA`] trait.
 /// * [`crate::fungible::blocklist::BlockList`] (enabling the compatibility and
 ///   overrides for [`crate::fungible::blocklist::FungibleBlockList`]) trait,
-///   incompatible with [`crate::fungible::allowlist::AllowList`] trait.
+///   incompatible with [`crate::fungible::allowlist::AllowList`] trait and
+///   [`crate::rwa::RWA`] trait.
+/// * [`crate::rwa::RWA`] (enabling the compatibility and overrides for
+///   [`crate::rwa::RWAToken`]) trait, incompatible with
+///   [`crate::fungible::allowlist::AllowList`] trait and
+///   [`crate::fungible::blocklist::BlockList`] trait.
 ///
-/// You can find the default implementations of this trait for `FTBase`,
-/// `Allowlist`, and `Blocklist` by navigating to:
-/// `ContractType::{method_name}`. For example, if you want to find how
+/// You can find the default implementations of this trait for `Base`,
+/// `Allowlist`, `Blocklist` and `RWA` by navigating to:
+/// `ContractType::{method_name}`.
+///
+/// For example, if you want to find how
 /// [`FungibleToken::transfer`] is implemented for the `Allowlist` contract
 /// type, you can find it using
 /// [`crate::fungible::allowlist::AllowList::transfer`].

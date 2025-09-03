@@ -15,6 +15,7 @@ members = [
     "examples/nft-sequential-minting",
     "examples/ownable",
     "examples/pausable",
+    "examples/rwa",
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
     "examples/upgradeable/*",
@@ -44,6 +45,8 @@ proptest = "1"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 soroban-test-helpers = "0.2.3"
+k256 = "0.13.4"
+p256 = "0.13.2"
 hex-literal = "1.0.0"
 ed25519-dalek = "2.0.0"
 

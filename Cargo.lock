@@ -406,6 +406,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7c1832837b905bbfb5101e07cc24c8deddf52f93225eee6ead5f4d63d53ddcb"
 dependencies = [
  "const-oid",
+ "pem-rfc7468",
  "zeroize",
 ]
 
@@ -476,6 +477,7 @@ dependencies = [
  "elliptic-curve",
  "rfc6979",
  "signature",
+ "spki",
 ]
 
 [[package]]
@@ -521,6 +523,8 @@ dependencies = [
  "ff",
  "generic-array",
  "group",
+ "pem-rfc7468",
+ "pkcs8",
  "rand_core 0.6.4",
  "sec1",
  "subtle",
@@ -841,7 +845,9 @@ dependencies = [
  "cfg-if",
  "ecdsa",
  "elliptic-curve",
+ "once_cell",
  "sha2",
+ "signature",
 ]
 
 [[package]]
@@ -1041,6 +1047,15 @@ dependencies = [
  "stellar-access",
  "stellar-contract-utils",
  "stellar-macros",
+]
+
+[[package]]
+name = "pem-rfc7468"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88b39c9bfcfc231068454382784bb460aae594343fb030d46e9f50a645418412"
+dependencies = [
+ "base64ct",
 ]
 
 [[package]]
@@ -1282,6 +1297,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "rwa-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1350,6 +1375,7 @@ dependencies = [
  "base16ct",
  "der",
  "generic-array",
+ "pkcs8",
  "subtle",
  "zeroize",
 ]
@@ -1745,9 +1771,13 @@ dependencies = [
 name = "stellar-tokens"
 version = "0.4.1"
 dependencies = [
+ "ed25519-dalek",
+ "k256",
+ "p256",
  "soroban-sdk",
  "soroban-test-helpers",
  "stellar-access",
+ "stellar-contract-utils",
  "stellar-event-assertion",
 ]
 

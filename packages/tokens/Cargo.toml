@@ -13,10 +13,14 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+stellar-contract-utils = { workspace = true }
 stellar-access = { workspace = true }
 
 
 [dev-dependencies]
+ed25519-dalek = { workspace = true }
 soroban-sdk = { workspace = true, features = ["testutils"] }
 soroban-test-helpers = { workspace = true }
 stellar-event-assertion = { workspace = true }
+k256 = { workspace = true, features = ["ecdsa"] }
+p256 = { workspace = true, features = ["ecdsa"] }
