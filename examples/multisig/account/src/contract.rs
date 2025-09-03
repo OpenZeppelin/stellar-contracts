@@ -2,7 +2,7 @@ use soroban_sdk::{
     auth::{Context, CustomAccountInterface},
     contract, contracterror, contractimpl,
     crypto::Hash,
-    panic_with_error, Address, Env, String, Symbol, Val, Vec,
+    Address, Env, Map, String, Symbol, Val, Vec,
 };
 use stellar_accounts::smart_account::{
     add_context_rule, add_policy, add_signer, get_context_rule, get_context_rules,
@@ -21,16 +21,7 @@ pub enum MultisigError {
 pub struct MultisigContract;
 
 impl MultisigContract {
-    pub fn __constructor(
-        e: &Env,
-        signers: Vec<Signer>,
-        policies: Vec<Address>,
-        policies_install_params: Vec<Val>,
-    ) {
-        if signers.is_empty() && policies.is_empty() {
-            panic_with_error!(e, MultisigError::NoSignersAndPolicies)
-        }
-
+    pub fn __constructor(e: &Env, signers: Vec<Signer>, policies: Map<Address, Val>) {
         add_context_rule(
             e,
             &ContextRuleType::Default,
@@ -38,7 +29,6 @@ impl MultisigContract {
             None,
             signers,
             policies,
-            policies_install_params,
         );
     }
 }
@@ -74,12 +64,11 @@ impl SmartAccount for MultisigContract {
         name: String,
         valid_until: Option<u32>,
         signers: Vec<Signer>,
-        policies: Vec<Address>,
-        policies_params: Vec<Val>,
+        policies: Map<Address, Val>,
     ) -> ContextRule {
         e.current_contract_address().require_auth();
 
-        add_context_rule(e, &context_type, name, valid_until, signers, policies, policies_params)
+        add_context_rule(e, &context_type, name, valid_until, signers, policies)
     }
 
     fn update_context_rule_name(e: &Env, context_rule_id: u32, name: String) -> ContextRule {

@@ -1,9 +1,9 @@
 pub mod storage;
 //mod test;
-use soroban_sdk::{auth::CustomAccountInterface, Address, Env, String, Symbol, Val, Vec};
+use soroban_sdk::{auth::CustomAccountInterface, Address, Env, Map, String, Symbol, Val, Vec};
 pub use storage::{
-    add_context_rule, add_policy, add_signer, authenticate, enforce_policy, get_context_rule,
-    get_context_rules, get_validated_context, remove_context_rule, remove_policy, remove_signer,
+    add_context_rule, add_policy, add_signer, authenticate, get_context_rule, get_context_rules,
+    get_validated_context, remove_context_rule, remove_policy, remove_signer,
     update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType, Meta,
     Signatures, Signer, SmartAccountError,
 };
@@ -20,8 +20,7 @@ pub trait SmartAccount: CustomAccountInterface {
         name: String,
         valid_until: Option<u32>,
         signers: Vec<Signer>,
-        policies: Vec<Address>,
-        policies_params: Vec<Val>,
+        policies: Map<Address, Val>,
     ) -> ContextRule;
 
     fn update_context_rule_name(e: &Env, context_rule_id: u32, name: String) -> ContextRule;

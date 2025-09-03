@@ -354,7 +354,12 @@ pub fn do_check_auth(
     for (rule, context, authenticated_signers) in validated_contexts.iter() {
         let ContextRule { signers, policies, .. } = rule;
         for policy in policies.iter() {
-            enforce_policy(&e, &policy, &context, &signers, &authenticated_signers);
+            PolicyClient::new(&e, &policy).enforce(
+                &context,
+                &signers,
+                &authenticated_signers,
+                &e.current_contract_address(),
+            );
         }
     }
 
@@ -363,29 +368,13 @@ pub fn do_check_auth(
 
 // ################## CHANGE STATE ##################
 
-pub fn enforce_policy(
-    e: &Env,
-    policy: &Address,
-    context: &Context,
-    rule_signers: &Vec<Signer>,
-    matched_signers: &Vec<Signer>,
-) {
-    PolicyClient::new(e, policy).enforce(
-        context,
-        rule_signers,
-        matched_signers,
-        &e.current_contract_address(),
-    );
-}
-
 pub fn add_context_rule(
     e: &Env,
     context_type: &ContextRuleType,
     name: String,
     valid_until: Option<u32>,
     signers: Vec<Signer>,
-    policies: Vec<Address>,
-    policies_params: Vec<Val>,
+    policies: Map<Address, Val>,
 ) -> ContextRule {
     let mut id = e.storage().persistent().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
     let mut same_key_ids: Vec<u32> = e
@@ -408,15 +397,6 @@ pub fn add_context_rule(
         unique_signers.push_back(signer);
     }
 
-    // Check for duplicate policies
-    let mut unique_policies = Vec::new(e);
-    for policy in policies.iter() {
-        if unique_policies.contains(&policy) {
-            panic_with_error!(e, SmartAccountError::DuplicatePolicy)
-        }
-        unique_policies.push_back(policy);
-    }
-
     // Check valid_until
     if let Some(valid_until) = valid_until {
         if valid_until < e.ledger().sequence() {
@@ -432,10 +412,18 @@ pub fn add_context_rule(
     e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
     // Store policies and install them
-    e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
-    for (policy, param) in policies.iter().zip(policies_params.iter()) {
+    let mut policies_vec = Vec::new(e);
+    for (policy, param) in policies.iter() {
+        // Check for duplicate policies
+        if policies_vec.contains(&policy) {
+            panic_with_error!(e, SmartAccountError::DuplicatePolicy)
+        }
+        policies_vec.push_back(policy.clone());
+        // Install the policy
         PolicyClient::new(e, &policy).install(&param, &e.current_contract_address());
     }
+    // Store policies
+    e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies_vec);
 
     // Update ids list
     same_key_ids.push_back(id);
@@ -450,7 +438,7 @@ pub fn add_context_rule(
         context_type: context_type.clone(),
         name,
         signers,
-        policies,
+        policies: policies_vec,
         valid_until,
     }
 }
