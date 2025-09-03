@@ -14,7 +14,7 @@ pub struct IdentityRegistryContract;
 
 #[contractimpl]
 impl IdentityRegistryContract {
-    pub fn __constructor(e: &Env, admin: Address, manager: Address) {
+    pub fn constructor(e: &Env, admin: Address, manager: Address) {
         access_control::set_admin(e, &admin);
         access_control::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
     }

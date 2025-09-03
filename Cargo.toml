@@ -6,7 +6,7 @@ members = [
     "examples/fungible-capped",
     "examples/fungible-merkle-airdrop",
     "examples/fungible-pausable",
-    "examples/fungible-token-interface",
+    # "examples/fungible-token-interface",
     "examples/fungible-vault",
     "examples/merkle-voting",
     "examples/nft-access-control",
@@ -17,6 +17,7 @@ members = [
     "examples/ownable",
     "examples/pausable",
     "examples/rwa",
+    "examples/same-name",
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
     "examples/upgradeable/*",
@@ -39,7 +40,7 @@ categories = ["no-std", "wasm"]
 version = "0.4.1"
 
 [workspace.dependencies]
-soroban-sdk = "22.0.8"
+soroban-sdk = { git = "https://github.com/stellar/rs-soroban-sdk.git", branch = "allow-coexisting-contractimpls-with-same-names" }
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
@@ -71,6 +72,3 @@ lto = true
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true
-
-[patch.crates-io]
-soroban-sdk = { git = "https://github.com/stellar/rs-soroban-sdk.git", branch = "allow-coexisting-contractimpls-with-same-names" }
