@@ -15,5 +15,4 @@ doctest = false
 soroban-sdk = { workspace = true, features = ["testutils"] }
 stellar-access = { workspace = true }
 stellar-macros = { workspace = true }
-stellar-event-assertion = { workspace = true }
 stellar-tokens = { workspace = true }

@@ -2,7 +2,13 @@ extern crate std;
 
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 
-use crate::fungible::{extensions::allowlist::storage::AllowList, Base};
+use crate::fungible::{
+    extensions::{
+        allowlist::{AllowList, FungibleAllowList},
+        burnable::FungibleBurnable,
+    },
+    FungibleToken,
+};
 
 #[contract]
 struct MockContract;
@@ -19,7 +25,7 @@ fn allow_user_works() {
         assert!(!AllowList::allowed(&e, &user));
 
         // Allow user
-        AllowList::allow_user(&e, &user);
+        AllowList::allow_user(&e, &user, &user);
 
         // Verify user is allowed
         assert!(AllowList::allowed(&e, &user));
@@ -35,13 +41,13 @@ fn disallow_user_works() {
 
     e.as_contract(&address, || {
         // Allow user first
-        AllowList::allow_user(&e, &user);
+        AllowList::allow_user(&e, &user, &user);
         assert!(AllowList::allowed(&e, &user));
     });
 
     e.as_contract(&address, || {
         // Disallow user
-        AllowList::disallow_user(&e, &user);
+        AllowList::disallow_user(&e, &user, &user);
 
         // Verify user is not allowed
         assert!(!AllowList::allowed(&e, &user));
@@ -58,18 +64,18 @@ fn transfer_with_allowed_users_works() {
 
     e.as_contract(&address, || {
         // Allow both users
-        AllowList::allow_user(&e, &user1);
-        AllowList::allow_user(&e, &user2);
+        AllowList::allow_user(&e, &user1, &user1);
+        AllowList::allow_user(&e, &user2, &user1);
 
         // Mint tokens to user1
-        Base::mint(&e, &user1, 100);
+        AllowList::internal_mint(&e, &user1, 100);
 
         // Transfer tokens from user1 to user2
         AllowList::transfer(&e, &user1, &user2, 50);
 
         // Verify balances
-        assert_eq!(Base::balance(&e, &user1), 50);
-        assert_eq!(Base::balance(&e, &user2), 50);
+        assert_eq!(AllowList::balance(&e, &user1), 50);
+        assert_eq!(AllowList::balance(&e, &user2), 50);
     });
 }
 
@@ -82,16 +88,16 @@ fn allowlist_burn_override_works() {
 
     e.as_contract(&address, || {
         // Allow user first
-        AllowList::allow_user(&e, &user);
+        AllowList::allow_user(&e, &user, &user);
 
         // Mint tokens to user
-        Base::mint(&e, &user, 100);
+        AllowList::internal_mint(&e, &user, 100);
 
         // Burn tokens from user
         AllowList::burn(&e, &user, 50);
 
         // Verify balance
-        assert_eq!(Base::balance(&e, &user), 50);
+        assert_eq!(AllowList::balance(&e, &user), 50);
     });
 }
 
@@ -105,19 +111,19 @@ fn allowlist_burn_from_override_works() {
 
     e.as_contract(&address, || {
         // Allow user1 first
-        AllowList::allow_user(&e, &user1);
+        AllowList::allow_user(&e, &user1, &user1);
 
         // Mint tokens to user1
-        Base::mint(&e, &user1, 100);
+        AllowList::internal_mint(&e, &user1, 100);
 
         // Allow user2 to burn tokens from user1
-        Base::approve(&e, &user1, &user2, 50, 100);
+        AllowList::approve(&e, &user1, &user2, 50, 100);
 
         // Burn tokens from user1 by user2
         AllowList::burn_from(&e, &user2, &user1, 50);
 
         // Verify balance
-        assert_eq!(Base::balance(&e, &user1), 50);
+        assert_eq!(AllowList::balance(&e, &user1), 50);
     });
 }
 
@@ -132,10 +138,10 @@ fn transfer_with_sender_not_allowed_panics() {
 
     e.as_contract(&address, || {
         // Allow only user2
-        AllowList::allow_user(&e, &user2);
+        AllowList::allow_user(&e, &user2, &user1);
 
         // Mint tokens to user1
-        Base::mint(&e, &user1, 100);
+        AllowList::internal_mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 (not allowed) to user2
         AllowList::transfer(&e, &user1, &user2, 50);
@@ -153,10 +159,10 @@ fn transfer_with_receiver_not_allowed_panics() {
 
     e.as_contract(&address, || {
         // Allow only user1
-        AllowList::allow_user(&e, &user1);
+        AllowList::allow_user(&e, &user1, &user1);
 
         // Mint tokens to user1
-        Base::mint(&e, &user1, 100);
+        AllowList::internal_mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 to user2 (not allowed)
         AllowList::transfer(&e, &user1, &user2, 50);
@@ -188,7 +194,7 @@ fn burn_with_not_allowed_panics() {
 
     e.as_contract(&address, || {
         // Mint tokens to user
-        Base::mint(&e, &user, 100);
+        AllowList::internal_mint(&e, &user, 100);
 
         // Try to burn tokens from user (not allowed)
         AllowList::burn(&e, &user, 50);
@@ -206,10 +212,10 @@ fn burn_from_with_not_allowed_panics() {
 
     e.as_contract(&address, || {
         // Mint tokens to user1
-        Base::mint(&e, &user1, 100);
+        AllowList::internal_mint(&e, &user1, 100);
 
         // Allow user2 to burn tokens from user1
-        Base::approve(&e, &user1, &user2, 50, 100);
+        AllowList::approve(&e, &user1, &user2, 50, 100);
 
         // Try to burn tokens from user1 by user2 (not allowed)
         AllowList::burn_from(&e, &user2, &user1, 50);

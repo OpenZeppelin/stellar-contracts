@@ -2,10 +2,8 @@ pub mod storage;
 
 mod test;
 
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{contracttrait, Env};
 pub use storage::Enumerable;
-
-use crate::non_fungible::NonFungibleToken;
 
 /// Enumerable Trait for Non-Fungible Token
 ///
@@ -40,30 +38,26 @@ use crate::non_fungible::NonFungibleToken;
 ///    exists for the use-cases where the enumeration is required as an on-chain
 ///    operation.
 ///
-/// # Notes
+/// Note that, `Enumerable` trait can also be offloaded to off-chain services.
+/// This extension exists for the use-cases where the enumeration is required as
+/// an on-chain operation.
 ///
-/// `#[contractimpl]` macro requires even the default implementations to be
-/// present under its scope. To not confuse the developers, we did not provide
-/// the default implementations here, but we are providing a macro to generate
-/// the default implementations for you.
+/// # Example
 ///
 /// When implementing [`NonFungibleEnumerable`] trait for your Smart Contract,
 /// you can follow the below example:
 ///
 /// ```ignore
-/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
 /// #[contractimpl]
 /// impl NonFungibleEnumerable for MyContract {
+///     type Impl = Enumerable;
 ///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
 ///     /* and the macro will generate all the missing default implementations for you */
 /// }
 /// ```
-pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
+#[contracttrait(add_impl_type = true)]
+pub trait NonFungibleEnumerable {
     /// Returns the total amount of tokens stored by the contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
     fn total_supply(e: &Env) -> u32;
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
@@ -73,7 +67,6 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `owner` - Account of the token's owner.
     /// * `index` - Index of the token in the owner's local list.
     ///
@@ -96,7 +89,6 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     ///
     /// # Arguments
     ///
-    /// * `e` - Access to the Soroban environment.
     /// * `index` - Index of the token in the global list.
     ///
     /// # Errors

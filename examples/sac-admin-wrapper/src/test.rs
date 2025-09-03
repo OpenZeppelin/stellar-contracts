@@ -16,6 +16,7 @@ fn test_sac_transfer() {
     let issuer = Address::generate(&e);
     let default_admin = Address::generate(&e);
     let manager = Address::generate(&e);
+    let manager2 = Address::generate(&e);
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
 
@@ -44,7 +45,7 @@ fn test_sac_transfer() {
     // Deploy the New Admin
     let new_admin = e.register(
         ExampleContract,
-        (default_admin.clone(), manager.clone(), sac_client.address.clone()),
+        (default_admin.clone(), manager.clone(), manager2.clone(), sac_client.address.clone()),
     );
     let new_admin_client = ExampleContractClient::new(&e, &new_admin);
 
@@ -87,6 +88,7 @@ fn test_transfer_admin() {
     let default_admin = Address::generate(&e);
     let new_default_admin = Address::generate(&e);
     let manager = Address::generate(&e);
+    let manager2 = Address::generate(&e);
 
     // Deploy the Stellar Asset Contract
     let sac = e.register_stellar_asset_contract_v2(issuer.clone());
@@ -95,7 +97,7 @@ fn test_transfer_admin() {
     // Deploy the New Admin
     let new_admin = e.register(
         ExampleContract,
-        (default_admin.clone(), manager.clone(), sac_client.address.clone()),
+        (default_admin.clone(), manager.clone(), manager2, sac_client.address.clone()),
     );
     let new_admin_client = ExampleContractClient::new(&e, &new_admin);
 

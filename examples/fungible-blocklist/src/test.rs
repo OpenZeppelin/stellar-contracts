@@ -81,10 +81,10 @@ fn blocklist_approve_override_works() {
     let user1 = Address::generate(&e);
     let user2 = Address::generate(&e);
     let initial_supply = 1_000_000;
-    let client = create_client(&e, &admin, &manager, &initial_supply);
-    let transfer_amount = 1000;
-
     e.mock_all_auths();
+    let client = create_client(&e, &admin, &manager, &initial_supply);
+
+    let transfer_amount = 1000;
 
     // Verify initial state - no users are blocked
     assert!(!client.blocked(&user1));

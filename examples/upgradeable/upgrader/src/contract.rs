@@ -1,6 +1,6 @@
 /// Helper contract to perform upgrade+migrate in a single transaction.
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol, Val};
-use stellar_access::ownable;
+use stellar_access::{Ownable, Owner};
 use stellar_contract_utils::upgradeable::UpgradeableClient;
 use stellar_macros::only_owner;
 
@@ -10,9 +10,14 @@ pub const MIGRATE: Symbol = symbol_short!("migrate");
 pub struct Upgrader;
 
 #[contractimpl]
+impl Ownable for Upgrader {
+    type Impl = Owner;
+}
+
+#[contractimpl]
 impl Upgrader {
     pub fn __constructor(e: &Env, owner: Address) {
-        ownable::set_owner(e, &owner);
+        Self::set_owner(e, &owner);
     }
 
     #[only_owner]
