@@ -1,28 +1,62 @@
 use soroban_sdk::{
     auth::{Context, CustomAccountInterface},
-    contract, contractimpl,
+    contract, contracterror, contractimpl,
     crypto::Hash,
-    Address, Env, String, Symbol, Val, Vec,
+    panic_with_error, Address, Env, String, Symbol, Val, Vec,
 };
-use stellar_accounts::smart_account::{
-    add_context_rule, get_context_rule, get_context_rules, modify_context_rule,
-    remove_context_rule, storage::do_check_auth, ContextRule, ContextRuleType, ContextRuleVal,
-    ExecutionEntry, Signatures, Signer, SmartAccount, SmartAccountError,
+use stellar_accounts::{
+    policies::PolicyClient,
+    smart_account::{
+        add_context_rule, get_context_rule, get_context_rules, modify_context_rule,
+        remove_context_rule, storage::do_check_auth, ContextRule, ContextRuleType, ContextRuleVal,
+        ExecutionEntryPoint, Signatures, Signer, SmartAccount, SmartAccountError,
+    },
 };
+
+#[contracterror]
+#[repr(u32)]
+pub enum MultisigError {
+    NoSignersAndPolicies = 0,
+}
 
 #[contract]
-pub struct SmartAccountContract;
+pub struct MultisigContract;
 
-impl SmartAccountContract {
-    pub fn __constructor(e: &Env, signers: Vec<Signer>, policies: Vec<Address>, name: String) {
-        // TODO: validate signers.len() or policies.len()
-        let context_rule_val = ContextRuleVal { name, signers, policies, valid_until: None };
+impl MultisigContract {
+    pub fn __constructor(
+        e: &Env,
+        signers: Vec<Signer>,
+        policies: Vec<Address>,
+        policies_install_params: Vec<Val>,
+    ) {
+        if signers.is_empty() && policies.is_empty() {
+            panic_with_error!(e, MultisigError::NoSignersAndPolicies)
+        }
+
+        let context_rule_val = ContextRuleVal {
+            name: String::from_str(e, "multisig"),
+            signers,
+            policies: policies.clone(),
+            valid_until: None,
+        };
         add_context_rule(e, &ContextRuleType::Default, &context_rule_val);
+
+        Self::install_policies(e, policies, policies_install_params);
     }
+
+    fn install_policies(e: &Env, policies: Vec<Address>, install_params: Vec<Val>) {
+        for (policy, param) in policies.iter().zip(install_params.iter()) {
+            PolicyClient::new(e, &policy).install(&param, &e.current_contract_address());
+        }
+    }
+
+    //pub fn add_signer(e: &Env, context_rule_id: u32, signer: Signer) {
+    //let rule = get_context_rule(e, context_rule_id);
+    //}
 }
 
 #[contractimpl]
-impl CustomAccountInterface for SmartAccountContract {
+impl CustomAccountInterface for MultisigContract {
     type Error = SmartAccountError;
     type Signature = Signatures;
 
@@ -37,7 +71,7 @@ impl CustomAccountInterface for SmartAccountContract {
 }
 
 #[contractimpl]
-impl SmartAccount for SmartAccountContract {
+impl SmartAccount for MultisigContract {
     type ContextRule = ContextRule;
     type ContextRuleType = ContextRuleType;
     type ContextRuleVal = ContextRuleVal;
@@ -78,7 +112,7 @@ impl SmartAccount for SmartAccountContract {
 }
 
 #[contractimpl]
-impl ExecutionEntry for SmartAccountContract {
+impl ExecutionEntryPoint for MultisigContract {
     fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>) {
         e.current_contract_address().require_auth();
 

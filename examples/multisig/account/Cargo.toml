@@ -1,5 +1,5 @@
 [package]
-name = "smart-account-example"
+name = "multisig-account-example"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

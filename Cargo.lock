@@ -884,6 +884,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "multisig-account-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-accounts",
+]
+
+[[package]]
+name = "multisig-ed25519-verifier-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-accounts",
+]
+
+[[package]]
+name = "multisig-threshold-policy-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-accounts",
+]
+
+[[package]]
 name = "nft-access-control-example"
 version = "0.4.1"
 dependencies = [
@@ -1383,14 +1407,6 @@ name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
-
-[[package]]
-name = "smart-account-example"
-version = "0.4.1"
-dependencies = [
- "soroban-sdk",
- "stellar-accounts",
-]
 
 [[package]]
 name = "soroban-builtin-sdk-macros"
