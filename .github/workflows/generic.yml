@@ -52,7 +52,7 @@ jobs:
         with:
           toolchain: stable, nightly
           components: clippy, rustfmt, llvm-tools-preview
-          target: wasm32-unknown-unknown
+          target: wasm32-unknown-unknown, wasm32v1-none
 
       - name: Install cargo-llvm-cov
         run: cargo install cargo-llvm-cov
