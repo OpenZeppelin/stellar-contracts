@@ -37,6 +37,7 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
+          - macos-latest
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -64,6 +65,9 @@ jobs:
 
       - name: Check build
         run: cargo build --target wasm32-unknown-unknown --release
+
+      - name: Check tests
+        run: cargo test
 
       - name: Run tests with coverage
         run: cargo llvm-cov --workspace --lcov --fail-under-lines 90 --output-path lcov.info
