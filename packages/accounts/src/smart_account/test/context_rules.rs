@@ -1130,3 +1130,35 @@ fn get_context_rules_empty_result() {
         assert_eq!(rules.len(), 0);
     });
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2007)")]
+fn add_context_rule_duplicate_signer_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr);
+        let policies_map = create_test_policies_map(&e);
+
+        // Create signers with duplicate
+        let signer1 = Signer::Native(Address::generate(&e));
+        let signer2 = Signer::Native(Address::generate(&e));
+        let duplicate_signer = signer1.clone(); // Duplicate of signer1
+
+        let mut signers = Vec::new(&e);
+        signers.push_back(signer1);
+        signers.push_back(signer2);
+        signers.push_back(duplicate_signer); // This should cause the error
+
+        add_context_rule(
+            &e,
+            &context_type,
+            String::from_str(&e, "test_rule"),
+            None,
+            signers,
+            policies_map,
+        );
+    });
+}

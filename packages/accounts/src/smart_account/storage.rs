@@ -247,8 +247,8 @@ pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
     }
 }
 
-/// Retrieves all context rules of a specific type. Returns a vector of all
-/// context rules matching the specified type, including expired rules.
+/// Retrieves all context rules of a specific context type. Returns a vector of
+/// all context rules matching the specified type, including expired rules.
 ///
 /// # Arguments
 ///
@@ -389,7 +389,7 @@ pub fn get_validated_context(
 }
 
 /// Authenticates all provided signatures against their respective signers.
-/// Verifies both native Soroban signatures and delegated signatures through
+/// Verifies both `Address` authorizations and delegated signatures through
 /// external verifier contracts.
 ///
 /// # Arguments
@@ -452,7 +452,9 @@ pub fn can_enforce_all_policies(
 
 /// Performs complete authorization check for multiple contexts. Authenticates
 /// signatures, validates contexts against rules, and enforces all applicable
-/// policies. Returns `Ok(())` if all contexts are successfully authorized.
+/// policies. Returns success if all contexts are successfully authorized.
+///
+/// This function is meant to be used in `__check_auth` of a smart account.
 ///
 /// # Arguments
 ///
@@ -520,8 +522,6 @@ pub fn do_check_auth(
 /// * [`SmartAccountError::DuplicateSigner`] - When the same signer appears
 ///   multiple times.
 /// * [`SmartAccountError::PastValidUntil`] - When valid_until is in the past.
-/// * [`SmartAccountError::DuplicatePolicy`] - When the same policy appears
-///   multiple times.
 ///
 /// # Events
 ///
@@ -577,10 +577,6 @@ pub fn add_context_rule(
     // Store policies and install them
     let mut policies_vec = Vec::new(e);
     for (policy, param) in policies.iter() {
-        // Check for duplicate policies
-        if policies_vec.contains(&policy) {
-            panic_with_error!(e, SmartAccountError::DuplicatePolicy)
-        }
         policies_vec.push_back(policy.clone());
         // Install the policy
         PolicyClient::new(e, &policy).install(&param, &e.current_contract_address());
@@ -616,7 +612,7 @@ pub fn add_context_rule(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `id` - The unique identifier of the context rule to update.
+/// * `id` - The ID of the context rule to update.
 /// * `name` - The new name for the context rule.
 ///
 /// # Errors
@@ -665,7 +661,7 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: String) -> ContextRule {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `id` - The unique identifier of the context rule to update.
+/// * `id` - The ID of the context rule to update.
 /// * `valid_until` - The new expiration ledger sequence for the rule.
 ///
 /// # Errors
@@ -723,7 +719,7 @@ pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `id` - The unique identifier of the context rule to remove.
+/// * `id` - The ID of the context rule to remove.
 ///
 /// # Errors
 ///
@@ -773,7 +769,7 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `id` - The unique identifier of the context rule.
+/// * `id` - The ID of the context rule.
 /// * `signer` - The signer to add to the context rule.
 ///
 /// # Errors
@@ -818,7 +814,7 @@ pub fn add_signer(e: &Env, id: u32, signer: Signer) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `id` - The unique identifier of the context rule.
+/// * `id` - The ID of the context rule.
 /// * `signer` - The signer to remove from the context rule.
 ///
 /// # Errors
@@ -865,7 +861,7 @@ pub fn remove_signer(e: &Env, id: u32, signer: Signer) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `id` - The unique identifier of the context rule.
+/// * `id` - The ID of the context rule.
 /// * `policy` - The address of the policy contract to add.
 /// * `install_param` - The installation parameter for the policy.
 ///
@@ -914,7 +910,7 @@ pub fn add_policy(e: &Env, id: u32, policy: Address, install_param: Val) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `id` - The unique identifier of the context rule.
+/// * `id` - The ID of the context rule.
 /// * `policy` - The address of the policy contract to remove.
 ///
 /// # Errors
