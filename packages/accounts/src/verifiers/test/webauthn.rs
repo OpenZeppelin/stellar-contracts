@@ -69,72 +69,6 @@ fn encode_client_data(e: &Env, challenge: &str, type_field: &str) -> Bytes {
 struct MockContract;
 
 #[test]
-fn webauthn_works() {
-    let e = Env::default();
-
-    //"S7eouZYJsLix1TRpS7HzHxKROKLyoR-OhwLu27eSki4",
-    let payload: [u8; 32] =
-        hex!("4bb7a8b99609b0b8b1d534694bb1f31f129138a2f2a11f8e8702eedbb792922e");
-
-    let mut encoded = [0u8; 43];
-    base64_url_encode(&mut encoded, &payload);
-
-    let client_data =
-        encode_client_data(&e, std::str::from_utf8(&encoded).unwrap(), "webauthn.get");
-    let authenticator_data = encode_authenticator_data(
-        &e,
-        AUTH_DATA_FLAGS_UP | AUTH_DATA_FLAGS_UV | AUTH_DATA_FLAGS_BE | AUTH_DATA_FLAGS_BS,
-    );
-
-    let mut msg = authenticator_data.clone();
-    msg.extend_from_array(&e.crypto().sha256(&client_data).to_array());
-    let digest = e.crypto().sha256(&msg);
-    let (key_data, signature) = sign(&e, digest);
-
-    let sig_data = WebAuthnSigData { client_data, authenticator_data, signature }.to_xdr(&e);
-
-    let signature_payload = Bytes::from_array(&e, &payload);
-
-    let address = e.register(MockContract, ());
-    e.as_contract(&address, || assert!(verify(&e, &signature_payload, &key_data, &sig_data)));
-}
-
-#[test]
-#[should_panic(expected = "Error(Crypto, InvalidInput)")]
-fn webauthn_fake_signature_fails() {
-    let e = Env::default();
-
-    //"S7eouZYJsLix1TRpS7HzHxKROKLyoR-OhwLu27eSki4",
-    let payload: [u8; 32] =
-        hex!("4bb7a8b99609b0b8b1d534694bb1f31f129138a2f2a11f8e8702eedbb792922e");
-
-    let mut encoded = [0u8; 43];
-    base64_url_encode(&mut encoded, &payload);
-
-    let client_data =
-        encode_client_data(&e, std::str::from_utf8(&encoded).unwrap(), "webauthn.get");
-    let authenticator_data = encode_authenticator_data(
-        &e,
-        AUTH_DATA_FLAGS_UP | AUTH_DATA_FLAGS_UV | AUTH_DATA_FLAGS_BE | AUTH_DATA_FLAGS_BS,
-    );
-
-    let mut msg = authenticator_data.clone();
-    msg.extend_from_array(&e.crypto().sha256(&client_data).to_array());
-    let digest = e.crypto().sha256(&msg);
-    let (key_data, mut signature) = sign(&e, digest);
-
-    // modify signature
-    signature.set(0, 123);
-
-    let sig_data = WebAuthnSigData { client_data, authenticator_data, signature }.to_xdr(&e);
-
-    let signature_payload = Bytes::from_array(&e, &payload);
-
-    let address = e.register(MockContract, ());
-    e.as_contract(&address, || assert!(verify(&e, &signature_payload, &key_data, &sig_data)));
-}
-
-#[test]
 fn validate_expected_type_valid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -326,6 +260,72 @@ fn validate_backup_eligibility_and_state_invalid_be0_bs1() {
 }
 
 #[test]
+fn webauthn_verify_success() {
+    let e = Env::default();
+
+    //"S7eouZYJsLix1TRpS7HzHxKROKLyoR-OhwLu27eSki4",
+    let payload: [u8; 32] =
+        hex!("4bb7a8b99609b0b8b1d534694bb1f31f129138a2f2a11f8e8702eedbb792922e");
+
+    let mut encoded = [0u8; 43];
+    base64_url_encode(&mut encoded, &payload);
+
+    let client_data =
+        encode_client_data(&e, std::str::from_utf8(&encoded).unwrap(), "webauthn.get");
+    let authenticator_data = encode_authenticator_data(
+        &e,
+        AUTH_DATA_FLAGS_UP | AUTH_DATA_FLAGS_UV | AUTH_DATA_FLAGS_BE | AUTH_DATA_FLAGS_BS,
+    );
+
+    let mut msg = authenticator_data.clone();
+    msg.extend_from_array(&e.crypto().sha256(&client_data).to_array());
+    let digest = e.crypto().sha256(&msg);
+    let (key_data, signature) = sign(&e, digest);
+
+    let sig_data = WebAuthnSigData { client_data, authenticator_data, signature }.to_xdr(&e);
+
+    let signature_payload = Bytes::from_array(&e, &payload);
+
+    let address = e.register(MockContract, ());
+    e.as_contract(&address, || assert!(verify(&e, &signature_payload, &key_data, &sig_data)));
+}
+
+#[test]
+#[should_panic(expected = "Error(Crypto, InvalidInput)")]
+fn webauthn_verify_fake_signature_fails() {
+    let e = Env::default();
+
+    //"S7eouZYJsLix1TRpS7HzHxKROKLyoR-OhwLu27eSki4",
+    let payload: [u8; 32] =
+        hex!("4bb7a8b99609b0b8b1d534694bb1f31f129138a2f2a11f8e8702eedbb792922e");
+
+    let mut encoded = [0u8; 43];
+    base64_url_encode(&mut encoded, &payload);
+
+    let client_data =
+        encode_client_data(&e, std::str::from_utf8(&encoded).unwrap(), "webauthn.get");
+    let authenticator_data = encode_authenticator_data(
+        &e,
+        AUTH_DATA_FLAGS_UP | AUTH_DATA_FLAGS_UV | AUTH_DATA_FLAGS_BE | AUTH_DATA_FLAGS_BS,
+    );
+
+    let mut msg = authenticator_data.clone();
+    msg.extend_from_array(&e.crypto().sha256(&client_data).to_array());
+    let digest = e.crypto().sha256(&msg);
+    let (key_data, mut signature) = sign(&e, digest);
+
+    // modify signature
+    signature.set(0, 123);
+
+    let sig_data = WebAuthnSigData { client_data, authenticator_data, signature }.to_xdr(&e);
+
+    let signature_payload = Bytes::from_array(&e, &payload);
+
+    let address = e.register(MockContract, ());
+    e.as_contract(&address, || assert!(verify(&e, &signature_payload, &key_data, &sig_data)));
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #0)")]
 fn verify_key_data_invalid() {
     let e = Env::default();
@@ -407,6 +407,32 @@ fn verify_client_data_too_long() {
             signature,
         }.to_xdr(&e);
 
+        verify(&e, &signature_payload, &key_data, &sig_data);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn verify_authenticator_data_too_short() {
+    let e = Env::default();
+    let key_data = Bytes::from_array(&e, &[1u8; 65]);
+    let payload: [u8; 32] = [1; 32];
+    let signature_payload = Bytes::from_array(&e, &payload);
+
+    let mut encoded = [0u8; 43];
+    base64_url_encode(&mut encoded, &payload);
+
+    let client_data =
+        encode_client_data(&e, std::str::from_utf8(&encoded).unwrap(), "webauthn.get");
+    // Slice authenticator_data
+    let authenticator_data =
+        encode_authenticator_data(&e, AUTH_DATA_FLAGS_UP | AUTH_DATA_FLAGS_UV).slice(0..35);
+    let signature = BytesN::<64>::from_array(&e, &[2u8; 64]);
+
+    let sig_data = WebAuthnSigData { client_data, authenticator_data, signature }.to_xdr(&e);
+
+    let address = e.register(MockContract, ());
+    e.as_contract(&address, || {
         verify(&e, &signature_payload, &key_data, &sig_data);
     });
 }
