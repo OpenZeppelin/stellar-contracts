@@ -2,7 +2,9 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, testutils::Address as _, Address, Env, Map, String, Val, Vec,
+    contract, contractimpl,
+    testutils::{Address as _, Events},
+    Address, Env, Map, String, Val, Vec,
 };
 
 use super::super::storage::{
@@ -87,6 +89,7 @@ fn add_signer_success() {
         add_signer(&e, rule.id, new_signer.clone());
 
         let updated_rule = get_context_rule(&e, rule.id);
+        assert_eq!(e.events().all().len(), 1);
         assert_eq!(updated_rule.signers.len(), 3);
         assert!(updated_rule.signers.contains(&new_signer));
     });
@@ -132,6 +135,7 @@ fn remove_signer_success() {
 
         let updated_rule = get_context_rule(&e, rule.id);
         assert_eq!(updated_rule.signers.len(), 1);
+        assert_eq!(e.events().all().len(), 1);
         assert!(!updated_rule.signers.contains(&signer_to_remove));
     });
 }
@@ -198,6 +202,7 @@ fn add_policy_success() {
         add_policy(&e, rule.id, policy_address.clone(), install_param);
 
         let updated_rule = get_context_rule(&e, rule.id);
+        assert_eq!(e.events().all().len(), 1);
         assert_eq!(updated_rule.policies.len(), 1);
         assert!(updated_rule.policies.contains(&policy_address));
     });
@@ -255,6 +260,7 @@ fn remove_policy_success() {
         remove_policy(&e, rule.id, policy_address.clone());
 
         let updated_rule = get_context_rule(&e, rule.id);
+        assert_eq!(e.events().all().len(), 2);
         assert_eq!(updated_rule.policies.len(), 0);
         assert!(!updated_rule.policies.contains(&policy_address));
     });

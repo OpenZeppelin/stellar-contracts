@@ -49,3 +49,134 @@ pub trait SmartAccount: CustomAccountInterface {
 pub trait ExecutionEntryPoint {
     fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>);
 }
+
+// ################## EVENTS ##################
+
+/// Emits an event indicating a context rule has been added.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `context_rule` - The newly created context rule.
+///
+/// # Events
+///
+/// * topics - `["context_rule_added", context_rule_id: u32]`
+/// * data - `[name: String, context_type: ContextRuleType, valid_until:
+///   Option<u32>, signers: Vec<Signer>, policies: Vec<Address>]`
+pub fn emit_context_rule_added(e: &Env, context_rule: &ContextRule) {
+    let topics = (Symbol::new(e, "context_rule_added"), context_rule.id);
+    e.events().publish(
+        topics,
+        (
+            context_rule.name.clone(),
+            context_rule.context_type.clone(),
+            context_rule.valid_until,
+            context_rule.signers.clone(),
+            context_rule.policies.clone(),
+        ),
+    )
+}
+
+/// Emits an event indicating a context rule has been updated.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `context_rule_id` - The ID of the updated context rule.
+/// * `meta` - The meta data of the context rule.
+///
+/// # Events
+///
+/// * topics - `["context_rule_updated", context_rule_id: u32]`
+/// * data - `[name: String, context_type: ContextRuleType, valid_until:
+///   Option<u32>]`
+pub fn emit_context_rule_updated(e: &Env, context_rule_id: u32, meta: &Meta) {
+    let topics = (Symbol::new(e, "context_rule_updated"), context_rule_id);
+    e.events().publish(topics, (meta.name.clone(), meta.context_type.clone(), meta.valid_until))
+}
+
+/// Emits an event indicating a context rule has been removed.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `context_rule_id` - The ID of the removed context rule.
+///
+/// # Events
+///
+/// * topics - `["context_rule_removed", context_rule_id: u32]`
+/// * data - `[]`
+pub fn emit_context_rule_removed(e: &Env, context_rule_id: u32) {
+    let topics = (Symbol::new(e, "context_rule_removed"), context_rule_id);
+    e.events().publish(topics, ())
+}
+
+/// Emits an event indicating a signer has been added to a context rule.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `context_rule_id` - The ID of the context rule.
+/// * `signer` - The signer that was added.
+///
+/// # Events
+///
+/// * topics - `["signer_added", context_rule_id: u32]`
+/// * data - `[signer: Signer]`
+pub fn emit_signer_added(e: &Env, context_rule_id: u32, signer: &Signer) {
+    let topics = (Symbol::new(e, "signer_added"), context_rule_id);
+    e.events().publish(topics, signer.clone())
+}
+
+/// Emits an event indicating a signer has been removed from a context rule.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `context_rule_id` - The ID of the context rule.
+/// * `signer` - The signer that was removed.
+///
+/// # Events
+///
+/// * topics - `["signer_removed", context_rule_id: u32]`
+/// * data - `[signer: Signer]`
+pub fn emit_signer_removed(e: &Env, context_rule_id: u32, signer: &Signer) {
+    let topics = (Symbol::new(e, "signer_removed"), context_rule_id);
+    e.events().publish(topics, signer.clone())
+}
+
+/// Emits an event indicating a policy has been added to a context rule.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `context_rule_id` - The ID of the context rule.
+/// * `policy` - The policy address that was added.
+/// * `install_param` - The installation parameter for the policy.
+///
+/// # Events
+///
+/// * topics - `["policy_added", context_rule_id: u32]`
+/// * data - `[policy: Address, install_param: Val]`
+pub fn emit_policy_added(e: &Env, context_rule_id: u32, policy: &Address, install_param: &Val) {
+    let topics = (Symbol::new(e, "policy_added"), context_rule_id);
+    e.events().publish(topics, (policy.clone(), install_param))
+}
+
+/// Emits an event indicating a policy has been removed from a context rule.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `context_rule_id` - The ID of the context rule.
+/// * `policy` - The policy address that was removed.
+///
+/// # Events
+///
+/// * topics - `["policy_removed", context_rule_id: u32]`
+/// * data - `[policy: Address]`
+pub fn emit_policy_removed(e: &Env, context_rule_id: u32, policy: &Address) {
+    let topics = (Symbol::new(e, "policy_removed"), context_rule_id);
+    e.events().publish(topics, policy.clone())
+}

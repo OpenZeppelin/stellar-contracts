@@ -94,7 +94,14 @@ use soroban_sdk::{
     panic_with_error, Address, Bytes, BytesN, Env, IntoVal, Map, String, Val, Vec,
 };
 
-use crate::{policies::PolicyClient, verifiers::VerifierClient};
+use crate::{
+    policies::PolicyClient,
+    smart_account::{
+        emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
+        emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
+    },
+    verifiers::VerifierClient,
+};
 
 // TODO: proper enumeration
 #[contracterror]
@@ -376,7 +383,7 @@ pub fn add_context_rule(
     signers: Vec<Signer>,
     policies: Map<Address, Val>,
 ) -> ContextRule {
-    let mut id = e.storage().persistent().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
+    let mut id = e.storage().instance().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
     let mut same_key_ids: Vec<u32> = e
         .storage()
         .persistent()
@@ -429,18 +436,23 @@ pub fn add_context_rule(
     same_key_ids.push_back(id);
     e.storage().persistent().set(&SmartAccountStorageKey::Ids(context_type.clone()), &same_key_ids);
 
-    // Increment next id
-    id += 1;
-    e.storage().persistent().set(&SmartAccountStorageKey::NextId, &id);
-
-    ContextRule {
-        id: id - 1,
+    let context_rule = ContextRule {
+        id,
         context_type: context_type.clone(),
         name,
         signers,
         policies: policies_vec,
         valid_until,
-    }
+    };
+
+    // Emit event
+    emit_context_rule_added(e, &context_rule);
+
+    // Increment next id
+    id += 1;
+    e.storage().instance().set(&SmartAccountStorageKey::NextId, &id);
+
+    context_rule
 }
 
 pub fn update_context_rule_name(e: &Env, id: u32, name: String) -> ContextRule {
@@ -454,14 +466,19 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: String) -> ContextRule {
     };
     e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
 
-    ContextRule {
+    let context_rule = ContextRule {
         id,
         context_type: existing_rule.context_type,
         name,
         signers: existing_rule.signers,
         policies: existing_rule.policies,
         valid_until: existing_rule.valid_until,
-    }
+    };
+
+    // Emit event
+    emit_context_rule_updated(e, id, &meta);
+
+    context_rule
 }
 
 pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32>) -> ContextRule {
@@ -482,14 +499,19 @@ pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32
     };
     e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
 
-    ContextRule {
+    let context_rule = ContextRule {
         id,
         context_type: existing_rule.context_type,
         name: existing_rule.name,
         signers: existing_rule.signers,
         policies: existing_rule.policies,
         valid_until,
-    }
+    };
+
+    // Emit event
+    emit_context_rule_updated(e, id, &meta);
+
+    context_rule
 }
 
 pub fn remove_context_rule(e: &Env, id: u32) {
@@ -513,6 +535,9 @@ pub fn remove_context_rule(e: &Env, id: u32) {
         ids.remove(pos as u32);
         e.storage().persistent().set(&ids_key, &ids);
     }
+
+    // Emit event
+    emit_context_rule_removed(e, id);
 }
 
 // ################## SIGNER MANAGEMENT ##################
@@ -529,8 +554,11 @@ pub fn add_signer(e: &Env, id: u32, signer: Signer) {
         panic_with_error!(e, SmartAccountError::DuplicateSigner)
     }
 
-    signers.push_back(signer);
+    signers.push_back(signer.clone());
     e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
+
+    // Emit event
+    emit_signer_added(e, id, &signer);
 }
 
 pub fn remove_signer(e: &Env, id: u32, signer: Signer) {
@@ -544,6 +572,9 @@ pub fn remove_signer(e: &Env, id: u32, signer: Signer) {
     if let Some(pos) = signers.iter().rposition(|s| s == signer) {
         signers.remove(pos as u32);
         e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
+
+        // Emit event
+        emit_signer_removed(e, id, &signer);
     } else {
         panic_with_error!(e, SmartAccountError::SignerNotFound)
     }
@@ -566,8 +597,11 @@ pub fn add_policy(e: &Env, id: u32, policy: Address, install_param: Val) {
     // Install the policy
     PolicyClient::new(e, &policy).install(&install_param, &e.current_contract_address());
 
-    policies.push_back(policy);
+    policies.push_back(policy.clone());
     e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
+
+    // Emit event
+    emit_policy_added(e, id, &policy, &install_param);
 }
 
 pub fn remove_policy(e: &Env, id: u32, policy: Address) {
@@ -584,6 +618,9 @@ pub fn remove_policy(e: &Env, id: u32, policy: Address) {
 
         policies.remove(pos as u32);
         e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
+
+        // Emit event
+        emit_policy_removed(e, id, &policy);
     } else {
         panic_with_error!(e, SmartAccountError::PolicyNotFound)
     }
