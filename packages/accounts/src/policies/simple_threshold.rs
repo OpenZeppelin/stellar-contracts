@@ -31,12 +31,26 @@ pub enum SimpleThresholdStorageKey {
     Threshold(Address), // -> u32
 }
 
+// ################## CONSTANTS ##################
+
+const DAY_IN_LEDGERS: u32 = 17280;
+pub const SIMPLE_THRESHOLD_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const SIMPLE_THRESHOLD_TTL_THRESHOLD: u32 = SIMPLE_THRESHOLD_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
 // ################## QUERY STATE ##################
 
 pub fn get_threshold(e: &Env, smart_account: &Address) -> u32 {
+    let key = SimpleThresholdStorageKey::Threshold(smart_account.clone());
     e.storage()
         .persistent()
-        .get(&SimpleThresholdStorageKey::Threshold(smart_account.clone()))
+        .get(&key)
+        .inspect(|_| {
+            e.storage().persistent().extend_ttl(
+                &key,
+                SIMPLE_THRESHOLD_TTL_THRESHOLD,
+                SIMPLE_THRESHOLD_EXTEND_AMOUNT,
+            );
+        })
         .unwrap_or_else(|| panic_with_error!(e, SimpleThresholdError::SmartAccountNotInstalled))
 }
 
@@ -47,10 +61,15 @@ pub fn can_enforce(
     authenticated_signers: &Vec<Signer>,
     smart_account: &Address,
 ) -> bool {
-    let threshold: Option<u32> =
-        e.storage().persistent().get(&SimpleThresholdStorageKey::Threshold(smart_account.clone()));
+    let key = SimpleThresholdStorageKey::Threshold(smart_account.clone());
+    let threshold: Option<u32> = e.storage().persistent().get(&key);
 
     if let Some(threshold) = threshold {
+        e.storage().persistent().extend_ttl(
+            &key,
+            SIMPLE_THRESHOLD_TTL_THRESHOLD,
+            SIMPLE_THRESHOLD_EXTEND_AMOUNT,
+        );
         authenticated_signers.len() >= threshold
     } else {
         false

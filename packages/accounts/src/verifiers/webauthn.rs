@@ -48,7 +48,6 @@ pub const CLIENT_DATA_MAX_LEN: usize = 1024;
 /// Min. length of authenticator_data
 pub const AUTHENTICATOR_DATA_MIN_LEN: usize = 37;
 
-// TODO: proper enumeration
 #[contracterror]
 #[repr(u32)]
 pub enum WebAuthnError {

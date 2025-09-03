@@ -45,19 +45,41 @@ pub enum WeightedThresholdStorageKey {
     SignersWeight(Address), // -> Map(Signer, u32)
 }
 
+// ################## CONSTANTS ##################
+
+const DAY_IN_LEDGERS: u32 = 17280;
+pub const WEIGHTED_THRESHOLD_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const WEIGHTED_THRESHOLD_TTL_THRESHOLD: u32 = WEIGHTED_THRESHOLD_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
 // ################## QUERY STATE ##################
 
 pub fn get_threshold(e: &Env, smart_account: &Address) -> u32 {
+    let key = WeightedThresholdStorageKey::Threshold(smart_account.clone());
     e.storage()
         .persistent()
-        .get(&WeightedThresholdStorageKey::Threshold(smart_account.clone()))
+        .get(&key)
+        .inspect(|_| {
+            e.storage().persistent().extend_ttl(
+                &key,
+                WEIGHTED_THRESHOLD_TTL_THRESHOLD,
+                WEIGHTED_THRESHOLD_EXTEND_AMOUNT,
+            );
+        })
         .unwrap_or_else(|| panic_with_error!(e, WeightedThresholdError::SmartAccountNotInstalled))
 }
 
 pub fn get_signer_weights(e: &Env, smart_account: &Address) -> Map<Signer, u32> {
+    let key = WeightedThresholdStorageKey::SignersWeight(smart_account.clone());
     e.storage()
         .persistent()
-        .get(&WeightedThresholdStorageKey::SignersWeight(smart_account.clone()))
+        .get(&key)
+        .inspect(|_| {
+            e.storage().persistent().extend_ttl(
+                &key,
+                WEIGHTED_THRESHOLD_TTL_THRESHOLD,
+                WEIGHTED_THRESHOLD_EXTEND_AMOUNT,
+            );
+        })
         .unwrap_or_else(|| panic_with_error!(e, WeightedThresholdError::SmartAccountNotInstalled))
 }
 
@@ -83,11 +105,15 @@ pub fn can_enforce(
     authenticated_signers: &Vec<Signer>,
     smart_account: &Address,
 ) -> bool {
-    let threshold: Option<u32> = e
-        .storage()
-        .persistent()
-        .get(&WeightedThresholdStorageKey::Threshold(smart_account.clone()));
+    let key = WeightedThresholdStorageKey::Threshold(smart_account.clone());
+    let threshold: Option<u32> = e.storage().persistent().get(&key);
+
     if let Some(threshold) = threshold {
+        e.storage().persistent().extend_ttl(
+            &key,
+            WEIGHTED_THRESHOLD_TTL_THRESHOLD,
+            WEIGHTED_THRESHOLD_EXTEND_AMOUNT,
+        );
         calculate_weight(e, authenticated_signers, smart_account) >= threshold
     } else {
         false

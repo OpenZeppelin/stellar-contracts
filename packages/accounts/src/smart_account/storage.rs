@@ -91,7 +91,7 @@ use soroban_sdk::{
     },
     contracterror, contracttype,
     crypto::Hash,
-    panic_with_error, Address, Bytes, BytesN, Env, IntoVal, Map, String, Val, Vec,
+    panic_with_error, Address, Bytes, BytesN, Env, IntoVal, Map, String, TryFromVal, Val, Vec,
 };
 
 use crate::{
@@ -103,7 +103,12 @@ use crate::{
     verifiers::VerifierClient,
 };
 
-// TODO: proper enumeration
+// ################## CONSTANTS ##################
+
+const DAY_IN_LEDGERS: u32 = 17280;
+pub const SMART_ACCOUNT_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const SMART_ACCOUNT_TTL_THRESHOLD: u32 = SMART_ACCOUNT_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
 #[contracterror]
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u32)]
@@ -170,17 +175,15 @@ pub struct ContextRule {
 // ################## QUERY STATE ##################
 
 pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
-    let meta: Meta = e
-        .storage()
-        .persistent()
-        .get(&SmartAccountStorageKey::Meta(id))
+    let meta_key = SmartAccountStorageKey::Meta(id);
+    let meta: Meta = get_persistent_entry(e, &meta_key)
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
-    let signers: Vec<Signer> =
-        e.storage().persistent().get(&SmartAccountStorageKey::Signers(id)).unwrap_or(Vec::new(e));
+    let signers_key = SmartAccountStorageKey::Signers(id);
+    let signers: Vec<Signer> = get_persistent_entry(e, &signers_key).unwrap_or(Vec::new(e));
 
-    let policies: Vec<Address> =
-        e.storage().persistent().get(&SmartAccountStorageKey::Policies(id)).unwrap_or(Vec::new(e));
+    let policies_key = SmartAccountStorageKey::Policies(id);
+    let policies: Vec<Address> = get_persistent_entry(e, &policies_key).unwrap_or(Vec::new(e));
 
     ContextRule {
         id,
@@ -193,11 +196,8 @@ pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
 }
 
 pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<ContextRule> {
-    let ids = e
-        .storage()
-        .persistent()
-        .get::<_, Vec<u32>>(&SmartAccountStorageKey::Ids(context_rule_type.clone()))
-        .unwrap_or(Vec::new(e));
+    let ids_key = SmartAccountStorageKey::Ids(context_rule_type.clone());
+    let ids: Vec<u32> = get_persistent_entry(e, &ids_key).unwrap_or(Vec::new(e));
 
     let mut rules = Vec::new(e);
     for id in ids.iter() {
@@ -209,17 +209,11 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
 }
 
 pub fn get_valid_context_rules(e: &Env, context_key: ContextRuleType) -> Vec<ContextRule> {
-    let matched_ids = e
-        .storage()
-        .persistent()
-        .get(&SmartAccountStorageKey::Ids(context_key))
-        .unwrap_or(Vec::new(e));
+    let matched_ids_key = SmartAccountStorageKey::Ids(context_key);
+    let matched_ids: Vec<u32> = get_persistent_entry(e, &matched_ids_key).unwrap_or(Vec::new(e));
 
-    let default_ids = e
-        .storage()
-        .persistent()
-        .get(&SmartAccountStorageKey::Ids(ContextRuleType::Default))
-        .unwrap_or(Vec::new(e));
+    let default_ids_key = SmartAccountStorageKey::Ids(ContextRuleType::Default);
+    let default_ids: Vec<u32> = get_persistent_entry(e, &default_ids_key).unwrap_or(Vec::new(e));
 
     let get_rules = |ids: Vec<u32>| -> Vec<ContextRule> {
         let mut rules = Vec::new(e);
@@ -384,11 +378,9 @@ pub fn add_context_rule(
     policies: Map<Address, Val>,
 ) -> ContextRule {
     let mut id = e.storage().instance().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
-    let mut same_key_ids: Vec<u32> = e
-        .storage()
-        .persistent()
-        .get(&SmartAccountStorageKey::Ids(context_type.clone()))
-        .unwrap_or(Vec::new(e));
+    let ids_key = SmartAccountStorageKey::Ids(context_type.clone());
+    // Don't extend TTL here since we set this key later in the same function
+    let mut same_key_ids: Vec<u32> = e.storage().persistent().get(&ids_key).unwrap_or(Vec::new(e));
 
     // Check for at least one of signers or policies > 0
     if signers.is_empty() && policies.is_empty() {
@@ -529,6 +521,7 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 
     // Remove from ids list
     let ids_key = SmartAccountStorageKey::Ids(context_rule.context_type);
+    // Don't extend TTL here since we set this key later in the same function
     let mut ids = e.storage().persistent().get::<_, Vec<u32>>(&ids_key).unwrap_or(Vec::new(e));
 
     if let Some(pos) = ids.iter().rposition(|i| i == id) {
@@ -543,10 +536,12 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 // ################## SIGNER MANAGEMENT ##################
 
 pub fn add_signer(e: &Env, id: u32, signer: Signer) {
+    let signers_key = SmartAccountStorageKey::Signers(id);
+    // Don't extend TTL here since we set this key later in the same function
     let mut signers: Vec<Signer> = e
         .storage()
         .persistent()
-        .get(&SmartAccountStorageKey::Signers(id))
+        .get(&signers_key)
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
     // Check if signer already exists
@@ -562,10 +557,12 @@ pub fn add_signer(e: &Env, id: u32, signer: Signer) {
 }
 
 pub fn remove_signer(e: &Env, id: u32, signer: Signer) {
+    let signers_key = SmartAccountStorageKey::Signers(id);
+    // Don't extend TTL here since we set this key later in the same function
     let mut signers: Vec<Signer> = e
         .storage()
         .persistent()
-        .get(&SmartAccountStorageKey::Signers(id))
+        .get(&signers_key)
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
     // Find and remove the signer
@@ -583,10 +580,12 @@ pub fn remove_signer(e: &Env, id: u32, signer: Signer) {
 // ################## POLICY MANAGEMENT ##################
 
 pub fn add_policy(e: &Env, id: u32, policy: Address, install_param: Val) {
+    let policies_key = SmartAccountStorageKey::Policies(id);
+    // Don't extend TTL here since we set this key later in the same function
     let mut policies: Vec<Address> = e
         .storage()
         .persistent()
-        .get(&SmartAccountStorageKey::Policies(id))
+        .get(&policies_key)
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
     // Check if policy already exists
@@ -605,10 +604,12 @@ pub fn add_policy(e: &Env, id: u32, policy: Address, install_param: Val) {
 }
 
 pub fn remove_policy(e: &Env, id: u32, policy: Address) {
+    let policies_key = SmartAccountStorageKey::Policies(id);
+    // Don't extend TTL here since we set this key later in the same function
     let mut policies: Vec<Address> = e
         .storage()
         .persistent()
-        .get(&SmartAccountStorageKey::Policies(id))
+        .get(&policies_key)
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
     // Find and remove the policy
@@ -624,4 +625,26 @@ pub fn remove_policy(e: &Env, id: u32, policy: Address) {
     } else {
         panic_with_error!(e, SmartAccountError::PolicyNotFound)
     }
+}
+
+// ################## HELPERS ##################
+
+/// Helper function that tries to retrieve a persistent storage value and
+/// extend its TTL if the entry exists.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban reference.
+/// * `key` - The key required to retrieve the underlying storage.
+fn get_persistent_entry<T: TryFromVal<Env, Val>>(
+    e: &Env,
+    key: &SmartAccountStorageKey,
+) -> Option<T> {
+    e.storage().persistent().get::<_, T>(key).inspect(|_| {
+        e.storage().persistent().extend_ttl(
+            key,
+            SMART_ACCOUNT_TTL_THRESHOLD,
+            SMART_ACCOUNT_EXTEND_AMOUNT,
+        );
+    })
 }
