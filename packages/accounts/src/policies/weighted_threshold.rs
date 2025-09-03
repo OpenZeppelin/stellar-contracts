@@ -33,10 +33,10 @@ pub struct WeightedThresholdInstallParams {
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u32)]
 pub enum WeightedThresholdError {
-    SmartAccountNotInstalled = 0,
-    InvalidWeight = 1,
-    InvalidThreshold = 2,
-    MathOverflow = 3,
+    SmartAccountNotInstalled = 2210,
+    InvalidWeight = 2211,
+    InvalidThreshold = 2212,
+    MathOverflow = 2213,
 }
 
 #[contracttype]

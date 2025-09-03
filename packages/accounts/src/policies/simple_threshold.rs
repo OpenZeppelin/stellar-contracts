@@ -22,8 +22,8 @@ pub struct SimpleThresholdInstallParams {
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u32)]
 pub enum SimpleThresholdError {
-    SmartAccountNotInstalled = 0,
-    InvalidThreshold = 1,
+    SmartAccountNotInstalled = 2200,
+    InvalidThreshold = 2201,
 }
 
 #[contracttype]

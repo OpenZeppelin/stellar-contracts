@@ -6,8 +6,8 @@ use crate::verifiers::utils::extract_from_bytes;
 #[contracterror]
 #[repr(u32)]
 pub enum Ed25519Error {
-    KeyDataInvalid = 0,
-    SignatureFormatInvalid = 1,
+    KeyDataInvalid = 2100,
+    SignatureFormatInvalid = 2101,
 }
 
 pub type Ed25519SigData = BytesN<64>;

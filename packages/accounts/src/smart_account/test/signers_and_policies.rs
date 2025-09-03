@@ -93,7 +93,7 @@ fn add_signer_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #0)")]
+#[should_panic(expected = "Error(Contract, #2000)")]
 fn add_signer_nonexistent_rule_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -105,7 +105,7 @@ fn add_signer_nonexistent_rule_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #7)")]
+#[should_panic(expected = "Error(Contract, #2007)")]
 fn add_signer_duplicate_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -137,7 +137,7 @@ fn remove_signer_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #0)")]
+#[should_panic(expected = "Error(Contract, #2000)")]
 fn remove_signer_nonexistent_rule_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -149,7 +149,7 @@ fn remove_signer_nonexistent_rule_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #6)")]
+#[should_panic(expected = "Error(Contract, #2006)")]
 fn remove_signer_not_found_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -204,7 +204,7 @@ fn add_policy_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #0)")]
+#[should_panic(expected = "Error(Contract, #2000)")]
 fn add_policy_nonexistent_rule_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -218,7 +218,7 @@ fn add_policy_nonexistent_rule_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #9)")]
+#[should_panic(expected = "Error(Contract, #2009)")]
 fn add_policy_duplicate_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -261,7 +261,7 @@ fn remove_policy_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #0)")]
+#[should_panic(expected = "Error(Contract, #2000)")]
 fn remove_policy_nonexistent_rule_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -273,7 +273,7 @@ fn remove_policy_nonexistent_rule_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #2008)")]
 fn remove_policy_not_found_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());

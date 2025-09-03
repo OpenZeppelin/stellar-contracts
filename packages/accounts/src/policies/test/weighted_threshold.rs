@@ -46,7 +46,7 @@ fn install_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")]
+#[should_panic(expected = "Error(Contract, #2212)")]
 fn install_zero_threshold_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -66,7 +66,7 @@ fn install_zero_threshold_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #2211)")]
 fn install_zero_weight_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -86,7 +86,7 @@ fn install_zero_weight_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")]
+#[should_panic(expected = "Error(Contract, #2212)")]
 fn install_threshold_exceeds_total_weight_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -148,7 +148,7 @@ fn calculate_weight_partial_signers() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #0)")]
+#[should_panic(expected = "Error(Contract, #2210)")]
 fn calculate_weight_not_installed_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -161,7 +161,7 @@ fn calculate_weight_not_installed_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3)")]
+#[should_panic(expected = "Error(Contract, #2213)")]
 fn calculate_weight_overflow_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -349,7 +349,7 @@ fn set_threshold_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")]
+#[should_panic(expected = "Error(Contract, #2212)")]
 fn set_threshold_zero_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -370,7 +370,7 @@ fn set_threshold_zero_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3)")]
+#[should_panic(expected = "Error(Contract, #2213)")]
 fn install_math_overflow_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());

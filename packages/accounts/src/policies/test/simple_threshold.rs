@@ -41,7 +41,7 @@ fn install_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #2201)")]
 fn install_zero_threshold_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -53,6 +53,20 @@ fn install_zero_threshold_fails() {
         let params = SimpleThresholdInstallParams { threshold: 0, signers_count: 3 }; // Invalid
 
         install(&e, &params, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2200)")]
+fn smart_account_get_threshold_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        get_threshold(&e, &smart_account);
     });
 }
 
@@ -211,7 +225,7 @@ fn set_threshold_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #2201)")]
 fn set_threshold_zero_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());

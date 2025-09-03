@@ -52,17 +52,17 @@ pub const AUTHENTICATOR_DATA_MIN_LEN: usize = 37;
 #[contracterror]
 #[repr(u32)]
 pub enum WebAuthnError {
-    KeyDataInvalid = 0,
-    SignaturePayloadInvalid = 1,
-    SignatureFormatInvalid = 2,
-    ClientDataTooLong = 3,
-    JsonParseError = 4,
-    TypeFieldInvalid = 5,
-    ChallengeInvalid = 6,
-    AuthDataFormatInvalid = 7,
-    PresentBitNotSet = 8,
-    VerifiedBitNotSet = 9,
-    BackupEligibilityAndStateNotSet = 10,
+    KeyDataInvalid = 2110,
+    SignaturePayloadInvalid = 2111,
+    SignatureFormatInvalid = 2112,
+    ClientDataTooLong = 2113,
+    JsonParseError = 2114,
+    TypeFieldInvalid = 2115,
+    ChallengeInvalid = 2116,
+    AuthDataFormatInvalid = 2117,
+    PresentBitNotSet = 2118,
+    VerifiedBitNotSet = 2119,
+    BackupEligibilityAndStateNotSet = 2220,
 }
 
 #[derive(serde::Deserialize)]

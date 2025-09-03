@@ -101,16 +101,16 @@ use crate::{policies::PolicyClient, verifiers::VerifierClient};
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[repr(u32)]
 pub enum SmartAccountError {
-    ContextRuleNotFound = 0,
-    ConflictingContextRule = 1,
-    UnvalidatedContext = 2,
-    DelegatedVerificationFailed = 3,
-    NoSignersAndPolicies = 4,
-    PastValidUntil = 5,
-    SignerNotFound = 6,
-    DuplicateSigner = 7,
-    PolicyNotFound = 8,
-    DuplicatePolicy = 9,
+    ContextRuleNotFound = 2000,
+    ConflictingContextRule = 2001,
+    UnvalidatedContext = 2002,
+    DelegatedVerificationFailed = 2003,
+    NoSignersAndPolicies = 2004,
+    PastValidUntil = 2005,
+    SignerNotFound = 2006,
+    DuplicateSigner = 2007,
+    PolicyNotFound = 2008,
+    DuplicatePolicy = 2009,
 }
 
 #[contracttype]

@@ -40,7 +40,7 @@ fn ed25519_verify_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #0)")]
+#[should_panic(expected = "Error(Contract, #2100)")]
 fn ed25519_verify_key_data_invalid_too_small() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -59,7 +59,7 @@ fn ed25519_verify_key_data_invalid_too_small() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #0)")]
+#[should_panic(expected = "Error(Contract, #2100)")]
 fn ed25519_verify_key_data_invalid_empty() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -78,7 +78,7 @@ fn ed25519_verify_key_data_invalid_empty() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #2101)")]
 fn ed25519_verify_signature_format_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());

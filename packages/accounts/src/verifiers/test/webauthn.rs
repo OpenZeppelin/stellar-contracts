@@ -83,7 +83,7 @@ fn validate_expected_type_valid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5)")]
+#[should_panic(expected = "Error(Contract, #2115)")]
 fn validate_expected_type_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -120,7 +120,7 @@ fn validate_challenge_valid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #6)")]
+#[should_panic(expected = "Error(Contract, #2116)")]
 fn validate_challenge_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -137,7 +137,7 @@ fn validate_challenge_invalid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1)")]
+#[should_panic(expected = "Error(Contract, #2111)")]
 fn validate_challenge_invalid_payload_size() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -167,7 +167,7 @@ fn validate_user_present_bit_set_valid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #8)")]
+#[should_panic(expected = "Error(Contract, #2118)")]
 fn validate_user_present_bit_set_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -194,7 +194,7 @@ fn validate_user_verified_bit_set_valid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #9)")]
+#[should_panic(expected = "Error(Contract, #2119)")]
 fn validate_user_verified_bit_set_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -247,7 +247,7 @@ fn validate_backup_eligibility_and_state_valid_be0_bs0() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #10)")]
+#[should_panic(expected = "Error(Contract, #2220)")]
 fn validate_backup_eligibility_and_state_invalid_be0_bs1() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -326,7 +326,7 @@ fn webauthn_verify_fake_signature_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #0)")]
+#[should_panic(expected = "Error(Contract, #2110)")]
 fn verify_key_data_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -350,7 +350,7 @@ fn verify_key_data_invalid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2)")]
+#[should_panic(expected = "Error(Contract, #2112)")]
 fn verify_signature_format_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -381,7 +381,7 @@ fn verify_signature_format_invalid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3)")]
+#[should_panic(expected = "Error(Contract, #2113)")]
 fn verify_client_data_too_long() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -412,7 +412,7 @@ fn verify_client_data_too_long() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #7)")]
+#[should_panic(expected = "Error(Contract, #2117)")]
 fn verify_authenticator_data_too_short() {
     let e = Env::default();
     let key_data = Bytes::from_array(&e, &[1u8; 65]);
@@ -438,7 +438,7 @@ fn verify_authenticator_data_too_short() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #4)")]
+#[should_panic(expected = "Error(Contract, #2114)")]
 fn verify_json_parse_error() {
     let e = Env::default();
     let address = e.register(MockContract, ());
