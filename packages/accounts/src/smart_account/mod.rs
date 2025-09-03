@@ -1,38 +1,46 @@
 pub mod storage;
-mod test;
-use soroban_sdk::{auth::CustomAccountInterface, Address, Env, FromVal, Symbol, Val, Vec};
+//mod test;
+use soroban_sdk::{auth::CustomAccountInterface, Address, Env, String, Symbol, Val, Vec};
 pub use storage::{
-    add_context_rule, authenticate, enforce_policy, get_context_rule, get_context_rules,
-    get_validated_context, modify_context_rule, remove_context_rule, ContextRule, ContextRuleType,
-    ContextRuleVal, Signatures, Signer, SmartAccountError,
+    add_context_rule, add_policy, add_signer, authenticate, enforce_policy, get_context_rule,
+    get_context_rules, get_validated_context, remove_context_rule, remove_policy, remove_signer,
+    update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType, Meta,
+    Signatures, Signer, SmartAccountError,
 };
 
 // provide user defined types to generalize the interface
 pub trait SmartAccount: CustomAccountInterface {
-    type ContextRule: FromVal<Env, Val>;
-    type ContextRuleType: FromVal<Env, Val>;
-    type ContextRuleVal: FromVal<Env, Val>;
+    fn get_context_rule(e: &Env, context_rule_id: u32) -> ContextRule;
 
-    fn get_context_rule(e: &Env, context_rule_id: u32) -> Self::ContextRule;
-
-    fn get_context_rules(
-        e: &Env,
-        context_rule_type: Self::ContextRuleType,
-    ) -> Vec<Self::ContextRule>;
+    fn get_context_rules(e: &Env, context_rule_type: ContextRuleType) -> Vec<ContextRule>;
 
     fn add_context_rule(
         e: &Env,
-        context_rule_type: Self::ContextRuleType,
-        context_rule_val: Self::ContextRuleVal,
-    ) -> Self::ContextRule;
+        context_type: ContextRuleType,
+        name: String,
+        valid_until: Option<u32>,
+        signers: Vec<Signer>,
+        policies: Vec<Address>,
+        policies_params: Vec<Val>,
+    ) -> ContextRule;
 
-    fn modify_context_rule(
+    fn update_context_rule_name(e: &Env, context_rule_id: u32, name: String) -> ContextRule;
+
+    fn update_context_rule_valid_until(
         e: &Env,
         context_rule_id: u32,
-        context_rule_val: Self::ContextRuleVal,
-    ) -> Self::ContextRule;
+        valid_until: Option<u32>,
+    ) -> ContextRule;
 
     fn remove_context_rule(e: &Env, context_rule_id: u32);
+
+    fn add_signer(e: &Env, context_rule_id: u32, signer: Signer);
+
+    fn remove_signer(e: &Env, context_rule_id: u32, signer: Signer);
+
+    fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val);
+
+    fn remove_policy(e: &Env, context_rule_id: u32, policy: Address);
 }
 
 // Simple execution entry-point to call arbitrary contracts.

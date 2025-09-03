@@ -91,7 +91,7 @@ use soroban_sdk::{
     },
     contracterror, contracttype,
     crypto::Hash,
-    panic_with_error, Address, Bytes, BytesN, Env, IntoVal, Map, String, Vec,
+    panic_with_error, Address, Bytes, BytesN, Env, IntoVal, Map, String, Val, Vec,
 };
 
 use crate::{policies::PolicyClient, verifiers::VerifierClient};
@@ -107,14 +107,19 @@ pub enum SmartAccountError {
     DelegatedVerificationFailed = 3,
     NoSignersAndPolicies = 4,
     PastValidUntil = 5,
+    SignerNotFound = 6,
+    DuplicateSigner = 7,
+    PolicyNotFound = 8,
+    DuplicatePolicy = 9,
 }
 
 #[contracttype]
-#[allow(clippy::enum_variant_names)]
 pub enum SmartAccountStorageKey {
-    ContextRule(u32),                // -> ContextRule
-    ContextRuleIds(ContextRuleType), // -> ids per context type
-    ContextRuleNextId,
+    Signers(u32),         // maps context id to Vec<Signer>
+    Policies(u32),        // maps context id to Vec<Address>
+    Ids(ContextRuleType), // maps context type to ids per context type
+    Meta(u32),            // maps context id to Meta
+    NextId,
 }
 
 #[contracttype]
@@ -138,10 +143,9 @@ pub enum ContextRuleType {
 
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
-pub struct ContextRuleVal {
+pub struct Meta {
     pub name: String,
-    pub signers: Vec<Signer>,
-    pub policies: Vec<Address>,
+    pub context_type: ContextRuleType,
     pub valid_until: Option<u32>,
 }
 
@@ -159,23 +163,39 @@ pub struct ContextRule {
 // ################## QUERY STATE ##################
 
 pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
-    e.storage()
+    let meta: Meta = e
+        .storage()
         .persistent()
-        .get(&SmartAccountStorageKey::ContextRule(id))
-        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound))
+        .get(&SmartAccountStorageKey::Meta(id))
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+
+    let signers: Vec<Signer> =
+        e.storage().persistent().get(&SmartAccountStorageKey::Signers(id)).unwrap_or(Vec::new(e));
+
+    let policies: Vec<Address> =
+        e.storage().persistent().get(&SmartAccountStorageKey::Policies(id)).unwrap_or(Vec::new(e));
+
+    ContextRule {
+        id,
+        context_type: meta.context_type,
+        name: meta.name,
+        signers,
+        policies,
+        valid_until: meta.valid_until,
+    }
 }
 
 pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<ContextRule> {
     let ids = e
         .storage()
         .persistent()
-        .get::<_, Vec<u32>>(&SmartAccountStorageKey::ContextRuleIds(context_rule_type.clone()))
+        .get::<_, Vec<u32>>(&SmartAccountStorageKey::Ids(context_rule_type.clone()))
         .unwrap_or(Vec::new(e));
 
     let mut rules = Vec::new(e);
     for id in ids.iter() {
-        if let Some(rule) = e.storage().persistent().get(&SmartAccountStorageKey::ContextRule(id)) {
-            rules.push_back(rule);
+        if e.storage().persistent().has(&SmartAccountStorageKey::Meta(id)) {
+            rules.push_back(get_context_rule(e, id));
         }
     }
     rules
@@ -185,23 +205,20 @@ pub fn get_valid_context_rules(e: &Env, context_key: ContextRuleType) -> Vec<Con
     let matched_ids = e
         .storage()
         .persistent()
-        .get(&SmartAccountStorageKey::ContextRuleIds(context_key))
+        .get(&SmartAccountStorageKey::Ids(context_key))
         .unwrap_or(Vec::new(e));
 
     let default_ids = e
         .storage()
         .persistent()
-        .get(&SmartAccountStorageKey::ContextRuleIds(ContextRuleType::Default))
+        .get(&SmartAccountStorageKey::Ids(ContextRuleType::Default))
         .unwrap_or(Vec::new(e));
 
     let get_rules = |ids: Vec<u32>| -> Vec<ContextRule> {
         let mut rules = Vec::new(e);
         for id in ids.iter() {
-            if let Some(rule) = e
-                .storage()
-                .persistent()
-                .get::<_, ContextRule>(&SmartAccountStorageKey::ContextRule(id))
-            {
+            if e.storage().persistent().has(&SmartAccountStorageKey::Meta(id)) {
+                let rule = get_context_rule(e, id);
                 match rule.valid_until {
                     // skip if expired
                     Some(seq) if seq < e.ledger().sequence() => continue,
@@ -363,90 +380,223 @@ pub fn enforce_policy(
 
 pub fn add_context_rule(
     e: &Env,
-    context_rule_type: &ContextRuleType,
-    context_rule_val: &ContextRuleVal,
+    context_type: &ContextRuleType,
+    name: String,
+    valid_until: Option<u32>,
+    signers: Vec<Signer>,
+    policies: Vec<Address>,
+    policies_params: Vec<Val>,
 ) -> ContextRule {
-    let mut id =
-        e.storage().persistent().get(&SmartAccountStorageKey::ContextRuleNextId).unwrap_or(0u32);
+    let mut id = e.storage().persistent().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
     let mut same_key_ids: Vec<u32> = e
         .storage()
         .persistent()
-        .get(&SmartAccountStorageKey::ContextRuleIds(context_rule_type.clone()))
+        .get(&SmartAccountStorageKey::Ids(context_type.clone()))
         .unwrap_or(Vec::new(e));
 
-    let ContextRuleVal { signers, policies, name, valid_until } = context_rule_val.clone();
-    // check signers or policies > 0
+    // Check for at least one of signers or policies > 0
     if signers.is_empty() && policies.is_empty() {
         panic_with_error!(e, SmartAccountError::NoSignersAndPolicies)
     }
+
+    // Check for duplicate signers
+    let mut unique_signers = Vec::new(e);
+    for signer in signers.iter() {
+        if unique_signers.contains(&signer) {
+            panic_with_error!(e, SmartAccountError::DuplicateSigner)
+        }
+        unique_signers.push_back(signer);
+    }
+
+    // Check for duplicate policies
+    let mut unique_policies = Vec::new(e);
+    for policy in policies.iter() {
+        if unique_policies.contains(&policy) {
+            panic_with_error!(e, SmartAccountError::DuplicatePolicy)
+        }
+        unique_policies.push_back(policy);
+    }
+
+    // Check valid_until
+    if let Some(valid_until) = valid_until {
+        if valid_until < e.ledger().sequence() {
+            panic_with_error!(e, SmartAccountError::PastValidUntil)
+        }
+    }
+
+    // Store meta information
+    let meta = Meta { name: name.clone(), context_type: context_type.clone(), valid_until };
+    e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
+
+    // Store signers
+    e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
+
+    // Store policies and install them
+    e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
+    for (policy, param) in policies.iter().zip(policies_params.iter()) {
+        PolicyClient::new(e, &policy).install(&param, &e.current_contract_address());
+    }
+
+    // Update ids list
+    same_key_ids.push_back(id);
+    e.storage().persistent().set(&SmartAccountStorageKey::Ids(context_type.clone()), &same_key_ids);
+
+    // Increment next id
+    id += 1;
+    e.storage().persistent().set(&SmartAccountStorageKey::NextId, &id);
+
+    ContextRule {
+        id: id - 1,
+        context_type: context_type.clone(),
+        name,
+        signers,
+        policies,
+        valid_until,
+    }
+}
+
+pub fn update_context_rule_name(e: &Env, id: u32, name: String) -> ContextRule {
+    let existing_rule = get_context_rule(e, id);
+
+    // Update only the name in meta information
+    let meta = Meta {
+        name: name.clone(),
+        context_type: existing_rule.context_type.clone(),
+        valid_until: existing_rule.valid_until,
+    };
+    e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
+
+    ContextRule {
+        id,
+        context_type: existing_rule.context_type,
+        name,
+        signers: existing_rule.signers,
+        policies: existing_rule.policies,
+        valid_until: existing_rule.valid_until,
+    }
+}
+
+pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32>) -> ContextRule {
+    let existing_rule = get_context_rule(e, id);
+
     // check valid_until
     if let Some(valid_until) = valid_until {
         if valid_until < e.ledger().sequence() {
             panic_with_error!(e, SmartAccountError::PastValidUntil)
         }
     }
-    let rule = ContextRule {
-        id,
-        context_type: context_rule_type.clone(),
-        name,
-        signers,
-        policies,
+
+    // Update only the valid_until in meta information
+    let meta = Meta {
+        name: existing_rule.name.clone(),
+        context_type: existing_rule.context_type.clone(),
         valid_until,
     };
+    e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
 
-    e.storage().persistent().set(&SmartAccountStorageKey::ContextRule(id), &rule);
-
-    same_key_ids.push_back(id);
-    e.storage()
-        .persistent()
-        .set(&SmartAccountStorageKey::ContextRuleIds(context_rule_type.clone()), &same_key_ids);
-
-    id += 1;
-    e.storage().persistent().set(&SmartAccountStorageKey::ContextRuleNextId, &id);
-
-    rule
-}
-
-// cannot modify id and context_type
-pub fn modify_context_rule(e: &Env, id: u32, context_rule_val: &ContextRuleVal) -> ContextRule {
-    let existing_rule = get_context_rule(e, id);
-
-    let ContextRuleVal { signers, policies, name, valid_until } = context_rule_val.clone();
-    let modified_rule = ContextRule {
+    ContextRule {
         id,
         context_type: existing_rule.context_type,
-        name,
-        signers,
-        policies,
+        name: existing_rule.name,
+        signers: existing_rule.signers,
+        policies: existing_rule.policies,
         valid_until,
-    };
-
-    // check signers or policies > 0
-    if modified_rule.signers.is_empty() && modified_rule.policies.is_empty() {
-        panic_with_error!(e, SmartAccountError::NoSignersAndPolicies)
     }
-    // check valid_until
-    if let Some(valid_until) = modified_rule.valid_until {
-        if valid_until < e.ledger().sequence() {
-            panic_with_error!(e, SmartAccountError::PastValidUntil)
-        }
-    }
-
-    e.storage().persistent().set(&SmartAccountStorageKey::ContextRule(id), &modified_rule);
-
-    modified_rule
 }
 
 pub fn remove_context_rule(e: &Env, id: u32) {
     let context_rule = get_context_rule(e, id);
 
-    e.storage().persistent().remove(&SmartAccountStorageKey::ContextRule(id));
+    // Uninstall all policies
+    for policy in context_rule.policies.iter() {
+        PolicyClient::new(e, &policy).uninstall(&e.current_contract_address());
+    }
 
-    let ids_key = SmartAccountStorageKey::ContextRuleIds(context_rule.context_type);
+    // Remove all storage entries for this context rule
+    e.storage().persistent().remove(&SmartAccountStorageKey::Meta(id));
+    e.storage().persistent().remove(&SmartAccountStorageKey::Signers(id));
+    e.storage().persistent().remove(&SmartAccountStorageKey::Policies(id));
+
+    // Remove from ids list
+    let ids_key = SmartAccountStorageKey::Ids(context_rule.context_type);
     let mut ids = e.storage().persistent().get::<_, Vec<u32>>(&ids_key).unwrap_or(Vec::new(e));
 
     if let Some(pos) = ids.iter().rposition(|i| i == id) {
         ids.remove(pos as u32);
         e.storage().persistent().set(&ids_key, &ids);
+    }
+}
+
+// ################## SIGNER MANAGEMENT ##################
+
+pub fn add_signer(e: &Env, id: u32, signer: Signer) {
+    let mut signers: Vec<Signer> = e
+        .storage()
+        .persistent()
+        .get(&SmartAccountStorageKey::Signers(id))
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+
+    // Check if signer already exists
+    if signers.contains(&signer) {
+        panic_with_error!(e, SmartAccountError::DuplicateSigner)
+    }
+
+    signers.push_back(signer);
+    e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
+}
+
+pub fn remove_signer(e: &Env, id: u32, signer: Signer) {
+    let mut signers: Vec<Signer> = e
+        .storage()
+        .persistent()
+        .get(&SmartAccountStorageKey::Signers(id))
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+
+    // Find and remove the signer
+    if let Some(pos) = signers.iter().rposition(|s| s == signer) {
+        signers.remove(pos as u32);
+        e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
+    } else {
+        panic_with_error!(e, SmartAccountError::SignerNotFound)
+    }
+}
+
+// ################## POLICY MANAGEMENT ##################
+
+pub fn add_policy(e: &Env, id: u32, policy: Address, install_param: Val) {
+    let mut policies: Vec<Address> = e
+        .storage()
+        .persistent()
+        .get(&SmartAccountStorageKey::Policies(id))
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+
+    // Check if policy already exists
+    if policies.contains(&policy) {
+        panic_with_error!(e, SmartAccountError::DuplicatePolicy)
+    }
+
+    // Install the policy
+    PolicyClient::new(e, &policy).install(&install_param, &e.current_contract_address());
+
+    policies.push_back(policy);
+    e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
+}
+
+pub fn remove_policy(e: &Env, id: u32, policy: Address) {
+    let mut policies: Vec<Address> = e
+        .storage()
+        .persistent()
+        .get(&SmartAccountStorageKey::Policies(id))
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+
+    // Find and remove the policy
+    if let Some(pos) = policies.iter().rposition(|p| p == policy) {
+        // Uninstall the policy
+        PolicyClient::new(e, &policy).uninstall(&e.current_contract_address());
+
+        policies.remove(pos as u32);
+        e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
+    } else {
+        panic_with_error!(e, SmartAccountError::PolicyNotFound)
     }
 }
