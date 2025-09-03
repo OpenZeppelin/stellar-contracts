@@ -40,6 +40,6 @@ pub trait SmartAccount: CustomAccountInterface {
 // Most likely to be used to call owned stateful polciies, and as direct
 // contract-to-contract invocations are always authorized, that's a way to avoid
 // re-entry when the policy need to auth back its owner.
-pub trait ExecutionEntry {
+pub trait ExecutionEntryPoint {
     fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>);
 }
