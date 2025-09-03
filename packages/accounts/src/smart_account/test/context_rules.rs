@@ -47,9 +47,9 @@ impl MockPolicyContract {
     ) {
     }
 
-    pub fn install(_e: &Env, _param: Val, _smart_acocunt: Address) {}
+    pub fn install(_e: &Env, _param: Val, _smart_account: Address) {}
 
-    pub fn uninstall(_e: &Env, _smart_acocunt: Address) {}
+    pub fn uninstall(_e: &Env, _smart_account: Address) {}
 }
 
 #[contract]
