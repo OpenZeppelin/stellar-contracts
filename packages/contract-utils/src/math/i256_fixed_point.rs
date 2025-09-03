@@ -30,40 +30,41 @@ use crate::math::soroban_fixed_point::SorobanFixedPoint;
 
 impl SorobanFixedPoint for I256 {
     fn fixed_mul_floor(&self, env: &Env, y: &I256, denominator: &I256) -> I256 {
-        mul_div_floor(env, &self, y, denominator)
+        mul_div_floor(env, self, y, denominator)
     }
 
     fn fixed_mul_ceil(&self, env: &Env, y: &I256, denominator: &I256) -> I256 {
-        mul_div_ceil(env, &self, y, denominator)
+        mul_div_ceil(env, self, y, denominator)
     }
 }
 
 /// Performs floor(x * y / z)
 pub(crate) fn mul_div_floor(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
     let zero = I256::from_i32(env, 0);
-    let r = x.mul(&y);
+    let r = x.mul(y);
     if r < zero || (r > zero && z.clone() < zero) {
         // ceiling is taken by default for a negative result
-        let remainder = r.rem_euclid(&z);
+        let remainder = r.rem_euclid(z);
         let one = I256::from_i32(env, 1);
-        r.div(&z).sub(if remainder > zero { &one } else { &zero })
+        r.div(z).sub(if remainder > zero { &one } else { &zero })
     } else {
         // floor taken by default for a positive or zero result
-        r.div(&z)
+        r.div(z)
     }
 }
 
 /// Performs ceil(x * y / z)
 pub(crate) fn mul_div_ceil(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
     let zero = I256::from_i32(env, 0);
-    let r = x.mul(&y);
-    if r <= zero || (r > zero && z.clone() < zero) {
+    let r = x.mul(y);
+
+    if z.clone() < zero || r <= zero {
         // ceiling is taken by default for a negative or zero result
-        r.div(&z)
+        r.div(z)
     } else {
         // floor taken by default for a positive result
-        let remainder = r.rem_euclid(&z);
+        let remainder = r.rem_euclid(z);
         let one = I256::from_i32(env, 1);
-        r.div(&z).add(if remainder > zero { &one } else { &zero })
+        r.div(z).add(if remainder > zero { &one } else { &zero })
     }
 }

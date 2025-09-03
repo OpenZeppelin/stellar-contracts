@@ -42,7 +42,7 @@ fn div_floor(r: i128, z: i128) -> Option<i128> {
 
 /// Performs ceil(r / z)
 fn div_ceil(r: i128, z: i128) -> Option<i128> {
-    if r <= 0 || (r > 0 && z < 0) {
+    if r <= 0 || z < 0 {
         // ceiling is taken by default for a negative or zero result
         r.checked_div(z)
     } else {
@@ -54,46 +54,46 @@ fn div_ceil(r: i128, z: i128) -> Option<i128> {
 
 impl SorobanFixedPoint for i128 {
     fn fixed_mul_floor(&self, env: &Env, y: &i128, denominator: &i128) -> i128 {
-        scaled_mul_div_floor(&self, env, y, denominator)
+        scaled_mul_div_floor(self, env, y, denominator)
     }
 
     fn fixed_mul_ceil(&self, env: &Env, y: &i128, denominator: &i128) -> i128 {
-        scaled_mul_div_ceil(&self, env, y, denominator)
+        scaled_mul_div_ceil(self, env, y, denominator)
     }
 }
 
 /// Performs floor(x * y / z)
 fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
-    return match x.checked_mul(*y) {
+    match x.checked_mul(*y) {
         Some(r) => div_floor(r, *z).unwrap_optimized(),
         None => {
             // scale to i256 and retry
             let res = crate::math::i256_fixed_point::mul_div_floor(
-                &env,
-                &I256::from_i128(&env, *x),
-                &I256::from_i128(&env, *y),
-                &I256::from_i128(&env, *z),
+                env,
+                &I256::from_i128(env, *x),
+                &I256::from_i128(env, *y),
+                &I256::from_i128(env, *z),
             );
             // will panic if result is not representable in i128
             res.to_i128().unwrap_optimized()
         }
-    };
+    }
 }
 
 /// Performs floor(x * y / z)
 fn scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
-    return match x.checked_mul(*y) {
+    match x.checked_mul(*y) {
         Some(r) => div_ceil(r, *z).unwrap_optimized(),
         None => {
             // scale to i256 and retry
             let res = crate::math::i256_fixed_point::mul_div_ceil(
-                &env,
-                &I256::from_i128(&env, *x),
-                &I256::from_i128(&env, *y),
-                &I256::from_i128(&env, *z),
+                env,
+                &I256::from_i128(env, *x),
+                &I256::from_i128(env, *y),
+                &I256::from_i128(env, *z),
             );
             // will panic if result is not representable in i128
             res.to_i128().unwrap_optimized()
         }
-    };
+    }
 }

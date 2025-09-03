@@ -62,7 +62,12 @@ impl Vault {
     }
 
     /// Converts an amount of underlying assets to the equivalent amount of
-    /// vault shares (rounded down).
+    /// vault shares (rounded down) using an idealized, fee-neutral conversion
+    /// rate.
+    ///
+    /// This function provides the theoretical conversion rate without
+    /// considering fees or other conditions that might affect actual
+    /// deposit outcomes.
     ///
     /// # Arguments
     ///
@@ -77,7 +82,12 @@ impl Vault {
     }
 
     /// Converts an amount of vault shares to the equivalent amount of
-    /// underlying assets (rounded down).
+    /// underlying assets (rounded down) using an idealized, fee-neutral
+    /// conversion rate.
+    ///
+    /// This function provides the theoretical conversion rate without
+    /// considering fees or other conditions that might affect actual
+    /// redemption outcomes.
     ///
     /// # Arguments
     ///
@@ -104,6 +114,10 @@ impl Vault {
 
     /// Simulates and returns the amount of vault shares that would be minted
     /// for a given deposit of underlying assets (rounded down).
+    ///
+    /// This function provides the exact outcome of a deposit operation under
+    /// current conditions, including any fees or other conditions that might
+    /// reduce the shares received compared to the idealized conversion rate.
     ///
     /// # Arguments
     ///
@@ -186,6 +200,10 @@ impl Vault {
 
     /// Simulates and returns the amount of underlying assets that would be
     /// received for redeeming a given amount of vault shares (rounded down).
+    ///
+    /// This function provides the exact outcome of a redemption operation under
+    /// current conditions, including any fees or other conditions that might
+    /// reduce the assets received compared to the idealized conversion rate.
     ///
     /// # Arguments
     ///
@@ -474,7 +492,7 @@ impl Vault {
     /// rounding direction, returning the equivalent amount of vault shares.
     ///
     /// Implements the formula:
-    /// `assets.mulDiv(totalSupply() + 10 ** _decimalsOffset(), totalAssets() +
+    /// `assets.mulDiv(totalSupply() + 10 ** decimalsOffset(), totalAssets() +
     /// 1, rounding)`
     ///
     /// # Arguments
@@ -514,7 +532,7 @@ impl Vault {
     ///
     /// Implements the formula:
     /// `shares.mulDiv(totalAssets() + 1, totalSupply() + 10 **
-    /// _decimalsOffset(), rounding)`
+    /// decimalsOffset(), rounding)`
     ///
     /// # Arguments
     ///
