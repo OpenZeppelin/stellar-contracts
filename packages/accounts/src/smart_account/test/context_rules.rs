@@ -374,27 +374,6 @@ fn add_context_rule_different_context_types() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2004)")]
-fn add_context_rule_no_signers_and_policies_fails() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let signers = Vec::new(&e);
-        let contract_addr = Address::generate(&e);
-
-        add_context_rule(
-            &e,
-            &ContextRuleType::CallContract(contract_addr),
-            String::from_str(&e, "empty_rule"),
-            None,
-            signers,
-            Map::new(&e),
-        );
-    });
-}
-
-#[test]
 #[should_panic(expected = "Error(Contract, #2005)")]
 fn add_context_rule_past_valid_until_fails() {
     let e = Env::default();

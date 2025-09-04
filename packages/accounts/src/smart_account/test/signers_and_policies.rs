@@ -7,9 +7,12 @@ use soroban_sdk::{
     Address, Env, Map, String, Val, Vec,
 };
 
-use super::super::storage::{
-    add_context_rule, add_policy, add_signer, get_context_rule, remove_policy, remove_signer,
-    ContextRule, ContextRuleType, Signer,
+use super::super::{
+    storage::{
+        add_context_rule, add_policy, add_signer, get_context_rule, remove_policy, remove_signer,
+        validate_signers_and_policies, ContextRule, ContextRuleType, Signer,
+    },
+    MAX_POLICIES, MAX_SIGNERS,
 };
 use crate::policies::Policy;
 
@@ -295,5 +298,71 @@ fn remove_policy_not_found_fails() {
 
     e.as_contract(&address, || {
         remove_policy(&e, rule.id, policy_address); // Policy not in rule
+    });
+}
+
+// ################## VALIDATION TESTS ##################
+
+#[test]
+fn validate_signers_and_policies_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let signers = Vec::from_array(&e, [Signer::Native(Address::generate(&e))]);
+        let policies = Vec::from_array(&e, [Address::generate(&e)]);
+
+        // Should not panic
+        validate_signers_and_policies(&e, &signers, &policies);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2004)")]
+fn validate_signers_and_policies_no_signers_and_policies_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let signers = Vec::new(&e);
+        let policies = Vec::new(&e);
+
+        validate_signers_and_policies(&e, &signers, &policies);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2010)")]
+fn validate_signers_and_policies_too_many_signers_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let mut signers = Vec::new(&e);
+        // Add more than MAX_SIGNERS (15)
+        for _ in 0..=MAX_SIGNERS {
+            signers.push_back(Signer::Native(Address::generate(&e)));
+        }
+        let policies = Vec::new(&e);
+
+        validate_signers_and_policies(&e, &signers, &policies);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2011)")]
+fn validate_signers_and_policies_too_many_policies_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let signers = Vec::new(&e);
+        let mut policies = Vec::new(&e);
+        // Add more than MAX_POLICIES (5)
+        for _ in 0..=MAX_POLICIES {
+            policies.push_back(Address::generate(&e));
+        }
+
+        validate_signers_and_policies(&e, &signers, &policies);
     });
 }

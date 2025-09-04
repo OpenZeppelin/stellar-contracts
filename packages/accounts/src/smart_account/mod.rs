@@ -50,6 +50,17 @@ pub trait ExecutionEntryPoint {
     fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>);
 }
 
+// ################## CONSTANTS ##################
+
+const DAY_IN_LEDGERS: u32 = 17280;
+pub const SMART_ACCOUNT_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const SMART_ACCOUNT_TTL_THRESHOLD: u32 = SMART_ACCOUNT_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
+/// Maximum number of policies allowed per context rule.
+pub const MAX_POLICIES: u32 = 5;
+/// Maximum number of signers allowed per context rule.
+pub const MAX_SIGNERS: u32 = 15;
+
 // ################## EVENTS ##################
 
 /// Emits an event indicating a context rule has been added.

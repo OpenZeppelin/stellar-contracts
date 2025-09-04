@@ -94,6 +94,7 @@ use soroban_sdk::{
     panic_with_error, Address, Bytes, BytesN, Env, IntoVal, Map, String, TryFromVal, Val, Vec,
 };
 
+use super::{MAX_POLICIES, MAX_SIGNERS, SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD};
 use crate::{
     policies::PolicyClient,
     smart_account::{
@@ -102,12 +103,6 @@ use crate::{
     },
     verifiers::VerifierClient,
 };
-
-// ################## CONSTANTS ##################
-
-const DAY_IN_LEDGERS: u32 = 17280;
-pub const SMART_ACCOUNT_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
-pub const SMART_ACCOUNT_TTL_THRESHOLD: u32 = SMART_ACCOUNT_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 /// Error codes for smart account operations.
 #[contracterror]
@@ -134,6 +129,10 @@ pub enum SmartAccountError {
     PolicyNotFound = 2008,
     /// The policy already exists in the context rule.
     DuplicatePolicy = 2009,
+    /// Too many signers in the context rule.
+    TooManySigners = 2010,
+    /// Too many policies in the context rule.
+    TooManyPolicies = 2011,
 }
 
 /// Storage keys for smart account data.
@@ -442,6 +441,39 @@ pub fn can_enforce_all_policies(
     true
 }
 
+/// Validates signers and policies against maximum limits and minimum
+/// requirements.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signers` - The vector of signers to validate.
+/// * `policies` - The vector of policies to validate.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::TooManySigners`] - When there are more than
+///   MAX_SIGNERS signers.
+/// * [`SmartAccountError::TooManyPolicies`] - When there are more than
+///   MAX_POLICIES policies.
+/// * [`SmartAccountError::NoSignersAndPolicies`] - When there are no signers
+///   and no policies.
+pub fn validate_signers_and_policies(e: &Env, signers: &Vec<Signer>, policies: &Vec<Address>) {
+    // Check maximum limits
+    if signers.len() > MAX_SIGNERS {
+        panic_with_error!(e, SmartAccountError::TooManySigners);
+    }
+
+    if policies.len() > MAX_POLICIES {
+        panic_with_error!(e, SmartAccountError::TooManyPolicies);
+    }
+
+    // Check minimum requirements - must have at least one signer or one policy
+    if signers.is_empty() && policies.is_empty() {
+        panic_with_error!(e, SmartAccountError::NoSignersAndPolicies);
+    }
+}
+
 /// Performs complete authorization check for multiple contexts. Authenticates
 /// signatures, validates contexts against rules, and enforces all applicable
 /// policies. Returns success if all contexts are successfully authorized.
@@ -511,6 +543,10 @@ pub fn do_check_auth(
 ///
 /// * [`SmartAccountError::NoSignersAndPolicies`] - When both signers and
 ///   policies are empty.
+/// * [`SmartAccountError::TooManySigners`] - When the number of signers exceeds
+///   MAX_SIGNERS (15).
+/// * [`SmartAccountError::TooManyPolicies`] - When the number of policies
+///   exceeds MAX_POLICIES (5).
 /// * [`SmartAccountError::DuplicateSigner`] - When the same signer appears
 ///   multiple times.
 /// * [`SmartAccountError::PastValidUntil`] - When valid_until is in the past.
@@ -559,6 +595,14 @@ pub fn add_context_rule(
         }
     }
 
+    let mut policies_vec = Vec::new(e);
+    for policy in policies.keys() {
+        policies_vec.push_back(policy.clone());
+    }
+
+    // Validate the signers and policies
+    validate_signers_and_policies(e, &unique_signers, &policies_vec);
+
     // Store meta information
     let meta = Meta { name: name.clone(), context_type: context_type.clone(), valid_until };
     e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
@@ -566,11 +610,6 @@ pub fn add_context_rule(
     // Store signers
     e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
-    // Store policies
-    let mut policies_vec = Vec::new(e);
-    for policy in policies.keys() {
-        policies_vec.push_back(policy.clone());
-    }
     // Store policies
     e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies_vec);
 
@@ -773,6 +812,8 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 ///   the specified ID does not exist.
 /// * [`SmartAccountError::DuplicateSigner`] - When the signer already exists in
 ///   the context rule.
+/// * [`SmartAccountError::TooManySigners`] - When adding this signer would
+///   exceed MAX_SIGNERS (15).
 ///
 /// # Events
 ///
@@ -784,13 +825,8 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 /// This function modifies storage without requiring authorization. Ensure
 /// proper access control is implemented at the contract level.
 pub fn add_signer(e: &Env, id: u32, signer: Signer) {
-    let signers_key = SmartAccountStorageKey::Signers(id);
-    // Don't extend TTL here since we set this key later in the same function
-    let mut signers: Vec<Signer> = e
-        .storage()
-        .persistent()
-        .get(&signers_key)
-        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+    let rule = get_context_rule(e, id);
+    let mut signers = rule.signers.clone();
 
     // Check if signer already exists
     if signers.contains(&signer) {
@@ -798,6 +834,10 @@ pub fn add_signer(e: &Env, id: u32, signer: Signer) {
     }
 
     signers.push_back(signer.clone());
+
+    // Validate the updated signers and policies
+    validate_signers_and_policies(e, &signers, &rule.policies);
+
     e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
     // Emit event
@@ -866,6 +906,8 @@ pub fn remove_signer(e: &Env, id: u32, signer: Signer) {
 ///   the specified ID does not exist.
 /// * [`SmartAccountError::DuplicatePolicy`] - When the policy already exists in
 ///   the context rule.
+/// * [`SmartAccountError::TooManyPolicies`] - When adding this policy would
+///   exceed MAX_POLICIES (5).
 ///
 /// # Events
 ///
@@ -889,6 +931,10 @@ pub fn add_policy(e: &Env, id: u32, policy: Address, install_param: Val) {
     PolicyClient::new(e, &policy).install(&install_param, &rule, &e.current_contract_address());
 
     policies.push_back(policy.clone());
+
+    // Validate the updated signers and policies
+    validate_signers_and_policies(e, &rule.signers, &policies);
+
     e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
 
     // Emit event
