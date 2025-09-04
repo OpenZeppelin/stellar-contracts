@@ -8,11 +8,79 @@ pub use storage::{
     Signatures, Signer, SmartAccountError,
 };
 
+/// Core trait for smart account functionality, extending Soroban's
+/// CustomAccountInterface with context rule management capabilities.
+///
+/// This trait provides methods for managing context rules, which define
+/// authorization policies for different types of operations. Context rules can
+/// contain signers and policies.
+///
+/// # Context Rules
+///
+/// Context rules are the fundamental building blocks of smart account
+/// authorization:
+/// - Each rule has a unique ID and applies to a specific context type
+/// - Rules can contain multiple signers and policies
+/// - Rules can have expiration times for temporary authorization
+/// - Rules are validated against maximum limits (MAX_SIGNERS, MAX_POLICIES)
 pub trait SmartAccount: CustomAccountInterface {
+    /// Retrieves a complete context rule by its unique ID, returning the
+    /// `ContextRule` containing all metadata, signers, and policies.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context_rule_id` - The unique identifier of the context rule to
+    ///   retrieve.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::ContextRuleNotFound`] - When no context rule
+    ///   exists with the given ID.
     fn get_context_rule(e: &Env, context_rule_id: u32) -> ContextRule;
 
+    /// Retrieves all context rules of a specific type, returning a vector of
+    /// all `ContextRule`s matching the specified type. Returns an empty
+    /// vector if no rules of the given type exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context_rule_type` - The type of context rules to retrieve (e.g.,
+    ///   Default, CallContract).
     fn get_context_rules(e: &Env, context_rule_type: ContextRuleType) -> Vec<ContextRule>;
 
+    /// Creates a new context rule with the specified configuration, returning
+    /// the newly created `ContextRule` with a unique ID assigned. Installs
+    /// all specified policies during creation.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context_type` - The type of context this rule applies to.
+    /// * `name` - Human-readable name for the context rule.
+    /// * `valid_until` - Optional expiration ledger sequence.
+    /// * `signers` - List of signers authorized by this rule.
+    /// * `policies` - Map of policy addresses to their installation parameters.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::NoSignersAndPolicies`] - When both signers and
+    ///   policies are empty.
+    /// * [`SmartAccountError::TooManySigners`] - When signers exceed
+    ///   MAX_SIGNERS (15).
+    /// * [`SmartAccountError::TooManyPolicies`] - When policies exceed
+    ///   MAX_POLICIES (5).
+    /// * [`SmartAccountError::DuplicateSigner`] - When the same signer appears
+    ///   multiple times.
+    /// * [`SmartAccountError::PastValidUntil`] - When valid_until is in the
+    ///   past.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["context_rule_added", id: u32]`
+    /// * data - `[name: String, context_type: ContextRuleType, valid_until:
+    ///   Option<u32>, signers: Vec<Signer>, policies: Vec<Address>]`
     fn add_context_rule(
         e: &Env,
         context_type: ContextRuleType,
@@ -22,31 +90,195 @@ pub trait SmartAccount: CustomAccountInterface {
         policies: Map<Address, Val>,
     ) -> ContextRule;
 
+    /// Updates the name of an existing context rule, returning the updated
+    /// `ContextRule` with the new name.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context_rule_id` - The ID of the context rule to update.
+    /// * `name` - The new human-readable name for the context rule.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::ContextRuleNotFound`] - When no context rule
+    ///   exists with the given ID.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["context_rule_updated", context_rule_id: u32]`
+    /// * data - `[name: String, context_type: ContextRuleType, valid_until:
+    ///   Option<u32>]`
     fn update_context_rule_name(e: &Env, context_rule_id: u32, name: String) -> ContextRule;
 
+    /// Updates the expiration time of an existing context rule, returning the
+    /// updated `ContextRule` with the new expiration time.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context_rule_id` - The ID of the context rule to update.
+    /// * `valid_until` - New optional expiration ledger sequence. Use `None`
+    ///   for no expiration.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::ContextRuleNotFound`] - When no context rule
+    ///   exists with the given ID.
+    /// * [`SmartAccountError::PastValidUntil`] - When valid_until is in the
+    ///   past.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["context_rule_updated", context_rule_id: u32]`
+    /// * data - `[name: String, context_type: ContextRuleType, valid_until:
+    ///   Option<u32>]`
     fn update_context_rule_valid_until(
         e: &Env,
         context_rule_id: u32,
         valid_until: Option<u32>,
     ) -> ContextRule;
 
+    /// Removes a context rule and cleans up all associated data. This function
+    /// uninstalls all policies associated with the rule and removes all stored
+    /// data including signers, policies, and metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context_rule_id` - The ID of the context rule to remove.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::ContextRuleNotFound`] - When no context rule
+    ///   exists with the given ID.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["context_rule_removed", context_rule_id: u32]`
+    /// * data - `[]`
     fn remove_context_rule(e: &Env, context_rule_id: u32);
 
+    /// Adds a new signer to an existing context rule.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context_rule_id` - The ID of the context rule to modify.
+    /// * `signer` - The signer to add to the context rule.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::ContextRuleNotFound`] - When no context rule
+    ///   exists with the given ID.
+    /// * [`SmartAccountError::DuplicateSigner`] - When the signer already
+    ///   exists in the rule.
+    /// * [`SmartAccountError::TooManySigners`] - When adding would exceed
+    ///   MAX_SIGNERS (15).
+    ///
+    /// # Events
+    ///
+    /// * topics - `["signer_added", context_rule_id: u32]`
+    /// * data - `[signer: Signer]`
     fn add_signer(e: &Env, context_rule_id: u32, signer: Signer);
 
+    /// Removes a signer from an existing context rule. Removing the last signer
+    /// is allowed only if the rule has at least one policy.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context_rule_id` - The ID of the context rule to modify.
+    /// * `signer` - The signer to remove from the context rule.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::ContextRuleNotFound`] - When no context rule
+    ///   exists with the given ID.
+    /// * [`SmartAccountError::SignerNotFound`] - When the signer doesn't exist
+    ///   in the rule.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["signer_removed", context_rule_id: u32]`
+    /// * data - `[signer: Signer]`
     fn remove_signer(e: &Env, context_rule_id: u32, signer: Signer);
 
+    /// Adds a new policy to an existing context rule and installs it. The
+    /// policy's `install` method will be called during this operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context_rule_id` - The ID of the context rule to modify.
+    /// * `policy` - The address of the policy contract to add.
+    /// * `install_param` - The installation parameter for the policy.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::ContextRuleNotFound`] - When no context rule
+    ///   exists with the given ID.
+    /// * [`SmartAccountError::DuplicatePolicy`] - When the policy already
+    ///   exists in the rule.
+    /// * [`SmartAccountError::TooManyPolicies`] - When adding would exceed
+    ///   MAX_POLICIES (5).
+    ///
+    /// # Events
+    ///
+    /// * topics - `["policy_added", context_rule_id: u32]`
+    /// * data - `[policy: Address, install_param: Val]`
     fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val);
 
+    /// Removes a policy from an existing context rule and uninstalls it. The
+    /// policy's `uninstall` method will be called during this operation.
+    /// Removing the last policy is allowed only if the rule has at least
+    /// one signer.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context_rule_id` - The ID of the context rule to modify.
+    /// * `policy` - The address of the policy contract to remove.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::ContextRuleNotFound`] - When no context rule
+    ///   exists with the given ID.
+    /// * [`SmartAccountError::PolicyNotFound`] - When the policy doesn't exist
+    ///   in the rule.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["policy_removed", context_rule_id: u32]`
+    /// * data - `[policy: Address]`
     fn remove_policy(e: &Env, context_rule_id: u32, policy: Address);
 }
 
-// Simple execution entry-point to call arbitrary contracts.
-//
-// Most likely to be used to call owned stateful polciies, and as direct
-// contract-to-contract invocations are always authorized, that's a way to avoid
-// re-entry when the policy need to auth back its owner.
+/// Simple execution entry-point to call arbitrary contracts from within a smart
+/// account.
+///
+/// # Security Considerations
+///
+/// Since direct contract-to-contract invocations are always authorized in
+/// Soroban, this trait provides a way to avoid re-entry issues when policies
+/// need to authenticate back to their owner smart account.
+///
+/// # Usage
+///
+/// Implement this trait to enable your smart account to execute arbitrary
+/// contract calls. This is particularly useful for:
+/// - Calling owned policy contracts
+/// - Interacting with external protocols on behalf of the smart account
 pub trait ExecutionEntryPoint {
+    /// Executes a function call on a target contract from within the smart
+    /// account context.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `target` - The address of the contract to call.
+    /// * `target_fn` - The function name to invoke on the target contract.
+    /// * `target_args` - Arguments to pass to the target function.
     fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>);
 }
 

@@ -2,11 +2,95 @@ pub mod ed25519;
 mod test;
 pub mod utils;
 pub mod webauthn;
-use soroban_sdk::{contractclient, Bytes, Env, FromVal, Val};
+use soroban_sdk::{contractclient, xdr::FromXdr, Bytes, Env, FromVal, Val};
 
+/// Core trait for cryptographic signature verification in smart accounts.
+///
+/// This trait defines the interface for verifying digital signatures against
+/// cryptographic keys. Implementations handle different signature schemes
+/// (e.g., Ed25519, WebAuthn) and provide a unified interface for the smart
+/// account system.
+///
+/// # Type Parameters
+///
+/// * `SigData` - The signature data type specific to the verification scheme.
+///   Must implement `FromVal<Env, Val>` and FromXdr for Soroban serialization.
+///
+/// # Implementation Notes
+///
+/// Verifiers should:
+/// - Validate input parameters (hash, key_data, sig_data) for correctness
+/// - Perform cryptographic verification according to their specific scheme
+/// - Panic with appropriate errors for malformed inputs
+///
+/// # Examples
+///
+/// ```rust
+/// use soroban_sdk::{Bytes, Env};
+/// use stellar_accounts::verifiers::Verifier;
+///
+/// struct MyVerifier;
+/// impl Verifier for MyVerifier {
+///     type SigData = Bytes;
+///
+///     fn verify(e: &Env, hash: Bytes, key_data: Bytes, sig_data: Bytes) -> bool {
+///         // Implementation specific verification logic
+///         true
+///     }
+/// }
+/// ```
 pub trait Verifier {
-    type SigData: FromVal<Env, Val>;
+    type SigData: FromVal<Env, Val> + FromXdr;
 
+    /// Verifies a cryptographic signature against a hash and public key.
+    ///
+    /// This method performs cryptographic verification of a digital signature
+    /// according to the specific signature scheme implemented by the verifier.
+    /// It validates that the signature was created by the holder of the private
+    /// key corresponding to the provided public key data.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `hash` - The hash of the data that was signed (typically 32 bytes).
+    /// * `key_data` - The public key data in the format expected by this
+    ///   verifier.
+    /// * `sig_data` - The signature data in the format expected by this
+    ///   verifier.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the signature is valid and was created by the private key
+    /// corresponding to `key_data`, `false` otherwise.
+    ///
+    /// # Panics
+    ///
+    /// Implementations should panic with appropriate error codes when:
+    /// - `key_data` is malformed or has invalid length
+    /// - `sig_data` is malformed or has invalid format
+    /// - `hash` has invalid length for the signature scheme
+    /// - Other cryptographic validation failures occur
+    ///
+    /// # Security Requirements
+    ///
+    /// Implementations must:
+    /// - Use constant-time operations to prevent timing attacks
+    /// - Validate all input parameters thoroughly
+    /// - Resist signature malleability attacks
+    /// - Follow the cryptographic standards for their signature scheme
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use soroban_sdk::{Bytes, Env};
+    /// use stellar_accounts::verifiers::Verifier;
+    ///
+    /// // Example usage (implementation-specific)
+    /// let is_valid = MyVerifier::verify(&env, message_hash, public_key, signature);
+    /// if is_valid {
+    ///     // Signature is valid, proceed with authorization
+    /// }
+    /// ```
     fn verify(e: &Env, hash: Bytes, key_data: Bytes, sig_data: Bytes) -> bool;
 }
 
