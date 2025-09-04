@@ -1,4 +1,3 @@
-#![cfg(test)]
 extern crate std;
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Bytes, BytesN, Env, String, Vec};

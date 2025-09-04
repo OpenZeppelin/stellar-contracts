@@ -1,4 +1,3 @@
-#![cfg(test)]
 extern crate std;
 use ed25519_dalek::{Signer as Ed25519Signer, SigningKey};
 use k256::{

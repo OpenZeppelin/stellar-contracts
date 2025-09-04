@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 extern crate std;
 
 #[allow(unused_imports)]

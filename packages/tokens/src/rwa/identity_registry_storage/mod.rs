@@ -140,6 +140,8 @@
 //! - Metadata can be used to provide additional context for mixed relation
 //!   types
 mod storage;
+
+#[cfg(test)]
 mod test;
 
 use soroban_sdk::{contracterror, Address, Env, FromVal, Symbol, Val, Vec};

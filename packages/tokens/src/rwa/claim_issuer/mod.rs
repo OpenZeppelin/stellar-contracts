@@ -60,6 +60,7 @@
 //! ```
 
 mod storage;
+#[cfg(test)]
 mod test;
 
 use soroban_sdk::{contractclient, contracterror, crypto::Hash, Address, Bytes, Env, Symbol};

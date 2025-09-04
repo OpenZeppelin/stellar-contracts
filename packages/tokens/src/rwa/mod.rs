@@ -43,8 +43,10 @@ pub mod compliance;
 pub mod identity_claims;
 pub mod identity_registry_storage;
 pub mod storage;
-pub mod test;
 pub mod utils;
+
+#[cfg(test)]
+mod test;
 
 use soroban_sdk::{contracterror, symbol_short, Address, Env, Symbol};
 use stellar_contract_utils::pausable::Pausable;

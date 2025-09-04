@@ -49,6 +49,7 @@
 
 mod storage;
 
+#[cfg(test)]
 mod test;
 
 use soroban_sdk::{contracterror, symbol_short, Address, Env};

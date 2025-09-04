@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 extern crate std;
 
 use soroban_sdk::{contract, testutils::Events, vec, Env, IntoVal, Symbol};

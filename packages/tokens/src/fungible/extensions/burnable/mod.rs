@@ -1,5 +1,6 @@
 mod storage;
 
+#[cfg(test)]
 mod test;
 
 use soroban_sdk::{symbol_short, Address, Env};
