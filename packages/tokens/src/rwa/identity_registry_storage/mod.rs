@@ -453,17 +453,14 @@ pub fn emit_country_data_event(
     country_data: &CountryData,
 ) {
     match event_type {
-        CountryDataEvent::Added => {
+        CountryDataEvent::Added =>
             CountryDataAdded { account: account.clone(), country_data: country_data.clone() }
-                .publish(e)
-        }
-        CountryDataEvent::Removed => {
+                .publish(e),
+        CountryDataEvent::Removed =>
             CountryDataRemoved { account: account.clone(), country_data: country_data.clone() }
-                .publish(e)
-        }
-        CountryDataEvent::Modified => {
+                .publish(e),
+        CountryDataEvent::Modified =>
             CountryDataModified { account: account.clone(), country_data: country_data.clone() }
-                .publish(e)
-        }
+                .publish(e),
     }
 }

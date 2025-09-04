@@ -376,11 +376,7 @@ pub struct RoleGranted {
 /// * `account` - The account that received the role.
 /// * `caller` - The account that granted the role.
 pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
-    RoleGranted {
-        role: role.clone(),
-        account: account.clone(),
-        sender: caller.clone(),
-    }.publish(e);
+    RoleGranted { role: role.clone(), account: account.clone(), sender: caller.clone() }.publish(e);
 }
 
 /// Event emitted when a role is revoked.
@@ -405,11 +401,7 @@ pub struct RoleRevoked {
 /// * `caller` - The account that revoked the role (either the admin or the
 ///   account itself).
 pub fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
-    RoleRevoked {
-        role: role.clone(),
-        account: account.clone(),
-        sender: caller.clone(),
-    }.publish(e);
+    RoleRevoked { role: role.clone(), account: account.clone(), sender: caller.clone() }.publish(e);
 }
 
 /// Event emitted when a role admin is changed.
@@ -442,7 +434,8 @@ pub fn emit_role_admin_changed(
         role: role.clone(),
         previous_admin_role: previous_admin_role.clone(),
         new_admin_role: new_admin_role.clone(),
-    }.publish(e);
+    }
+    .publish(e);
 }
 
 /// Event emitted when an admin transfer is initiated.
@@ -474,7 +467,8 @@ pub fn emit_admin_transfer_initiated(
         current_admin: current_admin.clone(),
         new_admin: new_admin.clone(),
         live_until_ledger,
-    }.publish(e);
+    }
+    .publish(e);
 }
 
 /// Event emitted when an admin transfer is completed.
@@ -494,10 +488,8 @@ pub struct AdminTransferCompleted {
 /// * `previous_admin` - The previous admin.
 /// * `new_admin` - The new admin who accepted the transfer.
 pub fn emit_admin_transfer_completed(e: &Env, previous_admin: &Address, new_admin: &Address) {
-    AdminTransferCompleted {
-        new_admin: new_admin.clone(),
-        previous_admin: previous_admin.clone(),
-    }.publish(e);
+    AdminTransferCompleted { new_admin: new_admin.clone(), previous_admin: previous_admin.clone() }
+        .publish(e);
 }
 
 /// Event emitted when the admin role is renounced.
@@ -515,7 +507,5 @@ pub struct AdminRenounced {
 /// * `e` - Access to Soroban environment.
 /// * `admin` - The admin that renounced the role.
 pub fn emit_admin_renounced(e: &Env, admin: &Address) {
-    AdminRenounced {
-        admin: admin.clone(),
-    }.publish(e);
+    AdminRenounced { admin: admin.clone() }.publish(e);
 }
