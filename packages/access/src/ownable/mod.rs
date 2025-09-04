@@ -170,7 +170,6 @@ pub fn emit_ownership_transfer(
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipTransferCompleted {
-    #[topic]
     pub new_owner: Address,
 }
 
@@ -188,7 +187,6 @@ pub fn emit_ownership_transfer_completed(e: &Env, new_owner: &Address) {
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipRenounced {
-    #[topic]
     pub old_owner: Address,
 }
 

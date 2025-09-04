@@ -363,8 +363,7 @@ pub struct RoleGranted {
     pub role: Symbol,
     #[topic]
     pub account: Address,
-    #[topic]
-    pub sender: Address,
+    pub caller: Address,
 }
 
 /// Emits an event when a role is granted to an account.
@@ -376,7 +375,7 @@ pub struct RoleGranted {
 /// * `account` - The account that received the role.
 /// * `caller` - The account that granted the role.
 pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
-    RoleGranted { role: role.clone(), account: account.clone(), sender: caller.clone() }.publish(e);
+    RoleGranted { role: role.clone(), account: account.clone(), caller: caller.clone() }.publish(e);
 }
 
 /// Event emitted when a role is revoked.
@@ -387,8 +386,7 @@ pub struct RoleRevoked {
     pub role: Symbol,
     #[topic]
     pub account: Address,
-    #[topic]
-    pub sender: Address,
+    pub caller: Address,
 }
 
 /// Emits an event when a role is revoked from an account.
@@ -401,7 +399,7 @@ pub struct RoleRevoked {
 /// * `caller` - The account that revoked the role (either the admin or the
 ///   account itself).
 pub fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
-    RoleRevoked { role: role.clone(), account: account.clone(), sender: caller.clone() }.publish(e);
+    RoleRevoked { role: role.clone(), account: account.clone(), caller: caller.clone() }.publish(e);
 }
 
 /// Event emitted when a role admin is changed.
@@ -410,9 +408,7 @@ pub fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, caller: &Add
 pub struct RoleAdminChanged {
     #[topic]
     pub role: Symbol,
-    #[topic]
     pub previous_admin_role: Symbol,
-    #[topic]
     pub new_admin_role: Symbol,
 }
 

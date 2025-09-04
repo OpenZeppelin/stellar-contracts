@@ -13,8 +13,8 @@ use soroban_sdk::{contractclient, contracterror, contractevent, Address, Env, Ma
 /// on the [`ClaimTopicsAndIssuers`] trait:
 ///
 /// ```rust, ignore
-/// pub trait ClaimTopicsAndIssuers       //
-/// pub trait ClaimTopicsAndIssuers: RWA  //
+/// pub trait ClaimTopicsAndIssuers       // ✅
+/// pub trait ClaimTopicsAndIssuers: RWA  // ❌
 /// ```
 #[contractclient(name = "ClaimTopicsAndIssuersClient")]
 pub trait ClaimTopicsAndIssuers {
