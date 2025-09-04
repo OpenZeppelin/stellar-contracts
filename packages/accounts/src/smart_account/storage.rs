@@ -284,14 +284,12 @@ pub fn get_valid_context_rules(e: &Env, context_key: ContextRuleType) -> Vec<Con
     let get_rules = |ids: Vec<u32>| -> Vec<ContextRule> {
         let mut rules = Vec::new(e);
         for id in ids.iter() {
-            if e.storage().persistent().has(&SmartAccountStorageKey::Meta(id)) {
-                let rule = get_context_rule(e, id);
-                match rule.valid_until {
-                    // skip if expired
-                    Some(seq) if seq < e.ledger().sequence() => continue,
-                    // push front so that we start from the last added when iterating
-                    _ => rules.push_front(rule),
-                }
+            let rule = get_context_rule(e, id);
+            match rule.valid_until {
+                // skip if expired
+                Some(seq) if seq < e.ledger().sequence() => continue,
+                // push front so that we start from the last added when iterating
+                _ => rules.push_front(rule),
             }
         }
         rules
