@@ -9,7 +9,10 @@ use soroban_sdk::{
     Address, Env, IntoVal, Vec,
 };
 
-use crate::policies::simple_threshold::*;
+use crate::{
+    policies::simple_threshold::*,
+    smart_account::{ContextRule, ContextRuleType},
+};
 
 #[contract]
 struct MockContract;
@@ -22,6 +25,23 @@ fn create_test_signers(e: &Env) -> (Address, Address, Address) {
     (addr1, addr2, addr3)
 }
 
+fn create_test_context_rule(e: &Env) -> ContextRule {
+    let (addr1, addr2, addr3) = create_test_signers(e);
+    let mut signers = Vec::new(e);
+    signers.push_back(Signer::Native(addr1));
+    signers.push_back(Signer::Native(addr2));
+    signers.push_back(Signer::Native(addr3));
+    let policies = Vec::new(e);
+    ContextRule {
+        id: 1,
+        context_type: ContextRuleType::Default,
+        name: soroban_sdk::String::from_str(e, "test_rule"),
+        signers,
+        policies,
+        valid_until: None,
+    }
+}
+
 #[test]
 fn install_success() {
     let e = Env::default();
@@ -32,11 +52,12 @@ fn install_success() {
 
     e.as_contract(&address, || {
         let (_, _, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
+        let params = SimpleThresholdAccountParams { threshold: 2 };
+        let context_rule = create_test_context_rule(&e);
 
-        install(&e, &params, &smart_account);
+        install(&e, &params, &context_rule, &smart_account);
 
-        assert_eq!(get_threshold(&e, &smart_account), 2);
+        assert_eq!(get_threshold(&e, &context_rule, &smart_account), 2);
     });
 }
 
@@ -50,9 +71,10 @@ fn install_zero_threshold_fails() {
     e.mock_all_auths();
 
     e.as_contract(&address, || {
-        let params = SimpleThresholdInstallParams { threshold: 0, signers_count: 3 }; // Invalid
+        let params = SimpleThresholdAccountParams { threshold: 0 }; // Invalid
+        let context_rule = create_test_context_rule(&e);
 
-        install(&e, &params, &smart_account);
+        install(&e, &params, &context_rule, &smart_account);
     });
 }
 
@@ -66,7 +88,8 @@ fn smart_account_get_threshold_fails() {
     e.mock_all_auths();
 
     e.as_contract(&address, || {
-        get_threshold(&e, &smart_account);
+        let context_rule = create_test_context_rule(&e);
+        get_threshold(&e, &context_rule, &smart_account);
     });
 }
 
@@ -80,13 +103,13 @@ fn can_enforce_sufficient_signers() {
 
     e.as_contract(&address, || {
         let (addr1, addr2, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
+        let params = SimpleThresholdAccountParams { threshold: 2 };
+        let context_rule = create_test_context_rule(&e);
 
-        install(&e, &params, &smart_account);
+        install(&e, &params, &context_rule, &smart_account);
 
         let authenticated_signers =
             Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
-        let context_rule_signers = Vec::new(&e);
 
         let context = Context::Contract(soroban_sdk::auth::ContractContext {
             contract: Address::generate(&e),
@@ -94,13 +117,8 @@ fn can_enforce_sufficient_signers() {
             args: ().into_val(&e),
         });
 
-        let result = can_enforce(
-            &e,
-            &context,
-            &context_rule_signers,
-            &authenticated_signers,
-            &smart_account,
-        );
+        let result =
+            can_enforce(&e, &context, &authenticated_signers, &context_rule, &smart_account);
 
         assert!(result);
     });
@@ -116,12 +134,12 @@ fn can_enforce_insufficient_signers() {
 
     e.as_contract(&address, || {
         let (addr1, _, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
+        let params = SimpleThresholdAccountParams { threshold: 2 };
+        let context_rule = create_test_context_rule(&e);
 
-        install(&e, &params, &smart_account);
+        install(&e, &params, &context_rule, &smart_account);
 
         let authenticated_signers = Vec::from_array(&e, [Signer::Native(addr1)]);
-        let context_rule_signers = Vec::new(&e);
 
         let context = Context::Contract(soroban_sdk::auth::ContractContext {
             contract: Address::generate(&e),
@@ -129,13 +147,8 @@ fn can_enforce_insufficient_signers() {
             args: ().into_val(&e),
         });
 
-        let result = can_enforce(
-            &e,
-            &context,
-            &context_rule_signers,
-            &authenticated_signers,
-            &smart_account,
-        );
+        let result =
+            can_enforce(&e, &context, &authenticated_signers, &context_rule, &smart_account);
 
         assert!(!result);
     });
@@ -149,7 +162,7 @@ fn can_enforce_not_installed() {
 
     e.as_contract(&address, || {
         let authenticated_signers = Vec::from_array(&e, [Signer::Native(Address::generate(&e))]);
-        let context_rule_signers = Vec::new(&e);
+        let context_rule = create_test_context_rule(&e);
 
         let context = Context::Contract(soroban_sdk::auth::ContractContext {
             contract: Address::generate(&e),
@@ -157,13 +170,8 @@ fn can_enforce_not_installed() {
             args: ().into_val(&e),
         });
 
-        let result = can_enforce(
-            &e,
-            &context,
-            &context_rule_signers,
-            &authenticated_signers,
-            &smart_account,
-        );
+        let result =
+            can_enforce(&e, &context, &authenticated_signers, &context_rule, &smart_account);
 
         assert!(!result);
     });
@@ -181,15 +189,16 @@ fn enforce_success() {
         let (addr1, addr2, _) = create_test_signers(&e);
         let authenticated_signers =
             Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
-        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
+        let params = SimpleThresholdAccountParams { threshold: 2 };
+        let context_rule = create_test_context_rule(&e);
 
-        install(&e, &params, &smart_account);
+        install(&e, &params, &context_rule, &smart_account);
 
         authenticated_signers
     });
 
     e.as_contract(&address, || {
-        let context_rule_signers = Vec::new(&e);
+        let context_rule = create_test_context_rule(&e);
 
         let context = Context::Contract(soroban_sdk::auth::ContractContext {
             contract: Address::generate(&e),
@@ -197,7 +206,7 @@ fn enforce_success() {
             args: ().into_val(&e),
         });
 
-        enforce(&e, &context, &context_rule_signers, &authenticated_signers, &smart_account);
+        enforce(&e, &context, &authenticated_signers, &context_rule, &smart_account);
 
         assert_eq!(e.events().all().len(), 1);
     });
@@ -213,14 +222,16 @@ fn set_threshold_success() {
 
     e.as_contract(&address, || {
         let (_, _, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 2 };
+        let params = SimpleThresholdAccountParams { threshold: 2 };
+        let context_rule = create_test_context_rule(&e);
 
-        install(&e, &params, &smart_account);
+        install(&e, &params, &context_rule, &smart_account);
     });
 
     e.as_contract(&address, || {
-        set_threshold(&e, 3, 3, &smart_account);
-        assert_eq!(get_threshold(&e, &smart_account), 3);
+        let context_rule = create_test_context_rule(&e);
+        set_threshold(&e, 3, &context_rule, &smart_account);
+        assert_eq!(get_threshold(&e, &context_rule, &smart_account), 3);
     });
 }
 
@@ -235,13 +246,15 @@ fn set_threshold_zero_fails() {
 
     e.as_contract(&address, || {
         let (_, _, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
+        let params = SimpleThresholdAccountParams { threshold: 2 };
+        let context_rule = create_test_context_rule(&e);
 
-        install(&e, &params, &smart_account);
+        install(&e, &params, &context_rule, &smart_account);
     });
 
     e.as_contract(&address, || {
-        set_threshold(&e, 0, 3, &smart_account); // Invalid threshold
+        let context_rule = create_test_context_rule(&e);
+        set_threshold(&e, 0, &context_rule, &smart_account); // Invalid threshold
     });
 }
 
@@ -255,15 +268,17 @@ fn uninstall_success() {
 
     e.as_contract(&address, || {
         let (_, _, _) = create_test_signers(&e);
-        let params = SimpleThresholdInstallParams { threshold: 2, signers_count: 3 };
+        let params = SimpleThresholdAccountParams { threshold: 2 };
+        let context_rule = create_test_context_rule(&e);
 
-        install(&e, &params, &smart_account);
+        install(&e, &params, &context_rule, &smart_account);
 
         // Verify it's installed
-        assert_eq!(get_threshold(&e, &smart_account), 2);
+        assert_eq!(get_threshold(&e, &context_rule, &smart_account), 2);
     });
 
     e.as_contract(&address, || {
-        uninstall(&e, &smart_account);
+        let context_rule = create_test_context_rule(&e);
+        uninstall(&e, &context_rule, &smart_account);
     });
 }

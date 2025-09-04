@@ -10,13 +10,16 @@ use soroban_sdk::{
     vec, Address, Bytes, BytesN, Env, Map, String, Symbol, Val, Vec,
 };
 
-use crate::smart_account::{
-    get_context_rules, get_validated_context,
-    storage::{
-        add_context_rule, authenticate, can_enforce_all_policies, do_check_auth,
-        get_authenticated_signers, get_context_rule, get_valid_context_rules, remove_context_rule,
-        update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType,
-        Signatures, Signer,
+use crate::{
+    policies::Policy,
+    smart_account::{
+        get_context_rules, get_validated_context,
+        storage::{
+            add_context_rule, authenticate, can_enforce_all_policies, do_check_auth,
+            get_authenticated_signers, get_context_rule, get_valid_context_rules,
+            remove_context_rule, update_context_rule_name, update_context_rule_valid_until,
+            ContextRule, ContextRuleType, Signatures, Signer,
+        },
     },
 };
 
@@ -27,29 +30,31 @@ struct MockContract;
 struct MockPolicyContract;
 
 #[contractimpl]
-impl MockPolicyContract {
-    pub fn can_enforce(
+impl Policy for MockPolicyContract {
+    type AccountParams = Val;
+
+    fn can_enforce(
         e: &Env,
         _context: Context,
-        _context_rule_signers: Vec<Signer>,
         _authenticated_signers: Vec<Signer>,
+        _rule: ContextRule,
         _smart_account: Address,
     ) -> bool {
         e.storage().persistent().get(&symbol_short!("enforce")).unwrap_or(true)
     }
 
-    pub fn enforce(
+    fn enforce(
         _e: &Env,
         _context: Context,
-        _context_rule_signers: Vec<Signer>,
         _authenticated_signers: Vec<Signer>,
+        _rule: ContextRule,
         _smart_account: Address,
     ) {
     }
 
-    pub fn install(_e: &Env, _param: Val, _smart_account: Address) {}
+    fn install(_e: &Env, _param: Val, _rule: ContextRule, _smart_account: Address) {}
 
-    pub fn uninstall(_e: &Env, _smart_account: Address) {}
+    fn uninstall(_e: &Env, _rule: ContextRule, _smart_account: Address) {}
 }
 
 #[contract]
@@ -506,13 +511,12 @@ fn can_enforce_all_policies_success() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let policies = create_test_policies(&e);
-        let rule_signers = create_test_signers(&e);
-        let matched_signers = rule_signers.clone();
+        let mut rule = setup_test_rule(&e, &address);
+        rule.policies = create_test_policies(&e);
+        let matched_signers = rule.signers.clone();
         let context = get_context(Address::generate(&e), symbol_short!("test"), vec![&e]);
 
-        let result =
-            can_enforce_all_policies(&e, &context, &policies, &rule_signers, &matched_signers);
+        let result = can_enforce_all_policies(&e, &context, &rule, &matched_signers);
         assert!(result);
     });
 }
@@ -523,21 +527,20 @@ fn can_enforce_all_policies_one_fails() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let policies = create_test_policies(&e);
-        let rule_signers = create_test_signers(&e);
-        let matched_signers = rule_signers.clone();
+        let mut rule = setup_test_rule(&e, &address);
+        rule.policies = create_test_policies(&e);
+        let matched_signers = rule.signers.clone();
         let context = get_context(Address::generate(&e), symbol_short!("test"), vec![&e]);
 
         // Set first policy to return true, second to return false
-        e.as_contract(&policies.get(0).unwrap(), || {
+        e.as_contract(&rule.policies.get(0).unwrap(), || {
             e.storage().persistent().set(&symbol_short!("enforce"), &true);
         });
-        e.as_contract(&policies.get(1).unwrap(), || {
+        e.as_contract(&rule.policies.get(1).unwrap(), || {
             e.storage().persistent().set(&symbol_short!("enforce"), &false);
         });
 
-        let result =
-            can_enforce_all_policies(&e, &context, &policies, &rule_signers, &matched_signers);
+        let result = can_enforce_all_policies(&e, &context, &rule, &matched_signers);
         assert!(!result); // Should fail because one policy returns false
     });
 }

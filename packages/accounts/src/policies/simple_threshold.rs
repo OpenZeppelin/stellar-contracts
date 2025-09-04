@@ -8,17 +8,16 @@ use soroban_sdk::{
     auth::Context, contracterror, contracttype, panic_with_error, Address, Env, Symbol, Vec,
 };
 
+use crate::smart_account::ContextRule;
 // re-export
 pub use crate::smart_account::Signer;
 
 /// Installation parameters for the simple threshold policy.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
-pub struct SimpleThresholdInstallParams {
+pub struct SimpleThresholdAccountParams {
     /// The minimum number of signers required for authorization.
     pub threshold: u32,
-    /// The total number of signers available for this policy.
-    pub signers_count: u32,
 }
 
 /// Error codes for simple threshold policy operations.
@@ -35,9 +34,7 @@ pub enum SimpleThresholdError {
 /// Storage keys for simple threshold policy data.
 #[contracttype]
 pub enum SimpleThresholdStorageKey {
-    /// Storage key for the threshold value of a smart account.
-    /// Maps to a `u32` representing the minimum number of signers required.
-    Threshold(Address),
+    AccountContext(Address, u32),
 }
 
 // ################## CONSTANTS ##################
@@ -59,8 +56,8 @@ pub const SIMPLE_THRESHOLD_TTL_THRESHOLD: u32 = SIMPLE_THRESHOLD_EXTEND_AMOUNT -
 ///
 /// * [`SimpleThresholdError::SmartAccountNotInstalled`] - When the smart
 ///   account does not have a simple threshold policy installed.
-pub fn get_threshold(e: &Env, smart_account: &Address) -> u32 {
-    let key = SimpleThresholdStorageKey::Threshold(smart_account.clone());
+pub fn get_threshold(e: &Env, context_rule: &ContextRule, smart_account: &Address) -> u32 {
+    let key = SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
     e.storage()
         .persistent()
         .get(&key)
@@ -83,17 +80,17 @@ pub fn get_threshold(e: &Env, smart_account: &Address) -> u32 {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `_context` - The authorization context (unused).
-/// * `_context_rule_signers` - The signers from context rules (unused).
 /// * `authenticated_signers` - The list of authenticated signers.
+/// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
 pub fn can_enforce(
     e: &Env,
     _context: &Context,
-    _context_rule_signers: &Vec<Signer>,
     authenticated_signers: &Vec<Signer>,
+    context_rule: &ContextRule,
     smart_account: &Address,
 ) -> bool {
-    let key = SimpleThresholdStorageKey::Threshold(smart_account.clone());
+    let key = SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
     let threshold: Option<u32> = e.storage().persistent().get(&key);
 
     if let Some(threshold) = threshold {
@@ -117,8 +114,8 @@ pub fn can_enforce(
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context` - The authorization context.
-/// * `context_rule_signers` - The signers from the context rule.
 /// * `authenticated_signers` - The list of authenticated signers.
+/// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
 ///
 /// # Events
@@ -128,14 +125,14 @@ pub fn can_enforce(
 pub fn enforce(
     e: &Env,
     context: &Context,
-    context_rule_signers: &Vec<Signer>,
     authenticated_signers: &Vec<Signer>,
+    context_rule: &ContextRule,
     smart_account: &Address,
 ) {
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    if can_enforce(e, context, context_rule_signers, authenticated_signers, smart_account) {
+    if can_enforce(e, context, authenticated_signers, context_rule, smart_account) {
         // emit event
         e.events().publish(
             (Symbol::new(e, "simple_policy_enforced"), smart_account),
@@ -150,25 +147,26 @@ pub fn enforce(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `threshold` - The minimum number of signers required.
-/// * `signers_count` - The total number of signers available.
+/// * `threshold` - The minimum number of signers required for authorization.
+/// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
 ///
 /// # Errors
 ///
 /// * [`SimpleThresholdError::InvalidThreshold`] - When threshold is 0 or
 ///   exceeds the total number of signers.
-pub fn set_threshold(e: &Env, threshold: u32, signers_count: u32, smart_account: &Address) {
+pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    if threshold == 0 || threshold > signers_count {
+    if threshold == 0 || threshold > context_rule.signers.len() {
         panic_with_error!(e, SimpleThresholdError::InvalidThreshold)
     }
 
-    e.storage()
-        .persistent()
-        .set(&SimpleThresholdStorageKey::Threshold(smart_account.clone()), &threshold);
+    e.storage().persistent().set(
+        &SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id),
+        &threshold,
+    );
 }
 
 /// Installs the simple threshold policy on a smart account.
@@ -177,36 +175,47 @@ pub fn set_threshold(e: &Env, threshold: u32, signers_count: u32, smart_account:
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `params` - Installation parameters containing threshold and signers count.
+/// * `params` - Installation parameters containing the threshold.
+/// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
 ///
 /// # Errors
 ///
 /// * [`SimpleThresholdError::InvalidThreshold`] - When threshold is 0 or
-///   exceeds the total number of signers.
-pub fn install(e: &Env, params: &SimpleThresholdInstallParams, smart_account: &Address) {
+///   exceeds the total number of signers in the context rule.
+pub fn install(
+    e: &Env,
+    params: &SimpleThresholdAccountParams,
+    context_rule: &ContextRule,
+    smart_account: &Address,
+) {
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    if params.threshold == 0 || params.threshold > params.signers_count {
+    if params.threshold == 0 || params.threshold > context_rule.signers.len() {
         panic_with_error!(e, SimpleThresholdError::InvalidThreshold)
     }
 
-    e.storage()
-        .persistent()
-        .set(&SimpleThresholdStorageKey::Threshold(smart_account.clone()), &params.threshold);
+    e.storage().persistent().set(
+        &SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id),
+        &params.threshold,
+    );
 }
 
 /// Uninstalls the simple threshold policy from a smart account.
+/// Removes all stored threshold data for the account and context rule.
 /// Requires authorization from the smart account.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+/// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
-pub fn uninstall(e: &Env, smart_account: &Address) {
+pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    e.storage().persistent().remove(&SimpleThresholdStorageKey::Threshold(smart_account.clone()));
+    e.storage()
+        .persistent()
+        .remove(&SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id));
 }

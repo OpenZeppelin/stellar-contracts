@@ -26,13 +26,13 @@ struct MockPolicyContract;
 
 #[contractimpl]
 impl Policy for MockPolicyContract {
-    type InstallParams = Val;
+    type AccountParams = Val;
 
     fn can_enforce(
         _e: &Env,
         _context: soroban_sdk::auth::Context,
-        _context_rule_signers: Vec<Signer>,
         _authenticated_signers: Vec<Signer>,
+        _rule: ContextRule,
         _smart_account: Address,
     ) -> bool {
         true
@@ -41,15 +41,21 @@ impl Policy for MockPolicyContract {
     fn enforce(
         _e: &Env,
         _context: soroban_sdk::auth::Context,
-        _context_rule_signers: Vec<Signer>,
         _authenticated_signers: Vec<Signer>,
+        _rule: ContextRule,
         _smart_account: Address,
     ) {
     }
 
-    fn install(_e: &Env, _install_params: Self::InstallParams, _smart_account: Address) {}
+    fn install(
+        _e: &Env,
+        _install_params: Self::AccountParams,
+        _rule: ContextRule,
+        _smart_account: Address,
+    ) {
+    }
 
-    fn uninstall(_e: &Env, _smart_account: Address) {}
+    fn uninstall(_e: &Env, _rule: ContextRule, _smart_account: Address) {}
 }
 
 fn create_test_signers(e: &Env) -> Vec<Signer> {

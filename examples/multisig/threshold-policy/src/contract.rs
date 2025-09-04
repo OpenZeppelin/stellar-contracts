@@ -1,7 +1,7 @@
 use soroban_sdk::{auth::Context, contract, contractimpl, Address, Env, Vec};
 use stellar_accounts::{
     policies::{simple_threshold, Policy},
-    smart_account::Signer,
+    smart_account::{ContextRule, Signer},
 };
 
 #[contract]
@@ -9,20 +9,20 @@ pub struct ThresholdPolicyContract;
 
 #[contractimpl]
 impl Policy for ThresholdPolicyContract {
-    type InstallParams = simple_threshold::SimpleThresholdInstallParams;
+    type AccountParams = simple_threshold::SimpleThresholdAccountParams;
 
     fn can_enforce(
         e: &Env,
         context: Context,
-        context_rule_signers: Vec<Signer>,
         authenticated_signers: Vec<Signer>,
+        context_rule: ContextRule,
         smart_account: Address,
     ) -> bool {
         simple_threshold::can_enforce(
             e,
             &context,
-            &context_rule_signers,
             &authenticated_signers,
+            &context_rule,
             &smart_account,
         )
     }
@@ -30,37 +30,47 @@ impl Policy for ThresholdPolicyContract {
     fn enforce(
         e: &Env,
         context: Context,
-        context_rule_signers: Vec<Signer>,
         authenticated_signers: Vec<Signer>,
+        context_rule: ContextRule,
         smart_account: Address,
     ) {
         simple_threshold::enforce(
             e,
             &context,
-            &context_rule_signers,
             &authenticated_signers,
+            &context_rule,
             &smart_account,
         )
     }
 
-    fn install(e: &Env, install_params: Self::InstallParams, smart_account: Address) {
-        simple_threshold::install(e, &install_params, &smart_account)
+    fn install(
+        e: &Env,
+        install_params: Self::AccountParams,
+        context_rule: ContextRule,
+        smart_account: Address,
+    ) {
+        simple_threshold::install(e, &install_params, &context_rule, &smart_account)
     }
 
-    fn uninstall(e: &Env, smart_account: Address) {
-        simple_threshold::uninstall(e, &smart_account)
+    fn uninstall(e: &Env, context_rule: ContextRule, smart_account: Address) {
+        simple_threshold::uninstall(e, &context_rule, &smart_account)
     }
 }
 
 #[contractimpl]
 impl ThresholdPolicyContract {
     /// Get the current threshold for a smart account
-    pub fn get_threshold(e: Env, smart_account: Address) -> u32 {
-        simple_threshold::get_threshold(&e, &smart_account)
+    pub fn get_threshold(e: Env, context_rule: ContextRule, smart_account: Address) -> u32 {
+        simple_threshold::get_threshold(&e, &context_rule, &smart_account)
     }
 
     /// Set a new threshold for a smart account
-    pub fn set_threshold(e: Env, threshold: u32, signers_count: u32, smart_account: Address) {
-        simple_threshold::set_threshold(&e, signers_count, threshold, &smart_account)
+    pub fn set_threshold(
+        e: Env,
+        threshold: u32,
+        context_rule: ContextRule,
+        smart_account: Address,
+    ) {
+        simple_threshold::set_threshold(&e, threshold, &context_rule, &smart_account)
     }
 }
