@@ -12,6 +12,10 @@ impl ExampleContract {
     pub fn __constructor(e: &Env) {
         Base::set_metadata(e, 18, String::from_str(e, "Token"), String::from_str(e, "EXA"));
     }
+
+    pub fn add(a: i128, b: i128) -> i128 {
+        a + b
+    }
 }
 
 #[default_impl]
@@ -27,5 +31,9 @@ pub struct AnotherContract;
 impl AnotherContract {
     pub fn __constructor(e: &Env) {
         Base::set_metadata(e, 18, String::from_str(e, "Token2"), String::from_str(e, "EXA2"));
+    }
+
+    pub fn add(a: i128, b: i128) -> i128 {
+        a + b
     }
 }
