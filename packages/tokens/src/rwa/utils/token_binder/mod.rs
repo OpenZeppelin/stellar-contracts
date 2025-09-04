@@ -1,5 +1,8 @@
 mod storage;
+
+#[cfg(test)]
 mod test;
+
 use soroban_sdk::{contracterror, Address, Env, Symbol, Vec};
 pub use storage::{
     bind_token, bind_tokens, get_token_by_index, get_token_index, linked_tokens, unbind_token,

@@ -15,10 +15,7 @@ use soroban_sdk::{
 };
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_macros::when_not_paused;
-use stellar_tokens::{
-    fungible::{burnable::FungibleBurnable, Base, FungibleToken},
-    impl_token_interface,
-};
+use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, FungibleToken};
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
 
@@ -140,9 +137,3 @@ impl FungibleBurnable for ExampleContract {
         Self::ContractType::burn_from(e, &spender, &from, amount)
     }
 }
-
-// NOTE: if your contract implements `FungibleToken` and `FungibleBurnable`,
-// and you also want your contract to implement
-// `soroban_sdk::token::TokenInterface`, you can use the `impl_token_interface!`
-// macro to generate the boilerplate implementation.
-impl_token_interface!(ExampleContract);

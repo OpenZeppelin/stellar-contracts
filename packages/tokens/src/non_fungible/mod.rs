@@ -69,6 +69,7 @@ mod overrides;
 mod storage;
 mod utils;
 
+#[cfg(test)]
 mod test;
 
 pub use extensions::{burnable, consecutive, enumerable, royalties};

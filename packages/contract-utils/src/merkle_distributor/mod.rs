@@ -48,6 +48,7 @@
 
 mod storage;
 
+#[cfg(test)]
 mod test;
 
 use core::marker::PhantomData;

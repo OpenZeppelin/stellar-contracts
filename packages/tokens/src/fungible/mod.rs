@@ -68,11 +68,11 @@
 //!   `INSTANCE_TTL_THRESHOLD` and `INSTANCE_EXTEND_AMOUNT`.
 
 mod extensions;
-mod impl_token_interface_macro;
 mod overrides;
 mod storage;
 mod utils;
 
+#[cfg(test)]
 mod test;
 
 pub use extensions::{allowlist, blocklist, burnable, capped};

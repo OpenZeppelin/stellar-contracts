@@ -76,6 +76,7 @@ use crate::non_fungible::NonFungibleToken;
 /// `Enumerable` extension.
 pub trait NonFungibleConsecutive: NonFungibleToken<ContractType = Consecutive> {}
 
+#[cfg(test)]
 mod test;
 
 // ################## EVENTS ##################

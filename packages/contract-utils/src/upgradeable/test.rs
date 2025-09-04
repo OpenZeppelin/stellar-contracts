@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use soroban_sdk::{contract, Env};
 
 use crate::upgradeable::storage::{

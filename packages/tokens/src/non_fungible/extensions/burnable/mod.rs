@@ -1,6 +1,7 @@
 mod storage;
 use crate::non_fungible::NonFungibleToken;
 
+#[cfg(test)]
 mod test;
 
 use soroban_sdk::{symbol_short, Address, Env};
