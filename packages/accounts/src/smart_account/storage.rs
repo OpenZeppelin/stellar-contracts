@@ -574,11 +574,6 @@ pub fn add_context_rule(
     // Don't extend TTL here since we set this key later in the same function
     let mut same_key_ids: Vec<u32> = e.storage().persistent().get(&ids_key).unwrap_or(Vec::new(e));
 
-    // Check for at least one of signers or policies > 0
-    if signers.is_empty() && policies.is_empty() {
-        panic_with_error!(e, SmartAccountError::NoSignersAndPolicies)
-    }
-
     // Check for duplicate signers
     let mut unique_signers = Vec::new(e);
     for signer in signers.iter() {
