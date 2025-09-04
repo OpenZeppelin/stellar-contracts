@@ -43,7 +43,7 @@ pub enum DocumentStorageKey {
     DocumentList,
 }
 
-// ################## QUERY FUNCTIONS ##################
+// ################## QUERY STATE ##################
 
 /// Retrieves the details of a document with a known name.
 ///
@@ -85,7 +85,7 @@ pub fn get_all_documents(e: &Env) -> Vec<(BytesN<32>, Document)> {
     documents
 }
 
-// ################## MUTATING FUNCTIONS ##################
+// ################## UPDATE STATE ##################
 
 /// Attaches a new document to the contract or updates an existing one.
 ///
@@ -98,8 +98,6 @@ pub fn get_all_documents(e: &Env) -> Vec<(BytesN<32>, Document)> {
 ///
 /// # Events
 ///
-/// Emits a `DocumentUpdated` event.
-///
 /// * topics - `["document_updated", name: BytesN<32>]`
 /// * data - `[uri: String, document_hash: BytesN<32>, timestamp: u64]`
 ///
@@ -109,9 +107,6 @@ pub fn get_all_documents(e: &Env) -> Vec<(BytesN<32>, Document)> {
 /// be used:
 /// - During contract initialization/construction
 /// - In functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant security
-/// risks as it could allow unauthorized document modifications.
 pub fn set_document(e: &Env, name: &BytesN<32>, uri: &String, document_hash: &BytesN<32>) {
     let timestamp = e.ledger().timestamp();
 
@@ -154,8 +149,6 @@ pub fn set_document(e: &Env, name: &BytesN<32>, uri: &String, document_hash: &By
 ///
 /// # Events
 ///
-/// Emits a `DocumentRemoved` event.
-///
 /// * topics - `["document_removed", name: BytesN<32>]`
 /// * data - `[]`
 ///
@@ -170,9 +163,6 @@ pub fn set_document(e: &Env, name: &BytesN<32>, uri: &String, document_hash: &By
 /// be used:
 /// - During contract initialization/construction
 /// - In functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant security
-/// risks as it could allow unauthorized document removal.
 pub fn remove_document(e: &Env, name: &BytesN<32>) {
     if !document_exists(e, name) {
         panic_with_error!(e, DocumentError::DocumentNotFound)

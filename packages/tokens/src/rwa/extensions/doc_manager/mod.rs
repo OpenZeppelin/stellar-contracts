@@ -32,7 +32,7 @@ mod test;
 use soroban_sdk::{contracterror, Address, BytesN, Env, String, Symbol, Vec};
 pub use storage::{
     document_exists, get_all_documents, get_document, get_document_count, remove_document,
-    set_document, Document,
+    set_document, Document, DocumentStorageKey,
 };
 
 use crate::rwa::RWAToken;
@@ -64,16 +64,15 @@ pub trait DocumentManager: RWAToken {
     /// * `document_hash` - The hash of the document contents.
     /// * `operator` - The address authorizing this operation.
     ///
-    /// # Events
+    /// # Errors
     ///
-    /// Emits a `DocumentUpdated` event.
+    /// * [`DocumentError::DocumentNotFound`]- If no document exists with the
+    ///   given name.
+    ///
+    /// # Events
     ///
     /// * topics - `["document_updated", name: BytesN<32>]`
     /// * data - `[uri: String, document_hash: BytesN<32>, timestamp: u64]`
-    ///
-    /// # Errors
-    ///
-    /// * Authorization errors if the operator is not permitted
     fn set_document(
         e: &Env,
         name: BytesN<32>,
@@ -90,17 +89,15 @@ pub trait DocumentManager: RWAToken {
     /// * `name` - The document name to remove.
     /// * `operator` - The address authorizing this operation.
     ///
-    /// # Events
+    /// # Errors
     ///
-    /// Emits a `DocumentRemoved` event.
+    /// * [`DocumentError::DocumentNotFound`]- If no document exists with the
+    ///   given name.
+    ///
+    /// # Events
     ///
     /// * topics - `["document_removed", name: BytesN<32>]`
     /// * data - `[]`
-    ///
-    /// # Errors
-    ///
-    /// * `DocumentNotFound` - If no document exists with the given name
-    /// * Authorization errors if the operator is not permitted
     fn remove_document(e: &Env, name: BytesN<32>, operator: Address);
 
     /// Retrieves a full list of all documents attached to the contract.
@@ -108,11 +105,6 @@ pub trait DocumentManager: RWAToken {
     /// # Arguments
     ///
     /// * `e` - The Soroban environment.
-    ///
-    /// # Returns
-    ///
-    /// Returns a vector of tuples containing document names and their details
-    /// for all documents that have been added and not subsequently removed.
     fn get_all_documents(e: &Env) -> Vec<(BytesN<32>, Document)>;
 }
 
