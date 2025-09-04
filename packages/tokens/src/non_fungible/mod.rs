@@ -75,7 +75,7 @@ mod test;
 pub use extensions::{burnable, consecutive, enumerable, royalties};
 pub use overrides::{Base, ContractOverrides};
 // ################## TRAIT ##################
-use soroban_sdk::{contracterror, symbol_short, Address, Env, String, Symbol};
+use soroban_sdk::{contracterror, contractevent, Address, Env, String};
 pub use storage::{ApprovalData, NFTStorageKey};
 pub use utils::sequential;
 
@@ -401,41 +401,51 @@ pub const MAX_BASE_URI_LEN: usize = 200;
 
 // ################## EVENTS ##################
 
-/// Emits an event indicating a transfer of token.
+/// Event emitted when a token is transferred.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Transfer {
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub token_id: u32,
+}
+
+/// Emits an event for a transfer of a token from `from` to `to`.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to Soroban environment.
-/// * `from` - The address holding the token.
-/// * `to` - The address receiving the transferred token.
-/// * `token_id` - The identifier of the transferred token.
-///
-/// # Events
-///
-/// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[token_id: u32]`
+/// * `e` - The Soroban environment.
+/// * `from` - The sender address.
+/// * `to` - The recipient address.
+/// * `token_id` - The token identifier.
 pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-    let topics = (symbol_short!("transfer"), from, to);
-    e.events().publish(topics, token_id)
+    Transfer { from: from.clone(), to: to.clone(), token_id }.publish(e);
+}
+
+/// Event emitted when an approval is granted.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Approve {
+    #[topic]
+    pub approver: Address,
+    #[topic]
+    pub token_id: u32,
+    pub approved: Address,
+    pub live_until_ledger: u32,
 }
 
 /// Emits an event when `approver` enables `approved` to manage the the token
-/// with `token_id`.
+/// with `token_id` until `live_until_ledger`.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to Soroban environment.
-/// * `approver` - The address of the approver (should be `owner` or
-///   `operator`).
-/// * `approved` - Address of the approved.
-/// * `token_id` - The identifier of the transferred token.
-/// * `live_until_ledger` - The ledger number at which the approval expires. If
-///   `live_until_ledger` is `0`, the approval is revoked.
-///
-/// # Events
-///
-/// * topics - `["approve", owner: Address, token_id: u32]`
-/// * data - `[approved: Address, live_until_ledger: u32]`
+/// * `e` - The Soroban environment.
+/// * `approver` - The approver address.
+/// * `approved` - The approved address.
+/// * `token_id` - The token identifier.
+/// * `live_until_ledger` - The ledger number until which the approval is valid.
 pub fn emit_approve(
     e: &Env,
     approver: &Address,
@@ -443,44 +453,50 @@ pub fn emit_approve(
     token_id: u32,
     live_until_ledger: u32,
 ) {
-    let topics = (symbol_short!("approve"), approver, token_id);
-    e.events().publish(topics, (approved, live_until_ledger))
+    Approve { approver: approver.clone(), token_id, approved: approved.clone(), live_until_ledger }
+        .publish(e);
+}
+
+/// Event emitted when approval for all tokens is granted.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ApproveForAll {
+    #[topic]
+    pub owner: Address,
+    pub operator: Address,
+    pub live_until_ledger: u32,
 }
 
 /// Emits an event when `owner` enables `operator` to manage the the token with
-/// `token_id`.
+/// `token_id` until `live_until_ledger`.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to Soroban environment.
-/// * `owner` - Address of the owner of the token.
-/// * `operator` - Address of an operator that will manage operations on the
-///   token.
-/// * `live_until_ledger` - The ledger number at which the allowance expires. If
-///   `live_until_ledger` is `0`, the approval is revoked.
-///
-/// # Events
-///
-/// * topics - `["approve_for_all", owner: Address]`
-/// * data - `[operator: Address, live_until_ledger: u32]`
+/// * `e` - The Soroban environment.
+/// * `owner` - The owner address.
+/// * `operator` - The operator address.
+/// * `live_until_ledger` - The ledger number until which the approval is valid.
 pub fn emit_approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
-    let topics = (Symbol::new(e, "approve_for_all"), owner);
-    e.events().publish(topics, (operator, live_until_ledger))
+    ApproveForAll { owner: owner.clone(), operator: operator.clone(), live_until_ledger }
+        .publish(e);
+}
+
+/// Event emitted when a token is minted.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Mint {
+    #[topic]
+    pub to: Address,
+    pub token_id: u32,
 }
 
 /// Emits an event indicating a mint of a token.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to Soroban environment.
-/// * `to` - The address receiving the new token.
-/// * `token_id` - Token ID as a number.
-///
-/// # Events
-///
-/// * topics - `["mint", to: Address]`
-/// * data - `[token_id: u32]`
+/// * `e` - The Soroban environment.
+/// * `to` - The recipient address.
+/// * `token_id` - The token identifier.
 pub fn emit_mint(e: &Env, to: &Address, token_id: u32) {
-    let topics = (symbol_short!("mint"), to);
-    e.events().publish(topics, token_id)
+    Mint { to: to.clone(), token_id }.publish(e);
 }

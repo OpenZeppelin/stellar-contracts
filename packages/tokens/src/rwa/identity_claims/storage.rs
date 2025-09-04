@@ -122,9 +122,9 @@ pub fn add_claim(
     // Emit appropriate event
     if is_new_claim {
         add_claim_to_topic_index(e, topic, &claim_id);
-        emit_claim_event(e, ClaimEvent::Added, &claim);
+        emit_claim_event(e, ClaimEvent::Added, claim);
     } else {
-        emit_claim_event(e, ClaimEvent::Changed, &claim);
+        emit_claim_event(e, ClaimEvent::Changed, claim);
     }
 
     claim_id
@@ -209,7 +209,7 @@ pub fn remove_claim(e: &Env, claim_id: &BytesN<32>) {
 
     remove_claim_from_topic_index(e, claim.topic, claim_id);
 
-    emit_claim_event(e, ClaimEvent::Removed, &claim);
+    emit_claim_event(e, ClaimEvent::Removed, claim);
 }
 
 /// Low-level function to remove a claim ID from the topic index.

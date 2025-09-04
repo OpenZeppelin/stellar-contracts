@@ -63,7 +63,9 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractclient, contracterror, crypto::Hash, Address, Bytes, Env, Symbol};
+use soroban_sdk::{
+    contractclient, contracterror, contractevent, crypto::Hash, Address, Bytes, BytesN, Env,
+};
 pub use storage::{
     allow_key, is_claim_revoked, is_key_allowed, remove_key, set_claim_revoked,
     ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
@@ -161,7 +163,25 @@ pub enum KeyEvent {
     Removed,
 }
 
-/// Emits an event for allowing or removing keys.
+/// Event emitted when a key is allowed for a claim topic.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KeyAllowed {
+    #[topic]
+    pub public_key: Bytes,
+    pub claim_topic: u32,
+}
+
+/// Event emitted when a key is removed from a claim topic.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KeyRemoved {
+    #[topic]
+    pub public_key: Bytes,
+    pub claim_topic: u32,
+}
+
+/// Emits an event for key management operations (allow/remove).
 ///
 /// # Arguments
 ///
@@ -169,17 +189,21 @@ pub enum KeyEvent {
 /// * `event_type` - The type of key event.
 /// * `public_key` - The public key involved in the operation.
 /// * `claim_topic` - Optional claim topic for topic-specific operations.
-///
-/// # Events
-///
-/// * topics - `["key_allowed" | "key_removed", public_key: Bytes]`
-/// * data - `[claim_topic: u32]`
 pub fn emit_key_event(e: &Env, event_type: KeyEvent, public_key: &Bytes, claim_topic: u32) {
-    let name = match event_type {
-        KeyEvent::Allowed => Symbol::new(e, "key_allowed"),
-        KeyEvent::Removed => Symbol::new(e, "key_removed"),
-    };
-    e.events().publish((name, public_key.clone()), claim_topic);
+    match event_type {
+        KeyEvent::Allowed => KeyAllowed { public_key: public_key.clone(), claim_topic }.publish(e),
+        KeyEvent::Removed => KeyRemoved { public_key: public_key.clone(), claim_topic }.publish(e),
+    }
+}
+
+/// Event emitted when a claim is revoked.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimRevoked {
+    #[topic]
+    pub claim_digest: BytesN<32>,
+    #[topic]
+    pub revoked: bool,
 }
 
 /// Emits an event for a claim revocation operation.
@@ -189,14 +213,8 @@ pub fn emit_key_event(e: &Env, event_type: KeyEvent, public_key: &Bytes, claim_t
 /// * `e` - The Soroban environment.
 /// * `claim_digest` - The hash digest of the claim.
 /// * `revoked` - Whether the claim should be marked as revoked.
-///
-/// # Events
-///
-/// * topics - `["claim_revoked", claim_digest: Hash<32>, revoked: bool]`
-/// * data - `[]`
 pub fn emit_revocation_event(e: &Env, claim_digest: &Hash<32>, revoked: bool) {
-    let event_topics = (Symbol::new(e, "claim_revoked"), claim_digest.clone(), revoked);
-    e.events().publish(event_topics, ());
+    ClaimRevoked { claim_digest: claim_digest.to_bytes(), revoked }.publish(e);
 }
 
 // ################## ERRORS ##################

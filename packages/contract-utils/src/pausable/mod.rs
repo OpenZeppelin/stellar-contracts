@@ -52,7 +52,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, symbol_short, Address, Env};
+use soroban_sdk::{contracterror, contractevent, Address, Env};
 
 pub use crate::pausable::storage::{pause, paused, unpause, when_not_paused, when_paused};
 
@@ -139,32 +139,30 @@ pub enum PausableError {
 
 // ################## EVENTS ##################
 
+/// Event emitted when the contract is paused.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Paused {}
+
 /// Emits an event when `Paused` state is triggered.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to Soroban environment.
-///
-/// # Events
-///
-/// * topics - `["paused"]`
-/// * data - `[]`
+/// * `e` - The Soroban environment.
 pub fn emit_paused(e: &Env) {
-    let topics = (symbol_short!("paused"),);
-    e.events().publish(topics, ())
+    Paused {}.publish(e);
 }
+
+/// Event emitted when the contract is unpaused.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Unpaused {}
 
 /// Emits an event when `Unpaused` state is triggered.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to Soroban environment.
-///
-/// # Events
-///
-/// * topics - `["unpaused"]`
-/// * data - `[]`
+/// * `e` - The Soroban environment.
 pub fn emit_unpaused(e: &Env) {
-    let topics = (symbol_short!("unpaused"),);
-    e.events().publish(topics, ())
+    Unpaused {}.publish(e);
 }

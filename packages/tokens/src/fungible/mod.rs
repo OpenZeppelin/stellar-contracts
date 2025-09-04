@@ -77,7 +77,7 @@ mod test;
 
 pub use extensions::{allowlist, blocklist, burnable, capped};
 pub use overrides::{Base, ContractOverrides};
-use soroban_sdk::{contracterror, symbol_short, Address, Env, String};
+use soroban_sdk::{contracterror, contractevent, Address, Env, String};
 pub use storage::{AllowanceData, AllowanceKey, StorageKey};
 pub use utils::{sac_admin_generic, sac_admin_wrapper};
 
@@ -328,6 +328,17 @@ pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 // ################## EVENTS ##################
 
+/// Event emitted when tokens are transferred between addresses.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Transfer {
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub amount: i128,
+}
+
 /// Emits an event indicating a transfer of tokens.
 ///
 /// # Arguments
@@ -336,14 +347,20 @@ pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 /// * `from` - The address holding the tokens.
 /// * `to` - The address receiving the transferred tokens.
 /// * `amount` - The amount of tokens to be transferred.
-///
-/// # Events
-///
-/// * topics - `["transfer", from: Address, to: Address]`
-/// * data - `[amount: i128]`
 pub fn emit_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-    let topics = (symbol_short!("transfer"), from, to);
-    e.events().publish(topics, amount)
+    Transfer { from: from.clone(), to: to.clone(), amount }.publish(e);
+}
+
+/// Event emitted when an allowance is approved.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Approve {
+    #[topic]
+    pub owner: Address,
+    #[topic]
+    pub spender: Address,
+    pub amount: i128,
+    pub live_until_ledger: u32,
 }
 
 /// Emits an event indicating an allowance was set.
@@ -355,11 +372,6 @@ pub fn emit_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
 /// * `spender` - The address authorized to spend the tokens.
 /// * `amount` - The amount of tokens made available to `spender`.
 /// * `live_until_ledger` - The ledger number at which the allowance expires.
-///
-/// # Events
-///
-/// * topics - `["approve", owner: Address, spender: Address]`
-/// * data - `[amount: i128, live_until_ledger: u32]`
 pub fn emit_approve(
     e: &Env,
     owner: &Address,
@@ -367,8 +379,17 @@ pub fn emit_approve(
     amount: i128,
     live_until_ledger: u32,
 ) {
-    let topics = (symbol_short!("approve"), owner, spender);
-    e.events().publish(topics, (amount, live_until_ledger))
+    Approve { owner: owner.clone(), spender: spender.clone(), amount, live_until_ledger }
+        .publish(e);
+}
+
+/// Event emitted when tokens are minted.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Mint {
+    #[topic]
+    pub to: Address,
+    pub amount: i128,
 }
 
 /// Emits an event indicating a mint of tokens.
@@ -378,12 +399,6 @@ pub fn emit_approve(
 /// * `e` - Access to Soroban environment.
 /// * `to` - The address receiving the new tokens.
 /// * `amount` - The amount of tokens to mint.
-///
-/// # Events
-///
-/// * topics - `["mint", account: Address]`
-/// * data - `[amount: i128]`
 pub fn emit_mint(e: &Env, to: &Address, amount: i128) {
-    let topics = (symbol_short!("mint"), to);
-    e.events().publish(topics, amount)
+    Mint { to: to.clone(), amount }.publish(e);
 }

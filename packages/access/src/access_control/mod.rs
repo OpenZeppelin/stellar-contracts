@@ -91,7 +91,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, Address, Env, Symbol};
+use soroban_sdk::{contracterror, contractevent, Address, Env, Symbol};
 
 pub use crate::access_control::storage::{
     accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
@@ -355,6 +355,18 @@ pub const ROLE_TTL_THRESHOLD: u32 = ROLE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 // ################## EVENTS ##################
 
+/// Event emitted when a role is granted.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RoleGranted {
+    #[topic]
+    pub role: Symbol,
+    #[topic]
+    pub account: Address,
+    #[topic]
+    pub sender: Address,
+}
+
 /// Emits an event when a role is granted to an account.
 ///
 /// # Arguments
@@ -363,14 +375,24 @@ pub const ROLE_TTL_THRESHOLD: u32 = ROLE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 /// * `role` - The role that was granted.
 /// * `account` - The account that received the role.
 /// * `caller` - The account that granted the role.
-///
-/// # Events
-///
-/// * topics - `["role_granted", role: Symbol, account: Address]`
-/// * data - `[caller: Address]`
 pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
-    let topics = (Symbol::new(e, "role_granted"), role, account);
-    e.events().publish(topics, caller);
+    RoleGranted {
+        role: role.clone(),
+        account: account.clone(),
+        sender: caller.clone(),
+    }.publish(e);
+}
+
+/// Event emitted when a role is revoked.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RoleRevoked {
+    #[topic]
+    pub role: Symbol,
+    #[topic]
+    pub account: Address,
+    #[topic]
+    pub sender: Address,
 }
 
 /// Emits an event when a role is revoked from an account.
@@ -382,14 +404,24 @@ pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, caller: &Add
 /// * `account` - The account that lost the role.
 /// * `caller` - The account that revoked the role (either the admin or the
 ///   account itself).
-///
-/// # Events
-///
-/// * topics - `["role_revoked", role: Symbol, account: Address]`
-/// * data - `[caller: Address]`
 pub fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
-    let topics = (Symbol::new(e, "role_revoked"), role, account);
-    e.events().publish(topics, caller);
+    RoleRevoked {
+        role: role.clone(),
+        account: account.clone(),
+        sender: caller.clone(),
+    }.publish(e);
+}
+
+/// Event emitted when a role admin is changed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RoleAdminChanged {
+    #[topic]
+    pub role: Symbol,
+    #[topic]
+    pub previous_admin_role: Symbol,
+    #[topic]
+    pub new_admin_role: Symbol,
 }
 
 /// Emits an event when the admin role for a role changes.
@@ -400,19 +432,27 @@ pub fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, caller: &Add
 /// * `role` - The role whose admin is changing.
 /// * `previous_admin_role` - The previous admin role.
 /// * `new_admin_role` - The new admin role.
-///
-/// # Events
-///
-/// * topics - `["role_admin_changed", role: Symbol]`
-/// * data - `[previous_admin_role: Symbol, new_admin_role: Symbol]`
 pub fn emit_role_admin_changed(
     e: &Env,
     role: &Symbol,
     previous_admin_role: &Symbol,
     new_admin_role: &Symbol,
 ) {
-    let topics = (Symbol::new(e, "role_admin_changed"), role);
-    e.events().publish(topics, (previous_admin_role, new_admin_role));
+    RoleAdminChanged {
+        role: role.clone(),
+        previous_admin_role: previous_admin_role.clone(),
+        new_admin_role: new_admin_role.clone(),
+    }.publish(e);
+}
+
+/// Event emitted when an admin transfer is initiated.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminTransferInitiated {
+    #[topic]
+    pub current_admin: Address,
+    pub new_admin: Address,
+    pub live_until_ledger: u32,
 }
 
 /// Emits an event when an admin transfer is initiated.
@@ -424,19 +464,26 @@ pub fn emit_role_admin_changed(
 /// * `new_admin` - The proposed new admin.
 /// * `live_until_ledger` - The ledger number at which the pending transfer will
 ///   expire. If this value is `0`, it means the pending transfer is cancelled.
-///
-/// # Events
-///
-/// * topics - `["admin_transfer_initiated", current_admin: Address]`
-/// * data - `[new_admin: Address, live_until_ledger: u32]`
 pub fn emit_admin_transfer_initiated(
     e: &Env,
     current_admin: &Address,
     new_admin: &Address,
     live_until_ledger: u32,
 ) {
-    let topics = (Symbol::new(e, "admin_transfer_initiated"), current_admin);
-    e.events().publish(topics, (new_admin, live_until_ledger));
+    AdminTransferInitiated {
+        current_admin: current_admin.clone(),
+        new_admin: new_admin.clone(),
+        live_until_ledger,
+    }.publish(e);
+}
+
+/// Event emitted when an admin transfer is completed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminTransferCompleted {
+    #[topic]
+    pub new_admin: Address,
+    pub previous_admin: Address,
 }
 
 /// Emits an event when an admin transfer is completed.
@@ -446,14 +493,19 @@ pub fn emit_admin_transfer_initiated(
 /// * `e` - Access to Soroban environment.
 /// * `previous_admin` - The previous admin.
 /// * `new_admin` - The new admin who accepted the transfer.
-///
-/// # Events
-///
-/// * topics - `["admin_transfer_completed", new_admin: Address]`
-/// * data - `[previous_admin: Address]`
 pub fn emit_admin_transfer_completed(e: &Env, previous_admin: &Address, new_admin: &Address) {
-    let topics = (Symbol::new(e, "admin_transfer_completed"), new_admin);
-    e.events().publish(topics, previous_admin);
+    AdminTransferCompleted {
+        new_admin: new_admin.clone(),
+        previous_admin: previous_admin.clone(),
+    }.publish(e);
+}
+
+/// Event emitted when the admin role is renounced.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdminRenounced {
+    #[topic]
+    pub admin: Address,
 }
 
 /// Emits an event when the admin role is renounced.
@@ -462,12 +514,8 @@ pub fn emit_admin_transfer_completed(e: &Env, previous_admin: &Address, new_admi
 ///
 /// * `e` - Access to Soroban environment.
 /// * `admin` - The admin that renounced the role.
-///
-/// # Events
-///
-/// * topics - `["admin_renounced", admin: Address]`
-/// * data - `[]`
 pub fn emit_admin_renounced(e: &Env, admin: &Address) {
-    let topics = (Symbol::new(e, "admin_renounced"), admin);
-    e.events().publish(topics, ());
+    AdminRenounced {
+        admin: admin.clone(),
+    }.publish(e);
 }

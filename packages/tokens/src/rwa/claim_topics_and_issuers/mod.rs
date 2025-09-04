@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractclient, contracterror, Address, Env, Map, Symbol, Vec};
+use soroban_sdk::{contractclient, contracterror, contractevent, Address, Env, Map, Vec};
 
 /// Trait for managing claim topics and trusted issuers for RWA tokens.
 ///
@@ -13,8 +13,8 @@ use soroban_sdk::{contractclient, contracterror, Address, Env, Map, Symbol, Vec}
 /// on the [`ClaimTopicsAndIssuers`] trait:
 ///
 /// ```rust, ignore
-/// pub trait ClaimTopicsAndIssuers       // ✅
-/// pub trait ClaimTopicsAndIssuers: RWA  // ❌
+/// pub trait ClaimTopicsAndIssuers       //
+/// pub trait ClaimTopicsAndIssuers: RWA  //
 /// ```
 #[contractclient(name = "ClaimTopicsAndIssuersClient")]
 pub trait ClaimTopicsAndIssuers {
@@ -270,72 +270,87 @@ pub const MAX_ISSUERS: u32 = 50;
 
 // ################## EVENTS ##################
 
+/// Event emitted when a claim topic is added.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimTopicAdded {
+    #[topic]
+    pub claim_topic: u32,
+}
+
 /// Emits an event indicating a claim topic has been added.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to the Soroban environment.
-/// * `claim_topic` - The claim topic index.
-///
-/// # Events
-///
-/// * topics - `["claim_added", claim_topic: u32]`
-/// * data - `[]`
+/// * `e` - The Soroban environment.
+/// * `claim_topic` - The claim topic that was added.
 pub fn emit_claim_topic_added(e: &Env, claim_topic: u32) {
-    let topics = (Symbol::new(e, "claim_topic_added"), claim_topic);
-    e.events().publish(topics, ())
+    ClaimTopicAdded { claim_topic }.publish(e);
+}
+
+/// Event emitted when a claim topic is removed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimTopicRemoved {
+    #[topic]
+    pub claim_topic: u32,
 }
 
 /// Emits an event indicating a claim topic has been removed.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to the Soroban environment.
-/// * `claim_topic` - The claim topic index.
-///
-/// # Events
-///
-/// * topics - `["claim_removed", claim_topic: u32]`
-/// * data - `[]`
+/// * `e` - The Soroban environment.
+/// * `claim_topic` - The claim topic that was removed.
 pub fn emit_claim_topic_removed(e: &Env, claim_topic: u32) {
-    let topics = (Symbol::new(e, "claim_topic_removed"), claim_topic);
-    e.events().publish(topics, ())
+    ClaimTopicRemoved { claim_topic }.publish(e);
+}
+
+/// Event emitted when a trusted issuer is added.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TrustedIssuerAdded {
+    #[topic]
+    pub trusted_issuer: Address,
+    pub claim_topics: Vec<u32>,
 }
 
 /// Emits an event indicating a trusted issuer has been added.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to the Soroban environment.
-/// * `trusted_issuer` - The address of the trusted issuer's claim issuer
-///   contract.
-/// * `claim_topics` - The set of claims that the trusted issuer is allowed to
-///   emit.
-///
-/// # Events
-///
-/// * topics - `["issuer_added", trusted_issuer: Address]`
-/// * data - `[claim_topics: Vec<u32>]`
+/// * `e` - The Soroban environment.
+/// * `trusted_issuer` - The trusted issuer that was added.
+/// * `claim_topics` - The claim topics associated with the trusted issuer.
 pub fn emit_trusted_issuer_added(e: &Env, trusted_issuer: &Address, claim_topics: Vec<u32>) {
-    let topics = (Symbol::new(e, "trusted_issuer_added"), trusted_issuer);
-    e.events().publish(topics, claim_topics)
+    TrustedIssuerAdded { trusted_issuer: trusted_issuer.clone(), claim_topics }.publish(e);
+}
+
+/// Event emitted when a trusted issuer is removed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TrustedIssuerRemoved {
+    #[topic]
+    pub trusted_issuer: Address,
 }
 
 /// Emits an event indicating a trusted issuer has been removed.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to the Soroban environment.
-/// * `trusted_issuer` - The address of the trusted issuer's claim issuer
-///   contract.
-///
-/// # Events
-///
-/// * topics - `["issuer_removed", trusted_issuer: Address]`
-/// * data - `[]`
+/// * `e` - The Soroban environment.
+/// * `trusted_issuer` - The trusted issuer that was removed.
 pub fn emit_trusted_issuer_removed(e: &Env, trusted_issuer: &Address) {
-    let topics = (Symbol::new(e, "trusted_issuer_removed"), trusted_issuer);
-    e.events().publish(topics, ())
+    TrustedIssuerRemoved { trusted_issuer: trusted_issuer.clone() }.publish(e);
+}
+
+/// Event emitted when issuer topics are updated.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IssuerTopicsUpdated {
+    #[topic]
+    pub trusted_issuer: Address,
+    pub claim_topics: Vec<u32>,
 }
 
 /// Emits an event indicating claim topics have been updated for a trusted
@@ -343,17 +358,9 @@ pub fn emit_trusted_issuer_removed(e: &Env, trusted_issuer: &Address) {
 ///
 /// # Arguments
 ///
-/// * `e` - Access to the Soroban environment.
-/// * `trusted_issuer` - The address of the trusted issuer's claim issuer
-///   contract.
-/// * `claim_topics` - The set of claims that the trusted issuer is allowed to
-///   emit.
-///
-/// # Events
-///
-/// * topics - `["topics_updated", trusted_issuer: Address]`
-/// * data - `[claim_topics: Vec<u32>]`
+/// * `e` - The Soroban environment.
+/// * `trusted_issuer` - The trusted issuer whose claim topics were updated.
+/// * `claim_topics` - The updated claim topics.
 pub fn emit_issuer_topics_updated(e: &Env, trusted_issuer: &Address, claim_topics: Vec<u32>) {
-    let topics = (Symbol::new(e, "issuer_topics_updated"), trusted_issuer);
-    e.events().publish(topics, claim_topics)
+    IssuerTopicsUpdated { trusted_issuer: trusted_issuer.clone(), claim_topics }.publish(e);
 }

@@ -35,7 +35,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, Address, Env, Symbol};
+use soroban_sdk::{contracterror, contractevent, Address, Env};
 
 pub use crate::ownable::storage::{
     accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
@@ -134,28 +134,44 @@ pub enum OwnableError {
 
 // ################## EVENTS ##################
 
+/// Event emitted when an ownership transfer is initiated.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OwnershipTransfer {
+    pub old_owner: Address,
+    pub new_owner: Address,
+    pub live_until_ledger: u32,
+}
+
 /// Emits an event when an ownership transfer is initiated.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `old_owner` - The current owner initiating the transfer.
-/// * `new_owner` - The proposed new owner.
-/// * `live_until_ledger` - The ledger number at which the pending transfer will
-///   expire. If this value is `0`, it means the pending transfer is cancelled.
-///
-/// # Events
-///
-/// * topics - `["ownership_transfer"]`
-/// * data - `[old_owner: Address, new_owner: Address]`
+/// * `old_owner` - The address of the current owner.
+/// * `new_owner` - The address of the proposed new owner.
+/// * `live_until_ledger` - The ledger number until which the new owner can
+///   accept the transfer.
 pub fn emit_ownership_transfer(
     e: &Env,
     old_owner: &Address,
     new_owner: &Address,
     live_until_ledger: u32,
 ) {
-    let topics = (Symbol::new(e, "ownership_transfer"),);
-    e.events().publish(topics, (old_owner, new_owner, live_until_ledger));
+    OwnershipTransfer {
+        old_owner: old_owner.clone(),
+        new_owner: new_owner.clone(),
+        live_until_ledger,
+    }
+    .publish(e);
+}
+
+/// Event emitted when an ownership transfer is completed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OwnershipTransferCompleted {
+    #[topic]
+    pub new_owner: Address,
 }
 
 /// Emits an event when an ownership transfer is completed.
@@ -163,15 +179,17 @@ pub fn emit_ownership_transfer(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `new_owner` - The new owner who accepted the transfer.
-///
-/// # Events
-///
-/// * topics - `["ownership_transfer_completed"]`
-/// * data - `[new_owner: Address]`
+/// * `new_owner` - The address of the new owner.
 pub fn emit_ownership_transfer_completed(e: &Env, new_owner: &Address) {
-    let topics = (Symbol::new(e, "ownership_transfer_completed"),);
-    e.events().publish(topics, new_owner);
+    OwnershipTransferCompleted { new_owner: new_owner.clone() }.publish(e);
+}
+
+/// Event emitted when ownership is renounced.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct OwnershipRenounced {
+    #[topic]
+    pub old_owner: Address,
 }
 
 /// Emits an event when ownership is renounced.
@@ -180,12 +198,6 @@ pub fn emit_ownership_transfer_completed(e: &Env, new_owner: &Address) {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `old_owner` - The address of the owner who renounced ownership.
-///
-/// # Events
-///
-/// * topics - `["ownership_renounced"]`
-/// * data - `[old_owner: Address]`
 pub fn emit_ownership_renounced(e: &Env, old_owner: &Address) {
-    let topics = (Symbol::new(e, "ownership_renounced"),);
-    e.events().publish(topics, old_owner);
+    OwnershipRenounced { old_owner: old_owner.clone() }.publish(e);
 }

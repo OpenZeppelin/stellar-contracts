@@ -3,7 +3,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{contractevent, Address, Env};
 
 use crate::fungible::FungibleToken;
 
@@ -71,6 +71,15 @@ pub trait FungibleBurnable: FungibleToken {
 
 // ################## EVENTS ##################
 
+/// Event emitted when tokens are burned.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Burn {
+    #[topic]
+    pub from: Address,
+    pub amount: i128,
+}
+
 /// Emits an event indicating a burn of tokens.
 ///
 /// # Arguments
@@ -78,12 +87,6 @@ pub trait FungibleBurnable: FungibleToken {
 /// * `e` - Access to Soroban environment.
 /// * `from` - The address holding the tokens.
 /// * `amount` - The amount of tokens to be burned.
-///
-/// # Events
-///
-/// * topics - `["burn", from: Address]`
-/// * data - `[amount: i128]`
 pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
-    let topics = (symbol_short!("burn"), from);
-    e.events().publish(topics, amount)
+    Burn { from: from.clone(), amount }.publish(e);
 }
