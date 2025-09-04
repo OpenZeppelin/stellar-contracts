@@ -448,6 +448,23 @@ fn set_signer_weight_success() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #2210)")]
+fn set_threshold_not_installed_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let context_rule = create_test_context_rule(&e);
+
+        // Try to set threshold without installing the policy first
+        set_threshold(&e, 100, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2210)")]
 fn set_signer_weight_not_installed_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
