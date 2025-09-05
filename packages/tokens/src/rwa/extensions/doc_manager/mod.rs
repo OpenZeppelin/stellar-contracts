@@ -27,6 +27,7 @@
 //! ```
 
 mod storage;
+#[cfg(test)]
 mod test;
 
 use soroban_sdk::{contracterror, contractevent, Address, BytesN, Env, String, Vec};
