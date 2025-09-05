@@ -235,6 +235,20 @@ pub fn remove_claim_topic(e: &Env, claim_topic: u32) {
         let key = ClaimTopicsAndIssuersStorageKey::ClaimTopics;
         e.storage().persistent().set(&key, &claim_topics);
 
+        // Remove the topic from all trusted issuers' IssuerClaimTopics mappings
+        let trusted_issuers = get_trusted_issuers(e);
+        for issuer in trusted_issuers.iter() {
+            let issuer_key = ClaimTopicsAndIssuersStorageKey::IssuerClaimTopics(issuer.clone());
+            if let Some(mut issuer_topics) =
+                e.storage().persistent().get::<_, Vec<u32>>(&issuer_key)
+            {
+                if let Some(topic_index) = issuer_topics.iter().position(|x| x == claim_topic) {
+                    issuer_topics.remove(topic_index as u32);
+                    e.storage().persistent().set(&issuer_key, &issuer_topics);
+                }
+            }
+        }
+
         // removing ClaimTopicIssuers for this topic
         let key = ClaimTopicsAndIssuersStorageKey::ClaimTopicIssuers(claim_topic);
         e.storage().persistent().remove(&key);
