@@ -58,7 +58,17 @@ pub fn get_modules_for_hook(e: &Env, hook: ComplianceHook) -> Vec<Address> {
 /// `true` if the module is registered for the hook, `false` otherwise.
 pub fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool {
     let existence_key = DataKey::ModuleRegistered(hook, module);
-    e.storage().persistent().get::<_, ()>(&existence_key).is_some()
+    match e.storage().persistent().get::<_, ()>(&existence_key) {
+        Some(_) => {
+            e.storage().persistent().extend_ttl(
+                &existence_key,
+                COMPLIANCE_TTL_THRESHOLD,
+                COMPLIANCE_EXTEND_AMOUNT,
+            );
+            true
+        }
+        None => false,
+    }
 }
 
 // ################## CHANGE STATE ##################
@@ -107,9 +117,7 @@ pub fn add_module_to(e: &Env, hook: ComplianceHook, module: Address) {
     }
 
     // Get the modules for this hook
-    let key = DataKey::HookModules(hook.clone());
-    let mut modules: Vec<Address> =
-        e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
+    let mut modules = get_modules_for_hook(e, hook.clone());
 
     // Check the bound
     if modules.len() >= MAX_MODULES {
@@ -117,6 +125,7 @@ pub fn add_module_to(e: &Env, hook: ComplianceHook, module: Address) {
     }
 
     // Add the module
+    let key = DataKey::HookModules(hook.clone());
     modules.push_back(module.clone());
     e.storage().persistent().set(&key, &modules);
     e.storage().persistent().set(&existence_key, &());
