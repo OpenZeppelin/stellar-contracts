@@ -62,7 +62,7 @@
 //!   in this extension must be used. Using other minting functions will break
 //!   the logic of tracking ownership.
 pub mod storage;
-use soroban_sdk::{Address, Env, Symbol};
+use soroban_sdk::{contractevent, Address, Env};
 pub use storage::Consecutive;
 
 use crate::non_fungible::NonFungibleToken;
@@ -81,20 +81,25 @@ mod test;
 
 // ################## EVENTS ##################
 
-/// Emits an event indicating a mint of a batch of tokens.
+/// Event emitted when consecutive tokens are minted.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConsecutiveMint {
+    #[topic]
+    pub to: Address,
+    pub from_token_id: u32,
+    pub to_token_id: u32,
+}
+
+/// Emits an event for a consecutive mint of tokens from `from_token_id` to
+/// `to_token_id` to `to`.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to Soroban environment.
-/// * `to` - The address receiving the new tokens.
-/// * `from_token_id` - First token ID in the batch.
-/// * `to_token_id` - Last token ID of the batch.
-///
-/// # Events
-///
-/// * topics - `["consecutive_mint", to: Address]`
-/// * data - `[from_token_id: u32, to_token_id: u32]`
+/// * `e` - The Soroban environment.
+/// * `to` - The recipient address.
+/// * `from_token_id` - The starting token identifier.
+/// * `to_token_id` - The ending token identifier.
 pub fn emit_consecutive_mint(e: &Env, to: &Address, from_token_id: u32, to_token_id: u32) {
-    let topics = (Symbol::new(e, "consecutive_mint"), to);
-    e.events().publish(topics, (from_token_id, to_token_id))
+    ConsecutiveMint { to: to.clone(), from_token_id, to_token_id }.publish(e);
 }

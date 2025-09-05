@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use soroban_sdk::{symbol_short, testutils::Events, Address, Env, IntoVal, Symbol, Val, Vec};
+use soroban_sdk::{symbol_short, testutils::Events, Address, Env, IntoVal, Map, Symbol, Val, Vec};
 
 pub struct EventAssertion<'a> {
     env: &'a Env,
@@ -65,7 +65,9 @@ impl<'a> EventAssertion<'a> {
 
         let event_from: Address = topics.get_unchecked(1).into_val(self.env);
         let event_to: Address = topics.get_unchecked(2).into_val(self.env);
-        let event_amount: i128 = data.into_val(self.env);
+
+        let data_map: Map<Symbol, i128> = data.into_val(self.env);
+        let event_amount = data_map.get(Symbol::new(self.env, "amount")).unwrap();
 
         assert_eq!(&event_from, from, "Transfer event has wrong from address");
         assert_eq!(&event_to, to, "Transfer event has wrong to address");
@@ -88,7 +90,9 @@ impl<'a> EventAssertion<'a> {
 
         let event_from: Address = topics.get_unchecked(1).into_val(self.env);
         let event_to: Address = topics.get_unchecked(2).into_val(self.env);
-        let event_token_id: u32 = data.into_val(self.env);
+
+        let data_map: Map<Symbol, u32> = data.into_val(self.env);
+        let event_token_id = data_map.get(Symbol::new(self.env, "token_id")).unwrap();
 
         assert_eq!(&event_from, from, "Transfer event has wrong from address");
         assert_eq!(&event_to, to, "Transfer event has wrong to address");
@@ -110,7 +114,9 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(topic_symbol, symbol_short!("mint"));
 
         let event_to: Address = topics.get_unchecked(1).into_val(self.env);
-        let event_amount: i128 = data.into_val(self.env);
+
+        let data_map: Map<Symbol, i128> = data.into_val(self.env);
+        let event_amount = data_map.get(Symbol::new(self.env, "amount")).unwrap();
 
         assert_eq!(&event_to, to, "Mint event has wrong to address");
         assert_eq!(event_amount, amount, "Mint event has wrong amount");
@@ -131,7 +137,9 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(topic_symbol, symbol_short!("mint"));
 
         let event_to: Address = topics.get_unchecked(1).into_val(self.env);
-        let event_token_id: u32 = data.into_val(self.env);
+
+        let data_map: Map<Symbol, u32> = data.into_val(self.env);
+        let event_token_id = data_map.get(Symbol::new(self.env, "token_id")).unwrap();
 
         assert_eq!(&event_to, to, "Mint event has wrong to address");
         assert_eq!(event_token_id, token_id, "Mint event has wrong token_id");
@@ -152,7 +160,9 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(topic_symbol, symbol_short!("burn"));
 
         let event_from: Address = topics.get_unchecked(1).into_val(self.env);
-        let event_amount: i128 = data.into_val(self.env);
+
+        let data_map: Map<Symbol, i128> = data.into_val(self.env);
+        let event_amount = data_map.get(Symbol::new(self.env, "amount")).unwrap();
 
         assert_eq!(&event_from, from, "Burn event has wrong from address");
         assert_eq!(event_amount, amount, "Burn event has wrong amount");
@@ -173,7 +183,9 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(topic_symbol, symbol_short!("burn"));
 
         let event_from: Address = topics.get_unchecked(1).into_val(self.env);
-        let event_token_id: u32 = data.into_val(self.env);
+
+        let data_map: Map<Symbol, u32> = data.into_val(self.env);
+        let event_token_id = data_map.get(Symbol::new(self.env, "token_id")).unwrap();
 
         assert_eq!(&event_from, from, "Burn event has wrong from address");
         assert_eq!(event_token_id, token_id, "Burn event has wrong token_id");
@@ -212,7 +224,13 @@ impl<'a> EventAssertion<'a> {
 
         let event_owner: Address = topics.get_unchecked(1).into_val(self.env);
         let event_spender: Address = topics.get_unchecked(2).into_val(self.env);
-        let event_data: (i128, u32) = data.into_val(self.env);
+
+        let data_map: Map<Symbol, Val> = data.into_val(self.env);
+        let event_amount: i128 =
+            data_map.get(Symbol::new(self.env, "amount")).unwrap().into_val(self.env);
+        let event_live_until_ledger: u32 =
+            data_map.get(Symbol::new(self.env, "live_until_ledger")).unwrap().into_val(self.env);
+        let event_data = (event_amount, event_live_until_ledger);
 
         assert_eq!(&event_owner, owner, "Approve event has wrong owner address");
         assert_eq!(&event_spender, spender, "Approve event has wrong spender address");
@@ -242,12 +260,20 @@ impl<'a> EventAssertion<'a> {
 
         let event_owner: Address = topics.get_unchecked(1).into_val(self.env);
         let event_token_id: u32 = topics.get_unchecked(2).into_val(self.env);
-        let event_data: (Address, u32) = data.into_val(self.env);
+
+        let data_map: Map<Symbol, Val> = data.into_val(self.env);
+        let event_approved: Address =
+            data_map.get(Symbol::new(self.env, "approved")).unwrap().into_val(self.env);
+        let event_live_until_ledger: u32 =
+            data_map.get(Symbol::new(self.env, "live_until_ledger")).unwrap().into_val(self.env);
 
         assert_eq!(&event_owner, owner, "Approve event has wrong owner address");
-        assert_eq!(event_token_id, token_id, "Approve event has wrong spender address");
-        assert_eq!(event_data.0, *spender, "Approve event has wrong token_id");
-        assert_eq!(event_data.1, live_until_ledger, "Approve event has wrong live_until_ledger");
+        assert_eq!(event_token_id, token_id, "Approve event has wrong token_id");
+        assert_eq!(event_approved, *spender, "Approve event has wrong approved address");
+        assert_eq!(
+            event_live_until_ledger, live_until_ledger,
+            "Approve event has wrong live_until_ledger"
+        );
     }
 
     pub fn assert_approve_for_all(
@@ -270,11 +296,19 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(topic_symbol, Symbol::new(self.env, "approve_for_all"));
 
         let event_owner: Address = topics.get_unchecked(1).into_val(self.env);
-        let event_data: (Address, u32) = data.into_val(self.env);
 
-        assert_eq!(&event_owner, owner, "Approve event has wrong owner address");
-        assert_eq!(event_data.0, *operator, "Approve event has wrong operator address");
-        assert_eq!(event_data.1, live_until_ledger, "Approve event has wrong live_until_ledger");
+        let data_map: Map<Symbol, Val> = data.into_val(self.env);
+        let event_operator: Address =
+            data_map.get(Symbol::new(self.env, "operator")).unwrap().into_val(self.env);
+        let event_live_until_ledger: u32 =
+            data_map.get(Symbol::new(self.env, "live_until_ledger")).unwrap().into_val(self.env);
+
+        assert_eq!(&event_owner, owner, "ApproveForAll event has wrong owner address");
+        assert_eq!(event_operator, *operator, "ApproveForAll event has wrong operator address");
+        assert_eq!(
+            event_live_until_ledger, live_until_ledger,
+            "ApproveForAll event has wrong live_until_ledger"
+        );
     }
 
     pub fn assert_consecutive_mint(&mut self, to: &Address, from_id: u32, to_id: u32) {
@@ -292,7 +326,11 @@ impl<'a> EventAssertion<'a> {
         assert_eq!(topic_symbol, Symbol::new(self.env, "consecutive_mint"));
 
         let event_to: Address = topics.get_unchecked(1).into_val(self.env);
-        let event_data: (u32, u32) = data.into_val(self.env);
+
+        let data_map: Map<Symbol, u32> = data.into_val(self.env);
+        let from_token_id_val = data_map.get(Symbol::new(self.env, "from_token_id")).unwrap();
+        let to_token_id_val = data_map.get(Symbol::new(self.env, "to_token_id")).unwrap();
+        let event_data = (from_token_id_val, to_token_id_val);
 
         assert_eq!(&event_to, to, "ConsecutiveMint event has wrong to address");
         assert_eq!(event_data.0, from_id, "ConsecutiveMint event has wrong from_token_id");

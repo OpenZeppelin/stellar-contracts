@@ -4,7 +4,7 @@ use crate::non_fungible::NonFungibleToken;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{Address, Env, Symbol};
+use soroban_sdk::{contractevent, Address, Env};
 
 /// Royalties Trait for Non-Fungible Token (ERC2981)
 ///
@@ -139,55 +139,63 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
 
 // ################## EVENTS ##################
 
+/// Event emitted when default royalty is set.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SetDefaultRoyalty {
+    #[topic]
+    pub receiver: Address,
+    pub basis_points: u32,
+}
+
 /// Emits an event indicating that default royalty has been set.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to Soroban environment.
-/// * `receiver` - The address that will receive royalty payments.
-/// * `basis_points` - The royalty percentage in basis points (100 = 1%, 10000 =
-///   100%).
-///
-/// # Events
-///
-/// * topics - `["set_default_royalty", receiver: Address]`
-/// * data - `[basis_points: u32]`
+/// * `e` - The Soroban environment.
+/// * `receiver` - The royalty receiver address.
+/// * `basis_points` - The royalty basis points.
 pub fn emit_set_default_royalty(e: &Env, receiver: &Address, basis_points: u32) {
-    let topics = (Symbol::new(e, "set_default_royalty"), receiver);
-    e.events().publish(topics, basis_points);
+    SetDefaultRoyalty { receiver: receiver.clone(), basis_points }.publish(e);
+}
+
+/// Event emitted when token royalty is set.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SetTokenRoyalty {
+    #[topic]
+    pub receiver: Address,
+    #[topic]
+    pub token_id: u32,
+    pub basis_points: u32,
 }
 
 /// Emits an event indicating that token royalty has been set.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to Soroban environment.
-/// * `receiver` - The address that will receive royalty payments.
-/// * `token_id` - The identifier of the token.
-/// * `basis_points` - The royalty percentage in basis points (100 = 1%, 10000 =
-///   100%).
-///
-/// # Events
-///
-/// * topics - `["set_token_royalty", receiver: Address, token_id: u32]`
-/// * data - `[basis_points: u32]`
+/// * `e` - The Soroban environment.
+/// * `receiver` - The royalty receiver address.
+/// * `token_id` - The token identifier.
+/// * `basis_points` - The royalty basis points.
 pub fn emit_set_token_royalty(e: &Env, receiver: &Address, token_id: u32, basis_points: u32) {
-    let topics = (Symbol::new(e, "set_token_royalty"), receiver, token_id);
-    e.events().publish(topics, basis_points);
+    SetTokenRoyalty { receiver: receiver.clone(), token_id, basis_points }.publish(e);
+}
+
+/// Event emitted when token royalty is removed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RemoveTokenRoyalty {
+    #[topic]
+    pub token_id: u32,
 }
 
 /// Emits an event indicating that token royalty has been removed.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to Soroban environment.
-/// * `token_id` - The identifier of the token.
-///
-/// # Events
-///
-/// * topics - `["remove_token_royalty", token_id: u32]`
-/// * data - `[]`
+/// * `e` - The Soroban environment.
+/// * `token_id` - The token identifier.
 pub fn emit_remove_token_royalty(e: &Env, token_id: u32) {
-    let topics = (Symbol::new(e, "remove_token_royalty"), token_id);
-    e.events().publish(topics, ());
+    RemoveTokenRoyalty { token_id }.publish(e);
 }
