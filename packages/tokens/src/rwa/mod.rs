@@ -51,7 +51,7 @@ pub mod utils;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, symbol_short, Address, Env, Symbol};
+use soroban_sdk::{contracterror, contractevent, Address, Env, Symbol};
 use stellar_contract_utils::pausable::Pausable;
 pub use storage::{RWAStorageKey, RWA};
 
@@ -406,20 +406,33 @@ pub const FROZEN_TTL_THRESHOLD: u32 = FROZEN_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 // ################## EVENTS ##################
 
-/// Emits an event indicating token onchain_id has been updated.
+/// Event emitted when token onchain ID is updated.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokenOnchainIdUpdated {
+    #[topic]
+    pub onchain_id: Address,
+}
+
+/// Emits an event indicating token onchain ID is updated.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `onchain_id` - The address of the onchain ID.
-///
-/// # Events
-///
-/// * topics - `["token_onchain_id_updated", onchain_id: Address]`
-/// * data - `[]`
 pub fn emit_token_onchain_id_updated(e: &Env, onchain_id: &Address) {
-    let topics = (Symbol::new(e, "token_onchain_id_updated"), onchain_id);
-    e.events().publish(topics, ())
+    TokenOnchainIdUpdated { onchain_id: onchain_id.clone() }.publish(e);
+}
+
+/// Event emitted when a recovery is successful.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RecoverySuccess {
+    #[topic]
+    pub lost_wallet: Address,
+    #[topic]
+    pub new_wallet: Address,
+    pub investor_onchain_id: Address,
 }
 
 /// Emits an event indicating a successful recovery.
@@ -430,19 +443,30 @@ pub fn emit_token_onchain_id_updated(e: &Env, onchain_id: &Address) {
 /// * `lost_wallet` - The address of the lost wallet.
 /// * `new_wallet` - The address of the new wallet.
 /// * `investor_onchain_id` - The address of the investor's onchain ID.
-///
-/// # Events
-///
-/// * topics - `["recovery_success", lost_wallet: Address, new_wallet: Address]`
-/// * data - `[investor_onchain_id: Address]`
 pub fn emit_recovery_success(
     e: &Env,
     lost_wallet: &Address,
     new_wallet: &Address,
     investor_onchain_id: &Address,
 ) {
-    let topics = (Symbol::new(e, "recovery_success"), lost_wallet, new_wallet);
-    e.events().publish(topics, investor_onchain_id)
+    RecoverySuccess {
+        lost_wallet: lost_wallet.clone(),
+        new_wallet: new_wallet.clone(),
+        investor_onchain_id: investor_onchain_id.clone(),
+    }
+    .publish(e);
+}
+
+/// Event emitted when an address is frozen or unfrozen.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AddressFrozen {
+    #[topic]
+    pub user_address: Address,
+    #[topic]
+    pub is_frozen: bool,
+    #[topic]
+    pub caller: Address,
 }
 
 /// Emits an event indicating an address has been frozen or unfrozen.
@@ -453,15 +477,18 @@ pub fn emit_recovery_success(
 /// * `user_address` - The wallet address that is affected.
 /// * `is_frozen` - The freezing status of the wallet.
 /// * `caller` - The address of the who called the function.
-///
-/// # Events
-///
-/// * topics - `["address_frozen", user_address: Address, is_frozen: bool,
-///   caller: Address]`
-/// * data - `[]`
 pub fn emit_address_frozen(e: &Env, user_address: &Address, is_frozen: bool, caller: &Address) {
-    let topics = (Symbol::new(e, "address_frozen"), user_address, is_frozen, caller);
-    e.events().publish(topics, ())
+    AddressFrozen { user_address: user_address.clone(), is_frozen, caller: caller.clone() }
+        .publish(e);
+}
+
+/// Event emitted when tokens are frozen.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokensFrozen {
+    #[topic]
+    pub user_address: Address,
+    pub amount: i128,
 }
 
 /// Emits an event indicating tokens have been frozen.
@@ -471,14 +498,17 @@ pub fn emit_address_frozen(e: &Env, user_address: &Address, is_frozen: bool, cal
 /// * `e` - Access to the Soroban environment.
 /// * `user_address` - The wallet address where tokens are frozen.
 /// * `amount` - The amount of tokens that are frozen.
-///
-/// # Events
-///
-/// * topics - `["tokens_frozen", user_address: Address]`
-/// * data - `[amount: i128]`
 pub fn emit_tokens_frozen(e: &Env, user_address: &Address, amount: i128) {
-    let topics = (Symbol::new(e, "tokens_frozen"), user_address);
-    e.events().publish(topics, amount)
+    TokensFrozen { user_address: user_address.clone(), amount }.publish(e);
+}
+
+/// Event emitted when tokens are unfrozen.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokensUnfrozen {
+    #[topic]
+    pub user_address: Address,
+    pub amount: i128,
 }
 
 /// Emits an event indicating tokens have been unfrozen.
@@ -488,14 +518,17 @@ pub fn emit_tokens_frozen(e: &Env, user_address: &Address, amount: i128) {
 /// * `e` - Access to the Soroban environment.
 /// * `user_address` - The wallet address where tokens are unfrozen.
 /// * `amount` - The amount of tokens that are unfrozen.
-///
-/// # Events
-///
-/// * topics - `["tokens_unfrozen", user_address: Address]`
-/// * data - `[amount: i128]`
 pub fn emit_tokens_unfrozen(e: &Env, user_address: &Address, amount: i128) {
-    let topics = (Symbol::new(e, "tokens_unfrozen"), user_address);
-    e.events().publish(topics, amount)
+    TokensUnfrozen { user_address: user_address.clone(), amount }.publish(e);
+}
+
+/// Event emitted when tokens are minted.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Mint {
+    #[topic]
+    pub to: Address,
+    pub amount: i128,
 }
 
 /// Emits an event indicating a mint of tokens.
@@ -505,14 +538,17 @@ pub fn emit_tokens_unfrozen(e: &Env, user_address: &Address, amount: i128) {
 /// * `e` - Access to the Soroban environment.
 /// * `to` - The address receiving the new tokens.
 /// * `amount` - The amount of tokens minted.
-///
-/// # Events
-///
-/// * topics - `["mint", to: Address]`
-/// * data - `[amount: i128]`
 pub fn emit_mint(e: &Env, to: &Address, amount: i128) {
-    let topics = (symbol_short!("mint"), to);
-    e.events().publish(topics, amount)
+    Mint { to: to.clone(), amount }.publish(e);
+}
+
+/// Event emitted when tokens are burned.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Burn {
+    #[topic]
+    pub from: Address,
+    pub amount: i128,
 }
 
 /// Emits an event indicating a burn of tokens.
@@ -522,14 +558,16 @@ pub fn emit_mint(e: &Env, to: &Address, amount: i128) {
 /// * `e` - Access to the Soroban environment.
 /// * `from` - The address from which tokens were burned.
 /// * `amount` - The amount of tokens burned.
-///
-/// # Events
-///
-/// * topics - `["burn", from: Address]`
-/// * data - `[amount: i128]`
 pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
-    let topics = (symbol_short!("burn"), from);
-    e.events().publish(topics, amount)
+    Burn { from: from.clone(), amount }.publish(e);
+}
+
+/// Event emitted when compliance contract is set.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ComplianceSet {
+    #[topic]
+    pub compliance: Address,
 }
 
 /// Emits an event indicating the Compliance contract has been set.
@@ -538,14 +576,16 @@ pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `compliance` - The address of the Compliance contract.
-///
-/// # Events
-///
-/// * topics - `["compliance_set", compliance: Address]`
-/// * data - `[]`
 pub fn emit_compliance_set(e: &Env, compliance: &Address) {
-    let topics = (Symbol::new(e, "compliance_set"), compliance);
-    e.events().publish(topics, ())
+    ComplianceSet { compliance: compliance.clone() }.publish(e);
+}
+
+/// Event emitted when claim topics and issuers contract is set.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimTopicsAndIssuersSet {
+    #[topic]
+    pub claim_topics_and_issuers: Address,
 }
 
 /// Emits an event indicating the Claim Topics and Issuers contract has been
@@ -556,14 +596,17 @@ pub fn emit_compliance_set(e: &Env, compliance: &Address) {
 /// * `e` - Access to the Soroban environment.
 /// * `claim_topics_and_issuers` - The address of the Claim Topics and Issuers
 ///   contract.
-///
-/// # Events
-///
-/// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers: Address]`
-/// * data - `[]`
 pub fn emit_claim_topics_and_issuers_set(e: &Env, claim_topics_and_issuers: &Address) {
-    let topics = (Symbol::new(e, "claim_topics_issuers_set"), claim_topics_and_issuers);
-    e.events().publish(topics, ())
+    ClaimTopicsAndIssuersSet { claim_topics_and_issuers: claim_topics_and_issuers.clone() }
+        .publish(e);
+}
+
+/// Event emitted when identity registry storage contract is set.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentityRegistryStorageSet {
+    #[topic]
+    pub identity_registry_storage: Address,
 }
 
 /// Emits an event indicating the Identity Registry Storage contract has been
@@ -574,13 +617,7 @@ pub fn emit_claim_topics_and_issuers_set(e: &Env, claim_topics_and_issuers: &Add
 /// * `e` - Access to the Soroban environment.
 /// * `identity_registry_storage` - The address of the Identity Registry Storage
 ///   contract.
-///
-/// # Events
-///
-/// * topics - `["identity_registry_storage_set", identity_registry_storage:
-///   Address]`
-/// * data - `[]`
 pub fn emit_identity_registry_storage_set(e: &Env, identity_registry_storage: &Address) {
-    let topics = (Symbol::new(e, "identity_registry_storage_set"), identity_registry_storage);
-    e.events().publish(topics, ())
+    IdentityRegistryStorageSet { identity_registry_storage: identity_registry_storage.clone() }
+        .publish(e);
 }

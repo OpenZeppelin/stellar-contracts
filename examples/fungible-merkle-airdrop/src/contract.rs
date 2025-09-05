@@ -59,7 +59,7 @@ impl AirdropContract {
         e.storage().instance().set(&DataKey::TokenAddress, &token);
         token::TokenClient::new(&e, &token).transfer(
             &funding_source,
-            &e.current_contract_address(),
+            e.current_contract_address(),
             &funding_amount,
         );
     }

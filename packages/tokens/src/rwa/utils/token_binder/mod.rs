@@ -3,7 +3,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, Address, Env, Symbol, Vec};
+use soroban_sdk::{contracterror, contractevent, Address, Env, Vec};
 pub use storage::{
     bind_token, bind_tokens, get_token_by_index, get_token_index, linked_tokens, unbind_token,
 };
@@ -109,20 +109,30 @@ pub const MAX_TOKENS: u32 = BUCKET_SIZE * MAX_BUCKETS; // 10_000
 
 // ################## EVENTS ##################
 
+/// Event emitted when a token is bound to the contract.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokenBound {
+    #[topic]
+    pub token: Address,
+}
+
 /// Emits an event when a token is bound to the contract.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment
 /// * `token` - The token address that was bound
-///
-/// # Events
-///
-/// * topics - `["token_bound", token: Address]`
-/// * data - `[]`
 pub fn emit_token_bound(e: &Env, token: &Address) {
-    let topics = (Symbol::new(e, "token_bound"), token.clone());
-    e.events().publish(topics, ());
+    TokenBound { token: token.clone() }.publish(e);
+}
+
+/// Event emitted when a token is unbound from the contract.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokenUnbound {
+    #[topic]
+    pub token: Address,
 }
 
 /// Emits an event when a token is unbound from the contract.
@@ -131,12 +141,6 @@ pub fn emit_token_bound(e: &Env, token: &Address) {
 ///
 /// * `e` - The Soroban environment
 /// * `token` - The token address that was unbound
-///
-/// # Events
-///
-/// * topics - `["token_unbound", token: Address]`
-/// * data - `[]`
 fn emit_token_unbound(e: &Env, token: &Address) {
-    let topics = (Symbol::new(e, "token_unbound"), token.clone());
-    e.events().publish(topics, ());
+    TokenUnbound { token: token.clone() }.publish(e);
 }

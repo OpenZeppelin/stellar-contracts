@@ -144,7 +144,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, Address, Env, FromVal, Symbol, Val, Vec};
+use soroban_sdk::{contracterror, contractevent, Address, Env, FromVal, Val, Vec};
 pub use storage::{
     add_country_data_entries, add_identity, delete_country_data, get_country_data,
     get_country_data_entries, get_identity, modify_country_data, modify_identity, remove_identity,
@@ -346,6 +346,16 @@ pub enum CountryDataEvent {
     Modified,
 }
 
+/// Event emitted when an identity is stored for an account.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentityStored {
+    #[topic]
+    pub account: Address,
+    #[topic]
+    pub identity: Address,
+}
+
 /// Emits an event when an identity is stored for an account.
 ///
 /// # Arguments
@@ -353,14 +363,18 @@ pub enum CountryDataEvent {
 /// * `e` - The Soroban environment.
 /// * `account` - The account address associated with the identity.
 /// * `identity` - The identity address that was stored.
-///
-/// # Events
-///
-/// * topics - `["identity_stored", account: Address, identity: Address]`
-/// * data - `()`
 pub fn emit_identity_stored(e: &Env, account: &Address, identity: &Address) {
-    let topics = (Symbol::new(e, "identity_stored"), account, identity);
-    e.events().publish(topics, ());
+    IdentityStored { account: account.clone(), identity: identity.clone() }.publish(e);
+}
+
+/// Event emitted when an identity is removed from an account.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentityUnstored {
+    #[topic]
+    pub account: Address,
+    #[topic]
+    pub identity: Address,
 }
 
 /// Emits an event when an identity is removed from an account.
@@ -370,13 +384,18 @@ pub fn emit_identity_stored(e: &Env, account: &Address, identity: &Address) {
 /// * `e` - The Soroban environment.
 /// * `account` - The account address that had its identity removed.
 /// * `identity` - The identity address that was removed.
-///
-/// # Events
-///
-/// * topics - `["identity_unstored", account: Address, identity: Address]`
-/// * data - `()`
 pub fn emit_identity_unstored(e: &Env, account: &Address, identity: &Address) {
-    e.events().publish((Symbol::new(e, "identity_unstored"), account, identity), ());
+    IdentityUnstored { account: account.clone(), identity: identity.clone() }.publish(e);
+}
+
+/// Event emitted when an identity is modified for an account.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentityModified {
+    #[topic]
+    pub old_identity: Address,
+    #[topic]
+    pub new_identity: Address,
 }
 
 /// Emits an event when an identity is modified for an account.
@@ -386,15 +405,37 @@ pub fn emit_identity_unstored(e: &Env, account: &Address, identity: &Address) {
 /// * `e` - The Soroban environment.
 /// * `old_identity` - The previous identity address.
 /// * `new_identity` - The new identity address.
-///
-/// # Events
-///
-/// * topics - `["identity_modified", old_identity: Address, new_identity:
-///   Address]`
-/// * data - `()`
 pub fn emit_identity_modified(e: &Env, old_identity: &Address, new_identity: &Address) {
-    let topics = (Symbol::new(e, "identity_modified"), old_identity, new_identity);
-    e.events().publish(topics, ());
+    IdentityModified { old_identity: old_identity.clone(), new_identity: new_identity.clone() }
+        .publish(e);
+}
+
+/// Event emitted for country data operations.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CountryDataAdded {
+    #[topic]
+    pub account: Address,
+    #[topic]
+    pub country_data: CountryData,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CountryDataRemoved {
+    #[topic]
+    pub account: Address,
+    #[topic]
+    pub country_data: CountryData,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CountryDataModified {
+    #[topic]
+    pub account: Address,
+    #[topic]
+    pub country_data: CountryData,
 }
 
 /// Emits an event for country data operations (add, remove, modify).
@@ -405,29 +446,21 @@ pub fn emit_identity_modified(e: &Env, old_identity: &Address, new_identity: &Ad
 /// * `event_type` - The type of country data event.
 /// * `account` - The account address associated with the country data.
 /// * `country_data` - The country data that was affected.
-///
-/// # Events
-///
-/// * topics - `[event_name: Symbol, account: Address, country_data:
-///   CountryData]`
-/// * data - `()`
-///
-/// Where `event_name` is one of:
-/// - `"country_added"` for [`CountryDataEvent::Added`]
-/// - `"country_removed"` for [`CountryDataEvent::Removed`]
-/// - `"country_modified"` for [`CountryDataEvent::Modified`]
 pub fn emit_country_data_event(
     e: &Env,
     event_type: CountryDataEvent,
     account: &Address,
     country_data: &CountryData,
 ) {
-    let name = match event_type {
-        CountryDataEvent::Added => Symbol::new(e, "country_added"),
-        CountryDataEvent::Removed => Symbol::new(e, "country_removed"),
-        CountryDataEvent::Modified => Symbol::new(e, "country_modified"),
-    };
-
-    let topics = (name, account, country_data.clone());
-    e.events().publish(topics, ());
+    match event_type {
+        CountryDataEvent::Added =>
+            CountryDataAdded { account: account.clone(), country_data: country_data.clone() }
+                .publish(e),
+        CountryDataEvent::Removed =>
+            CountryDataRemoved { account: account.clone(), country_data: country_data.clone() }
+                .publish(e),
+        CountryDataEvent::Modified =>
+            CountryDataModified { account: account.clone(), country_data: country_data.clone() }
+                .publish(e),
+    }
 }

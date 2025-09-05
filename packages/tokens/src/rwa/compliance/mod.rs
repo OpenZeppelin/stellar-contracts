@@ -1,4 +1,6 @@
-use soroban_sdk::{contractclient, contracterror, contracttype, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{
+    contractclient, contracterror, contractevent, contracttype, Address, Env, String, Vec,
+};
 
 pub mod storage;
 
@@ -196,21 +198,34 @@ pub const MAX_MODULES: u32 = 20;
 
 // ################## EVENTS ##################
 
-/// Emits an event indicating a module has been added to the compliance system.
+/// Event emitted when a module is added to compliance.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModuleAdded {
+    #[topic]
+    pub hook: ComplianceHook,
+    pub module: Address,
+}
+
+/// Emits an event indicating a module has been added to the compliance
+/// system.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `hook` - The hook type the module is registered for.
 /// * `module` - The address of the module.
-///
-/// # Events
-///
-/// * topics - `["module_added", hook: u32]`
-/// * data - `[module: Address]`
 pub fn emit_module_added(e: &Env, hook: ComplianceHook, module: Address) {
-    let topics = (Symbol::new(e, "module_added"), hook.clone());
-    e.events().publish(topics, module)
+    ModuleAdded { hook, module }.publish(e);
+}
+
+/// Event emitted when a module is removed from compliance.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ModuleRemoved {
+    #[topic]
+    pub hook: ComplianceHook,
+    pub module: Address,
 }
 
 /// Emits an event indicating a module has been removed from the compliance
@@ -221,14 +236,8 @@ pub fn emit_module_added(e: &Env, hook: ComplianceHook, module: Address) {
 /// * `e` - Access to the Soroban environment.
 /// * `hook` - The hook type the module is registered for.
 /// * `module` - The address of the module.
-///
-/// # Events
-///
-/// * topics - `["module_removed", hook: u32]`
-/// * data - `[module: Address]`
 pub fn emit_module_removed(e: &Env, hook: ComplianceHook, module: Address) {
-    let topics = (Symbol::new(e, "module_removed"), hook.clone());
-    e.events().publish(topics, module)
+    ModuleRemoved { hook, module }.publish(e);
 }
 
 // ################## COMPLIANCE MODULE TRAIT ##################
