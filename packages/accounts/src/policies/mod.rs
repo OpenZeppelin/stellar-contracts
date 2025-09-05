@@ -1,3 +1,10 @@
+//! # Policy Building Blocks
+//!
+//! This module contains the core `Policy` trait and functions necessary to
+//! implement some authorization policies for smart accounts. It provides
+//! utility functions for `simple_threshold` (basic M-of-N multisig) and
+//! `weighted_threshold` (complex weighted voting) that can be used to build
+//! policy contracts.
 use soroban_sdk::{auth::Context, contractclient, Address, Env, FromVal, Val, Vec};
 
 use crate::smart_account::{ContextRule, Signer};

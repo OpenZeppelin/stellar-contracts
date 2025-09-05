@@ -1,3 +1,10 @@
+//! # Verifier Building Blocks
+//!
+//! This module contains the core `Verifier` trait and functions necessary to
+//! implement cryptographic signature verification for smart accounts. It
+//! provides utility functions for `ed25519` signature verification and
+//! `webauthn` (passkey authentication) that can be used to build verifier
+//! contracts.
 pub mod ed25519;
 #[cfg(test)]
 mod test;
