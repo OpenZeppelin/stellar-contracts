@@ -459,36 +459,6 @@ fn can_enforce_not_installed() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2223)")]
-fn enforce_non_transfer_context_errors() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-    let smart_account = Address::generate(&e);
-    let context_rule = create_context_rule(&e);
-
-    e.mock_all_auths();
-
-    e.as_contract(&address, || {
-        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
-
-        install(&e, &params, &context_rule, &smart_account);
-    });
-
-    e.as_contract(&address, || {
-        // Try to enforce with a non-transfer context (using a different function name)
-        let contract_address = Address::generate(&e);
-        let args = Vec::new(&e);
-        let context = Context::Contract(ContractContext {
-            contract: contract_address,
-            fn_name: symbol_short!("deploy"),
-            args,
-        });
-
-        enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account);
-    });
-}
-
-#[test]
 fn can_enforce_invalid_amount_arg() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -554,36 +524,7 @@ fn can_enforce_missing_amount_arg() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2223)")]
-fn enforce_panics_on_non_transfer() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-    let smart_account = Address::generate(&e);
-    let context_rule = create_context_rule(&e);
-
-    e.mock_all_auths();
-
-    e.as_contract(&address, || {
-        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
-        install(&e, &params, &context_rule, &smart_account);
-    });
-
-    e.as_contract(&address, || {
-        let contract_address = Address::generate(&e);
-        let args = Vec::new(&e);
-        let context = Context::Contract(ContractContext {
-            contract: contract_address,
-            fn_name: symbol_short!("anon_fn"),
-            args,
-        });
-
-        enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #2223)")]
-fn enforce_panics_on_non_contract_context() {
+fn can_enforce_on_non_contract_context() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let smart_account = Address::generate(&e);
@@ -600,6 +541,132 @@ fn enforce_panics_on_non_contract_context() {
         let context = Context::CreateContractHostFn(CreateContractHostFnContext {
             salt: BytesN::from_array(&e, &[1u8; 32]),
             executable: ContractExecutable::Wasm(BytesN::from_array(&e, &[1u8; 32])),
+        });
+
+        assert!(!can_enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2223)")]
+fn enforce_non_transfer_context_errors() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        // Try to enforce with a non-transfer context (using a different function name)
+        let contract_address = Address::generate(&e);
+        let args = Vec::new(&e);
+        let context = Context::Contract(ContractContext {
+            contract: contract_address,
+            fn_name: symbol_short!("deploy"),
+            args,
+        });
+
+        enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2223)")]
+fn enforce_on_non_contract_context_errors() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        let context = Context::CreateContractHostFn(CreateContractHostFnContext {
+            salt: BytesN::from_array(&e, &[1u8; 32]),
+            executable: ContractExecutable::Wasm(BytesN::from_array(&e, &[1u8; 32])),
+        });
+
+        enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2223)")]
+fn enforce_invalid_amount_arg_errors() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+    let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        let contract_address = Address::generate(&e);
+        let from = Address::generate(&e);
+        let to = Address::generate(&e);
+
+        let mut args = Vec::new(&e);
+        args.push_back(from.into_val(&e));
+        args.push_back(to.into_val(&e));
+        // Push an invalid type for the amount
+        args.push_back(symbol_short!("invalid").into_val(&e));
+
+        let context = Context::Contract(ContractContext {
+            contract: contract_address,
+            fn_name: symbol_short!("transfer"),
+            args,
+        });
+
+        enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2223)")]
+fn enforce_missing_amount_arg_errors() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+    let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        let contract_address = Address::generate(&e);
+        let from = Address::generate(&e);
+        let to = Address::generate(&e);
+
+        let mut args = Vec::new(&e);
+        args.push_back(from.into_val(&e));
+        args.push_back(to.into_val(&e));
+        // Do not push the amount argument
+
+        let context = Context::Contract(ContractContext {
+            contract: contract_address,
+            fn_name: symbol_short!("transfer"),
+            args,
         });
 
         enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account);

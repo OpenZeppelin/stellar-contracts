@@ -179,11 +179,11 @@ pub fn can_enforce(
                         }
                     }
                 }
-                // For non-transfer contract contexts, policy is not valid
+                // For non-transfer contract calls, policy is not valid
                 false
             }
             _ => {
-                // For non-contract contexts, policy is not valid
+                // For non-contract call contexts, policy is not valid
                 false
             }
         }
