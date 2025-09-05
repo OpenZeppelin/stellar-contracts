@@ -5,12 +5,23 @@
 //! weight.
 
 use soroban_sdk::{
-    auth::Context, contracterror, contracttype, panic_with_error, Address, Env, Symbol, Vec,
+    auth::Context, contracterror, contractevent, contracttype, panic_with_error, Address, Env, Vec,
 };
 
 use crate::smart_account::ContextRule;
 // re-export
 pub use crate::smart_account::Signer;
+
+/// Event emitted when a simple threshold policy is enforced.
+#[contractevent]
+#[derive(Clone)]
+pub struct SimplePolicyEnforced {
+    #[topic]
+    pub smart_account: Address,
+    pub context: Context,
+    pub context_rule_id: u32,
+    pub authenticated_signers: Vec<Signer>,
+}
 
 /// Installation parameters for the simple threshold policy.
 #[contracttype]
@@ -121,7 +132,8 @@ pub fn can_enforce(
 /// # Events
 ///
 /// * topics - `["simple_policy_enforced", smart_account: Address]`
-/// * data - `[context: Context, authenticated_signers: Vec<Signer>]`
+/// * data - `[context: Context, context_rule_id: u32 authenticated_signers:
+///   Vec<Signer>]`
 pub fn enforce(
     e: &Env,
     context: &Context,
@@ -134,10 +146,13 @@ pub fn enforce(
 
     if can_enforce(e, context, authenticated_signers, context_rule, smart_account) {
         // emit event
-        e.events().publish(
-            (Symbol::new(e, "simple_policy_enforced"), smart_account),
-            (context.clone(), authenticated_signers.clone()),
-        );
+        SimplePolicyEnforced {
+            smart_account: smart_account.clone(),
+            context: context.clone(),
+            context_rule_id: context_rule.id,
+            authenticated_signers: authenticated_signers.clone(),
+        }
+        .publish(e);
     }
 }
 

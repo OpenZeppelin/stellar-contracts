@@ -1757,7 +1757,7 @@ name = "stellar-accounts"
 version = "0.4.1"
 dependencies = [
  "ed25519-dalek",
- "hex-literal",
+ "hex-literal 1.0.0",
  "p256",
  "serde",
  "serde-json-core",

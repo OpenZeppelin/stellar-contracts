@@ -1,7 +1,9 @@
 mod storage;
 #[cfg(test)]
 mod test;
-use soroban_sdk::{auth::CustomAccountInterface, Address, Env, Map, String, Symbol, Val, Vec};
+use soroban_sdk::{
+    auth::CustomAccountInterface, contractevent, Address, Env, Map, String, Symbol, Val, Vec,
+};
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, do_check_auth, get_context_rule,
     get_context_rules, get_validated_context, remove_context_rule, remove_policy, remove_signer,
@@ -296,6 +298,19 @@ pub const MAX_SIGNERS: u32 = 15;
 
 // ################## EVENTS ##################
 
+/// Event emitted when a context rule is added.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContextRuleAdded {
+    #[topic]
+    pub context_rule_id: u32,
+    pub name: String,
+    pub context_type: ContextRuleType,
+    pub valid_until: Option<u32>,
+    pub signers: Vec<Signer>,
+    pub policies: Vec<Address>,
+}
+
 /// Emits an event indicating a context rule has been added.
 ///
 /// # Arguments
@@ -309,17 +324,26 @@ pub const MAX_SIGNERS: u32 = 15;
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
 ///   Option<u32>, signers: Vec<Signer>, policies: Vec<Address>]`
 pub fn emit_context_rule_added(e: &Env, context_rule: &ContextRule) {
-    let topics = (Symbol::new(e, "context_rule_added"), context_rule.id);
-    e.events().publish(
-        topics,
-        (
-            context_rule.name.clone(),
-            context_rule.context_type.clone(),
-            context_rule.valid_until,
-            context_rule.signers.clone(),
-            context_rule.policies.clone(),
-        ),
-    )
+    ContextRuleAdded {
+        context_rule_id: context_rule.id,
+        name: context_rule.name.clone(),
+        context_type: context_rule.context_type.clone(),
+        valid_until: context_rule.valid_until,
+        signers: context_rule.signers.clone(),
+        policies: context_rule.policies.clone(),
+    }
+    .publish(e);
+}
+
+/// Event emitted when a context rule is updated.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContextRuleUpdated {
+    #[topic]
+    pub context_rule_id: u32,
+    pub name: String,
+    pub context_type: ContextRuleType,
+    pub valid_until: Option<u32>,
 }
 
 /// Emits an event indicating a context rule has been updated.
@@ -336,8 +360,21 @@ pub fn emit_context_rule_added(e: &Env, context_rule: &ContextRule) {
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
 ///   Option<u32>]`
 pub fn emit_context_rule_updated(e: &Env, context_rule_id: u32, meta: &Meta) {
-    let topics = (Symbol::new(e, "context_rule_updated"), context_rule_id);
-    e.events().publish(topics, (meta.name.clone(), meta.context_type.clone(), meta.valid_until))
+    ContextRuleUpdated {
+        context_rule_id,
+        name: meta.name.clone(),
+        context_type: meta.context_type.clone(),
+        valid_until: meta.valid_until,
+    }
+    .publish(e);
+}
+
+/// Event emitted when a context rule is removed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ContextRuleRemoved {
+    #[topic]
+    pub context_rule_id: u32,
 }
 
 /// Emits an event indicating a context rule has been removed.
@@ -352,8 +389,16 @@ pub fn emit_context_rule_updated(e: &Env, context_rule_id: u32, meta: &Meta) {
 /// * topics - `["context_rule_removed", context_rule_id: u32]`
 /// * data - `[]`
 pub fn emit_context_rule_removed(e: &Env, context_rule_id: u32) {
-    let topics = (Symbol::new(e, "context_rule_removed"), context_rule_id);
-    e.events().publish(topics, ())
+    ContextRuleRemoved { context_rule_id }.publish(e);
+}
+
+/// Event emitted when a signer is added to a context rule.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignerAdded {
+    #[topic]
+    pub context_rule_id: u32,
+    pub signer: Signer,
 }
 
 /// Emits an event indicating a signer has been added to a context rule.
@@ -369,8 +414,16 @@ pub fn emit_context_rule_removed(e: &Env, context_rule_id: u32) {
 /// * topics - `["signer_added", context_rule_id: u32]`
 /// * data - `[signer: Signer]`
 pub fn emit_signer_added(e: &Env, context_rule_id: u32, signer: &Signer) {
-    let topics = (Symbol::new(e, "signer_added"), context_rule_id);
-    e.events().publish(topics, signer.clone())
+    SignerAdded { context_rule_id, signer: signer.clone() }.publish(e);
+}
+
+/// Event emitted when a signer is removed from a context rule.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignerRemoved {
+    #[topic]
+    pub context_rule_id: u32,
+    pub signer: Signer,
 }
 
 /// Emits an event indicating a signer has been removed from a context rule.
@@ -386,8 +439,17 @@ pub fn emit_signer_added(e: &Env, context_rule_id: u32, signer: &Signer) {
 /// * topics - `["signer_removed", context_rule_id: u32]`
 /// * data - `[signer: Signer]`
 pub fn emit_signer_removed(e: &Env, context_rule_id: u32, signer: &Signer) {
-    let topics = (Symbol::new(e, "signer_removed"), context_rule_id);
-    e.events().publish(topics, signer.clone())
+    SignerRemoved { context_rule_id, signer: signer.clone() }.publish(e);
+}
+
+/// Event emitted when a policy is added to a context rule.
+#[contractevent]
+#[derive(Clone, Debug)]
+pub struct PolicyAdded {
+    #[topic]
+    pub context_rule_id: u32,
+    pub policy: Address,
+    pub install_param: Val,
 }
 
 /// Emits an event indicating a policy has been added to a context rule.
@@ -404,8 +466,17 @@ pub fn emit_signer_removed(e: &Env, context_rule_id: u32, signer: &Signer) {
 /// * topics - `["policy_added", context_rule_id: u32]`
 /// * data - `[policy: Address, install_param: Val]`
 pub fn emit_policy_added(e: &Env, context_rule_id: u32, policy: &Address, install_param: &Val) {
-    let topics = (Symbol::new(e, "policy_added"), context_rule_id);
-    e.events().publish(topics, (policy.clone(), install_param))
+    PolicyAdded { context_rule_id, policy: policy.clone(), install_param: install_param.clone() }
+        .publish(e);
+}
+
+/// Event emitted when a policy is removed from a context rule.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PolicyRemoved {
+    #[topic]
+    pub context_rule_id: u32,
+    pub policy: Address,
 }
 
 /// Emits an event indicating a policy has been removed from a context rule.
@@ -421,6 +492,5 @@ pub fn emit_policy_added(e: &Env, context_rule_id: u32, policy: &Address, instal
 /// * topics - `["policy_removed", context_rule_id: u32]`
 /// * data - `[policy: Address]`
 pub fn emit_policy_removed(e: &Env, context_rule_id: u32, policy: &Address) {
-    let topics = (Symbol::new(e, "policy_removed"), context_rule_id);
-    e.events().publish(topics, policy.clone())
+    PolicyRemoved { context_rule_id, policy: policy.clone() }.publish(e);
 }

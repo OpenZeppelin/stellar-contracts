@@ -156,7 +156,7 @@ pub enum SmartAccountStorageKey {
 
 /// Represents different types of signers in the smart account system.
 #[contracttype]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Signer {
     /// A native Soroban address that uses built-in signature verification.
     Native(Address),
@@ -172,7 +172,7 @@ pub struct Signatures(pub Map<Signer, Bytes>);
 
 /// Types of contexts that can be authorized by smart account rules.
 #[contracttype]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ContextRuleType {
     /// Default rules that can authorize any context.
     Default,
