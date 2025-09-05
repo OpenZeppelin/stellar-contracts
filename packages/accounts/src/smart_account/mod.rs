@@ -2,7 +2,8 @@ mod storage;
 #[cfg(test)]
 mod test;
 use soroban_sdk::{
-    auth::CustomAccountInterface, contractevent, Address, Env, Map, String, Symbol, Val, Vec,
+    auth::CustomAccountInterface, contracterror, contractevent, Address, Env, Map, String, Symbol,
+    Val, Vec,
 };
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, do_check_auth, get_context_rule,
@@ -295,6 +296,39 @@ pub const SMART_ACCOUNT_TTL_THRESHOLD: u32 = SMART_ACCOUNT_EXTEND_AMOUNT - DAY_I
 pub const MAX_POLICIES: u32 = 5;
 /// Maximum number of signers allowed per context rule.
 pub const MAX_SIGNERS: u32 = 15;
+
+// ################## ERRORS ##################
+
+/// Error codes for smart account operations.
+#[contracterror]
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[repr(u32)]
+pub enum SmartAccountError {
+    /// The specified context rule does not exist.
+    ContextRuleNotFound = 2000,
+    /// A conflicting context rule already exists.
+    ConflictingContextRule = 2001,
+    /// The provided context cannot be validated against any rule.
+    UnvalidatedContext = 2002,
+    /// Delegated signature verification failed.
+    DelegatedVerificationFailed = 2003,
+    /// Context rule must have at least one signer or policy.
+    NoSignersAndPolicies = 2004,
+    /// The valid_until timestamp is in the past.
+    PastValidUntil = 2005,
+    /// The specified signer was not found.
+    SignerNotFound = 2006,
+    /// The signer already exists in the context rule.
+    DuplicateSigner = 2007,
+    /// The specified policy was not found.
+    PolicyNotFound = 2008,
+    /// The policy already exists in the context rule.
+    DuplicatePolicy = 2009,
+    /// Too many signers in the context rule.
+    TooManySigners = 2010,
+    /// Too many policies in the context rule.
+    TooManyPolicies = 2011,
+}
 
 // ################## EVENTS ##################
 

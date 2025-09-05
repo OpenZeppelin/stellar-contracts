@@ -89,7 +89,7 @@ use soroban_sdk::{
         Context, ContractContext, ContractExecutable, CreateContractHostFnContext,
         CreateContractWithConstructorHostFnContext,
     },
-    contracterror, contracttype,
+    contracttype,
     crypto::Hash,
     panic_with_error, Address, Bytes, BytesN, Env, IntoVal, Map, String, TryFromVal, Val, Vec,
 };
@@ -99,41 +99,11 @@ use crate::{
     smart_account::{
         emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
         emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
-        MAX_POLICIES, MAX_SIGNERS, SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
+        SmartAccountError, MAX_POLICIES, MAX_SIGNERS, SMART_ACCOUNT_EXTEND_AMOUNT,
+        SMART_ACCOUNT_TTL_THRESHOLD,
     },
     verifiers::VerifierClient,
 };
-
-/// Error codes for smart account operations.
-#[contracterror]
-#[derive(Copy, Clone, Debug, PartialEq)]
-#[repr(u32)]
-pub enum SmartAccountError {
-    /// The specified context rule does not exist.
-    ContextRuleNotFound = 2000,
-    /// A conflicting context rule already exists.
-    ConflictingContextRule = 2001,
-    /// The provided context cannot be validated against any rule.
-    UnvalidatedContext = 2002,
-    /// Delegated signature verification failed.
-    DelegatedVerificationFailed = 2003,
-    /// Context rule must have at least one signer or policy.
-    NoSignersAndPolicies = 2004,
-    /// The valid_until timestamp is in the past.
-    PastValidUntil = 2005,
-    /// The specified signer was not found.
-    SignerNotFound = 2006,
-    /// The signer already exists in the context rule.
-    DuplicateSigner = 2007,
-    /// The specified policy was not found.
-    PolicyNotFound = 2008,
-    /// The policy already exists in the context rule.
-    DuplicatePolicy = 2009,
-    /// Too many signers in the context rule.
-    TooManySigners = 2010,
-    /// Too many policies in the context rule.
-    TooManyPolicies = 2011,
-}
 
 /// Storage keys for smart account data.
 #[contracttype]
