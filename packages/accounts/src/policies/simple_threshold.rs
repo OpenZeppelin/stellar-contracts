@@ -174,14 +174,7 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    if threshold == 0 || threshold > context_rule.signers.len() {
-        panic_with_error!(e, SimpleThresholdError::InvalidThreshold)
-    }
-
-    e.storage().persistent().set(
-        &SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id),
-        &threshold,
-    );
+    validate_and_set_threshold(e, threshold, context_rule, smart_account);
 }
 
 /// Installs the simple threshold policy on a smart account.
@@ -207,14 +200,7 @@ pub fn install(
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    if params.threshold == 0 || params.threshold > context_rule.signers.len() {
-        panic_with_error!(e, SimpleThresholdError::InvalidThreshold)
-    }
-
-    e.storage().persistent().set(
-        &SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id),
-        &params.threshold,
-    );
+    validate_and_set_threshold(e, params.threshold, context_rule, smart_account);
 }
 
 /// Uninstalls the simple threshold policy from a smart account.
@@ -233,4 +219,33 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     e.storage()
         .persistent()
         .remove(&SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id));
+}
+
+/// Internal function that validates and sets the threshold.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `threshold` - The minimum number of signers required for authorization.
+/// * `context_rule` - The context rule for this policy.
+/// * `smart_account` - The address of the smart account.
+///
+/// # Errors
+///
+/// * [`SimpleThresholdError::InvalidThreshold`] - When threshold is 0 or
+///   exceeds the total number of signers.
+fn validate_and_set_threshold(
+    e: &Env,
+    threshold: u32,
+    context_rule: &ContextRule,
+    smart_account: &Address,
+) {
+    if threshold == 0 || threshold > context_rule.signers.len() {
+        panic_with_error!(e, SimpleThresholdError::InvalidThreshold)
+    }
+
+    e.storage().persistent().set(
+        &SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id),
+        &threshold,
+    );
 }
