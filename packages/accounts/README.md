@@ -15,6 +15,8 @@ The design leverages Protocol 23 improvements for marginal storage read costs an
 
 ## Core Components
 
+![context rule](https://github.com/OpenZeppelin/stellar-contracts/blob/smart-account/packages/accounts/docs/SmartAccount-ContextRules.png "Context Rule Structure")
+
 ### 1. Smart Account Trait
 
 The `SmartAccount` trait extends `CustomAccountInterface` from `soroban_sdk` with context rule management capabilities:
@@ -76,13 +78,14 @@ Signer::Native(Address)
 ```rust
 Signer::Delegated(Address, Bytes)
 ```
-
 - External verifier contract + public key data
 - Offloads signature verification to specialized contracts
-- **Advantages**:
+- Advantages:
   - **Scalability**: Support for any cryptographic scheme
   - **Flexibility**: Can easily adapt to emerging authentication methods (zk-proofs, email signing)
   - **Low setup cost**: Reuse verifier contracts across accounts
+
+![delegated signers with verifying contracts](https://github.com/OpenZeppelin/stellar-contracts/blob/smart-account/packages/accounts/docs/DelegatedSigner.png "Delegated Signers with Verifier Contracts")
 
 ### 4. Verifiers
 
@@ -98,8 +101,8 @@ pub trait Verifier {
 
 #### Implementation Requirements
 
-- **Stateless**: No internal state, pure verification functions
-- **Immutable**: Cannot be upgraded once deployed (trustless operation)
+- No internal state, pure verification functions
+- Cannot be upgraded once deployed (trustless operation)
 
 #### Benefits of Shared Verifiers
 
@@ -116,33 +119,33 @@ Policies provide programmable authorization logic that can be attached to contex
 pub trait Policy {
     type AccountParams: FromVal<Env, Val>;
 
+    // Read-only pre-check, no state changes
     fn can_enforce(/* ... */) -> bool;
+
+    // State-changing hook, requires smart account authorization
     fn enforce(/* ... */);
+
+    // Initialize policy-specific storage and configuration
     fn install(/* ... */);
+
+    // Clean up policy data for an account and context rule
     fn uninstall(/* ... */);
 }
 ```
 
 #### Lifecycle
 
-1. **Installation**: Configure and attach to context rule
-2. **Enforcement**: Validate authorization attempts
-3. **Uninstallation**: Clean up and remove
-
-#### Functions
-
-- **`can_enforce()`**: Read-only pre-check, no state changes
-- **`enforce()`**: State-changing hook, requires smart account authorization
-- **`install()`**: Initialize policy-specific storage and configuration
-- **`uninstall()`**: Clean up policy data
+1. Installation: Configure and attach to a smart account and its context rule
+2. Enforcement: Validate authorization and optionally change state
+3. Uninstallation: Clean up and remove 
 
 #### Policy Examples
 
-- **Admin Access**: Elevated permissions for account management
-- **Spending Limits**: Time-based or token-based restrictions
-- **Multisig**: Threshold-based authorization
-- **Session Policies**: Temporary, scoped permissions
-- **Recovery Policies**: Account recovery mechanisms
+- Admin Access: Elevated permissions for account management
+- Spending Limits: Time-based or token-based restrictions
+- Multisig: Threshold-based authorization
+- Session Policies: Temporary, scoped permissions
+- Recovery Policies: Account recovery mechanisms
 
 ### 6. Execution Entry Point
 
@@ -170,12 +173,12 @@ The smart account uses the following matching algorithm to determine authorizati
 
 For each rule in order:
 
-1. **Signer Filtering**: Extract authenticated signers from the rule's signer list
-2. **Policy Validation**: If policies exist, verify all can be enforced via `can_enforce()`
-3. **Authorization Check**:
+1. Signer Filtering: Extract authenticated signers from the context rule's signer list
+2. Policy Validation: If policies exist, verify all can be enforced via `can_enforce()`
+3. Authorization Check:
    - With policies: Success if all policies are enforceable
    - Without policies: Success if all signers are authenticated
-4. **Rule Precedence**: First matching rule wins (newest takes precedence)
+4. Rule Precedence: First matching rule wins (newest takes precedence)
 
 ### 3. Policy Enforcement
 
@@ -316,8 +319,7 @@ add_context_rule(
 For policies, you have two options:
 
 **Option A: Use Ecosystem Policies (Recommended)**
-- Use pre-deployed, audited policy contracts for common use cases
-- These are trusted by the ecosystem and cover standard scenarios
+- Use pre-deployed, audited policy contracts for common use cases thar are trusted by the ecosystem and cover standard scenarios
 - Examples: Simple threshold, weighted threshold, spending limits, time-based restrictions
 
 **Option B: Create Custom Policies**
@@ -360,15 +362,13 @@ For delegated signers, you have two options:
 
 This crate is organized into three main submodules that provide building blocks for implementing smart accounts. These submodules can be used independently or together, allowing developers to implement only the components they need, create custom smart account architectures, mix and match different authentication methods, and build specialized authorization policies.
 
-### `smart_account`
-- **Core traits**: `SmartAccount` and `ExecutionEntryPoint`
-- **Storage utilities**: Context rule management, signer/policy storage functions
+1. **smart_account**
+- `SmartAccount` and `ExecutionEntryPoint` traits
+- Context rule management, signer/policy storage functions
 
-### `verifiers` 
-- **Core trait**: `Verifier` for cryptographic signature verification
-- **Verifiers**: `ed25519` and `webauthn` (passkey authentication) utilities
+2. **verifiers**
+- `ed25519` and `webauthn` (passkey authentication) utility funcitons for implementing the `Verifier` trait
 
-### `policies`
-- **Core trait**: `Policy` for programmable authorization logic
-- **Policies**: `simple_threshold` and `weighted_threshold` utilities
+3. **policies**
+- `simple_threshold` and `weighted_threshold` utility funcitons for implementing the `Policy` trait
 
