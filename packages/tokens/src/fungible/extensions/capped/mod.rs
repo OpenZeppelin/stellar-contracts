@@ -11,4 +11,5 @@
 ///   Should be used before calling `mint()`.
 mod storage;
 pub use self::storage::{check_cap, query_cap, set_cap, CAP_KEY};
+#[cfg(test)]
 mod test;

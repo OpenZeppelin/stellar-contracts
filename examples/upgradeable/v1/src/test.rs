@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 extern crate std;
 
 use contract_v2::Data;

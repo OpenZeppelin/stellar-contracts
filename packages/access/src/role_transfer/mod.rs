@@ -16,4 +16,5 @@ pub enum RoleTransferError {
     InvalidPendingAccount = 1202,
 }
 
+#[cfg(test)]
 mod test;

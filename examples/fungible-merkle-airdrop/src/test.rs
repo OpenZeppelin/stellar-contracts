@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use hex_literal::hex;
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, vec, Address, BytesN, Env};
 use stellar_macros::default_impl;

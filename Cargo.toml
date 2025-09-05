@@ -6,7 +6,6 @@ members = [
     "examples/fungible-capped",
     "examples/fungible-merkle-airdrop",
     "examples/fungible-pausable",
-    "examples/fungible-token-interface",
     "examples/fungible-vault",
     "examples/merkle-voting",
     "examples/nft-access-control",
@@ -39,13 +38,13 @@ categories = ["no-std", "wasm"]
 version = "0.4.1"
 
 [workspace.dependencies]
-soroban-sdk = "22.0.8"
+soroban-sdk = "23.0.2"
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 soroban-test-helpers = "0.2.3"
-hex-literal = "0.4.1"
+hex-literal = "1.0.0"
 ed25519-dalek = "2.1.1"
 k256 = "0.13.4"
 p256 = "0.13.2"

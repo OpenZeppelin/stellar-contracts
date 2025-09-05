@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 extern crate std;
 
 use soroban_sdk::{contract, testutils::Events, vec, Env, IntoVal, Symbol};
@@ -33,17 +31,9 @@ fn pause_works() {
 
         let events = e.events().all();
         assert_eq!(events.len(), 1);
-        assert_eq!(
-            events,
-            vec![
-                &e,
-                (
-                    address.clone(),
-                    vec![&e, Symbol::new(&e, "paused").into_val(&e)],
-                    ().into_val(&e)
-                )
-            ]
-        );
+        let event = events.get(0).unwrap();
+        assert_eq!(event.0, address);
+        assert_eq!(event.1, vec![&e, Symbol::new(&e, "paused").into_val(&e)]);
     });
 }
 
@@ -61,17 +51,9 @@ fn unpause_works() {
         assert!(!paused(&e));
         let events = e.events().all();
         assert_eq!(events.len(), 1);
-        assert_eq!(
-            events,
-            vec![
-                &e,
-                (
-                    address.clone(),
-                    vec![&e, Symbol::new(&e, "unpaused").into_val(&e)],
-                    ().into_val(&e)
-                )
-            ]
-        );
+        let event = events.get(0).unwrap();
+        assert_eq!(event.0, address);
+        assert_eq!(event.1, vec![&e, Symbol::new(&e, "unpaused").into_val(&e)]);
     });
 }
 

@@ -1,5 +1,6 @@
 pub mod storage;
 
+#[cfg(test)]
 mod test;
 
 use soroban_sdk::{Address, Env};
