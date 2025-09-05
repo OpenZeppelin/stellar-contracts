@@ -24,7 +24,7 @@ pub struct SimplePolicyEnforced {
 }
 
 /// Installation parameters for the simple threshold policy.
-#[contracttype]
+#[contracttype] // codecov: ignore
 #[derive(Clone, Debug, PartialEq)]
 pub struct SimpleThresholdAccountParams {
     /// The minimum number of signers required for authorization.
