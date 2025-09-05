@@ -229,9 +229,7 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
 
     let mut rules = Vec::new(e);
     for id in ids.iter() {
-        if e.storage().persistent().has(&SmartAccountStorageKey::Meta(id)) {
-            rules.push_back(get_context_rule(e, id));
-        }
+        rules.push_back(get_context_rule(e, id));
     }
     rules
 }

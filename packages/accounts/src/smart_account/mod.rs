@@ -28,7 +28,7 @@ pub use storage::{
 /// - Rules can have expiration times for temporary authorization
 /// - Rules are validated against maximum limits (MAX_SIGNERS, MAX_POLICIES)
 pub trait SmartAccount: CustomAccountInterface {
-    /// Retrieves a complete context rule by its unique ID, returning the
+    /// Retrieves a context rule by its unique ID, returning the
     /// `ContextRule` containing all metadata, signers, and policies.
     ///
     /// # Arguments
