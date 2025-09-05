@@ -226,8 +226,8 @@ fn add_policy_nonexistent_rule_fails() {
 
     e.as_contract(&address, || {
         let install_param: Val = Val::from_void().into();
-        add_policy(&e, 999, &policy_address, install_param); // Non-existent rule
-                                                             // ID
+        // Non-existent rule ID
+        add_policy(&e, 999, &policy_address, install_param);
     });
 }
 
