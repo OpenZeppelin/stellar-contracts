@@ -319,7 +319,7 @@ add_context_rule(
 For policies, you have two options:
 
 **Option A: Use Ecosystem Policies (Recommended)**
-- Use pre-deployed, audited policy contracts for common use cases thar are trusted by the ecosystem and cover standard scenarios
+- Use pre-deployed, audited policy contracts for common use cases that are trusted by the ecosystem and cover standard scenarios
 - Examples: Simple threshold, weighted threshold, spending limits, time-based restrictions
 
 **Option B: Create Custom Policies**
@@ -367,8 +367,8 @@ This crate is organized into three main submodules that provide building blocks 
 - Context rule management, signer/policy storage functions
 
 2. **verifiers**
-- `ed25519` and `webauthn` (passkey authentication) utility funcitons for implementing the `Verifier` trait
+- `ed25519` and `webauthn` (passkey authentication) utility functions for implementing the `Verifier` trait
 
 3. **policies**
-- `simple_threshold` and `weighted_threshold` utility funcitons for implementing the `Policy` trait
+- `simple_threshold` and `weighted_threshold` utility functions for implementing the `Policy` trait
 
