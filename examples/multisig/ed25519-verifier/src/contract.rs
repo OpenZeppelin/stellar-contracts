@@ -1,3 +1,9 @@
+//! # Ed25519 Verifier Contract
+//!
+//! A reusable verifier contract for Ed25519 signature verification. This
+//! contract can be deployed once and used by multiple smart accounts across the
+//! network for delegated signature verification. Provides cryptographic
+//! verification for Ed25519 signatures against message hashes and public keys.
 use soroban_sdk::{contract, contractimpl, Bytes, Env};
 use stellar_accounts::verifiers::ed25519;
 

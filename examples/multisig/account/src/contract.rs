@@ -1,3 +1,9 @@
+//! # Smart Account Example - Multisig
+//!
+//! A core smart account contract implementation that demonstrates the use of
+//! context rules, signers, and policies. This contract can be configured as
+//! a multisig by using the simple threshold policy, or customized with other
+//! policies for different authorization patterns.
 use soroban_sdk::{
     auth::{Context, CustomAccountInterface},
     contract, contractimpl,

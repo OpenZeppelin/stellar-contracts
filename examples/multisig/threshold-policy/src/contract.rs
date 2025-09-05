@@ -1,3 +1,10 @@
+//! # Simple Threshold Policy Contract
+//!
+//! A reusable policy contract that implements simple threshold-based
+//! authorization. This contract can be deployed once and used by multiple smart
+//! accounts, with each account defining its own threshold value for different
+//! context rules. Enables M-of-N multisig functionality where M signers out of
+//! N total signers must authorize a transaction.
 use soroban_sdk::{auth::Context, contract, contractimpl, Address, Env, Vec};
 use stellar_accounts::{
     policies::{simple_threshold, Policy},

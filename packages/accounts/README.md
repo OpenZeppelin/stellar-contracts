@@ -313,6 +313,17 @@ add_context_rule(
 
 ### 3. Add Policies (Optional)
 
+For policies, you have two options:
+
+**Option A: Use Ecosystem Policies (Recommended)**
+- Use pre-deployed, audited policy contracts for common use cases
+- These are trusted by the ecosystem and cover standard scenarios
+- Examples: Simple threshold, weighted threshold, spending limits, time-based restrictions
+
+**Option B: Create Custom Policies**
+- Implement your own policy contracts by implementing the `Policy` trait
+- Useful for specialized business logic or unique authorization requirements
+
 ```rust
 // Add a spending limit policy
 add_policy(
