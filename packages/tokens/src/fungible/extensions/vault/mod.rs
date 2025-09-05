@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractevent, symbol_short, Address, Env};
+use soroban_sdk::{contractevent, Address, Env};
 pub use storage::Vault;
 
 use crate::fungible::FungibleToken;

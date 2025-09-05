@@ -247,14 +247,14 @@ impl Vault {
     /// It is the responsibility of the implementer to establish appropriate
     /// access controls to ensure that only authorized accounts can execute
     /// deposit operations. Consider combining with the Ownable or Access
-    /// Control pattern.
+    /// Control pattern, or using `operator.require_auth()`.
     pub fn deposit(e: &Env, assets: i128, receiver: Address, operator: Address) -> i128 {
         let max_assets = Self::max_deposit(e, receiver.clone());
         if assets > max_assets {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxDeposit);
         }
         let shares: i128 = Self::preview_deposit(e, assets);
-        Self::deposit_no_auth(e, &receiver, assets, shares, &operator);
+        Self::deposit_internal(e, &receiver, assets, shares, &operator);
         shares
     }
 
@@ -287,14 +287,14 @@ impl Vault {
     /// It is the responsibility of the implementer to establish appropriate
     /// access controls to ensure that only authorized accounts can execute
     /// mint operations. Consider combining with the Ownable or Access
-    /// Control pattern.
+    /// Control pattern, or using `operator.require_auth()`.
     pub fn mint(e: &Env, shares: i128, receiver: Address, operator: Address) -> i128 {
         let max_shares = Self::max_mint(e, receiver.clone());
         if shares > max_shares {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxMint);
         }
         let assets: i128 = Self::preview_mint(e, shares);
-        Self::deposit_no_auth(e, &receiver, assets, shares, &operator);
+        Self::deposit_internal(e, &receiver, assets, shares, &operator);
         assets
     }
 
@@ -328,7 +328,7 @@ impl Vault {
     /// It is the responsibility of the implementer to establish appropriate
     /// access controls to ensure that only authorized accounts can execute
     /// withdrawal operations. Consider combining with the Ownable or Access
-    /// Control pattern.
+    /// Control pattern, or using `operator.require_auth()`.
     pub fn withdraw(
         e: &Env,
         assets: i128,
@@ -341,7 +341,7 @@ impl Vault {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxWithdraw);
         }
         let shares: i128 = Self::preview_withdraw(e, assets);
-        Self::withdraw_no_auth(e, &receiver, &owner, assets, shares, &operator);
+        Self::withdraw_internal(e, &receiver, &owner, assets, shares, &operator);
         shares
     }
 
@@ -375,7 +375,7 @@ impl Vault {
     /// It is the responsibility of the implementer to establish appropriate
     /// access controls to ensure that only authorized accounts can execute
     /// redemption operations. Consider combining with the Ownable or Access
-    /// Control pattern.
+    /// Control pattern, or using `operator.require_auth()`.
     pub fn redeem(
         e: &Env,
         shares: i128,
@@ -388,7 +388,7 @@ impl Vault {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxRedeem);
         }
         let assets = Self::preview_redeem(e, shares);
-        Self::withdraw_no_auth(e, &receiver, &owner, assets, shares, &operator);
+        Self::withdraw_internal(e, &receiver, &owner, assets, shares, &operator);
         assets
     }
 
@@ -588,7 +588,7 @@ impl Vault {
     /// This function assumes prior authorization of the operator and validation
     /// of amounts. It should only be called from higher-level functions that
     /// handle these concerns.
-    pub fn deposit_no_auth(
+    pub fn deposit_internal(
         e: &Env,
         receiver: &Address,
         assets: i128,
@@ -600,7 +600,7 @@ impl Vault {
         let token_client = token::Client::new(e, &Self::query_asset(e));
         // `safeTransfer` mechanism is not present in the base module, (will be provided
         // as an extension)
-        token_client.transfer(operator, &e.current_contract_address(), &assets);
+        token_client.transfer(operator, e.current_contract_address(), &assets);
         Base::mint(e, receiver, shares);
         emit_deposit(e, operator, receiver, assets, shares);
     }
@@ -631,7 +631,7 @@ impl Vault {
     /// of amounts. It automatically handles allowance spending when the
     /// operator is different from the owner. It should only be called from
     /// higher-level functions that handle authorization concerns.
-    pub fn withdraw_no_auth(
+    pub fn withdraw_internal(
         e: &Env,
         receiver: &Address,
         owner: &Address,
