@@ -1,10 +1,10 @@
 extern crate std;
 
 use soroban_sdk::{
-    auth::{Context, ContractContext},
+    auth::{Context, ContractContext, ContractExecutable, CreateContractHostFnContext},
     contract, symbol_short,
     testutils::{Address as _, Events, Ledger},
-    Address, Env, IntoVal, Vec,
+    Address, BytesN, Env, IntoVal, Vec,
 };
 
 use crate::{
@@ -246,28 +246,26 @@ fn rolling_window_functionality() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
 
     // Install policy
     e.mock_all_auths();
     e.as_contract(&address, || {
-        let context_rule = create_context_rule(&e);
         let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
         install(&e, &params, &context_rule, &smart_account);
+    });
+    e.ledger().with_mut(|li| {
+        li.sequence_number = 1000;
     });
 
     // First transaction: 600,000
     e.as_contract(&address, || {
-        let context_rule = create_context_rule(&e);
-        e.ledger().with_mut(|li| {
-            li.sequence_number = 1000;
-        });
         let context1 = create_transfer_context(&e, 600_000);
         enforce(&e, &context1, &Vec::new(&e), &context_rule, &smart_account);
     });
 
     // Second transaction: 300,000 (should succeed, total = 900,000)
     e.as_contract(&address, || {
-        let context_rule = create_context_rule(&e);
         let context2 = create_transfer_context(&e, 300_000);
         enforce(&e, &context2, &Vec::new(&e), &context_rule, &smart_account);
     });
@@ -278,40 +276,36 @@ fn rolling_window_functionality() {
                                    // window
     });
 
-    // Third transaction: 200,000 (should fail, total would be 1,100,000)
     e.as_contract(&address, || {
-        let context_rule = create_context_rule(&e);
+        // 200,000 (should fail, total would be 1,100,000)
         let context3 = create_transfer_context(&e, 200_000);
         // Verify that can_enforce returns false for this transaction
         assert!(!can_enforce(&e, &context3, &Vec::new(&e), &context_rule, &smart_account));
+
+        // But 100,000 is fine
+        let context4 = create_transfer_context(&e, 100_000);
+        enforce(&e, &context4, &Vec::new(&e), &context_rule, &smart_account);
     });
 
     // Move forward beyond the rolling window
     e.ledger().with_mut(|li| {
-        li.sequence_number = 1150; // 150 ledgers later, first transaction
+        li.sequence_number = 1150; // 150 ledgers later, first 2 transactions
                                    // should be outside window
     });
 
-    // Now the 200,000 transaction should succeed (only 300,000 from second tx in
-    // window)
+    // Now the 900,000 transaction should succeed
     e.as_contract(&address, || {
-        let context_rule = create_context_rule(&e);
-        let context3 = create_transfer_context(&e, 200_000);
-        enforce(&e, &context3, &Vec::new(&e), &context_rule, &smart_account);
-    });
+        let context5 = create_transfer_context(&e, 900_000);
+        enforce(&e, &context5, &Vec::new(&e), &context_rule, &smart_account);
 
-    // Check that old entries were cleaned up
-    e.as_contract(&address, || {
-        let context_rule = create_context_rule(&e);
+        // Check that old entries were cleaned up
         let data = get_spending_limit_data(&e, &context_rule, &smart_account);
-        // After cleanup, should have second and third transactions (first should be
-        // removed) But the exact count may vary based on cleanup timing, so
-        // let's check it's > 0
-        assert!(!data.spending_history.is_empty());
+        // After cleanup, should have second and third transactions
+        assert_eq!(data.spending_history.len(), 2);
 
-        // Verify the most recent transaction is the 200,000 one
+        // Verify the most recent transaction is the 900,000 one
         let last_entry = data.spending_history.get(data.spending_history.len() - 1).unwrap();
-        assert_eq!(last_entry.amount, 200_000);
+        assert_eq!(last_entry.amount, 900_000);
     });
 }
 
@@ -441,10 +435,9 @@ fn get_spending_limit_data_not_installed() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
 
     e.as_contract(&address, || {
-        let context_rule = create_context_rule(&e);
-
         // Try to get data without installing first
         get_spending_limit_data(&e, &context_rule, &smart_account);
     });
@@ -455,9 +448,9 @@ fn can_enforce_not_installed() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
 
     e.as_contract(&address, || {
-        let context_rule = create_context_rule(&e);
         let context = create_transfer_context(&e, 500_000);
 
         // Should return false when policy is not installed
@@ -491,11 +484,124 @@ fn enforce_non_transfer_context_errors() {
             args,
         });
 
-        // This should not enforce (return without doing anything)
         enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account);
+    });
+}
 
-        // Verify no spending was recorded
-        let data = get_spending_limit_data(&e, &context_rule, &smart_account);
-        assert_eq!(data.spending_history.len(), 0);
+#[test]
+fn can_enforce_invalid_amount_arg() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+    let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+
+        let contract_address = Address::generate(&e);
+        let from = Address::generate(&e);
+        let to = Address::generate(&e);
+
+        let mut args = Vec::new(&e);
+        args.push_back(from.into_val(&e));
+        args.push_back(to.into_val(&e));
+        // Push an invalid type for the amount
+        args.push_back(symbol_short!("invalid").into_val(&e));
+
+        let context = Context::Contract(ContractContext {
+            contract: contract_address,
+            fn_name: symbol_short!("transfer"),
+            args,
+        });
+
+        assert!(!can_enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account));
+    });
+}
+
+#[test]
+fn can_enforce_missing_amount_arg() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+    let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+
+        let contract_address = Address::generate(&e);
+        let from = Address::generate(&e);
+        let to = Address::generate(&e);
+
+        let mut args = Vec::new(&e);
+        args.push_back(from.into_val(&e));
+        args.push_back(to.into_val(&e));
+        // Do not push the amount argument
+
+        let context = Context::Contract(ContractContext {
+            contract: contract_address,
+            fn_name: symbol_short!("transfer"),
+            args,
+        });
+
+        assert!(!can_enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2223)")]
+fn enforce_panics_on_non_transfer() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        let contract_address = Address::generate(&e);
+        let args = Vec::new(&e);
+        let context = Context::Contract(ContractContext {
+            contract: contract_address,
+            fn_name: symbol_short!("anon_fn"),
+            args,
+        });
+
+        enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2223)")]
+fn enforce_panics_on_non_contract_context() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        let context = Context::CreateContractHostFn(CreateContractHostFnContext {
+            salt: BytesN::from_array(&e, &[1u8; 32]),
+            executable: ContractExecutable::Wasm(BytesN::from_array(&e, &[1u8; 32])),
+        });
+
+        enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account);
     });
 }

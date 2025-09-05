@@ -264,8 +264,9 @@ pub fn enforce(
                             total_spent_in_period: total_spent + amount,
                         }
                         .publish(e);
+
+                        return;
                     }
-                    return;
                 }
             }
         }
