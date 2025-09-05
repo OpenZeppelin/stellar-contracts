@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{contractevent, symbol_short, Address, Env};
 pub use storage::Vault;
 
 use crate::fungible::FungibleToken;
@@ -345,6 +345,18 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
 
 // ################## EVENTS ##################
 
+/// Event emitted when underlying assets are deposited into the vault.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Deposit {
+    #[topic]
+    pub sender: Address,
+    #[topic]
+    pub owner: Address,
+    pub assets: i128,
+    pub shares: i128,
+}
+
 /// Emits an event when underlying assets are deposited into the vault in
 /// exchange for shares.
 ///
@@ -356,14 +368,22 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
 /// * `assets` - The amount of underlying assets being deposited into the vault.
 /// * `shares` - The amount of vault shares being minted in exchange for the
 ///   assets.
-///
-/// # Events
-///
-/// * topics - `["deposit", sender: Address, owner: Address]`
-/// * data - `[assets: i128, shares: i128]`
 pub fn emit_deposit(e: &Env, sender: &Address, owner: &Address, assets: i128, shares: i128) {
-    let topics = (symbol_short!("deposit"), sender, owner);
-    e.events().publish(topics, (assets, shares));
+    Deposit { sender: sender.clone(), owner: owner.clone(), assets, shares }.publish(e);
+}
+
+/// Event emitted when shares are exchanged back for underlying assets.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Withdraw {
+    #[topic]
+    pub sender: Address,
+    #[topic]
+    pub receiver: Address,
+    #[topic]
+    pub owner: Address,
+    pub assets: i128,
+    pub shares: i128,
 }
 
 /// Emits an event when shares are exchanged back for underlying assets and
@@ -379,12 +399,6 @@ pub fn emit_deposit(e: &Env, sender: &Address, owner: &Address, assets: i128, sh
 /// * `assets` - The amount of underlying assets being withdrawn from the vault.
 /// * `shares` - The amount of vault shares being burned in exchange for the
 ///   assets.
-///
-/// # Events
-///
-/// * topics - `["withdraw", sender: Address, receiver: Address, owner:
-///   Address]`
-/// * data - `[assets: i128, shares: i128]`
 pub fn emit_withdraw(
     e: &Env,
     sender: &Address,
@@ -393,6 +407,12 @@ pub fn emit_withdraw(
     assets: i128,
     shares: i128,
 ) {
-    let topics = (symbol_short!("withdraw"), sender, receiver, owner);
-    e.events().publish(topics, (assets, shares));
+    Withdraw {
+        sender: sender.clone(),
+        receiver: receiver.clone(),
+        owner: owner.clone(),
+        assets,
+        shares,
+    }
+    .publish(e);
 }
