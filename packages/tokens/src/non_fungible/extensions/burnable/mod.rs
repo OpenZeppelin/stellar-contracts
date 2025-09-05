@@ -1,9 +1,10 @@
 mod storage;
 use crate::non_fungible::NonFungibleToken;
 
+#[cfg(test)]
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{contractevent, Address, Env};
 
 /// Burnable Trait for Non-Fungible Token
 ///
@@ -106,19 +107,22 @@ pub trait NonFungibleBurnable: NonFungibleToken {
 
 // ################## EVENTS ##################
 
-/// Emits an event indicating a burn of tokens.
+/// Event emitted when a token is burned.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Burn {
+    #[topic]
+    pub from: Address,
+    pub token_id: u32,
+}
+
+/// Emits an event for a burn of a token from `from`.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to Soroban environment.
-/// * `from` - The address holding the tokens.
-/// * `token_id` - The token ID of the burned token.
-///
-/// # Events
-///
-/// * topics - `["burn", from: Address]`
-/// * data - `[token_id: u32]`
+/// * `e` - The Soroban environment.
+/// * `from` - The sender address.
+/// * `token_id` - The token identifier.
 pub fn emit_burn(e: &Env, from: &Address, token_id: u32) {
-    let topics = (symbol_short!("burn"), from);
-    e.events().publish(topics, token_id)
+    Burn { from: from.clone(), token_id }.publish(e);
 }

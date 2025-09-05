@@ -74,6 +74,7 @@
 
 mod storage;
 
+#[cfg(test)]
 mod test;
 
 use soroban_sdk::{contractclient, contracterror, Address, BytesN, Env, FromVal, Val};

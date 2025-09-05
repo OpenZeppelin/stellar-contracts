@@ -74,6 +74,7 @@ pub use storage::{
     clawback, get_sac_address, get_sac_client, mint, set_admin, set_authorized, set_sac_address,
 };
 
+#[cfg(test)]
 mod test;
 
 use soroban_sdk::{Address, Env};

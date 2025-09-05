@@ -1,8 +1,6 @@
-#![cfg(test)]
-
 extern crate std;
 
-use soroban_sdk::{testutils::Address as _, Address, Env};
+use soroban_sdk::{testutils::Address as _, token, Address, Env};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
@@ -65,4 +63,16 @@ fn mint_multiple_exceeds_cap() {
 
     // Attempt to mint 500 more tokens (would exceed cap)
     client.mint(&user, &500); // This should panic
+}
+
+#[test]
+fn test_token_interface() {
+    let e = Env::default();
+    let cap = 1000_i128;
+
+    let address = e.register(ExampleContract, (cap,));
+    let client = token::Client::new(&e, &address);
+    let user = Address::generate(&e);
+
+    assert_eq!(client.balance(&user), 0);
 }

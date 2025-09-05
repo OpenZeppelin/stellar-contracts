@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{contractevent, Address, Env};
 pub use storage::BlockList;
 
 use crate::fungible::FungibleToken;
@@ -69,20 +69,30 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
 
 // ################## EVENTS ##################
 
+/// Event emitted when a user is blocked from transferring tokens.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UserBlocked {
+    #[topic]
+    pub user: Address,
+}
+
+/// Event emitted when a user is unblocked and allowed to transfer tokens.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UserUnblocked {
+    #[topic]
+    pub user: Address,
+}
+
 /// Emits an event when a user is blocked from transferring tokens.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `user` - The address that is blocked from transferring tokens.
-///
-/// # Events
-///
-/// * topics - `["block", user: Address]`
-/// * data - `[]`
 pub fn emit_user_blocked(e: &Env, user: &Address) {
-    let topics = (symbol_short!("block"), user);
-    e.events().publish(topics, ());
+    UserBlocked { user: user.clone() }.publish(e);
 }
 
 /// Emits an event when a user is unblocked and allowed to transfer tokens
@@ -92,12 +102,6 @@ pub fn emit_user_blocked(e: &Env, user: &Address) {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `user` - The address that is unblocked.
-///
-/// # Events
-///
-/// * topics - `["unblock", user: Address]`
-/// * data - `[]`
 pub fn emit_user_unblocked(e: &Env, user: &Address) {
-    let topics = (symbol_short!("unblock"), user);
-    e.events().publish(topics, ());
+    UserUnblocked { user: user.clone() }.publish(e);
 }

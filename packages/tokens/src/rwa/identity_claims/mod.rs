@@ -1,8 +1,9 @@
 mod storage;
+#[cfg(test)]
 mod test;
 
 use soroban_sdk::{
-    contractclient, contracterror, Address, Bytes, BytesN, Env, String, Symbol, Vec,
+    contractclient, contracterror, contractevent, Address, Bytes, BytesN, Env, String, Vec,
 };
 pub use storage::{
     add_claim, generate_claim_id, get_claim, get_claim_ids_by_topic, remove_claim, Claim,
@@ -95,28 +96,41 @@ pub enum ClaimEvent {
     Changed,
 }
 
-/// Emits an event for a claim operation (add, remove, change).
+/// Event emitted when a claim is added.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimAdded {
+    #[topic]
+    pub claim: Claim,
+}
+
+/// Event emitted when a claim is removed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimRemoved {
+    #[topic]
+    pub claim: Claim,
+}
+
+/// Event emitted when a claim is changed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimChanged {
+    #[topic]
+    pub claim: Claim,
+}
+
+/// Emits an event for a claim operation.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `claim` - The claim on which was operated.
-///
-/// # Events
-///
-/// * topics - `["event_name": Symbol, claim: Claim]`
-/// * data - `[]`
-///
-/// Where `event_name` is one of:
-/// - `"claim_added"` for [`ClaimEvent::Added`]
-/// - `"claim_removed"` for [`ClaimEvent::Removed`]
-/// - `"claim_changed"` for [`ClaimEvent::Changed`]
-pub fn emit_claim_event(e: &Env, event_type: ClaimEvent, claim: &Claim) {
-    let name = match event_type {
-        ClaimEvent::Added => Symbol::new(e, "claim_added"),
-        ClaimEvent::Removed => Symbol::new(e, "claim_removed"),
-        ClaimEvent::Changed => Symbol::new(e, "claim_changed"),
-    };
-    let event_topics = (name, claim.clone());
-    e.events().publish(event_topics, ());
+/// * `event_type` - The type of claim event (Added, Removed, or Changed).
+/// * `claim` - The claim data.
+pub fn emit_claim_event(e: &Env, event_type: ClaimEvent, claim: Claim) {
+    match event_type {
+        ClaimEvent::Added => ClaimAdded { claim }.publish(e),
+        ClaimEvent::Removed => ClaimRemoved { claim }.publish(e),
+        ClaimEvent::Changed => ClaimChanged { claim }.publish(e),
+    }
 }

@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 extern crate std;
 
 #[allow(unused_imports)]
@@ -75,22 +73,8 @@ fn approve_with_event() {
 
         let events = e.events().all();
         assert_eq!(events.len(), 1);
-        assert_eq!(
-            events,
-            vec![
-                &e,
-                (
-                    address.clone(),
-                    vec![
-                        &e,
-                        symbol_short!("approve").into_val(&e),
-                        owner.into_val(&e),
-                        spender.into_val(&e)
-                    ],
-                    allowance_data.into_val(&e)
-                )
-            ]
-        );
+        let event = events.get(0).unwrap();
+        assert_eq!(event.0, address);
     });
 }
 

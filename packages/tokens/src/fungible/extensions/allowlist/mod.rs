@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{symbol_short, Address, Env};
+use soroban_sdk::{contractevent, Address, Env};
 pub use storage::AllowList;
 
 use crate::fungible::FungibleToken;
@@ -69,20 +69,30 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
 
 // ################## EVENTS ##################
 
+/// Event emitted when a user is allowed to transfer tokens.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UserAllowed {
+    #[topic]
+    pub user: Address,
+}
+
+/// Event emitted when a user is disallowed from transferring tokens.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UserDisallowed {
+    #[topic]
+    pub user: Address,
+}
+
 /// Emits an event when a user is allowed to transfer tokens.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `user` - The address that is allowed to transfer tokens.
-///
-/// # Events
-///
-/// * topics - `["allow", user: Address]`
-/// * data - `[]`
 pub fn emit_user_allowed(e: &Env, user: &Address) {
-    let topics = (symbol_short!("allow"), user);
-    e.events().publish(topics, ());
+    UserAllowed { user: user.clone() }.publish(e);
 }
 
 /// Emits an event when a user is disallowed from transferring tokens.
@@ -91,12 +101,6 @@ pub fn emit_user_allowed(e: &Env, user: &Address) {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `user` - The address that is disallowed from transferring tokens.
-///
-/// # Events
-///
-/// * topics - `["disallow", user: Address]`
-/// * data - `[]`
 pub fn emit_user_disallowed(e: &Env, user: &Address) {
-    let topics = (symbol_short!("disallow"), user);
-    e.events().publish(topics, ());
+    UserDisallowed { user: user.clone() }.publish(e);
 }
