@@ -465,9 +465,8 @@ pub struct PolicyAdded {
 ///
 /// * topics - `["policy_added", context_rule_id: u32]`
 /// * data - `[policy: Address, install_param: Val]`
-pub fn emit_policy_added(e: &Env, context_rule_id: u32, policy: &Address, install_param: &Val) {
-    PolicyAdded { context_rule_id, policy: policy.clone(), install_param: install_param.clone() }
-        .publish(e);
+pub fn emit_policy_added(e: &Env, context_rule_id: u32, policy: &Address, install_param: Val) {
+    PolicyAdded { context_rule_id, policy: policy.clone(), install_param }.publish(e);
 }
 
 /// Event emitted when a policy is removed from a context rule.

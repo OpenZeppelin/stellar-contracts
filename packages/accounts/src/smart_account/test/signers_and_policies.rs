@@ -75,10 +75,10 @@ fn setup_test_rule(e: &Env, address: &Address) -> ContextRule {
         add_context_rule(
             e,
             &ContextRuleType::CallContract(contract_addr),
-            String::from_str(e, "test_rule"),
+            &String::from_str(e, "test_rule"),
             None,
-            signers,
-            Map::new(e),
+            &signers,
+            &Map::new(e),
         )
     })
 }
@@ -95,7 +95,7 @@ fn add_signer_success() {
     e.as_contract(&address, || {
         let new_signer = Signer::Native(Address::generate(&e));
 
-        add_signer(&e, rule.id, new_signer.clone());
+        add_signer(&e, rule.id, &new_signer);
 
         let updated_rule = get_context_rule(&e, rule.id);
         assert_eq!(e.events().all().len(), 1);
@@ -112,7 +112,7 @@ fn add_signer_nonexistent_rule_fails() {
 
     e.as_contract(&address, || {
         let new_signer = Signer::Native(Address::generate(&e));
-        add_signer(&e, 999, new_signer); // Non-existent rule ID
+        add_signer(&e, 999, &new_signer); // Non-existent rule ID
     });
 }
 
@@ -126,7 +126,7 @@ fn add_signer_duplicate_fails() {
 
     e.as_contract(&address, || {
         let existing_signer = rule.signers.get(0).unwrap();
-        add_signer(&e, rule.id, existing_signer); // Duplicate signer
+        add_signer(&e, rule.id, &existing_signer); // Duplicate signer
     });
 }
 
@@ -140,7 +140,7 @@ fn remove_signer_success() {
     e.as_contract(&address, || {
         let signer_to_remove = rule.signers.get(0).unwrap();
 
-        remove_signer(&e, rule.id, signer_to_remove.clone());
+        remove_signer(&e, rule.id, &signer_to_remove);
 
         let updated_rule = get_context_rule(&e, rule.id);
         assert_eq!(updated_rule.signers.len(), 1);
@@ -157,7 +157,7 @@ fn remove_signer_nonexistent_rule_fails() {
 
     e.as_contract(&address, || {
         let signer = Signer::Native(Address::generate(&e));
-        remove_signer(&e, 999, signer); // Non-existent rule ID
+        remove_signer(&e, 999, &signer); // Non-existent rule ID
     });
 }
 
@@ -171,7 +171,7 @@ fn remove_signer_not_found_fails() {
 
     e.as_contract(&address, || {
         let nonexistent_signer = Signer::Native(Address::generate(&e));
-        remove_signer(&e, rule.id, nonexistent_signer); // Signer not in rule
+        remove_signer(&e, rule.id, &nonexistent_signer); // Signer not in rule
     });
 }
 
@@ -187,8 +187,8 @@ fn remove_signer_last_one_success() {
         let signer1 = rule.signers.get(0).unwrap();
         let signer2 = rule.signers.get(1).unwrap();
 
-        remove_signer(&e, rule.id, signer1);
-        remove_signer(&e, rule.id, signer2);
+        remove_signer(&e, rule.id, &signer1);
+        remove_signer(&e, rule.id, &signer2);
 
         let updated_rule = get_context_rule(&e, rule.id);
         assert_eq!(updated_rule.signers.len(), 0);
@@ -208,7 +208,7 @@ fn add_policy_success() {
     e.as_contract(&address, || {
         let install_param: Val = Val::from_void().into();
 
-        add_policy(&e, rule.id, policy_address.clone(), install_param);
+        add_policy(&e, rule.id, &policy_address.clone(), install_param);
 
         let updated_rule = get_context_rule(&e, rule.id);
         assert_eq!(e.events().all().len(), 1);
@@ -226,8 +226,8 @@ fn add_policy_nonexistent_rule_fails() {
 
     e.as_contract(&address, || {
         let install_param: Val = Val::from_void().into();
-        add_policy(&e, 999, policy_address, install_param); // Non-existent rule
-                                                            // ID
+        add_policy(&e, 999, &policy_address, install_param); // Non-existent rule
+                                                             // ID
     });
 }
 
@@ -244,10 +244,10 @@ fn add_policy_duplicate_fails() {
         let install_param: Val = Val::from_void().into();
 
         // Add policy first time
-        add_policy(&e, rule.id, policy_address.clone(), install_param);
+        add_policy(&e, rule.id, &policy_address, install_param);
 
         // Try to add same policy again
-        add_policy(&e, rule.id, policy_address, install_param); // Duplicate policy
+        add_policy(&e, rule.id, &policy_address, install_param); // Duplicate policy
     });
 }
 
@@ -263,10 +263,10 @@ fn remove_policy_success() {
         let install_param: Val = Val::from_void().into();
 
         // First add a policy
-        add_policy(&e, rule.id, policy_address.clone(), install_param);
+        add_policy(&e, rule.id, &policy_address, install_param);
 
         // Then remove it
-        remove_policy(&e, rule.id, policy_address.clone());
+        remove_policy(&e, rule.id, &policy_address);
 
         let updated_rule = get_context_rule(&e, rule.id);
         assert_eq!(e.events().all().len(), 2);
@@ -283,7 +283,7 @@ fn remove_policy_nonexistent_rule_fails() {
     let policy_address = e.register(MockPolicyContract, ());
 
     e.as_contract(&address, || {
-        remove_policy(&e, 999, policy_address); // Non-existent rule ID
+        remove_policy(&e, 999, &policy_address); // Non-existent rule ID
     });
 }
 
@@ -297,7 +297,7 @@ fn remove_policy_not_found_fails() {
     let rule = setup_test_rule(&e, &address);
 
     e.as_contract(&address, || {
-        remove_policy(&e, rule.id, policy_address); // Policy not in rule
+        remove_policy(&e, rule.id, &policy_address); // Policy not in rule
     });
 }
 

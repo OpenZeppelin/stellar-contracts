@@ -92,16 +92,15 @@ fn create_test_policies_map(e: &Env) -> Map<Address, Val> {
 
 fn setup_test_rule(e: &Env, address: &Address) -> ContextRule {
     e.as_contract(address, || {
-        let signers = create_test_signers(e);
         let contract_addr = Address::generate(e);
 
         add_context_rule(
             e,
             &ContextRuleType::CallContract(contract_addr),
-            String::from_str(e, "test_rule"),
+            &String::from_str(e, "test_rule"),
             None,
-            signers,
-            Map::new(e),
+            &create_test_signers(e),
+            &Map::new(e),
         )
     })
 }
@@ -134,10 +133,10 @@ fn do_check_auth_single_context_with_policies_success() {
         add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "policy_rule"),
+            &String::from_str(&e, "policy_rule"),
             None,
-            Vec::new(&e),
-            policies_map,
+            &Vec::new(&e),
+            &policies_map,
         );
 
         let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
@@ -145,8 +144,7 @@ fn do_check_auth_single_context_with_policies_success() {
         let signatures = create_signatures(&e, &Vec::new(&e));
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
-        let result =
-            do_check_auth(e.clone(), e.crypto().sha256(&payload), signatures, auth_contexts);
+        let result = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
 
         assert!(result.is_ok());
     });
@@ -171,18 +169,18 @@ fn do_check_auth_multiple_contexts_success() {
         let rule1 = add_context_rule(
             &e,
             &context_type1,
-            String::from_str(&e, "rule1"),
+            &String::from_str(&e, "rule1"),
             None,
-            signers.clone(),
-            policies.clone(),
+            &signers,
+            &policies,
         );
         let rule2 = add_context_rule(
             &e,
             &context_type2,
-            String::from_str(&e, "rule2"),
+            &String::from_str(&e, "rule2"),
             None,
-            signers.clone(),
-            policies.clone(),
+            &signers,
+            &policies,
         );
 
         let context1 = get_context(contract_addr1, symbol_short!("test1"), vec![&e]);
@@ -195,8 +193,7 @@ fn do_check_auth_multiple_contexts_success() {
         let signatures = create_signatures(&e, &all_signers);
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
-        let result =
-            do_check_auth(e.clone(), e.crypto().sha256(&payload), signatures, auth_contexts);
+        let result = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
 
         assert!(result.is_ok());
     });
@@ -220,10 +217,10 @@ fn do_check_auth_authentication_fails() {
         add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "delegated_rule"),
+            &String::from_str(&e, "delegated_rule"),
             None,
-            signers,
-            Map::new(&e),
+            &signers,
+            &Map::new(&e),
         );
 
         // Set verifier to return false
@@ -239,7 +236,7 @@ fn do_check_auth_authentication_fails() {
         let signatures = Signatures(signature_map);
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
-        let _ = do_check_auth(e.clone(), e.crypto().sha256(&payload), signatures, auth_contexts);
+        let _ = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
     });
 }
 
@@ -259,10 +256,10 @@ fn do_check_auth_context_validation_fails() {
         let rule = add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "strict_rule"),
+            &String::from_str(&e, "strict_rule"),
             None,
-            create_test_signers(&e),
-            Map::new(&e),
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
 
         let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
@@ -273,7 +270,7 @@ fn do_check_auth_context_validation_fails() {
         let signatures = create_signatures(&e, &insufficient_signers);
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
-        let _ = do_check_auth(e.clone(), e.crypto().sha256(&payload), signatures, auth_contexts);
+        let _ = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
     });
 }
 #[test]
@@ -289,10 +286,10 @@ fn add_context_rule_success() {
         let rule = add_context_rule(
             &e,
             &ContextRuleType::CallContract(contract_addr),
-            String::from_str(&e, "test_rule"),
+            &String::from_str(&e, "test_rule"),
             Some(future_sequence),
-            signers,
-            Map::new(&e),
+            &signers,
+            &Map::new(&e),
         );
 
         assert_eq!(rule.id, 0);
@@ -316,19 +313,19 @@ fn add_context_rule_multiple_rules_increment_id() {
         let rule1 = add_context_rule(
             &e,
             &ContextRuleType::CallContract(contract_addr.clone()),
-            String::from_str(&e, "rule_1"),
+            &String::from_str(&e, "rule_1"),
             None,
-            signers.clone(),
-            Map::new(&e),
+            &signers,
+            &Map::new(&e),
         );
 
         let rule2 = add_context_rule(
             &e,
             &ContextRuleType::CallContract(contract_addr),
-            String::from_str(&e, "rule_2"),
+            &String::from_str(&e, "rule_2"),
             None,
-            signers,
-            Map::new(&e),
+            &signers,
+            &Map::new(&e),
         );
 
         assert_eq!(rule1.id, 0);
@@ -351,19 +348,19 @@ fn add_context_rule_different_context_types() {
         let call_rule = add_context_rule(
             &e,
             &ContextRuleType::CallContract(contract_addr),
-            String::from_str(&e, "call_rule"),
+            &String::from_str(&e, "call_rule"),
             None,
-            signers.clone(),
-            Map::new(&e),
+            &signers,
+            &Map::new(&e),
         );
 
         let create_rule = add_context_rule(
             &e,
             &ContextRuleType::CreateContract(wasm_hash),
-            String::from_str(&e, "create_rule"),
+            &String::from_str(&e, "create_rule"),
             None,
-            signers,
-            Map::new(&e),
+            &signers,
+            &Map::new(&e),
         );
 
         assert_eq!(call_rule.id, 0);
@@ -388,10 +385,10 @@ fn add_context_rule_past_valid_until_fails() {
         add_context_rule(
             &e,
             &ContextRuleType::CallContract(contract_addr),
-            String::from_str(&e, "expired_rule"),
+            &String::from_str(&e, "expired_rule"),
             Some(99),
-            signers,
-            Map::new(&e),
+            &signers,
+            &Map::new(&e),
         );
     });
 }
@@ -406,7 +403,7 @@ fn update_context_rule_success() {
     e.as_contract(&address, || {
         let future_sequence = e.ledger().sequence() + 500;
         // Update name and valid_until separately
-        update_context_rule_name(&e, rule.id, String::from_str(&e, "modified_rule"));
+        update_context_rule_name(&e, rule.id, &String::from_str(&e, "modified_rule"));
         update_context_rule_valid_until(&e, rule.id, Some(future_sequence));
         assert_eq!(e.events().all().len(), 2);
 
@@ -436,7 +433,8 @@ fn update_context_rule_nonexistent_fails() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        update_context_rule_name(&e, 999, String::from_str(&e, "nonexistent")); // Non-existent ID
+        update_context_rule_name(&e, 999, &String::from_str(&e, "nonexistent"));
+        // Non-existent ID
     });
 }
 
@@ -690,21 +688,21 @@ fn get_valid_context_rules_matched_rules_only() {
         add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "rule1"),
+            &String::from_str(&e, "rule1"),
             None,
-            create_test_signers(&e),
-            Map::new(&e),
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
         add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "rule2"),
+            &String::from_str(&e, "rule2"),
             None,
-            create_test_signers(&e),
-            Map::new(&e),
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
 
-        let valid_rules = get_valid_context_rules(&e, context_type);
+        let valid_rules = get_valid_context_rules(&e, &context_type);
 
         // Should return both rules in reverse order (last added first)
         assert_eq!(valid_rules.len(), 2);
@@ -723,27 +721,26 @@ fn get_valid_context_rules_with_defaults() {
         let context_type = ContextRuleType::CallContract(contract_addr.clone());
 
         // Add a matched rule
-
         add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "matched"),
+            &String::from_str(&e, "matched"),
             None,
-            create_test_signers(&e),
-            Map::new(&e),
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
 
         // Add default rules
         add_context_rule(
             &e,
             &ContextRuleType::Default,
-            String::from_str(&e, "default"),
+            &String::from_str(&e, "default"),
             None,
-            create_test_signers(&e),
-            Map::new(&e),
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
 
-        let valid_rules = get_valid_context_rules(&e, context_type);
+        let valid_rules = get_valid_context_rules(&e, &context_type);
 
         // Should return matched rule first, then defaults
         assert_eq!(valid_rules.len(), 2);
@@ -766,21 +763,21 @@ fn get_valid_context_rules_only_defaults() {
         add_context_rule(
             &e,
             &ContextRuleType::Default,
-            String::from_str(&e, "default1"),
+            &String::from_str(&e, "default1"),
             None,
-            signers.clone(),
-            Map::new(&e),
+            &signers,
+            &Map::new(&e),
         );
         add_context_rule(
             &e,
             &ContextRuleType::Default,
-            String::from_str(&e, "default2"),
+            &String::from_str(&e, "default2"),
             None,
-            signers,
-            Map::new(&e),
+            &signers,
+            &Map::new(&e),
         );
 
-        let valid_rules = get_valid_context_rules(&e, context_type);
+        let valid_rules = get_valid_context_rules(&e, &context_type);
 
         // Should return only defaults in reverse order
         assert_eq!(valid_rules.len(), 2);
@@ -802,25 +799,23 @@ fn get_valid_context_rules_filters_expired() {
         e.ledger().set_sequence_number(100);
 
         // Add valid rule (future expiration)
-        let signers = create_test_signers(&e);
         add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "valid"),
+            &String::from_str(&e, "valid"),
             Some(200),
-            signers,
-            Map::new(&e),
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
 
         // Add expired rule
-        let signers = create_test_signers(&e);
         add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "expired"),
+            &String::from_str(&e, "expired"),
             Some(150),
-            signers,
-            Map::new(&e),
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
 
         // Forward ledger sequence
@@ -830,13 +825,13 @@ fn get_valid_context_rules_filters_expired() {
         add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "no_expiry"),
+            &String::from_str(&e, "no_expiry"),
             None,
-            create_test_signers(&e),
-            Map::new(&e),
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
 
-        let valid_rules = get_valid_context_rules(&e, context_type);
+        let valid_rules = get_valid_context_rules(&e, &context_type);
 
         // Should only return non-expired rules
         assert_eq!(valid_rules.len(), 2);
@@ -854,7 +849,7 @@ fn get_valid_context_rules_empty_result() {
         let contract_addr = Address::generate(&e);
         let context_type = ContextRuleType::CallContract(contract_addr);
 
-        let valid_rules = get_valid_context_rules(&e, context_type);
+        let valid_rules = get_valid_context_rules(&e, &context_type);
 
         // Should return empty vector when no rules exist
         assert_eq!(valid_rules.len(), 0);
@@ -874,10 +869,10 @@ fn get_validated_context_call_contract_with_signers_success() {
         let rule = add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "test_rule"),
+            &String::from_str(&e, "test_rule"),
             None,
-            create_test_signers(&e),
-            Map::new(&e),
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
 
         let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
@@ -902,13 +897,14 @@ fn get_validated_context_create_contract_with_policies_success() {
 
         // Add rule with policies
         let policies_map = create_test_policies_map(&e);
+        let empty_signers = Vec::new(&e);
         let rule = add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "policy_rule"),
+            &String::from_str(&e, "policy_rule"),
             None,
-            Vec::new(&e),
-            policies_map,
+            &empty_signers,
+            &policies_map,
         );
 
         let context =
@@ -939,10 +935,10 @@ fn get_validated_context_create_contract_success() {
         let rule = add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "create_rule"),
+            &String::from_str(&e, "create_rule"),
             None,
-            create_test_signers(&e),
-            Map::new(&e),
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
 
         let context = Context::CreateContractHostFn(CreateContractHostFnContext {
@@ -975,14 +971,8 @@ fn get_validated_context_call_contract_with_policies_fails() {
             policies_map.set(policy, Val::from_void().into());
         }
         let context_val_name = String::from_str(&e, "policy_rule");
-        add_context_rule(
-            &e,
-            &context_type,
-            context_val_name,
-            None,
-            Vec::new(&e),
-            policies_map.clone(),
-        );
+        let empty_signers = Vec::new(&e);
+        add_context_rule(&e, &context_type, &context_val_name, None, &empty_signers, &policies_map);
         let failing_policy = policies_vec.get(1).unwrap();
         e.as_contract(&failing_policy, || {
             e.storage().persistent().set(&symbol_short!("enforce"), &false);
@@ -1007,14 +997,15 @@ fn get_validated_context_insufficient_signers_fails() {
         let rule = add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "strict_rule"),
+            &String::from_str(&e, "strict_rule"),
             None,
-            create_test_signers(&e),
-            Map::new(&e),
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
 
         let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
-        let insufficient_signers = rule.signers.slice(..1); // Only 1 signer
+        let signers = rule.signers.clone();
+        let insufficient_signers = signers.slice(..1); // Only 1 signer
 
         get_validated_context(&e, &context, &insufficient_signers);
     });
@@ -1032,15 +1023,13 @@ fn get_validated_context_no_matching_rules_fails() {
 
         // Add rule for different contract
         let different_context_type = ContextRuleType::CallContract(different_addr);
-        let signers = create_test_signers(&e);
-        let policies = Map::new(&e);
         add_context_rule(
             &e,
             &different_context_type,
-            String::from_str(&e, "other_rule"),
+            &String::from_str(&e, "other_rule"),
             None,
-            signers,
-            policies,
+            &create_test_signers(&e),
+            &Map::new(&e),
         );
 
         let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
@@ -1061,30 +1050,29 @@ fn get_context_rules_multiple_rules() {
 
         // Add multiple rules
         let signers = create_test_signers(&e);
-        let policies = Map::new(&e);
         let rule1 = add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "rule1"),
+            &String::from_str(&e, "rule1"),
             None,
-            signers.clone(),
-            policies.clone(),
+            &signers.clone(),
+            &Map::new(&e),
         );
         let rule2 = add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "rule2"),
+            &String::from_str(&e, "rule2"),
             None,
-            signers.clone(),
-            policies.clone(),
+            &signers.clone(),
+            &Map::new(&e),
         );
         let rule3 = add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "rule3"),
+            &String::from_str(&e, "rule3"),
             None,
-            signers.clone(),
-            policies.clone(),
+            &signers.clone(),
+            &Map::new(&e),
         );
 
         let rules = get_context_rules(&e, &context_type);
@@ -1137,10 +1125,10 @@ fn add_context_rule_duplicate_signer_fails() {
         add_context_rule(
             &e,
             &context_type,
-            String::from_str(&e, "test_rule"),
+            &String::from_str(&e, "test_rule"),
             None,
-            signers,
-            policies_map,
+            &signers,
+            &policies_map,
         );
     });
 }
