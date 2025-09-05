@@ -29,7 +29,7 @@
 mod storage;
 mod test;
 
-use soroban_sdk::{contracterror, Address, BytesN, Env, String, Symbol, Vec};
+use soroban_sdk::{contracterror, contractevent, Address, BytesN, Env, String, Vec};
 pub use storage::{
     document_exists, get_all_documents, get_document, get_document_count, remove_document,
     set_document, Document, DocumentStorageKey,
@@ -121,6 +121,17 @@ pub enum DocumentError {
 
 // ################## EVENTS ##################
 
+/// Event emitted when a document is updated (added or modified).
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DocumentUpdated {
+    #[topic]
+    pub name: BytesN<32>,
+    pub uri: String,
+    pub document_hash: BytesN<32>,
+    pub timestamp: u64,
+}
+
 /// Emits an event when a document is updated (added or modified).
 ///
 /// # Arguments
@@ -137,8 +148,21 @@ pub fn emit_document_updated(
     document_hash: &BytesN<32>,
     timestamp: u64,
 ) {
-    let topics = (Symbol::new(e, "document_updated"), name.clone());
-    e.events().publish(topics, (uri.clone(), document_hash.clone(), timestamp));
+    DocumentUpdated {
+        name: name.clone(),
+        uri: uri.clone(),
+        document_hash: document_hash.clone(),
+        timestamp,
+    }
+    .publish(e);
+}
+
+/// Event emitted when a document is removed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DocumentRemoved {
+    #[topic]
+    pub name: BytesN<32>,
 }
 
 /// Emits an event when a document is removed.
@@ -148,6 +172,5 @@ pub fn emit_document_updated(
 /// * `e` - The Soroban environment.
 /// * `name` - The document name.
 pub fn emit_document_removed(e: &Env, name: &BytesN<32>) {
-    let topics = (Symbol::new(e, "document_removed"), name.clone());
-    e.events().publish(topics, ());
+    DocumentRemoved { name: name.clone() }.publish(e);
 }
