@@ -3,6 +3,7 @@ use soroban_sdk::{auth::Context, contractclient, Address, Env, FromVal, Val, Vec
 use crate::smart_account::{ContextRule, Signer};
 
 pub mod simple_threshold;
+#[cfg(test)]
 mod test;
 pub mod weighted_threshold;
 

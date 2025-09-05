@@ -1,4 +1,5 @@
 pub mod ed25519;
+#[cfg(test)]
 mod test;
 pub mod utils;
 pub mod webauthn;

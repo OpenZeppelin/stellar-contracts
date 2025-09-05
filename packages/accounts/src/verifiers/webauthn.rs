@@ -31,8 +31,7 @@ use soroban_sdk::{
     contracterror, contracttype, panic_with_error, xdr::FromXdr, Bytes, BytesN, Env, String,
 };
 
-use super::utils::base64_url_encode;
-use crate::verifiers::utils::extract_from_bytes;
+use crate::verifiers::utils::{base64_url_encode, extract_from_bytes};
 
 /// Bit 0 of the authenticator data flags: "User Present" bit.
 pub const AUTH_DATA_FLAGS_UP: u8 = 0x01;

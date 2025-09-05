@@ -1,4 +1,3 @@
-#![cfg(test)]
 extern crate std;
 
 use hex_literal::hex;

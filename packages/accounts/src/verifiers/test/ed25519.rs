@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use ed25519_dalek::{Signer as Ed25519Signer, SigningKey};
 use soroban_sdk::{contract, xdr::ToXdr, Bytes, BytesN, Env};
 

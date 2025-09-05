@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 extern crate std;
 
 use soroban_sdk::{
@@ -11,7 +9,7 @@ use soroban_sdk::{
 
 use crate::{
     policies::weighted_threshold::*,
-    smart_account::{storage::Signer, ContextRule, ContextRuleType},
+    smart_account::{ContextRule, ContextRuleType, Signer},
 };
 
 #[contract]

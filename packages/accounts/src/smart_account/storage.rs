@@ -94,12 +94,12 @@ use soroban_sdk::{
     panic_with_error, Address, Bytes, BytesN, Env, IntoVal, Map, String, TryFromVal, Val, Vec,
 };
 
-use super::{MAX_POLICIES, MAX_SIGNERS, SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD};
 use crate::{
     policies::PolicyClient,
     smart_account::{
         emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
         emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
+        MAX_POLICIES, MAX_SIGNERS, SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
     },
     verifiers::VerifierClient,
 };
