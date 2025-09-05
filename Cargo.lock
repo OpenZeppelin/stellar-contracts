@@ -920,6 +920,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "multisig-account-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-accounts",
+]
+
+[[package]]
+name = "multisig-ed25519-verifier-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-accounts",
+]
+
+[[package]]
+name = "multisig-threshold-policy-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-accounts",
+]
+
+[[package]]
 name = "nft-access-control-example"
 version = "0.4.1"
 dependencies = [
@@ -1399,6 +1423,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-json-core"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b81787e655bd59cecadc91f7b6b8651330b2be6c33246039a65e5cd6f4e0828"
+dependencies = [
+ "ryu",
+ "serde",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1725,6 +1759,20 @@ name = "stellar-access"
 version = "0.4.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-event-assertion",
+]
+
+[[package]]
+name = "stellar-accounts"
+version = "0.4.1"
+dependencies = [
+ "ed25519-dalek",
+ "hex-literal 1.0.0",
+ "p256",
+ "serde",
+ "serde-json-core",
+ "soroban-sdk",
+ "soroban-test-helpers",
  "stellar-event-assertion",
 ]
 

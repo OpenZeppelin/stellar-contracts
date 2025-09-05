@@ -18,7 +18,9 @@ members = [
     "examples/rwa",
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
+    "examples/multisig/*",
     "examples/upgradeable/*",
+    "packages/accounts",
     "packages/access",
     "packages/contract-utils",
     "packages/macros",
@@ -48,9 +50,12 @@ hex-literal = "1.0.0"
 ed25519-dalek = "2.1.1"
 k256 = "0.13.4"
 p256 = "0.13.2"
+serde = { version = "1", default-features = false }
+serde-json-core = { version = "0.6.0", default-features = false }
 
 # members
 stellar-access = { path = "packages/access" }
+stellar-accounts = { path = "packages/accounts" }
 stellar-contract-utils = { path = "packages/contract-utils" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
 stellar-tokens = { path = "packages/tokens" }
