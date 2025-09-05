@@ -126,6 +126,80 @@ fn remove_nonexistent_claim_topic_panics() {
     });
 }
 
+#[test]
+fn remove_claim_topic_cleans_up_issuer_mappings() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let issuer1 = Address::generate(&e);
+    let issuer2 = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Add claim topics
+        add_claim_topic(&e, 1); // KYC
+        add_claim_topic(&e, 2); // AML
+        add_claim_topic(&e, 3); // Accreditation
+
+        // Create claim topics vectors for issuers
+        let mut issuer1_topics = Vec::new(&e);
+        issuer1_topics.push_back(1);
+        issuer1_topics.push_back(2);
+
+        let mut issuer2_topics = Vec::new(&e);
+        issuer2_topics.push_back(2);
+        issuer2_topics.push_back(3);
+
+        // Add trusted issuers with their claim topics
+        add_trusted_issuer(&e, &issuer1, &issuer1_topics);
+        add_trusted_issuer(&e, &issuer2, &issuer2_topics);
+
+        // Verify initial state
+        let issuer1_initial_topics = get_trusted_issuer_claim_topics(&e, &issuer1);
+        assert_eq!(issuer1_initial_topics.len(), 2);
+        assert!(issuer1_initial_topics.contains(1));
+        assert!(issuer1_initial_topics.contains(2));
+
+        let issuer2_initial_topics = get_trusted_issuer_claim_topics(&e, &issuer2);
+        assert_eq!(issuer2_initial_topics.len(), 2);
+        assert!(issuer2_initial_topics.contains(2));
+        assert!(issuer2_initial_topics.contains(3));
+
+        // Remove claim topic 2 (AML)
+        remove_claim_topic(&e, 2);
+
+        // Verify topic 2 was removed from global topics
+        let global_topics = get_claim_topics(&e);
+        assert_eq!(global_topics.len(), 2);
+        assert!(global_topics.contains(1));
+        assert!(!global_topics.contains(2));
+        assert!(global_topics.contains(3));
+
+        // Verify topic 2 was removed from issuer1's topics
+        let issuer1_topics_after = get_trusted_issuer_claim_topics(&e, &issuer1);
+        assert_eq!(issuer1_topics_after.len(), 1);
+        assert!(issuer1_topics_after.contains(1));
+        assert!(!issuer1_topics_after.contains(2));
+
+        // Verify topic 2 was removed from issuer2's topics
+        let issuer2_topics_after = get_trusted_issuer_claim_topics(&e, &issuer2);
+        assert_eq!(issuer2_topics_after.len(), 1);
+        assert!(!issuer2_topics_after.contains(2));
+        assert!(issuer2_topics_after.contains(3));
+
+        // Verify that subsequent operations don't panic
+        let mut new_topics = Vec::new(&e);
+        new_topics.push_back(1);
+        new_topics.push_back(3);
+        update_issuer_claim_topics(&e, &issuer1, &new_topics);
+
+        // Verify the update worked correctly
+        let issuer1_final_topics = get_trusted_issuer_claim_topics(&e, &issuer1);
+        assert_eq!(issuer1_final_topics.len(), 2);
+        assert!(issuer1_final_topics.contains(1));
+        assert!(issuer1_final_topics.contains(3));
+    });
+}
+
 // ################## TRUSTED ISSUERS TESTS ##################
 
 #[test]
