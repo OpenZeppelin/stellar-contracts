@@ -393,7 +393,7 @@ fn mint_without_compliance_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #305)")]
+#[should_panic(expected = "Error(Contract, #306)")]
 fn mint_fails_when_not_compliant() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());

@@ -839,7 +839,7 @@ impl RWA {
         let can_create: bool = compliance_client.can_create(to, &amount);
 
         if !can_create {
-            panic_with_error!(e, RWAError::TransferNotCompliant);
+            panic_with_error!(e, RWAError::MintNotCompliant);
         }
     }
 }
