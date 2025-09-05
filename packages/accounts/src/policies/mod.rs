@@ -16,10 +16,10 @@ pub mod weighted_threshold;
 /// # Lifecycle
 ///
 /// Policies follow a three-phase lifecycle:
-/// 1. **Installation** - Policy is configured and attached to a context rule
+/// 1. **Installation** - Policy is configured and attached to a context rule.
 /// 2. **Enforcement** - Policy validates and potentially modifies authorization
-///    attempts
-/// 3. **Uninstallation** - Policy is removed and cleaned up
+///    attempts.
+/// 3. **Uninstallation** - Policy is removed and cleaned up.
 ///
 /// # Type Parameters
 ///
