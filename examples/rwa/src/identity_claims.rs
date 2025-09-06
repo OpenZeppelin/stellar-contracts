@@ -4,17 +4,12 @@
 //! This contract stores and manages claims made by trusted issuers
 //! about specific identities.
 
-use soroban_sdk::{
-    contract, contractimpl, contractmeta, symbol_short, Address, Bytes, BytesN, Env, String, Vec,
-};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Bytes, BytesN, Env, String, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::{default_impl, only_role};
+use stellar_macros::default_impl;
 use stellar_tokens::rwa::identity_claims::{
-    storage::{add_claim, get_claim, get_claim_ids_by_topic, remove_claim, Claim},
-    IdentityClaims,
+    add_claim, get_claim, get_claim_ids_by_topic, Claim, IdentityClaims,
 };
-
-contractmeta!(key = "Description", val = "On-chain identity claims storage");
 
 /// Role for managing claims
 pub const CLAIMS_ADMIN_ROLE: soroban_sdk::Symbol = symbol_short!("CLM_ADM");

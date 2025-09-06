@@ -4,7 +4,7 @@
 //! This contract stores the mapping between wallet addresses and their
 //! associated identity contracts with jurisdictional information.
 
-use soroban_sdk::{contract, contractimpl, contractmeta, symbol_short, Address, Env, Vec};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::{default_impl, only_role};
 use stellar_tokens::rwa::identity_registry_storage::{
@@ -12,8 +12,6 @@ use stellar_tokens::rwa::identity_registry_storage::{
     get_country_data_entries, get_identity, modify_country_data, modify_identity, remove_identity,
     CountryData, CountryDataManager, IdentityRegistryStorage, IdentityType,
 };
-
-contractmeta!(key = "Description", val = "Identity registry storage for RWA compliance");
 
 /// Role for identity managers
 pub const IDENTITY_MANAGER_ROLE: soroban_sdk::Symbol = symbol_short!("ID_MGR");

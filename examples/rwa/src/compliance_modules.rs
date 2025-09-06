@@ -3,16 +3,12 @@
 //! Example compliance modules that can be registered with the compliance system
 //! to enforce specific transfer restrictions and validation rules.
 
-use soroban_sdk::{contract, contractimpl, contractmeta, Address, Env, String};
-use stellar_contract_utils::access_control::{AccessControl, AccessControlTrait};
-use stellar_tokens::rwa::compliance::{ComplianceModule, ComplianceModuleTrait};
+use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use stellar_access::access_control::AccessControl;
+use stellar_macros::default_impl;
+use stellar_tokens::rwa::compliance::ComplianceModule;
 
 // ################## TRANSFER LIMIT MODULE ##################
-
-contractmeta!(
-    key = "Description",
-    val = "Transfer limit compliance module"
-);
 
 /// Role for managing transfer limits
 pub const LIMIT_ADMIN_ROLE: soroban_sdk::Symbol = soroban_sdk::symbol_short!("LMT_ADM");
@@ -21,27 +17,27 @@ pub const LIMIT_ADMIN_ROLE: soroban_sdk::Symbol = soroban_sdk::symbol_short!("LM
 pub struct TransferLimitModule;
 
 #[contractimpl]
-impl ComplianceModuleTrait for TransferLimitModule {
-    fn on_transfer(e: &Env, _from: Address, _to: Address, _amount: i128) {
+impl ComplianceModule for TransferLimitModule {
+    fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128) {
         // Track transfer for limit enforcement
         // Implementation would track daily/monthly transfer volumes
     }
 
-    fn on_created(e: &Env, _to: Address, _amount: i128) {
+    fn on_created(_e: &Env, _to: Address, _amount: i128) {
         // Track minting for supply limits
     }
 
-    fn on_destroyed(e: &Env, _from: Address, _amount: i128) {
+    fn on_destroyed(_e: &Env, _from: Address, _amount: i128) {
         // Track burning
     }
 
-    fn can_transfer(e: &Env, _from: Address, _to: Address, amount: i128) -> bool {
+    fn can_transfer(_e: &Env, _from: Address, _to: Address, amount: i128) -> bool {
         // Example: Enforce maximum transfer amount
         let max_transfer = 1_000_000_000i128; // 1B tokens max per transfer
         amount <= max_transfer
     }
 
-    fn can_create(e: &Env, _to: Address, amount: i128) -> bool {
+    fn can_create(_e: &Env, _to: Address, amount: i128) -> bool {
         // Example: Enforce maximum mint amount
         let max_mint = 10_000_000_000i128; // 10B tokens max per mint
         amount <= max_mint
@@ -52,28 +48,9 @@ impl ComplianceModuleTrait for TransferLimitModule {
     }
 }
 
+#[default_impl]
 #[contractimpl]
-impl AccessControlTrait for TransferLimitModule {
-    fn has_role(e: Env, role: soroban_sdk::Symbol, account: Address) -> bool {
-        AccessControl::has_role(&e, &role, &account)
-    }
-
-    fn get_role_admin(e: Env, role: soroban_sdk::Symbol) -> soroban_sdk::Symbol {
-        AccessControl::get_role_admin(&e, &role)
-    }
-
-    fn grant_role(e: Env, role: soroban_sdk::Symbol, account: Address, admin: Address) {
-        AccessControl::grant_role(&e, &role, &account, &admin);
-    }
-
-    fn revoke_role(e: Env, role: soroban_sdk::Symbol, account: Address, admin: Address) {
-        AccessControl::revoke_role(&e, &role, &account, &admin);
-    }
-
-    fn renounce_role(e: Env, role: soroban_sdk::Symbol, account: Address) {
-        AccessControl::renounce_role(&e, &role, &account);
-    }
-}
+impl AccessControl for TransferLimitModule {}
 
 #[contractimpl]
 impl TransferLimitModule {
@@ -96,27 +73,27 @@ impl TransferLimitModule {
 pub struct CountryRestrictionModule;
 
 #[contractimpl]
-impl ComplianceModuleTrait for CountryRestrictionModule {
-    fn on_transfer(e: &Env, _from: Address, _to: Address, _amount: i128) {
+impl ComplianceModule for CountryRestrictionModule {
+    fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128) {
         // Log transfer for audit purposes
     }
 
-    fn on_created(e: &Env, _to: Address, _amount: i128) {
+    fn on_created(_e: &Env, _to: Address, _amount: i128) {
         // Log minting
     }
 
-    fn on_destroyed(e: &Env, _from: Address, _amount: i128) {
+    fn on_destroyed(_e: &Env, _from: Address, _amount: i128) {
         // Log burning
     }
 
-    fn can_transfer(e: &Env, from: Address, to: Address, _amount: i128) -> bool {
+    fn can_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128) -> bool {
         // Example: Check if addresses are from allowed countries
         // This would integrate with the identity registry to check country data
         // For now, return true (allow all transfers)
         true
     }
 
-    fn can_create(e: &Env, to: Address, _amount: i128) -> bool {
+    fn can_create(_e: &Env, _to: Address, _amount: i128) -> bool {
         // Example: Check if recipient is from allowed country for minting
         true
     }
@@ -126,28 +103,9 @@ impl ComplianceModuleTrait for CountryRestrictionModule {
     }
 }
 
+#[default_impl]
 #[contractimpl]
-impl AccessControlTrait for CountryRestrictionModule {
-    fn has_role(e: Env, role: soroban_sdk::Symbol, account: Address) -> bool {
-        AccessControl::has_role(&e, &role, &account)
-    }
-
-    fn get_role_admin(e: Env, role: soroban_sdk::Symbol) -> soroban_sdk::Symbol {
-        AccessControl::get_role_admin(&e, &role)
-    }
-
-    fn grant_role(e: Env, role: soroban_sdk::Symbol, account: Address, admin: Address) {
-        AccessControl::grant_role(&e, &role, &account, &admin);
-    }
-
-    fn revoke_role(e: Env, role: soroban_sdk::Symbol, account: Address, admin: Address) {
-        AccessControl::revoke_role(&e, &role, &account, &admin);
-    }
-
-    fn renounce_role(e: Env, role: soroban_sdk::Symbol, account: Address) {
-        AccessControl::renounce_role(&e, &role, &account);
-    }
-}
+impl AccessControl for CountryRestrictionModule {}
 
 #[contractimpl]
 impl CountryRestrictionModule {
