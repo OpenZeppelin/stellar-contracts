@@ -49,7 +49,7 @@ impl ComplianceModule for TransferLimitModule {
 impl TransferLimitModule {
     /// Initializes the transfer limit module
     pub fn initialize(e: Env, admin: Address) {
-        access_control::set_admin(e, &admin);
+        access_control::set_admin(&e, &admin);
     }
 }
 
@@ -97,6 +97,6 @@ impl AccessControl for CountryRestrictionModule {}
 impl CountryRestrictionModule {
     /// Initializes the country restriction module
     pub fn initialize(e: Env, admin: Address) {
-        access_control::set_admin(e, &admin);
+        access_control::set_admin(&e, &admin);
     }
 }
