@@ -6,11 +6,14 @@
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::{default_impl, only_role};
-use stellar_tokens::rwa::identity_registry_storage::{
-    add_country_data_entries, add_identity, delete_country_data, get_country_data,
-    get_country_data_entries, get_identity, modify_country_data, modify_identity, remove_identity,
-    CountryData, CountryDataManager, IdentityRegistryStorage, IdentityType,
+use stellar_macros::{default_impl, only_admin, only_role};
+use stellar_tokens::rwa::{
+    identity_registry_storage::{
+        add_country_data_entries, add_identity, delete_country_data, get_country_data,
+        get_country_data_entries, get_identity, modify_country_data, modify_identity,
+        remove_identity, CountryData, CountryDataManager, IdentityRegistryStorage, IdentityType,
+    },
+    utils::token_binder::{bind_token, linked_tokens, unbind_token, TokenBinder},
 };
 
 /// Role for identity managers
@@ -25,6 +28,23 @@ impl IdentityRegistryContract {
     pub fn __constructor(e: &Env, admin: Address) {
         access_control::set_admin(e, &admin);
         access_control::grant_role_no_auth(e, &admin, &admin, &IDENTITY_MANAGER_ROLE);
+    }
+}
+
+#[contractimpl]
+impl TokenBinder for IdentityRegistryContract {
+    fn linked_tokens(e: &Env) -> Vec<Address> {
+        linked_tokens(e)
+    }
+
+    #[only_admin]
+    fn bind_token(e: &Env, token: Address, _operator: Address) {
+        bind_token(e, &token);
+    }
+
+    #[only_admin]
+    fn unbind_token(e: &Env, token: Address, _operator: Address) {
+        unbind_token(e, &token);
     }
 }
 
