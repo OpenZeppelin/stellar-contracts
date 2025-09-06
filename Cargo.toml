@@ -6,6 +6,7 @@ members = [
     "examples/fungible-capped",
     "examples/fungible-merkle-airdrop",
     "examples/fungible-pausable",
+    "examples/fungible-vault",
     "examples/merkle-voting",
     "examples/nft-access-control",
     "examples/nft-consecutive",
