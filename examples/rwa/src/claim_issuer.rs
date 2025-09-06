@@ -4,18 +4,13 @@
 //! This contract can authorize keys for specific claim topics and track
 //! claim revocations.
 
-use soroban_sdk::{contract, contractimpl, contractmeta, symbol_short, Address, Bytes, Env, String};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Bytes, Env, String};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::{default_impl, only_role};
 use stellar_tokens::rwa::claim_issuer::{
-    storage::{allow_key, is_claim_revoked, is_key_allowed, remove_key, set_claim_revoked, Ed25519Verifier},
-    ClaimIssuer,
+    allow_key, is_claim_revoked, is_key_allowed, remove_key, set_claim_revoked, ClaimIssuer,
+    Ed25519Verifier, SignatureVerifier,
 };
-
-contractmeta!(
-    key = "Description",
-    val = "Claim issuer for identity verification"
-);
 
 /// Role for key administrators who can add/remove signing keys
 pub const KEY_ADMIN_ROLE: soroban_sdk::Symbol = symbol_short!("KEY_ADM");
@@ -38,11 +33,12 @@ impl ClaimIssuer for ClaimIssuerContract {
         let signature_data = Ed25519Verifier::extract_signature_data(e, &sig_data);
 
         // Check if the public key is authorized for this topic
-        if !is_key_allowed(e, &signature_data.public_key.to_bytes(), claim_topic) {
+        if !is_key_allowed(e, &signature_data.public_key, claim_topic) {
             return false;
         }
 
-        let claim_digest = Ed25519Verifier::build_claim_digest(&identity, claim_topic, &claim_data);
+        let claim_digest =
+            Ed25519Verifier::build_claim_digest(e, &identity, claim_topic, &claim_data);
 
         // Check if claim was revoked
         if is_claim_revoked(e, &claim_digest) {

@@ -4,18 +4,14 @@
 //! the full T-REX standard with identity verification, compliance rules,
 //! and administrative controls.
 
-use soroban_sdk::{
-    contract, contractimpl, contractmeta, symbol_short, Address, Env, String, Symbol,
-};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol};
 use stellar_access::access_control::{self as access_control, AccessControl};
+use stellar_contract_utils::pausable::{self, Pausable};
 use stellar_macros::{default_impl, only_role};
 use stellar_tokens::{
     fungible::{Base, FungibleToken},
     rwa::{RWAToken, RWA},
 };
-
-// Metadata that is added on to every WASM custom section
-contractmeta!(key = "Description", val = "Real World Asset Token with T-REX compliance");
 
 /// Role for token administrators who can mint, burn, and manage the token
 pub const ADMIN_ROLE: Symbol = symbol_short!("ADMIN");
@@ -55,6 +51,23 @@ impl RWATokenContract {
 #[contractimpl]
 impl FungibleToken for RWATokenContract {
     type ContractType = RWA;
+}
+
+#[contractimpl]
+impl Pausable for RWATokenContract {
+    fn paused(e: &Env) -> bool {
+        pausable::paused(e)
+    }
+
+    #[only_role(operator, "ADMIN")]
+    fn pause(e: &Env, operator: Address) {
+        pausable::pause(e);
+    }
+
+    #[only_role(operator, "ADMIN")]
+    fn unpause(e: &Env, operator: Address) {
+        pausable::unpause(e);
+    }
 }
 
 #[contractimpl]
@@ -108,7 +121,7 @@ impl RWAToken for RWATokenContract {
         RWA::get_frozen_tokens(e, &user_address)
     }
 
-    fn version(e: &Env) -> Symbol {
+    fn version(e: &Env) -> String {
         RWA::version(e)
     }
 

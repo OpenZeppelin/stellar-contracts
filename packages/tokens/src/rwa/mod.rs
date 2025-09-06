@@ -51,7 +51,7 @@ pub mod utils;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env, Symbol};
+use soroban_sdk::{contracterror, contractevent, Address, Env, String};
 use stellar_contract_utils::pausable::Pausable;
 pub use storage::{RWAStorageKey, RWA};
 
@@ -271,7 +271,7 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Errors
     ///
     /// * [`RWAError::VersionNotSet`] - When the token version is not set.
-    fn version(e: &Env) -> Symbol;
+    fn version(e: &Env) -> String;
 
     /// Returns the address of the onchain ID of the token.
     ///
