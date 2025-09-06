@@ -404,7 +404,7 @@ fn signature_verifier_different_inputs_different_digests() {
 fn set_and_check_claim_revocation() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
-    let test_digest = e.crypto().keccak256(&Bytes::from_array(&e, &[1, 2, 3, 4]));
+    let test_digest = BytesN::<32>::from_array(&e, &[1u8; 32]);
 
     e.as_contract(&contract_id, || {
         assert!(!is_claim_revoked(&e, &test_digest));
@@ -419,7 +419,7 @@ fn set_and_check_claim_revocation() {
 fn unrevoke_claim() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
-    let test_digest = e.crypto().keccak256(&Bytes::from_array(&e, &[5, 6, 7, 8]));
+    let test_digest = BytesN::<32>::from_array(&e, &[1u8; 32]);
 
     e.as_contract(&contract_id, || {
         set_claim_revoked(&e, &test_digest, true);
@@ -482,8 +482,8 @@ fn revocation_edge_cases() {
 
     e.as_contract(&contract_id, || {
         // Test with different digest types
-        let digest1 = e.crypto().keccak256(&Bytes::new(&e));
-        let digest2 = e.crypto().keccak256(&Bytes::from_array(&e, &[0u8; 1000]));
+        let digest1 = BytesN::<32>::from_array(&e, &[1u8; 32]);
+        let digest2 = BytesN::<32>::from_array(&e, &[2u8; 32]);
 
         // Test revoking non-existent claim
         assert!(!is_claim_revoked(&e, &digest1));

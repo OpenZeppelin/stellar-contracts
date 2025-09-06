@@ -213,8 +213,8 @@ pub struct ClaimRevoked {
 /// * `e` - The Soroban environment.
 /// * `claim_digest` - The hash digest of the claim.
 /// * `revoked` - Whether the claim should be marked as revoked.
-pub fn emit_revocation_event(e: &Env, claim_digest: &Hash<32>, revoked: bool) {
-    ClaimRevoked { claim_digest: claim_digest.to_bytes(), revoked }.publish(e);
+pub fn emit_revocation_event(e: &Env, claim_digest: &BytesN<32>, revoked: bool) {
+    ClaimRevoked { claim_digest: claim_digest.clone(), revoked }.publish(e);
 }
 
 // ################## ERRORS ##################
