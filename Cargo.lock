@@ -936,6 +936,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "multisig-spending-limit-policy-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-accounts",
+]
+
+[[package]]
 name = "multisig-threshold-policy-example"
 version = "0.4.1"
 dependencies = [

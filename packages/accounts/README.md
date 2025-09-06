@@ -370,5 +370,5 @@ This crate is organized into three main submodules that provide building blocks 
 - `ed25519` and `webauthn` (passkey authentication) utility functions for implementing the `Verifier` trait
 
 3. **policies**
-- `simple_threshold` and `weighted_threshold` utility functions for implementing the `Policy` trait
+- `simple_threshold`, `weighted_threshold` and `spending_limit` utility functions for implementing the `Policy` trait
 
