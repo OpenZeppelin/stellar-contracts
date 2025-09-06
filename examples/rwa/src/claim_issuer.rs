@@ -4,7 +4,7 @@
 //! This contract can authorize keys for specific claim topics and track
 //! claim revocations.
 
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Bytes, Env, String};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Bytes, BytesN, Env, String};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::{default_impl, only_role};
 use stellar_tokens::rwa::claim_issuer::{
@@ -33,7 +33,8 @@ impl ClaimIssuer for ClaimIssuerContract {
         let signature_data = Ed25519Verifier::extract_signature_data(e, &sig_data);
 
         // Check if the public key is authorized for this topic
-        if !is_key_allowed(e, &signature_data.public_key, claim_topic) {
+        let pub_key = signature_data.public_key.clone();
+        if !is_key_allowed(e, &pub_key.into(), claim_topic) {
             return false;
         }
 
@@ -41,7 +42,7 @@ impl ClaimIssuer for ClaimIssuerContract {
             Ed25519Verifier::build_claim_digest(e, &identity, claim_topic, &claim_data);
 
         // Check if claim was revoked
-        if is_claim_revoked(e, &claim_digest) {
+        if is_claim_revoked(e, &claim_digest.to_bytes()) {
             return false;
         }
 
@@ -82,12 +83,12 @@ impl ClaimIssuerContract {
 
     /// Revokes a claim by its digest
     #[only_role(admin, "CLM_ADM")]
-    pub fn revoke_claim(e: &Env, claim_digest: Bytes, admin: Address) {
+    pub fn revoke_claim(e: &Env, claim_digest: BytesN<32>, admin: Address) {
         set_claim_revoked(e, &claim_digest, true);
     }
 
     /// Checks if a claim is revoked
-    pub fn is_claim_revoked(e: &Env, claim_digest: Bytes) -> bool {
+    pub fn is_claim_revoked(e: &Env, claim_digest: BytesN<32>) -> bool {
         is_claim_revoked(e, &claim_digest)
     }
 
