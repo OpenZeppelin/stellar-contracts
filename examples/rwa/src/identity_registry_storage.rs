@@ -57,7 +57,7 @@ impl IdentityRegistryStorage for IdentityRegistryContract {
         e: &Env,
         account: Address,
         identity: Address,
-        country_data_list: Vec<Self::CountryData>,
+        country_data_list: Vec<CountryData>,
         operator: Address,
     ) {
         add_identity(e, &account, &identity, IdentityType::Individual, &country_data_list);
@@ -84,7 +84,7 @@ impl CountryDataManager for IdentityRegistryContract {
     fn add_country_data_entries(
         e: &Env,
         account: Address,
-        country_data_list: Vec<Self::CountryData>,
+        country_data_list: Vec<CountryData>,
         operator: Address,
     ) {
         add_country_data_entries(e, &account, &country_data_list);
@@ -95,7 +95,7 @@ impl CountryDataManager for IdentityRegistryContract {
         e: &Env,
         account: Address,
         index: u32,
-        country_data: Self::CountryData,
+        country_data: CountryData,
         operator: Address,
     ) {
         modify_country_data(e, &account, index, &country_data);
@@ -106,11 +106,11 @@ impl CountryDataManager for IdentityRegistryContract {
         delete_country_data(e, &account, index);
     }
 
-    fn get_country_data(e: &Env, account: Address, index: u32) -> Self::CountryData {
+    fn get_country_data(e: &Env, account: Address, index: u32) -> CountryData {
         get_country_data(e, &account, index)
     }
 
-    fn get_country_data_entries(e: &Env, account: Address) -> Vec<Self::CountryData> {
+    fn get_country_data_entries(e: &Env, account: Address) -> Vec<CountryData> {
         get_country_data_entries(e, &account)
     }
 }

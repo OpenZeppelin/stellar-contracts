@@ -1,6 +1,6 @@
 extern crate std;
 
-use soroban_sdk::{testutils::Address as _, vec, Address, Env};
+use soroban_sdk::{testutils::Address as _, Address, Env};
 
 use crate::identity_registry_storage::{IdentityRegistryContract, IdentityRegistryContractClient};
 
@@ -24,10 +24,9 @@ fn bind_max() {
     let mut tokens = vec![&e];
     for _ in 0..200 {
         let token = Address::generate(&e);
-        tokens.push_back(token.clone());
+        client.bind_token(&token, &manager);
     }
 
-    client.bind_tokens(&tokens, &manager);
     assert_eq!(client.linked_tokens().len(), 200)
 }
 
