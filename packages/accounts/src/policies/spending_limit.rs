@@ -1,9 +1,8 @@
 //! # Spending Limit Policy Module
 //!
 //! This policy implements spending limit functionality where transactions above
-//! a specified amount are blocked. It monitors transfer operations and enforces
-//! spending limits over a configurable rolling time window to prevent
-//! unauthorized large transactions.
+//! the specified amount are blocked. It intersects transfer operations and
+//! enforces spending limits over a configurable rolling time window.
 //!
 //! ## Example Usage
 //!
