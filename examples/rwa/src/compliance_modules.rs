@@ -4,14 +4,11 @@
 //! to enforce specific transfer restrictions and validation rules.
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_access::access_control::AccessControl;
+use stellar_access::access_control::{self, AccessControl};
 use stellar_macros::default_impl;
 use stellar_tokens::rwa::compliance::ComplianceModule;
 
 // ################## TRANSFER LIMIT MODULE ##################
-
-/// Role for managing transfer limits
-pub const LIMIT_ADMIN_ROLE: soroban_sdk::Symbol = soroban_sdk::symbol_short!("LMT_ADM");
 
 #[contract]
 pub struct TransferLimitModule;
@@ -48,22 +45,11 @@ impl ComplianceModule for TransferLimitModule {
     }
 }
 
-#[default_impl]
-#[contractimpl]
-impl AccessControl for TransferLimitModule {}
-
 #[contractimpl]
 impl TransferLimitModule {
     /// Initializes the transfer limit module
     pub fn initialize(e: Env, admin: Address) {
-        AccessControl::initialize(&e, &admin);
-        AccessControl::grant_role(&e, &LIMIT_ADMIN_ROLE, &admin, &admin);
-    }
-
-    /// Sets the maximum transfer amount
-    pub fn set_max_transfer(e: Env, max_amount: i128, admin: Address) {
-        AccessControl::check_role(&e, &LIMIT_ADMIN_ROLE, &admin);
-        e.storage().persistent().set(&soroban_sdk::symbol_short!("max_xfer"), &max_amount);
+        access_control::set_admin(e, &admin);
     }
 }
 
@@ -111,6 +97,6 @@ impl AccessControl for CountryRestrictionModule {}
 impl CountryRestrictionModule {
     /// Initializes the country restriction module
     pub fn initialize(e: Env, admin: Address) {
-        AccessControl::initialize(&e, &admin);
+        access_control::set_admin(e, &admin);
     }
 }

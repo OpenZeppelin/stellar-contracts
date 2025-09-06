@@ -31,7 +31,7 @@ impl IdentityClaims for IdentityClaimsContract {
         // Only the identity owner or authorized admin can add claims
         issuer.require_auth();
 
-        add_claim(e, topic, scheme, issuer, signature, data, uri)
+        add_claim(e, topic, scheme, &issuer, &signature, &data, &uri)
     }
 
     fn get_claim(e: &Env, claim_id: BytesN<32>) -> Claim {
