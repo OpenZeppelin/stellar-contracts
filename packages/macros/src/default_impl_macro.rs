@@ -233,6 +233,88 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
         ],
+        "FungibleVault" => vec![
+            syn::parse_quote! {
+                fn query_asset(e: &soroban_sdk::Env) -> soroban_sdk::Address {
+                    Self::ContractType::query_asset(e)
+                }
+            },
+            syn::parse_quote! {
+                fn total_assets(e: &soroban_sdk::Env) -> i128 {
+                    Self::ContractType::total_assets(e)
+                }
+            },
+            syn::parse_quote! {
+                fn convert_to_shares(e: &soroban_sdk::Env, assets: i128) -> i128 {
+                    Self::ContractType::convert_to_shares(e, assets)
+                }
+            },
+            syn::parse_quote! {
+                fn convert_to_assets(e: &soroban_sdk::Env, shares: i128) -> i128 {
+                    Self::ContractType::convert_to_assets(e, shares)
+                }
+            },
+            syn::parse_quote! {
+                fn max_deposit(e: &soroban_sdk::Env, receiver: soroban_sdk::Address) -> i128 {
+                    Self::ContractType::max_deposit(e, receiver)
+                }
+            },
+            syn::parse_quote! {
+                fn preview_deposit(e: &soroban_sdk::Env, assets: i128) -> i128 {
+                    Self::ContractType::preview_deposit(e, assets)
+                }
+            },
+            syn::parse_quote! {
+                fn deposit(e: &soroban_sdk::Env, assets: i128, receiver: soroban_sdk::Address, operator: soroban_sdk::Address) -> i128 {
+                    Self::ContractType::deposit(e, assets, receiver, operator)
+                }
+            },
+            syn::parse_quote! {
+                fn max_mint(e: &soroban_sdk::Env, receiver: soroban_sdk::Address) -> i128 {
+                    Self::ContractType::max_mint(e, receiver)
+                }
+            },
+            syn::parse_quote! {
+                fn preview_mint(e: &soroban_sdk::Env, shares: i128) -> i128 {
+                    Self::ContractType::preview_mint(e, shares)
+                }
+            },
+            syn::parse_quote! {
+                fn mint(e: &soroban_sdk::Env, shares: i128, receiver: soroban_sdk::Address, operator: soroban_sdk::Address) -> i128 {
+                    Self::ContractType::mint(e, shares, receiver, operator)
+                }
+            },
+            syn::parse_quote! {
+                fn max_withdraw(e: &soroban_sdk::Env, owner: soroban_sdk::Address) -> i128 {
+                    Self::ContractType::max_withdraw(e, owner)
+                }
+            },
+            syn::parse_quote! {
+                fn preview_withdraw(e: &soroban_sdk::Env, assets: i128) -> i128 {
+                    Self::ContractType::preview_withdraw(e, assets)
+                }
+            },
+            syn::parse_quote! {
+                fn withdraw(e: &soroban_sdk::Env, assets: i128, receiver: soroban_sdk::Address, owner: soroban_sdk::Address, operator: soroban_sdk::Address) -> i128 {
+                    Self::ContractType::withdraw(e, assets, receiver, owner, operator)
+                }
+            },
+            syn::parse_quote! {
+                fn max_redeem(e: &soroban_sdk::Env, owner: soroban_sdk::Address) -> i128 {
+                    Self::ContractType::max_redeem(e, owner)
+                }
+            },
+            syn::parse_quote! {
+                fn preview_redeem(e: &soroban_sdk::Env, shares: i128) -> i128 {
+                    Self::ContractType::preview_redeem(e, shares)
+                }
+            },
+            syn::parse_quote! {
+                fn redeem(e: &soroban_sdk::Env, shares: i128, receiver: soroban_sdk::Address, owner: soroban_sdk::Address, operator: soroban_sdk::Address) -> i128 {
+                    Self::ContractType::redeem(e, shares, receiver, owner, operator)
+                }
+            },
+        ],
 
         not_supported => {
             panic!("Trait {not_supported} is not supported by #[default_impl]")

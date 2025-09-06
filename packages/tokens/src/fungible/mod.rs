@@ -75,7 +75,7 @@ mod utils;
 #[cfg(test)]
 mod test;
 
-pub use extensions::{allowlist, blocklist, burnable, capped};
+pub use extensions::{allowlist, blocklist, burnable, capped, vault};
 pub use overrides::{Base, ContractOverrides};
 use soroban_sdk::{contracterror, contractevent, Address, Env, String};
 pub use storage::{AllowanceData, AllowanceKey, StorageKey};
@@ -314,6 +314,24 @@ pub enum FungibleTokenError {
     UserNotAllowed = 113,
     /// The user is blocked and cannot perform this operation
     UserBlocked = 114,
+    /// Indicates access to uninitialized vault asset address.
+    VaultAssetAddressNotSet = 115,
+    /// Indicates that vault asset address is already set.
+    VaultAssetAddressAlreadySet = 116,
+    /// Indicates that vault virtual decimals offset is already set.
+    VaultVirtualDecimalsOffsetAlreadySet = 117,
+    /// Indicates the amount is not a valid vault assets value.
+    VaultInvalidAssetsAmount = 118,
+    /// Indicates the amount is not a valid vault shares value.
+    VaultInvalidSharesAmount = 119,
+    /// Attempted to deposit more assets than the max amount for address.
+    VaultExceededMaxDeposit = 120,
+    /// Attempted to mint more shares than the max amount for address.
+    VaultExceededMaxMint = 121,
+    /// Attempted to withdraw more assets than the max amount for address.
+    VaultExceededMaxWithdraw = 122,
+    /// Attempted to redeem more shares than the max amount for address.
+    VaultExceededMaxRedeem = 123,
 }
 
 // ################## CONSTANTS ##################
