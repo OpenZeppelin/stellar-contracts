@@ -330,8 +330,8 @@ pub fn is_key_allowed(e: &Env, public_key: &Bytes, claim_topic: u32) -> bool {
 ///
 /// Using this function in public-facing methods may create significant security
 /// risks as it could allow unauthorized modifications.
-pub fn set_claim_revoked(e: &Env, claim_digest: &Hash<32>, revoked: bool) {
-    let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest.to_bytes());
+pub fn set_claim_revoked(e: &Env, claim_digest: &BytesN<32>, revoked: bool) {
+    let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest.clone());
     e.storage().persistent().set(&key, &revoked);
 
     emit_revocation_event(e, claim_digest, revoked);
@@ -343,8 +343,8 @@ pub fn set_claim_revoked(e: &Env, claim_digest: &Hash<32>, revoked: bool) {
 ///
 /// * `e` - The Soroban environment.
 /// * `claim_digest` - The hash digest of the claim message to check.
-pub fn is_claim_revoked(e: &Env, claim_digest: &Hash<32>) -> bool {
-    let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest.to_bytes());
+pub fn is_claim_revoked(e: &Env, claim_digest: &BytesN<32>) -> bool {
+    let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest.clone());
     e.storage()
         .persistent()
         .get(&key)
