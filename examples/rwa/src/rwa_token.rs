@@ -13,8 +13,6 @@ use stellar_tokens::{
     rwa::{RWAToken, RWA},
 };
 
-/// Role for token administrators who can mint, burn, and manage the token
-pub const ADMIN_ROLE: Symbol = symbol_short!("ADMIN");
 /// Role for compliance officers who can freeze addresses and manage compliance
 pub const COMPLIANCE_ROLE: Symbol = symbol_short!("COMPLNC");
 /// Role for recovery agents who can perform wallet recovery operations
