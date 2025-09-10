@@ -28,6 +28,47 @@
 //!   privileges for the administrative functions based on the needs of the
 //!   token/project.
 //!
+//! ## Flexibility
+//!
+//! RWA Token contract is designed to be flexible and extensible, allowing
+//! for easy integration with variety of identity registry and compliance
+//! frameworks (i.e. Merkle-Tree or Zero-Knowledge based identity
+//! registries, etc.). This flexibility is achieved by the architecture
+//! and loose-coupling between the modules and the token contract.
+//!
+//! ## Architecture
+//!
+//! The main RWA contract denoted by [`RWAToken`] interface, is expecting two
+//! functions to be available from external contracts:
+//!
+//! - `fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) ->
+//!   bool;` for compliance validation
+//! - `fn verify_identity(e: &Env, user_address: &Address);` for the identity
+//!   verification
+//!
+//! Hence, the [`RWAToken`] interface also exposes the following functions to
+//! set and get the necessary contracts:
+//!
+//! Compliance (required for `can_transfer()`):
+//! - `set_compliance(e: &Env, compliance: Address, operator: Address)`
+//! - `compliance(e: &Env) -> Address`
+//!
+//! IdentityVerifier (required for `verify_identity()`):
+//! - `set_identity_verifier(e: &Env, identity_verifier: Address, operator:
+//!   Address)`
+//! - `identity_verifier(e: &Env) -> Address`
+//!
+//! As long as these two functions are available to the RWA Token contract,
+//! the [`RWAToken`] interface can be used to create a compliant RWA token.
+//!
+//! These two functions `can_transfer() and `verify_identity()` are
+//! deliberately marked as implementation details, to provide flexibility and
+//! allow for alternate approaches for different business needs.
+//!
+//! The concrete implementation for these functions can be found in the modules
+//! below. These modules act as the default implementations for the most common
+//! needs.
+//!
 //! ## Modules
 //!
 //! - **Claim Topics and Issuers**: Management of trusted claim issuers and
@@ -45,6 +86,7 @@ pub mod compliance;
 pub mod extensions;
 pub mod identity_claims;
 pub mod identity_registry_storage;
+pub mod identity_verifier;
 pub mod storage;
 pub mod utils;
 
@@ -283,6 +325,7 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     // ################## COMPLIANCE AND IDENTITY FUNCTIONS ##################
 
     /// Sets the compliance contract of the token.
+    ///
     /// This function can only be called by the operator with necessary
     /// privileges. RBAC checks are expected to be enforced on the
     /// `operator`.
@@ -299,48 +342,6 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * data - `[]`
     fn set_compliance(e: &Env, compliance: Address, operator: Address);
 
-    /// Sets the claim topics and issuers contract of the token.
-    /// This function can only be called by the operator with necessary
-    /// privileges. RBAC checks are expected to be enforced on the
-    /// `operator`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `claim_topics_and_issuers` - The address of the claim topics and
-    ///   issuers contract to set.
-    /// * `operator` - The address of the operator.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers:
-    ///   Address]`
-    /// * data - `[]`
-    fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: Address, operator: Address);
-
-    /// Sets the identity registry storage contract of the token.
-    /// This function can only be called by the operator with necessary
-    /// privileges. RBAC checks are expected to be enforced on the
-    /// `operator`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `identity_registry_storage` - The address of the identity registry
-    ///   storage contract to set.
-    /// * `operator` - The address of the operator.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["identity_registry_storage_set", identity_registry_storage:
-    ///   Address]`
-    /// * data - `[]`
-    fn set_identity_registry_storage(
-        e: &Env,
-        identity_registry_storage: Address,
-        operator: Address,
-    );
-
     /// Returns the Compliance contract linked to the token.
     ///
     /// # Errors
@@ -349,21 +350,32 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///   set.
     fn compliance(e: &Env) -> Address;
 
-    /// Returns the Claim Topics and Issuers contract linked to the token.
+    /// Sets the identity verifier contract of the token.
     ///
-    /// # Errors
+    /// This function can only be called by the operator with necessary
+    /// privileges. RBAC checks are expected to be enforced on the
+    /// `operator`.
     ///
-    /// * [`RWAError::ClaimTopicsAndIssuersNotSet`] - When the claim topics and
-    ///   issuers contract is not set.
-    fn claim_topics_and_issuers(e: &Env) -> Address;
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `identity_verifier` - The address of the identity verifier contract to
+    ///   set.
+    /// * `operator` - The address of the operator.
+    ///
+    /// # Events
+    ///
+    /// * topics - ["identity_verifier_set", identity_verifier: Address]
+    /// * data - `[]`
+    fn set_identity_verifier(e: &Env, identity_verifier: Address, operator: Address);
 
-    /// Returns the Identity Registry Storage contract linked to the token.
+    /// Returns the Identity Verifier contract linked to the token.
     ///
     /// # Errors
     ///
-    /// * [`RWAError::IdentityRegistryStorageNotSet`] - When the identity
-    ///   registry storage contract is not set.
-    fn identity_registry_storage(e: &Env) -> Address;
+    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier
+    ///   contract is not set.
+    fn identity_verifier(e: &Env) -> Address;
 }
 
 // ################## ERRORS ##################
@@ -396,6 +408,8 @@ pub enum RWAError {
     ClaimTopicsAndIssuersNotSet = 310,
     /// Indicates the identity registry storage contract is not set.
     IdentityRegistryStorageNotSet = 311,
+    /// Indicates the identity verifier contract is not set.
+    IdentityVerifierNotSet = 312,
 }
 
 // ################## CONSTANTS ##################
@@ -620,4 +634,22 @@ pub struct IdentityRegistryStorageSet {
 pub fn emit_identity_registry_storage_set(e: &Env, identity_registry_storage: &Address) {
     IdentityRegistryStorageSet { identity_registry_storage: identity_registry_storage.clone() }
         .publish(e);
+}
+
+/// Event emitted when identity verifier contract is set.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentityVerifierSet {
+    #[topic]
+    pub identity_verifier: Address,
+}
+
+/// Emits an event indicating the Identity Verifier contract has been set.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `identity_verifier` - The address of the Identity Verifier contract.
+pub fn emit_identity_verifier_set(e: &Env, identity_verifier: &Address) {
+    IdentityVerifierSet { identity_verifier: identity_verifier.clone() }.publish(e);
 }

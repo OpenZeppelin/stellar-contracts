@@ -11,6 +11,8 @@ use crate::{
     rwa::{storage::RWAStorageKey, RWA},
 };
 
+// TODO: rework the tests w.r.t identity_verifier module
+
 #[contract]
 pub struct MockIdentityRegistryStorage;
 
