@@ -406,8 +406,10 @@ pub enum RWAError {
     VersionNotSet = 309,
     /// Indicates the claim topics and issuers contract is not set.
     ClaimTopicsAndIssuersNotSet = 310,
+    /// Indicates the identity registry storage contract is not set.
+    IdentityRegistryStorageNotSet = 311,
     /// Indicates the identity verifier contract is not set.
-    IdentityVerifierNotSet = 311,
+    IdentityVerifierNotSet = 312,
 }
 
 // ################## CONSTANTS ##################

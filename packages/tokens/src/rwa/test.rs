@@ -145,7 +145,7 @@ fn set_and_get_identity_verifier() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #311)")]
+#[should_panic(expected = "Error(Contract, #312)")]
 fn get_unset_identity_verifier_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
