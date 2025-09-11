@@ -1,70 +1,25 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, map, symbol_short, testutils::Address as _, vec, Address, Bytes, Env,
-    Map, String, Vec,
+    contract, contractimpl, panic_with_error, symbol_short, testutils::Address as _, Address, Env,
+    String,
 };
 
-use super::{claim_issuer::ClaimIssuer, identity_claims::Claim};
 use crate::{
     fungible::ContractOverrides,
-    rwa::{storage::RWAStorageKey, RWA},
+    rwa::{storage::RWAStorageKey, RWAError, RWA},
 };
 
-// TODO: rework the tests w.r.t identity_verifier module
-
 #[contract]
-pub struct MockIdentityRegistryStorage;
+pub struct MockIdentityVerifier;
 
 #[contractimpl]
-impl MockIdentityRegistryStorage {
-    pub fn stored_identity(e: &Env, _account: Address) -> Address {
-        e.storage().persistent().get(&symbol_short!("stored_id")).unwrap()
-    }
-}
-
-#[contract]
-pub struct MockClaimTopicsAndIssuers;
-
-#[contractimpl]
-impl MockClaimTopicsAndIssuers {
-    pub fn get_claim_topics_and_issuers(e: &Env) -> Map<u32, Vec<Address>> {
-        let issuers = e.storage().persistent().get(&symbol_short!("issuers")).unwrap();
-        map![e, (1u32, issuers)]
-    }
-}
-
-#[contract]
-pub struct MockIdentityClaims;
-
-#[contractimpl]
-impl MockIdentityClaims {
-    pub fn get_claim(e: &Env, _claim_id: soroban_sdk::BytesN<32>) -> Claim {
-        let default = Claim {
-            topic: 1u32,
-            scheme: 1u32,
-            issuer: Address::generate(e),
-            signature: Bytes::from_array(e, &[1, 2, 3, 4]),
-            data: Bytes::from_array(e, &[5, 6, 7, 8]),
-            uri: soroban_sdk::String::from_str(e, "https://example.com"),
-        };
-        e.storage().persistent().get(&symbol_short!("claim")).unwrap_or(default)
-    }
-}
-
-#[contract]
-pub struct MockClaimIssuer;
-
-#[contractimpl]
-impl ClaimIssuer for MockClaimIssuer {
-    fn is_claim_valid(
-        e: &Env,
-        _identity: Address,
-        _claim_topic: u32,
-        _sig_data: Bytes,
-        _claim_data: Bytes,
-    ) -> bool {
-        e.storage().persistent().get(&symbol_short!("claim_ok")).unwrap_or(true)
+impl MockIdentityVerifier {
+    pub fn verify_identity(e: &Env, _account: Address) {
+        let result = e.storage().persistent().get(&symbol_short!("id_ok")).unwrap_or(true);
+        if !result {
+            panic_with_error!(e, RWAError::IdentityVerificationFailed)
+        }
     }
 }
 
@@ -92,41 +47,10 @@ impl MockCompliance {
 #[contract]
 struct MockRWAContract;
 
-fn construct_claim(e: &Env, issuer: &Address, topic: u32) -> Claim {
-    Claim {
-        topic,
-        scheme: 1u32,
-        issuer: issuer.clone(),
-        signature: Bytes::from_array(e, &[1, 2, 3, 4]),
-        data: Bytes::from_array(e, &[5, 6, 7, 8]),
-        uri: soroban_sdk::String::from_str(e, "https://example.com"),
-    }
-}
-
-fn set_and_return_verification_contracts(e: &Env) -> (Address, Address, Address, Address) {
-    let identity = e.register(MockIdentityClaims, ());
-    let issuer = e.register(MockClaimIssuer, ());
-    let irs = e.register(MockIdentityRegistryStorage, ());
-    let cti = e.register(MockClaimTopicsAndIssuers, ());
-
-    e.as_contract(&irs, || {
-        // Set up storage with mock contract addresses
-        e.storage().persistent().set(&symbol_short!("stored_id"), &identity);
-    });
-    e.as_contract(&identity, || {
-        let claim = construct_claim(e, &issuer, 1);
-        e.storage().persistent().set(&symbol_short!("claim"), &claim);
-    });
-
-    e.as_contract(&cti, || {
-        // Set up storage with mock contract addresses
-        e.storage().persistent().set(&symbol_short!("issuers"), &vec![&e, issuer.clone()]);
-    });
-
-    RWA::set_claim_topics_and_issuers(e, &cti);
-    RWA::set_identity_registry_storage(e, &irs);
-
-    (identity, issuer, irs, cti)
+fn set_and_return_identity_verifier(e: &Env) -> Address {
+    let identity_verifier = e.register(MockIdentityVerifier, ());
+    RWA::set_identity_verifier(e, &identity_verifier);
+    identity_verifier
 }
 
 fn set_and_return_compliance(e: &Env) -> Address {
@@ -136,7 +60,7 @@ fn set_and_return_compliance(e: &Env) -> Address {
 }
 
 fn setup_all_contracts(e: &Env) {
-    let _ = set_and_return_verification_contracts(e);
+    let _ = set_and_return_identity_verifier(e);
     let _ = set_and_return_compliance(e);
 }
 
@@ -209,48 +133,25 @@ fn get_unset_compliance_fails() {
 }
 
 #[test]
-fn set_and_get_claim_topics_and_issuers() {
+fn set_and_get_identity_verifier() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
 
     e.as_contract(&address, || {
-        let claim_topics_and_issuers = Address::generate(&e);
-        RWA::set_claim_topics_and_issuers(&e, &claim_topics_and_issuers);
-        assert_eq!(RWA::claim_topics_and_issuers(&e), claim_topics_and_issuers);
+        let identity_verifier = Address::generate(&e);
+        RWA::set_identity_verifier(&e, &identity_verifier);
+        assert_eq!(RWA::identity_verifier(&e), identity_verifier);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #310)")]
-fn get_unset_claim_topics_and_issuers_fails() {
+#[should_panic(expected = "Error(Contract, #312)")]
+fn get_unset_identity_verifier_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
 
     e.as_contract(&address, || {
-        RWA::claim_topics_and_issuers(&e);
-    });
-}
-
-#[test]
-fn set_and_get_identity_registry_storage() {
-    let e = Env::default();
-    let address = e.register(MockRWAContract, ());
-
-    e.as_contract(&address, || {
-        let identity_registry_storage = Address::generate(&e);
-        RWA::set_identity_registry_storage(&e, &identity_registry_storage);
-        assert_eq!(RWA::identity_registry_storage(&e), identity_registry_storage);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #311)")]
-fn get_unset_identity_registry_storage_fails() {
-    let e = Env::default();
-    let address = e.register(MockRWAContract, ());
-
-    e.as_contract(&address, || {
-        RWA::identity_registry_storage(&e);
+        RWA::identity_verifier(&e);
     });
 }
 
@@ -270,118 +171,6 @@ fn mint_tokens() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #304)")]
-fn mint_fails_when_not_same_claim_topic() {
-    let e = Env::default();
-    let address = e.register(MockRWAContract, ());
-    let to = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        let (identity, issuer, ..) = set_and_return_verification_contracts(&e);
-        e.as_contract(&identity, || {
-            let claim = construct_claim(&e, &issuer, 2);
-            e.storage().persistent().set(&symbol_short!("claim"), &claim);
-        });
-
-        set_and_return_compliance(&e);
-
-        RWA::mint(&e, &to, 100);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #304)")]
-fn mint_fails_when_not_same_issuers() {
-    let e = Env::default();
-    let address = e.register(MockRWAContract, ());
-    let to = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        let (identity, ..) = set_and_return_verification_contracts(&e);
-        let other_issuer = e.register(MockClaimIssuer, ());
-        e.as_contract(&identity, || {
-            let claim = construct_claim(&e, &other_issuer, 1);
-            e.storage().persistent().set(&symbol_short!("claim"), &claim);
-        });
-
-        set_and_return_compliance(&e);
-
-        RWA::mint(&e, &to, 100);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #304)")]
-fn mint_fails_when_claim_not_valid() {
-    let e = Env::default();
-    let address = e.register(MockRWAContract, ());
-    let to = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        let (_, claim_issuer, ..) = set_and_return_verification_contracts(&e);
-        e.as_contract(&claim_issuer, || {
-            e.storage().persistent().set(&symbol_short!("claim_ok"), &false)
-        });
-
-        set_and_return_compliance(&e);
-
-        RWA::mint(&e, &to, 100);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #304)")]
-fn mint_fails_with_claim_issuer_conversion_error() {
-    let e = Env::default();
-    let address = e.register(MockRWAContract, ());
-    let to = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        let (_, claim_issuer, ..) = set_and_return_verification_contracts(&e);
-        // Claim issuer returns invalid data, u32 instead of bool
-        e.as_contract(&claim_issuer, || {
-            e.storage().persistent().set(&symbol_short!("claim_ok"), &12u32)
-        });
-
-        set_and_return_compliance(&e);
-
-        RWA::mint(&e, &to, 100);
-    });
-}
-
-#[test]
-fn mint_with_two_claim_issuers() {
-    let e = Env::default();
-    let address = e.register(MockRWAContract, ());
-    let to = Address::generate(&e);
-
-    e.as_contract(&address, || {
-        let (identity, claim_issuer, _, cti) = set_and_return_verification_contracts(&e);
-
-        // First claim issuer returns invalid data, u32 instead of bool
-        e.as_contract(&claim_issuer, || {
-            e.storage().persistent().set(&symbol_short!("claim_ok"), &12u32)
-        });
-
-        // Second claim issuer returns claim is valid
-        let claim_issuer_2 = e.register(MockClaimIssuer, ());
-        e.as_contract(&identity, || {
-            let claim = construct_claim(&e, &claim_issuer_2, 1);
-            e.storage().persistent().set(&symbol_short!("claim"), &claim);
-        });
-        e.as_contract(&cti, || {
-            e.storage()
-                .persistent()
-                .set(&symbol_short!("issuers"), &vec![&e, claim_issuer.clone(), claim_issuer_2]);
-        });
-
-        set_and_return_compliance(&e);
-
-        RWA::mint(&e, &to, 100);
-    });
-}
-
-#[test]
 #[should_panic(expected = "Error(Contract, #307)")]
 fn mint_without_compliance_fails() {
     let e = Env::default();
@@ -389,7 +178,7 @@ fn mint_without_compliance_fails() {
     let to = Address::generate(&e);
 
     e.as_contract(&address, || {
-        set_and_return_verification_contracts(&e);
+        set_and_return_identity_verifier(&e);
         RWA::mint(&e, &to, 100);
     });
 }
@@ -407,8 +196,26 @@ fn mint_fails_when_not_compliant() {
     });
 
     e.as_contract(&address, || {
-        set_and_return_verification_contracts(&e);
+        set_and_return_identity_verifier(&e);
         RWA::set_compliance(&e, &failing_compliance);
+
+        RWA::mint(&e, &from, 100);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #304)")]
+fn mint_fails_when_identity_verification_fails() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let identity_verifier = set_and_return_identity_verifier(&e);
+
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("id_ok"), &false);
+        });
 
         RWA::mint(&e, &from, 100);
     });

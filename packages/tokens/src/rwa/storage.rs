@@ -1,18 +1,13 @@
-use soroban_sdk::{contractclient, contracttype, panic_with_error, Address, Env, String};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
-use super::{
-    claim_issuer::ClaimIssuerClient,
-    claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
-    identity_claims::{generate_claim_id, Claim, IdentityClaimsClient},
-};
 use crate::{
     fungible::{emit_transfer, Base, ContractOverrides, StorageKey},
     rwa::{
-        compliance::ComplianceClient, emit_address_frozen, emit_burn,
-        emit_claim_topics_and_issuers_set, emit_compliance_set, emit_identity_registry_storage_set,
+        compliance::ComplianceClient, emit_address_frozen, emit_burn, emit_compliance_set,
         emit_mint, emit_recovery_success, emit_token_onchain_id_updated, emit_tokens_frozen,
-        emit_tokens_unfrozen, RWAError, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
+        emit_tokens_unfrozen, identity_verifier::IdentityVerifierClient, RWAError,
+        FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
 };
 
@@ -29,24 +24,8 @@ pub enum RWAStorageKey {
     OnchainId,
     /// Version of the token
     Version,
-    // TODO: move these to identity_verifier module
-    /// Claim Topics and Issuers contract address
-    ClaimTopicsAndIssuers,
-    /// Identity Registry Storage contract address
-    IdentityRegistryStorage,
-}
-
-// TODO: move this to identity_verifier module
-// We need to declare an `IdentityRegistryStorageClient` here, instead of
-// importing one from the dedicated module, as the trait there can't be used
-// with `#[contractclient]` macro, because it has an associated type, which is
-// not supported by the `#[contractclient]` macro.
-// Another option would have been to use `e.invoke_contract`, but we stick with
-// the above choice for consistency reasons.
-#[allow(unused)]
-#[contractclient(name = "IdentityRegistryStorageClient")]
-trait IdentityRegistryStorage {
-    fn stored_identity(e: &Env, user_address: Address) -> Address;
+    /// Identity Verifier contract address
+    IdentityVerifier,
 }
 
 pub struct RWA;
@@ -113,7 +92,22 @@ impl RWA {
             .unwrap_or_else(|| panic_with_error!(e, RWAError::ComplianceNotSet))
     }
 
-    // TODO: getter for identity_verifier
+    /// Returns the Identity Verifier contract linked to the token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier
+    ///   contract is not set.
+    pub fn identity_verifier(e: &Env) -> Address {
+        e.storage()
+            .instance()
+            .get(&RWAStorageKey::IdentityVerifier)
+            .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityVerifierNotSet))
+    }
 
     /// Returns the freezing status of a wallet. Frozen wallets cannot send or
     /// receive funds.
@@ -237,9 +231,11 @@ impl RWA {
     ///
     /// # Errors
     ///
-    /// refer to [`RWA::verify_identity`] errors.
-    /// refer to [`RWA::validate_compliance`] errors.
-    /// refer to [`Base::update`] errors.
+    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
+    ///   configured.
+    /// * [`RWAError::MintNotCompliant`] - When the mint operation violates
+    ///   compliance rules.
+    /// * refer to [`Base::update`] errors.
     ///
     /// # Events
     ///
@@ -262,14 +258,21 @@ impl RWA {
     /// admin.require_auth();
     /// ```
     pub fn mint(e: &Env, to: &Address, amount: i128) {
-        Self::verify_identity(e, to);
-
-        Base::update(e, None, Some(to), amount);
-
-        Self::validate_mint_compliance(e, to, amount);
+        let identity_verifier_addr = Self::identity_verifier(e);
+        let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
+        identity_verifier_client.verify_identity(to);
 
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
+
+        let can_create: bool = compliance_client.can_create(to, &amount);
+
+        if !can_create {
+            panic_with_error!(e, RWAError::MintNotCompliant);
+        }
+
+        Base::update(e, None, Some(to), amount);
+
         compliance_client.created(to, &amount);
 
         emit_mint(e, to, amount);
@@ -364,7 +367,9 @@ impl RWA {
         investor_onchain_id: &Address,
     ) -> bool {
         // Verify identity for the new wallet
-        Self::verify_identity(e, new_wallet);
+        let identity_verifier_addr = Self::identity_verifier(e);
+        let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
+        identity_verifier_client.verify_identity(new_wallet);
 
         let lost_balance = Base::balance(e, lost_wallet);
         if lost_balance == 0 {
@@ -554,7 +559,26 @@ impl RWA {
         emit_compliance_set(e, compliance);
     }
 
-    // TODO: setter for identity_verifier
+    /// Sets the identity verifier contract of the token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `identity_verifier` - The address of the identity verifier contract.
+    ///
+    /// # Events
+    ///
+    /// * topics - ["identity_verifier_set", identity_verifier: Address]
+    /// * data - `[]`
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used internally or in admin functions that implement their own
+    /// authorization logic.
+    pub fn set_identity_verifier(e: &Env, identity_verifier: &Address) {
+        e.storage().instance().set(&RWAStorageKey::IdentityVerifier, identity_verifier);
+    }
 
     // ################## OVERRIDDEN FUNCTIONS ##################
 
@@ -594,16 +618,22 @@ impl RWA {
             panic_with_error!(e, RWAError::InsufficientFreeTokens);
         }
 
-        Self::verify_identity(e, from);
-        Self::verify_identity(e, to);
+        let identity_verifier_addr = Self::identity_verifier(e);
+        let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
+        identity_verifier_client.verify_identity(from);
+        identity_verifier_client.verify_identity(to);
 
         // Validate compliance rules for the transfer
-        Self::validate_transfer_compliance(e, from, to, amount);
+        let compliance_addr = Self::compliance(e);
+        let compliance_client = ComplianceClient::new(e, &compliance_addr);
+        let can_transfer: bool = compliance_client.can_transfer(from, to, &amount);
+
+        if !can_transfer {
+            panic_with_error!(e, RWAError::TransferNotCompliant);
+        }
 
         Base::update(e, Some(from), Some(to), amount);
 
-        let compliance_addr = Self::compliance(e);
-        let compliance_client = ComplianceClient::new(e, &compliance_addr);
         compliance_client.transferred(from, to, &amount);
 
         emit_transfer(e, from, to, amount);
@@ -618,69 +648,5 @@ impl RWA {
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         Base::spend_allowance(e, from, spender, amount);
         Self::transfer(e, from, to, amount);
-    }
-
-    // ########## HELPER FUNCTIONS ##########
-
-    /// Validates compliance rules for a token transfer.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `from` - The address sending tokens.
-    /// * `to` - The address receiving tokens.
-    /// * `amount` - The amount of tokens being transferred.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
-    ///   configured.
-    /// * [`RWAError::TransferNotCompliant`] - When the transfer violates
-    ///   compliance rules.
-    ///
-    /// # Notes
-    ///
-    /// This function calls the compliance contract to validate the transfer
-    /// against configured compliance rules. The compliance contract should
-    /// implement a `can_transfer` function that returns a boolean.
-    fn validate_transfer_compliance(e: &Env, from: &Address, to: &Address, amount: i128) {
-        let compliance_addr = Self::compliance(e);
-        let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        let can_transfer: bool = compliance_client.can_transfer(from, to, &amount);
-
-        if !can_transfer {
-            panic_with_error!(e, RWAError::TransferNotCompliant);
-        }
-    }
-
-    /// Validates compliance rules for a mint operation.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `to` - The address receiving tokens.
-    /// * `amount` - The amount of tokens being created.
-    ///
-    /// # Errors
-    ///
-    /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
-    ///   configured.
-    /// * [`RWAError::MintNotCompliant`] - When the mint operation violates
-    ///   compliance rules.
-    ///
-    /// # Notes
-    ///
-    /// This function calls the compliance contract to validate the mint
-    /// operation against configured compliance rules. The compliance
-    /// contract should implement a `can_create` function that returns a
-    /// boolean.
-    fn validate_mint_compliance(e: &Env, to: &Address, amount: i128) {
-        let compliance_addr = Self::compliance(e);
-        let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        let can_create: bool = compliance_client.can_create(to, &amount);
-
-        if !can_create {
-            panic_with_error!(e, RWAError::MintNotCompliant);
-        }
     }
 }

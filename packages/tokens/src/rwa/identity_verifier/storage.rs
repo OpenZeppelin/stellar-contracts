@@ -1,3 +1,34 @@
+use soroban_sdk::{contractclient, contracttype, panic_with_error, Address, Env};
+
+use crate::rwa::{
+    claim_issuer::ClaimIssuerClient,
+    claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
+    emit_claim_topics_and_issuers_set, emit_identity_registry_storage_set,
+    identity_claims::{generate_claim_id, Claim, IdentityClaimsClient},
+    RWAError,
+};
+
+/// Storage keys for the data associated with `RWA` token
+#[contracttype]
+pub enum IdentityVerifierStorageKey {
+    /// Claim Topics and Issuers contract address
+    ClaimTopicsAndIssuers,
+    /// Identity Registry Storage contract address
+    IdentityRegistryStorage,
+}
+
+// We need to declare an `IdentityRegistryStorageClient` here, instead of
+// importing one from the dedicated module, as the trait there can't be used
+// with `#[contractclient]` macro, because it has an associated type, which is
+// not supported by the `#[contractclient]` macro.
+// Another option would have been to use `e.invoke_contract`, but we stick with
+// the above choice for consistency reasons.
+#[allow(unused)]
+#[contractclient(name = "IdentityRegistryStorageClient")]
+trait IdentityRegistryStorage {
+    fn stored_identity(e: &Env, user_address: Address) -> Address;
+}
+
 /// Returns the Claim Topics and Issuers contract linked to the token.
 ///
 /// # Arguments
@@ -11,7 +42,7 @@
 pub fn claim_topics_and_issuers(e: &Env) -> Address {
     e.storage()
         .instance()
-        .get(&RWAStorageKey::ClaimTopicsAndIssuers)
+        .get(&IdentityVerifierStorageKey::ClaimTopicsAndIssuers)
         .unwrap_or_else(|| panic_with_error!(e, RWAError::ClaimTopicsAndIssuersNotSet))
 }
 
@@ -23,12 +54,12 @@ pub fn claim_topics_and_issuers(e: &Env) -> Address {
 ///
 /// # Errors
 ///
-/// * [`RWAError::IdentityRegistryStorageNotSet`] - When the identity
-///   registry storage contract is not set.
+/// * [`RWAError::IdentityRegistryStorageNotSet`] - When the identity registry
+///   storage contract is not set.
 pub fn identity_registry_storage(e: &Env) -> Address {
     e.storage()
         .instance()
-        .get(&RWAStorageKey::IdentityRegistryStorage)
+        .get(&IdentityVerifierStorageKey::IdentityRegistryStorage)
         .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityRegistryStorageNotSet))
 }
 
@@ -42,16 +73,16 @@ pub fn identity_registry_storage(e: &Env) -> Address {
 ///
 /// # Errors
 ///
-/// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
-///   user address cannot be verified.
+/// * [`RWAError::IdentityVefificationFailed`] - When the identity of the user
+///   address cannot be verified.
 pub fn verify_identity(e: &Env, user_address: &Address) {
-    let irs_addr = Self::identity_registry_storage(e);
+    let irs_addr = identity_registry_storage(e);
     let irs_client = IdentityRegistryStorageClient::new(e, &irs_addr);
 
     let investor_onchain_id = irs_client.stored_identity(user_address);
     let identity_client = IdentityClaimsClient::new(e, &investor_onchain_id);
 
-    let cti_addr = Self::claim_topics_and_issuers(e);
+    let cti_addr = claim_topics_and_issuers(e);
     let cti_client = ClaimTopicsAndIssuersClient::new(e, &cti_addr);
 
     let topics_and_issuers = cti_client.get_claim_topics_and_issuers();
@@ -68,7 +99,7 @@ pub fn verify_identity(e: &Env, user_address: &Address) {
         for (issuer, claim_id, is_last) in issuers_with_claim_ids {
             let claim: Claim = identity_client.get_claim(&claim_id);
 
-            if Self::validate_claim(e, &claim, claim_topic, &issuer, &investor_onchain_id) {
+            if validate_claim(e, &claim, claim_topic, &issuer, &investor_onchain_id) {
                 break;
             } else if is_last {
                 panic_with_error!(e, RWAError::IdentityVerificationFailed);
@@ -118,13 +149,12 @@ pub fn validate_claim(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `claim_topics_and_issuers` - The address of the claim topics and
-///   issuers contract.
+/// * `claim_topics_and_issuers` - The address of the claim topics and issuers
+///   contract.
 ///
 /// # Events
 ///
-/// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers:
-///   Address]`
+/// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers: Address]`
 /// * data - `[]`
 ///
 /// # Security Warning
@@ -133,7 +163,9 @@ pub fn validate_claim(
 /// only be used internally or in admin functions that implement their own
 /// authorization logic.
 pub fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: &Address) {
-    e.storage().instance().set(&RWAStorageKey::ClaimTopicsAndIssuers, claim_topics_and_issuers);
+    e.storage()
+        .instance()
+        .set(&IdentityVerifierStorageKey::ClaimTopicsAndIssuers, claim_topics_and_issuers);
     emit_claim_topics_and_issuers_set(e, claim_topics_and_issuers);
 }
 
@@ -142,8 +174,8 @@ pub fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: &Address)
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `identity_registry_storage` - The address of the identity registry
-///   storage contract.
+/// * `identity_registry_storage` - The address of the identity registry storage
+///   contract.
 ///
 /// # Events
 ///
@@ -157,6 +189,8 @@ pub fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: &Address)
 /// only be used internally or in admin functions that implement their own
 /// authorization logic.
 pub fn set_identity_registry_storage(e: &Env, identity_registry_storage: &Address) {
-    e.storage().instance().set(&RWAStorageKey::IdentityRegistryStorage, identity_registry_storage);
+    e.storage()
+        .instance()
+        .set(&IdentityVerifierStorageKey::IdentityRegistryStorage, identity_registry_storage);
     emit_identity_registry_storage_set(e, identity_registry_storage);
 }

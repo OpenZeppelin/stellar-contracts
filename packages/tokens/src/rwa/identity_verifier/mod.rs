@@ -1,10 +1,59 @@
-// TODO: mention that for our suggested implementation, we also require
-// `IdentityStorage`, and we provide the setter/getter for that contract in our
-// storage.rs file and also present in our examples folder for RWA. However,
-// based on the implementation, `IdentityStorage` may not be required, hence it
-// is not a part of the trait.
+use soroban_sdk::{contractclient, Address, Env};
+
+#[cfg(test)]
+mod test;
+
+pub mod storage;
+
+/// # Identity Verifier Module
+///
+/// This module provides the `IdentityVerifier` trait for verifying user
+/// identities in Real World Asset (RWA) tokens. Identity verification is
+/// critical for regulatory compliance, ensuring only verified users can
+/// participate in token operations by validating addresses against
+/// cryptographic claims from trusted authorities.
+///
+/// ## Architecture & Implementation Approaches
+///
+/// Identity verification systems can be implemented in various ways depending
+/// on regulatory and business requirements:
+///
+/// - **Merkle Tree**: Efficient verification using merkle proofs (minimal
+///   storage)
+/// - **Zero-Knowledge**: Privacy-preserving verification (custom ZK circuits)
+/// - **Claim-based**: Cryptographic claims from trusted issuers (our default
+///   approach)
+/// - and other custom approaches
+///
+/// ## Default Implementation
+///
+/// Our suggested claim-based implementation uses two external contracts:
+/// 1. **Claim Topics and Issuers**: Manages trusted issuers and claim types
+/// 2. **Identity Registry Storage**: Maps wallet addresses to onchain
+///    identities
+///
+/// Since `IdentityRegistryStorage` may not be required for all approaches
+/// (e.g., merkle tree or zero-knowledge implementations), it's not part of the
+/// trait interface. However, `storage.rs` provides the necessary functions for
+/// `IdentityRegistryStorage` integration. Examples are available in the RWA
+/// examples folder.
+#[contractclient(name = "IdentityVerifierClient")]
 pub trait IdentityVerifier {
-    /// Sets the claim topics and issuers contract of the token.
+    /// Verifies that the identity of an user address has the required valid
+    /// claims.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `user_address` - The user address to verify.
+    ///
+    /// # Errors
+    ///
+    /// * [`crate::rwa::RWAError::IdentityVerificationFailed`] - When the
+    ///   identity of the user address cannot be verified.
+    fn verify_identity(e: &Env, user_address: &Address);
+
+    /// Sets the identity registry contract of the token.
     /// This function can only be called by the operator with necessary
     /// privileges. RBAC checks are expected to be enforced on the
     /// `operator`.
@@ -27,7 +76,7 @@ pub trait IdentityVerifier {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::ClaimTopicsAndIssuersNotSet`] - When the claim topics and
-    ///   issuers contract is not set.
+    /// * [`crate::rwa::RWAError::ClaimTopicsAndIssuersNotSet`] - When the claim
+    ///   topics and issuers contract is not set.
     fn claim_topics_and_issuers(e: &Env) -> Address;
 }
