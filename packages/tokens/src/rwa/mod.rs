@@ -406,10 +406,8 @@ pub enum RWAError {
     VersionNotSet = 309,
     /// Indicates the claim topics and issuers contract is not set.
     ClaimTopicsAndIssuersNotSet = 310,
-    /// Indicates the identity registry storage contract is not set.
-    IdentityRegistryStorageNotSet = 311,
     /// Indicates the identity verifier contract is not set.
-    IdentityVerifierNotSet = 312,
+    IdentityVerifierNotSet = 311,
 }
 
 // ################## CONSTANTS ##################
@@ -612,27 +610,6 @@ pub struct ClaimTopicsAndIssuersSet {
 ///   contract.
 pub fn emit_claim_topics_and_issuers_set(e: &Env, claim_topics_and_issuers: &Address) {
     ClaimTopicsAndIssuersSet { claim_topics_and_issuers: claim_topics_and_issuers.clone() }
-        .publish(e);
-}
-
-/// Event emitted when identity registry storage contract is set.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct IdentityRegistryStorageSet {
-    #[topic]
-    pub identity_registry_storage: Address,
-}
-
-/// Emits an event indicating the Identity Registry Storage contract has been
-/// set.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `identity_registry_storage` - The address of the Identity Registry Storage
-///   contract.
-pub fn emit_identity_registry_storage_set(e: &Env, identity_registry_storage: &Address) {
-    IdentityRegistryStorageSet { identity_registry_storage: identity_registry_storage.clone() }
         .publish(e);
 }
 

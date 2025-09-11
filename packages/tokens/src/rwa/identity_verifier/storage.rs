@@ -3,7 +3,7 @@ use soroban_sdk::{contractclient, contracttype, panic_with_error, Address, Env};
 use crate::rwa::{
     claim_issuer::ClaimIssuerClient,
     claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
-    emit_claim_topics_and_issuers_set, emit_identity_registry_storage_set,
+    emit_claim_topics_and_issuers_set,
     identity_claims::{generate_claim_id, Claim, IdentityClaimsClient},
     RWAError,
 };
@@ -192,5 +192,4 @@ pub fn set_identity_registry_storage(e: &Env, identity_registry_storage: &Addres
     e.storage()
         .instance()
         .set(&IdentityVerifierStorageKey::IdentityRegistryStorage, identity_registry_storage);
-    emit_identity_registry_storage_set(e, identity_registry_storage);
 }
