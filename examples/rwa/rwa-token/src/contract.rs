@@ -133,29 +133,16 @@ impl RWAToken for RWATokenContract {
     }
 
     #[only_role(operator, "ADMIN")]
-    fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: Address, operator: Address) {
-        RWA::set_claim_topics_and_issuers(e, &claim_topics_and_issuers);
-    }
-
-    #[only_role(operator, "ADMIN")]
-    fn set_identity_registry_storage(
-        e: &Env,
-        identity_registry_storage: Address,
-        operator: Address,
-    ) {
-        RWA::set_identity_registry_storage(e, &identity_registry_storage);
+    fn set_identity_verifier(e: &Env, identity_verifier: Address, operator: Address) {
+        RWA::set_identity_verifier(e, &identity_verifier);
     }
 
     fn compliance(e: &Env) -> Address {
         RWA::compliance(e)
     }
 
-    fn claim_topics_and_issuers(e: &Env) -> Address {
-        RWA::claim_topics_and_issuers(e)
-    }
-
-    fn identity_registry_storage(e: &Env) -> Address {
-        RWA::identity_registry_storage(e)
+    fn identity_verifier(e: &Env) -> Address {
+        RWA::identity_verifier(e)
     }
 }
 

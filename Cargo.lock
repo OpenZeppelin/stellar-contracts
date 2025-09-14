@@ -269,6 +269,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "claim-issuer-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "claim-topics-and-issuers-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "compliance-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -279,6 +312,17 @@ name = "core-foundation-sys"
 version = "0.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
+
+[[package]]
+name = "country-restriction-module-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
+]
 
 [[package]]
 name = "cpufeatures"
@@ -787,6 +831,28 @@ name = "ident_case"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
+
+[[package]]
+name = "identity-claims-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "identity-registry-storage-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
+]
 
 [[package]]
 name = "indexmap"
@@ -1332,7 +1398,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rwa-example"
+name = "rwa-token-example"
 version = "0.4.1"
 dependencies = [
  "soroban-sdk",
@@ -1960,6 +2026,17 @@ checksum = "30cfb0125f12d9c277f35663a0a33f8c30190f4e4574868a330595412d34ebf3"
 dependencies = [
  "num-conv",
  "time-core",
+]
+
+[[package]]
+name = "transfer-limit-module-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]
