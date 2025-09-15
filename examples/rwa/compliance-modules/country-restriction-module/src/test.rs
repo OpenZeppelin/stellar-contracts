@@ -6,19 +6,18 @@ use crate::contract::{CountryRestrictionModule, CountryRestrictionModuleClient};
 
 fn create_client(e: &Env) -> (Address, CountryRestrictionModuleClient<'_>) {
     let admin = Address::generate(e);
-    let contract_id = e.register(CountryRestrictionModule, (&admin,));
-    let client = CountryRestrictionModuleClient::new(e, &contract_id);
+    let address = e.register(CountryRestrictionModule, ());
+    let client = CountryRestrictionModuleClient::new(e, &address);
     (admin, client)
 }
 
 #[test]
-fn test_initialization() {
+fn country_module_initialization_() {
     let e = Env::default();
     e.mock_all_auths();
 
     let (_admin, client) = create_client(&e);
 
-    // Test module name
     assert_eq!(client.name(), String::from_str(&e, "Country Restriction Module"));
 }
 

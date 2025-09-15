@@ -12,15 +12,18 @@ fn create_client(e: &Env) -> (Address, ClaimTopicsAndIssuersContractClient<'_>) 
 }
 
 #[test]
-fn test_initialization() {
+fn test_setup_default_topics() {
     let e = Env::default();
     e.mock_all_auths();
 
     let (_admin, client) = create_client(&e);
 
-    // Initially no claim topics should exist
-    assert_eq!(client.get_claim_topics().len(), 0);
-    assert_eq!(client.get_trusted_issuers().len(), 0);
+    let topics = client.get_claim_topics();
+    assert_eq!(topics.len(), 4);
+    assert!(topics.contains(1u32)); // KYC
+    assert!(topics.contains(2u32)); // AML
+    assert!(topics.contains(3u32)); // Accredited Investor
+    assert!(topics.contains(4u32)); // Country Verification
 }
 
 #[test]
@@ -31,14 +34,14 @@ fn test_claim_topic_management() {
     let (admin, client) = create_client(&e);
 
     // Add claim topic
-    client.add_claim_topic(&1u32, &admin);
+    client.add_claim_topic(&10u32, &admin);
     let topics = client.get_claim_topics();
-    assert_eq!(topics.len(), 1);
-    assert_eq!(topics.get(0).unwrap(), 1u32);
+    assert_eq!(topics.len(), 5);
+    assert_eq!(topics.get(4).unwrap(), 10u32);
 
     // Remove claim topic
-    client.remove_claim_topic(&1u32, &admin);
-    assert_eq!(client.get_claim_topics().len(), 0);
+    client.remove_claim_topic(&10u32, &admin);
+    assert_eq!(client.get_claim_topics().len(), 4);
 }
 
 #[test]
@@ -67,22 +70,4 @@ fn test_trusted_issuer_management() {
     // Remove trusted issuer
     client.remove_trusted_issuer(&issuer, &admin);
     assert!(!client.is_trusted_issuer(&issuer));
-}
-
-#[test]
-fn test_setup_default_topics() {
-    let e = Env::default();
-    e.mock_all_auths();
-
-    let (admin, client) = create_client(&e);
-
-    // Setup default topics
-    client.setup_default_topics(&admin);
-
-    let topics = client.get_claim_topics();
-    assert_eq!(topics.len(), 4);
-    assert!(topics.contains(1u32)); // KYC
-    assert!(topics.contains(2u32)); // AML
-    assert!(topics.contains(3u32)); // Accredited Investor
-    assert!(topics.contains(4u32)); // Country Verification
 }

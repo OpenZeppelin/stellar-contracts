@@ -8,9 +8,11 @@ use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::{default_impl, only_role};
 use stellar_tokens::rwa::compliance::{
-    emit_module_added, emit_module_removed,
-    storage::{add_module_to, get_modules_for_hook, is_module_registered, remove_module_from},
-    Compliance, ComplianceHook, ComplianceModuleClient,
+    storage::{
+        add_module_to, can_create, can_transfer, created, destroyed, get_modules_for_hook,
+        is_module_registered, remove_module_from, transferred,
+    },
+    Compliance, ComplianceHook,
 };
 
 /// Role for compliance administrators
@@ -24,13 +26,11 @@ impl Compliance for ComplianceContract {
     #[only_role(operator, "COMP_ADM")]
     fn add_module_to(e: &Env, hook: ComplianceHook, module: Address, operator: Address) {
         add_module_to(e, hook.clone(), module.clone());
-        emit_module_added(e, hook, module);
     }
 
     #[only_role(operator, "COMP_ADM")]
     fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address, operator: Address) {
         remove_module_from(e, hook.clone(), module.clone());
-        emit_module_removed(e, hook, module);
     }
 
     fn get_modules_for_hook(e: &Env, hook: ComplianceHook) -> Vec<Address> {
@@ -42,49 +42,23 @@ impl Compliance for ComplianceContract {
     }
 
     fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
-        let modules = get_modules_for_hook(e, ComplianceHook::Transferred);
-        for module in modules.iter() {
-            let client = ComplianceModuleClient::new(e, &module);
-            client.on_transfer(&from, &to, &amount);
-        }
+        transferred(e, from, to, amount);
     }
 
     fn created(e: &Env, to: Address, amount: i128) {
-        let modules = get_modules_for_hook(e, ComplianceHook::Created);
-        for module in modules.iter() {
-            let client = ComplianceModuleClient::new(e, &module);
-            client.on_created(&to, &amount);
-        }
+        created(e, to, amount);
     }
 
     fn destroyed(e: &Env, from: Address, amount: i128) {
-        let modules = get_modules_for_hook(e, ComplianceHook::Destroyed);
-        for module in modules.iter() {
-            let client = ComplianceModuleClient::new(e, &module);
-            client.on_destroyed(&from, &amount);
-        }
+        destroyed(e, from, amount);
     }
 
     fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
-        let modules = get_modules_for_hook(e, ComplianceHook::CanTransfer);
-        for module in modules.iter() {
-            let client = ComplianceModuleClient::new(e, &module);
-            if !client.can_transfer(&from, &to, &amount) {
-                return false;
-            }
-        }
-        true
+        can_transfer(e, from, to, amount)
     }
 
     fn can_create(e: &Env, to: Address, amount: i128) -> bool {
-        let modules = get_modules_for_hook(e, ComplianceHook::CanCreate);
-        for module in modules.iter() {
-            let client = ComplianceModuleClient::new(e, &module);
-            if !client.can_create(&to, &amount) {
-                return false;
-            }
-        }
-        true
+        can_create(e, to, amount)
     }
 }
 

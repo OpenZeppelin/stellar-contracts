@@ -99,11 +99,7 @@ impl ClaimTopicsAndIssuersContract {
     pub fn __constructor(e: &Env, admin: Address) {
         access_control::set_admin(e, &admin);
         access_control::grant_role_no_auth(e, &admin, &admin, &TOPICS_ADMIN_ROLE);
-    }
 
-    /// Sets up common claim topics for KYC/AML compliance
-    #[only_role(admin, "TOP_ADM")]
-    pub fn setup_default_topics(e: &Env, admin: Address) {
         // Standard claim topics
         add_claim_topic(e, 1); // KYC
         add_claim_topic(e, 2); // AML

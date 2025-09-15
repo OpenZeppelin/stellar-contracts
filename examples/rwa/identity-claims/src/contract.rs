@@ -4,15 +4,10 @@
 //! This contract stores and manages claims made by trusted issuers
 //! about specific identities.
 
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Bytes, BytesN, Env, String, Vec};
-use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::default_impl;
+use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, String, Vec};
 use stellar_tokens::rwa::identity_claims::{
     add_claim, get_claim, get_claim_ids_by_topic, Claim, IdentityClaims,
 };
-
-/// Role for managing claims
-pub const CLAIMS_ADMIN_ROLE: soroban_sdk::Symbol = symbol_short!("CLM_ADM");
 
 #[contract]
 pub struct IdentityClaimsContract;
@@ -28,7 +23,6 @@ impl IdentityClaims for IdentityClaimsContract {
         data: Bytes,
         uri: String,
     ) -> BytesN<32> {
-        // Only the identity owner or authorized admin can add claims
         issuer.require_auth();
 
         add_claim(e, topic, scheme, &issuer, &signature, &data, &uri)
@@ -40,18 +34,5 @@ impl IdentityClaims for IdentityClaimsContract {
 
     fn get_claim_ids_by_topic(e: &Env, topic: u32) -> Vec<BytesN<32>> {
         get_claim_ids_by_topic(e, topic)
-    }
-}
-
-#[default_impl]
-#[contractimpl]
-impl AccessControl for IdentityClaimsContract {}
-
-#[contractimpl]
-impl IdentityClaimsContract {
-    /// Initializes the identity claims contract
-    pub fn __constructor(e: &Env, admin: Address) {
-        access_control::set_admin(e, &admin);
-        access_control::grant_role_no_auth(e, &admin, &admin, &CLAIMS_ADMIN_ROLE);
     }
 }

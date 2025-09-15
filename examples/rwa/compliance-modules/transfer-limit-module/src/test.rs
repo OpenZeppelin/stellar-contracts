@@ -6,7 +6,7 @@ use crate::contract::{TransferLimitModule, TransferLimitModuleClient};
 
 fn create_client(e: &Env) -> (Address, TransferLimitModuleClient<'_>) {
     let admin = Address::generate(e);
-    let contract_id = e.register(TransferLimitModule, (&admin,));
+    let contract_id = e.register(TransferLimitModule, ());
     let client = TransferLimitModuleClient::new(e, &contract_id);
     (admin, client)
 }

@@ -5,8 +5,6 @@
 //! transfers based on jurisdictional requirements.
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_access::access_control::{self, AccessControl};
-use stellar_macros::default_impl;
 use stellar_tokens::rwa::compliance::ComplianceModule;
 
 #[contract]
@@ -38,19 +36,7 @@ impl ComplianceModule for CountryRestrictionModule {
         true
     }
 
-    fn name() -> String {
-        String::from_str(&soroban_sdk::Env::default(), "Country Restriction Module")
-    }
-}
-
-#[default_impl]
-#[contractimpl]
-impl AccessControl for CountryRestrictionModule {}
-
-#[contractimpl]
-impl CountryRestrictionModule {
-    /// Initializes the country restriction module
-    pub fn __constructor(e: &Env, admin: Address) {
-        access_control::set_admin(e, &admin);
+    fn name(e: &Env) -> String {
+        String::from_str(e, "Country Restriction Module")
     }
 }

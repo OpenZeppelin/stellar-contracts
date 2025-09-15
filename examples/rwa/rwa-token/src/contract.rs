@@ -7,7 +7,7 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_contract_utils::pausable::{self, Pausable};
-use stellar_macros::{default_impl, only_role};
+use stellar_macros::{default_impl, only_admin, only_role};
 use stellar_tokens::{
     fungible::{Base, FungibleToken},
     rwa::{RWAToken, RWA},
@@ -57,31 +57,31 @@ impl Pausable for RWATokenContract {
         pausable::paused(e)
     }
 
-    #[only_role(operator, "ADMIN")]
-    fn pause(e: &Env, operator: Address) {
+    #[only_admin]
+    fn pause(e: &Env, _operator: Address) {
         pausable::pause(e);
     }
 
-    #[only_role(operator, "ADMIN")]
-    fn unpause(e: &Env, operator: Address) {
+    #[only_admin]
+    fn unpause(e: &Env, _operator: Address) {
         pausable::unpause(e);
     }
 }
 
 #[contractimpl]
 impl RWAToken for RWATokenContract {
-    #[only_role(operator, "ADMIN")]
-    fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, operator: Address) {
+    #[only_admin]
+    fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, _operator: Address) {
         RWA::forced_transfer(e, &from, &to, amount);
     }
 
-    #[only_role(operator, "ADMIN")]
-    fn mint(e: &Env, to: Address, amount: i128, operator: Address) {
+    #[only_admin]
+    fn mint(e: &Env, to: Address, amount: i128, _operator: Address) {
         RWA::mint(e, &to, amount);
     }
 
-    #[only_role(operator, "ADMIN")]
-    fn burn(e: &Env, user_address: Address, amount: i128, operator: Address) {
+    #[only_admin]
+    fn burn(e: &Env, user_address: Address, amount: i128, _operator: Address) {
         RWA::burn(e, &user_address, amount);
     }
 
@@ -127,13 +127,13 @@ impl RWAToken for RWATokenContract {
         RWA::onchain_id(e)
     }
 
-    #[only_role(operator, "ADMIN")]
-    fn set_compliance(e: &Env, compliance: Address, operator: Address) {
+    #[only_admin]
+    fn set_compliance(e: &Env, compliance: Address, _operator: Address) {
         RWA::set_compliance(e, &compliance);
     }
 
-    #[only_role(operator, "ADMIN")]
-    fn set_identity_verifier(e: &Env, identity_verifier: Address, operator: Address) {
+    #[only_admin]
+    fn set_identity_verifier(e: &Env, identity_verifier: Address, _operator: Address) {
         RWA::set_identity_verifier(e, &identity_verifier);
     }
 

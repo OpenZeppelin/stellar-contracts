@@ -1,14 +1,37 @@
 extern crate std;
 
-use soroban_sdk::{testutils::Address as _, Address, Bytes, Env, String};
+use soroban_sdk::{testutils::Address as _, Address, Bytes, Env, String, contract, contractimpl};
+use stellar_tokens::rwa::claim_issuer::ClaimIssuer;
 
 use crate::contract::{IdentityClaimsContract, IdentityClaimsContractClient};
 
+// Mock claim issuer for testing
+#[contract]
+pub struct MockClaimIssuer;
+
+#[contractimpl]
+impl ClaimIssuer for MockClaimIssuer {
+    fn is_claim_valid(
+        _e: &Env,
+        _identity: Address,
+        _claim_topic: u32,
+        _signature: Bytes,
+        _data: Bytes,
+    ) -> bool {
+        // Always return true for testing
+        true
+    }
+}
+
 fn create_client(e: &Env) -> (Address, IdentityClaimsContractClient<'_>) {
     let admin = Address::generate(e);
-    let contract_id = e.register(IdentityClaimsContract, (&admin,));
+    let contract_id = e.register(IdentityClaimsContract, ());
     let client = IdentityClaimsContractClient::new(e, &contract_id);
     (admin, client)
+}
+
+fn create_mock_issuer(e: &Env) -> Address {
+    e.register(MockClaimIssuer, ())
 }
 
 #[test]
@@ -27,7 +50,7 @@ fn test_add_and_get_claim() {
     e.mock_all_auths();
 
     let (_admin, client) = create_client(&e);
-    let issuer = Address::generate(&e);
+    let issuer = create_mock_issuer(&e);
 
     let topic = 1u32; // KYC
     let scheme = 1u32; // ECDSA
@@ -54,7 +77,7 @@ fn test_get_claim_ids_by_topic() {
     e.mock_all_auths();
 
     let (_admin, client) = create_client(&e);
-    let issuer = Address::generate(&e);
+    let issuer = create_mock_issuer(&e);
 
     let topic = 1u32; // KYC
     let scheme = 1u32; // ECDSA

@@ -37,15 +37,7 @@ impl ComplianceModule for TransferLimitModule {
         amount <= max_mint
     }
 
-    fn name() -> String {
-        String::from_str(&soroban_sdk::Env::default(), "Transfer Limit Module")
-    }
-}
-
-#[contractimpl]
-impl TransferLimitModule {
-    /// Initializes the transfer limit module
-    pub fn __constructor(e: &Env, admin: Address) {
-        stellar_access::access_control::set_admin(e, &admin);
+    fn name(e: &Env) -> String {
+        String::from_str(e, "Transfer Limit Module")
     }
 }

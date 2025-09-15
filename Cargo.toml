@@ -21,6 +21,7 @@ members = [
     "examples/rwa/compliance-modules/*",
     "examples/rwa/identity-claims",
     "examples/rwa/identity-registry-storage",
+    "examples/rwa/integration-test",
     "examples/rwa/rwa-token",
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",

@@ -315,5 +315,5 @@ pub trait ComplianceModule {
     /// # Returns
     ///
     /// A string identifying the module.
-    fn name() -> String;
+    fn name(e: &Env) -> String;
 }
