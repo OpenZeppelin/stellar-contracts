@@ -148,8 +148,8 @@ use soroban_sdk::{contracterror, contractevent, Address, Env, FromVal, Val, Vec}
 pub use storage::{
     add_country_data_entries, add_identity, delete_country_data, get_country_data,
     get_country_data_entries, get_identity, modify_country_data, modify_identity, remove_identity,
-    CountryData, CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
-    OrganizationCountryRelation,
+    CountryCode, CountryData, CountryRelation, IdentityProfile, IdentityType,
+    IndividualCountryRelation, OrganizationCountryRelation,
 };
 
 use crate::rwa::utils::token_binder::TokenBinder;
@@ -453,14 +453,17 @@ pub fn emit_country_data_event(
     country_data: &CountryData,
 ) {
     match event_type {
-        CountryDataEvent::Added =>
+        CountryDataEvent::Added => {
             CountryDataAdded { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
-        CountryDataEvent::Removed =>
+                .publish(e)
+        }
+        CountryDataEvent::Removed => {
             CountryDataRemoved { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
-        CountryDataEvent::Modified =>
+                .publish(e)
+        }
+        CountryDataEvent::Modified => {
             CountryDataModified { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
+                .publish(e)
+        }
     }
 }
