@@ -61,14 +61,15 @@ pub const SIMPLE_THRESHOLD_TTL_THRESHOLD: u32 = SIMPLE_THRESHOLD_EXTEND_AMOUNT -
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+/// * `context_rule_id` - The context rule ID for this policy.
 /// * `smart_account` - The address of the smart account.
 ///
 /// # Errors
 ///
 /// * [`SimpleThresholdError::SmartAccountNotInstalled`] - When the smart
 ///   account does not have a simple threshold policy installed.
-pub fn get_threshold(e: &Env, context_rule: &ContextRule, smart_account: &Address) -> u32 {
-    let key = SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
+pub fn get_threshold(e: &Env, context_rule_id: u32, smart_account: &Address) -> u32 {
+    let key = SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule_id);
     e.storage()
         .persistent()
         .get(&key)

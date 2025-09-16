@@ -102,7 +102,7 @@ pub const SPENDING_LIMIT_TTL_THRESHOLD: u32 = SPENDING_LIMIT_EXTEND_AMOUNT - DAY
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `context_rule` - The context rule for this policy.
+/// * `context_rule_id` - The context rule ID for this policy.
 /// * `smart_account` - The address of the smart account.
 ///
 /// # Errors
@@ -111,10 +111,10 @@ pub const SPENDING_LIMIT_TTL_THRESHOLD: u32 = SPENDING_LIMIT_EXTEND_AMOUNT - DAY
 ///   does not have a spending limit policy installed.
 pub fn get_spending_limit_data(
     e: &Env,
-    context_rule: &ContextRule,
+    context_rule_id: u32,
     smart_account: &Address,
 ) -> SpendingLimitData {
-    let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id);
+    let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule_id);
     e.storage()
         .persistent()
         .get(&key)
@@ -220,7 +220,7 @@ pub fn enforce(
     smart_account.require_auth();
 
     let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id);
-    let mut data = get_spending_limit_data(e, context_rule, smart_account);
+    let mut data = get_spending_limit_data(e, context_rule.id, smart_account);
     let current_ledger = e.ledger().sequence();
 
     match context {
@@ -304,7 +304,7 @@ pub fn set_spending_limit(
     }
 
     let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id);
-    let mut data = get_spending_limit_data(e, context_rule, smart_account);
+    let mut data = get_spending_limit_data(e, context_rule.id, smart_account);
     data.spending_limit = spending_limit;
 
     e.storage().persistent().set(&key, &data);

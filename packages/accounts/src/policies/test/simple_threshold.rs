@@ -55,7 +55,7 @@ fn install_success() {
 
         install(&e, &params, &context_rule, &smart_account);
 
-        assert_eq!(get_threshold(&e, &context_rule, &smart_account), 2);
+        assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 2);
     });
 }
 
@@ -87,7 +87,7 @@ fn smart_account_get_threshold_fails() {
 
     e.as_contract(&address, || {
         let context_rule = create_test_context_rule(&e);
-        get_threshold(&e, &context_rule, &smart_account);
+        get_threshold(&e, context_rule.id, &smart_account);
     });
 }
 
@@ -229,7 +229,7 @@ fn set_threshold_success() {
     e.as_contract(&address, || {
         let context_rule = create_test_context_rule(&e);
         set_threshold(&e, 3, &context_rule, &smart_account);
-        assert_eq!(get_threshold(&e, &context_rule, &smart_account), 3);
+        assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 3);
     });
 }
 
@@ -272,7 +272,7 @@ fn uninstall_success() {
         install(&e, &params, &context_rule, &smart_account);
 
         // Verify it's installed
-        assert_eq!(get_threshold(&e, &context_rule, &smart_account), 2);
+        assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 2);
     });
 
     e.as_contract(&address, || {
