@@ -12,7 +12,9 @@ Discussion: TBD
 ```
 
 ## Summary
-This proposal defines a standard contract interface for Real World Asset (RWA) tokens on Stellar. RWA tokens represent tokenized real-world assets such as securities, bonds, real estate, or other regulated financial instruments that require compliance with regulatory frameworks. The interface is based on the T-REX (Token for Regulated Exchanges) standard and extends fungible token functionality with comprehensive regulatory compliance features.
+This proposal defines a standard contract interface for Real World Asset (RWA) tokens on Stellar, developed through collaboration between OpenZeppelin, Tokeny, and Stellar. RWA tokens represent tokenized real-world assets such as securities, bonds, real estate, or other regulated financial instruments that require compliance with regulatory frameworks.
+
+This standard is based on the T-REX (Token for Regulated Exchanges) framework but introduces significant architectural improvements for flexibility and modularity.
 
 ## Motivation
 Real World Assets (RWAs) represent a significant opportunity for blockchain adoption, enabling the tokenization of traditional financial instruments and physical assets. However, unlike standard fungible tokens, RWAs must comply with complex regulatory requirements including but not limited to:
@@ -32,35 +34,94 @@ The T-REX standard provides a comprehensive framework for compliant security tok
 - **Recovery systems** for institutional-grade wallet management
 - **Compliance hooks** for regulatory reporting
 
-## Flexibility and Extensibility
+## Architecture Overview
 
-The RWA Token contract is designed to be flexible and extensible, allowing for easy integration with a variety of identity registry and compliance frameworks. This flexibility is achieved through a modular architecture with loose coupling between components:
+Based on extensive research and collaboration with industry experts, this RWA standard introduces a fundamentally different approach to regulatory compliance in tokenized assets. The architecture is built around **loose coupling** and **implementation abstraction**, addressing key limitations identified in existing standards.
 
-- **Identity Verification**: Supports multiple implementation approaches including Merkle-Tree based systems, Zero-Knowledge proof systems, claim-based verification, and custom approaches
-- **Compliance Framework**: Pluggable compliance rules that can be customized based on regulatory requirements
-- **Modular Design**: Clean separation between the core RWA token functionality and external compliance/identity contracts
+### Core Design Principles
 
-By establishing this standard, RWA tokens can interact seamlessly with DeFi protocols, custody solutions, and compliance infrastructure while maintaining full regulatory compliance.
+1. **Separation of Concerns**: Core token functionality is cleanly separated from compliance and identity verification
+2. **Implementation Flexibility**: Compliance and identity systems are treated as pluggable implementation details
+3. **Shared Infrastructure**: Components can be shared across multiple token contracts to reduce deployment costs
+4. **Regulatory Adaptability**: The system can adapt to different regulatory frameworks without core changes
+
+### Component Architecture
+
+The RWA ecosystem consists of several interconnected but loosely coupled components:
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────────┐
+│   RWA Token     │───▶│   Compliance     │───▶│  Compliance Modules │
+│   (Core)        │    │   Contract       │    │  (Pluggable Rules)  │
+└─────────────────┘    └──────────────────┘    └─────────────────────┘
+         │
+         ▼
+┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│ Identity        │───▶│ Claim Topics &   │    │ Custom Identity  │
+│ Verifier        │    │ Issuers          │───▶│ Registry         │
+└─────────────────┘    └──────────────────┘    └──────────────────┘
+```
+
+### Flexibility Through Abstraction
+
+The architecture supports multiple implementation strategies:
+
+- **Identity Verification**: Merkle trees, Zero-Knowledge proofs, claim-based systems, or custom approaches
+- **Compliance Rules**: Modular hook-based system supporting diverse regulatory requirements
+- **Access Control**: Integration with external RBAC systems
+
+This design enables the same core RWA interface to work with vastly different regulatory and technical requirements.
 
 ## Interface
-The RWA token interface extends the standard fungible token functionality with regulatory compliance features. The interface is designed to be modular, allowing implementations to plug in different compliance rules, identity verification systems, and administrative controls based on specific regulatory requirements.
+
+The RWA token interface extends the **fungible token** functionality with regulatory compliance features.
 
 ### Architecture Overview
 
-The main RWA contract expects two key functions to be available from external contracts:
+The RWA Token contract requires only **two external functions** to operate:
 
-- `fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool;` for compliance validation
-- `fn verify_identity(e: &Env, user_address: &Address);` for identity verification
+```rust
+// Compliance validation - returns true if transfer is allowed
+fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool;
 
-These functions are deliberately marked as implementation details to provide flexibility and allow for alternate approaches based on different business needs. The RWA Token interface provides setter and getter functions for these external contracts:
+// Identity verification - panics if user is not verified
+fn verify_identity(e: &Env, user_address: &Address);
+```
 
-**Compliance Contract:**
-- `set_compliance(e: &Env, compliance: Address, operator: Address)`
-- `compliance(e: &Env) -> Address`
+- `can_transfer()` is expected to be exposed from a compliance contract.
+- `verify_identity()` is expected to be exposed from an identity verifier contract.
 
-**Identity Verifier Contract:**
-- `set_identity_verifier(e: &Env, identity_verifier: Address, operator: Address)`
-- `identity_verifier(e: &Env) -> Address`
+These functions are **deliberately abstracted** as implementation details, enabling:
+- **Regulatory Flexibility**: Different jurisdictions can implement different compliance logic
+- **Technical Flexibility**: Various identity verification approaches (ZK, Merkle trees, claims)
+- **Cost Optimization**: Shared contracts across multiple tokens
+- **Future-Proofing**: New compliance approaches without interface changes
+
+In other words, the only thing required by this RWA token design, is that the RWA token should be able to call these expected functions made available by your compliance and identity verification contracts.
+
+### Contract Connection Interface
+
+The RWA Token provides simple setter/getter functions for external contracts:
+
+```rust
+// Compliance Contract Management
+fn set_compliance(e: &Env, compliance: Address, operator: Address);
+fn compliance(e: &Env) -> Address;
+
+// Identity Verifier Contract Management
+fn set_identity_verifier(e: &Env, identity_verifier: Address, operator: Address);
+fn identity_verifier(e: &Env) -> Address;
+```
+
+### Integration Pattern
+
+To deploy a compliant RWA token:
+
+1. **Deploy Core RWA Token**: Implements the RWAToken trait
+2. **Deploy/Connect Compliance Contract**: Implements compliance validation logic
+3. **Deploy/Connect Identity Verifier**: Implements identity verification logic
+4. **Configure Connections**: Use setter functions to link contracts
+5. **Configure Rules**: Set up compliance modules and identity requirements
 
 ```rust
 use soroban_sdk::{Address, Env, String};
@@ -386,73 +447,286 @@ The identity verifier set event is emitted when the identity verifier contract i
 **Data:**
 - Empty array `[]`
 
-## Notes on Regulatory Compliance
+## Component Deep Dive
 
-### Identity Verification
-RWA tokens require robust identity verification mechanisms to ensure compliance with KYC/AML regulations. The identity verification system is designed to be flexible and support multiple implementation approaches. Below is an example of the Claim-Based Identity Verification
+### 1. Identity Verification System
 
-#### Claim-Based Implementation
-The suggested claim-based implementation uses external contracts:
-- **Claim Topics and Issuers**: Manages trusted claim issuers and defines claim topics (e.g., KYC=1, AML=2, Accredited Investor=3)
-- **Identity Registry Storage**: Maps wallet addresses to onchain identities (optional, not required for all approaches)
-- **Identity Claims**: Validates cryptographic claims with support for multiple signature schemes (Ed25519, Secp256k1, Secp256r1)
+**Philosophy**: The entire identity stack is treated as an implementation detail, enabling maximum regulatory and technical flexibility.
 
-### Compliance Framework
-The modular compliance framework allows for pluggable compliance rules that can be customized based on regulatory requirements:
+#### The IdentityVerifier Trait
 
-- **Transfer Validation**: Before any transfer, the compliance contract validates whether the transfer meets regulatory requirements
-- **Mint Validation**: Before any issuing of new tokens, the compliance contract validates whether the mint operation meets regulatory requirements
-- **Compliance Hooks**: The system provides hooks for `Transferred`, `Created`, and `Destroyed` events
+```rust
+pub trait IdentityVerifier {
+    /// Core verification function - panics if user is not verified
+    fn verify_identity(e: &Env, user_address: &Address);
+
+    // Setters and getters for the claim topics and issuers contract
+    fn set_claim_topics_and_issuers(e: &Env, contract: Address, operator: Address);
+    fn claim_topics_and_issuers(e: &Env) -> Address;
+}
+```
+
+#### Implementation Strategies
+
+Different regulatory environments may require different approaches. Here are some examples:
+
+**1. Claim-Based Verification (Reference Implementation)**
+- **Use Case**: Traditional KYC/AML with trusted issuers
+- **Components**: ClaimTopicsAndIssuers + IdentityRegistryStorage + IdentityClaims
+- **Benefits**: Familiar to regulators, rich metadata support
+
+**2. Merkle Tree Verification**
+- **Use Case**: Privacy-focused compliance with efficient proofs
+- **Components**: ClaimTopicsAndIssuers + Merkle root storage + proof validation
+- **Benefits**: Minimal storage, efficient verification
+
+**3. Zero-Knowledge Verification**
+- **Use Case**: Privacy-preserving compliance
+- **Components**: ClaimTopicsAndIssuers + ZK circuit + proof verification
+- **Benefits**: Maximum privacy, selective disclosure
+
+**4. Custom Approaches**
+- **Use Case**: Jurisdiction-specific requirements
+- **Components**: ClaimTopicsAndIssuers + Custom verification logic
+- **Benefits**: Tailored to specific regulatory needs
+
+#### Reference Implementation Architecture
+
+Our claim-based reference implementation demonstrates the full complexity of traditional RWA compliance:
+
+```
+┌─────────────────────┐
+│  Identity Verifier  │
+│  (Orchestrator)     │
+│                     │
+└─────────────────────┘
+              │
+              ├────▶┌───────────────────────────┐
+              │     │ Claim Topics & Issuers    │
+              │     │ (Shared Registry)         │
+              │     └───────────────────────────┘
+              │
+              ├────▶┌───────────────────────────┐
+              │     │ Identity Registry Storage │
+              │     │ (User Profiles)           │
+              │     └───────────────────────────┘
+              │
+              ├────▶┌───────────────────────────┐
+              │     │ Identity Claims           │
+              │     │ (Claim Validation)        │
+              │     └───────────────────────────┘
+              │
+              └────▶┌───────────────────────────┐
+                    │ Claim Issuer              │
+                    │ (Signature Validation)    │
+                    └───────────────────────────┘
+```
+
+**Key Components:**
+
+- **ClaimTopicsAndIssuers**: Merged registry managing both trusted issuers and required claim types (KYC=1, AML=2, etc.)
+- **IdentityRegistryStorage**: Component storing identity profiles with country relations and metadata
+- **IdentityClaims**: Validates cryptographic claims using multiple signature schemes (Ed25519, Secp256k1, Secp256r1)
+- **ClaimIssuer**: Builds and validates cryptographic claims about user attributes
+
+### 2. Compliance System
+
+Modular hook-based architecture supporting diverse regulatory requirements through pluggable compliance modules.
+
+#### The Compliance Trait
+
+```rust
+pub trait Compliance {
+    // Module management
+    fn add_module_to(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
+    fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
+
+    // Validation hooks (READ-only)
+    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool;
+    fn can_create(e: &Env, to: Address, amount: i128) -> bool;
+
+    // State update hooks (called after successful operations)
+    fn transferred(e: &Env, from: Address, to: Address, amount: i128);
+    fn created(e: &Env, to: Address, amount: i128);
+    fn destroyed(e: &Env, from: Address, amount: i128);
+}
+```
+
+#### Hook-Based Architecture
+
+The compliance system uses a sophisticated hook mechanism:
+
+```rust
+pub enum ComplianceHook {
+    CanTransfer,    // Pre-validation: Check if transfer meets compliance rules
+    CanCreate,      // Pre-validation: Check if mint operation is compliant
+    Transferred,    // Post-event: Update state after successful transfer
+    Created,        // Post-event: Update state after successful mint
+    Destroyed,      // Post-event: Update state after successful burn
+}
+```
+
+#### Compliance Module Examples
+
+**Transfer Limits Module**:
+- Hook: `CanTransfer` + `Transferred`
+- Logic: Enforce daily/monthly transfer limits per user
+
+**Jurisdiction Restrictions Module**:
+- Hook: `CanTransfer`
+- Logic: Block transfers between incompatible jurisdictions
+
+**Holding Period Module**:
+- Hook: `CanTransfer` + `Created`
+- Logic: Enforce minimum holding periods for newly minted tokens
+
+**Investor Accreditation Module**:
+- Hook: `CanCreate`
+- Logic: Verify investor accreditation before minting
+
+#### Shared Compliance Infrastructure
+
+Compliance contracts are designed to be **shared across multiple RWA tokens**, reducing deployment costs and ensuring consistent regulatory enforcement:
+
+```
+┌─────────────┐    ┌─────────────────────┐    ┌──────────────────┐
+│ RWA Token A │───▶│                     │───▶│ Transfer Limits  │
+├─────────────┤    │   Shared Compliance │    │ Module           │
+│ RWA Token B │───▶│   Contract          │───▶├──────────────────┤
+├─────────────┤    │                     │    │ Jurisdiction     │
+│ RWA Token C │───▶│                     │    │ Module           │
+└─────────────┘    └─────────────────────┘    └──────────────────┘
+```
 
 
-### Freezing Mechanisms
-RWA tokens support sophisticated freezing capabilities for regulatory enforcement:
+### 3. Advanced Token Controls
 
-- **Address-Level Freezing**: Completely freeze an address, preventing all token operations
-- **Partial Token Freezing**: Freeze specific amounts of tokens while allowing operations on unfrozen balances
-- **Regulatory Enforcement**: Freezing can be triggered by regulatory requirements, suspicious activity, or legal proceedings
+#### Freezing Mechanisms
 
-### Recovery System
-The recovery system enables institutional-grade wallet management:
+Based on regulatory requirements research, the system supports multiple freezing strategies:
 
-- **Identity-Based Recovery**: Recovery requires verification of the investor's onchain identity
-- **Operator Authorization**: Recovery operations must be performed by authorized operators with proper RBAC permissions
-- **Audit Trail**: All recovery operations are logged with comprehensive event emission for regulatory reporting
+**Address-Level Freezing**:
+```rust
+fn set_address_frozen(e: &Env, user_address: Address, freeze: bool, operator: Address);
+fn is_frozen(e: &Env, user_address: Address) -> bool;
+```
+- **Use Case**: Complete account suspension for regulatory investigations
+- **Effect**: Prevents all token operations (send/receive)
 
-## Notes on Role-Based Access Control (RBAC)
+**Partial Token Freezing**:
+```rust
+fn freeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
+fn unfreeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
+fn get_frozen_tokens(e: &Env, user_address: Address) -> i128;
+```
+- **Use Case**: Escrow scenarios, disputed transactions
+- **Effect**: Freezes specific token amounts while allowing operations on remaining balance
 
-RWA tokens implement comprehensive RBAC to ensure that sensitive operations are only performed by authorized entities:
+#### Recovery System
 
-- **Operator Roles**: Different operator roles can be defined with specific permissions for minting, burning, freezing, recovery, and compliance management
-- **Administrative Functions**: All administrative functions require proper operator authorization
-- **Compliance Integration**: RBAC permissions can be integrated with compliance rules to ensure regulatory requirements are met
+Institutional-grade wallet recovery for high-value securities:
 
-## Notes on Integration with Fungible Tokens
+```rust
+fn recovery_address(
+    e: &Env,
+    lost_wallet: Address,
+    new_wallet: Address,
+    investor_onchain_id: Address,
+    operator: Address
+) -> bool;
+```
 
-RWA tokens extend the standard fungible token interface while adding regulatory compliance features:
+**Recovery Process**:
+1. **Identity Verification**: Verify investor's onchain identity matches the lost wallet
+2. **Authorization Check**: Ensure operator has recovery permissions
+3. **Balance Transfer**: Move all tokens from lost wallet to new wallet
+4. **Identity Update**: Update identity registry to map new wallet to existing identity
+5. **Audit Trail**: Emit comprehensive events for regulatory reporting
 
-- **Base Functionality**: All standard fungible token operations (transfer, approve, allowance) are available
-- **Compliance Overrides**: Standard operations are enhanced with compliance checks and identity verification
-- **Pausable Operations**: The entire token can be paused for emergency situations while maintaining compliance
+#### Forced Transfers
 
-## Security Considerations
+For regulatory compliance (court orders, sanctions):
 
-### Access Control
-- All administrative functions must implement proper RBAC checks
-- Operator permissions should be carefully managed and regularly audited
-- Multi-signature schemes should be considered for high-privilege operations
+```rust
+fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, operator: Address);
+```
 
-### Identity Verification
-- Identity claims must be cryptographically verified using trusted issuers
-- Claim expiration and revocation mechanisms should be implemented
-- Regular re-verification of investor identities may be required based on regulatory requirements
+- **Use Case**: Court-ordered asset transfers, regulatory seizures
+- **Authorization**: Requires operator with forced transfer permissions
+- **Compliance**: Bypasses normal compliance validation checks (operator responsibility)
 
-### Compliance Validation
-- All token operations should be validated against current compliance rules
-- Compliance contracts should be upgradeable to adapt to changing regulations
-- Emergency pause mechanisms should be available for regulatory compliance
+### 4. Access Control & Governance
 
-### Freezing and Recovery
-- Freezing operations should be logged and auditable
-- Recovery operations should require multiple levels of authorization
-- Time-locked recovery mechanisms can provide additional security for high-value operations
+RWA tokens require proper access control to ensure that sensitive operations are only performed by authorized entities:
+
+- **Operator Authorization**: All administrative functions require proper operator authorization using Soroban's built-in authorization mechanisms
+- **Flexible Access Control**: While the RWA interface itself doesn't prescribe a specific access control model, implementations can integrate with external access control systems as needed
+- **Compliance Integration**: Access control permissions should be integrated with compliance rules to ensure regulatory requirements are met
+
+## Integration & Interoperability
+
+### Fungible Token Compatibility
+
+RWA tokens maintain full compatibility with standard fungible token interfaces:
+
+```rust
+pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
+    // RWA-specific functions...
+}
+```
+
+**Standard Operations Enhanced**:
+- `transfer()`: Enhanced with compliance validation and identity verification
+- `approve()`: Standard ERC-20 style approvals work unchanged
+- `allowance()`: Full allowance system compatibility
+- `balance()`: Standard balance queries
+
+**Emergency Controls**:
+- `pause()`/`unpause()`: Emergency pause functionality
+- Paused state blocks all operations except queries
+
+### Deployment Patterns
+
+**Single Token Deployment**:
+```
+RWA Token ──▶ Dedicated Compliance
+```
+
+**Multi-Token Suite**:
+```
+RWA Token A ──┐
+RWA Token B ──┼──▶ Shared Compliance
+RWA Token C ──┘
+```
+
+## Research-Driven Design Decisions
+
+### Addressing ERC-3643 Limitations
+
+Through our (OpenZeppelin) collaboration with Tokeny, Stellar, we identified key limitations in existing RWA standards:
+
+**1. Tight Coupling Issues**
+- **Problem**: ERC-3643 tightly couples identity verification with specific contract structures
+- **Solution**: Abstract identity verification as pluggable implementation detail
+
+**2. Inflexible Identity Models**
+- **Problem**: Hardcoded ERC-734/735 identity contracts don't translate to all blockchain architectures
+- **Solution**: Support multiple identity verification approaches (Merkle, ZK, claims, custom)
+
+**3. Redundant Contract Hierarchies**
+- **Problem**: Complex IdentityRegistry ↔ IdentityRegistryStorage relationships
+- **Solution**: Direct access patterns
+
+**4. Limited Compliance Flexibility**
+- **Problem**: Monolithic compliance validation
+- **Solution**: Modular hook-based compliance system
+
+### Upgrade and Migration Strategies
+
+**Compliance Evolution**:
+- Modular compliance system supports rule updates without token redeployment
+- New compliance modules can be added for evolving regulations
+
+**Identity System Migration**:
+- Abstract identity verification enables migration between verification approaches
+- Gradual migration strategies for existing user bases
