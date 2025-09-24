@@ -15,7 +15,7 @@ members = [
     "examples/nft-sequential-minting",
     "examples/ownable",
     "examples/pausable",
-    "examples/rwa",
+    #"examples/rwa",
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
     "examples/multisig/*",

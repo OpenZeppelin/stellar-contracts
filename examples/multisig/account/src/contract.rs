@@ -8,7 +8,7 @@ use soroban_sdk::{
     auth::{Context, CustomAccountInterface},
     contract, contractimpl,
     crypto::Hash,
-    Address, Bytes, Env, Map, String, Symbol, Val, Vec,
+    Address, Env, Map, String, Symbol, Val, Vec,
 };
 use stellar_accounts::smart_account::{
     add_context_rule, add_policy, add_signer, do_check_auth, get_context_rule, get_context_rules,
@@ -37,15 +37,15 @@ impl MultisigContract {
 #[contractimpl]
 impl CustomAccountInterface for MultisigContract {
     type Error = SmartAccountError;
-    type Signature = Map<Signer, Bytes>;
+    type Signature = Signatures;
 
     fn __check_auth(
         e: Env,
         signature_payload: Hash<32>,
-        signatures: Map<Signer, Bytes>,
+        signatures: Signatures,
         auth_contexts: Vec<Context>,
     ) -> Result<(), Self::Error> {
-        do_check_auth(&e, &signature_payload, &Signatures(signatures), &auth_contexts)
+        do_check_auth(&e, &signature_payload, &signatures, &auth_contexts)
     }
 }
 
