@@ -2,8 +2,8 @@ mod storage;
 #[cfg(test)]
 mod test;
 use soroban_sdk::{
-    auth::CustomAccountInterface, contracterror, contractevent, Address, Env, Map, String, Symbol,
-    Val, Vec,
+    auth::CustomAccountInterface, contractclient, contracterror, contractevent, Address, Env, Map,
+    String, Symbol, Val, Vec,
 };
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, do_check_auth, get_context_rule,
@@ -27,6 +27,7 @@ pub use storage::{
 /// - Rules can contain multiple signers and policies
 /// - Rules can have expiration times for temporary authorization
 /// - Rules are validated against maximum limits (MAX_SIGNERS, MAX_POLICIES)
+#[contractclient(name = "SmartAccountClient")]
 pub trait SmartAccount: CustomAccountInterface {
     /// Retrieves a context rule by its unique ID, returning the
     /// `ContextRule` containing all metadata, signers, and policies.
