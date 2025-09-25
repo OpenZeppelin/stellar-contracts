@@ -361,8 +361,8 @@ pub fn get_validated_context(
 ///
 /// * [`SmartAccountError::DelegatedVerificationFailed`] - When a delegated
 ///   signature fails verification through its verifier contract.
-pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signatures: &Signatures) {
-    for (signer, sig_data) in signatures.0.iter() {
+pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signers: &Map<Signer, Bytes>) {
+    for (signer, sig_data) in signers.iter() {
         match signer {
             Signer::Delegated(verifier, key_data) => {
                 let sig_payload = Bytes::from_array(e, &signature_payload.to_bytes().to_array());
@@ -465,7 +465,7 @@ pub fn do_check_auth(
     signatures: &Signatures,
     auth_contexts: &Vec<Context>,
 ) -> Result<(), SmartAccountError> {
-    authenticate(e, signature_payload, signatures);
+    authenticate(e, signature_payload, &signatures.0);
 
     let mut validated_contexts = Vec::new(e);
     for context in auth_contexts.iter() {

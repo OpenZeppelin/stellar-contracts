@@ -124,6 +124,6 @@ impl ExecutionEntryPoint for MultisigContract {
     fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>) {
         e.current_contract_address().require_auth();
 
-        e.invoke_contract::<()>(&target, &target_fn, target_args);
+        e.invoke_contract::<Val>(&target, &target_fn, target_args);
     }
 }
