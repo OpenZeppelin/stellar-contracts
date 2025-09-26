@@ -264,8 +264,8 @@ fn test_max_functions() {
     e.mock_all_auths();
 
     // Test max functions with empty vault
-    assert_eq!(vault_client.max_deposit(&user), i64::MAX as i128);
-    assert_eq!(vault_client.max_mint(&user), i64::MAX as i128);
+    assert_eq!(vault_client.max_deposit(&user), i128::MAX);
+    assert_eq!(vault_client.max_mint(&user), i128::MAX);
     assert_eq!(vault_client.max_withdraw(&user), 0); // No shares yet
     assert_eq!(vault_client.max_redeem(&user), 0); // No shares yet
 
@@ -335,9 +335,9 @@ fn test_deposit_max_validation() {
 
     e.mock_all_auths();
 
-    // Test that max_deposit returns i64::MAX
+    // Test that max_deposit returns i128::MAX
     let max_deposit = vault_client.max_deposit(&user);
-    assert_eq!(max_deposit, i64::MAX as i128);
+    assert_eq!(max_deposit, i128::MAX);
 
     // Test normal deposit works fine
     let deposit_amount = 100_000_000_000_000_000i128;
