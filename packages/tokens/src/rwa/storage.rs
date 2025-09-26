@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
-    fungible::{emit_transfer, Base, ContractOverrides, StorageKey},
+    fungible::{emit_transfer, Base, ContractOverrides},
     rwa::{
         compliance::ComplianceClient, emit_address_frozen, emit_burn, emit_compliance_set,
         emit_identity_verifier_set, emit_mint, emit_recovery_success,
@@ -327,8 +327,8 @@ impl RWA {
 
     /// Recovery function used to force transfer tokens from a lost wallet to a
     /// new wallet. This function transfers all tokens and preserves the frozen
-    /// status from the lost wallet to the new wallet. Returns `true` if recovery was
-    /// successful, `false` if no tokens to recover.
+    /// status from the lost wallet to the new wallet. Returns `true` if
+    /// recovery was successful, `false` if no tokens to recover.
     ///
     /// # Arguments
     ///
@@ -353,8 +353,9 @@ impl RWA {
     ///
     /// # Notes
     ///
-    /// This function preserves the frozen status (both partial and full) from the
-    /// lost wallet and applies it to the new wallet, maintaining regulatory compliance.
+    /// This function preserves the frozen status (both partial and full) from
+    /// the lost wallet and applies it to the new wallet, maintaining
+    /// regulatory compliance.
     ///
     /// # Security Warning
     ///
@@ -381,7 +382,8 @@ impl RWA {
         let frozen_tokens = Self::get_frozen_tokens(e, lost_wallet);
         let is_address_frozen = Self::is_frozen(e, lost_wallet);
 
-        // Use forced_transfer to transfer all tokens (this handles unfreezing as needed)
+        // Use forced_transfer to transfer all tokens (this handles unfreezing as
+        // needed)
         Self::forced_transfer(e, lost_wallet, new_wallet, lost_balance);
 
         // Preserve frozen tokens on the new wallet if there were any
@@ -393,10 +395,6 @@ impl RWA {
         if is_address_frozen {
             Self::set_address_frozen(e, &e.current_contract_address(), new_wallet, true);
         }
-
-        // TODO: instead of below, we can just delete the wallet, if we have a delete mechanism?
-        e.storage().persistent().remove(&RWAStorageKey::FrozenTokens(lost_wallet.clone()));
-        e.storage().persistent().remove(&RWAStorageKey::AddressFrozen(lost_wallet.clone()));
 
         emit_recovery_success(e, lost_wallet, new_wallet, investor_onchain_id);
 

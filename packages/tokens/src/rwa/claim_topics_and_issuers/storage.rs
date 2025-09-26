@@ -455,11 +455,11 @@ pub fn update_issuer_claim_topics(e: &Env, trusted_issuer: &Address, claim_topic
 
     // Calculate topics to remove (in old but not in new)
     let topics_to_remove: Vec<u32> =
-        old_topics.iter().filter(|old_topic| !claim_topics.contains(old_topic)).collect();
+        Vec::from_iter(e, old_topics.iter().filter(|old_topic| !claim_topics.contains(old_topic)));
 
     // Calculate topics to add (in new but not in old)
     let topics_to_add: Vec<u32> =
-        claim_topics.iter().filter(|new_topic| !old_topics.contains(new_topic)).collect();
+        Vec::from_iter(e, claim_topics.iter().filter(|new_topic| !old_topics.contains(new_topic)));
 
     // Update issuer's claim topics
     let topics_key = ClaimTopicsAndIssuersStorageKey::IssuerClaimTopics(trusted_issuer.clone());
