@@ -326,8 +326,8 @@ impl RWA {
     }
 
     /// Recovery function used to force transfer tokens from a lost wallet to a
-    /// new wallet. This function transfers all tokens and clears frozen
-    /// status from the lost wallet. Returns `true` if recovery was
+    /// new wallet. This function transfers all tokens and preserves the frozen
+    /// status from the lost wallet to the new wallet. Returns `true` if recovery was
     /// successful, `false` if no tokens to recover.
     ///
     /// # Arguments
@@ -353,8 +353,8 @@ impl RWA {
     ///
     /// # Notes
     ///
-    /// This function automatically unfreezes all frozen tokens and clears the
-    /// frozen status of the lost wallet before transferring.
+    /// This function preserves the frozen status (both partial and full) from the
+    /// lost wallet and applies it to the new wallet, maintaining regulatory compliance.
     ///
     /// # Security Warning
     ///
@@ -377,28 +377,27 @@ impl RWA {
             return false;
         }
 
-        // Transfer all tokens from lost wallet to new wallet
+        // Store frozen status before transfer
         let frozen_tokens = Self::get_frozen_tokens(e, lost_wallet);
+        let is_address_frozen = Self::is_frozen(e, lost_wallet);
 
-        // If there are frozen tokens, unfreeze them first
+        // Use forced_transfer to transfer all tokens (this handles unfreezing as needed)
+        Self::forced_transfer(e, lost_wallet, new_wallet, lost_balance);
+
+        // Preserve frozen tokens on the new wallet if there were any
         if frozen_tokens > 0 {
-            e.storage().persistent().set(&RWAStorageKey::FrozenTokens(lost_wallet.clone()), &0i128);
-            emit_tokens_unfrozen(e, lost_wallet, frozen_tokens);
+            Self::freeze_partial_tokens(e, new_wallet, frozen_tokens);
         }
 
-        // Transfer all balance
-        let new_balance = Base::balance(e, new_wallet) + lost_balance;
-        e.storage().persistent().set(&StorageKey::Balance(lost_wallet.clone()), &0i128);
-        e.storage().persistent().set(&StorageKey::Balance(new_wallet.clone()), &new_balance);
-
-        // Clear frozen status if set
-        if Self::is_frozen(e, lost_wallet) {
-            e.storage()
-                .persistent()
-                .set(&RWAStorageKey::AddressFrozen(lost_wallet.clone()), &false);
+        // Preserve address frozen status on the new wallet if it was frozen
+        if is_address_frozen {
+            Self::set_address_frozen(e, &e.current_contract_address(), new_wallet, true);
         }
 
-        emit_transfer(e, lost_wallet, new_wallet, lost_balance);
+        // TODO: instead of below, we can just delete the wallet, if we have a delete mechanism?
+        e.storage().persistent().remove(&RWAStorageKey::FrozenTokens(lost_wallet.clone()));
+        e.storage().persistent().remove(&RWAStorageKey::AddressFrozen(lost_wallet.clone()));
+
         emit_recovery_success(e, lost_wallet, new_wallet, investor_onchain_id);
 
         true
@@ -650,5 +649,27 @@ impl RWA {
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         Base::spend_allowance(e, from, spender, amount);
         Self::transfer(e, from, to, amount);
+    }
+
+    /// Deletes the wallet from the storage.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `address` - The address of the wallet to delete.
+    ///
+    /// # Events
+    ///
+    /// * topics - ["wallet_deleted", address: Address]
+    /// * data - `[]`
+    ///
+    /// # Security Warning
+    ///
+    /// **IMPORTANT**: This function bypasses authorization checks and should
+    /// only be used internally or in admin functions that implement their own
+    /// authorization logic.
+    pub fn delete(e: &Env, address: &Address) {
+        e.storage().persistent().remove(&RWAStorageKey::FrozenTokens(address.clone()));
+        e.storage().persistent().remove(&RWAStorageKey::AddressFrozen(address.clone()));
     }
 }
