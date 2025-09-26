@@ -648,26 +648,4 @@ impl RWA {
         Base::spend_allowance(e, from, spender, amount);
         Self::transfer(e, from, to, amount);
     }
-
-    /// Deletes the wallet from the storage.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `address` - The address of the wallet to delete.
-    ///
-    /// # Events
-    ///
-    /// * topics - ["wallet_deleted", address: Address]
-    /// * data - `[]`
-    ///
-    /// # Security Warning
-    ///
-    /// **IMPORTANT**: This function bypasses authorization checks and should
-    /// only be used internally or in admin functions that implement their own
-    /// authorization logic.
-    pub fn delete(e: &Env, address: &Address) {
-        e.storage().persistent().remove(&RWAStorageKey::FrozenTokens(address.clone()));
-        e.storage().persistent().remove(&RWAStorageKey::AddressFrozen(address.clone()));
-    }
 }
