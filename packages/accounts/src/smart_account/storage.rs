@@ -366,7 +366,11 @@ pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signatures: &Signatur
         match signer {
             Signer::Delegated(verifier, key_data) => {
                 let sig_payload = Bytes::from_array(e, &signature_payload.to_bytes().to_array());
-                if !VerifierClient::new(e, &verifier).verify(&sig_payload, &key_data, &sig_data) {
+                if !VerifierClient::new(e, &verifier).verify(
+                    &sig_payload,
+                    &key_data.into_val(e),
+                    &sig_data.into_val(e),
+                ) {
                     panic_with_error!(e, SmartAccountError::DelegatedVerificationFailed)
                 }
             }
