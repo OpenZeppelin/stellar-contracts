@@ -97,12 +97,21 @@ pub fn verify_identity(e: &Env, user_address: &Address) {
         });
 
         for (issuer, claim_id, is_last) in issuers_with_claim_ids {
-            let claim: Claim = identity_client.get_claim(&claim_id);
+            let claim: Claim = match identity_client.try_get_claim(&claim_id) {
+                Ok(Ok(claim)) => claim,
+                Err(_) | Ok(Err(_)) => {
+                    if is_last {
+                        panic_with_error!(e, RWAError::IdentityVerificationFailed)
+                    } else {
+                        continue;
+                    }
+                }
+            };
 
             if validate_claim(e, &claim, claim_topic, &issuer, &investor_onchain_id) {
                 break;
             } else if is_last {
-                panic_with_error!(e, RWAError::IdentityVerificationFailed);
+                panic_with_error!(e, RWAError::IdentityVerificationFailed)
             }
         }
     }

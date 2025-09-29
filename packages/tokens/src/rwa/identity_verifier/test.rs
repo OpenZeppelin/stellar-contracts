@@ -1,13 +1,13 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, map, symbol_short, testutils::Address as _, vec, Address, Bytes, Env,
-    Map, Vec,
+    contract, contractimpl, contracttype, map, panic_with_error, symbol_short,
+    testutils::Address as _, vec, Address, Bytes, BytesN, Env, Map, Vec,
 };
 
 use crate::rwa::{
     claim_issuer::ClaimIssuer,
-    identity_claims::Claim,
+    identity_claims::{generate_claim_id, Claim, ClaimsError},
     identity_verifier::storage::{
         claim_topics_and_issuers, identity_registry_storage, set_claim_topics_and_issuers,
         set_identity_registry_storage, validate_claim, verify_identity,
@@ -42,9 +42,22 @@ impl MockClaimTopicsAndIssuers {
 #[contract]
 pub struct MockIdentityClaims;
 
+#[contracttype]
+pub enum IdentityClaimsMockStorageKey {
+    Revert(BytesN<32>),
+}
+
 #[contractimpl]
 impl MockIdentityClaims {
-    pub fn get_claim(e: &Env, _claim_id: soroban_sdk::BytesN<32>) -> Claim {
+    pub fn get_claim(e: &Env, claim_id: soroban_sdk::BytesN<32>) -> Claim {
+        if e.storage()
+            .persistent()
+            .get(&IdentityClaimsMockStorageKey::Revert(claim_id))
+            .unwrap_or(false)
+        {
+            panic_with_error!(e, ClaimsError::ClaimNotFound)
+        }
+
         let default = Claim {
             topic: 1u32,
             scheme: 1u32,
@@ -286,6 +299,44 @@ fn verify_identity_success_with_multiple_issuers() {
         set_claim_topics_and_issuers(&e, &cti);
 
         // Should succeed with second issuer
+        verify_identity(&e, &user_address);
+    });
+}
+
+#[test]
+fn verify_identity_success_first_claim_not_found() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let user_address = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let (identity_claims, issuer1, irs, cti) = setup_verification_contracts(&e);
+        let issuer2 = e.register(MockClaimIssuer, ());
+
+        // Both issuers return invalid claims
+        e.as_contract(&identity_claims, || {
+            // set claim for issuer1 to revert
+            let claim_id = generate_claim_id(&e, &issuer1, 1);
+            e.storage().persistent().set(&IdentityClaimsMockStorageKey::Revert(claim_id), &true);
+
+            // set claim for issuer2 to be ok
+            let claim = construct_claim(&e, &issuer2, 1);
+            e.storage().persistent().set(&symbol_short!("claim"), &claim);
+        });
+        e.as_contract(&issuer2, || {
+            e.storage().persistent().set(&symbol_short!("claim_ok"), &true);
+        });
+
+        // Update claim topics and issuers to include both
+        e.as_contract(&cti, || {
+            e.storage()
+                .persistent()
+                .set(&symbol_short!("issuers"), &vec![&e, issuer1.clone(), issuer2.clone()]);
+        });
+
+        set_identity_registry_storage(&e, &irs);
+        set_claim_topics_and_issuers(&e, &cti);
+
         verify_identity(&e, &user_address);
     });
 }
