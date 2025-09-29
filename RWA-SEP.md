@@ -74,7 +74,7 @@ This design enables the same core RWA interface to work with vastly different re
 
 ## Interface
 
-The RWA token interface extends the **fungible token** functionality with regulatory compliance features.
+The RWA token interface extends the **fungible token** ([SEP-41](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0041.md)) functionality with regulatory compliance features.
 
 ### Architecture Overview
 
@@ -137,8 +137,15 @@ use crate::fungible::FungibleToken;
 ///
 /// This trait extends basic fungible token functionality with regulatory
 /// features required for security tokens.
-pub trait RWAToken: Pausable + FungibleToken {
+pub trait RWAToken: TokenInterface {
     // ################## CORE TOKEN FUNCTIONS ##################
+
+    /// Returns the total amount of tokens in circulation.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn total_supply(e: &Env) -> i128;
 
     /// Forces a transfer of tokens between two whitelisted wallets.
     /// This function can only be called by the operator with necessary
@@ -299,9 +306,17 @@ pub trait RWAToken: Pausable + FungibleToken {
     // ################## METADATA FUNCTIONS ##################
 
     /// Returns the version of the token (T-REX version).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
     fn version(e: &Env) -> String;
 
     /// Returns the address of the onchain ID of the token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
     fn onchain_id(e: &Env) -> Address;
 
     // ################## COMPLIANCE AND IDENTITY FUNCTIONS ##################
@@ -343,10 +358,37 @@ pub trait RWAToken: Pausable + FungibleToken {
     fn set_identity_verifier(e: &Env, identity_verifier: Address, operator: Address);
 
     /// Returns the Compliance contract linked to the token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
     fn compliance(e: &Env) -> Address;
 
     /// Returns the Identity Verifier contract linked to the token.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
     fn identity_verifier(e: &Env) -> Address;
+
+    // ################## PAUSABLE FUNCTIONS ##################
+
+    /// Returns true if the contract is paused, and false otherwise.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `caller` - The address of the caller.
+    fn pause(e: &Env, caller: Address);
+
+    /// Triggers `Unpaused` state.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `caller` - The address of the caller.
+    fn unpause(e: &Env, caller: Address);
+
 }
 ```
 
