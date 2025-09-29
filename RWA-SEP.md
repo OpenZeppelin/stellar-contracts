@@ -12,7 +12,7 @@ Discussion: TBD
 ```
 
 ## Summary
-This proposal defines a standard contract interface for Real World Asset (RWA) tokens on Stellar, developed through collaboration between OpenZeppelin, Tokeny, and Stellar. RWA tokens represent tokenized real-world assets such as securities, bonds, real estate, or other regulated financial instruments that require compliance with regulatory frameworks.
+This proposal defines a standard contract interface for Real World Asset (RWA) tokens on Stellar. RWA tokens represent tokenized real-world assets such as securities, bonds, real estate, or other regulated financial instruments that require compliance with regulatory frameworks.
 
 This standard is based on the T-REX (Token for Regulated Exchanges) framework but introduces significant architectural improvements for flexibility and modularity.
 
@@ -36,18 +36,18 @@ The T-REX standard provides a comprehensive framework for compliant security tok
 
 ## Architecture Overview
 
-Based on extensive research and collaboration with industry experts, this RWA standard introduces a fundamentally different approach to regulatory compliance in tokenized assets. The architecture is built around **loose coupling** and **implementation abstraction**, addressing key limitations identified in existing standards.
+Based on extensive research and collaboration with industry experts, this RWA standard introduces an approach built around **loose coupling** and **implementation abstraction**, addressing key limitations identified in existing standards.
 
 ### Core Design Principles
 
 1. **Separation of Concerns**: Core token functionality is cleanly separated from compliance and identity verification
 2. **Implementation Flexibility**: Compliance and identity systems are treated as pluggable implementation details
-3. **Shared Infrastructure**: Components can be shared across multiple token contracts to reduce deployment costs
+3. **Shared Infrastructure**: Components can be shared across multiple token contracts to reduce deployment and management costs
 4. **Regulatory Adaptability**: The system can adapt to different regulatory frameworks without core changes
 
 ### Component Architecture
 
-The RWA ecosystem consists of several interconnected but loosely coupled components:
+The Stellar T-REX consists of several interconnected but loosely coupled components:
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────────┐
@@ -97,7 +97,7 @@ These functions are **deliberately abstracted** as implementation details, enabl
 - **Cost Optimization**: Shared contracts across multiple tokens
 - **Future-Proofing**: New compliance approaches without interface changes
 
-In other words, the only thing required by this RWA token design, is that the RWA token should be able to call these expected functions made available by your compliance and identity verification contracts.
+In other words, the only thing required by this RWA token design, is that the RWA token should be able to call these expected functions made available by the compliance and identity verification contracts.
 
 ### Contract Connection Interface
 
@@ -115,7 +115,7 @@ fn identity_verifier(e: &Env) -> Address;
 
 ### Integration Pattern
 
-To deploy a compliant RWA token:
+To deploy a compliant RWA token and make it functional:
 
 1. **Deploy Core RWA Token**: Implements the RWAToken trait
 2. **Deploy/Connect Compliance Contract**: Implements compliance validation logic
