@@ -14,7 +14,7 @@ Discussion: TBD
 ## Summary
 This proposal defines a standard contract interface for Real World Asset (RWA) tokens on Stellar. RWA tokens represent tokenized real-world assets such as securities, bonds, real estate, or other regulated financial instruments that require compliance with regulatory frameworks.
 
-This standard is based on the T-REX (Token for Regulated Exchanges) framework but introduces significant architectural improvements for flexibility and modularity.
+This standard is based on the T-REX (Token for Regulated Exchanges) framework, as implemented in ERC-3643 (https://github.com/ERC-3643/ERC-3643), but introduces significant architectural improvements for flexibility and modularity.
 
 ## Motivation
 Real World Assets (RWAs) represent a significant opportunity for blockchain adoption, enabling the tokenization of traditional financial instruments and physical assets. However, unlike standard fungible tokens, RWAs must comply with complex regulatory requirements including but not limited to:
@@ -526,7 +526,7 @@ Our claim-based reference implementation demonstrates the full complexity of tra
 
 - **ClaimTopicsAndIssuers**: Merged registry managing both trusted issuers and required claim types (KYC=1, AML=2, etc.)
 - **IdentityRegistryStorage**: Component storing identity profiles with country relations and metadata
-- **IdentityClaims**: Validates cryptographic claims using multiple signature schemes (Ed25519, Secp256k1, Secp256r1)
+- **IdentityClaims**: Validates cryptographic claims using multiple signature schemes (Ed25519, Secp256k1, Secp256r1), with an emphasis on interoperability with the evolving OnchainID specification (https://github.com/ERC-3643/ERCs/blob/erc-oid/ERCS/erc-xxxx.md).
 - **ClaimIssuer**: Builds and validates cryptographic claims about user attributes
 
 ### 2. Compliance System
@@ -663,42 +663,6 @@ RWA tokens require proper access control to ensure that sensitive operations are
 - **Flexible Access Control**: While the RWA interface itself doesn't prescribe a specific access control model, implementations can integrate with external access control systems as needed
 - **Compliance Integration**: Access control permissions should be integrated with compliance rules to ensure regulatory requirements are met
 
-## Integration & Interoperability
-
-### Fungible Token Compatibility
-
-RWA tokens maintain full compatibility with standard fungible token interfaces:
-
-```rust
-pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
-    // RWA-specific functions...
-}
-```
-
-**Standard Operations Enhanced**:
-- `transfer()`: Enhanced with compliance validation and identity verification
-- `approve()`: Standard ERC-20 style approvals work unchanged
-- `allowance()`: Full allowance system compatibility
-- `balance()`: Standard balance queries
-
-**Emergency Controls**:
-- `pause()`/`unpause()`: Emergency pause functionality
-- Paused state blocks all operations except queries
-
-### Deployment Patterns
-
-**Single Token Deployment**:
-```
-RWA Token ──▶ Dedicated Compliance
-```
-
-**Multi-Token Suite**:
-```
-RWA Token A ──┐
-RWA Token B ──┼──▶ Shared Compliance
-RWA Token C ──┘
-```
-
 ## Research-Driven Design Decisions
 
 ### Addressing ERC-3643 Limitations
@@ -721,7 +685,7 @@ Through our (OpenZeppelin) collaboration with Tokeny, Stellar, we identified key
 - **Problem**: Monolithic compliance validation
 - **Solution**: Modular hook-based compliance system
 
-### Upgrade and Migration Strategies
+## Upgrade and Migration Strategies
 
 **Compliance Evolution**:
 - Modular compliance system supports rule updates without token redeployment
