@@ -15,11 +15,13 @@ pub struct MockIdentityVerifier;
 
 #[contractimpl]
 impl MockIdentityVerifier {
-    pub fn verify_identity(e: &Env, _account: Address) {
+    pub fn verify_identity(e: &Env, _account: Address) -> Address {
         let result = e.storage().persistent().get(&symbol_short!("id_ok")).unwrap_or(true);
         if !result {
             panic_with_error!(e, RWAError::IdentityVerificationFailed)
         }
+        // random string to return a static address for recovery tests
+        Address::from_str(e, "CAASCQKVVBSLREPEUGPOTQZ4BC2NDBY2MW7B2LGIGFUPIY4Z3XUZRVTX")
     }
 }
 
@@ -348,12 +350,11 @@ fn unfreeze_more_than_frozen_fails() {
 }
 
 #[test]
-fn recovery_address() {
+fn recover_balance() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
-    let investor_id = Address::generate(&e);
 
     e.as_contract(&address, || {
         setup_all_contracts(&e);
@@ -363,7 +364,7 @@ fn recovery_address() {
         assert_eq!(RWA::balance(&e, &lost_wallet), 100);
 
         // Perform recovery
-        let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
+        let success = RWA::recover_balance(&e, &lost_wallet, &new_wallet);
         assert!(success);
 
         // Verify tokens were transferred
@@ -378,13 +379,12 @@ fn recovery_with_zero_balance_returns_false() {
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
-    let investor_id = Address::generate(&e);
 
     e.as_contract(&address, || {
         setup_all_contracts(&e);
 
         // No tokens in lost wallet
-        let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
+        let success = RWA::recover_balance(&e, &lost_wallet, &new_wallet);
         assert!(!success); // Should return false for zero balance
     });
 }
@@ -586,12 +586,11 @@ fn forced_transfer_exact_unfreezing() {
 }
 
 #[test]
-fn recovery_address_with_frozen_tokens() {
+fn recover_balance_with_frozen_tokens() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
-    let investor_id = Address::generate(&e);
 
     e.as_contract(&address, || {
         setup_all_contracts(&e);
@@ -602,7 +601,7 @@ fn recovery_address_with_frozen_tokens() {
         assert_eq!(RWA::get_frozen_tokens(&e, &lost_wallet), 60);
 
         // Perform recovery
-        let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
+        let success = RWA::recover_balance(&e, &lost_wallet, &new_wallet);
         assert!(success);
 
         // Verify tokens were transferred and frozen tokens are preserved
@@ -613,12 +612,11 @@ fn recovery_address_with_frozen_tokens() {
 }
 
 #[test]
-fn recovery_address_with_frozen_address() {
+fn recover_balance_with_frozen_address() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
-    let investor_id = Address::generate(&e);
     let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
@@ -630,7 +628,7 @@ fn recovery_address_with_frozen_address() {
         assert!(RWA::is_frozen(&e, &lost_wallet));
 
         // Perform recovery
-        let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
+        let success = RWA::recover_balance(&e, &lost_wallet, &new_wallet);
         assert!(success);
 
         // Verify tokens were transferred and frozen status is preserved
@@ -641,12 +639,11 @@ fn recovery_address_with_frozen_address() {
 }
 
 #[test]
-fn recovery_address_with_both_frozen_tokens_and_address() {
+fn recover_balance_with_both_frozen_tokens_and_address() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
-    let investor_id = Address::generate(&e);
     let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
@@ -661,7 +658,7 @@ fn recovery_address_with_both_frozen_tokens_and_address() {
         assert!(RWA::is_frozen(&e, &lost_wallet));
 
         // Perform recovery
-        let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
+        let success = RWA::recover_balance(&e, &lost_wallet, &new_wallet);
         assert!(success);
 
         // Verify tokens were transferred and both frozen statuses are preserved

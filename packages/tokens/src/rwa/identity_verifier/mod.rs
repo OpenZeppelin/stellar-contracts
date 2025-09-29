@@ -40,7 +40,7 @@ pub mod storage;
 #[contractclient(name = "IdentityVerifierClient")]
 pub trait IdentityVerifier {
     /// Verifies that the identity of an user address has the required valid
-    /// claims.
+    /// claims. Returns the `onchain_id` of the user.
     ///
     /// # Arguments
     ///
@@ -51,7 +51,7 @@ pub trait IdentityVerifier {
     ///
     /// * [`crate::rwa::RWAError::IdentityVerificationFailed`] - When the
     ///   identity of the user address cannot be verified.
-    fn verify_identity(e: &Env, user_address: &Address);
+    fn verify_identity(e: &Env, user_address: &Address) -> Address;
 
     /// Sets the identity registry contract of the token.
     /// This function can only be called by the operator with necessary

@@ -43,8 +43,8 @@
 //!
 //! - `fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) ->
 //!   bool;` for compliance validation
-//! - `fn verify_identity(e: &Env, user_address: &Address);` for the identity
-//!   verification
+//! - `fn verify_identity(e: &Env, user_address: &Address) -> Address;` for the
+//!   identity verification (returns the onchain ID of the user)
 //!
 //! Hence, the [`RWAToken`] interface also exposes the following functions to
 //! set and get the necessary contracts:
@@ -190,6 +190,7 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
 
     /// Recovery function used to force transfer tokens from a lost wallet
     /// to a new wallet for an investor.
+    ///
     /// This function can only be called by the operator with necessary
     /// privileges. RBAC checks are expected to be enforced on the
     /// `operator`.
@@ -199,14 +200,14 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * `e` - Access to the Soroban environment.
     /// * `lost_wallet` - The wallet that the investor lost.
     /// * `new_wallet` - The newly provided wallet for token transfer.
-    /// * `investor_onchain_id` - The onchain ID of the investor asking for
-    ///   recovery.
     /// * `operator` - The address of the operator.
     ///
     /// # Errors
     ///
-    /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
+    /// * [`RWAError::IdentityVerificationFailed`] - When the identity of the
     ///   new wallet cannot be verified.
+    /// * [`RWAError::IdentityMismatch`] - When the lost wallet and new wallet
+    ///   have different identities.
     ///
     /// # Events
     ///
@@ -215,11 +216,10 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * topics - `["recovery", lost_wallet: Address, new_wallet: Address,
     ///   investor_onchain_id: Address]`
     /// * data - `[]`
-    fn recovery_address(
+    fn recover_balance(
         e: &Env,
         lost_wallet: Address,
         new_wallet: Address,
-        investor_onchain_id: Address,
         operator: Address,
     ) -> bool;
 
@@ -410,6 +410,8 @@ pub enum RWAError {
     IdentityRegistryStorageNotSet = 311,
     /// Indicates the identity verifier contract is not set.
     IdentityVerifierNotSet = 312,
+    /// Indicates the lost wallet and new wallet have different identities.
+    IdentityMismatch = 313,
 }
 
 // ################## CONSTANTS ##################

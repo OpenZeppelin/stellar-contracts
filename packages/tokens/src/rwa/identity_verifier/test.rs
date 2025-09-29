@@ -245,7 +245,7 @@ fn verify_identity_success() {
         });
 
         // Should not panic
-        verify_identity(&e, &user_address);
+        let _ = verify_identity(&e, &user_address);
     });
 }
 
@@ -286,7 +286,7 @@ fn verify_identity_success_with_multiple_issuers() {
         set_claim_topics_and_issuers(&e, &cti);
 
         // Should succeed with second issuer
-        verify_identity(&e, &user_address);
+        let _ = verify_identity(&e, &user_address);
     });
 }
 
@@ -319,6 +319,6 @@ fn verify_identity_fails_all_issuers_invalid() {
         set_identity_registry_storage(&e, &irs);
         set_claim_topics_and_issuers(&e, &cti);
 
-        verify_identity(&e, &user_address);
+        let _ = verify_identity(&e, &user_address);
     });
 }

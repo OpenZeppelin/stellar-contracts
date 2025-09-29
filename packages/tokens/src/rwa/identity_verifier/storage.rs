@@ -64,7 +64,7 @@ pub fn identity_registry_storage(e: &Env) -> Address {
 }
 
 /// Verifies that the identity of an user address has the required valid
-/// claims.
+/// claims. Returns the `onchain_id` of the user.
 ///
 /// # Arguments
 ///
@@ -75,7 +75,7 @@ pub fn identity_registry_storage(e: &Env) -> Address {
 ///
 /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the user
 ///   address cannot be verified.
-pub fn verify_identity(e: &Env, user_address: &Address) {
+pub fn verify_identity(e: &Env, user_address: &Address) -> Address {
     let irs_addr = identity_registry_storage(e);
     let irs_client = IdentityRegistryStorageClient::new(e, &irs_addr);
 
@@ -106,6 +106,8 @@ pub fn verify_identity(e: &Env, user_address: &Address) {
             }
         }
     }
+
+    investor_onchain_id
 }
 
 /// Validates a claim against the expected topic and issuer.
