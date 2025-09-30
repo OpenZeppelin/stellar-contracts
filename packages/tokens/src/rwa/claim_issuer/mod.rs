@@ -35,6 +35,7 @@
 //!         e: &Env,
 //!         identity: Address,
 //!         claim_topic: u32,
+//!         scheme: u32,
 //!         sig_data: Bytes,
 //!         claim_data: Bytes,
 //!     ) -> bool {
@@ -45,8 +46,12 @@
 //!         if !is_key_allowed(e, &signature_data.public_key.to_bytes(), claim_topic) {
 //!             return false;
 //!         }
-//!         let claim_digest =
+//!         let claim_digest = if scheme == 101 {
 //!             Ed25519Verifier::build_claim_digest(&identity, claim_topic, &claim_data);
+//!         } else {
+//!             // build claim digest or
+//!             // panic if other schemes are not used at this claim issuer
+//!         }
 //!
 //!         // Optionally check claim was not revoked.
 //!         if is_claim_revoked(e, &claim_digest) {
@@ -82,6 +87,7 @@ pub trait ClaimIssuer {
     /// * `e` - The Soroban environment.
     /// * `identity` - The identity address the claim is about.
     /// * `claim_topic` - The topic of the claim to validate.
+    /// * `scheme` - The signature scheme used.
     /// * `sig_data` - The signature data as bytes: public key, signature and
     ///   other data required by the concrete signature scheme.
     /// * `claim_data` - The claim data to validate.
@@ -89,6 +95,7 @@ pub trait ClaimIssuer {
         e: &Env,
         identity: Address,
         claim_topic: u32,
+        scheme: u32,
         sig_data: Bytes,
         claim_data: Bytes,
     ) -> bool;

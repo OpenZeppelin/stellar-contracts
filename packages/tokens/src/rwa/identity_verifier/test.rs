@@ -66,6 +66,7 @@ impl ClaimIssuer for MockClaimIssuer {
         e: &Env,
         _identity: Address,
         _claim_topic: u32,
+        _scheme: u32,
         _sig_data: Bytes,
         _claim_data: Bytes,
     ) -> bool {
