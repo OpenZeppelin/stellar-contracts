@@ -551,3 +551,63 @@ fn set_signer_weight_makes_threshold_unreachable_fails() {
         set_signer_weight(&e, &Signer::Native(signer1), 10, &context_rule, &smart_account);
     });
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2210)")]
+fn enforce_not_installed_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let (_, addr1, addr2) = create_test_weights(&e);
+        let authenticated_signers =
+            Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
+        let context_rule = create_test_context_rule(&e);
+
+        let context = Context::Contract(soroban_sdk::auth::ContractContext {
+            contract: Address::generate(&e),
+            fn_name: soroban_sdk::symbol_short!("test"),
+            args: ().into_val(&e),
+        });
+
+        // Try to enforce without installing the policy first
+        enforce(&e, &context, &authenticated_signers, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2213)")]
+fn enforce_threshold_not_met_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let (weights, _, _) = create_test_weights(&e);
+        let params = WeightedThresholdAccountParams { signer_weights: weights, threshold: 75 };
+        let context_rule = create_test_context_rule(&e);
+
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        let (_, _, addr2) = create_test_weights(&e);
+        // Only addr2 authenticated with weight 50, but threshold is 75
+        let authenticated_signers = Vec::from_array(&e, [Signer::Native(addr2)]);
+        let context_rule = create_test_context_rule(&e);
+
+        let context = Context::Contract(soroban_sdk::auth::ContractContext {
+            contract: Address::generate(&e),
+            fn_name: soroban_sdk::symbol_short!("test"),
+            args: ().into_val(&e),
+        });
+
+        // Should fail because weight is 50 but threshold is 75
+        enforce(&e, &context, &authenticated_signers, &context_rule, &smart_account);
+    });
+}
