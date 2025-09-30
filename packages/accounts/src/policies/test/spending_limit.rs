@@ -75,6 +75,7 @@ fn install_success() {
         assert_eq!(data.spending_limit, 1_000_000);
         assert_eq!(data.period_ledgers, 100);
         assert_eq!(data.spending_history.len(), 0);
+        assert_eq!(data.cached_total_spent, 0);
     });
 }
 
@@ -231,6 +232,7 @@ fn enforce_within_limit() {
         // If this fails, the enforce function didn't save the spending entry
         assert!(!data.spending_history.is_empty());
         assert_eq!(data.spending_history.get(0).unwrap().amount, 500_000);
+        assert_eq!(data.cached_total_spent, 500_000);
 
         // Check event was emitted
         assert!(!e.events().all().is_empty());
@@ -415,6 +417,7 @@ fn set_spending_limit_success() {
         let data = get_spending_limit_data(&e, &context_rule, &smart_account);
         assert_eq!(data.spending_limit, 2_000_000);
         assert_eq!(data.period_ledgers, 100); // Should remain unchanged
+        assert_eq!(data.cached_total_spent, 0); // Should remain unchanged
     });
 }
 
@@ -710,5 +713,81 @@ fn enforce_missing_amount_arg_errors() {
         });
 
         enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2224)")]
+fn enforce_history_capacity_exceeded() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+    let context = create_transfer_context(&e, 1);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        // Install with a very long period so entries don't expire
+        let params =
+            SpendingLimitAccountParams { spending_limit: i128::MAX, period_ledgers: 1_000_000 };
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    // Fill up the history to MAX_HISTORY_ENTRIES
+    for i in 0..MAX_HISTORY_ENTRIES {
+        e.ledger().with_mut(|li| {
+            li.sequence_number = 1000 + i;
+        });
+        e.as_contract(&address, || {
+            enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
+        });
+    }
+
+    // This should panic with HistoryCapacityExceeded
+    e.ledger().with_mut(|li| {
+        li.sequence_number = MAX_HISTORY_ENTRIES + 1000;
+    });
+    e.as_contract(&address, || {
+        assert!(!can_enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account));
+        enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+fn history_capacity_allows_new_transaction_after_cleanup() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+    let context = create_transfer_context(&e, 1);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        // Install with a short period so entries expire
+        let params = SpendingLimitAccountParams { spending_limit: i128::MAX, period_ledgers: 100 };
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    // Fill up the history to MAX_HISTORY_ENTRIES
+    for i in 0..MAX_HISTORY_ENTRIES {
+        e.ledger().with_mut(|li| {
+            li.sequence_number = 1000 + i;
+        });
+        e.as_contract(&address, || {
+            enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
+        });
+    }
+
+    // Move forward beyond the period so old entries expire
+    e.ledger().with_mut(|li| {
+        li.sequence_number = MAX_HISTORY_ENTRIES + 1001;
+    });
+
+    // This should succeed because old entries will be cleaned up
+    e.as_contract(&address, || {
+        assert!(can_enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account));
+        enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
     });
 }
