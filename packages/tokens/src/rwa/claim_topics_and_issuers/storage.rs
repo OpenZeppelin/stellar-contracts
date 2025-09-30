@@ -23,6 +23,51 @@ pub enum ClaimTopicsAndIssuersStorageKey {
     ClaimTopicIssuers(u32),
 }
 
+// ################## HELPER FUNCTIONS ##################
+
+/// Validates that all topics in the provided vector exist in the global claim
+/// topics registry.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `topics` - The vector of topics to validate.
+///
+/// # Errors
+///
+/// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If any topic
+///   doesn't exist.
+fn validate_topics_exist(e: &Env, topics: &Vec<u32>) {
+    let global_topics = get_claim_topics(e);
+    for topic in topics.iter() {
+        if !global_topics.contains(topic) {
+            panic_with_error!(e, ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist);
+        }
+    }
+}
+
+/// Validates that a vector of topics contains no duplicates.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `topics` - The vector of topics to validate.
+///
+/// # Errors
+///
+/// * [`ClaimTopicsAndIssuersError::ClaimTopicAlreadyExists`] - If duplicates
+///   are found.
+fn validate_no_duplicate_topics(e: &Env, topics: &Vec<u32>) {
+    for i in 0..topics.len() {
+        let topic = topics.get(i).unwrap();
+        for j in (i + 1)..topics.len() {
+            if topics.get(j).unwrap() == topic {
+                panic_with_error!(e, ClaimTopicsAndIssuersError::ClaimTopicAlreadyExists);
+            }
+        }
+    }
+}
+
 // ################## QUERY STATE ##################
 
 /// Returns all stored claim topics. Defaults to empty vector if no topics are
@@ -304,6 +349,12 @@ pub fn add_trusted_issuer(e: &Env, trusted_issuer: &Address, claim_topics: &Vec<
         panic_with_error!(e, ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached);
     }
 
+    // Validate that there are no duplicate topics in the input
+    validate_no_duplicate_topics(e, claim_topics);
+
+    // Validate that all topics exist before making any state changes
+    validate_topics_exist(e, claim_topics);
+
     let mut trusted_issuers = get_trusted_issuers(e);
 
     // Check limit of 50 trusted issuers
@@ -444,6 +495,12 @@ pub fn update_issuer_claim_topics(e: &Env, trusted_issuer: &Address, claim_topic
     if claim_topics.len() > MAX_CLAIM_TOPICS {
         panic_with_error!(e, ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached);
     }
+
+    // Validate that there are no duplicate topics in the input
+    validate_no_duplicate_topics(e, claim_topics);
+
+    // Validate that all topics exist before making any state changes
+    validate_topics_exist(e, claim_topics);
 
     // Check if issuer exists
     if !is_trusted_issuer(e, trusted_issuer) {

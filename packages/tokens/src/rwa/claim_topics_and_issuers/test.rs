@@ -865,3 +865,104 @@ fn get_trusted_issuer_claim_topics_nonexistent_issuer_panics() {
         get_trusted_issuer_claim_topics(&e, &nonexistent_issuer);
     });
 }
+
+// ################## DUPLICATE PREVENTION TESTS ##################
+
+#[test]
+#[should_panic(expected = "Error(Contract, #372)")]
+fn add_trusted_issuer_with_duplicate_topics_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let issuer = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        add_claim_topic(&e, 1);
+        add_claim_topic(&e, 2);
+
+        // Create topics vector with duplicates
+        let mut topics_with_duplicates = Vec::new(&e);
+        topics_with_duplicates.push_back(1);
+        topics_with_duplicates.push_back(2);
+        topics_with_duplicates.push_back(1); // duplicate
+
+        // Should panic due to duplicate topics
+        add_trusted_issuer(&e, &issuer, &topics_with_duplicates);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #370)")]
+fn add_trusted_issuer_with_nonexistent_topic_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let issuer = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        add_claim_topic(&e, 1);
+
+        // Create topics vector with non-existent topic
+        let mut topics = Vec::new(&e);
+        topics.push_back(1);
+        topics.push_back(999); // non-existent topic
+
+        // Should panic due to non-existent topic
+        add_trusted_issuer(&e, &issuer, &topics);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #372)")]
+fn update_issuer_claim_topics_with_duplicate_topics_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let issuer = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        add_claim_topic(&e, 1);
+        add_claim_topic(&e, 2);
+        add_claim_topic(&e, 3);
+
+        // Add issuer first
+        let mut initial_topics = Vec::new(&e);
+        initial_topics.push_back(1);
+        add_trusted_issuer(&e, &issuer, &initial_topics);
+
+        // Try to update with duplicate topics
+        let mut topics_with_duplicates = Vec::new(&e);
+        topics_with_duplicates.push_back(2);
+        topics_with_duplicates.push_back(3);
+        topics_with_duplicates.push_back(2); // duplicate
+
+        // Should panic due to duplicate topics
+        update_issuer_claim_topics(&e, &issuer, &topics_with_duplicates);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #370)")]
+fn update_issuer_claim_topics_with_nonexistent_topic_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let issuer = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        add_claim_topic(&e, 1);
+
+        // Add issuer first
+        let mut initial_topics = Vec::new(&e);
+        initial_topics.push_back(1);
+        add_trusted_issuer(&e, &issuer, &initial_topics);
+
+        // Try to update with non-existent topic
+        let mut topics = Vec::new(&e);
+        topics.push_back(1);
+        topics.push_back(999); // non-existent topic
+
+        // Should panic due to non-existent topic
+        update_issuer_claim_topics(&e, &issuer, &topics);
+    });
+}
