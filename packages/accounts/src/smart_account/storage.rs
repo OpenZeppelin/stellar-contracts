@@ -830,17 +830,16 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
 /// This function modifies storage without requiring authorization. Ensure
 /// proper access control is implemented at the contract level.
 pub fn remove_signer(e: &Env, id: u32, signer: &Signer) {
-    let signers_key = SmartAccountStorageKey::Signers(id);
-    // Don't extend TTL here since we set this key later in the same function
-    let mut signers: Vec<Signer> = e
-        .storage()
-        .persistent()
-        .get(&signers_key)
-        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+    let rule = get_context_rule(e, id);
+    let mut signers = rule.signers.clone();
 
     // Find and remove the signer
     if let Some(pos) = signers.iter().rposition(|s| s == *signer) {
         signers.remove(pos as u32);
+
+        // Validate that the rule still has at least one signer or one policy
+        validate_signers_and_policies(e, &signers, &rule.policies);
+
         e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
         // Emit event
@@ -932,10 +931,14 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
 
     // Find and remove the policy
     if let Some(pos) = policies.iter().rposition(|p| p == *policy) {
+        policies.remove(pos as u32);
+
+        // Validate that the rule still has at least one signer or one policy
+        validate_signers_and_policies(e, &rule.signers, &policies);
+
         // Uninstall the policy
         PolicyClient::new(e, policy).uninstall(&rule, &e.current_contract_address());
 
-        policies.remove(pos as u32);
         e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
 
         // Emit event
