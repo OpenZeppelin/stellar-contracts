@@ -130,23 +130,27 @@ pub fn get_spending_limit_data(
 
 /// Checks if the spending limit policy can be enforced for the given
 /// transaction. Returns `true` if the transaction amount is within the spending
-/// limit for the rolling period, `false` otherwise or if the policy is not
-/// installed.
+/// limit for the rolling period and there is at least one authenticated signer,
+/// `false` otherwise or if the policy is not installed.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context` - The authorization context.
-/// * `_authenticated_signers` - The list of authenticated signers (unused).
+/// * `authenticated_signers` - The list of authenticated signers.
 /// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
 pub fn can_enforce(
     e: &Env,
     context: &Context,
-    _authenticated_signers: &Vec<Signer>,
+    authenticated_signers: &Vec<Signer>,
     context_rule: &ContextRule,
     smart_account: &Address,
 ) -> bool {
+    if authenticated_signers.is_empty() {
+        return false;
+    }
+
     let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id);
     let spending_data: Option<SpendingLimitData> = e.storage().persistent().get(&key);
 
@@ -200,9 +204,16 @@ pub fn can_enforce(
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context` - The authorization context.
-/// * `_authenticated_signers` - The list of authenticated signers.
+/// * `authenticated_signers` - The list of authenticated signers.
 /// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
+///
+/// # Errors
+///
+/// * [`SpendingLimitError::SpendingLimitExceeded`] - When the transaction
+///   amount is not within the spending limit for the rolling period.
+/// * [`SpendingLimitError::NotAllowed`] - When there are no authenticated
+///   signers, the context is not a transfer with well-formatted amount.
 ///
 /// # Events
 ///
@@ -212,12 +223,16 @@ pub fn can_enforce(
 pub fn enforce(
     e: &Env,
     context: &Context,
-    _authenticated_signers: &Vec<Signer>,
+    authenticated_signers: &Vec<Signer>,
     context_rule: &ContextRule,
     smart_account: &Address,
 ) {
     // Require authorization from the smart_account
     smart_account.require_auth();
+
+    if authenticated_signers.is_empty() {
+        panic_with_error!(e, SpendingLimitError::NotAllowed)
+    }
 
     let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id);
     let mut data = get_spending_limit_data(e, context_rule, smart_account);
@@ -237,7 +252,7 @@ pub fn enforce(
 
                         // Check if the transaction exceeds the spending limit
                         if total_spent + amount > data.spending_limit {
-                            panic_with_error!(e, SpendingLimitError::SpendingLimitExceeded);
+                            panic_with_error!(e, SpendingLimitError::SpendingLimitExceeded)
                         }
 
                         // Add the new spending entry
@@ -270,10 +285,10 @@ pub fn enforce(
             }
         }
         _ => {
-            panic_with_error!(e, SpendingLimitError::NotAllowed);
+            panic_with_error!(e, SpendingLimitError::NotAllowed)
         }
     }
-    panic_with_error!(e, SpendingLimitError::NotAllowed);
+    panic_with_error!(e, SpendingLimitError::NotAllowed)
 }
 
 /// Sets the spending limit for a smart account's spending limit policy.
@@ -300,7 +315,7 @@ pub fn set_spending_limit(
     smart_account.require_auth();
 
     if spending_limit <= 0 {
-        panic_with_error!(e, SpendingLimitError::InvalidLimitOrPeriod);
+        panic_with_error!(e, SpendingLimitError::InvalidLimitOrPeriod)
     }
 
     let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id);
@@ -335,7 +350,7 @@ pub fn install(
     smart_account.require_auth();
 
     if params.spending_limit <= 0 || params.period_ledgers == 0 {
-        panic_with_error!(e, SpendingLimitError::InvalidLimitOrPeriod);
+        panic_with_error!(e, SpendingLimitError::InvalidLimitOrPeriod)
     }
 
     let data = SpendingLimitData {
