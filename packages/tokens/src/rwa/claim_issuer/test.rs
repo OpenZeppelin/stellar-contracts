@@ -359,45 +359,76 @@ fn secp256r1_verify_claim_digest_success() {
 #[test]
 fn signature_verifier_build_claim_digest_consistency() {
     let e = Env::default();
+    let contract_id = e.register(MockContract, ());
 
     let identity = Address::generate(&e);
     let claim_topic = 42u32;
     let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
 
     // All verifiers should produce the same digest for the same inputs
-    let ed25519_digest =
-        Ed25519Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
-    let secp256r1_digest =
-        Secp256r1Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
-    let secp256k1_digest =
-        Secp256k1Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
+    e.as_contract(&contract_id, || {
+        let ed25519_digest =
+            Ed25519Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes();
+        let secp256r1_digest =
+            Secp256r1Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data)
+                .to_bytes();
+        let secp256k1_digest =
+            Secp256k1Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data)
+                .to_bytes();
 
-    assert_eq!(ed25519_digest, secp256r1_digest);
-    assert_eq!(secp256r1_digest, secp256k1_digest);
+        assert_eq!(ed25519_digest, secp256r1_digest);
+        assert_eq!(secp256r1_digest, secp256k1_digest);
+    });
+}
+
+#[test]
+fn signature_verifier_build_claim_digest_different_issuers() {
+    let e = Env::default();
+    let contract_id1 = e.register(MockContract, ());
+    let contract_id2 = e.register(MockContract, ());
+
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
+
+    // Use same data on different claim issuers
+    let ed25519_digest_1 = e.as_contract(&contract_id1, || {
+        Ed25519Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes()
+    });
+    let ed25519_digest_2 = e.as_contract(&contract_id2, || {
+        Ed25519Verifier::build_claim_digest(&e, &identity, claim_topic, &claim_data).to_bytes()
+    });
+    assert_ne!(ed25519_digest_1, ed25519_digest_2);
 }
 
 #[test]
 fn signature_verifier_different_inputs_different_digests() {
     let e = Env::default();
+    let contract_id = e.register(MockContract, ());
 
     let identity1 = Address::generate(&e);
     let identity2 = Address::generate(&e);
     let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
 
     // Different identities should produce different digests
-    let digest1 = Ed25519Verifier::build_claim_digest(&e, &identity1, 1u32, &claim_data).to_bytes();
-    let digest2 = Ed25519Verifier::build_claim_digest(&e, &identity2, 1u32, &claim_data).to_bytes();
-    assert_ne!(digest1, digest2);
+    e.as_contract(&contract_id, || {
+        let digest1 =
+            Ed25519Verifier::build_claim_digest(&e, &identity1, 1u32, &claim_data).to_bytes();
+        let digest2 =
+            Ed25519Verifier::build_claim_digest(&e, &identity2, 1u32, &claim_data).to_bytes();
+        assert_ne!(digest1, digest2);
 
-    // Different topics should produce different digests
-    let digest3 = Ed25519Verifier::build_claim_digest(&e, &identity1, 2u32, &claim_data).to_bytes();
-    assert_ne!(digest1, digest3);
+        // Different topics should produce different digests
+        let digest3 =
+            Ed25519Verifier::build_claim_digest(&e, &identity1, 2u32, &claim_data).to_bytes();
+        assert_ne!(digest1, digest3);
 
-    // Different data should produce different digests
-    let different_data = Bytes::from_array(&e, &[4, 5, 6]);
-    let digest4 =
-        Ed25519Verifier::build_claim_digest(&e, &identity1, 1u32, &different_data).to_bytes();
-    assert_ne!(digest1, digest4);
+        // Different data should produce different digests
+        let different_data = Bytes::from_array(&e, &[4, 5, 6]);
+        let digest4 =
+            Ed25519Verifier::build_claim_digest(&e, &identity1, 1u32, &different_data).to_bytes();
+        assert_ne!(digest1, digest4);
+    });
 }
 
 #[test]
