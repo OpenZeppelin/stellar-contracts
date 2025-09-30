@@ -866,8 +866,6 @@ fn get_trusted_issuer_claim_topics_nonexistent_issuer_panics() {
     });
 }
 
-// ################## DUPLICATE PREVENTION TESTS ##################
-
 #[test]
 #[should_panic(expected = "Error(Contract, #372)")]
 fn add_trusted_issuer_with_duplicate_topics_panics() {
