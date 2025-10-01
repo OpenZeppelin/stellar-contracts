@@ -1,8 +1,6 @@
 use core::ops::RangeBounds;
 
-use soroban_sdk::{
-    contracttype, crypto::Hash, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env,
-};
+use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env};
 
 use crate::rwa::claim_issuer::{
     emit_key_allowed, emit_key_removed, emit_revocation_event, ClaimIssuerError, SignatureVerifier,
@@ -66,25 +64,12 @@ impl SignatureVerifier<32> for Ed25519Verifier {
         Ed25519SignatureData { public_key, signature }
     }
 
-    fn build_claim_digest(
-        e: &Env,
-        identity: &Address,
-        claim_topic: u32,
-        claim_data: &Bytes,
-    ) -> Hash<32> {
-        let claim_message = build_claim_message(e, identity, claim_topic, claim_data);
-        e.crypto().keccak256(&claim_message)
+    fn build_message(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> Bytes {
+        build_claim_message(e, identity, claim_topic, claim_data)
     }
 
-    fn verify_claim_digest(
-        e: &Env,
-        claim_digest: &Hash<32>,
-        signature_data: &Self::SignatureData,
-    ) -> bool {
-        // For Ed25519, convert hash digest to Bytes
-        let msg = Bytes::from_slice(e, &claim_digest.to_array());
-
-        e.crypto().ed25519_verify(&signature_data.public_key, &msg, &signature_data.signature);
+    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) -> bool {
+        e.crypto().ed25519_verify(&signature_data.public_key, message, &signature_data.signature);
         true
     }
 
@@ -113,25 +98,16 @@ impl SignatureVerifier<32> for Secp256r1Verifier {
         Secp256r1SignatureData { public_key, signature }
     }
 
-    fn build_claim_digest(
-        e: &Env,
-        identity: &Address,
-        claim_topic: u32,
-        claim_data: &Bytes,
-    ) -> Hash<32> {
-        let claim_message = build_claim_message(e, identity, claim_topic, claim_data);
-        e.crypto().keccak256(&claim_message)
+    fn build_message(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> Bytes {
+        build_claim_message(e, identity, claim_topic, claim_data)
     }
 
-    fn verify_claim_digest(
-        e: &Env,
-        claim_digest: &Hash<32>,
-        signature_data: &Self::SignatureData,
-    ) -> bool {
+    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) -> bool {
         // For Secp256r1, use the claim digest directly
+        let claim_digest = e.crypto().sha256(message);
         e.crypto().secp256r1_verify(
             &signature_data.public_key,
-            claim_digest,
+            &claim_digest,
             &signature_data.signature,
         );
         true
@@ -171,24 +147,15 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
         Secp256k1SignatureData { public_key, signature, recovery_id }
     }
 
-    fn build_claim_digest(
-        e: &Env,
-        identity: &Address,
-        claim_topic: u32,
-        claim_data: &Bytes,
-    ) -> Hash<32> {
-        let claim_message = build_claim_message(e, identity, claim_topic, claim_data);
-        e.crypto().keccak256(&claim_message)
+    fn build_message(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> Bytes {
+        build_claim_message(e, identity, claim_topic, claim_data)
     }
 
-    fn verify_claim_digest(
-        e: &Env,
-        claim_digest: &Hash<32>,
-        signature_data: &Self::SignatureData,
-    ) -> bool {
+    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) -> bool {
         // For Secp256k1, recover public key and compare
+        let claim_digest = e.crypto().keccak256(message);
         let recovered_key = e.crypto().secp256k1_recover(
-            claim_digest,
+            &claim_digest,
             &signature_data.signature,
             signature_data.recovery_id,
         );

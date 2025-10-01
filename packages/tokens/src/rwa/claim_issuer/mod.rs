@@ -85,16 +85,16 @@
 //!             if !is_key_allowed(e, &signature_data.public_key.to_bytes(), scheme, claim_topic) {
 //!                 return false;
 //!             }
-//!             let claim_digest =
-//!                 Ed25519Verifier::build_claim_digest(&identity, claim_topic, &claim_data);
+//!             let message =
+//!                 Ed25519Verifier::build_message(&identity, claim_topic, &claim_data);
 //!
 //!             // Optionally check claim was not revoked.
-//!             if is_claim_revoked(e, &claim_digest) {
+//!             if is_claim_revoked(e, &message) {
 //!                 return false;
 //!             }
 //!
 //!             // Verify the signature
-//!             Ed25519Verifier::verify_claim_digest(e, &claim_digest, &signature_data)
+//!             Ed25519Verifier::verify(e, &message, &signature_data)
 //!         } else {
 //!             // follow similar steps as for Ed25519Verifier or
 //!             // panic if other schemes are not used at this claim issuer
@@ -107,9 +107,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{
-    contractclient, contracterror, contractevent, crypto::Hash, Address, Bytes, BytesN, Env,
-};
+use soroban_sdk::{contractclient, contracterror, contractevent, Address, Bytes, BytesN, Env};
 pub use storage::{
     allow_key, is_claim_revoked, is_key_allowed, remove_key, set_claim_revoked,
     ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
@@ -163,10 +161,9 @@ pub trait SignatureVerifier<const N: usize> {
     ///   invalid.
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData;
 
-    /// Builds the message and hashes it to verify for claim signature
-    /// validation.
+    /// Builds the message to verify for claim signature validation.
     ///
-    /// The message format is: identity || claim_topic || claim_data
+    /// The message format is: claim_issuer || identity || claim_topic || claim_data
     ///
     /// # Arguments
     ///
@@ -174,12 +171,7 @@ pub trait SignatureVerifier<const N: usize> {
     /// * `identity` - The identity address the claim is about.
     /// * `claim_topic` - The topic of the claim.
     /// * `claim_data` - The claim data to validate.
-    fn build_claim_digest(
-        e: &Env,
-        identity: &Address,
-        claim_topic: u32,
-        claim_data: &Bytes,
-    ) -> Hash<N>;
+    fn build_message(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> Bytes;
 
     /// Validates a claim signature using the parsed signature data and returns
     /// true if valid.
@@ -187,13 +179,9 @@ pub trait SignatureVerifier<const N: usize> {
     /// # Arguments
     ///
     /// * `e` - The Soroban environment.
-    /// * `claim_digest` - The hash digest of the claim message.
+    /// * `message` - The claim message.
     /// * `signature_data` - The parsed signature data.
-    fn verify_claim_digest(
-        e: &Env,
-        claim_digest: &Hash<N>,
-        signature_data: &Self::SignatureData,
-    ) -> bool;
+    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) -> bool;
 
     /// Returns the expected signature data length for this scheme.
     fn expected_sig_data_len() -> u32;
