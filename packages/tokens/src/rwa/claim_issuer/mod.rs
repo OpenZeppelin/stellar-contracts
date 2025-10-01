@@ -56,12 +56,14 @@
 //!     ClaimIssuer,
 //! };
 //!
+//! pub const ED25519_SCHEME_NUM: u32 = 101;
+//!
 //! #[contract]
 //! pub struct MyContract;
 //!
 //! #[contractimpl]
 //! pub fn __constructor(e: Env, ed25519_key: Bytes) {
-//!     allow_key(&e, &ed25519_key, 42);
+//!     allow_key(&e, &ed25519_key, ED25519_SCHEME_NUM, 42);
 //! }
 //!
 //! #[contractimpl]
@@ -80,7 +82,7 @@
 //!             let signature_data = Ed25519Verifier::extract_signature_data(e, &sig_data);
 //!
 //!             // Check if the public key is authorized for this topic
-//!             if !is_key_allowed(e, &signature_data.public_key.to_bytes(), claim_topic) {
+//!             if !is_key_allowed(e, &signature_data.public_key.to_bytes(), scheme, claim_topic) {
 //!                 return false;
 //!             }
 //!             let claim_digest =
@@ -199,30 +201,36 @@ pub trait SignatureVerifier<const N: usize> {
 
 // ################## EVENTS ##################
 
-/// Event types for key management operations.
-pub enum KeyEvent {
-    /// Key was allowed for topic-specific authorization.
-    Allowed,
-    /// Key was removed from topic-specific authorization.
-    Removed,
-}
-
-/// Event emitted when a key is allowed for a claim topic.
+/// Event emitted when a key is allowed for a scheme and claim topic.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KeyAllowed {
     #[topic]
     pub public_key: Bytes,
+    pub scheme: u32,
     pub claim_topic: u32,
 }
 
-/// Event emitted when a key is removed from a claim topic.
+/// Event emitted when a key is removed from a scheme and claim topic.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KeyRemoved {
     #[topic]
     pub public_key: Bytes,
+    pub scheme: u32,
     pub claim_topic: u32,
+}
+
+/// Emits an event when key is allowed.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `public_key` - The public key involved in the operation.
+/// * `scheme` - The signature scheme used.
+/// * `claim_topic` - Optional claim topic for topic-specific operations.
+pub fn emit_key_allowed(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32) {
+    KeyAllowed { public_key: public_key.clone(), scheme, claim_topic }.publish(e)
 }
 
 /// Emits an event for key management operations (allow/remove).
@@ -230,14 +238,11 @@ pub struct KeyRemoved {
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `event_type` - The type of key event.
 /// * `public_key` - The public key involved in the operation.
+/// * `scheme` - The signature scheme used.
 /// * `claim_topic` - Optional claim topic for topic-specific operations.
-pub fn emit_key_event(e: &Env, event_type: KeyEvent, public_key: &Bytes, claim_topic: u32) {
-    match event_type {
-        KeyEvent::Allowed => KeyAllowed { public_key: public_key.clone(), claim_topic }.publish(e),
-        KeyEvent::Removed => KeyRemoved { public_key: public_key.clone(), claim_topic }.publish(e),
-    }
+pub fn emit_key_removed(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32) {
+    KeyRemoved { public_key: public_key.clone(), scheme, claim_topic }.publish(e)
 }
 
 /// Event emitted when a claim is revoked.

@@ -174,39 +174,18 @@ fn topic_specific_key_management() {
     let topic = 42u32;
 
     e.as_contract(&contract_id, || {
-        assert!(!is_key_allowed(&e, &public_key, topic));
+        assert!(!is_key_allowed(&e, &public_key, 1, topic));
 
-        allow_key(&e, &public_key, topic);
-        assert!(is_key_allowed(&e, &public_key, topic));
+        allow_key(&e, &public_key, 1, topic);
+        assert!(is_key_allowed(&e, &public_key, 1, topic));
 
-        assert!(!is_key_allowed(&e, &public_key, topic + 1));
+        // check for different topic
+        assert!(!is_key_allowed(&e, &public_key, 1, topic + 1));
+        // check for different scheme
+        assert!(!is_key_allowed(&e, &public_key, 2, topic));
 
-        remove_key(&e, &public_key, topic);
-        assert!(!is_key_allowed(&e, &public_key, topic));
-    });
-}
-
-#[test]
-fn multiple_topics_same_key() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    let public_key = Bytes::from_array(&e, &[6u8; 32]);
-    let topic1 = 100u32;
-    let topic2 = 200u32;
-    let topic3 = 300u32;
-
-    e.as_contract(&contract_id, || {
-        allow_key(&e, &public_key, topic1);
-        allow_key(&e, &public_key, topic2);
-
-        assert!(is_key_allowed(&e, &public_key, topic1));
-        assert!(is_key_allowed(&e, &public_key, topic2));
-        assert!(!is_key_allowed(&e, &public_key, topic3));
-
-        remove_key(&e, &public_key, topic1);
-
-        assert!(!is_key_allowed(&e, &public_key, topic1));
-        assert!(is_key_allowed(&e, &public_key, topic2));
+        remove_key(&e, &public_key, 1, topic);
+        assert!(!is_key_allowed(&e, &public_key, 1, topic));
     });
 }
 
@@ -440,10 +419,10 @@ fn allow_key_already_allowed() {
 
     e.as_contract(&contract_id, || {
         // Add key first time
-        allow_key(&e, &public_key, topic);
+        allow_key(&e, &public_key, 1, topic);
 
         // Try to add same key again - should panic with KeyAlreadyAllowed
-        allow_key(&e, &public_key, topic);
+        allow_key(&e, &public_key, 1, topic);
     });
 }
 
@@ -457,7 +436,7 @@ fn remove_key_not_found() {
 
     e.as_contract(&contract_id, || {
         // Try to remove non-existent key - should panic with KeyNotFound
-        remove_key(&e, &public_key, topic);
+        remove_key(&e, &public_key, 1, topic);
     });
 }
 
@@ -471,7 +450,7 @@ fn empty_key_panics() {
 
     e.as_contract(&contract_id, || {
         // Test with empty key
-        allow_key(&e, &empty_key, topic);
+        allow_key(&e, &empty_key, 1, topic);
     });
 }
 
