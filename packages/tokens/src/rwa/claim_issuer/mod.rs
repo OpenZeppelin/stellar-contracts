@@ -85,11 +85,10 @@
 //!             if !is_key_allowed(e, &signature_data.public_key.to_bytes(), scheme, claim_topic) {
 //!                 return false;
 //!             }
-//!             let message =
-//!                 Ed25519Verifier::build_message(&identity, claim_topic, &claim_data);
+//!             let message = Ed25519Verifier::build_message(&identity, claim_topic, &claim_data);
 //!
 //!             // Optionally check claim was not revoked.
-//!             if is_claim_revoked(e, &message) {
+//!             if is_claim_revoked(e, &identity, claim_topic, &claim_data) {
 //!                 return false;
 //!             }
 //!
@@ -107,7 +106,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractclient, contracterror, contractevent, Address, Bytes, BytesN, Env};
+use soroban_sdk::{contractclient, contracterror, contractevent, Address, Bytes, Env};
 pub use storage::{
     allow_key, is_claim_revoked, is_key_allowed, remove_key, set_claim_revoked,
     ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
@@ -163,7 +162,8 @@ pub trait SignatureVerifier<const N: usize> {
 
     /// Builds the message to verify for claim signature validation.
     ///
-    /// The message format is: claim_issuer || identity || claim_topic || claim_data
+    /// The message format is: claim_issuer || identity || claim_topic ||
+    /// claim_data
     ///
     /// # Arguments
     ///
@@ -238,9 +238,12 @@ pub fn emit_key_removed(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ClaimRevoked {
     #[topic]
-    pub claim_digest: BytesN<32>,
+    pub identity: Address,
+    #[topic]
+    pub claim_topic: u32,
     #[topic]
     pub revoked: bool,
+    pub claim_data: Bytes,
 }
 
 /// Emits an event for a claim revocation operation.
@@ -248,10 +251,24 @@ pub struct ClaimRevoked {
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `claim_digest` - The hash digest of the claim.
+/// * `identity` - The identity address the claim is about.
+/// * `claim_topic` - The topic of the claim.
+/// * `claim_data` - The claim data.
 /// * `revoked` - Whether the claim should be marked as revoked.
-pub fn emit_revocation_event(e: &Env, claim_digest: &BytesN<32>, revoked: bool) {
-    ClaimRevoked { claim_digest: claim_digest.clone(), revoked }.publish(e);
+pub fn emit_revocation_event(
+    e: &Env,
+    identity: &Address,
+    claim_topic: u32,
+    claim_data: &Bytes,
+    revoked: bool,
+) {
+    ClaimRevoked {
+        identity: identity.clone(),
+        claim_topic,
+        claim_data: claim_data.clone(),
+        revoked,
+    }
+    .publish(e);
 }
 
 // ################## ERRORS ##################

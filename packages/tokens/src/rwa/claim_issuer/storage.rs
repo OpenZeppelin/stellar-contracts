@@ -278,18 +278,25 @@ pub fn is_key_allowed(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32
 
 // ====================== CLAIM REVOCATION =====================
 
-/// Sets the revocation status for a claim using its digest.
+/// Sets the revocation status for a claim.
+///
+/// The claim is identified by hashing the claim message (identity ||
+/// claim_topic || claim_data) using keccak256. The resulting digest is used as
+/// the storage key for the revocation status.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `claim_digest` - The hash digest of the claim message.
+/// * `identity` - The identity address the claim is about.
+/// * `claim_topic` - The topic of the claim.
+/// * `claim_data` - The claim data.
 /// * `revoked` - Whether the claim should be marked as revoked.
 ///
 /// # Events
 ///
-/// * topics - `["claim_revoked", claim_digest: Hash<32>, revoked: true]`
-/// * data - `[]`
+/// * topics - `["claim_revoked", identity: Address, claim_topic: u32, revoked:
+///   bool]`
+/// * data - `[claim_data: Bytes]`
 ///
 /// # Security Warning
 ///
@@ -300,21 +307,39 @@ pub fn is_key_allowed(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32
 ///
 /// Using this function in public-facing methods may create significant security
 /// risks as it could allow unauthorized modifications.
-pub fn set_claim_revoked(e: &Env, claim_digest: &BytesN<32>, revoked: bool) {
-    let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest.clone());
+pub fn set_claim_revoked(
+    e: &Env,
+    identity: &Address,
+    claim_topic: u32,
+    claim_data: &Bytes,
+    revoked: bool,
+) {
+    let claim_digest =
+        e.crypto().keccak256(&build_claim_message(e, identity, claim_topic, claim_data)).to_bytes();
+
+    let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest);
     e.storage().persistent().set(&key, &revoked);
 
-    emit_revocation_event(e, claim_digest, revoked);
+    emit_revocation_event(e, identity, claim_topic, claim_data, revoked);
 }
 
-/// Checks if a claim has been revoked using its digest.
+/// Checks if a claim has been revoked.
+///
+/// The claim is identified by hashing the claim message (identity ||
+/// claim_topic || claim_data) using keccak256 and checking the revocation
+/// status stored under that digest.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `claim_digest` - The hash digest of the claim message to check.
-pub fn is_claim_revoked(e: &Env, claim_digest: &BytesN<32>) -> bool {
-    let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest.clone());
+/// * `identity` - The identity address the claim is about.
+/// * `claim_topic` - The topic of the claim.
+/// * `claim_data` - The claim data.
+pub fn is_claim_revoked(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> bool {
+    let claim_digest =
+        e.crypto().keccak256(&build_claim_message(e, identity, claim_topic, claim_data)).to_bytes();
+
+    let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest);
     e.storage()
         .persistent()
         .get(&key)

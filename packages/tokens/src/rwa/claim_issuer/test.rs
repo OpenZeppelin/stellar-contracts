@@ -327,14 +327,16 @@ fn signature_verifier_different_inputs_different_messages() {
 fn set_and_check_claim_revocation() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
-    let test_digest = BytesN::<32>::from_array(&e, &[1u8; 32]);
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
 
     e.as_contract(&contract_id, || {
-        assert!(!is_claim_revoked(&e, &test_digest));
+        assert!(!is_claim_revoked(&e, &identity, claim_topic, &claim_data));
 
-        set_claim_revoked(&e, &test_digest, true);
+        set_claim_revoked(&e, &identity, claim_topic, &claim_data, true);
 
-        assert!(is_claim_revoked(&e, &test_digest));
+        assert!(is_claim_revoked(&e, &identity, claim_topic, &claim_data));
     });
 }
 
@@ -342,14 +344,16 @@ fn set_and_check_claim_revocation() {
 fn unrevoke_claim() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
-    let test_digest = BytesN::<32>::from_array(&e, &[1u8; 32]);
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
 
     e.as_contract(&contract_id, || {
-        set_claim_revoked(&e, &test_digest, true);
-        assert!(is_claim_revoked(&e, &test_digest));
+        set_claim_revoked(&e, &identity, claim_topic, &claim_data, true);
+        assert!(is_claim_revoked(&e, &identity, claim_topic, &claim_data));
 
-        set_claim_revoked(&e, &test_digest, false);
-        assert!(!is_claim_revoked(&e, &test_digest));
+        set_claim_revoked(&e, &identity, claim_topic, &claim_data, false);
+        assert!(!is_claim_revoked(&e, &identity, claim_topic, &claim_data));
     });
 }
 
@@ -404,29 +408,31 @@ fn revocation_edge_cases() {
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
-        // Test with different digest types
-        let digest1 = BytesN::<32>::from_array(&e, &[1u8; 32]);
-        let digest2 = BytesN::<32>::from_array(&e, &[2u8; 32]);
+        let identity1 = Address::generate(&e);
+        let identity2 = Address::generate(&e);
+        let claim_topic = 42u32;
+        let claim_data1 = Bytes::from_array(&e, &[1, 2, 3]);
+        let claim_data2 = Bytes::from_array(&e, &[4, 5, 6]);
 
         // Test revoking non-existent claim
-        assert!(!is_claim_revoked(&e, &digest1));
+        assert!(!is_claim_revoked(&e, &identity1, claim_topic, &claim_data1));
 
         // Test setting revocation multiple times
-        set_claim_revoked(&e, &digest1, true);
-        set_claim_revoked(&e, &digest1, true); // Should not error
-        assert!(is_claim_revoked(&e, &digest1));
+        set_claim_revoked(&e, &identity1, claim_topic, &claim_data1, true);
+        set_claim_revoked(&e, &identity1, claim_topic, &claim_data1, true); // Should not error
+        assert!(is_claim_revoked(&e, &identity1, claim_topic, &claim_data1));
 
         // Test unrevoking non-revoked claim
-        set_claim_revoked(&e, &digest2, false);
-        assert!(!is_claim_revoked(&e, &digest2));
+        set_claim_revoked(&e, &identity2, claim_topic, &claim_data2, false);
+        assert!(!is_claim_revoked(&e, &identity2, claim_topic, &claim_data2));
 
-        // Test multiple digests independently
-        set_claim_revoked(&e, &digest2, true);
-        assert!(is_claim_revoked(&e, &digest1));
-        assert!(is_claim_revoked(&e, &digest2));
+        // Test multiple claims independently
+        set_claim_revoked(&e, &identity2, claim_topic, &claim_data2, true);
+        assert!(is_claim_revoked(&e, &identity1, claim_topic, &claim_data1));
+        assert!(is_claim_revoked(&e, &identity2, claim_topic, &claim_data2));
 
-        set_claim_revoked(&e, &digest1, false);
-        assert!(!is_claim_revoked(&e, &digest1));
-        assert!(is_claim_revoked(&e, &digest2));
+        set_claim_revoked(&e, &identity1, claim_topic, &claim_data1, false);
+        assert!(!is_claim_revoked(&e, &identity1, claim_topic, &claim_data1));
+        assert!(is_claim_revoked(&e, &identity2, claim_topic, &claim_data2));
     });
 }
