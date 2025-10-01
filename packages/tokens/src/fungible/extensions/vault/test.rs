@@ -2,7 +2,7 @@ extern crate std;
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env};
 
-use crate::fungible::{vault::Vault, Base};
+use crate::fungible::{vault::Vault, Base, MAX_DECIMALS_OFFSET};
 
 // Simple mock contract for vault testing
 #[contract]
@@ -393,6 +393,16 @@ fn decimals_offset_already_set() {
         // Try to set decimals offset again (should panic)
         Vault::set_decimals_offset(&e, 8);
     });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #124)")]
+fn decimals_offset_exceeded() {
+    let e = Env::default();
+    let asset_address = Address::generate(&e);
+
+    // Try to set the offset to a value greater than MAX_DECIMALS_OFFSET
+    let _ = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET + 1);
 }
 
 #[test]

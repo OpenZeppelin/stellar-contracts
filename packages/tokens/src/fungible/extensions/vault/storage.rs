@@ -3,7 +3,7 @@ use stellar_contract_utils::math::fixed_point::{muldiv, Rounding};
 
 use crate::fungible::{
     vault::{emit_deposit, emit_withdraw},
-    Base, ContractOverrides, FungibleTokenError,
+    Base, ContractOverrides, FungibleTokenError, MAX_DECIMALS_OFFSET,
 };
 
 pub struct Vault;
@@ -481,6 +481,9 @@ impl Vault {
     /// of your smart contract or combining with the Ownable or Access Control
     /// pattern.
     pub fn set_decimals_offset(e: &Env, offset: u32) {
+        if offset > MAX_DECIMALS_OFFSET {
+            panic_with_error!(e, FungibleTokenError::VaultMaxDecimalsOffsetExceeded);
+        }
         // Check if virtual decimals offset is already set
         if e.storage().instance().has(&VaultStorageKey::VirtualDecimalsOffset) {
             panic_with_error!(e, FungibleTokenError::VaultVirtualDecimalsOffsetAlreadySet);
