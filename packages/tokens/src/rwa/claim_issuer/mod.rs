@@ -1,16 +1,51 @@
 //! # Claim Issuer Module
 //!
 //! This module provides functionality for validating cryptographic claims
-//! about identities. The core `ClaimIssuer` trait is minimal, but the module
-//! offers a variety of optional features that can be integrated in any
-//! combination as needed:
+//! about identities. The core `ClaimIssuer` trait defines a single method
+//! `is_claim_valid()` that implementors must provide:
 //!
-//! - **Multiple Signature Schemes**: Ed25519, Secp256k1, Secp256r1 support
-//! - **Topic-Specific Key Authorization**: Keys authorized for specific claim
-//!   topics
-//! - **Claim Revocation**: Digest-based revocation tracking with persistent
-//!   storage
-//! - **Key Management**: Add, remove and query
+//! ```rust
+//! pub trait ClaimIssuer {
+//!     fn is_claim_valid(
+//!         e: &Env,
+//!         identity: Address,
+//!         claim_topic: u32,
+//!         scheme: u32,
+//!         sig_data: Bytes,
+//!         claim_data: Bytes,
+//!     ) -> bool;
+//! }
+//! ```
+//! The trait is intentionally minimal and unopinionated, allowing maximum
+//! flexibility in implementation.
+//!
+//! ## Verification Schemes
+//!
+//! A claim issuer contract can support one or multiple verification schemes,
+//! identified by the `scheme` parameter. The scheme number is contract-specific
+//! and has meaning only within that particular claim issuer implementation.
+//!
+//! Depending on the verification scheme, the `sig_data` parameter can be
+//! interpreted differently. For example:
+//! - Scheme 101 might expect Ed25519 signature data (64-byte signature +
+//!   32-byte public key)
+//! - Scheme 102 might expect Secp256k1 signature data (64-byte signature +
+//!   33-byte compressed public key)
+//! - Scheme 200 might use a completely custom format
+//!
+//! ## Optional Helper Features
+//!
+//! This module provides optional helper utilities that can be used in any
+//! combination as needed. These are **implementation details** and not
+//! requirements:
+//!
+//! - **Signature Verifiers**: Pre-built verifiers for Ed25519, Secp256k1, and
+//!   Secp256r1 schemes with a common `SignatureVerifier` trait structure
+//! - **Key Management**: Functions for topic-specific key authorization
+//! - **Claim Revocation**: Revocation tracking
+//!
+//! Implementors are free to use alternative structures for signature
+//! verification, key management, or any other aspect of claim validation.
 //!
 //! ## Example Usage
 //!
@@ -39,27 +74,29 @@
 //!         sig_data: Bytes,
 //!         claim_data: Bytes,
 //!     ) -> bool {
-//!         // Extract signature data and verify against stored key
-//!         let signature_data = Ed25519Verifier::extract_signature_data(e, &sig_data);
+//!         // scheme number has a meaning only within the claim issuer
+//!         if scheme == 101 {
+//!             // Extract signature data
+//!             let signature_data = Ed25519Verifier::extract_signature_data(e, &sig_data);
 //!
-//!         // Check if the public key is authorized for this topic
-//!         if !is_key_allowed(e, &signature_data.public_key.to_bytes(), claim_topic) {
-//!             return false;
-//!         }
-//!         let claim_digest = if scheme == 101 {
-//!             Ed25519Verifier::build_claim_digest(&identity, claim_topic, &claim_data);
+//!             // Check if the public key is authorized for this topic
+//!             if !is_key_allowed(e, &signature_data.public_key.to_bytes(), claim_topic) {
+//!                 return false;
+//!             }
+//!             let claim_digest =
+//!                 Ed25519Verifier::build_claim_digest(&identity, claim_topic, &claim_data);
+//!
+//!             // Optionally check claim was not revoked.
+//!             if is_claim_revoked(e, &claim_digest) {
+//!                 return false;
+//!             }
+//!
+//!             // Verify the signature
+//!             Ed25519Verifier::verify_claim_digest(e, &claim_digest, &signature_data)
 //!         } else {
-//!             // build claim digest or
+//!             // follow similar steps as for Ed25519Verifier or
 //!             // panic if other schemes are not used at this claim issuer
 //!         }
-//!
-//!         // Optionally check claim was not revoked.
-//!         if is_claim_revoked(e, &claim_digest) {
-//!             return false;
-//!         }
-//!
-//!         // Verify the signature
-//!         Ed25519Verifier::verify_claim_digest(e, &claim_digest, &signature_data)
 //!     }
 //! }
 //! ```
