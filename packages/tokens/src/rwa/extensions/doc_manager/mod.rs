@@ -123,6 +123,10 @@ pub enum DocumentError {
 
 // ################## CONSTANTS ##################
 
+const DAY_IN_LEDGERS: u32 = 17280;
+pub const DOCUMENT_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const DOCUMENT_TTL_THRESHOLD: u32 = DOCUMENT_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
 /// Max. number of buckets
 pub const MAX_BUCKETS: u32 = 100;
 /// Maximum number of document entries per bucket.
