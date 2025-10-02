@@ -96,7 +96,7 @@ fn test_vault_deposit() {
     assert_eq!(asset_client.balance(&user), deposit_amount);
 
     // User deposits assets into vault
-    let shares_minted = vault_client.deposit(&deposit_amount, &user, &user);
+    let shares_minted = vault_client.deposit(&deposit_amount, &user, &user, &user);
 
     // Check balances
     assert_eq!(vault_client.balance(&user), shares_minted);
@@ -132,7 +132,7 @@ fn test_vault_mint() {
     asset_client.transfer(&admin, &user, &required_assets);
 
     // User mints specific amount of shares
-    let assets_deposited = vault_client.mint(&shares_to_mint, &user, &user);
+    let assets_deposited = vault_client.mint(&shares_to_mint, &user, &user, &user);
 
     // Check balances
     assert_eq!(vault_client.balance(&user), shares_to_mint);
@@ -160,7 +160,7 @@ fn test_vault_withdraw() {
 
     // Setup: deposit assets first
     asset_client.transfer(&admin, &user, &deposit_amount);
-    let shares_minted = vault_client.deposit(&deposit_amount, &user, &user);
+    let shares_minted = vault_client.deposit(&deposit_amount, &user, &user, &user);
 
     // Withdraw assets
     let shares_burned = vault_client.withdraw(&withdraw_amount, &user, &user, &user);
@@ -189,7 +189,7 @@ fn test_vault_redeem() {
 
     // Setup: deposit assets first
     asset_client.transfer(&admin, &user, &deposit_amount);
-    let shares_minted = vault_client.deposit(&deposit_amount, &user, &user);
+    let shares_minted = vault_client.deposit(&deposit_amount, &user, &user, &user);
 
     // Redeem half the shares
     let shares_to_redeem = shares_minted / 2;
@@ -236,7 +236,7 @@ fn test_conversion_functions() {
 
     // Add some assets to vault and test conversions
     asset_client.transfer(&admin, &user, &deposit_amount);
-    vault_client.deposit(&deposit_amount, &user, &user);
+    vault_client.deposit(&deposit_amount, &user, &user, &user);
 
     // Test conversions with vault having assets
     let new_assets = 50_000_000_000_000_000i128;
@@ -271,7 +271,7 @@ fn test_max_functions() {
 
     // Deposit some assets
     asset_client.transfer(&admin, &user, &deposit_amount);
-    let shares_minted = vault_client.deposit(&deposit_amount, &user, &user);
+    let shares_minted = vault_client.deposit(&deposit_amount, &user, &user, &user);
 
     // Test max functions with user having shares
     assert_eq!(vault_client.max_redeem(&user), shares_minted);
@@ -302,10 +302,10 @@ fn test_multiple_users_deposit_withdraw() {
     asset_client.transfer(&admin, &user2, &deposit_amount);
 
     // User1 deposits first
-    let shares1 = vault_client.deposit(&deposit_amount, &user1, &user1);
+    let shares1 = vault_client.deposit(&deposit_amount, &user1, &user1, &user1);
 
     // User2 deposits same amount (should get same shares since ratio is still 1:1)
-    let shares2 = vault_client.deposit(&deposit_amount, &user2, &user2);
+    let shares2 = vault_client.deposit(&deposit_amount, &user2, &user2, &user2);
 
     assert_eq!(shares1, shares2);
     assert_eq!(vault_client.total_supply(), shares1 + shares2);
@@ -342,7 +342,7 @@ fn test_deposit_max_validation() {
     // Test normal deposit works fine
     let deposit_amount = 100_000_000_000_000_000i128;
     asset_client.transfer(&admin, &user, &deposit_amount);
-    let shares = vault_client.deposit(&deposit_amount, &user, &user);
+    let shares = vault_client.deposit(&deposit_amount, &user, &user, &user);
     assert!(shares > 0);
 }
 
@@ -365,7 +365,7 @@ fn test_withdraw_exceeds_max() {
 
     // Deposit some assets
     asset_client.transfer(&admin, &user, &deposit_amount);
-    vault_client.deposit(&deposit_amount, &user, &user);
+    vault_client.deposit(&deposit_amount, &user, &user, &user);
 
     // Try to withdraw more than max
     let max_withdraw = vault_client.max_withdraw(&user);
@@ -391,7 +391,7 @@ fn test_redeem_exceeds_max() {
 
     // Deposit some assets
     asset_client.transfer(&admin, &user, &deposit_amount);
-    let shares = vault_client.deposit(&deposit_amount, &user, &user);
+    let shares = vault_client.deposit(&deposit_amount, &user, &user, &user);
 
     // Try to redeem more shares than user has
     vault_client.redeem(&(shares + 1), &user, &user, &user);

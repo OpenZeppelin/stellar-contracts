@@ -8,7 +8,8 @@ use crate::fungible::{vault::Vault, Base};
 #[contract]
 struct MockVaultContract;
 
-// Mock Asset Contract - Only implements balance, transfer, and decimals
+// Mock Asset Contract - Implements balance, transfer, transfer_from, approve,
+// and decimals
 #[contract]
 struct MockAssetContract;
 
@@ -24,6 +25,37 @@ impl MockAssetContract {
 
         e.storage().temporary().set(&from, &(from_balance - amount));
         e.storage().temporary().set(&to, &(to_balance + amount));
+    }
+
+    pub fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128) {
+        // Get allowance
+        let allowance_key = (from.clone(), spender.clone());
+        let allowance: i128 = e.storage().temporary().get(&allowance_key).unwrap_or(0);
+
+        // Check if allowance is sufficient
+        if allowance < amount {
+            panic!("Insufficient allowance");
+        }
+
+        // Update allowance
+        e.storage().temporary().set(&allowance_key, &(allowance - amount));
+
+        // Transfer tokens
+        let from_balance = Self::balance(e, from.clone());
+        let to_balance = Self::balance(e, to.clone());
+        e.storage().temporary().set(&from, &(from_balance - amount));
+        e.storage().temporary().set(&to, &(to_balance + amount));
+    }
+
+    pub fn approve(
+        e: &Env,
+        from: Address,
+        spender: Address,
+        amount: i128,
+        _expiration_ledger: u32,
+    ) {
+        let allowance_key = (from, spender);
+        e.storage().temporary().set(&allowance_key, &amount);
     }
 
     pub fn decimals(_e: &Env) -> u32 {
@@ -179,7 +211,8 @@ fn deposit_functionality() {
 
     e.as_contract(&vault_address, || {
         // Test deposit functionality
-        let shares_minted = Vault::deposit(&e, deposit_amount, user.clone(), admin.clone());
+        let shares_minted =
+            Vault::deposit(&e, deposit_amount, user.clone(), admin.clone(), admin.clone());
 
         // Check results
         assert_eq!(Base::balance(&e, &user), shares_minted);
@@ -209,7 +242,8 @@ fn mint_functionality() {
     e.as_contract(&vault_address, || {
         let required_assets = Vault::preview_mint(&e, shares_to_mint);
 
-        let assets_deposited = Vault::mint(&e, shares_to_mint, user.clone(), user.clone());
+        let assets_deposited =
+            Vault::mint(&e, shares_to_mint, user.clone(), user.clone(), user.clone());
 
         assert_eq!(Base::balance(&e, &user), shares_to_mint);
         assert_eq!(Base::total_supply(&e), shares_to_mint);
@@ -234,7 +268,8 @@ fn withdraw_functionality() {
     e.mock_all_auths();
 
     e.as_contract(&vault_address, || {
-        let shares_minted = Vault::deposit(&e, deposit_amount, user.clone(), user.clone());
+        let shares_minted =
+            Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
 
         // Withdraw assets
         let shares_burned =
@@ -262,7 +297,8 @@ fn redeem_functionality() {
     e.mock_all_auths();
 
     e.as_contract(&vault_address, || {
-        let shares_minted = Vault::deposit(&e, deposit_amount, user.clone(), user.clone());
+        let shares_minted =
+            Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
 
         // Redeem half the shares
         let shares_to_redeem = shares_minted / 2;
@@ -299,7 +335,7 @@ fn conversion_with_existing_assets() {
     asset_client.transfer(&admin, &vault_address, &deposit_amount);
 
     e.as_contract(&vault_address, || {
-        Vault::deposit(&e, deposit_amount, user.clone(), user.clone());
+        Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
 
         // Test conversions with vault having assets
         let new_assets = 50_000_000_000_000_000i128;
@@ -332,7 +368,7 @@ fn withdraw_exceeds_max() {
     asset_client.transfer(&admin, &vault_address, &deposit_amount);
 
     e.as_contract(&vault_address, || {
-        Vault::deposit(&e, deposit_amount, user.clone(), user.clone());
+        Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
 
         // Try to withdraw more than max
         let max_withdraw = Vault::max_withdraw(&e, user.clone());
@@ -361,7 +397,7 @@ fn redeem_exceeds_max() {
     asset_client.transfer(&admin, &vault_address, &deposit_amount);
 
     e.as_contract(&vault_address, || {
-        let shares = Vault::deposit(&e, deposit_amount, user.clone(), user.clone());
+        let shares = Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
 
         // Try to redeem more shares than user has
         Vault::redeem(&e, shares + 1, user.clone(), user.clone(), user.clone());
@@ -462,7 +498,7 @@ fn deposit_exceeds_max() {
         let max_deposit = Vault::max_deposit(&e, user.clone());
 
         // Try to deposit more than max allowed (should panic)
-        Vault::deposit(&e, max_deposit + 1, user.clone(), user.clone());
+        Vault::deposit(&e, max_deposit + 1, user.clone(), user.clone(), user.clone());
     });
 }
 
@@ -485,6 +521,137 @@ fn mint_exceeds_max() {
         let max_mint = Vault::max_mint(&e, user.clone());
 
         // Try to mint more shares than max allowed (should panic)
-        Vault::mint(&e, max_mint + 1, user.clone(), user.clone());
+        Vault::mint(&e, max_mint + 1, user.clone(), user.clone(), user.clone());
+    });
+}
+
+#[test]
+fn deposit_transfer_from() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user = Address::generate(&e);
+    let operator = Address::generate(&e);
+    let initial_supply = 1_000_000_000_000_000_000i128;
+    let decimals_offset = 6;
+    let deposit_amount = 100_000_000_000_000_000i128;
+
+    // Create contracts
+    let asset_address = create_asset_contract(&e, initial_supply, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+
+    e.mock_all_auths();
+
+    // Admin approves operator to spend their tokens
+    asset_client.approve(&admin, &operator, &deposit_amount, &1000);
+
+    e.as_contract(&vault_address, || {
+        // Operator deposits admin's assets to user (allowance-based transfer)
+        let shares_minted =
+            Vault::deposit(&e, deposit_amount, user.clone(), admin.clone(), operator.clone());
+
+        // Check results
+        assert_eq!(Base::balance(&e, &user), shares_minted);
+        assert_eq!(Base::total_supply(&e), shares_minted);
+        assert_eq!(Vault::total_assets(&e), deposit_amount);
+
+        // For first deposit, shares should equal assets with offset
+        assert_eq!(shares_minted, deposit_amount * 10i128.pow(decimals_offset));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Insufficient allowance")]
+fn deposit_transfer_from_not_enough_allowance() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user = Address::generate(&e);
+    let operator = Address::generate(&e);
+    let initial_supply = 1_000_000_000_000_000_000i128;
+    let decimals_offset = 6;
+    let deposit_amount = 100_000_000_000_000_000i128;
+    let insufficient_allowance = 50_000_000_000_000_000i128;
+
+    // Create contracts
+    let asset_address = create_asset_contract(&e, initial_supply, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+
+    e.mock_all_auths();
+
+    // Admin approves operator with insufficient allowance
+    asset_client.approve(&admin, &operator, &insufficient_allowance, &1000);
+
+    e.as_contract(&vault_address, || {
+        // Try to deposit more than allowance (should panic)
+        Vault::deposit(&e, deposit_amount, user.clone(), admin.clone(), operator.clone());
+    });
+}
+
+#[test]
+fn mint_transfer_from() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user = Address::generate(&e);
+    let operator = Address::generate(&e);
+    let initial_supply = 1_000_000_000_000_000_000i128;
+    let decimals_offset = 6;
+    let shares_to_mint = 100_000_000_000_000_000i128;
+
+    // Create contracts
+    let asset_address = create_asset_contract(&e, initial_supply, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+
+    e.mock_all_auths();
+
+    // Calculate required assets outside vault context
+    let required_assets = e.as_contract(&vault_address, || Vault::preview_mint(&e, shares_to_mint));
+
+    // Admin approves operator to spend the required assets
+    asset_client.approve(&admin, &operator, &required_assets, &1000);
+
+    e.as_contract(&vault_address, || {
+        // Operator mints shares for user using admin's assets (allowance-based
+        // transfer)
+        let assets_deposited =
+            Vault::mint(&e, shares_to_mint, user.clone(), admin.clone(), operator.clone());
+
+        // Check results
+        assert_eq!(Base::balance(&e, &user), shares_to_mint);
+        assert_eq!(Base::total_supply(&e), shares_to_mint);
+        assert_eq!(assets_deposited, required_assets);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Insufficient allowance")]
+fn mint_transfer_from_not_enough_allowance() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let user = Address::generate(&e);
+    let operator = Address::generate(&e);
+    let initial_supply = 1_000_000_000_000_000_000i128;
+    let decimals_offset = 6;
+    let shares_to_mint = 100_000_000_000_000_000i128;
+
+    // Create contracts
+    let asset_address = create_asset_contract(&e, initial_supply, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
+    let asset_client = MockAssetContractClient::new(&e, &asset_address);
+
+    e.mock_all_auths();
+
+    // Calculate required assets outside vault context
+    let required_assets = e.as_contract(&vault_address, || Vault::preview_mint(&e, shares_to_mint));
+
+    let insufficient_allowance = required_assets / 2;
+
+    // Admin approves operator with insufficient allowance
+    asset_client.approve(&admin, &operator, &insufficient_allowance, &1000);
+
+    e.as_contract(&vault_address, || {
+        // Try to mint with insufficient allowance (should panic)
+        Vault::mint(&e, shares_to_mint, user.clone(), admin.clone(), operator.clone());
     });
 }
