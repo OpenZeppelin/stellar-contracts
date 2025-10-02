@@ -650,10 +650,10 @@ impl Vault {
         // as an extension)
 
         if operator == from {
-            // Direct transfer: operator is depositing their own assets
+            // Direct transfer: `operator` is depositing their own assets
             token_client.transfer(from, e.current_contract_address(), &assets);
         } else {
-            // Allowance-based transfer: operator is depositing on behalf of from
+            // Allowance-based transfer: `operator` is depositing on behalf of `from`
             // This requires that `from` has approved `operator` on the underlying asset
             token_client.transfer_from(operator, from, &e.current_contract_address(), &assets);
         }
