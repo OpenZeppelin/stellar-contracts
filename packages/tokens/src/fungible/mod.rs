@@ -346,8 +346,8 @@ pub const ALLOW_BLOCK_TTL_THRESHOLD: u32 = ALLOW_BLOCK_EXTEND_AMOUNT - DAY_IN_LE
 pub const INSTANCE_EXTEND_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
 pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
-// i128::MAX ≈ 1.7014e38, 10^38 fits but 10^39 overflows
-pub const MAX_DECIMALS_OFFSET: u32 = 38;
+// Suggested upper-bound for decimals to maximize both security and UX
+pub const MAX_DECIMALS_OFFSET: u32 = 10;
 
 // ################## EVENTS ##################
 
