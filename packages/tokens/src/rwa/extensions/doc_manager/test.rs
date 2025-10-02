@@ -2,9 +2,12 @@ extern crate std;
 
 use soroban_sdk::{contract, Bytes, BytesN, Env, String, Vec};
 
-use super::storage::{
-    document_exists, get_all_documents, get_document, get_document_count, remove_document,
-    set_document,
+use crate::rwa::extensions::doc_manager::{
+    storage::{
+        get_all_documents, get_document, get_document_by_index, get_document_count,
+        remove_document, set_document,
+    },
+    DocumentStorageKey, BUCKET_SIZE, MAX_DOCUMENTS,
 };
 
 #[contract]
@@ -23,6 +26,11 @@ fn create_test_name(e: &Env, name: &str) -> BytesN<32> {
     let copy_len = std::cmp::min(name_slice.len(), 32);
     name_bytes[..copy_len].copy_from_slice(&name_slice[..copy_len]);
     BytesN::from_array(e, &name_bytes)
+}
+
+fn document_exists(e: &Env, name: &BytesN<32>) -> bool {
+    let key = DocumentStorageKey::DocumentIndex(name.clone());
+    e.storage().persistent().has(&key)
 }
 
 #[test]
@@ -99,12 +107,10 @@ fn remove_document_success() {
 
         // Set document
         set_document(&e, &name, &uri, &hash);
-        assert!(document_exists(&e, &name));
         assert_eq!(get_document_count(&e), 1);
 
         // Remove document
         remove_document(&e, &name);
-        assert!(!document_exists(&e, &name));
         assert_eq!(get_document_count(&e), 0);
     });
 }
@@ -259,5 +265,217 @@ fn document_count_tracking() {
         // Remove last document
         remove_document(&e, &name2);
         assert_eq!(get_document_count(&e), 0);
+    });
+}
+
+#[test]
+fn swap_and_pop_behavior() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        // Add 5 documents
+        let name1 = create_test_name(&e, "doc1");
+        let name2 = create_test_name(&e, "doc2");
+        let name3 = create_test_name(&e, "doc3");
+        let name4 = create_test_name(&e, "doc4");
+        let name5 = create_test_name(&e, "doc5");
+
+        let uri = String::from_str(&e, "https://example.com/doc.pdf");
+        let hash = create_test_hash(&e, "content");
+
+        set_document(&e, &name1, &uri, &hash);
+        set_document(&e, &name2, &uri, &hash);
+        set_document(&e, &name3, &uri, &hash);
+        set_document(&e, &name4, &uri, &hash);
+        set_document(&e, &name5, &uri, &hash);
+
+        assert_eq!(get_document_count(&e), 5);
+
+        // Remove doc2 (index 1) - should be replaced by doc5 (last element)
+        remove_document(&e, &name2);
+        assert_eq!(get_document_count(&e), 4);
+
+        // Verify doc2 is gone
+        assert!(!document_exists(&e, &name2));
+
+        // Verify doc5 is now at index 1 (where doc2 was)
+        let (doc_at_index_1, _) = get_document_by_index(&e, 1);
+        assert_eq!(doc_at_index_1, name5);
+
+        // Verify all other documents still exist
+        assert!(document_exists(&e, &name1));
+        assert!(document_exists(&e, &name3));
+        assert!(document_exists(&e, &name4));
+        assert!(document_exists(&e, &name5));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #381)")]
+fn max_documents_limit() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    let uri = String::from_str(&e, "https://example.com/doc.pdf");
+    let hash = create_test_hash(&e, "content");
+
+    e.as_contract(&contract_id, || {
+        e.storage().persistent().set(&DocumentStorageKey::DocumentCount, &MAX_DOCUMENTS);
+        let name = create_test_name(&e, "one_too_many");
+        set_document(&e, &name, &uri, &hash);
+    });
+}
+
+#[test]
+fn get_document_by_index_success() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let name1 = create_test_name(&e, "doc1");
+        let name2 = create_test_name(&e, "doc2");
+        let name3 = create_test_name(&e, "doc3");
+
+        let uri = String::from_str(&e, "https://example.com/doc.pdf");
+        let hash = create_test_hash(&e, "content");
+
+        set_document(&e, &name1, &uri, &hash);
+        set_document(&e, &name2, &uri, &hash);
+        set_document(&e, &name3, &uri, &hash);
+
+        // Get documents by index
+        let (doc_name_0, doc_0) = get_document_by_index(&e, 0);
+        assert_eq!(doc_name_0, name1);
+        assert_eq!(doc_0.uri, uri);
+
+        let (doc_name_1, _) = get_document_by_index(&e, 1);
+        assert_eq!(doc_name_1, name2);
+
+        let (doc_name_2, _) = get_document_by_index(&e, 2);
+        assert_eq!(doc_name_2, name3);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #380)")]
+fn get_document_by_index_out_of_bounds() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let name = create_test_name(&e, "doc1");
+        let uri = String::from_str(&e, "https://example.com/doc.pdf");
+        let hash = create_test_hash(&e, "content");
+
+        set_document(&e, &name, &uri, &hash);
+
+        // Try to get index 1 when only index 0 exists
+        get_document_by_index(&e, 1);
+    });
+}
+
+#[test]
+fn add_document_to_new_bucket() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let uri = String::from_str(&e, "https://example.com/doc.pdf");
+        let hash = create_test_hash(&e, "content");
+
+        // Add documents to fill first bucket (50 docs)
+        for i in 0..BUCKET_SIZE {
+            let name = create_test_name(&e, &std::format!("doc_bucket0_{}", i));
+            set_document(&e, &name, &uri, &hash);
+        }
+
+        assert_eq!(get_document_count(&e), BUCKET_SIZE);
+
+        // Verify first bucket is full by checking the last document
+        let (last_name_bucket0, _) = get_document_by_index(&e, BUCKET_SIZE - 1);
+        let expected_last_name =
+            create_test_name(&e, &std::format!("doc_bucket0_{}", BUCKET_SIZE - 1));
+        assert_eq!(last_name_bucket0, expected_last_name);
+
+        // Add one more document - should go to bucket 1
+        let name_bucket1 = create_test_name(&e, "doc_bucket1_0");
+        set_document(&e, &name_bucket1, &uri, &hash);
+
+        assert_eq!(get_document_count(&e), BUCKET_SIZE + 1);
+
+        // Verify the new document is in bucket 1 (index 50)
+        let (retrieved_name, retrieved_doc) = get_document_by_index(&e, BUCKET_SIZE);
+        assert_eq!(retrieved_name, name_bucket1);
+        assert_eq!(retrieved_doc.uri, uri);
+    });
+}
+
+#[test]
+fn swap_and_pop_across_different_buckets() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let uri = String::from_str(&e, "https://example.com/doc.pdf");
+        let hash = create_test_hash(&e, "content");
+
+        // Add 75 documents (will span 2 buckets: 50 in bucket 0, 25 in bucket 1)
+        for i in 0..75 {
+            let name = create_test_name(&e, &std::format!("doc_{}", i));
+            set_document(&e, &name, &uri, &hash);
+        }
+
+        assert_eq!(get_document_count(&e), 75);
+
+        // Remove a document from bucket 0 (index 10)
+        // This should swap with the last document (doc_74 at index 74 in bucket 1)
+        let name_to_remove = create_test_name(&e, "doc_10");
+        remove_document(&e, &name_to_remove);
+
+        assert_eq!(get_document_count(&e), 74);
+
+        // Verify doc_10 is gone
+        assert!(!document_exists(&e, &name_to_remove));
+
+        // Verify doc_74 is now at index 10 (where doc_10 was)
+        let (swapped_name, _) = get_document_by_index(&e, 10);
+        assert_eq!(swapped_name, create_test_name(&e, "doc_74"));
+
+        // Verify doc_74 still exists and can be retrieved by name
+        let doc_74 = get_document(&e, &create_test_name(&e, "doc_74"));
+        assert_eq!(doc_74.uri, uri);
+    });
+}
+
+#[test]
+fn remove_last_document_in_bucket() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let uri = String::from_str(&e, "https://example.com/doc.pdf");
+        let hash = create_test_hash(&e, "content");
+
+        // Add exactly 50 documents (fills bucket 0)
+        for i in 0..BUCKET_SIZE {
+            let name = create_test_name(&e, &std::format!("doc_{}", i));
+            set_document(&e, &name, &uri, &hash);
+        }
+
+        assert_eq!(get_document_count(&e), BUCKET_SIZE);
+
+        // Remove the last document (index 49)
+        let last_name = create_test_name(&e, &std::format!("doc_{}", BUCKET_SIZE - 1));
+        remove_document(&e, &last_name);
+
+        assert_eq!(get_document_count(&e), BUCKET_SIZE - 1);
+
+        // Verify it's gone
+        assert!(!document_exists(&e, &last_name));
+
+        // Verify we can still access other documents
+        let (first_name, _) = get_document_by_index(&e, 0);
+        assert_eq!(first_name, create_test_name(&e, "doc_0"));
     });
 }
