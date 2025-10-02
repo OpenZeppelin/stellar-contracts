@@ -268,7 +268,7 @@ impl Vault {
     ///
     /// # Events
     ///
-    /// * topics - `["deposit", operator: Address, receiver: Address]`
+    /// * topics - `["deposit", operator: Address, from: Address, receiver: Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
     /// # Security Warning
@@ -315,7 +315,7 @@ impl Vault {
     ///
     /// # Events
     ///
-    /// * topics - `["deposit", operator: Address, receiver: Address]`
+    /// * topics - `["deposit", operator: Address, from: Address, receiver: Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
     /// # Security Warning
@@ -625,7 +625,7 @@ impl Vault {
     ///
     /// # Events
     ///
-    /// * topics - `["deposit", operator: Address, receiver: Address]`
+    /// * topics - `["deposit", operator: Address, from: Address, receiver: Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
     /// # Notes
