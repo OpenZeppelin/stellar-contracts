@@ -6,8 +6,8 @@ use super::{
     storage::{
         add_country_data_entries, add_identity, delete_country_data, get_country_data,
         get_country_data_entries, get_identity, get_identity_profile, modify_country_data,
-        modify_identity, remove_identity, CountryData, CountryRelation, IdentityType,
-        IndividualCountryRelation, OrganizationCountryRelation,
+        modify_identity, recover_identity, remove_identity, CountryData, CountryRelation,
+        IdentityType, IndividualCountryRelation, OrganizationCountryRelation,
     },
     MAX_COUNTRY_ENTRIES,
 };
@@ -47,7 +47,7 @@ fn add_identity_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #320)")] // IdentityAlreadyExists
+#[should_panic(expected = "Error(Contract, #320)")] // IdentityOverwrite
 fn add_identity_already_exists() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -641,5 +641,133 @@ fn mixed_country_relations_succeeds() {
         assert_eq!(profile.countries.len(), 2);
         assert_eq!(get_country_data(&e, &account, 0), incorporation_data);
         assert_eq!(get_country_data(&e, &account, 1), individual_data);
+    });
+}
+
+#[test]
+fn recover_identity_success() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let old_account = Address::generate(&e);
+        let new_account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let country_data1 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+        let country_data2 = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Citizenship(276)),
+            metadata: None,
+        };
+
+        // Add identity to old account
+        add_identity(
+            &e,
+            &old_account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data1.clone(), country_data2.clone()],
+        );
+
+        // Recover identity to new account
+        recover_identity(&e, &old_account, &new_account);
+
+        // Verify identity is now linked to new account
+        assert_eq!(get_identity(&e, &new_account), identity);
+
+        // Verify identity profile is transferred
+        let profile = get_identity_profile(&e, &new_account);
+        assert_eq!(profile.identity_type, IdentityType::Individual);
+        assert_eq!(profile.countries.len(), 2);
+        assert_eq!(get_country_data(&e, &new_account, 0), country_data1);
+        assert_eq!(get_country_data(&e, &new_account, 1), country_data2);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #321)")] // IdentityNotFound
+fn recover_identity_old_account_not_found() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let old_account = Address::generate(&e);
+        let new_account = Address::generate(&e);
+
+        // Try to recover identity from account that doesn't have one
+        recover_identity(&e, &old_account, &new_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #320)")] // IdentityOverwrite
+fn recover_identity_new_account_already_has_identity() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let old_account = Address::generate(&e);
+        let new_account = Address::generate(&e);
+        let identity1 = Address::generate(&e);
+        let identity2 = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+
+        // Add identity to old account
+        add_identity(
+            &e,
+            &old_account,
+            &identity1,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        // Add identity to new account
+        add_identity(
+            &e,
+            &new_account,
+            &identity2,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        // Try to recover identity to account that already has one
+        recover_identity(&e, &old_account, &new_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #321)")] // IdentityNotFound
+fn recover_identity_removes_old_account_identity() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let old_account = Address::generate(&e);
+        let new_account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+
+        // Add identity to old account
+        add_identity(
+            &e,
+            &old_account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        // Recover identity to new account
+        recover_identity(&e, &old_account, &new_account);
+
+        // Verify old account no longer has identity (should panic)
+        get_identity(&e, &old_account);
     });
 }

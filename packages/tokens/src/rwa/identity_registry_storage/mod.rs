@@ -147,9 +147,9 @@ mod test;
 use soroban_sdk::{contracterror, contractevent, Address, Env, FromVal, Val, Vec};
 pub use storage::{
     add_country_data_entries, add_identity, delete_country_data, get_country_data,
-    get_country_data_entries, get_identity, modify_country_data, modify_identity, remove_identity,
-    CountryData, CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
-    OrganizationCountryRelation,
+    get_country_data_entries, get_identity, get_identity_profile, modify_country_data,
+    modify_identity, recover_identity, remove_identity, CountryData, CountryRelation,
+    IdentityProfile, IdentityType, IndividualCountryRelation, OrganizationCountryRelation,
 };
 
 use crate::rwa::utils::token_binder::TokenBinder;
@@ -217,6 +217,25 @@ pub trait IdentityRegistryStorage: TokenBinder {
     ///   Address]`
     /// * data - `[]`
     fn modify_identity(e: &Env, account: Address, identity: Address, operator: Address);
+
+    /// Recovers an identity by transferring it from an old account to a new
+    /// account.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `old_account` - The account address from which to recover the
+    ///   identity.
+    /// * `new_account` - The account address to which the identity will be
+    ///   transferred.
+    /// * `operator` - The address authorizing the invocation.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["identity_recovered", old_account: Address, new_account:
+    ///   Address]`
+    /// * data - `[]`
+    fn recover_identity(e: &Env, old_account: Address, new_account: Address, operator: Address);
 
     /// Retrieves the stored identity for a given account.
     ///
@@ -317,7 +336,7 @@ pub trait CountryDataManager: IdentityRegistryStorage {
 #[repr(u32)]
 pub enum IRSError {
     /// An identity already exists for the given account.
-    IdentityAlreadyExists = 320,
+    IdentityOverwrite = 320,
     /// No identity found for the given account.
     IdentityNotFound = 321,
     /// Country data not found at the specified index.
@@ -407,6 +426,28 @@ pub struct IdentityModified {
 /// * `new_identity` - The new identity address.
 pub fn emit_identity_modified(e: &Env, old_identity: &Address, new_identity: &Address) {
     IdentityModified { old_identity: old_identity.clone(), new_identity: new_identity.clone() }
+        .publish(e);
+}
+
+/// Event emitted when an identity is recovered for a new account.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentityRecovered {
+    #[topic]
+    pub old_account: Address,
+    #[topic]
+    pub new_account: Address,
+}
+
+/// Emits an event when an identity is recovered for a new account.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `old_account` - The previous acccount address.
+/// * `new_account` - The new account address.
+pub fn emit_identity_recovered(e: &Env, old_account: &Address, new_account: &Address) {
+    IdentityRecovered { old_account: old_account.clone(), new_account: new_account.clone() }
         .publish(e);
 }
 
