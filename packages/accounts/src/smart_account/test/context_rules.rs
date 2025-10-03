@@ -323,7 +323,7 @@ fn add_context_rule_multiple_rules_increment_id() {
             &e,
             &ContextRuleType::CallContract(contract_addr),
             &String::from_str(&e, "rule_2"),
-            None,
+            Some(1000),
             &signers,
             &Map::new(&e),
         );
@@ -772,7 +772,7 @@ fn get_valid_context_rules_only_defaults() {
             &e,
             &ContextRuleType::Default,
             &String::from_str(&e, "default2"),
-            None,
+            Some(1000),
             &signers,
             &Map::new(&e),
         );
@@ -1062,7 +1062,7 @@ fn get_context_rules_multiple_rules() {
             &e,
             &context_type,
             &String::from_str(&e, "rule2"),
-            None,
+            Some(1000),
             &signers.clone(),
             &Map::new(&e),
         );
@@ -1070,7 +1070,7 @@ fn get_context_rules_multiple_rules() {
             &e,
             &context_type,
             &String::from_str(&e, "rule3"),
-            None,
+            Some(2000),
             &signers.clone(),
             &Map::new(&e),
         );
