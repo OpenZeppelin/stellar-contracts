@@ -29,19 +29,25 @@ struct MockCompliance;
 
 #[contractimpl]
 impl MockCompliance {
-    pub fn can_transfer(e: Env, _from: Address, _to: Address, _amount: i128) -> bool {
+    pub fn can_transfer(
+        e: Env,
+        _from: Address,
+        _to: Address,
+        _amount: i128,
+        _contract: Address,
+    ) -> bool {
         e.storage().persistent().get(&symbol_short!("tx_ok")).unwrap_or(true)
     }
 
-    pub fn can_create(e: Env, _to: Address, _amount: i128) -> bool {
+    pub fn can_create(e: Env, _to: Address, _amount: i128, _contract: Address) -> bool {
         e.storage().persistent().get(&symbol_short!("mint_ok")).unwrap_or(true)
     }
 
-    pub fn transferred(_e: Env, _from: Address, _to: Address, _amount: i128) {}
+    pub fn transferred(_e: Env, _from: Address, _to: Address, _amount: i128, _contract: Address) {}
 
-    pub fn created(_e: Env, _to: Address, _amount: i128) {}
+    pub fn created(_e: Env, _to: Address, _amount: i128, _contract: Address) {}
 
-    pub fn destroyed(_e: Env, _from: Address, _amount: i128) {}
+    pub fn destroyed(_e: Env, _from: Address, _amount: i128, _contract: Address) {}
 }
 
 #[contract]

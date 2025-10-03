@@ -201,16 +201,17 @@ pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
 /// * `from` - The address that sent the tokens.
 /// * `to` - The address that received the tokens.
 /// * `amount` - The amount of tokens transferred.
+/// * `contract` - The address of the contract that is performing the transfer.
 ///
 /// # Cross-Contract Calls
 ///
 /// Invokes `on_transfer(from, to, amount)` on each registered module.
-pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
+pub fn transferred(e: &Env, from: Address, to: Address, amount: i128, contract: Address) {
     let modules = get_modules_for_hook(e, ComplianceHook::Transferred);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        client.on_transfer(&from, &to, &amount);
+        client.on_transfer(&from, &to, &amount, &contract);
     }
 }
 
@@ -224,16 +225,17 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128) {
 /// * `e` - Access to the Soroban environment.
 /// * `to` - The address that received the newly created tokens.
 /// * `amount` - The amount of tokens created.
+/// * `contract` - The address of the contract that is performing the mint.
 ///
 /// # Cross-Contract Calls
 ///
 /// Invokes `on_created(to, amount)` on each registered module.
-pub fn created(e: &Env, to: Address, amount: i128) {
+pub fn created(e: &Env, to: Address, amount: i128, contract: Address) {
     let modules = get_modules_for_hook(e, ComplianceHook::Created);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        client.on_created(&to, &amount);
+        client.on_created(&to, &amount, &contract);
     }
 }
 
@@ -247,16 +249,17 @@ pub fn created(e: &Env, to: Address, amount: i128) {
 /// * `e` - Access to the Soroban environment.
 /// * `from` - The address from which tokens were destroyed.
 /// * `amount` - The amount of tokens destroyed.
+/// * `contract` - The address of the contract that is performing the burn.
 ///
 /// # Cross-Contract Calls
 ///
 /// Invokes `on_destroyed(from, amount)` on each registered module.
-pub fn destroyed(e: &Env, from: Address, amount: i128) {
+pub fn destroyed(e: &Env, from: Address, amount: i128, contract: Address) {
     let modules = get_modules_for_hook(e, ComplianceHook::Destroyed);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        client.on_destroyed(&from, &amount);
+        client.on_destroyed(&from, &amount, &contract);
     }
 }
 
@@ -273,6 +276,7 @@ pub fn destroyed(e: &Env, from: Address, amount: i128) {
 /// * `from` - The address attempting to send tokens.
 /// * `to` - The address that would receive tokens.
 /// * `amount` - The amount of tokens to be transferred.
+/// * `contract` - The address of the contract that is performing the transfer.
 ///
 /// # Returns
 ///
@@ -283,12 +287,12 @@ pub fn destroyed(e: &Env, from: Address, amount: i128) {
 ///
 /// Invokes `can_transfer(from, to, amount)` on each registered module.
 /// Stops execution and returns `false` on the first module that rejects.
-pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
+pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, contract: Address) -> bool {
     let modules = get_modules_for_hook(e, ComplianceHook::CanTransfer);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        let result = client.can_transfer(&from, &to, &amount);
+        let result = client.can_transfer(&from, &to, &amount, &contract);
 
         // If any module returns false, the entire check fails
         if !result {
@@ -312,6 +316,7 @@ pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
 /// * `e` - Access to the Soroban environment.
 /// * `to` - The address that would receive tokens.
 /// * `amount` - The amount of tokens to be transferred.
+/// * `contract` - The address of the contract that is performing the mint.
 ///
 /// # Returns
 ///
@@ -322,12 +327,12 @@ pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool {
 ///
 /// Invokes `can_create(to, amount)` on each registered module.
 /// Stops execution and returns `false` on the first module that rejects.
-pub fn can_create(e: &Env, to: Address, amount: i128) -> bool {
+pub fn can_create(e: &Env, to: Address, amount: i128, contract: Address) -> bool {
     let modules = get_modules_for_hook(e, ComplianceHook::CanCreate);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        let result = client.can_create(&to, &amount);
+        let result = client.can_create(&to, &amount, &contract);
 
         // If any module returns false, the entire check fails
         if !result {
