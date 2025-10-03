@@ -520,7 +520,6 @@ pub fn compute_fingerprint(
     context_type: &ContextRuleType,
     signers: &Vec<Signer>,
     policies: &Vec<Address>,
-    valid_until: Option<u32>,
 ) -> BytesN<32> {
     let mut sorted_signers = Vec::new(e);
     for signer in signers.iter() {
@@ -541,7 +540,6 @@ pub fn compute_fingerprint(
     let mut rule_data = context_type.to_xdr(e);
     rule_data.append(&sorted_signers.to_xdr(e));
     rule_data.append(&sorted_policies.to_xdr(e));
-    rule_data.append(&valid_until.to_xdr(e));
 
     e.crypto().sha256(&rule_data).to_bytes()
 }
@@ -626,7 +624,7 @@ pub fn add_context_rule(
     }
 
     validate_signers_and_policies(e, &unique_signers, &policies_vec);
-    validate_and_set_fingerprint(e, context_type, &unique_signers, &policies_vec, valid_until);
+    validate_and_set_fingerprint(e, context_type, &unique_signers, &policies_vec);
 
     // Store meta information
     let meta = Meta { name: name.clone(), context_type: context_type.clone(), valid_until };
@@ -749,22 +747,6 @@ pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32
         }
     }
 
-    validate_and_set_fingerprint(
-        e,
-        &existing_rule.context_type,
-        &existing_rule.signers,
-        &existing_rule.policies,
-        valid_until,
-    );
-    // Remove the old fingerprint
-    remove_fingerprint(
-        e,
-        &existing_rule.context_type,
-        &existing_rule.signers,
-        &existing_rule.policies,
-        existing_rule.valid_until,
-    );
-
     // Update only the valid_until in meta information
     let meta = Meta {
         name: existing_rule.name.clone(),
@@ -827,7 +809,6 @@ pub fn remove_context_rule(e: &Env, id: u32) {
         &context_rule.context_type,
         &context_rule.signers,
         &context_rule.policies,
-        context_rule.valid_until,
     );
 
     // Remove from ids list
@@ -886,9 +867,9 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
     // Validate the updated signers and policies
     validate_signers_and_policies(e, &signers, &rule.policies);
 
-    validate_and_set_fingerprint(e, &rule.context_type, &signers, &rule.policies, rule.valid_until);
+    validate_and_set_fingerprint(e, &rule.context_type, &signers, &rule.policies);
     // Remove the old fingerprint
-    remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies, rule.valid_until);
+    remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
 
     e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
@@ -931,15 +912,9 @@ pub fn remove_signer(e: &Env, id: u32, signer: &Signer) {
         // Validate that the rule still has at least one signer or one policy
         validate_signers_and_policies(e, &signers, &rule.policies);
 
-        validate_and_set_fingerprint(
-            e,
-            &rule.context_type,
-            &signers,
-            &rule.policies,
-            rule.valid_until,
-        );
+        validate_and_set_fingerprint(e, &rule.context_type, &signers, &rule.policies);
         // Remove the old fingerprint
-        remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies, rule.valid_until);
+        remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
 
         e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
@@ -996,9 +971,9 @@ pub fn add_policy(e: &Env, id: u32, policy: &Address, install_param: Val) {
     // Validate the updated signers and policies
     validate_signers_and_policies(e, &rule.signers, &policies);
 
-    validate_and_set_fingerprint(e, &rule.context_type, &rule.signers, &policies, rule.valid_until);
+    validate_and_set_fingerprint(e, &rule.context_type, &rule.signers, &policies);
     // Remove the old fingerprint
-    remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies, rule.valid_until);
+    remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
 
     e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
 
@@ -1041,15 +1016,9 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
         // Validate that the rule still has at least one signer or one policy
         validate_signers_and_policies(e, &rule.signers, &policies);
 
-        validate_and_set_fingerprint(
-            e,
-            &rule.context_type,
-            &rule.signers,
-            &policies,
-            rule.valid_until,
-        );
+        validate_and_set_fingerprint(e, &rule.context_type, &rule.signers, &policies);
         // Remove the old fingerprint
-        remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies, rule.valid_until);
+        remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
 
         // Uninstall the policy
         PolicyClient::new(e, policy).uninstall(&rule, &e.current_contract_address());
@@ -1084,9 +1053,8 @@ pub fn validate_and_set_fingerprint(
     context_type: &ContextRuleType,
     signers: &Vec<Signer>,
     policies: &Vec<Address>,
-    valid_until: Option<u32>,
 ) {
-    let fingerprint = compute_fingerprint(e, context_type, signers, policies, valid_until);
+    let fingerprint = compute_fingerprint(e, context_type, signers, policies);
     let fingerprint_key = SmartAccountStorageKey::Fingerprint(fingerprint);
 
     if e.storage().persistent().has(&fingerprint_key) {
@@ -1103,17 +1071,16 @@ pub fn validate_and_set_fingerprint(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+/// * `context_type` - The type of context this rule applies to.
 /// * `signers` - The signers for the context rule.
 /// * `policies` - The policies for the context rule.
-/// * `valid_until` - Optional expiration ledger sequence.
 fn remove_fingerprint(
     e: &Env,
     context_type: &ContextRuleType,
     signers: &Vec<Signer>,
     policies: &Vec<Address>,
-    valid_until: Option<u32>,
 ) {
-    let fingerprint = compute_fingerprint(e, context_type, signers, policies, valid_until);
+    let fingerprint = compute_fingerprint(e, context_type, signers, policies);
     e.storage().persistent().remove(&SmartAccountStorageKey::Fingerprint(fingerprint));
 }
 

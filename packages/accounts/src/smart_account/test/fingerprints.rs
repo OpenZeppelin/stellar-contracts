@@ -1,18 +1,16 @@
 extern crate std;
 
 use soroban_sdk::{
-    auth::Context,
-    contract, contractimpl,
-    testutils::{Address as _, Ledger},
-    Address, Bytes, Env, Map, String, Val, Vec,
+    auth::Context, contract, contractimpl, testutils::Address as _, Address, Bytes, Env, Map,
+    String, Val, Vec,
 };
 
 use crate::{
     policies::Policy,
     smart_account::storage::{
         add_context_rule, add_policy, add_signer, compute_fingerprint, remove_context_rule,
-        remove_policy, remove_signer, update_context_rule_valid_until,
-        validate_and_set_fingerprint, ContextRule, ContextRuleType, Signer, SmartAccountStorageKey,
+        remove_policy, remove_signer, validate_and_set_fingerprint, ContextRule, ContextRuleType,
+        Signer, SmartAccountStorageKey,
     },
 };
 
@@ -76,8 +74,8 @@ fn compute_fingerprint_different_signers_different_fingerprint() {
     let policies = Vec::new(&e);
 
     e.as_contract(&address, || {
-        let fp1 = compute_fingerprint(&e, &context_type, &signers1, &policies, None);
-        let fp2 = compute_fingerprint(&e, &context_type, &signers2, &policies, None);
+        let fp1 = compute_fingerprint(&e, &context_type, &signers1, &policies);
+        let fp2 = compute_fingerprint(&e, &context_type, &signers2, &policies);
         assert_ne!(fp1, fp2);
     });
 }
@@ -96,8 +94,8 @@ fn compute_fingerprint_same_signers_different_order_same_fingerprint() {
     let policies = Vec::new(&e);
 
     e.as_contract(&address, || {
-        let fp1 = compute_fingerprint(&e, &context_type, &signers1, &policies, None);
-        let fp2 = compute_fingerprint(&e, &context_type, &signers2, &policies, None);
+        let fp1 = compute_fingerprint(&e, &context_type, &signers1, &policies);
+        let fp2 = compute_fingerprint(&e, &context_type, &signers2, &policies);
         assert_eq!(fp1, fp2);
     });
 }
@@ -114,8 +112,8 @@ fn compute_fingerprint_different_policies_different_fingerprint() {
     let policies2 = Vec::from_array(&e, [policy3]);
 
     e.as_contract(&address, || {
-        let fp1 = compute_fingerprint(&e, &context_type, &signers, &policies1, None);
-        let fp2 = compute_fingerprint(&e, &context_type, &signers, &policies2, None);
+        let fp1 = compute_fingerprint(&e, &context_type, &signers, &policies1);
+        let fp2 = compute_fingerprint(&e, &context_type, &signers, &policies2);
         assert_ne!(fp1, fp2);
     });
 }
@@ -133,14 +131,14 @@ fn compute_fingerprint_same_policies_different_order_same_fingerprint() {
     let policies_order2 = Vec::from_array(&e, [policy2, policy1]);
 
     e.as_contract(&address, || {
-        let fp1 = compute_fingerprint(&e, &context_type, &signers, &policies_order1, None);
-        let fp2 = compute_fingerprint(&e, &context_type, &signers, &policies_order2, None);
+        let fp1 = compute_fingerprint(&e, &context_type, &signers, &policies_order1);
+        let fp2 = compute_fingerprint(&e, &context_type, &signers, &policies_order2);
         assert_eq!(fp1, fp2);
     });
 }
 
 #[test]
-fn compute_fingerprint_different_valid_until_different_fingerprint() {
+fn compute_fingerprint_same_valid_until_same_fingerprint() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let contract_addr = Address::generate(&e);
@@ -149,9 +147,10 @@ fn compute_fingerprint_different_valid_until_different_fingerprint() {
     let policies = Vec::new(&e);
 
     e.as_contract(&address, || {
-        let fp1 = compute_fingerprint(&e, &context_type, &signers, &policies, None);
-        let fp2 = compute_fingerprint(&e, &context_type, &signers, &policies, Some(1000));
-        assert_ne!(fp1, fp2);
+        let fp1 = compute_fingerprint(&e, &context_type, &signers, &policies);
+        let fp2 = compute_fingerprint(&e, &context_type, &signers, &policies);
+        assert_eq!(fp1, fp2); // Should be equal since valid_until is not part
+                              // of fingerprint
     });
 }
 
@@ -183,9 +182,9 @@ fn compute_fingerprint_mixed_signer_same_fingerprint() {
     let policies = Vec::new(&e);
 
     e.as_contract(&address, || {
-        let fp1 = compute_fingerprint(&e, &context_type, &signers1, &policies, None);
-        let fp2 = compute_fingerprint(&e, &context_type, &signers2, &policies, None);
-        let fp3 = compute_fingerprint(&e, &context_type, &signers3, &policies, None);
+        let fp1 = compute_fingerprint(&e, &context_type, &signers1, &policies);
+        let fp2 = compute_fingerprint(&e, &context_type, &signers2, &policies);
+        let fp3 = compute_fingerprint(&e, &context_type, &signers3, &policies);
         assert_eq!(fp1, fp2);
         assert_eq!(fp3, fp2);
     });
@@ -204,7 +203,7 @@ fn compute_fingerprint_duplicate_signers_fails() {
     let policies = Vec::new(&e);
 
     e.as_contract(&address, || {
-        let _ = compute_fingerprint(&e, &context_type, &duplicate_signers, &policies, None);
+        let _ = compute_fingerprint(&e, &context_type, &duplicate_signers, &policies);
     });
 }
 
@@ -220,7 +219,7 @@ fn compute_fingerprint_duplicate_policies_fails() {
     let duplicate_policies = Vec::from_array(&e, [policy1.clone(), policy1]);
 
     e.as_contract(&address, || {
-        let _ = compute_fingerprint(&e, &context_type, &signers, &duplicate_policies, None);
+        let _ = compute_fingerprint(&e, &context_type, &signers, &duplicate_policies);
     });
 }
 
@@ -234,8 +233,8 @@ fn validate_and_set_fingerprint_success() {
     let policies = Vec::new(&e);
 
     e.as_contract(&address, || {
-        validate_and_set_fingerprint(&e, &context_type, &signers, &policies, None);
-        let fp = compute_fingerprint(&e, &context_type, &signers, &policies, None);
+        validate_and_set_fingerprint(&e, &context_type, &signers, &policies);
+        let fp = compute_fingerprint(&e, &context_type, &signers, &policies);
         assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp)))
     });
 }
@@ -252,15 +251,16 @@ fn validate_and_set_fingerprint_duplicate_fails() {
 
     e.as_contract(&address, || {
         // First call should succeed
-        validate_and_set_fingerprint(&e, &context_type, &signers, &policies, None);
+        validate_and_set_fingerprint(&e, &context_type, &signers, &policies);
 
         // Second call with same parameters should fail
-        validate_and_set_fingerprint(&e, &context_type, &signers, &policies, None);
+        validate_and_set_fingerprint(&e, &context_type, &signers, &policies);
     });
 }
 
 #[test]
-fn validate_and_set_fingerprint_different_valid_until_success() {
+#[should_panic(expected = "Error(Contract, #2001)")]
+fn validate_and_set_fingerprint_same_valid_until_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let contract_addr = Address::generate(&e);
@@ -269,9 +269,9 @@ fn validate_and_set_fingerprint_different_valid_until_success() {
     let policies = Vec::new(&e);
 
     e.as_contract(&address, || {
-        // Different valid_until values should produce different fingerprints
-        validate_and_set_fingerprint(&e, &context_type, &signers, &policies, None);
-        validate_and_set_fingerprint(&e, &context_type, &signers, &policies, Some(1000));
+        // Same fingerprint should fail since valid_until is not part of fingerprint
+        validate_and_set_fingerprint(&e, &context_type, &signers, &policies);
+        validate_and_set_fingerprint(&e, &context_type, &signers, &policies);
     });
 }
 
@@ -361,42 +361,8 @@ fn remove_context_rule_removes_fingerprint() {
 
         // Remove rule
         remove_context_rule(&e, rule.id);
-        let fp = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e), None);
+        let fp = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e));
         assert!(!e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp)))
-    });
-}
-
-#[test]
-fn update_valid_until_updates_fingerprint() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let contract_addr = Address::generate(&e);
-        let context_type = ContextRuleType::CallContract(contract_addr.clone());
-        let signers = create_test_signers(&e);
-
-        e.ledger().with_mut(|li| li.sequence_number = 100);
-
-        // Add rule with no expiration
-        let rule = add_context_rule(
-            &e,
-            &context_type,
-            &String::from_str(&e, "rule1"),
-            None,
-            &signers,
-            &Map::new(&e),
-        );
-
-        let fp1 = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e), None);
-        assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp1.clone())));
-
-        // Update valid_until
-        update_context_rule_valid_until(&e, rule.id, Some(1000));
-
-        let fp2 = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e), Some(1000));
-        assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp2)));
-        assert!(!e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp1)));
     });
 }
 
@@ -420,7 +386,7 @@ fn add_signer_updates_fingerprint() {
             &signers,
             &Map::new(&e),
         );
-        let fp1 = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e), None);
+        let fp1 = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e));
         assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp1.clone())));
 
         // Add another signer
@@ -428,7 +394,7 @@ fn add_signer_updates_fingerprint() {
         add_signer(&e, rule.id, &signer2);
 
         signers.push_back(signer2);
-        let fp2 = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e), None);
+        let fp2 = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e));
         assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp2)));
         assert!(!e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp1)));
     });
@@ -457,14 +423,14 @@ fn remove_signer_updates_fingerprint() {
             &signers,
             &policies_map,
         );
-        let fp1 = compute_fingerprint(&e, &context_type, &signers, &policies_map.keys(), None);
+        let fp1 = compute_fingerprint(&e, &context_type, &signers, &policies_map.keys());
         assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp1.clone())));
 
         // Remove one signer
         let signer_to_remove = signers.pop_back().unwrap();
         remove_signer(&e, rule.id, &signer_to_remove);
 
-        let fp2 = compute_fingerprint(&e, &context_type, &signers, &policies_map.keys(), None);
+        let fp2 = compute_fingerprint(&e, &context_type, &signers, &policies_map.keys());
         assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp2)));
         assert!(!e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp1)));
     });
@@ -490,15 +456,14 @@ fn add_policy_updates_fingerprint() {
             &Map::new(&e),
         );
 
-        let fp1 = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e), None);
+        let fp1 = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e));
         assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp1.clone())));
 
         // Add a policy
         let policy = e.register(MockPolicyContract, ());
         add_policy(&e, rule.id, &policy, Val::from_void().into());
 
-        let fp2 =
-            compute_fingerprint(&e, &context_type, &signers, &Vec::from_slice(&e, &[policy]), None);
+        let fp2 = compute_fingerprint(&e, &context_type, &signers, &Vec::from_slice(&e, &[policy]));
         assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp2)));
         assert!(!e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp1)));
     });
@@ -528,12 +493,12 @@ fn remove_policy_updates_fingerprint() {
             &policies_map,
         );
 
-        let fp1 = compute_fingerprint(&e, &context_type, &signers, &policies_map.keys(), None);
+        let fp1 = compute_fingerprint(&e, &context_type, &signers, &policies_map.keys());
         assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp1.clone())));
 
         // Remove the policy
         remove_policy(&e, rule.id, &policy);
-        let fp2 = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e), None);
+        let fp2 = compute_fingerprint(&e, &context_type, &signers, &Vec::new(&e));
         assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp2)));
         assert!(!e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp1)));
     });

@@ -69,8 +69,8 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Errors
     ///
-    /// * [`SmartAccountError::TooManyContextRules`] - When the number of context
-    ///   rules exceeds MAX_CONTEXT_RULES (15).
+    /// * [`SmartAccountError::TooManyContextRules`] - When the number of
+    ///   context rules exceeds MAX_CONTEXT_RULES (15).
     /// * [`SmartAccountError::NoSignersAndPolicies`] - When both signers and
     ///   policies are empty.
     /// * [`SmartAccountError::TooManySigners`] - When signers exceed

@@ -309,11 +309,12 @@ fn add_context_rule_multiple_rules_increment_id() {
 
     e.as_contract(&address, || {
         let signers = create_test_signers(&e);
-        let contract_addr = Address::generate(&e);
+        let contract_addr1 = Address::generate(&e);
+        let contract_addr2 = Address::generate(&e);
 
         let rule1 = add_context_rule(
             &e,
-            &ContextRuleType::CallContract(contract_addr.clone()),
+            &ContextRuleType::CallContract(contract_addr1),
             &String::from_str(&e, "rule_1"),
             None,
             &signers,
@@ -322,7 +323,7 @@ fn add_context_rule_multiple_rules_increment_id() {
 
         let rule2 = add_context_rule(
             &e,
-            &ContextRuleType::CallContract(contract_addr),
+            &ContextRuleType::CallContract(contract_addr2),
             &String::from_str(&e, "rule_2"),
             Some(1000),
             &signers,
@@ -759,8 +760,12 @@ fn get_valid_context_rules_only_defaults() {
         let contract_addr = Address::generate(&e);
         let context_type = ContextRuleType::CallContract(contract_addr);
 
-        // Add only default rules
+        // Add only default rules with different signers to ensure different
+        // fingerprints
         let signers = create_test_signers(&e);
+        let addr3 = Address::generate(&e);
+        let signers2 = Vec::from_array(&e, [Signer::Native(addr3)]);
+
         add_context_rule(
             &e,
             &ContextRuleType::Default,
@@ -774,7 +779,7 @@ fn get_valid_context_rules_only_defaults() {
             &ContextRuleType::Default,
             &String::from_str(&e, "default2"),
             Some(1000),
-            &signers,
+            &signers2,
             &Map::new(&e),
         );
 
@@ -1049,8 +1054,13 @@ fn get_context_rules_multiple_rules() {
         let contract_addr = Address::generate(&e);
         let context_type = ContextRuleType::CallContract(contract_addr.clone());
 
-        // Add multiple rules
+        // Add multiple rules with different signers to ensure different fingerprints
         let signers = create_test_signers(&e);
+        let addr3 = Address::generate(&e);
+        let addr4 = Address::generate(&e);
+        let signers2 = Vec::from_array(&e, [Signer::Native(addr3)]);
+        let signers3 = Vec::from_array(&e, [Signer::Native(addr4)]);
+
         let rule1 = add_context_rule(
             &e,
             &context_type,
@@ -1064,7 +1074,7 @@ fn get_context_rules_multiple_rules() {
             &context_type,
             &String::from_str(&e, "rule2"),
             Some(1000),
-            &signers.clone(),
+            &signers2.clone(),
             &Map::new(&e),
         );
         let rule3 = add_context_rule(
@@ -1072,7 +1082,7 @@ fn get_context_rules_multiple_rules() {
             &context_type,
             &String::from_str(&e, "rule3"),
             Some(2000),
-            &signers.clone(),
+            &signers3.clone(),
             &Map::new(&e),
         );
 
