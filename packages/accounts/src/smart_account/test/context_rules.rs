@@ -20,6 +20,7 @@ use crate::{
             remove_context_rule, update_context_rule_name, update_context_rule_valid_until,
             ContextRule, ContextRuleType, Signatures, Signer,
         },
+        MAX_CONTEXT_RULES,
     },
 };
 
@@ -1126,6 +1127,46 @@ fn add_context_rule_duplicate_signer_fails() {
             &e,
             &context_type,
             &String::from_str(&e, "test_rule"),
+            None,
+            &signers,
+            &policies_map,
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2012)")]
+fn add_context_rule_too_many_rules_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let signers = create_test_signers(&e);
+        let policies_map = Map::new(&e);
+
+        // Add MAX_CONTEXT_RULES (15) rules successfully
+        for i in 0..MAX_CONTEXT_RULES {
+            let contract_addr = Address::generate(&e);
+            let context_type = ContextRuleType::CallContract(contract_addr);
+
+            add_context_rule(
+                &e,
+                &context_type,
+                &String::from_str(&e, "test_rule"),
+                Some(i),
+                &signers,
+                &policies_map,
+            );
+        }
+
+        // Try to add the 16th rule - this should fail
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr);
+
+        add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "rule_16"),
             None,
             &signers,
             &policies_map,

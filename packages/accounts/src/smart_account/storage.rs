@@ -101,8 +101,8 @@ use crate::{
     smart_account::{
         emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
         emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
-        SmartAccountError, MAX_POLICIES, MAX_SIGNERS, SMART_ACCOUNT_EXTEND_AMOUNT,
-        SMART_ACCOUNT_TTL_THRESHOLD,
+        SmartAccountError, MAX_CONTEXT_RULES, MAX_POLICIES, MAX_SIGNERS,
+        SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
     },
     verifiers::VerifierClient,
 };
@@ -563,6 +563,8 @@ pub fn compute_fingerprint(
 ///
 /// # Errors
 ///
+/// * [`SmartAccountError::TooManyContextRules`] - When the number of context
+///   rules exceeds MAX_CONTEXT_RULES (15).
 /// * [`SmartAccountError::NoSignersAndPolicies`] - When both signers and
 ///   policies are empty.
 /// * [`SmartAccountError::TooManySigners`] - When the number of signers exceeds
@@ -592,6 +594,12 @@ pub fn add_context_rule(
     policies: &Map<Address, Val>,
 ) -> ContextRule {
     let mut id = e.storage().instance().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
+
+    // Check maximum context rules limit
+    if id >= MAX_CONTEXT_RULES {
+        panic_with_error!(e, SmartAccountError::TooManyContextRules);
+    }
+
     let ids_key = SmartAccountStorageKey::Ids(context_type.clone());
     // Don't extend TTL here since we set this key later in the same function
     let mut same_key_ids: Vec<u32> = e.storage().persistent().get(&ids_key).unwrap_or(Vec::new(e));
@@ -600,7 +608,7 @@ pub fn add_context_rule(
     let mut unique_signers = Vec::new(e);
     for signer in signers.iter() {
         if unique_signers.contains(&signer) {
-            panic_with_error!(e, SmartAccountError::DuplicateSigner)
+            panic_with_error!(e, SmartAccountError::DuplicateSigner);
         }
         unique_signers.push_back(signer);
     }
