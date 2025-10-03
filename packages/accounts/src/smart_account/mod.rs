@@ -307,7 +307,7 @@ pub enum SmartAccountError {
     /// The specified context rule does not exist.
     ContextRuleNotFound = 2000,
     /// A conflicting context rule already exists.
-    ConflictingContextRule = 2001,
+    DuplicateContextRule = 2001,
     /// The provided context cannot be validated against any rule.
     UnvalidatedContext = 2002,
     /// Delegated signature verification failed.

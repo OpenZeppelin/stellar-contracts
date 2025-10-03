@@ -91,7 +91,9 @@ use soroban_sdk::{
     },
     contracttype,
     crypto::Hash,
-    panic_with_error, Address, Bytes, BytesN, Env, IntoVal, Map, String, TryFromVal, Val, Vec,
+    panic_with_error,
+    xdr::ToXdr,
+    Address, Bytes, BytesN, Env, IntoVal, Map, String, TryFromVal, Val, Vec,
 };
 
 use crate::{
@@ -122,11 +124,12 @@ pub enum SmartAccountStorageKey {
     Meta(u32),
     /// Storage key for the next available context rule ID.
     NextId,
+    Fingerprint(BytesN<32>),
 }
 
 /// Represents different types of signers in the smart account system.
 #[contracttype]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Signer {
     /// A native Soroban address that uses built-in signature verification.
     Native(Address),
@@ -490,6 +493,59 @@ pub fn do_check_auth(
     Ok(())
 }
 
+/// Computes a unique fingerprint for a context rule based on its signers,
+/// policies, and expiration. The fingerprint is used to prevent duplicate rules
+/// with identical authorization requirements.
+///
+/// The fingerprint is calculated by:
+/// 1. Sorting signers and policies to ensure deterministic ordering
+/// 2. Serializing them to XDR format
+/// 3. Hashing the combined data with SHA-256
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signers` - The signers for the context rule.
+/// * `policies` - The policies for the context rule.
+/// * `valid_until` - Optional expiration ledger sequence.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::DuplicateSigner`] - When duplicate signers are found
+///   during sorting.
+/// * [`SmartAccountError::DuplicatePolicy`] - When duplicate policies are found
+///   during sorting.
+pub fn compute_fingerprint(
+    e: &Env,
+    context_type: &ContextRuleType,
+    signers: &Vec<Signer>,
+    policies: &Vec<Address>,
+    valid_until: Option<u32>,
+) -> BytesN<32> {
+    let mut sorted_signers = Vec::new(e);
+    for signer in signers.iter() {
+        match sorted_signers.binary_search(&signer) {
+            Ok(_) => panic_with_error!(e, SmartAccountError::DuplicateSigner),
+            Err(pos) => sorted_signers.insert(pos, signer),
+        }
+    }
+
+    let mut sorted_policies = Vec::new(e);
+    for policy in policies.iter() {
+        match sorted_policies.binary_search(&policy) {
+            Ok(_) => panic_with_error!(e, SmartAccountError::DuplicatePolicy),
+            Err(pos) => sorted_policies.insert(pos, policy),
+        }
+    }
+
+    let mut rule_data = context_type.to_xdr(e);
+    rule_data.append(&sorted_signers.to_xdr(e));
+    rule_data.append(&sorted_policies.to_xdr(e));
+    rule_data.append(&valid_until.to_xdr(e));
+
+    e.crypto().sha256(&rule_data).to_bytes()
+}
+
 // ################## CHANGE STATE ##################
 
 /// Creates a new context rule with the specified configuration. Returns the
@@ -561,8 +617,8 @@ pub fn add_context_rule(
         policies_vec.push_back(policy.clone());
     }
 
-    // Validate the signers and policies
     validate_signers_and_policies(e, &unique_signers, &policies_vec);
+    validate_and_set_fingerprint(e, context_type, &unique_signers, &policies_vec, valid_until);
 
     // Store meta information
     let meta = Meta { name: name.clone(), context_type: context_type.clone(), valid_until };
@@ -582,7 +638,7 @@ pub fn add_context_rule(
         id,
         context_type: context_type.clone(),
         name: name.clone(),
-        signers: signers.clone(),
+        signers: unique_signers,
         policies: policies_vec,
         valid_until,
     };
@@ -685,6 +741,22 @@ pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32
         }
     }
 
+    validate_and_set_fingerprint(
+        e,
+        &existing_rule.context_type,
+        &existing_rule.signers,
+        &existing_rule.policies,
+        valid_until,
+    );
+    // Remove the old fingerprint
+    remove_fingerprint(
+        e,
+        &existing_rule.context_type,
+        &existing_rule.signers,
+        &existing_rule.policies,
+        existing_rule.valid_until,
+    );
+
     // Update only the valid_until in meta information
     let meta = Meta {
         name: existing_rule.name.clone(),
@@ -742,6 +814,13 @@ pub fn remove_context_rule(e: &Env, id: u32) {
     e.storage().persistent().remove(&SmartAccountStorageKey::Meta(id));
     e.storage().persistent().remove(&SmartAccountStorageKey::Signers(id));
     e.storage().persistent().remove(&SmartAccountStorageKey::Policies(id));
+    remove_fingerprint(
+        e,
+        &context_rule.context_type,
+        &context_rule.signers,
+        &context_rule.policies,
+        context_rule.valid_until,
+    );
 
     // Remove from ids list
     let ids_key = SmartAccountStorageKey::Ids(context_rule.context_type);
@@ -799,6 +878,10 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
     // Validate the updated signers and policies
     validate_signers_and_policies(e, &signers, &rule.policies);
 
+    validate_and_set_fingerprint(e, &rule.context_type, &signers, &rule.policies, rule.valid_until);
+    // Remove the old fingerprint
+    remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies, rule.valid_until);
+
     e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
     // Emit event
@@ -839,6 +922,16 @@ pub fn remove_signer(e: &Env, id: u32, signer: &Signer) {
 
         // Validate that the rule still has at least one signer or one policy
         validate_signers_and_policies(e, &signers, &rule.policies);
+
+        validate_and_set_fingerprint(
+            e,
+            &rule.context_type,
+            &signers,
+            &rule.policies,
+            rule.valid_until,
+        );
+        // Remove the old fingerprint
+        remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies, rule.valid_until);
 
         e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
@@ -895,6 +988,10 @@ pub fn add_policy(e: &Env, id: u32, policy: &Address, install_param: Val) {
     // Validate the updated signers and policies
     validate_signers_and_policies(e, &rule.signers, &policies);
 
+    validate_and_set_fingerprint(e, &rule.context_type, &rule.signers, &policies, rule.valid_until);
+    // Remove the old fingerprint
+    remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies, rule.valid_until);
+
     e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
 
     // Emit event
@@ -936,6 +1033,16 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
         // Validate that the rule still has at least one signer or one policy
         validate_signers_and_policies(e, &rule.signers, &policies);
 
+        validate_and_set_fingerprint(
+            e,
+            &rule.context_type,
+            &rule.signers,
+            &policies,
+            rule.valid_until,
+        );
+        // Remove the old fingerprint
+        remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies, rule.valid_until);
+
         // Uninstall the policy
         PolicyClient::new(e, policy).uninstall(&rule, &e.current_contract_address());
 
@@ -948,7 +1055,59 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
     }
 }
 
+/// Validates that a context rule with the given authorization requirements
+/// doesn't already exist, then stores its fingerprint. This prevents creating
+/// duplicate rules with identical signers, policies, and expiration.
+///
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signers` - The signers for the context rule.
+/// * `policies` - The policies for the context rule.
+/// * `valid_until` - Optional expiration ledger sequence.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::DuplicateContextRule`] - When a rule with identical
+///   authorization requirements already exists.
+pub fn validate_and_set_fingerprint(
+    e: &Env,
+    context_type: &ContextRuleType,
+    signers: &Vec<Signer>,
+    policies: &Vec<Address>,
+    valid_until: Option<u32>,
+) {
+    let fingerprint = compute_fingerprint(e, context_type, signers, policies, valid_until);
+    let fingerprint_key = SmartAccountStorageKey::Fingerprint(fingerprint);
+
+    if e.storage().persistent().has(&fingerprint_key) {
+        panic_with_error!(e, SmartAccountError::DuplicateContextRule)
+    } else {
+        e.storage().persistent().set(&fingerprint_key, &true);
+    }
+}
+
 // ################## HELPERS ##################
+
+/// Removes a context rule's fingerprint from storage.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signers` - The signers for the context rule.
+/// * `policies` - The policies for the context rule.
+/// * `valid_until` - Optional expiration ledger sequence.
+fn remove_fingerprint(
+    e: &Env,
+    context_type: &ContextRuleType,
+    signers: &Vec<Signer>,
+    policies: &Vec<Address>,
+    valid_until: Option<u32>,
+) {
+    let fingerprint = compute_fingerprint(e, context_type, signers, policies, valid_until);
+    e.storage().persistent().remove(&SmartAccountStorageKey::Fingerprint(fingerprint));
+}
 
 /// Helper function that tries to retrieve a persistent storage value.
 ///
