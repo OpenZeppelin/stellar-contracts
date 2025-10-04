@@ -787,8 +787,15 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 ///
 /// # Security Warning
 ///
-/// This function modifies storage without requiring authorization. Ensure
-/// proper access control is implemented at the contract level.
+/// * **Threshold Policy Consideration:** If the ContextRule contains a
+///   threshold-based policy (e.g., simple_threshold), adding signers may
+///   silently weaken the security guarantee. For example, a strict N-of-N
+///   multisig becomes an N-of-(N+M) multisig after adding M signers. **Always
+///   update the policy threshold AFTER adding signers** to maintain the desired
+///   security level, especially for N-of-N multisig configurations.
+///
+/// * This function modifies storage without requiring authorization. Ensure
+///   proper access control is implemented at the contract level.
 pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
     let rule = get_context_rule(e, id);
     let mut signers = rule.signers.clone();
@@ -831,8 +838,14 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
 ///
 /// # Security Warning
 ///
-/// This function modifies storage without requiring authorization. Ensure
-/// proper access control is implemented at the contract level.
+/// * **Threshold Policy Consideration:** If the ContextRule contains a
+///   threshold-based policy (e.g., simple_threshold), removing signers may
+///   cause a denial of service if the remaining signers fall below the policy's
+///   threshold. **Always update the policy threshold BEFORE removing signers**
+///   to ensure the threshold remains achievable with the remaining signer set.
+///
+/// * This function modifies storage without requiring authorization. Ensure
+///   proper access control is implemented at the contract level.
 pub fn remove_signer(e: &Env, id: u32, signer: &Signer) {
     let rule = get_context_rule(e, id);
     let mut signers = rule.signers.clone();
