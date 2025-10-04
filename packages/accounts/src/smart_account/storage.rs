@@ -230,11 +230,7 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
     let ids_key = SmartAccountStorageKey::Ids(context_rule_type.clone());
     let ids: Vec<u32> = get_persistent_entry(e, &ids_key).unwrap_or(Vec::new(e));
 
-    let mut rules = Vec::new(e);
-    for id in ids.iter() {
-        rules.push_back(get_context_rule(e, id));
-    }
-    rules
+    Vec::from_iter(e, ids.iter().map(|id| get_context_rule(e, id)))
 }
 
 /// Retrieves all valid (non-expired) context rules for a specific context type,
@@ -470,10 +466,12 @@ pub fn do_check_auth(
 ) -> Result<(), SmartAccountError> {
     authenticate(e, signature_payload, signatures);
 
-    let mut validated_contexts = Vec::new(e);
-    for context in auth_contexts.iter() {
-        validated_contexts.push_back(get_validated_context(e, &context, &signatures.0.keys()));
-    }
+    let validated_contexts = Vec::from_iter(
+        e,
+        auth_contexts
+            .iter()
+            .map(|context| get_validated_context(e, &context, &signatures.0.keys())),
+    );
 
     // After collecting validated context rules and authenticated signers, call for
     // every policy `PolicyClient::enforce` to trigger the state-changing
@@ -618,10 +616,7 @@ pub fn add_context_rule(
         }
     }
 
-    let mut policies_vec = Vec::new(e);
-    for policy in policies.keys() {
-        policies_vec.push_back(policy.clone());
-    }
+    let policies_vec = Vec::from_iter(e, policies.keys());
 
     validate_signers_and_policies(e, &unique_signers, &policies_vec);
     validate_and_set_fingerprint(e, context_type, &unique_signers, &policies_vec);

@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{
-    auth::Context, contract, contractimpl, testutils::Address as _, Address, Bytes, Env, Map,
+    auth::Context, contract, contractimpl, map, testutils::Address as _, Address, Bytes, Env, Map,
     String, Val, Vec,
 };
 
@@ -412,8 +412,7 @@ fn remove_signer_updates_fingerprint() {
 
         // Add rule with two signers and a policy to satisfy minimum requirements
         let policy = e.register(MockPolicyContract, ());
-        let mut policies_map = Map::new(&e);
-        policies_map.set(policy, Val::from_void().into());
+        let policies_map = map![&e, (policy.clone(), Val::from_void().into())];
 
         let rule = add_context_rule(
             &e,
@@ -479,9 +478,7 @@ fn remove_policy_updates_fingerprint() {
         let context_type = ContextRuleType::CallContract(contract_addr.clone());
         let signers = create_test_signers(&e);
         let policy = e.register(MockPolicyContract, ());
-
-        let mut policies_map = Map::new(&e);
-        policies_map.set(policy.clone(), Val::from_void().into());
+        let policies_map = map![&e, (policy.clone(), Val::from_void().into())];
 
         // Add rule with one policy
         let rule = add_context_rule(
@@ -536,8 +533,6 @@ fn fingerprint_prevents_duplicate_rules_across_modifications() {
 
         // Add rule with signers [addr1, addr2, addr3] and a policy
         let policy = e.register(MockPolicyContract, ());
-        let mut policies_map = Map::new(&e);
-        policies_map.set(policy.clone(), Val::from_void().into());
 
         let rule2 = add_context_rule(
             &e,
@@ -545,7 +540,7 @@ fn fingerprint_prevents_duplicate_rules_across_modifications() {
             &String::from_str(&e, "rule2"),
             None,
             &signers_1_2_3,
-            &policies_map,
+            &map![&e, (policy.clone(), Val::from_void().into())],
         );
 
         // Remove addr3 and policy from rule2
