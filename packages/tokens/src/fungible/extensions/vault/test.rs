@@ -2,7 +2,7 @@ extern crate std;
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env};
 
-use crate::fungible::{vault::Vault, Base};
+use crate::fungible::{vault::Vault, Base, MAX_DECIMALS_OFFSET};
 
 // Simple mock contract for vault testing
 #[contract]
@@ -187,8 +187,8 @@ fn max_functions() {
 
     e.as_contract(&vault_address, || {
         // Test max functions with empty vault
-        assert_eq!(Vault::max_deposit(&e, user.clone()), i64::MAX as i128);
-        assert_eq!(Vault::max_mint(&e, user.clone()), i64::MAX as i128);
+        assert_eq!(Vault::max_deposit(&e, user.clone()), i128::MAX);
+        assert_eq!(Vault::max_mint(&e, user.clone()), i128::MAX);
         assert_eq!(Vault::max_withdraw(&e, user.clone()), 0); // No shares yet
         assert_eq!(Vault::max_redeem(&e, user.clone()), 0); // No shares yet
     });
@@ -432,6 +432,16 @@ fn decimals_offset_already_set() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #124)")]
+fn decimals_offset_exceeded() {
+    let e = Env::default();
+    let asset_address = Address::generate(&e);
+
+    // Try to set the offset to a value greater than MAX_DECIMALS_OFFSET
+    let _ = create_vault_contract(&e, &asset_address, MAX_DECIMALS_OFFSET + 1);
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #115)")]
 fn query_asset_not_set() {
     let e = Env::default();
@@ -476,52 +486,6 @@ fn invalid_shares_amount() {
     e.as_contract(&vault_address, || {
         // Try to convert negative shares (should panic)
         Vault::convert_to_assets(&e, -1);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #120)")]
-fn deposit_exceeds_max() {
-    let e = Env::default();
-    let admin = Address::generate(&e);
-    let user = Address::generate(&e);
-    let initial_supply = 1_000_000_000_000_000_000i128;
-    let decimals_offset = 6;
-
-    // Create contracts
-    let asset_address = create_asset_contract(&e, initial_supply, &admin);
-    let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
-
-    e.mock_all_auths();
-
-    e.as_contract(&vault_address, || {
-        let max_deposit = Vault::max_deposit(&e, user.clone());
-
-        // Try to deposit more than max allowed (should panic)
-        Vault::deposit(&e, max_deposit + 1, user.clone(), user.clone(), user.clone());
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #121)")]
-fn mint_exceeds_max() {
-    let e = Env::default();
-    let admin = Address::generate(&e);
-    let user = Address::generate(&e);
-    let initial_supply = 1_000_000_000_000_000_000i128;
-    let decimals_offset = 6;
-
-    // Create contracts
-    let asset_address = create_asset_contract(&e, initial_supply, &admin);
-    let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
-
-    e.mock_all_auths();
-
-    e.as_contract(&vault_address, || {
-        let max_mint = Vault::max_mint(&e, user.clone());
-
-        // Try to mint more shares than max allowed (should panic)
-        Vault::mint(&e, max_mint + 1, user.clone(), user.clone(), user.clone());
     });
 }
 
