@@ -27,9 +27,7 @@
 ///   Adapted from:
 ///   * https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/WebAuthn.sol
 ///   * https://github.com/kalepail/passkey-kit/blob/next/contracts/smart-wallet/src/verify.rs
-use soroban_sdk::{
-    contracterror, contracttype, panic_with_error, xdr::FromXdr, Bytes, BytesN, Env, String,
-};
+use soroban_sdk::{contracterror, contracttype, panic_with_error, Bytes, BytesN, Env, String};
 
 use crate::verifiers::utils::{base64_url_encode, extract_from_bytes};
 
@@ -51,28 +49,24 @@ pub const AUTHENTICATOR_DATA_MIN_LEN: usize = 37;
 #[contracterror]
 #[repr(u32)]
 pub enum WebAuthnError {
-    /// The provided key data is invalid or malformed.
-    KeyDataInvalid = 2110,
     /// The signature payload is invalid or has incorrect format.
-    SignaturePayloadInvalid = 2111,
-    /// The signature format is invalid or cannot be parsed.
-    SignatureFormatInvalid = 2112,
+    SignaturePayloadInvalid = 2110,
     /// The client data exceeds the maximum allowed length.
-    ClientDataTooLong = 2113,
+    ClientDataTooLong = 2111,
     /// Failed to parse JSON from client data.
-    JsonParseError = 2114,
+    JsonParseError = 2112,
     /// The type field in client data is not "webauthn.get".
-    TypeFieldInvalid = 2115,
+    TypeFieldInvalid = 2113,
     /// The challenge in client data does not match expected value.
-    ChallengeInvalid = 2116,
+    ChallengeInvalid = 2114,
     /// The authenticator data format is invalid or too short.
-    AuthDataFormatInvalid = 2117,
+    AuthDataFormatInvalid = 2115,
     /// The User Present (UP) bit is not set in authenticator flags.
-    PresentBitNotSet = 2118,
+    PresentBitNotSet = 2116,
     /// The User Verified (UV) bit is not set in authenticator flags.
-    VerifiedBitNotSet = 2119,
+    VerifiedBitNotSet = 2117,
     /// Invalid relationship between Backup Eligibility and State bits.
-    BackupEligibilityAndStateNotSet = 2220,
+    BackupEligibilityAndStateNotSet = 2218,
 }
 
 /// Parsed client data JSON structure for WebAuthn authentication.
@@ -275,9 +269,8 @@ pub fn validate_backup_eligibility_and_state(e: &Env, flags: u8) {
 /// * `e` - Access to the Soroban environment.
 /// * `signature_payload` - The data that was signed (first 32 bytes used as
 ///   challenge).
-/// * `key_data` - The public key data (65 bytes for secp256r1).
-/// * `sig_data` - XDR-encoded WebAuthnSigData containing signature and
-///   associated data.
+/// * `pub_key` - The public key (65 bytes for secp256r1).
+/// * `sig_data` - WebAuthnSigData containing signature and associated data.
 ///
 /// # Returns
 ///
@@ -285,9 +278,6 @@ pub fn validate_backup_eligibility_and_state(e: &Env, flags: u8) {
 ///
 /// # Errors
 ///
-/// * [`WebAuthnError::KeyDataInvalid`] - When key data is malformed.
-/// * [`WebAuthnError::SignatureFormatInvalid`] - When signature data cannot be
-///   parsed.
 /// * [`WebAuthnError::ClientDataTooLong`] - When client data exceeds maximum
 ///   length.
 /// * [`WebAuthnError::JsonParseError`] - When client data JSON is malformed.
@@ -307,13 +297,13 @@ pub fn validate_backup_eligibility_and_state(e: &Env, flags: u8) {
 /// # Reference
 ///
 /// https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
-pub fn verify(e: &Env, signature_payload: &Bytes, key_data: &Bytes, sig_data: &Bytes) -> bool {
-    let pub_key: BytesN<65> = extract_from_bytes(e, key_data, 0..65)
-        .unwrap_or_else(|| panic_with_error!(e, WebAuthnError::KeyDataInvalid));
-
-    let WebAuthnSigData { signature, authenticator_data, client_data } =
-        WebAuthnSigData::from_xdr(e, sig_data)
-            .unwrap_or_else(|_| panic_with_error!(e, WebAuthnError::SignatureFormatInvalid));
+pub fn verify(
+    e: &Env,
+    signature_payload: &Bytes,
+    pub_key: &BytesN<65>,
+    sig_data: &WebAuthnSigData,
+) -> bool {
+    let WebAuthnSigData { signature, authenticator_data, client_data } = sig_data;
 
     // Assume that client_data < 1KB, because:
     // - challenge: 43 bytes (equals to the base64 url encoded value of
@@ -355,13 +345,13 @@ pub fn verify(e: &Env, signature_payload: &Bytes, key_data: &Bytes, sig_data: &B
     validate_backup_eligibility_and_state(e, flags);
 
     // Step 19 in https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion.
-    let client_data_hash = e.crypto().sha256(&client_data);
+    let client_data_hash = e.crypto().sha256(client_data);
 
     // Step 20 in https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion.
-    let mut message_digest = authenticator_data;
+    let mut message_digest = authenticator_data.clone();
     message_digest.extend_from_array(&client_data_hash.to_array());
 
-    e.crypto().secp256r1_verify(&pub_key, &e.crypto().sha256(&message_digest), &signature);
+    e.crypto().secp256r1_verify(pub_key, &e.crypto().sha256(&message_digest), signature);
 
     true
 }

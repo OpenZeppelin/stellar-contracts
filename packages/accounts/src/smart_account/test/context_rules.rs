@@ -62,7 +62,7 @@ struct MockVerifierContract;
 
 #[contractimpl]
 impl MockVerifierContract {
-    pub fn verify(e: &Env, _hash: Bytes, _key_data: Bytes, _sig_data: Bytes) -> bool {
+    pub fn verify(e: &Env, _hash: Bytes, _key_data: Val, _sig_data: Val) -> bool {
         e.storage().persistent().get(&symbol_short!("verify")).unwrap_or(true)
     }
 }
@@ -559,7 +559,7 @@ fn authenticate_mixed_signers_success() {
 
     e.as_contract(&address, || {
         let native_addr = Address::generate(&e);
-        let key_data = Bytes::from_array(&e, &[1, 2, 3, 4]);
+        let key_data = Bytes::from_array(&e, &[1u8; 32]);
 
         let native_signer = Signer::Native(native_addr);
         let delegated_signer = Signer::Delegated(verifier_addr.clone(), key_data);
