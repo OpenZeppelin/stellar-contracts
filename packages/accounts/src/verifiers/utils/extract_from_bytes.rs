@@ -25,7 +25,7 @@ pub fn extract_from_bytes<const N: usize>(
         Bound::Included(n) => n + 1,
         Bound::Excluded(n) => n,
     };
-    if end > data.len() || end - start > N as u32 {
+    if end > data.len() || end - start != N as u32 {
         return None;
     }
 
