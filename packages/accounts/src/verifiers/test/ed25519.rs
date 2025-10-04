@@ -1,5 +1,5 @@
 use ed25519_dalek::{Signer as Ed25519Signer, SigningKey};
-use soroban_sdk::{contract, xdr::ToXdr, Bytes, BytesN, Env};
+use soroban_sdk::{contract, Bytes, BytesN, Env};
 
 use crate::verifiers::ed25519::verify;
 
@@ -19,76 +19,21 @@ fn ed25519_verify_success() {
     let signing_key = SigningKey::from_bytes(&secret_key);
     let verifying_key = signing_key.verifying_key();
 
-    let key_data: Bytes = Bytes::from_array(&e, verifying_key.as_bytes());
+    let key_data = BytesN::<32>::from_array(&e, verifying_key.as_bytes());
 
     let data = Bytes::from_array(&e, &[1u8; 64]);
     let signature_payload = e.crypto().keccak256(&data);
 
     let signature = signing_key.sign(&signature_payload.to_array()).to_bytes();
-    let sig_data = Bytes::from_array(&e, &signature);
+    let sig_data = BytesN::<64>::from_array(&e, &signature);
 
     e.as_contract(&address, || {
         assert!(verify(
             &e,
-            Bytes::from_array(&e, &signature_payload.to_array()),
-            key_data,
-            sig_data.to_xdr(&e)
+            &Bytes::from_array(&e, &signature_payload.to_array()),
+            &key_data,
+            &sig_data
         ))
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #2100)")]
-fn ed25519_verify_key_data_invalid_too_small() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let signature_payload = Bytes::from_array(&e, &[1u8; 32]);
-
-        // Invalid key data - too small (should be 32 bytes)
-        let key_data = Bytes::from_array(&e, &[1u8; 16]);
-
-        let signature = BytesN::<64>::from_array(&e, &[2u8; 64]);
-        let sig_data = signature.to_xdr(&e);
-
-        verify(&e, signature_payload, key_data, sig_data);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #2100)")]
-fn ed25519_verify_key_data_invalid_empty() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let signature_payload = Bytes::from_array(&e, &[1u8; 32]);
-
-        // Empty key data
-        let key_data = Bytes::from_array(&e, &[]);
-
-        let signature = BytesN::<64>::from_array(&e, &[2u8; 64]);
-        let sig_data = signature.to_xdr(&e);
-
-        verify(&e, signature_payload, key_data, sig_data);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #2101)")]
-fn ed25519_verify_signature_format_invalid() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let signature_payload = Bytes::from_array(&e, &[1u8; 32]);
-        let key_data = Bytes::from_array(&e, &[1u8; 32]);
-
-        // Invalid XDR data
-        let invalid_sig_data = Bytes::from_array(&e, &[0xFF, 0xFE, 0xFD]);
-
-        verify(&e, signature_payload, key_data, invalid_sig_data.to_xdr(&e));
     });
 }
 
@@ -106,7 +51,7 @@ fn ed25519_verify_invalid_signature() {
 
         let signing_key = SigningKey::from_bytes(&secret_key);
         let verifying_key = signing_key.verifying_key();
-        let key_data = Bytes::from_array(&e, verifying_key.as_bytes());
+        let key_data = BytesN::<32>::from_array(&e, verifying_key.as_bytes());
 
         let data = Bytes::from_array(&e, &[1u8; 64]);
         let signature_payload = e.crypto().keccak256(&data);
@@ -115,9 +60,9 @@ fn ed25519_verify_invalid_signature() {
         let mut signature = signing_key.sign(&signature_payload.to_array()).to_bytes();
         signature[0] = signature[0].wrapping_add(1); // Corrupt the signature
 
-        let sig_data = BytesN::<64>::from_array(&e, &signature).to_xdr(&e);
+        let sig_data = BytesN::<64>::from_array(&e, &signature);
 
-        verify(&e, Bytes::from_array(&e, &signature_payload.to_array()), key_data, sig_data);
+        verify(&e, &Bytes::from_array(&e, &signature_payload.to_array()), &key_data, &sig_data);
     });
 }
 
@@ -142,15 +87,15 @@ fn ed25519_verify_wrong_key() {
 
         // Use key1's public key but key2's signature
         let verifying_key1 = signing_key1.verifying_key();
-        let key_data = Bytes::from_array(&e, verifying_key1.as_bytes());
+        let key_data = BytesN::<32>::from_array(&e, verifying_key1.as_bytes());
 
         let data = Bytes::from_array(&e, &[1u8; 64]);
         let signature_payload = e.crypto().keccak256(&data);
 
         // Sign with key2 but verify with key1
         let signature = signing_key2.sign(&signature_payload.to_array()).to_bytes();
-        let sig_data = BytesN::<64>::from_array(&e, &signature).to_xdr(&e);
+        let sig_data = BytesN::<64>::from_array(&e, &signature);
 
-        verify(&e, Bytes::from_array(&e, &signature_payload.to_array()), key_data, sig_data);
+        verify(&e, &Bytes::from_array(&e, &signature_payload.to_array()), &key_data, &sig_data);
     });
 }
