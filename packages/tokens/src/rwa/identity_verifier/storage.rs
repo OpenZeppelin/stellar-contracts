@@ -26,7 +26,7 @@ pub enum IdentityVerifierStorageKey {
 #[allow(unused)]
 #[contractclient(name = "IdentityRegistryStorageClient")]
 trait IdentityRegistryStorage {
-    fn stored_identity(e: &Env, account: Address) -> Address;
+    fn stored_identity(e: &Env, user_address: Address) -> Address;
 }
 
 /// Returns the Claim Topics and Issuers contract linked to the token.
@@ -69,17 +69,17 @@ pub fn identity_registry_storage(e: &Env) -> Address {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `account` - The user address to verify.
+/// * `user_address` - The user address to verify.
 ///
 /// # Errors
 ///
 /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the user
 ///   address cannot be verified.
-pub fn verify_identity(e: &Env, account: &Address) {
+pub fn verify_identity(e: &Env, user_address: &Address) {
     let irs_addr = identity_registry_storage(e);
     let irs_client = IdentityRegistryStorageClient::new(e, &irs_addr);
 
-    let identity_addr = irs_client.stored_identity(account);
+    let identity_addr = irs_client.stored_identity(user_address);
     let identity_client = IdentityClaimsClient::new(e, &identity_addr);
 
     let cti_addr = claim_topics_and_issuers(e);
