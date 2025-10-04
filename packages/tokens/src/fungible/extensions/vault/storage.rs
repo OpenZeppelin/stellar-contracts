@@ -102,14 +102,14 @@ impl Vault {
     }
 
     /// Returns the maximum amount of underlying assets that can be deposited
-    /// for the given receiver address (currently `i64::MAX`).
+    /// for the given receiver address (currently `i128::MAX`).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
     pub fn max_deposit(_e: &Env, _receiver: Address) -> i128 {
-        i64::MAX as i128
+        i128::MAX
     }
 
     /// Simulates and returns the amount of vault shares that would be minted
@@ -132,14 +132,14 @@ impl Vault {
     }
 
     /// Returns the maximum amount of vault shares that can be minted
-    /// for the given receiver address (currently `i64::MAX`).
+    /// for the given receiver address (currently `i128::MAX`).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
     pub fn max_mint(_e: &Env, _receiver: Address) -> i128 {
-        i64::MAX as i128
+        i128::MAX
     }
 
     /// Simulates and returns the amount of underlying assets required to mint
