@@ -241,7 +241,7 @@ fn burn_tokens() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #100)")]
+#[should_panic(expected = "Error(Contract, #300)")]
 fn burn_insufficient_balance_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());

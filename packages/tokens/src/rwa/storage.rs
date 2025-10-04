@@ -303,6 +303,10 @@ impl RWA {
     /// only be used internally or in admin functions that implement their own
     /// authorization logic.
     pub fn burn(e: &Env, user_address: &Address, amount: i128) {
+        if amount > Base::balance(e, user_address) {
+            panic_with_error!(e, RWAError::InsufficientBalance);
+        }
+
         // Check if we need to unfreeze tokens to complete the burn
         let free_tokens = Self::get_free_tokens(e, user_address);
         if free_tokens < amount {
