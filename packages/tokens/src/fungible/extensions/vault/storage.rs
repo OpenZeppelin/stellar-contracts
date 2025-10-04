@@ -3,7 +3,7 @@ use stellar_contract_utils::math::fixed_point::{muldiv, Rounding};
 
 use crate::fungible::{
     vault::{emit_deposit, emit_withdraw},
-    Base, ContractOverrides, FungibleTokenError,
+    Base, ContractOverrides, FungibleTokenError, MAX_DECIMALS_OFFSET,
 };
 
 pub struct Vault;
@@ -461,6 +461,17 @@ impl Vault {
     /// share-to-asset conversions. This should typically be set once during
     /// contract initialization and remain immutable thereafter.
     ///
+    /// To enforce a reasonable value that maximizes the security and UX at the
+    /// same time, we bound this value to a maximum of 10.
+    ///
+    /// Any value higher than 10 is not recommended as it provides
+    /// almost no practical benefits, and any value close to 30 may
+    /// cause overflow errors depending on the base asset decimals, and
+    /// amount of assets in the vault.
+    ///
+    /// If a value higher than 10 needed, one should consider writing
+    /// their custom copy of this function.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
@@ -470,6 +481,9 @@ impl Vault {
     ///
     /// * [`FungibleTokenError::VaultVirtualDecimalsOffsetAlreadySet`] - When
     ///   attempting to set the offset after it has already been initialized.
+    /// * [`FungibleTokenError::VaultMaxDecimalsOffsetExceeded`] - When
+    ///   attempting to set the offset to a value higher than the suggested
+    ///   maximum allowed.
     ///
     /// # Security Warning
     ///
@@ -481,6 +495,9 @@ impl Vault {
     /// of your smart contract or combining with the Ownable or Access Control
     /// pattern.
     pub fn set_decimals_offset(e: &Env, offset: u32) {
+        if offset > MAX_DECIMALS_OFFSET {
+            panic_with_error!(e, FungibleTokenError::VaultMaxDecimalsOffsetExceeded);
+        }
         // Check if virtual decimals offset is already set
         if e.storage().instance().has(&VaultStorageKey::VirtualDecimalsOffset) {
             panic_with_error!(e, FungibleTokenError::VaultVirtualDecimalsOffsetAlreadySet);
@@ -492,8 +509,7 @@ impl Vault {
     /// rounding direction, returning the equivalent amount of vault shares.
     ///
     /// Implements the formula:
-    /// `assets.mulDiv(totalSupply() + 10 ** decimalsOffset(), totalAssets() +
-    /// 1, rounding)`
+    /// shares = (assets × (totalSupply + 10^offset)) / (totalAssets + 1)
     ///
     /// # Arguments
     ///
@@ -513,16 +529,26 @@ impl Vault {
         if assets == 0 {
             return 0;
         }
+
+        // Assets being deposited
         let x = assets;
+
+        // Virtual offset = 10^offset
         let pow = 10_i128
             .checked_pow(Self::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // Effective total supply = totalSupply + virtual offset
         let y = Self::total_supply(e)
             .checked_add(pow)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // Effective total assets = totalAssets + 1 (prevents division by zero)
         let denominator = Self::total_assets(e)
             .checked_add(1_i128)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // (assets × (totalSupply + 10^offset)) / (totalAssets + 1)
         muldiv(e, x, y, denominator, rounding)
     }
 
@@ -531,8 +557,7 @@ impl Vault {
     /// assets.
     ///
     /// Implements the formula:
-    /// `shares.mulDiv(totalAssets() + 1, totalSupply() + 10 **
-    /// decimalsOffset(), rounding)`
+    /// shares = (assets × (totalAssets + 1)) / (totalSupply + 10^offset)
     ///
     /// # Arguments
     ///
@@ -552,16 +577,26 @@ impl Vault {
         if shares == 0 {
             return 0;
         }
+
+        // Shares being redeemed
         let x = shares;
+
+        // Effective total assets = totalAssets + 1 (prevents division by zero)
         let y = Self::total_assets(e)
             .checked_add(1_i128)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // Virtual offset = 10^offset
         let pow = 10_i128
             .checked_pow(Self::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // Effective total supply = totalSupply + virtual offset
         let denominator = Self::total_supply(e)
             .checked_add(pow)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // (assets × (totalAssets + 1)) / (totalSupply + 10^offset)
         muldiv(e, x, y, denominator, rounding)
     }
 
