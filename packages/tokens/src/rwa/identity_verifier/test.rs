@@ -2,12 +2,12 @@ extern crate std;
 
 use soroban_sdk::{
     contract, contractimpl, contracttype, map, symbol_short, testutils::Address as _, vec, Address,
-    Bytes, BytesN, Env, Map, String, Vec,
+    Bytes, BytesN, Env, Map, Vec,
 };
 
 use crate::rwa::{
     claim_issuer::ClaimIssuer,
-    identity_claims::{generate_claim_id, Claim, IdentityClaims},
+    identity_claims::{generate_claim_id, Claim},
     identity_verifier::storage::{
         claim_topics_and_issuers, identity_registry_storage, set_claim_topics_and_issuers,
         set_identity_registry_storage, validate_claim, verify_identity,
@@ -48,24 +48,12 @@ pub enum IdentityClaimsMockStorageKey {
 }
 
 #[contractimpl]
-impl IdentityClaims for MockIdentityClaims {
-    fn get_claim(e: &Env, claim_id: soroban_sdk::BytesN<32>) -> Claim {
+impl MockIdentityClaims {
+    pub fn get_claim(e: &Env, claim_id: soroban_sdk::BytesN<32>) -> Claim {
         e.storage().persistent().get(&IdentityClaimsMockStorageKey::Claim(claim_id)).unwrap()
     }
 
-    fn add_claim(
-        _e: &Env,
-        _topic: u32,
-        _scheme: u32,
-        _issuer: Address,
-        _signature: Bytes,
-        _data: Bytes,
-        _uri: String,
-    ) -> BytesN<32> {
-        unimplemented!()
-    }
-
-    fn get_claim_ids_by_topic(e: &Env, _topic: u32) -> Vec<BytesN<32>> {
+    pub fn get_claim_ids_by_topic(e: &Env, _topic: u32) -> Vec<BytesN<32>> {
         e.storage().persistent().get(&symbol_short!("claim_ids")).unwrap()
     }
 }
