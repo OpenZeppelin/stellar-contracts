@@ -132,6 +132,7 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// * `e` - Access to the Soroban environment.
     /// * `assets` - The amount of underlying assets to deposit.
     /// * `receiver` - The address that will receive the minted vault shares.
+    /// * `from` - The address that will provide the underlying assets.
     /// * `operator` - The address performing the deposit operation.
     ///
     /// # Errors
@@ -146,7 +147,8 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Events
     ///
-    /// * topics - `["deposit", operator: Address, receiver: Address]`
+    /// * topics - `["deposit", operator: Address, from: Address, receiver:
+    ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
     /// # Security Warning
@@ -154,7 +156,7 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
     ///
     /// Authorization for the operator must be handled at a higher level.
-    fn deposit(e: &Env, assets: i128, receiver: Address, operator: Address) -> i128;
+    fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128;
 
     /// Returns the maximum amount of vault shares that can be minted
     /// for the given receiver address (currently `i128::MAX`).
@@ -190,6 +192,7 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// * `e` - Access to the Soroban environment.
     /// * `shares` - The amount of vault shares to mint.
     /// * `receiver` - The address that will receive the minted vault shares.
+    /// * `from` - The address that will provide the underlying assets.
     /// * `operator` - The address performing the mint operation.
     ///
     /// # Errors
@@ -204,7 +207,8 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Events
     ///
-    /// * topics - `["deposit", operator: Address, receiver: Address]`
+    /// * topics - `["deposit", operator: Address, from: Address, receiver:
+    ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
     /// # Security Warning
@@ -212,7 +216,7 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
     ///
     /// Authorization for the operator must be handled at a higher level.
-    fn mint(e: &Env, shares: i128, receiver: Address, operator: Address) -> i128;
+    fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128;
 
     /// Returns the maximum amount of underlying assets that can be
     /// withdrawn by the given owner, limited by their vault share balance.
@@ -350,9 +354,11 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Deposit {
     #[topic]
-    pub sender: Address,
+    pub operator: Address,
     #[topic]
-    pub owner: Address,
+    pub from: Address,
+    #[topic]
+    pub receiver: Address,
     pub assets: i128,
     pub shares: i128,
 }
@@ -363,13 +369,28 @@ pub struct Deposit {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `sender` - The address that initiated the deposit transaction.
-/// * `owner` - The address that will own the vault shares being minted.
+/// * `operator` - The address that initiated the deposit transaction.
+/// * `from` - The address that will provide the underlying assets.
+/// * `receiver` - The address that will own the vault shares being minted.
 /// * `assets` - The amount of underlying assets being deposited into the vault.
 /// * `shares` - The amount of vault shares being minted in exchange for the
 ///   assets.
-pub fn emit_deposit(e: &Env, sender: &Address, owner: &Address, assets: i128, shares: i128) {
-    Deposit { sender: sender.clone(), owner: owner.clone(), assets, shares }.publish(e);
+pub fn emit_deposit(
+    e: &Env,
+    operator: &Address,
+    from: &Address,
+    receiver: &Address,
+    assets: i128,
+    shares: i128,
+) {
+    Deposit {
+        operator: operator.clone(),
+        from: from.clone(),
+        receiver: receiver.clone(),
+        assets,
+        shares,
+    }
+    .publish(e);
 }
 
 /// Event emitted when shares are exchanged back for underlying assets.
@@ -377,7 +398,7 @@ pub fn emit_deposit(e: &Env, sender: &Address, owner: &Address, assets: i128, sh
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Withdraw {
     #[topic]
-    pub sender: Address,
+    pub operator: Address,
     #[topic]
     pub receiver: Address,
     #[topic]
@@ -392,7 +413,7 @@ pub struct Withdraw {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `sender` - The address that initiated the withdrawal transaction.
+/// * `operator` - The address that initiated the withdrawal transaction.
 /// * `receiver` - The address that will receive the underlying assets being
 ///   withdrawn.
 /// * `owner` - The address that owns the vault shares being burned.
@@ -401,14 +422,14 @@ pub struct Withdraw {
 ///   assets.
 pub fn emit_withdraw(
     e: &Env,
-    sender: &Address,
+    operator: &Address,
     receiver: &Address,
     owner: &Address,
     assets: i128,
     shares: i128,
 ) {
     Withdraw {
-        sender: sender.clone(),
+        operator: operator.clone(),
         receiver: receiver.clone(),
         owner: owner.clone(),
         assets,
