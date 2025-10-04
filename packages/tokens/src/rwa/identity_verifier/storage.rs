@@ -26,7 +26,7 @@ pub enum IdentityVerifierStorageKey {
 #[allow(unused)]
 #[contractclient(name = "IdentityRegistryStorageClient")]
 trait IdentityRegistryStorage {
-    fn stored_identity(e: &Env, user_address: Address) -> Address;
+    fn stored_identity(e: &Env, account: Address) -> Address;
 }
 
 /// Returns the Claim Topics and Issuers contract linked to the token.
@@ -69,18 +69,18 @@ pub fn identity_registry_storage(e: &Env) -> Address {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `user_address` - The user address to verify.
+/// * `account` - The user address to verify.
 ///
 /// # Errors
 ///
 /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the user
 ///   address cannot be verified.
-pub fn verify_identity(e: &Env, user_address: &Address) {
+pub fn verify_identity(e: &Env, account: &Address) {
     let irs_addr = identity_registry_storage(e);
     let irs_client = IdentityRegistryStorageClient::new(e, &irs_addr);
 
-    let investor_onchain_id = irs_client.stored_identity(user_address);
-    let identity_client = IdentityClaimsClient::new(e, &investor_onchain_id);
+    let identity_addr = irs_client.stored_identity(account);
+    let identity_client = IdentityClaimsClient::new(e, &identity_addr);
 
     let cti_addr = claim_topics_and_issuers(e);
     let cti_client = ClaimTopicsAndIssuersClient::new(e, &cti_addr);
@@ -95,21 +95,18 @@ pub fn verify_identity(e: &Env, user_address: &Address) {
                 i as u32 == issuers.len() - 1,
             )
         });
+        let account_claim_ids = identity_client.get_claim_ids_by_topic(&claim_topic);
 
         for (issuer, claim_id, is_last) in issuers_with_claim_ids {
-            let claim: Claim = match identity_client.try_get_claim(&claim_id) {
-                Ok(Ok(claim)) => claim,
-                Err(_) | Ok(Err(_)) => {
-                    if is_last {
-                        panic_with_error!(e, RWAError::IdentityVerificationFailed)
-                    } else {
-                        continue;
-                    }
-                }
-            };
+            if account_claim_ids.contains(&claim_id) {
+                // Here, we can assume claim exists so no need to use `try_get_claim()`.
+                let claim: Claim = identity_client.get_claim(&claim_id);
 
-            if validate_claim(e, &claim, claim_topic, &issuer, &investor_onchain_id) {
-                break;
+                if validate_claim(e, &claim, claim_topic, &issuer, &identity_addr) {
+                    break;
+                } else if is_last {
+                    panic_with_error!(e, RWAError::IdentityVerificationFailed)
+                }
             } else if is_last {
                 panic_with_error!(e, RWAError::IdentityVerificationFailed)
             }
@@ -125,7 +122,7 @@ pub fn verify_identity(e: &Env, user_address: &Address) {
 /// * `claim` - The claim to validate.
 /// * `claim_topic` - The expected claim topic.
 /// * `issuer` - The issuer address.
-/// * `investor_onchain_id` - The onchain ID of the investor
+/// * `identity_addr` - The identity address of the investor.
 ///
 /// # Returns
 ///
@@ -135,11 +132,11 @@ pub fn validate_claim(
     claim: &Claim,
     claim_topic: u32,
     issuer: &Address,
-    investor_onchain_id: &Address,
+    identity_addr: &Address,
 ) -> bool {
     if claim.topic == claim_topic && claim.issuer == *issuer {
         let validation = ClaimIssuerClient::new(e, issuer).try_is_claim_valid(
-            investor_onchain_id,
+            identity_addr,
             &claim_topic,
             &claim.signature,
             &claim.data,
