@@ -176,14 +176,38 @@ fn remove_signer_not_found_fails() {
 }
 
 #[test]
-fn remove_signer_last_one_success() {
+#[should_panic(expected = "Error(Contract, #2004)")]
+fn remove_signer_last_one_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     let rule = setup_test_rule(&e, &address);
 
     e.as_contract(&address, || {
-        // Remove all signers one by one
+        // Remove first signer - should succeed (still have one left)
+        let signer1 = rule.signers.get(0).unwrap();
+        remove_signer(&e, rule.id, &signer1);
+
+        // Try to remove last signer - should fail with NoSignersAndPolicies
+        let signer2 = rule.signers.get(1).unwrap();
+        remove_signer(&e, rule.id, &signer2);
+    });
+}
+
+#[test]
+fn remove_signer_with_policy_present_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let policy_address = e.register(MockPolicyContract, ());
+
+    let rule = setup_test_rule(&e, &address);
+
+    e.as_contract(&address, || {
+        // Add a policy first
+        let install_param: Val = Val::from_void().into();
+        add_policy(&e, rule.id, &policy_address, install_param);
+
+        // Now we can remove all signers because we have a policy
         let signer1 = rule.signers.get(0).unwrap();
         let signer2 = rule.signers.get(1).unwrap();
 
@@ -192,6 +216,7 @@ fn remove_signer_last_one_success() {
 
         let updated_rule = get_context_rule(&e, rule.id);
         assert_eq!(updated_rule.signers.len(), 0);
+        assert_eq!(updated_rule.policies.len(), 1);
     });
 }
 
@@ -298,6 +323,55 @@ fn remove_policy_not_found_fails() {
 
     e.as_contract(&address, || {
         remove_policy(&e, rule.id, &policy_address); // Policy not in rule
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2004)")]
+fn remove_policy_last_one_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let policy_address = e.register(MockPolicyContract, ());
+
+    e.as_contract(&address, || {
+        // Create a rule with only a policy, no signers
+        let signers = Vec::new(&e);
+        let mut policies_map = Map::new(&e);
+        policies_map.set(policy_address.clone(), Val::from_void().into());
+
+        let rule = add_context_rule(
+            &e,
+            &ContextRuleType::Default,
+            &String::from_str(&e, "policy_only_rule"),
+            None,
+            &signers,
+            &policies_map,
+        );
+
+        // Try to remove the only policy - should fail with NoSignersAndPolicies
+        remove_policy(&e, rule.id, &policy_address);
+    });
+}
+
+#[test]
+fn remove_policy_with_signers_present_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let policy_address = e.register(MockPolicyContract, ());
+
+    let rule = setup_test_rule(&e, &address);
+
+    e.as_contract(&address, || {
+        // Add a policy
+        let install_param: Val = Val::from_void().into();
+        add_policy(&e, rule.id, &policy_address, install_param);
+
+        // Remove the policy - should succeed because we still have signers
+        remove_policy(&e, rule.id, &policy_address);
+
+        let updated_rule = get_context_rule(&e, rule.id);
+        assert_eq!(updated_rule.policies.len(), 0);
+        assert_eq!(updated_rule.signers.len(), 2); // Still have signers
     });
 }
 

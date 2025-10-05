@@ -14,8 +14,6 @@ use crate::rwa::{
 pub enum DataKey {
     /// Maps ComplianceHook -> Vec<Address> for registered modules
     HookModules(ComplianceHook),
-    /// Existence check for a module registered for a specific hook type.
-    ModuleRegistered(ComplianceHook, Address),
 }
 
 // ################## QUERY STATE ##################
@@ -60,18 +58,8 @@ pub fn get_modules_for_hook(e: &Env, hook: ComplianceHook) -> Vec<Address> {
 ///
 /// `true` if the module is registered for the hook, `false` otherwise.
 pub fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool {
-    let existence_key = DataKey::ModuleRegistered(hook, module);
-    match e.storage().persistent().get::<_, ()>(&existence_key) {
-        Some(_) => {
-            e.storage().persistent().extend_ttl(
-                &existence_key,
-                COMPLIANCE_TTL_THRESHOLD,
-                COMPLIANCE_EXTEND_AMOUNT,
-            );
-            true
-        }
-        None => false,
-    }
+    let modules = get_modules_for_hook(e, hook);
+    modules.iter().any(|m| m == module)
 }
 
 // ################## CHANGE STATE ##################
@@ -109,18 +97,12 @@ pub fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> b
 /// security risks as it could allow unauthorized module registration.
 pub fn add_module_to(e: &Env, hook: ComplianceHook, module: Address) {
     // Check if module is already registered
-    let existence_key = DataKey::ModuleRegistered(hook.clone(), module.clone());
-    if e.storage().persistent().get::<_, ()>(&existence_key).is_some() {
-        e.storage().persistent().extend_ttl(
-            &existence_key,
-            COMPLIANCE_TTL_THRESHOLD,
-            COMPLIANCE_EXTEND_AMOUNT,
-        );
+    let mut modules = get_modules_for_hook(e, hook.clone());
+
+    // Check if module is already registered
+    if modules.iter().any(|m| m == module) {
         panic_with_error!(e, ComplianceError::ModuleAlreadyRegistered);
     }
-
-    // Get the modules for this hook
-    let mut modules = get_modules_for_hook(e, hook.clone());
 
     // Check the bound
     if modules.len() >= MAX_MODULES {
@@ -131,7 +113,6 @@ pub fn add_module_to(e: &Env, hook: ComplianceHook, module: Address) {
     let key = DataKey::HookModules(hook.clone());
     modules.push_back(module.clone());
     e.storage().persistent().set(&key, &modules);
-    e.storage().persistent().set(&existence_key, &());
 
     // Emit event
     emit_module_added(e, hook, module);
@@ -165,26 +146,21 @@ pub fn add_module_to(e: &Env, hook: ComplianceHook, module: Address) {
 /// Using this function in public-facing methods creates significant
 /// security risks as it could allow unauthorized module removal.
 pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
+    // Get the modules for this hook
+    let mut modules = get_modules_for_hook(e, hook.clone());
+
     // Check if module is registered
-    let existence_key = DataKey::ModuleRegistered(hook.clone(), module.clone());
-    if e.storage().persistent().get::<_, ()>(&existence_key).is_none() {
+    if !modules.iter().any(|m| m == module) {
         panic_with_error!(e, ComplianceError::ModuleNotRegistered);
     }
 
-    // Get the modules for this hook
-    let key = DataKey::HookModules(hook.clone());
-    let mut modules: Vec<Address> =
-        e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
-
-    // Remove the module
+    // Remove the module from the list
     let index = modules.iter().position(|x| x == module).expect("module exists") as u32;
     modules.remove(index);
 
     // Update storage
+    let key = DataKey::HookModules(hook.clone());
     e.storage().persistent().set(&key, &modules);
-
-    let existence_key = DataKey::ModuleRegistered(hook.clone(), module.clone());
-    e.storage().persistent().remove(&existence_key);
 
     // Emit event
     emit_module_removed(e, hook, module);

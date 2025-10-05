@@ -366,7 +366,11 @@ pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signatures: &Signatur
         match signer {
             Signer::Delegated(verifier, key_data) => {
                 let sig_payload = Bytes::from_array(e, &signature_payload.to_bytes().to_array());
-                if !VerifierClient::new(e, &verifier).verify(&sig_payload, &key_data, &sig_data) {
+                if !VerifierClient::new(e, &verifier).verify(
+                    &sig_payload,
+                    &key_data.into_val(e),
+                    &sig_data.into_val(e),
+                ) {
                     panic_with_error!(e, SmartAccountError::DelegatedVerificationFailed)
                 }
             }
@@ -783,8 +787,15 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 ///
 /// # Security Warning
 ///
-/// This function modifies storage without requiring authorization. Ensure
-/// proper access control is implemented at the contract level.
+/// * **Threshold Policy Consideration:** If the ContextRule contains a
+///   threshold-based policy (e.g., simple_threshold), adding signers may
+///   silently weaken the security guarantee. For example, a strict N-of-N
+///   multisig becomes an N-of-(N+M) multisig after adding M signers. **Always
+///   update the policy threshold AFTER adding signers** to maintain the desired
+///   security level, especially for N-of-N multisig configurations.
+///
+/// * This function modifies storage without requiring authorization. Ensure
+///   proper access control is implemented at the contract level.
 pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
     let rule = get_context_rule(e, id);
     let mut signers = rule.signers.clone();
@@ -827,20 +838,25 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
 ///
 /// # Security Warning
 ///
-/// This function modifies storage without requiring authorization. Ensure
-/// proper access control is implemented at the contract level.
+/// * **Threshold Policy Consideration:** If the ContextRule contains a
+///   threshold-based policy (e.g., simple_threshold), removing signers may
+///   cause a denial of service if the remaining signers fall below the policy's
+///   threshold. **Always update the policy threshold BEFORE removing signers**
+///   to ensure the threshold remains achievable with the remaining signer set.
+///
+/// * This function modifies storage without requiring authorization. Ensure
+///   proper access control is implemented at the contract level.
 pub fn remove_signer(e: &Env, id: u32, signer: &Signer) {
-    let signers_key = SmartAccountStorageKey::Signers(id);
-    // Don't extend TTL here since we set this key later in the same function
-    let mut signers: Vec<Signer> = e
-        .storage()
-        .persistent()
-        .get(&signers_key)
-        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+    let rule = get_context_rule(e, id);
+    let mut signers = rule.signers.clone();
 
     // Find and remove the signer
     if let Some(pos) = signers.iter().rposition(|s| s == *signer) {
         signers.remove(pos as u32);
+
+        // Validate that the rule still has at least one signer or one policy
+        validate_signers_and_policies(e, &signers, &rule.policies);
+
         e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
         // Emit event
@@ -932,10 +948,14 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
 
     // Find and remove the policy
     if let Some(pos) = policies.iter().rposition(|p| p == *policy) {
+        policies.remove(pos as u32);
+
+        // Validate that the rule still has at least one signer or one policy
+        validate_signers_and_policies(e, &rule.signers, &policies);
+
         // Uninstall the policy
         PolicyClient::new(e, policy).uninstall(&rule, &e.current_contract_address());
 
-        policies.remove(pos as u32);
         e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
 
         // Emit event
