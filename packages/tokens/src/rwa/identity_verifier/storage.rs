@@ -132,6 +132,7 @@ pub fn validate_claim(
         let validation = ClaimIssuerClient::new(e, issuer).try_is_claim_valid(
             investor_onchain_id,
             &claim_topic,
+            &claim.scheme,
             &claim.signature,
             &claim.data,
         );
