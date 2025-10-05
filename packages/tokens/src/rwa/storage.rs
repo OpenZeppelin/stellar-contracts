@@ -217,7 +217,7 @@ impl RWA {
 
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        compliance_client.transferred(from, to, &amount);
+        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
 
         emit_transfer(e, from, to, amount);
     }
@@ -266,7 +266,8 @@ impl RWA {
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
 
-        let can_create: bool = compliance_client.can_create(to, &amount);
+        let can_create: bool =
+            compliance_client.can_create(to, &amount, &e.current_contract_address());
 
         if !can_create {
             panic_with_error!(e, RWAError::MintNotCompliant);
@@ -274,7 +275,7 @@ impl RWA {
 
         Base::update(e, None, Some(to), amount);
 
-        compliance_client.created(to, &amount);
+        compliance_client.created(to, &amount, &e.current_contract_address());
 
         emit_mint(e, to, amount);
     }
@@ -324,7 +325,7 @@ impl RWA {
 
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        compliance_client.destroyed(user_address, &amount);
+        compliance_client.destroyed(user_address, &amount, &e.current_contract_address());
 
         emit_burn(e, user_address, amount);
     }
@@ -629,7 +630,8 @@ impl RWA {
         // Validate compliance rules for the transfer
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        let can_transfer: bool = compliance_client.can_transfer(from, to, &amount);
+        let can_transfer: bool =
+            compliance_client.can_transfer(from, to, &amount, &e.current_contract_address());
 
         if !can_transfer {
             panic_with_error!(e, RWAError::TransferNotCompliant);
@@ -637,7 +639,7 @@ impl RWA {
 
         Base::update(e, Some(from), Some(to), amount);
 
-        compliance_client.transferred(from, to, &amount);
+        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
 
         emit_transfer(e, from, to, amount);
     }
