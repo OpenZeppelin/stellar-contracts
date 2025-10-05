@@ -124,6 +124,7 @@ pub enum SmartAccountStorageKey {
     Meta(u32),
     /// Storage key for the next available context rule ID.
     NextId,
+    /// Storage key defining the fingerprint each context rule.
     Fingerprint(BytesN<32>),
 }
 

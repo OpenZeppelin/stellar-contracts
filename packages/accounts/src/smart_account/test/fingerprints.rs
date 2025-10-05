@@ -149,8 +149,7 @@ fn compute_fingerprint_same_valid_until_same_fingerprint() {
     e.as_contract(&address, || {
         let fp1 = compute_fingerprint(&e, &context_type, &signers, &policies);
         let fp2 = compute_fingerprint(&e, &context_type, &signers, &policies);
-        assert_eq!(fp1, fp2); // Should be equal since valid_until is not part
-                              // of fingerprint
+        assert_eq!(fp1, fp2);
     });
 }
 
