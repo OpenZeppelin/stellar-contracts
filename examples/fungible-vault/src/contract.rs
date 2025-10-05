@@ -91,14 +91,14 @@ impl FungibleVault for ExampleContract {
         Vault::preview_redeem(e, shares)
     }
 
-    fn deposit(e: &Env, assets: i128, receiver: Address, operator: Address) -> i128 {
+    fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128 {
         operator.require_auth();
-        Vault::deposit(e, assets, receiver, operator)
+        Vault::deposit(e, assets, receiver, from, operator)
     }
 
-    fn mint(e: &Env, shares: i128, receiver: Address, operator: Address) -> i128 {
+    fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128 {
         operator.require_auth();
-        Vault::mint(e, shares, receiver, operator)
+        Vault::mint(e, shares, receiver, from, operator)
     }
 
     fn withdraw(

@@ -128,9 +128,9 @@ pub fn get_all_documents(e: &Env) -> Vec<(BytesN<32>, Document)> {
     let last_bucket = (count - 1) / BUCKET_SIZE;
 
     for bucket_idx in 0..=last_bucket {
+        let bucket_key = DocumentStorageKey::DocumentBucket(bucket_idx);
         let bucket: Vec<(BytesN<32>, Document)> =
-            get_persistent_entry(e, &DocumentStorageKey::DocumentBucket(bucket_idx))
-                .unwrap_or(Vec::new(e));
+            e.storage().persistent().get(&bucket_key).unwrap_or_else(|| Vec::new(e));
 
         documents.append(&bucket);
     }

@@ -4,6 +4,52 @@
 //! signers have different voting weights, and a minimum total weight threshold
 //! must be reached for authorization.
 //!
+//! # Security Warning: Signer Set Divergence
+//!
+//! This policy stores signer weights and a threshold value that are validated
+//! at installation time. However, the policy is **NOT automatically notified**
+//! when signers are added or removed from the parent ContextRule. This creates
+//! a state divergence that can lead to:
+//!
+//! ## Denial of Service
+//!
+//! If signers are removed from the ContextRule after policy installation, the
+//! total available weight may fall below the stored threshold. This makes it
+//! **impossible to meet the weight requirement**, permanently blocking any
+//! actions governed by this policy until weights are manually updated.
+//!
+//! **Example:** A rule with signers A(100), B(75), C(50) and threshold=150.
+//! If signer A is removed, only 125 weight remains, making the threshold of 150
+//! impossible to reach.
+//!
+//! ## Unintentional Security Degradation
+//!
+//! If signers are added to the ContextRule after policy installation, but their
+//! weights are not configured in the policy, they contribute 0 weight. This can
+//! create confusion about the actual security level. Additionally, if weights
+//! are later added for these signers without adjusting the threshold, the
+//! security guarantee may silently weaken.
+//!
+//! **Example:** A 150-of-250 weighted multisig. If a new signer with weight 100
+//! is added, it becomes 150-of-350, reducing the required approval from 60% to
+//! 43% of total weight.
+//!
+//! ## Required Administrator Actions
+//!
+//! When modifying signers in a ContextRule with this policy:
+//!
+//! 1. **Review current weights** using `get_signer_weights()` and threshold
+//!    using `get_threshold()`
+//! 2. **Before removing signers**: Update weights using `set_signer_weight()`
+//!    or adjust threshold using `set_threshold()` to ensure it remains
+//!    achievable
+//! 3. **After adding signers**: Set weights for new signers using
+//!    `set_signer_weight()` and adjust threshold if needed to maintain security
+//!    level
+//!
+//! **Failure to follow this process may result in permanent DoS or silent
+//! security degradation.**
+//!
 //! ## Example Usage
 //!
 //! ```rust,ignore
@@ -55,6 +101,8 @@ pub enum WeightedThresholdError {
     InvalidThreshold = 2211,
     /// A mathematical operation would overflow.
     MathOverflow = 2212,
+    /// The transaction is not allowed by this policy.
+    NotAllowed = 2213,
 }
 
 /// Storage keys for weighted threshold policy data.
@@ -220,6 +268,13 @@ pub fn can_enforce(
 /// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
 ///
+/// # Errors
+///
+/// * [`WeightedThresholdError::SmartAccountNotInstalled`] - When the smart
+///   account does not have a weighted threshold policy installed.
+/// * [`WeightedThresholdError::NotAllowed`] - When the weight threshold is not
+///   met.
+///
 /// # Events
 ///
 /// * topics - `["policy_enforced", smart_account: Address]`
@@ -235,7 +290,15 @@ pub fn enforce(
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    if can_enforce(e, context, authenticated_signers, context_rule, smart_account) {
+    let key = WeightedThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
+    let params: WeightedThresholdAccountParams =
+        e.storage().persistent().get(&key).unwrap_or_else(|| {
+            panic_with_error!(e, WeightedThresholdError::SmartAccountNotInstalled)
+        });
+
+    let total_weight = calculate_weight(e, authenticated_signers, context_rule, smart_account);
+
+    if total_weight >= params.threshold {
         // emit event
         WeightedPolicyEnforced {
             smart_account: smart_account.clone(),
@@ -244,11 +307,20 @@ pub fn enforce(
             authenticated_signers: authenticated_signers.clone(),
         }
         .publish(e);
+    } else {
+        panic_with_error!(e, WeightedThresholdError::NotAllowed)
     }
 }
 
 /// Sets the threshold value for a smart account's weighted threshold policy.
 /// Requires authorization from the smart account.
+///
+/// # Security Warning
+///
+/// **Call this function when modifying the signer set** to maintain the desired
+/// security level and avoid DoS or security degradation. Update BEFORE removing
+/// signers to ensure the threshold remains achievable, or AFTER adding signers
+/// to maintain the intended approval percentage.
 ///
 /// # Arguments
 ///
@@ -291,6 +363,12 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
 /// Sets the weight for a specific signer in the weighted threshold policy.
 /// Requires authorization from the smart account.
 ///
+/// # Security Warning
+///
+/// **Call this function AFTER adding new signers** to the ContextRule to assign
+/// them appropriate weights. Signers without configured weights contribute 0
+/// weight, which may create confusion about the actual security level.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
@@ -303,6 +381,8 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
 ///
 /// * [`WeightedThresholdError::SmartAccountNotInstalled`] - When the smart
 ///   account does not have a weighted threshold policy installed.
+/// * [`WeightedThresholdError::InvalidThreshold`] - When the threshold would
+///   exceed the new total weight.
 pub fn set_signer_weight(
     e: &Env,
     signer: &Signer,
@@ -333,6 +413,14 @@ pub fn set_signer_weight(
 
 /// Installs the weighted threshold policy on a smart account.
 /// Requires authorization from the smart account.
+///
+/// # Security Warning
+///
+/// After installation, signer weights and threshold are **NOT automatically
+/// updated** when signers are added or removed from the ContextRule.
+/// Administrators must manually call `set_signer_weight()` and
+/// `set_threshold()` when modifying the signer set to avoid DoS or security
+/// degradation. See module-level documentation for details.
 ///
 /// # Arguments
 ///

@@ -146,6 +146,20 @@ fn extract_from_bytes_too_many_bytes() {
 }
 
 #[test]
+fn extract_from_bytes_less_than_n_bytes() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let data = Bytes::from_array(&e, &[1, 2, 3, 4]);
+
+        // Try to extract more bytes than N allows
+        let result: Option<BytesN<4>> = extract_from_bytes(&e, &data, 0..3);
+        assert!(result.is_none());
+    });
+}
+
+#[test]
 fn extract_from_bytes_empty_range() {
     let e = Env::default();
     let address = e.register(MockContract, ());
