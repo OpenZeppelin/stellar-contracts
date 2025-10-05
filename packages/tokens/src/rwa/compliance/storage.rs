@@ -180,7 +180,9 @@ pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
 /// * `from` - The address that sent the tokens.
 /// * `to` - The address that received the tokens.
 /// * `amount` - The amount of tokens transferred.
-/// * `contract` - The address of the contract that is performing the transfer.
+/// * `token` - The address of the token contract that is performing the
+///   transfer.
+/// *
 ///
 /// # Errors
 ///
@@ -189,14 +191,14 @@ pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
 /// # Cross-Contract Calls
 ///
 /// Invokes `on_transfer(from, to, amount)` on each registered module.
-pub fn transferred(e: &Env, from: Address, to: Address, amount: i128, contract: Address) {
-    require_auth_from_bound_contract(e, &contract);
+pub fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Address) {
+    require_auth_from_bound_token(e, &token);
 
     let modules = get_modules_for_hook(e, ComplianceHook::Transferred);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        client.on_transfer(&from, &to, &amount, &contract);
+        client.on_transfer(&from, &to, &amount, &token);
     }
 }
 
@@ -210,7 +212,7 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128, contract: 
 /// * `e` - Access to the Soroban environment.
 /// * `to` - The address that received the newly created tokens.
 /// * `amount` - The amount of tokens created.
-/// * `contract` - The address of the contract that is performing the mint.
+/// * `token` - The address of the token contract that is performing the mint.
 ///
 /// # Errors
 ///
@@ -219,14 +221,14 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128, contract: 
 /// # Cross-Contract Calls
 ///
 /// Invokes `on_created(to, amount)` on each registered module.
-pub fn created(e: &Env, to: Address, amount: i128, contract: Address) {
-    require_auth_from_bound_contract(e, &contract);
+pub fn created(e: &Env, to: Address, amount: i128, token: Address) {
+    require_auth_from_bound_token(e, &token);
 
     let modules = get_modules_for_hook(e, ComplianceHook::Created);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        client.on_created(&to, &amount, &contract);
+        client.on_created(&to, &amount, &token);
     }
 }
 
@@ -240,7 +242,7 @@ pub fn created(e: &Env, to: Address, amount: i128, contract: Address) {
 /// * `e` - Access to the Soroban environment.
 /// * `from` - The address from which tokens were destroyed.
 /// * `amount` - The amount of tokens destroyed.
-/// * `contract` - The address of the contract that is performing the burn.
+/// * `token` - The address of the token contract that is performing the burn.
 ///
 /// # Errors
 ///
@@ -249,19 +251,19 @@ pub fn created(e: &Env, to: Address, amount: i128, contract: Address) {
 /// # Cross-Contract Calls
 ///
 /// Invokes `on_destroyed(from, amount)` on each registered module.
-pub fn destroyed(e: &Env, from: Address, amount: i128, contract: Address) {
-    require_auth_from_bound_contract(e, &contract);
+pub fn destroyed(e: &Env, from: Address, amount: i128, token: Address) {
+    require_auth_from_bound_token(e, &token);
 
     let modules = get_modules_for_hook(e, ComplianceHook::Destroyed);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        client.on_destroyed(&from, &amount, &contract);
+        client.on_destroyed(&from, &amount, &token);
     }
 }
 
 /// Executes all modules registered for the CanTransfer hook to validate a
-/// transfer. Returns
+/// transfer.
 ///
 /// Called during transfer validation to check if a transfer should be allowed.
 /// Only modules that have registered for the CanTransfer hook will be invoked.
@@ -273,7 +275,8 @@ pub fn destroyed(e: &Env, from: Address, amount: i128, contract: Address) {
 /// * `from` - The address attempting to send tokens.
 /// * `to` - The address that would receive tokens.
 /// * `amount` - The amount of tokens to be transferred.
-/// * `contract` - The address of the contract that is performing the transfer.
+/// * `token` - The address of the token contract that is performing the
+///   transfer.
 ///
 /// # Returns
 ///
@@ -284,12 +287,12 @@ pub fn destroyed(e: &Env, from: Address, amount: i128, contract: Address) {
 ///
 /// Invokes `can_transfer(from, to, amount)` on each registered module.
 /// Stops execution and returns `false` on the first module that rejects.
-pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, contract: Address) -> bool {
+pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
     let modules = get_modules_for_hook(e, ComplianceHook::CanTransfer);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        let result = client.can_transfer(&from, &to, &amount, &contract);
+        let result = client.can_transfer(&from, &to, &amount, &token);
 
         // If any module returns false, the entire check fails
         if !result {
@@ -313,7 +316,7 @@ pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, contract:
 /// * `e` - Access to the Soroban environment.
 /// * `to` - The address that would receive tokens.
 /// * `amount` - The amount of tokens to be transferred.
-/// * `contract` - The address of the contract that is performing the mint.
+/// * `token` - The address of the token contract that is performing the mint.
 ///
 /// # Returns
 ///
@@ -324,12 +327,12 @@ pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, contract:
 ///
 /// Invokes `can_create(to, amount)` on each registered module.
 /// Stops execution and returns `false` on the first module that rejects.
-pub fn can_create(e: &Env, to: Address, amount: i128, contract: Address) -> bool {
+pub fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
     let modules = get_modules_for_hook(e, ComplianceHook::CanCreate);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        let result = client.can_create(&to, &amount, &contract);
+        let result = client.can_create(&to, &amount, &token);
 
         // If any module returns false, the entire check fails
         if !result {
@@ -343,26 +346,26 @@ pub fn can_create(e: &Env, to: Address, amount: i128, contract: Address) -> bool
 
 // ################## HELPERS ##################
 
-/// Helper function to check if the contract is bound to this compliance
-/// contract and require authorization from the contract.
+/// Helper function to check if the token contract is bound to this compliance
+/// contract and require authorization from the token contract.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `contract` - The address of the contract to check.
+/// * `token` - The address of the token contract to check.
 ///
 /// # Errors
 ///
-/// * `ComplianceError::TokenNotBound` - If the contract is not bound to this
-///   compliance contract.
-pub fn require_auth_from_bound_contract(e: &Env, contract: &Address) {
+/// * `ComplianceError::TokenNotBound` - If the token contract is not bound to
+///   this compliance contract.
+pub fn require_auth_from_bound_token(e: &Env, token: &Address) {
     // Only the token contract should call this function
-    contract.require_auth();
+    token.require_auth();
 
-    // Check if the contract is bound to this compliance contract
+    // Check if the token contract is bound to this compliance contract
     let bound_tokens = linked_tokens(e);
 
-    if !bound_tokens.contains(contract) {
+    if !bound_tokens.contains(token) {
         panic_with_error!(e, ComplianceError::TokenNotBound);
     }
 }
