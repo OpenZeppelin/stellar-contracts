@@ -25,10 +25,11 @@
 /// When removing a document, the last document in the list is moved to fill
 /// the gap left by the removed document. This keeps storage compact and
 /// ensures O(1) removal operations.
-use soroban_sdk::{contracttype, panic_with_error, BytesN, Env, String, Vec};
+use soroban_sdk::{contracttype, panic_with_error, BytesN, Env, String, TryFromVal, Val, Vec};
 
 use super::{
-    emit_document_removed, emit_document_updated, DocumentError, BUCKET_SIZE, MAX_DOCUMENTS,
+    emit_document_removed, emit_document_updated, DocumentError, BUCKET_SIZE,
+    DOCUMENT_EXTEND_AMOUNT, DOCUMENT_TTL_THRESHOLD, MAX_DOCUMENTS,
 };
 
 /// Represents a document with its metadata.
@@ -63,7 +64,7 @@ pub enum DocumentStorageKey {
 ///
 /// * `e` - The Soroban environment.
 pub fn get_document_count(e: &Env) -> u32 {
-    e.storage().persistent().get(&DocumentStorageKey::DocumentCount).unwrap_or(0)
+    get_persistent_entry(e, &DocumentStorageKey::DocumentCount).unwrap_or(0)
 }
 
 /// Retrieves the details of a document with a known name.
@@ -78,11 +79,7 @@ pub fn get_document_count(e: &Env) -> u32 {
 /// * [`DocumentError::DocumentNotFound`] - If no document exists with the given
 ///   name
 pub fn get_document(e: &Env, name: &BytesN<32>) -> Document {
-    let index_key = DocumentStorageKey::DocumentIndex(name.clone());
-    let index: u32 = e
-        .storage()
-        .persistent()
-        .get(&index_key)
+    let index: u32 = get_persistent_entry(e, &DocumentStorageKey::DocumentIndex(name.clone()))
         .unwrap_or_else(|| panic_with_error!(e, DocumentError::DocumentNotFound));
 
     let (_, document) = get_document_by_index(e, index);
@@ -108,9 +105,9 @@ pub fn get_document_by_index(e: &Env, index: u32) -> (BytesN<32>, Document) {
     let bucket_index = index / BUCKET_SIZE;
     let offset_in_bucket = index % BUCKET_SIZE;
 
-    let bucket_key = DocumentStorageKey::DocumentBucket(bucket_index);
     let bucket: Vec<(BytesN<32>, Document)> =
-        e.storage().persistent().get(&bucket_key).expect("bucket to be present");
+        get_persistent_entry(e, &DocumentStorageKey::DocumentBucket(bucket_index))
+            .expect("bucket to be present");
 
     bucket.get(offset_in_bucket).expect("document entry to be present in bucket")
 }
@@ -178,6 +175,12 @@ pub fn set_document(e: &Env, name: &BytesN<32>, uri: &String, document_hash: &By
     let existing_index: Option<u32> = e.storage().persistent().get(&index_key);
 
     if let Some(index) = existing_index {
+        // Extend TTL
+        e.storage().persistent().extend_ttl(
+            &index_key,
+            DOCUMENT_TTL_THRESHOLD,
+            DOCUMENT_EXTEND_AMOUNT,
+        );
         // Update existing document in its bucket
         let bucket_index = index / BUCKET_SIZE;
         let offset_in_bucket = index % BUCKET_SIZE;
@@ -199,7 +202,7 @@ pub fn set_document(e: &Env, name: &BytesN<32>, uri: &String, document_hash: &By
         let bucket_index = count / BUCKET_SIZE;
         let bucket_key = DocumentStorageKey::DocumentBucket(bucket_index);
         let mut bucket: Vec<(BytesN<32>, Document)> =
-            e.storage().persistent().get(&bucket_key).unwrap_or_else(|| Vec::new(e));
+            e.storage().persistent().get(&bucket_key).unwrap_or(Vec::new(e));
 
         bucket.push_back((name.clone(), document.clone()));
         e.storage().persistent().set(&bucket_key, &bucket);
@@ -290,4 +293,19 @@ pub fn remove_document(e: &Env, name: &BytesN<32>) {
     e.storage().persistent().set(&DocumentStorageKey::DocumentCount, &last_index);
 
     emit_document_removed(e, name);
+}
+
+// ################## HELPERS ##################
+
+/// Helper function that tries to retrieve a persistent storage value and
+/// extend its TTL if the entry exists.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban reference.
+/// * `key` - The key required to retrieve the underlying storage.
+fn get_persistent_entry<T: TryFromVal<Env, Val>>(e: &Env, key: &DocumentStorageKey) -> Option<T> {
+    e.storage().persistent().get::<_, T>(key).inspect(|_| {
+        e.storage().persistent().extend_ttl(key, DOCUMENT_TTL_THRESHOLD, DOCUMENT_EXTEND_AMOUNT);
+    })
 }

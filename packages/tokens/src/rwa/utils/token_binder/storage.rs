@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, TryFromVal, Val, Vec};
 
 use crate::rwa::utils::token_binder::{
     emit_token_bound, emit_token_unbound, TokenBinderError, BUCKET_SIZE, MAX_TOKENS,
@@ -29,7 +29,7 @@ pub enum TokenBinderStorageKey {
 ///
 /// * `e` - The Soroban environment.
 pub fn linked_token_count(e: &Env) -> u32 {
-    e.storage().persistent().get(&TokenBinderStorageKey::TotalCount).unwrap_or(0)
+    get_persistent_entry(e, &TokenBinderStorageKey::TotalCount).unwrap_or(0)
 }
 
 /// Returns a token address by its global index.
@@ -51,19 +51,9 @@ pub fn get_token_by_index(e: &Env, index: u32) -> Address {
     let bucket_index = index / BUCKET_SIZE;
     let offset_in_bucket = index % BUCKET_SIZE;
 
-    let key = TokenBinderStorageKey::TokenBucket(bucket_index);
-    let bucket: Vec<Address> = e
-        .storage()
-        .persistent()
-        .get(&key)
-        .inspect(|_| {
-            e.storage().persistent().extend_ttl(
-                &key,
-                TOKEN_BINDER_TTL_THRESHOLD,
-                TOKEN_BINDER_EXTEND_AMOUNT,
-            )
-        })
-        .expect("bucket to be present");
+    let bucket: Vec<Address> =
+        get_persistent_entry(e, &TokenBinderStorageKey::TokenBucket(bucket_index))
+            .expect("bucket to be present");
 
     bucket.get(offset_in_bucket).expect("value in bucket to be present")
 }
@@ -90,9 +80,9 @@ pub fn get_token_index(e: &Env, token: &Address) -> u32 {
     }
     let last_bucket = (count - 1) / BUCKET_SIZE;
     for bucket_idx in 0..=last_bucket {
-        let key = TokenBinderStorageKey::TokenBucket(bucket_idx);
         let bucket: Vec<Address> =
-            e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
+            get_persistent_entry(e, &TokenBinderStorageKey::TokenBucket(bucket_idx))
+                .unwrap_or(Vec::new(e));
 
         if let Some(relative_index) = bucket.first_index_of(token) {
             return bucket_idx * BUCKET_SIZE + relative_index;
@@ -118,9 +108,9 @@ pub fn is_token_bound(e: &Env, token: &Address) -> bool {
     }
     let last_bucket = (count - 1) / BUCKET_SIZE;
     for bucket_idx in 0..=last_bucket {
-        let key = TokenBinderStorageKey::TokenBucket(bucket_idx);
         let bucket: Vec<Address> =
-            e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
+            get_persistent_entry(e, &TokenBinderStorageKey::TokenBucket(bucket_idx))
+                .unwrap_or(Vec::new(e));
         if bucket.contains(token.clone()) {
             return true;
         }
@@ -143,19 +133,9 @@ pub fn linked_tokens(e: &Env) -> Vec<Address> {
 
     let last_bucket = (count - 1) / BUCKET_SIZE;
     for bucket_idx in 0..=last_bucket {
-        let key = TokenBinderStorageKey::TokenBucket(bucket_idx);
-        let bucket: Vec<Address> = e
-            .storage()
-            .persistent()
-            .get(&key)
-            .inspect(|_| {
-                e.storage().persistent().extend_ttl(
-                    &key,
-                    TOKEN_BINDER_TTL_THRESHOLD,
-                    TOKEN_BINDER_EXTEND_AMOUNT,
-                )
-            })
-            .unwrap_or_else(|| Vec::new(e));
+        let bucket: Vec<Address> =
+            get_persistent_entry(e, &TokenBinderStorageKey::TokenBucket(bucket_idx))
+                .unwrap_or(Vec::new(e));
 
         tokens.append(&bucket);
     }
@@ -205,8 +185,7 @@ pub fn bind_token(e: &Env, token: &Address) {
 
     let bucket_index = count / BUCKET_SIZE;
     let key = TokenBinderStorageKey::TokenBucket(bucket_index);
-    let mut bucket: Vec<Address> =
-        e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
+    let mut bucket: Vec<Address> = e.storage().persistent().get(&key).unwrap_or(Vec::new(e));
 
     bucket.push_back(token.clone());
     e.storage().persistent().set(&key, &bucket);
@@ -278,8 +257,7 @@ pub fn bind_tokens(e: &Env, tokens: &Vec<Address>) {
     while i < tokens.len() {
         let bucket_index = count / BUCKET_SIZE;
         let key = TokenBinderStorageKey::TokenBucket(bucket_index);
-        let mut bucket: Vec<Address> =
-            e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
+        let mut bucket: Vec<Address> = e.storage().persistent().get(&key).unwrap_or(Vec::new(e));
 
         // Capacity left in this bucket
         let used = bucket.len();
@@ -350,7 +328,7 @@ pub fn unbind_token(e: &Env, token: &Address) {
         let token_offset = token_index % BUCKET_SIZE;
         let token_key = TokenBinderStorageKey::TokenBucket(token_bucket_index);
         let mut token_bucket: Vec<Address> =
-            e.storage().persistent().get(&token_key).unwrap_or_else(|| Vec::new(e));
+            e.storage().persistent().get(&token_key).unwrap_or(Vec::new(e));
         token_bucket.set(token_offset, last_token.clone());
         e.storage().persistent().set(&token_key, &token_bucket);
     }
@@ -359,7 +337,7 @@ pub fn unbind_token(e: &Env, token: &Address) {
     let last_bucket_index = last_index / BUCKET_SIZE;
     let last_key = TokenBinderStorageKey::TokenBucket(last_bucket_index);
     let mut last_bucket: Vec<Address> =
-        e.storage().persistent().get(&last_key).unwrap_or_else(|| Vec::new(e));
+        e.storage().persistent().get(&last_key).unwrap_or(Vec::new(e));
     // if empty pop_back returns None
     last_bucket.pop_back();
 
@@ -369,4 +347,26 @@ pub fn unbind_token(e: &Env, token: &Address) {
     e.storage().persistent().set(&TokenBinderStorageKey::TotalCount, &last_index);
 
     emit_token_unbound(e, token);
+}
+
+// ################## HELPERS ##################
+
+/// Helper function that tries to retrieve a persistent storage value and
+/// extend its TTL if the entry exists.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban reference.
+/// * `key` - The key required to retrieve the underlying storage.
+fn get_persistent_entry<T: TryFromVal<Env, Val>>(
+    e: &Env,
+    key: &TokenBinderStorageKey,
+) -> Option<T> {
+    e.storage().persistent().get::<_, T>(key).inspect(|_| {
+        e.storage().persistent().extend_ttl(
+            key,
+            TOKEN_BINDER_TTL_THRESHOLD,
+            TOKEN_BINDER_EXTEND_AMOUNT,
+        );
+    })
 }
