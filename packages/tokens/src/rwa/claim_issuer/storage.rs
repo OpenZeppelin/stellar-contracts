@@ -255,16 +255,12 @@ pub fn is_key_allowed_for_topic(
     if let Some(topic_keys) =
         e.storage().persistent().get::<_, Vec<SigningKey>>(&topics_storage_key)
     {
-        for key in topic_keys.iter() {
-            if key.public_key == *public_key && key.scheme == scheme {
-                e.storage().persistent().extend_ttl(
-                    &topics_storage_key,
-                    KEYS_TTL_THRESHOLD,
-                    KEYS_EXTEND_AMOUNT,
-                );
-                return true;
-            }
-        }
+        e.storage().persistent().extend_ttl(
+            &topics_storage_key,
+            KEYS_TTL_THRESHOLD,
+            KEYS_EXTEND_AMOUNT,
+        );
+        return topic_keys.iter().any(|key| key.public_key == *public_key && key.scheme == scheme);
     }
 
     false
