@@ -41,7 +41,11 @@
 //!
 //! - **Signature Verifiers**: Pre-built verifiers for Ed25519, Secp256k1, and
 //!   Secp256r1 schemes with a common `SignatureVerifier` trait structure
-//! - **Key Management**: Functions for topic-specific key authorization
+//! - **Key Management**: Functions for topic-specific key authorization with
+//!   registry tracking. Each public key is tied to a signature scheme, and a
+//!   signing key (public key + scheme) can be authorized to sign claims for a
+//!   specific topic and registry combination. The same signing key can be
+//!   authorized across multiple topics and registries independently.
 //! - **Claim Revocation**: Revocation tracking
 //!
 //! Implementors are free to use alternative structures for signature
@@ -309,7 +313,11 @@ pub enum ClaimIssuerError {
     KeyAlreadyAllowed = 352,
     /// The specified key was not found in the allowed keys.
     KeyNotFound = 353,
+    /// The claim issuer is not registered at the claim topics and issuers
+    /// registry.
     IssuerNotRegistered = 354,
+    /// The claim issuer is not allowed to sign claims about the specified
+    /// claim topic.
     ClaimTopicNotAllowed = 355,
     /// Maximum number of signing keys per topic exceeded.
     MaxKeysPerTopicExceeded = 356,

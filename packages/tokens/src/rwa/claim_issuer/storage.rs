@@ -409,18 +409,20 @@ pub fn remove_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, 
 
         // If no more registries, also remove the key from Topics mapping
         let topics_storage_key = ClaimIssuerStorageKey::Topics(claim_topic);
-        if let Some(mut topic_keys) =
-            e.storage().persistent().get::<_, Vec<SigningKey>>(&topics_storage_key)
-        {
-            if let Some(pos) = topic_keys.first_index_of(&signing_key) {
-                topic_keys.remove_unchecked(pos);
+        let mut topic_keys: Vec<SigningKey> = e
+            .storage()
+            .persistent()
+            .get(&topics_storage_key)
+            .expect("signing keys for claim topic must be present"); // user can't remove this
+                                                                     // storage entry alone
 
-                if topic_keys.is_empty() {
-                    e.storage().persistent().remove(&topics_storage_key);
-                } else {
-                    e.storage().persistent().set(&topics_storage_key, &topic_keys);
-                }
-            }
+        let pos = topic_keys.first_index_of(&signing_key).expect("key must be in topic keys");
+        topic_keys.remove_unchecked(pos);
+
+        if topic_keys.is_empty() {
+            e.storage().persistent().remove(&topics_storage_key);
+        } else {
+            e.storage().persistent().set(&topics_storage_key, &topic_keys);
         }
     } else {
         e.storage().persistent().set(&registries_key, &registries);
