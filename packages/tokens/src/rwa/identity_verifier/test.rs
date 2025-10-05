@@ -1,13 +1,13 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, map, symbol_short, testutils::Address as _, vec, Address, Bytes, Env,
-    Map, Vec,
+    contract, contractimpl, contracttype, map, symbol_short, testutils::Address as _, vec, Address,
+    Bytes, BytesN, Env, Map, Vec,
 };
 
 use crate::rwa::{
     claim_issuer::ClaimIssuer,
-    identity_claims::Claim,
+    identity_claims::{generate_claim_id, Claim},
     identity_verifier::storage::{
         claim_topics_and_issuers, identity_registry_storage, set_claim_topics_and_issuers,
         set_identity_registry_storage, validate_claim, verify_identity,
@@ -42,18 +42,19 @@ impl MockClaimTopicsAndIssuers {
 #[contract]
 pub struct MockIdentityClaims;
 
+#[contracttype]
+pub enum IdentityClaimsMockStorageKey {
+    Claim(BytesN<32>),
+}
+
 #[contractimpl]
 impl MockIdentityClaims {
-    pub fn get_claim(e: &Env, _claim_id: soroban_sdk::BytesN<32>) -> Claim {
-        let default = Claim {
-            topic: 1u32,
-            scheme: 1u32,
-            issuer: Address::generate(e),
-            signature: Bytes::from_array(e, &[1, 2, 3, 4]),
-            data: Bytes::from_array(e, &[5, 6, 7, 8]),
-            uri: soroban_sdk::String::from_str(e, "https://example.com"),
-        };
-        e.storage().persistent().get(&symbol_short!("claim")).unwrap_or(default)
+    pub fn get_claim(e: &Env, claim_id: soroban_sdk::BytesN<32>) -> Claim {
+        e.storage().persistent().get(&IdentityClaimsMockStorageKey::Claim(claim_id)).unwrap()
+    }
+
+    pub fn get_claim_ids_by_topic(e: &Env, _topic: u32) -> Vec<BytesN<32>> {
+        e.storage().persistent().get(&symbol_short!("claim_ids")).unwrap()
     }
 }
 
@@ -97,7 +98,11 @@ fn setup_verification_contracts(e: &Env) -> (Address, Address, Address, Address)
     });
     e.as_contract(&identity_claims, || {
         let claim = construct_claim(e, &issuer, 1);
-        e.storage().persistent().set(&symbol_short!("claim"), &claim);
+        let claim_id = generate_claim_id(e, &issuer, 1);
+        e.storage()
+            .persistent()
+            .set(&IdentityClaimsMockStorageKey::Claim(claim_id.clone()), &claim);
+        e.storage().persistent().set(&symbol_short!("claim_ids"), &Vec::from_array(e, [claim_id]));
     });
     e.as_contract(&cti, || {
         e.storage().persistent().set(&symbol_short!("issuers"), &vec![&e, issuer.clone()]);
@@ -277,10 +282,20 @@ fn verify_identity_success_with_multiple_issuers() {
                 .set(&symbol_short!("issuers"), &vec![&e, issuer1.clone(), issuer2.clone()]);
         });
 
-        // Set up claim for second issuer
         e.as_contract(&identity_claims, || {
-            let claim = construct_claim(&e, &issuer2, 1);
-            e.storage().persistent().set(&symbol_short!("claim"), &claim);
+            let claim1 = construct_claim(&e, &issuer2, 1);
+            let claim2 = construct_claim(&e, &issuer2, 1);
+            let id1 = generate_claim_id(&e, &issuer1, 1);
+            let id2 = generate_claim_id(&e, &issuer2, 1);
+            e.storage()
+                .persistent()
+                .set(&IdentityClaimsMockStorageKey::Claim(id1.clone()), &claim1);
+            e.storage()
+                .persistent()
+                .set(&IdentityClaimsMockStorageKey::Claim(id2.clone()), &claim2);
+            e.storage()
+                .persistent()
+                .set(&symbol_short!("claim_ids"), &Vec::from_array(&e, [id1, id2]));
         });
 
         set_identity_registry_storage(&e, &irs);
@@ -299,7 +314,7 @@ fn verify_identity_fails_all_issuers_invalid() {
     let user_address = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let (_identity_claims, issuer1, irs, cti) = setup_verification_contracts(&e);
+        let (identity_claims, issuer1, irs, cti) = setup_verification_contracts(&e);
         let issuer2 = e.register(MockClaimIssuer, ());
 
         // Both issuers return invalid claims
@@ -311,6 +326,57 @@ fn verify_identity_fails_all_issuers_invalid() {
         });
 
         // Update claim topics and issuers to include both
+        e.as_contract(&cti, || {
+            e.storage()
+                .persistent()
+                .set(&symbol_short!("issuers"), &vec![&e, issuer1.clone(), issuer2.clone()]);
+        });
+
+        e.as_contract(&identity_claims, || {
+            let claim1 = construct_claim(&e, &issuer2, 1);
+            let claim2 = construct_claim(&e, &issuer2, 1);
+            let id1 = generate_claim_id(&e, &issuer1, 1);
+            let id2 = generate_claim_id(&e, &issuer2, 1);
+            e.storage()
+                .persistent()
+                .set(&IdentityClaimsMockStorageKey::Claim(id1.clone()), &claim1);
+            e.storage()
+                .persistent()
+                .set(&IdentityClaimsMockStorageKey::Claim(id2.clone()), &claim2);
+            e.storage()
+                .persistent()
+                .set(&symbol_short!("claim_ids"), &Vec::from_array(&e, [id1, id2]));
+        });
+
+        set_identity_registry_storage(&e, &irs);
+        set_claim_topics_and_issuers(&e, &cti);
+
+        verify_identity(&e, &user_address);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #304)")]
+fn verify_identity_fails_no_matched_ids() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let user_address = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let (identity_claims, issuer1, irs, cti) = setup_verification_contracts(&e);
+        let issuer2 = e.register(MockClaimIssuer, ());
+        let issuer3 = e.register(MockClaimIssuer, ());
+
+        // Both issuers return invalid claims
+        e.as_contract(&identity_claims, || {
+            // set claim id from another issuer
+            let id3 = generate_claim_id(&e, &issuer3, 1);
+
+            e.storage().persistent().set(&symbol_short!("claim_ids"), &Vec::from_array(&e, [id3]));
+        });
+
+        // Update claim topics and issuers to include issuer1 and issuer2, but not
+        // issuer3
         e.as_contract(&cti, || {
             e.storage()
                 .persistent()
