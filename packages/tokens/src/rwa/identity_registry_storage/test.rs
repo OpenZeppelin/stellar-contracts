@@ -5,8 +5,8 @@ use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, Map, Str
 use super::{
     storage::{
         add_country_data_entries, add_identity, delete_country_data, get_country_data,
-        get_country_data_entries, get_identity, get_identity_profile, modify_country_data,
-        modify_identity, recover_identity, remove_identity, CountryData, CountryRelation,
+        get_country_data_entries, get_identity_profile, modify_country_data, modify_identity,
+        recover_identity, remove_identity, stored_identity, CountryData, CountryRelation,
         IdentityType, IndividualCountryRelation, OrganizationCountryRelation,
     },
     MAX_COUNTRY_ENTRIES,
@@ -36,7 +36,7 @@ fn add_identity_success() {
             &vec![&e, country_data.clone()],
         );
 
-        let stored_identity = get_identity(&e, &account);
+        let stored_identity = stored_identity(&e, &account);
         assert_eq!(stored_identity, identity);
 
         let profile = get_identity_profile(&e, &account);
@@ -100,7 +100,7 @@ fn modify_identity_success() {
         );
         modify_identity(&e, &account, &new_identity);
 
-        assert_eq!(get_identity(&e, &account), new_identity);
+        assert_eq!(stored_identity(&e, &account), new_identity);
     });
 }
 
@@ -139,7 +139,7 @@ fn get_identity_success() {
             &vec![&e, country_data.clone()],
         );
 
-        assert_eq!(get_identity(&e, &account), identity);
+        assert_eq!(stored_identity(&e, &account), identity);
     });
 }
 
@@ -151,7 +151,7 @@ fn get_identity_not_found() {
 
     e.as_contract(&contract_id, || {
         let account = Address::generate(&e);
-        get_identity(&e, &account);
+        stored_identity(&e, &account);
     });
 }
 
@@ -181,7 +181,7 @@ fn remove_identity_success() {
 
         remove_identity(&e, &account);
 
-        get_identity(&e, &account);
+        stored_identity(&e, &account);
     });
 }
 
@@ -675,7 +675,7 @@ fn recover_identity_success() {
         recover_identity(&e, &old_account, &new_account);
 
         // Verify identity is now linked to new account
-        assert_eq!(get_identity(&e, &new_account), identity);
+        assert_eq!(stored_identity(&e, &new_account), identity);
 
         // Verify identity profile is transferred
         let profile = get_identity_profile(&e, &new_account);
@@ -768,6 +768,6 @@ fn recover_identity_removes_old_account_identity() {
         recover_identity(&e, &old_account, &new_account);
 
         // Verify old account no longer has identity (should panic)
-        get_identity(&e, &old_account);
+        stored_identity(&e, &old_account);
     });
 }

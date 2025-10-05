@@ -78,7 +78,12 @@ impl IdentityRegistryStorage for IdentityRegistryContract {
     }
 
     fn stored_identity(e: &Env, account: Address) -> Address {
-        identity_storage::get_identity(e, &account)
+        identity_storage::stored_identity(e, &account)
+    }
+
+    #[only_role(operator, "manager")]
+    fn recover_identity(e: &Env, old_account: Address, new_account: Address, operator: Address) {
+        identity_storage::recover_identity(e, &old_account, &new_account);
     }
 }
 

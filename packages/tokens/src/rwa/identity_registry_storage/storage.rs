@@ -211,7 +211,7 @@ pub enum IRSStorageKey {
 ///
 /// * [`IRSError::IdentityNotFound`] - If no identity is found for the
 ///   `account`.
-pub fn get_identity(e: &Env, account: &Address) -> Address {
+pub fn stored_identity(e: &Env, account: &Address) -> Address {
     let key = IRSStorageKey::Identity(account.clone());
     get_persistent_entry(e, &key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound))
