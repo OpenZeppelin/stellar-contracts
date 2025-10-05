@@ -2,12 +2,15 @@ extern crate std;
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, vec, Address, Env};
 
-use crate::rwa::compliance::{
-    storage::{
-        add_module_to, can_create, can_transfer, created, destroyed, get_modules_for_hook,
-        is_module_registered, remove_module_from, transferred,
+use crate::rwa::{
+    compliance::{
+        storage::{
+            add_module_to, can_create, can_transfer, created, destroyed, get_modules_for_hook,
+            is_module_registered, remove_module_from, transferred,
+        },
+        ComplianceHook, MAX_MODULES,
     },
-    ComplianceHook, MAX_MODULES,
+    utils::token_binder::bind_token,
 };
 
 #[contract]
@@ -361,14 +364,14 @@ fn transferred_hook_execution_works() {
     let amount = 1000i128;
 
     e.as_contract(&contract_address, || {
+        // Bind token contract to compliance contract
+        bind_token(&e, &token_contract_address);
+
         // Add module to Transfer hook
         add_module_to(&e, ComplianceHook::Transferred, module_address.clone());
 
-        // Execute transferred hook - should not panic
+        // Execute transferred hook
         transferred(&e, from.clone(), to.clone(), amount, token_contract_address.clone());
-
-        // Test with no modules registered for other hooks
-        transferred(&e, from, to, amount, token_contract_address);
     });
 }
 
@@ -383,15 +386,14 @@ fn created_hook_execution_works() {
     let amount = 1000i128;
 
     e.as_contract(&contract_address, || {
+        // Bind token contract to compliance contract
+        bind_token(&e, &token_contract_address);
+
         // Add module to Created hook
         add_module_to(&e, ComplianceHook::Created, module_address.clone());
 
-        // Execute created hook - should not panic
+        // Execute created hook
         created(&e, to.clone(), amount, token_contract_address.clone());
-
-        // Test with no modules registered
-        let empty_to = Address::generate(&e);
-        created(&e, empty_to, amount, token_contract_address);
     });
 }
 
@@ -406,15 +408,14 @@ fn destroyed_hook_execution_works() {
     let amount = 1000i128;
 
     e.as_contract(&contract_address, || {
+        // Bind token contract to compliance contract
+        bind_token(&e, &token_contract_address);
+
         // Add module to Destroyed hook
         add_module_to(&e, ComplianceHook::Destroyed, module_address.clone());
 
-        // Execute destroyed hook - should not panic
+        // Execute destroyed hook
         destroyed(&e, from.clone(), amount, token_contract_address.clone());
-
-        // Test with no modules registered
-        let empty_from = Address::generate(&e);
-        destroyed(&e, empty_from, amount, token_contract_address);
     });
 }
 
