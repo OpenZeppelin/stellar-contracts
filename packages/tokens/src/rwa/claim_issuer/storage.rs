@@ -1,18 +1,31 @@
 use core::ops::RangeBounds;
 
-use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env};
+use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, Vec};
 
-use crate::rwa::claim_issuer::{
-    emit_key_allowed, emit_key_removed, emit_revocation_event, ClaimIssuerError, SignatureVerifier,
-    CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT, KEYS_TTL_THRESHOLD,
+use crate::rwa::{
+    claim_issuer::{
+        emit_key_allowed, emit_key_removed, emit_revocation_event, ClaimIssuerError,
+        SignatureVerifier, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT,
+        KEYS_TTL_THRESHOLD, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
+    },
+    claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
 };
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SigningKey {
+    pub public_key: Bytes,
+    pub scheme: u32,
+}
 
 /// Storage keys for claim issuer key management.
 #[contracttype]
 #[derive(Clone)]
 pub enum ClaimIssuerStorageKey {
-    /// Allows signing for a specific scheme and topic (pubkey, scheme, topic).
-    TopicKey(Bytes, u32, u32),
+    /// topic -> Vec<SigningKey>
+    Topics(u32),
+    /// SigningKey -> Vec<registry>
+    Registries(SigningKey),
     /// Tracks explicitly revoked claims by claim digest
     RevokedClaim(BytesN<32>),
 }
@@ -173,92 +186,57 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
 
 // ====================== KEY MANAGEMENT =====================
 
-/// Allows a public key to sign claims for a specific topic.
+/// Returns all signing keys authorized for a specific claim topic.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `public_key` - The public key to authorize.
-/// * `scheme` - The signature scheme used.
-/// * `claim_topic` - The specific claim topic to authorize for.
-///
-/// # Errors
-///
-/// * [`ClaimIssuerError::KeyIsEmpty`] - If attempting to allow an empty key.
-/// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If the key is already allowed
-///   for this topic.
-///
-/// # Events
-///
-/// * topics - `["key_allowed", public_key: Bytes]`
-/// * data - `[scheme: u32, claim_topic: u32]`
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should only
-/// be used:
-/// - During contract initialization/construction
-/// - In admin functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant security
-/// risks as it could allow unauthorized modifications.
-pub fn allow_key(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32) {
-    if public_key.is_empty() {
-        panic_with_error!(e, ClaimIssuerError::KeyIsEmpty)
+/// * `claim_topic` - The claim topic to get signing keys for.
+pub fn get_keys_for_topic(e: &Env, claim_topic: u32) -> Vec<SigningKey> {
+    let topics_storage_key = ClaimIssuerStorageKey::Topics(claim_topic);
+
+    if let Some(topic_keys) =
+        e.storage().persistent().get::<_, Vec<SigningKey>>(&topics_storage_key)
+    {
+        e.storage().persistent().extend_ttl(
+            &topics_storage_key,
+            KEYS_TTL_THRESHOLD,
+            KEYS_EXTEND_AMOUNT,
+        );
+        topic_keys
+    } else {
+        Vec::new(e)
     }
-
-    let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), scheme, claim_topic);
-
-    if e.storage().persistent().has(&key) {
-        panic_with_error!(e, ClaimIssuerError::KeyAlreadyAllowed)
-    }
-
-    e.storage().persistent().set(&key, &true);
-
-    emit_key_allowed(e, public_key, scheme, claim_topic);
 }
 
-/// Removes a public key's authorization for a specific claim topic.
+/// Returns all registries associated with a specific signing key.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `public_key` - The public key to remove authorization for.
-/// * `scheme` - The signature scheme used.
-/// * `claim_topic` - The specific claim topic to remove authorization for.
+/// * `signing_key` - The signing key to get registries for.
 ///
 /// # Errors
 ///
 /// * [`ClaimIssuerError::KeyNotFound`] - If the key is not found for this
 ///   topic.
-///
-/// # Events
-///
-/// * topics - `["key_removed", public_key: Bytes]`
-/// * data - `[scheme: u32, claim_topic: u32]`
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function bypasses authorization checks and should only
-/// be used:
-/// - During contract initialization/construction
-/// - In admin functions that implement their own authorization logic
-///
-/// Using this function in public-facing methods may create significant security
-/// risks as it could allow unauthorized modifications.
-pub fn remove_key(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32) {
-    let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), scheme, claim_topic);
+pub fn get_registries(e: &Env, signing_key: &SigningKey) -> Vec<Address> {
+    let registries_storage_key = ClaimIssuerStorageKey::Registries(signing_key.clone());
 
-    if !e.storage().persistent().has(&key) {
-        panic_with_error!(e, ClaimIssuerError::KeyNotFound)
-    }
-
-    e.storage().persistent().remove(&key);
-    emit_key_removed(e, public_key, scheme, claim_topic);
+    e.storage()
+        .persistent()
+        .get::<_, Vec<Address>>(&registries_storage_key)
+        .inspect(|_| {
+            e.storage().persistent().extend_ttl(
+                &registries_storage_key,
+                KEYS_TTL_THRESHOLD,
+                KEYS_EXTEND_AMOUNT,
+            );
+        })
+        .unwrap_or_else(|| panic_with_error!(e, ClaimIssuerError::KeyNotFound))
 }
 
-/// Checks if a public key is allowed to sign claims for a specific topic and
-/// returns true if authorized for the specific topic.
+/// Checks if a public key is allowed to sign claims for a specific topic.
 ///
 /// # Arguments
 ///
@@ -266,14 +244,189 @@ pub fn remove_key(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32) {
 /// * `public_key` - The public key to check.
 /// * `scheme` - The signature scheme used.
 /// * `claim_topic` - The claim topic to check authorization for.
-pub fn is_key_allowed(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32) -> bool {
-    let topic_key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), scheme, claim_topic);
-    if e.storage().persistent().has(&topic_key) {
-        e.storage().persistent().extend_ttl(&topic_key, KEYS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT);
-        true
-    } else {
-        false
+pub fn is_key_allowed_for_topic(
+    e: &Env,
+    public_key: &Bytes,
+    scheme: u32,
+    claim_topic: u32,
+) -> bool {
+    let topics_storage_key = ClaimIssuerStorageKey::Topics(claim_topic);
+
+    if let Some(topic_keys) =
+        e.storage().persistent().get::<_, Vec<SigningKey>>(&topics_storage_key)
+    {
+        for key in topic_keys.iter() {
+            if key.public_key == *public_key && key.scheme == scheme {
+                e.storage().persistent().extend_ttl(
+                    &topics_storage_key,
+                    KEYS_TTL_THRESHOLD,
+                    KEYS_EXTEND_AMOUNT,
+                );
+                return true;
+            }
+        }
     }
+
+    false
+}
+
+/// Allows a public key to sign claims for specific topic and
+/// `claim_topics_and_issuers` registry.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `public_key` - The public key to authorize.
+/// * `registry` - The address of the `claim_topics_and_issuers` registry.
+/// * `scheme` - The signature scheme used.
+/// * `claim_topic` - The specific claim topic to authorize for.
+///
+/// # Errors
+///
+/// * [`ClaimIssuerError::KeyIsEmpty`] - If attempting to allow an empty key.
+/// * [`ClaimIssuerError::IssuerNotRegistered`] - If this claim issuer is not
+///   registed at the `claim_topics_and_issuers` registry.
+/// * [`ClaimIssuerError::ClaimTopicNotAllowed`] - If this claim issuer is not
+///   allowed to sign claims about the `claim_topic`.
+/// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If the key is already allowed
+///   for this topic.
+///
+/// # Events
+///
+/// * topics - `["key_allowed", public_key: Bytes]`
+/// * data - `[registry: Address, scheme: u32, claim_topic: u32]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
+pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, claim_topic: u32) {
+    if public_key.is_empty() {
+        panic_with_error!(e, ClaimIssuerError::KeyIsEmpty)
+    }
+
+    let registry_client = ClaimTopicsAndIssuersClient::new(e, registry);
+
+    // Check claim issuer is registered at claim_topics_and_issuers registry
+    if !registry_client.is_trusted_issuer(&e.current_contract_address()) {
+        panic_with_error!(e, ClaimIssuerError::IssuerNotRegistered)
+    }
+
+    // Check claim issuer can sign claim about a specific topic
+    if !registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic) {
+        panic_with_error!(e, ClaimIssuerError::ClaimTopicNotAllowed)
+    }
+
+    let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+
+    // Check if key already exists for this topic
+    if !is_key_allowed_for_topic(e, &signing_key.public_key, scheme, claim_topic) {
+        let key = ClaimIssuerStorageKey::Topics(claim_topic);
+        let mut topic_keys: Vec<SigningKey> =
+            e.storage().persistent().get(&key).unwrap_or(Vec::new(e));
+
+        if topic_keys.len() >= MAX_KEYS_PER_TOPIC {
+            panic_with_error!(e, ClaimIssuerError::MaxKeysPerTopicExceeded)
+        }
+
+        topic_keys.push_back(signing_key.clone());
+        e.storage().persistent().set(&key, &topic_keys);
+    }
+
+    // Update Registries mapping: SigningKey -> Vec<Address>
+    let registries_key = ClaimIssuerStorageKey::Registries(signing_key);
+    let mut registries: Vec<Address> =
+        e.storage().persistent().get(&registries_key).unwrap_or(Vec::new(e));
+
+    // Check if this registry is already added for this key
+    for existing_registry in registries.iter() {
+        if existing_registry == *registry {
+            panic_with_error!(e, ClaimIssuerError::KeyAlreadyAllowed)
+        }
+    }
+
+    registries.push_back(registry.clone());
+
+    if registries.len() >= MAX_REGISTRIES_PER_KEY {
+        panic_with_error!(e, ClaimIssuerError::MaxRegistriesPerKeyExceeded)
+    }
+
+    e.storage().persistent().set(&registries_key, &registries);
+
+    emit_key_allowed(e, public_key, registry, scheme, claim_topic);
+}
+
+/// Removes a public key's authorization for a specific claim topic and
+/// registry.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `public_key` - The public key to remove authorization for.
+/// * `registry` - The registry address to remove authorization for.
+/// * `scheme` - The signature scheme used.
+/// * `claim_topic` - The claim topic to remove authorization for.
+///
+/// # Errors
+///
+/// * [`ClaimIssuerError::KeyNotFound`] - If the key is not found for this topic
+///   or registry.
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
+pub fn remove_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, claim_topic: u32) {
+    let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+
+    // Remove registry from Registries mapping
+    let registries_key = ClaimIssuerStorageKey::Registries(signing_key.clone());
+    let mut registries: Vec<Address> = e
+        .storage()
+        .persistent()
+        .get(&registries_key)
+        .unwrap_or_else(|| panic_with_error!(e, ClaimIssuerError::KeyNotFound));
+
+    // Find and remove the specific registry
+    match registries.first_index_of(registry) {
+        Some(pos) => registries.remove_unchecked(pos),
+        None => panic_with_error!(e, ClaimIssuerError::KeyNotFound),
+    }
+
+    // Update or remove Registries mapping
+    if registries.is_empty() {
+        e.storage().persistent().remove(&registries_key);
+
+        // If no more registries, also remove the key from Topics mapping
+        let topics_storage_key = ClaimIssuerStorageKey::Topics(claim_topic);
+        if let Some(mut topic_keys) =
+            e.storage().persistent().get::<_, Vec<SigningKey>>(&topics_storage_key)
+        {
+            if let Some(pos) = topic_keys.first_index_of(&signing_key) {
+                topic_keys.remove_unchecked(pos);
+
+                if topic_keys.is_empty() {
+                    e.storage().persistent().remove(&topics_storage_key);
+                } else {
+                    e.storage().persistent().set(&topics_storage_key, &topic_keys);
+                }
+            }
+        }
+    } else {
+        e.storage().persistent().set(&registries_key, &registries);
+    }
+
+    emit_key_removed(e, public_key, registry, scheme, claim_topic);
 }
 
 // ====================== CLAIM REVOCATION =====================

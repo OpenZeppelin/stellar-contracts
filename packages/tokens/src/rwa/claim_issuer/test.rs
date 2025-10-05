@@ -1,5 +1,5 @@
 extern crate std;
-use ed25519_dalek::{Signer as Ed25519Signer, SigningKey};
+use ed25519_dalek::Signer as Ed25519Signer;
 use k256::{
     ecdsa::SigningKey as Secp256k1SigningKey, elliptic_curve::sec1::ToEncodedPoint,
     SecretKey as Secp256k1SecretKey,
@@ -11,19 +11,106 @@ use p256::{
     },
     SecretKey as Secp256r1SecretKey,
 };
-use soroban_sdk::{contract, testutils::Address as _, Address, Bytes, BytesN, Env};
+use soroban_sdk::{
+    contract, contractimpl, testutils::Address as _, Address, Bytes, BytesN, Env, Map, Vec,
+};
 
-use crate::rwa::claim_issuer::{
-    storage::{
-        allow_key, is_claim_revoked, is_key_allowed, remove_key, set_claim_revoked,
-        Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier,
-        Secp256r1SignatureData, Secp256r1Verifier,
+use crate::rwa::{
+    claim_issuer::{
+        storage::{
+            allow_key, get_keys_for_topic, get_registries, is_claim_revoked,
+            is_key_allowed_for_topic, remove_key, set_claim_revoked, ClaimIssuerStorageKey,
+            Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier,
+            Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
+        },
+        SignatureVerifier, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
     },
-    SignatureVerifier,
+    claim_topics_and_issuers::{
+        storage as ct_storage, ClaimTopicsAndIssuers, ClaimTopicsAndIssuersClient,
+    },
 };
 
 #[contract]
 struct MockContract;
+
+#[contract]
+struct MockClaimTopicsAndIssuersContract;
+
+#[contractimpl]
+impl ClaimTopicsAndIssuers for MockClaimTopicsAndIssuersContract {
+    fn add_claim_topic(e: &Env, claim_topic: u32, _operator: Address) {
+        ct_storage::add_claim_topic(e, claim_topic);
+    }
+
+    fn remove_claim_topic(e: &Env, claim_topic: u32, _operator: Address) {
+        ct_storage::remove_claim_topic(e, claim_topic);
+    }
+
+    fn get_claim_topics(e: &Env) -> Vec<u32> {
+        ct_storage::get_claim_topics(e)
+    }
+
+    fn add_trusted_issuer(
+        e: &Env,
+        trusted_issuer: Address,
+        claim_topics: Vec<u32>,
+        _operator: Address,
+    ) {
+        ct_storage::add_trusted_issuer(e, &trusted_issuer, &claim_topics);
+    }
+
+    fn remove_trusted_issuer(e: &Env, trusted_issuer: Address, _operator: Address) {
+        ct_storage::remove_trusted_issuer(e, &trusted_issuer);
+    }
+
+    fn get_trusted_issuers(e: &Env) -> Vec<Address> {
+        ct_storage::get_trusted_issuers(e)
+    }
+
+    fn get_claim_topic_issuers(e: &Env, claim_topic: u32) -> Vec<Address> {
+        ct_storage::get_claim_topic_issuers(e, claim_topic)
+    }
+
+    fn get_claim_topics_and_issuers(e: &Env) -> Map<u32, Vec<Address>> {
+        ct_storage::get_claim_topics_and_issuers(e)
+    }
+
+    fn update_issuer_claim_topics(
+        e: &Env,
+        trusted_issuer: Address,
+        claim_topics: Vec<u32>,
+        _operator: Address,
+    ) {
+        ct_storage::update_issuer_claim_topics(e, &trusted_issuer, &claim_topics);
+    }
+
+    fn is_trusted_issuer(e: &Env, issuer: Address) -> bool {
+        ct_storage::is_trusted_issuer(e, &issuer)
+    }
+
+    fn get_trusted_issuer_claim_topics(e: &Env, trusted_issuer: Address) -> Vec<u32> {
+        ct_storage::get_trusted_issuer_claim_topics(e, &trusted_issuer)
+    }
+
+    fn has_claim_topic(e: &Env, issuer: Address, claim_topic: u32) -> bool {
+        ct_storage::has_claim_topic(e, &issuer, claim_topic)
+    }
+}
+
+/// Helper to setup a mock registry contract
+fn setup_mock_registry(e: &Env, issuer: &Address, topics: &[u32]) -> Address {
+    let registry_id = e.register(MockClaimTopicsAndIssuersContract, ());
+    let registry_client = ClaimTopicsAndIssuersClient::new(e, &registry_id);
+    let operator = Address::generate(e);
+
+    for topic in topics {
+        registry_client.add_claim_topic(topic, &operator);
+    }
+
+    registry_client.add_trusted_issuer(issuer, &Vec::from_slice(e, topics), &operator);
+
+    registry_id
+}
 
 /// Helper function to create test signature data for Ed25519
 fn create_ed25519_test_data(e: &Env) -> (Bytes, Ed25519SignatureData) {
@@ -167,29 +254,6 @@ fn secp256k1_recovery_id_extraction() {
 }
 
 #[test]
-fn topic_specific_key_management() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    let public_key = Bytes::from_array(&e, &[2u8; 32]);
-    let topic = 42u32;
-
-    e.as_contract(&contract_id, || {
-        assert!(!is_key_allowed(&e, &public_key, 1, topic));
-
-        allow_key(&e, &public_key, 1, topic);
-        assert!(is_key_allowed(&e, &public_key, 1, topic));
-
-        // check for different topic
-        assert!(!is_key_allowed(&e, &public_key, 1, topic + 1));
-        // check for different scheme
-        assert!(!is_key_allowed(&e, &public_key, 2, topic));
-
-        remove_key(&e, &public_key, 1, topic);
-        assert!(!is_key_allowed(&e, &public_key, 1, topic));
-    });
-}
-
-#[test]
 fn ed25519_verify_success() {
     let e = Env::default();
 
@@ -202,7 +266,7 @@ fn ed25519_verify_success() {
         105, 123, 50, 105, 25, 112, 59, 172, 3, 28, 174, 127, 96,
     ];
 
-    let signing_key = SigningKey::from_bytes(&secret_key);
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(&secret_key);
     let verifying_key = signing_key.verifying_key();
 
     let public_key: BytesN<32> = BytesN::from_array(&e, verifying_key.as_bytes());
@@ -358,51 +422,6 @@ fn unrevoke_claim() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #352)")]
-fn allow_key_already_allowed() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    let public_key = Bytes::from_array(&e, &[7u8; 32]);
-    let topic = 999u32;
-
-    e.as_contract(&contract_id, || {
-        // Add key first time
-        allow_key(&e, &public_key, 1, topic);
-
-        // Try to add same key again - should panic with KeyAlreadyAllowed
-        allow_key(&e, &public_key, 1, topic);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #353)")]
-fn remove_key_not_found() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    let public_key = Bytes::from_array(&e, &[8u8; 32]);
-    let topic = 888u32;
-
-    e.as_contract(&contract_id, || {
-        // Try to remove non-existent key - should panic with KeyNotFound
-        remove_key(&e, &public_key, 1, topic);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #351)")]
-fn empty_key_panics() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    let empty_key = Bytes::new(&e);
-    let topic = 123u32;
-
-    e.as_contract(&contract_id, || {
-        // Test with empty key
-        allow_key(&e, &empty_key, 1, topic);
-    });
-}
-
-#[test]
 fn revocation_edge_cases() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -434,5 +453,391 @@ fn revocation_edge_cases() {
         set_claim_revoked(&e, &identity1, claim_topic, &claim_data1, false);
         assert!(!is_claim_revoked(&e, &identity1, claim_topic, &claim_data1));
         assert!(is_claim_revoked(&e, &identity2, claim_topic, &claim_data2));
+    });
+}
+
+// ====================== KEY MANAGEMENT =====================
+
+#[test]
+fn topic_specific_key_management() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry = setup_mock_registry(&e, &contract_id, &[42, 43]);
+    let public_key = Bytes::from_array(&e, &[2u8; 32]);
+    let topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        assert!(!is_key_allowed_for_topic(&e, &public_key, 1, topic));
+
+        allow_key(&e, &public_key, &registry, 1, topic);
+        assert!(is_key_allowed_for_topic(&e, &public_key, 1, topic));
+
+        // check for different topic
+        assert!(!is_key_allowed_for_topic(&e, &public_key, 1, topic + 1));
+        // check for different scheme
+        assert!(!is_key_allowed_for_topic(&e, &public_key, 2, topic));
+
+        remove_key(&e, &public_key, &registry, 1, topic);
+        assert!(!is_key_allowed_for_topic(&e, &public_key, 1, topic));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #352)")]
+fn allow_key_already_allowed() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry = setup_mock_registry(&e, &contract_id, &[999]);
+    let public_key = Bytes::from_array(&e, &[7u8; 32]);
+    let topic = 999u32;
+
+    e.as_contract(&contract_id, || {
+        // Add key first time
+        allow_key(&e, &public_key, &registry, 1, topic);
+
+        // Try to add same key again - should panic with KeyAlreadyAllowed
+        allow_key(&e, &public_key, &registry, 1, topic);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #353)")]
+fn remove_key_not_found() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let public_key = Bytes::from_array(&e, &[8u8; 32]);
+    let topic = 888u32;
+
+    e.as_contract(&contract_id, || {
+        let registry = Address::generate(&e);
+        // Try to remove non-existent key - should panic with KeyNotFound
+        remove_key(&e, &public_key, &registry, 1, topic);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #351)")]
+fn empty_key_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry = setup_mock_registry(&e, &contract_id, &[123]);
+    let empty_key = Bytes::new(&e);
+    let topic = 123u32;
+
+    e.as_contract(&contract_id, || {
+        // Test with empty key
+        allow_key(&e, &empty_key, &registry, 1, topic);
+    });
+}
+
+#[test]
+fn bidirectional_mapping_allow_key() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry = setup_mock_registry(&e, &contract_id, &[42, 43]);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+    let topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        allow_key(&e, &public_key, &registry, scheme, topic);
+
+        // Verify key is allowed
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, topic));
+
+        // Verify Topics mapping
+        let topic_keys = get_keys_for_topic(&e, topic);
+        assert_eq!(topic_keys.len(), 1);
+        assert_eq!(topic_keys.get(0).unwrap().public_key, public_key);
+        assert_eq!(topic_keys.get(0).unwrap().scheme, scheme);
+
+        // Verify Registries mapping
+        let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+        let registries = get_registries(&e, &signing_key);
+        assert_eq!(registries.len(), 1);
+        assert_eq!(registries.get(0).unwrap(), registry);
+    });
+}
+
+#[test]
+fn bidirectional_mapping_remove_key() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry = setup_mock_registry(&e, &contract_id, &[42]);
+
+    let public_key = Bytes::from_array(&e, &[2u8; 32]);
+    let scheme = 1u32;
+    let topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        allow_key(&e, &public_key, &registry, scheme, topic);
+        remove_key(&e, &public_key, &registry, scheme, topic);
+
+        // Verify key is no longer allowed
+        assert!(!is_key_allowed_for_topic(&e, &public_key, scheme, topic));
+
+        // Verify Topics mapping cleaned up
+        let topics_key = ClaimIssuerStorageKey::Topics(topic);
+        assert!(!e.storage().persistent().has(&topics_key));
+
+        // Verify Registries mapping cleaned up
+        let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+        let registries_key = ClaimIssuerStorageKey::Registries(signing_key);
+        assert!(!e.storage().persistent().has(&registries_key));
+    });
+}
+
+#[test]
+fn bidirectional_mapping_multiple_keys_same_topic() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry = setup_mock_registry(&e, &contract_id, &[42]);
+
+    let key1 = Bytes::from_array(&e, &[1u8; 32]);
+    let key2 = Bytes::from_array(&e, &[2u8; 32]);
+    let scheme = 1u32;
+    let topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        allow_key(&e, &key1, &registry, scheme, topic);
+        allow_key(&e, &key2, &registry, scheme, topic);
+
+        // Verify both keys in Topics mapping
+        let topic_keys = get_keys_for_topic(&e, topic);
+        assert_eq!(topic_keys.len(), 2);
+
+        // Remove one key
+        remove_key(&e, &key1, &registry, scheme, topic);
+
+        // Verify Topics mapping still has one key
+        let topic_keys = get_keys_for_topic(&e, topic);
+        assert_eq!(topic_keys.len(), 1);
+        assert_eq!(topic_keys.get(0).unwrap().public_key, key2);
+
+        // Remove second key
+        remove_key(&e, &key2, &registry, scheme, topic);
+
+        // Verify Topics mapping cleaned up
+        let topic_keys = get_keys_for_topic(&e, topic);
+        assert_eq!(topic_keys.len(), 0);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #352)")]
+fn bidirectional_mapping_same_key_same_registry_fails() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry = setup_mock_registry(&e, &contract_id, &[42]);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+    let topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        allow_key(&e, &public_key, &registry, scheme, topic);
+
+        // Try to add same key again for same topic and same registry - should fail
+        allow_key(&e, &public_key, &registry, scheme, topic);
+    });
+}
+
+#[test]
+fn bidirectional_mapping_same_key_different_registries() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry1 = setup_mock_registry(&e, &contract_id, &[42]);
+    let registry2 = setup_mock_registry(&e, &contract_id, &[42]);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+    let topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        allow_key(&e, &public_key, &registry1, scheme, topic);
+
+        // Add same key for same topic but different registry - should succeed
+        allow_key(&e, &public_key, &registry2, scheme, topic);
+
+        // Verify key is allowed
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, topic));
+
+        // Verify Topics mapping still has only one entry (key not duplicated)
+        let topic_keys = get_keys_for_topic(&e, topic);
+        assert_eq!(topic_keys.len(), 1);
+
+        // Verify Registries mapping has 2 registries
+        let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+        let registries = get_registries(&e, &signing_key);
+        assert_eq!(registries.len(), 2);
+        assert_eq!(registries.get(0).unwrap(), registry1);
+        assert_eq!(registries.get(1).unwrap(), registry2);
+    });
+}
+
+#[test]
+fn remove_key_granular_per_registry() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry1 = setup_mock_registry(&e, &contract_id, &[42]);
+    let registry2 = setup_mock_registry(&e, &contract_id, &[42]);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+    let topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        // Add key for same topic with two different registries
+        allow_key(&e, &public_key, &registry1, scheme, topic);
+        allow_key(&e, &public_key, &registry2, scheme, topic);
+
+        // Verify both registries are stored
+        let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+        let registries = get_registries(&e, &signing_key);
+        assert_eq!(registries.len(), 2);
+
+        // Remove key from only registry1
+        remove_key(&e, &public_key, &registry1, scheme, topic);
+
+        // Key should still be allowed (because registry2 still has it)
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, topic));
+
+        // Verify only registry2 remains
+        let registries = get_registries(&e, &signing_key);
+        assert_eq!(registries.len(), 1);
+        assert_eq!(registries.get(0).unwrap(), registry2);
+
+        // Verify Topics mapping still has the key
+        let topic_keys = get_keys_for_topic(&e, topic);
+        assert_eq!(topic_keys.len(), 1);
+
+        // Remove key from registry2
+        remove_key(&e, &public_key, &registry2, scheme, topic);
+
+        // Now key should not be allowed
+        assert!(!is_key_allowed_for_topic(&e, &public_key, scheme, topic));
+
+        // Verify Topics mapping is cleaned up
+        let topic_keys = get_keys_for_topic(&e, topic);
+        assert_eq!(topic_keys.len(), 0);
+    });
+}
+
+#[test]
+fn bidirectional_mapping_same_key_different_topics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry1 = setup_mock_registry(&e, &contract_id, &[42]);
+    let registry2 = setup_mock_registry(&e, &contract_id, &[43]);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+
+    e.as_contract(&contract_id, || {
+        allow_key(&e, &public_key, &registry1, scheme, 42);
+        allow_key(&e, &public_key, &registry2, scheme, 43);
+
+        // Verify both topics have the key
+        let topic_keys_42 = get_keys_for_topic(&e, 42);
+        assert_eq!(topic_keys_42.len(), 1);
+
+        let topic_keys_43 = get_keys_for_topic(&e, 43);
+        assert_eq!(topic_keys_43.len(), 1);
+
+        // Verify Registries mapping has 2 entries (one per topic/registry combination)
+        let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+        let registries = get_registries(&e, &signing_key);
+        assert_eq!(registries.len(), 2);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #356)")]
+fn max_keys_per_topic_exceeded() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry = setup_mock_registry(&e, &contract_id, &[42]);
+
+    let scheme = 1u32;
+    let topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        // Add MAX_KEYS_PER_TOPIC keys
+        for i in 0..MAX_KEYS_PER_TOPIC {
+            let key = Bytes::from_array(&e, &[i as u8; 32]);
+            allow_key(&e, &key, &registry, scheme, topic);
+        }
+
+        // Try to add one more - should panic
+        let extra_key = Bytes::from_array(&e, &[255u8; 32]);
+        allow_key(&e, &extra_key, &registry, scheme, topic);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #357)")]
+fn max_registries_per_key_exceeded() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+
+    e.as_contract(&contract_id, || {
+        // Add MAX_REGISTRIES_PER_KEY registries for different topics
+        for i in 0..MAX_REGISTRIES_PER_KEY {
+            let registry = setup_mock_registry(&e, &contract_id, &[i]);
+            allow_key(&e, &public_key, &registry, scheme, i);
+        }
+
+        // Try to add one more - should panic
+        let extra_registry = setup_mock_registry(&e, &contract_id, &[MAX_REGISTRIES_PER_KEY]);
+        allow_key(&e, &public_key, &extra_registry, scheme, MAX_REGISTRIES_PER_KEY);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #354)")]
+fn allow_key_issuer_not_registered() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry_id = e.register(MockClaimTopicsAndIssuersContract, ());
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+    let topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        // Try to allow key without being registered - should panic
+        allow_key(&e, &public_key, &registry_id, scheme, topic);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #355)")]
+fn allow_key_topic_not_allowed() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry_id = e.register(MockClaimTopicsAndIssuersContract, ());
+    let registry_client = ClaimTopicsAndIssuersClient::new(&e, &registry_id);
+    let operator = Address::generate(&e);
+
+    // Add a different topic (99) to the registry
+    registry_client.add_claim_topic(&99u32, &operator);
+
+    // Register issuer with topic 99, but we'll try to use topic 42
+    let mut topics = Vec::new(&e);
+    topics.push_back(99u32);
+    registry_client.add_trusted_issuer(&contract_id, &topics, &operator);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+    let topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        // Try to allow key for topic 42 which is not in the issuer's allowed topics -
+        // should panic
+        allow_key(&e, &public_key, &registry_id, scheme, topic);
     });
 }
