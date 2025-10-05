@@ -285,7 +285,7 @@ pub fn is_key_allowed_for_topic(
 ///
 /// * [`ClaimIssuerError::KeyIsEmpty`] - If attempting to allow an empty key.
 /// * [`ClaimIssuerError::IssuerNotRegistered`] - If this claim issuer is not
-///   registed at the `claim_topics_and_issuers` registry.
+///   registered at the `claim_topics_and_issuers` registry.
 /// * [`ClaimIssuerError::ClaimTopicNotAllowed`] - If this claim issuer is not
 ///   allowed to sign claims about the `claim_topic`.
 /// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If the key is already allowed
