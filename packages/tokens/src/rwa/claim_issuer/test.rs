@@ -19,9 +19,10 @@ use crate::rwa::{
     claim_issuer::{
         storage::{
             allow_key, get_keys_for_topic, get_registries, is_claim_revoked,
-            is_key_allowed_for_topic, remove_key, set_claim_revoked, ClaimIssuerStorageKey,
-            Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier,
-            Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
+            is_key_allowed_for_registry, is_key_allowed_for_topic, is_key_authorized, remove_key,
+            set_claim_revoked, ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier,
+            Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier,
+            SigningKey,
         },
         SignatureVerifier, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
     },
@@ -618,9 +619,9 @@ fn bidirectional_mapping_multiple_keys_same_topic() {
         // Remove second key
         remove_key(&e, &key2, &registry, scheme, topic);
 
-        // Verify Topics mapping cleaned up
-        let topic_keys = get_keys_for_topic(&e, topic);
-        assert_eq!(topic_keys.len(), 0);
+        // Verify Topics mapping cleaned up - storage entry should not exist
+        let topics_key = ClaimIssuerStorageKey::Topics(topic);
+        assert!(!e.storage().persistent().has(&topics_key));
     });
 }
 
@@ -718,9 +719,9 @@ fn remove_key_granular_per_registry() {
         // Now key should not be allowed
         assert!(!is_key_allowed_for_topic(&e, &public_key, scheme, topic));
 
-        // Verify Topics mapping is cleaned up
-        let topic_keys = get_keys_for_topic(&e, topic);
-        assert_eq!(topic_keys.len(), 0);
+        // Verify Topics mapping is cleaned up - storage entry should not exist
+        let topics_key = ClaimIssuerStorageKey::Topics(topic);
+        assert!(!e.storage().persistent().has(&topics_key));
     });
 }
 
@@ -839,5 +840,71 @@ fn allow_key_topic_not_allowed() {
         // Try to allow key for topic 42 which is not in the issuer's allowed topics -
         // should panic
         allow_key(&e, &public_key, &registry_id, scheme, topic);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #358)")]
+fn get_keys_for_topic_panics_when_no_keys() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        // Try to get keys for a topic that has no keys assigned
+        get_keys_for_topic(&e, 999);
+    });
+}
+
+#[test]
+fn is_key_allowed_for_registry_works() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry1 = setup_mock_registry(&e, &contract_id, &[42]);
+    let registry2 = setup_mock_registry(&e, &contract_id, &[43]);
+
+    let public_key = Bytes::from_array(&e, &[9u8; 32]);
+    let scheme = 1u32;
+    let topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        // Initially not allowed in either registry
+        assert!(!is_key_allowed_for_registry(&e, &public_key, scheme, &registry1));
+        assert!(!is_key_allowed_for_registry(&e, &public_key, scheme, &registry2));
+
+        // Allow key for topic 42 in registry1
+        allow_key(&e, &public_key, &registry1, scheme, topic);
+
+        // Should be allowed for registry1, not for registry2
+        assert!(is_key_allowed_for_registry(&e, &public_key, scheme, &registry1));
+        assert!(!is_key_allowed_for_registry(&e, &public_key, scheme, &registry2));
+
+        // Remove from registry1
+        remove_key(&e, &public_key, &registry1, scheme, topic);
+        assert!(!is_key_allowed_for_registry(&e, &public_key, scheme, &registry1));
+    });
+}
+
+#[test]
+fn is_key_authorized_checks_registry_and_topic() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    // registry_a trusts issuer and allows topic 42
+    let registry_a = setup_mock_registry(&e, &contract_id, &[42]);
+    // registry_b allows topic 42 but issuer will NOT be registered as trusted
+    let registry_b_id = e.register(MockClaimTopicsAndIssuersContract, ());
+    let registry_b = ClaimTopicsAndIssuersClient::new(&e, &registry_b_id);
+    let operator = Address::generate(&e);
+    registry_b.add_claim_topic(&42u32, &operator);
+
+    e.as_contract(&contract_id, || {
+        // Authorized in registry_a for topic 42
+        assert!(is_key_authorized(&e, &registry_a, 42));
+
+        // Not authorized in registry_a for topic 43 (topic not allowed)
+        assert!(!is_key_authorized(&e, &registry_a, 43));
+
+        // Not authorized in registry_b for topic 42 (issuer not trusted)
+        assert!(!is_key_authorized(&e, &registry_b_id, 42));
     });
 }

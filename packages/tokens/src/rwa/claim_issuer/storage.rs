@@ -11,6 +11,42 @@ use crate::rwa::{
     claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
 };
 
+/// This module maintains two correlated storage branches:
+/// - Registry branch: `Registries(SigningKey) -> Vec<Address>` Tracks at which
+///   `claim_topics_and_issuers` registries a given signing key (public key +
+///   scheme) is assigned.
+/// - Topic branch: `Topics(u32) -> Vec<SigningKey>` Tracks which signing keys
+///   are assigned to a specific claim topic.
+///
+/// Visual representation:
+///
+/// ```text
+///                          ┌─────────────────────────┐
+///                          │ SigningKey              │
+///                          │ (public_key + scheme)   │
+///                          └─────────────────────────┘
+///                                      │
+///                    ┌─────────────────┴─────────────────┐
+///                    │                                   │
+///                    ▼                                   ▼
+///        ┌────────────────────────┐          ┌──────────────────────┐
+///        │ Registries(SigningKey) │          │ Topics(claim_topic)  │
+///        │ -> Vec<Address>        │          │ -> Vec<SigningKey>   │
+///        └────────────────────────┘          └──────────────────────┘
+///                    │                                   │
+///                    ▼                                   ▼
+///     [registry_1, registry_2, ...]         [key_1, key_2, ...]
+/// ```
+///
+/// - During claim verification, the claim issuer's internal flow typically
+///   needs to check only the topic branch using `is_key_allowed_for_topic()` to
+///   confirm that a given signing key is assigned to the claim topic in this
+///   contract.
+/// - Although the branches are separate, they are updated atomically by
+///   `allow_key()`/`remove_key()`. A signing key cannot be assigned to a topic
+///   without also being assigned to at least one registry. When the last
+///   registry assignment for a key is removed, the key is automatically removed
+///   from the topic branch as well.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SigningKey {
@@ -186,27 +222,31 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
 
 // ====================== KEY MANAGEMENT =====================
 
-/// Returns all signing keys authorized for a specific claim topic.
+/// Returns all signing keys assigned to a specific claim topic.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
 /// * `claim_topic` - The claim topic to get signing keys for.
+///
+/// # Errors
+///
+/// * [`ClaimIssuerError::NoKeysForTopic`] - If no signing keys are found for
+///   the specified claim topic.
 pub fn get_keys_for_topic(e: &Env, claim_topic: u32) -> Vec<SigningKey> {
     let topics_storage_key = ClaimIssuerStorageKey::Topics(claim_topic);
 
-    if let Some(topic_keys) =
-        e.storage().persistent().get::<_, Vec<SigningKey>>(&topics_storage_key)
-    {
-        e.storage().persistent().extend_ttl(
-            &topics_storage_key,
-            KEYS_TTL_THRESHOLD,
-            KEYS_EXTEND_AMOUNT,
-        );
-        topic_keys
-    } else {
-        Vec::new(e)
-    }
+    e.storage()
+        .persistent()
+        .get::<_, Vec<SigningKey>>(&topics_storage_key)
+        .inspect(|_| {
+            e.storage().persistent().extend_ttl(
+                &topics_storage_key,
+                KEYS_TTL_THRESHOLD,
+                KEYS_EXTEND_AMOUNT,
+            );
+        })
+        .unwrap_or_else(|| panic_with_error!(e, ClaimIssuerError::NoKeysForTopic))
 }
 
 /// Returns all registries associated with a specific signing key.
@@ -236,7 +276,21 @@ pub fn get_registries(e: &Env, signing_key: &SigningKey) -> Vec<Address> {
         .unwrap_or_else(|| panic_with_error!(e, ClaimIssuerError::KeyNotFound))
 }
 
-/// Checks if a public key is allowed to sign claims for a specific topic.
+/// Checks if a public key and its scheme are allowed to sign claims for a
+/// specific topic.
+///
+/// This function is a helper meant to be used within the `is_claim_valid` flow
+/// (`identity_verifier` -> `claim_issuer`). It only checks whether the given
+/// signing key (public key + scheme) is authorized for the provided
+/// `claim_topic` in this contract's storage.
+///
+/// It does not:
+/// - validate that `claim_topic` is registered in the
+///   `claim_topics_and_issuers` contract, or
+/// - verify that this contract is a trusted issuer.
+///
+/// These validations are expected to be performed by the calling identity
+/// verifier prior to invoking this helper.
 ///
 /// # Arguments
 ///
@@ -264,6 +318,61 @@ pub fn is_key_allowed_for_topic(
     }
 
     false
+}
+
+/// Checks if a public key and its scheme are assigned to a given
+/// `claim_topics_and_issuers` registry (regardless of topic).
+///
+/// It does not verify that this contract is a trusted issuer, registered in the
+/// `claim_topics_and_issuers` contract.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `public_key` - The public key to check.
+/// * `scheme` - The signature scheme used.
+/// * `registry` - The registry address to check assignment for.
+pub fn is_key_allowed_for_registry(
+    e: &Env,
+    public_key: &Bytes,
+    scheme: u32,
+    registry: &Address,
+) -> bool {
+    let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+    let registries_key = ClaimIssuerStorageKey::Registries(signing_key);
+
+    if let Some(registries) = e.storage().persistent().get::<_, Vec<Address>>(&registries_key) {
+        e.storage().persistent().extend_ttl(
+            &registries_key,
+            KEYS_TTL_THRESHOLD,
+            KEYS_EXTEND_AMOUNT,
+        );
+        return registries.iter().any(|addr| addr == *registry);
+    }
+
+    false
+}
+
+/// Checks whether the current contract (claim issuer) is authorized at a given
+/// `claim_topics_and_issuers` registry for a specific claim topic.
+///
+/// This helper verifies both conditions:
+/// - the current contract is a trusted issuer in `registry`, and
+/// - the current contract is allowed to sign claims for `claim_topic` in
+///   `registry`.
+///
+/// It does not modify any storage and does not check signing key assignment.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `registry` - The registry address to check against.
+/// * `claim_topic` - The claim topic to check authorization for.
+pub fn is_key_authorized(e: &Env, registry: &Address, claim_topic: u32) -> bool {
+    let registry_client = ClaimTopicsAndIssuersClient::new(e, registry);
+
+    registry_client.is_trusted_issuer(&e.current_contract_address())
+        && registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic)
 }
 
 /// Allows a public key to sign claims for specific topic and

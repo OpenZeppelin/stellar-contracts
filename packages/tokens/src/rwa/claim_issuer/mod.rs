@@ -117,10 +117,10 @@ mod test;
 
 use soroban_sdk::{contractclient, contracterror, contractevent, Address, Bytes, Env};
 pub use storage::{
-    allow_key, get_keys_for_topic, get_registries, is_claim_revoked, is_key_allowed_for_topic,
-    remove_key, set_claim_revoked, ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier,
-    Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier,
-    SigningKey,
+    allow_key, get_keys_for_topic, get_registries, is_claim_revoked, is_key_allowed_for_registry,
+    is_key_allowed_for_topic, is_key_authorized, remove_key, set_claim_revoked,
+    ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
+    Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
 };
 
 /// Trait for validating claims issued by this identity to other identities.
@@ -323,6 +323,8 @@ pub enum ClaimIssuerError {
     MaxKeysPerTopicExceeded = 356,
     /// Maximum number of registries per signing key exceeded.
     MaxRegistriesPerKeyExceeded = 357,
+    /// No signing keys found for the specified claim topic.
+    NoKeysForTopic = 358,
 }
 
 // ################## CONSTANTS ##################
