@@ -280,9 +280,9 @@ pub fn is_key_allowed(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32
 
 /// Sets the revocation status for a claim.
 ///
-/// The claim is identified by hashing the claim message (identity ||
-/// claim_topic || claim_data) using keccak256. The resulting digest is used as
-/// the storage key for the revocation status.
+/// The claim is identified by hashing the claim message (claim_issuer ||
+/// identity || claim_topic || claim_data) using keccak256. The resulting digest
+/// is used as the storage key for the revocation status.
 ///
 /// # Arguments
 ///
@@ -325,9 +325,9 @@ pub fn set_claim_revoked(
 
 /// Checks if a claim has been revoked.
 ///
-/// The claim is identified by hashing the claim message (identity ||
-/// claim_topic || claim_data) using keccak256 and checking the revocation
-/// status stored under that digest.
+/// The claim is identified by hashing the claim message (claim_issuer ||
+/// identity || claim_topic || claim_data) using keccak256 and checking the
+/// revocation status stored under that digest.
 ///
 /// # Arguments
 ///
@@ -354,7 +354,7 @@ pub fn is_claim_revoked(e: &Env, identity: &Address, claim_topic: u32, claim_dat
 /// Builds and returns the message to verify for claim signature validation as
 /// Bytes.
 ///
-/// The message format is: identity || claim_topic || claim_data
+/// The message format is: claim_issuer || identity || claim_topic || claim_data
 ///
 /// # Arguments
 ///
@@ -368,7 +368,8 @@ pub fn build_claim_message(
     claim_topic: u32,
     claim_data: &Bytes,
 ) -> Bytes {
-    let mut data = identity.to_xdr(e);
+    let mut data = e.current_contract_address().to_xdr(e);
+    data.append(&identity.to_xdr(e));
     data.extend_from_array(&claim_topic.to_be_bytes());
     data.append(claim_data);
     data
