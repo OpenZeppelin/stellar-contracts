@@ -128,15 +128,15 @@ pub const WEIGHTED_THRESHOLD_TTL_THRESHOLD: u32 = WEIGHTED_THRESHOLD_EXTEND_AMOU
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `context_rule` - The context rule for this policy.
+/// * `context_rule` - The context rule ID for this policy.
 /// * `smart_account` - The address of the smart account.
 ///
 /// # Errors
 ///
 /// * [`WeightedThresholdError::SmartAccountNotInstalled`] - When the smart
 ///   account does not have a weighted threshold policy installed.
-pub fn get_threshold(e: &Env, context_rule: &ContextRule, smart_account: &Address) -> u32 {
-    let key = WeightedThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
+pub fn get_threshold(e: &Env, context_rule_id: u32, smart_account: &Address) -> u32 {
+    let key = WeightedThresholdStorageKey::AccountContext(smart_account.clone(), context_rule_id);
     let params: Option<WeightedThresholdAccountParams> =
         e.storage().persistent().get(&key).inspect(|_| {
             e.storage().persistent().extend_ttl(

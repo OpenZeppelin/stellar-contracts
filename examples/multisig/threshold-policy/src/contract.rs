@@ -67,8 +67,8 @@ impl Policy for ThresholdPolicyContract {
 #[contractimpl]
 impl ThresholdPolicyContract {
     /// Get the current threshold for a smart account
-    pub fn get_threshold(e: Env, context_rule: ContextRule, smart_account: Address) -> u32 {
-        simple_threshold::get_threshold(&e, &context_rule, &smart_account)
+    pub fn get_threshold(e: &Env, context_rule_id: u32, smart_account: Address) -> u32 {
+        simple_threshold::get_threshold(e, context_rule_id, &smart_account)
     }
 
     /// Set a new threshold for a smart account

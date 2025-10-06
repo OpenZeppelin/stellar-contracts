@@ -543,11 +543,10 @@ fn authenticate_delegated_signer_verification_fails() {
 
         let mut signature_map = Map::new(&e);
         signature_map.set(signer, sig_data);
-        let signatures = Signatures(signature_map);
 
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
-        authenticate(&e, &e.crypto().sha256(&payload), &signatures);
+        authenticate(&e, &e.crypto().sha256(&payload), &signature_map);
     });
 }
 
@@ -574,11 +573,10 @@ fn authenticate_mixed_signers_success() {
         let mut signature_map = Map::new(&e);
         signature_map.set(native_signer, Bytes::new(&e));
         signature_map.set(delegated_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
-        let signatures = Signatures(signature_map);
 
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
-        authenticate(&e, &e.crypto().sha256(&payload), &signatures);
+        authenticate(&e, &e.crypto().sha256(&payload), &signature_map);
     });
 }
 

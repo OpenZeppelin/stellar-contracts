@@ -73,10 +73,10 @@ impl SpendingLimitPolicyContract {
     /// Get the current spending limit data for a smart account
     pub fn get_spending_limit_data(
         e: Env,
-        context_rule: ContextRule,
+        context_rule_id: u32,
         smart_account: Address,
     ) -> spending_limit::SpendingLimitData {
-        spending_limit::get_spending_limit_data(&e, &context_rule, &smart_account)
+        spending_limit::get_spending_limit_data(&e, context_rule_id, &smart_account)
     }
 
     /// Set a new spending limit for a smart account
