@@ -172,8 +172,8 @@ pub trait SignatureVerifier<const N: usize> {
 
     /// Builds the message to verify for claim signature validation.
     ///
-    /// The message format is: claim_issuer || identity || claim_topic ||
-    /// claim_data
+    /// The message format is: network_id || claim_issuer || identity ||
+    /// claim_topic || claim_data
     ///
     /// # Arguments
     ///

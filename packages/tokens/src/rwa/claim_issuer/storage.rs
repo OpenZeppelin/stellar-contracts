@@ -627,7 +627,8 @@ pub fn is_claim_revoked(e: &Env, identity: &Address, claim_topic: u32, claim_dat
 /// Builds and returns the message to verify for claim signature validation as
 /// Bytes.
 ///
-/// The message format is: claim_issuer || identity || claim_topic || claim_data
+/// The message format is: network_id || claim_issuer || identity || claim_topic
+/// || claim_data
 ///
 /// # Arguments
 ///
@@ -641,7 +642,8 @@ pub fn build_claim_message(
     claim_topic: u32,
     claim_data: &Bytes,
 ) -> Bytes {
-    let mut data = e.current_contract_address().to_xdr(e);
+    let mut data = Bytes::from_array(e, &e.ledger().network_id().to_array());
+    data.append(&e.current_contract_address().to_xdr(e));
     data.append(&identity.to_xdr(e));
     data.extend_from_array(&claim_topic.to_be_bytes());
     data.append(claim_data);
