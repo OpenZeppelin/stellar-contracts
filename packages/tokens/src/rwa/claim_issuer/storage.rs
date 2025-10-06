@@ -5,7 +5,7 @@ use soroban_sdk::{
 };
 
 use crate::rwa::claim_issuer::{
-    emit_key_event, emit_revocation_event, ClaimIssuerError, KeyEvent, SignatureVerifier,
+    emit_key_allowed, emit_key_removed, emit_revocation_event, ClaimIssuerError, SignatureVerifier,
     CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT, KEYS_TTL_THRESHOLD,
 };
 
@@ -13,8 +13,8 @@ use crate::rwa::claim_issuer::{
 #[contracttype]
 #[derive(Clone)]
 pub enum ClaimIssuerStorageKey {
-    /// Allows signing for a specific topic.
-    TopicKey(Bytes, u32),
+    /// Allows signing for a specific scheme and topic (pubkey, scheme, topic).
+    TopicKey(Bytes, u32, u32),
     /// Tracks explicitly revoked claims by claim digest
     RevokedClaim(BytesN<32>),
 }
@@ -212,6 +212,7 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
 ///
 /// * `e` - The Soroban environment.
 /// * `public_key` - The public key to authorize.
+/// * `scheme` - The signature scheme used.
 /// * `claim_topic` - The specific claim topic to authorize for.
 ///
 /// # Errors
@@ -223,7 +224,7 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
 /// # Events
 ///
 /// * topics - `["key_allowed", public_key: Bytes]`
-/// * data - `[claim_topic: u32]`
+/// * data - `[scheme: u32, claim_topic: u32]`
 ///
 /// # Security Warning
 ///
@@ -234,12 +235,12 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
 ///
 /// Using this function in public-facing methods may create significant security
 /// risks as it could allow unauthorized modifications.
-pub fn allow_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
+pub fn allow_key(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32) {
     if public_key.is_empty() {
         panic_with_error!(e, ClaimIssuerError::KeyIsEmpty)
     }
 
-    let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
+    let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), scheme, claim_topic);
 
     if e.storage().persistent().has(&key) {
         panic_with_error!(e, ClaimIssuerError::KeyAlreadyAllowed)
@@ -247,7 +248,7 @@ pub fn allow_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
 
     e.storage().persistent().set(&key, &true);
 
-    emit_key_event(e, KeyEvent::Allowed, public_key, claim_topic);
+    emit_key_allowed(e, public_key, scheme, claim_topic);
 }
 
 /// Removes a public key's authorization for a specific claim topic.
@@ -256,6 +257,7 @@ pub fn allow_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
 ///
 /// * `e` - The Soroban environment.
 /// * `public_key` - The public key to remove authorization for.
+/// * `scheme` - The signature scheme used.
 /// * `claim_topic` - The specific claim topic to remove authorization for.
 ///
 /// # Errors
@@ -266,7 +268,7 @@ pub fn allow_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
 /// # Events
 ///
 /// * topics - `["key_removed", public_key: Bytes]`
-/// * data - `[claim_topic: u32]`
+/// * data - `[scheme: u32, claim_topic: u32]`
 ///
 /// # Security Warning
 ///
@@ -277,15 +279,15 @@ pub fn allow_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
 ///
 /// Using this function in public-facing methods may create significant security
 /// risks as it could allow unauthorized modifications.
-pub fn remove_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
-    let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
+pub fn remove_key(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32) {
+    let key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), scheme, claim_topic);
 
     if !e.storage().persistent().has(&key) {
         panic_with_error!(e, ClaimIssuerError::KeyNotFound)
     }
 
     e.storage().persistent().remove(&key);
-    emit_key_event(e, KeyEvent::Removed, public_key, claim_topic);
+    emit_key_removed(e, public_key, scheme, claim_topic);
 }
 
 /// Checks if a public key is allowed to sign claims for a specific topic and
@@ -295,9 +297,10 @@ pub fn remove_key(e: &Env, public_key: &Bytes, claim_topic: u32) {
 ///
 /// * `e` - The Soroban environment.
 /// * `public_key` - The public key to check.
+/// * `scheme` - The signature scheme used.
 /// * `claim_topic` - The claim topic to check authorization for.
-pub fn is_key_allowed(e: &Env, public_key: &Bytes, claim_topic: u32) -> bool {
-    let topic_key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), claim_topic);
+pub fn is_key_allowed(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32) -> bool {
+    let topic_key = ClaimIssuerStorageKey::TopicKey(public_key.clone(), scheme, claim_topic);
     if e.storage().persistent().has(&topic_key) {
         e.storage().persistent().extend_ttl(&topic_key, KEYS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT);
         true

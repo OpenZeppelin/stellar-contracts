@@ -3,7 +3,7 @@ use stellar_contract_utils::math::fixed_point::{muldiv, Rounding};
 
 use crate::fungible::{
     vault::{emit_deposit, emit_withdraw},
-    Base, ContractOverrides, FungibleTokenError,
+    Base, ContractOverrides, FungibleTokenError, MAX_DECIMALS_OFFSET,
 };
 
 pub struct Vault;
@@ -37,6 +37,29 @@ impl Vault {
     ///
     /// * [`FungibleTokenError::VaultAssetAddressNotSet`] - When the vault's
     ///   underlying asset address has not been initialized.
+    ///
+    /// # ERC-4626 Compliance Note
+    ///
+    /// ⚠️ **DEVIATION FROM ERC-4626 SPECIFICATION** ⚠️
+    ///
+    /// The ERC-4626 standard requires that `asset()` MUST NOT revert. However,
+    /// this implementation will panic if the underlying asset address has not
+    /// been set during vault initialization.
+    ///
+    /// **Rationale**: Unlike EVM which has a "zero address" (0x0) concept,
+    /// Soroban's type system does not provide a natural sentinel value for
+    /// uninitialized addresses. Returning an `Option<Address>` would break
+    /// ERC-4626 compatibility, while using an arbitrary sentinel address is
+    /// not idiomatic in Soroban.
+    ///
+    /// **Mitigation**: Implementers MUST ensure that [`Self::set_asset()`] is
+    /// called during contract initialization (typically in the constructor)
+    /// before any vault operations are performed. Once properly initialized,
+    /// this function will never revert during normal vault operations.
+    ///
+    /// **Impact**: This deviation affects [`Self::total_assets()`] and all
+    /// conversion functions that depend on it. All these functions will panic
+    /// if called before the vault is properly initialized.
     pub fn query_asset(e: &Env) -> Address {
         e.storage()
             .instance()
@@ -56,6 +79,12 @@ impl Vault {
     /// # Errors
     ///
     /// * refer to [`Self::query_asset()`] errors.
+    ///
+    /// # ERC-4626 Compliance Note
+    ///
+    /// This function inherits the revert behavior from [`Self::query_asset()`].
+    /// See the ERC-4626 Compliance Note in that function's documentation for
+    /// details on the deviation from the standard.
     pub fn total_assets(e: &Env) -> i128 {
         let token_client = token::Client::new(e, &Self::query_asset(e));
         token_client.balance(&e.current_contract_address())
@@ -102,14 +131,14 @@ impl Vault {
     }
 
     /// Returns the maximum amount of underlying assets that can be deposited
-    /// for the given receiver address (currently `i64::MAX`).
+    /// for the given receiver address (currently `i128::MAX`).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
     pub fn max_deposit(_e: &Env, _receiver: Address) -> i128 {
-        i64::MAX as i128
+        i128::MAX
     }
 
     /// Simulates and returns the amount of vault shares that would be minted
@@ -132,14 +161,14 @@ impl Vault {
     }
 
     /// Returns the maximum amount of vault shares that can be minted
-    /// for the given receiver address (currently `i64::MAX`).
+    /// for the given receiver address (currently `i128::MAX`).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
     pub fn max_mint(_e: &Env, _receiver: Address) -> i128 {
-        i64::MAX as i128
+        i128::MAX
     }
 
     /// Simulates and returns the amount of underlying assets required to mint
@@ -219,14 +248,16 @@ impl Vault {
 
     // ################## CHANGE STATE ##################
 
-    /// Deposits underlying assets into the vault and mints vault shares
-    /// to the receiver, returning the amount of vault shares minted.
+    /// Deposits underlying assets from the `from` address into the vault and
+    /// mints vault shares to the receiver, returning the amount of vault
+    /// shares minted.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `assets` - The amount of underlying assets to deposit.
     /// * `receiver` - The address that will receive the minted vault shares.
+    /// * `from` - The address that will provide the underlying assets.
     /// * `operator` - The address performing the deposit operation.
     ///
     /// # Errors
@@ -237,7 +268,8 @@ impl Vault {
     ///
     /// # Events
     ///
-    /// * topics - `["deposit", operator: Address, receiver: Address]`
+    /// * topics - `["deposit", operator: Address, from: Address, receiver:
+    ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
     /// # Security Warning
@@ -248,25 +280,32 @@ impl Vault {
     /// access controls to ensure that only authorized accounts can execute
     /// deposit operations. Consider combining with the Ownable or Access
     /// Control pattern, or using `operator.require_auth()`.
-    pub fn deposit(e: &Env, assets: i128, receiver: Address, operator: Address) -> i128 {
+    pub fn deposit(
+        e: &Env,
+        assets: i128,
+        receiver: Address,
+        from: Address,
+        operator: Address,
+    ) -> i128 {
         let max_assets = Self::max_deposit(e, receiver.clone());
         if assets > max_assets {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxDeposit);
         }
         let shares: i128 = Self::preview_deposit(e, assets);
-        Self::deposit_internal(e, &receiver, assets, shares, &operator);
+        Self::deposit_internal(e, &receiver, assets, shares, &from, &operator);
         shares
     }
 
     /// Mints a specific amount of vault shares to the receiver by depositing
-    /// the required amount of underlying assets, returning the amount of assets
-    /// deposited.
+    /// the required amount of underlying assets from the `from` address,
+    /// returning the amount of assets deposited.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `shares` - The amount of vault shares to mint.
     /// * `receiver` - The address that will receive the minted vault shares.
+    /// * `from` - The address that will provide the underlying assets.
     /// * `operator` - The address performing the mint operation.
     ///
     /// # Errors
@@ -277,7 +316,8 @@ impl Vault {
     ///
     /// # Events
     ///
-    /// * topics - `["deposit", operator: Address, receiver: Address]`
+    /// * topics - `["deposit", operator: Address, from: Address, receiver:
+    ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
     /// # Security Warning
@@ -288,13 +328,19 @@ impl Vault {
     /// access controls to ensure that only authorized accounts can execute
     /// mint operations. Consider combining with the Ownable or Access
     /// Control pattern, or using `operator.require_auth()`.
-    pub fn mint(e: &Env, shares: i128, receiver: Address, operator: Address) -> i128 {
+    pub fn mint(
+        e: &Env,
+        shares: i128,
+        receiver: Address,
+        from: Address,
+        operator: Address,
+    ) -> i128 {
         let max_shares = Self::max_mint(e, receiver.clone());
         if shares > max_shares {
             panic_with_error!(e, FungibleTokenError::VaultExceededMaxMint);
         }
         let assets: i128 = Self::preview_mint(e, shares);
-        Self::deposit_internal(e, &receiver, assets, shares, &operator);
+        Self::deposit_internal(e, &receiver, assets, shares, &from, &operator);
         assets
     }
 
@@ -461,6 +507,17 @@ impl Vault {
     /// share-to-asset conversions. This should typically be set once during
     /// contract initialization and remain immutable thereafter.
     ///
+    /// To enforce a reasonable value that maximizes the security and UX at the
+    /// same time, we bound this value to a maximum of 10.
+    ///
+    /// Any value higher than 10 is not recommended as it provides
+    /// almost no practical benefits, and any value close to 30 may
+    /// cause overflow errors depending on the base asset decimals, and
+    /// amount of assets in the vault.
+    ///
+    /// If a value higher than 10 needed, one should consider writing
+    /// their custom copy of this function.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
@@ -470,6 +527,9 @@ impl Vault {
     ///
     /// * [`FungibleTokenError::VaultVirtualDecimalsOffsetAlreadySet`] - When
     ///   attempting to set the offset after it has already been initialized.
+    /// * [`FungibleTokenError::VaultMaxDecimalsOffsetExceeded`] - When
+    ///   attempting to set the offset to a value higher than the suggested
+    ///   maximum allowed.
     ///
     /// # Security Warning
     ///
@@ -481,6 +541,9 @@ impl Vault {
     /// of your smart contract or combining with the Ownable or Access Control
     /// pattern.
     pub fn set_decimals_offset(e: &Env, offset: u32) {
+        if offset > MAX_DECIMALS_OFFSET {
+            panic_with_error!(e, FungibleTokenError::VaultMaxDecimalsOffsetExceeded);
+        }
         // Check if virtual decimals offset is already set
         if e.storage().instance().has(&VaultStorageKey::VirtualDecimalsOffset) {
             panic_with_error!(e, FungibleTokenError::VaultVirtualDecimalsOffsetAlreadySet);
@@ -492,8 +555,7 @@ impl Vault {
     /// rounding direction, returning the equivalent amount of vault shares.
     ///
     /// Implements the formula:
-    /// `assets.mulDiv(totalSupply() + 10 ** decimalsOffset(), totalAssets() +
-    /// 1, rounding)`
+    /// shares = (assets × (totalSupply + 10^offset)) / (totalAssets + 1)
     ///
     /// # Arguments
     ///
@@ -513,16 +575,26 @@ impl Vault {
         if assets == 0 {
             return 0;
         }
+
+        // Assets being deposited
         let x = assets;
+
+        // Virtual offset = 10^offset
         let pow = 10_i128
             .checked_pow(Self::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // Effective total supply = totalSupply + virtual offset
         let y = Self::total_supply(e)
             .checked_add(pow)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // Effective total assets = totalAssets + 1 (prevents division by zero)
         let denominator = Self::total_assets(e)
             .checked_add(1_i128)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // (assets × (totalSupply + 10^offset)) / (totalAssets + 1)
         muldiv(e, x, y, denominator, rounding)
     }
 
@@ -531,8 +603,7 @@ impl Vault {
     /// assets.
     ///
     /// Implements the formula:
-    /// `shares.mulDiv(totalAssets() + 1, totalSupply() + 10 **
-    /// decimalsOffset(), rounding)`
+    /// shares = (assets × (totalAssets + 1)) / (totalSupply + 10^offset)
     ///
     /// # Arguments
     ///
@@ -552,16 +623,26 @@ impl Vault {
         if shares == 0 {
             return 0;
         }
+
+        // Shares being redeemed
         let x = shares;
+
+        // Effective total assets = totalAssets + 1 (prevents division by zero)
         let y = Self::total_assets(e)
             .checked_add(1_i128)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // Virtual offset = 10^offset
         let pow = 10_i128
             .checked_pow(Self::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // Effective total supply = totalSupply + virtual offset
         let denominator = Self::total_supply(e)
             .checked_add(pow)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+
+        // (assets × (totalAssets + 1)) / (totalSupply + 10^offset)
         muldiv(e, x, y, denominator, rounding)
     }
 
@@ -576,23 +657,28 @@ impl Vault {
     /// * `receiver` - The address that will receive the minted vault shares.
     /// * `assets` - The amount of underlying assets being deposited.
     /// * `shares` - The amount of vault shares being minted.
+    /// * `from` - The address that will provide the underlying assets.
     /// * `operator` - The address performing the deposit operation.
     ///
     /// # Events
     ///
-    /// * topics - `["deposit", operator: Address, receiver: Address]`
+    /// * topics - `["deposit", operator: Address, from: Address, receiver:
+    ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
     /// # Notes
     ///
     /// This function assumes prior authorization of the operator and validation
-    /// of amounts. It should only be called from higher-level functions that
-    /// handle these concerns.
+    /// of amounts. When `operator != from`, the operator must have sufficient
+    /// allowance from `from` on the underlying asset contract. When `operator
+    /// == from`, the transfer is direct. It should only be called from
+    /// higher-level functions that handle authorization concerns.
     pub fn deposit_internal(
         e: &Env,
         receiver: &Address,
         assets: i128,
         shares: i128,
+        from: &Address,
         operator: &Address,
     ) {
         // This function assumes prior authorization of the operator and validation of
@@ -600,9 +686,18 @@ impl Vault {
         let token_client = token::Client::new(e, &Self::query_asset(e));
         // `safeTransfer` mechanism is not present in the base module, (will be provided
         // as an extension)
-        token_client.transfer(operator, e.current_contract_address(), &assets);
+
+        if operator == from {
+            // Direct transfer: `operator` is depositing their own assets
+            token_client.transfer(from, e.current_contract_address(), &assets);
+        } else {
+            // Allowance-based transfer: `operator` is depositing on behalf of `from`
+            // This requires that `from` has approved `operator` on the underlying asset
+            token_client.transfer_from(operator, from, &e.current_contract_address(), &assets);
+        }
+
         Base::mint(e, receiver, shares);
-        emit_deposit(e, operator, receiver, assets, shares);
+        emit_deposit(e, operator, from, receiver, assets, shares);
     }
 
     /// Internal withdraw/redeem workflow without authorization checks.

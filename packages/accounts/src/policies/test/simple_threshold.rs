@@ -1,10 +1,10 @@
 extern crate std;
 
 use soroban_sdk::{
-    auth::Context,
-    contract,
+    auth::{Context, ContractContext},
+    contract, symbol_short,
     testutils::{Address as _, Events},
-    Address, Env, IntoVal, Vec,
+    Address, Env, IntoVal, String, Vec,
 };
 
 use crate::{
@@ -33,7 +33,7 @@ fn create_test_context_rule(e: &Env) -> ContextRule {
     ContextRule {
         id: 1,
         context_type: ContextRuleType::Default,
-        name: soroban_sdk::String::from_str(e, "test_rule"),
+        name: String::from_str(e, "test_rule"),
         signers,
         policies,
         valid_until: None,
@@ -109,9 +109,9 @@ fn can_enforce_sufficient_signers() {
         let authenticated_signers =
             Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
 
-        let context = Context::Contract(soroban_sdk::auth::ContractContext {
+        let context = Context::Contract(ContractContext {
             contract: Address::generate(&e),
-            fn_name: soroban_sdk::symbol_short!("test"),
+            fn_name: symbol_short!("test"),
             args: ().into_val(&e),
         });
 
@@ -139,9 +139,9 @@ fn can_enforce_insufficient_signers() {
 
         let authenticated_signers = Vec::from_array(&e, [Signer::Native(addr1)]);
 
-        let context = Context::Contract(soroban_sdk::auth::ContractContext {
+        let context = Context::Contract(ContractContext {
             contract: Address::generate(&e),
-            fn_name: soroban_sdk::symbol_short!("test"),
+            fn_name: symbol_short!("test"),
             args: ().into_val(&e),
         });
 
@@ -162,9 +162,9 @@ fn can_enforce_not_installed() {
         let authenticated_signers = Vec::from_array(&e, [Signer::Native(Address::generate(&e))]);
         let context_rule = create_test_context_rule(&e);
 
-        let context = Context::Contract(soroban_sdk::auth::ContractContext {
+        let context = Context::Contract(ContractContext {
             contract: Address::generate(&e),
-            fn_name: soroban_sdk::symbol_short!("test"),
+            fn_name: symbol_short!("test"),
             args: ().into_val(&e),
         });
 
@@ -198,9 +198,9 @@ fn enforce_success() {
     e.as_contract(&address, || {
         let context_rule = create_test_context_rule(&e);
 
-        let context = Context::Contract(soroban_sdk::auth::ContractContext {
+        let context = Context::Contract(ContractContext {
             contract: Address::generate(&e),
-            fn_name: soroban_sdk::symbol_short!("test"),
+            fn_name: symbol_short!("test"),
             args: ().into_val(&e),
         });
 
@@ -278,5 +278,64 @@ fn uninstall_success() {
     e.as_contract(&address, || {
         let context_rule = create_test_context_rule(&e);
         uninstall(&e, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2200)")]
+fn enforce_not_installed_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let (addr1, addr2, _) = create_test_signers(&e);
+        let authenticated_signers =
+            Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
+        let context_rule = create_test_context_rule(&e);
+
+        let context = Context::Contract(ContractContext {
+            contract: Address::generate(&e),
+            fn_name: symbol_short!("test"),
+            args: ().into_val(&e),
+        });
+
+        // Try to enforce without installing the policy first
+        enforce(&e, &context, &authenticated_signers, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2202)")]
+fn enforce_threshold_not_met_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let params = SimpleThresholdAccountParams { threshold: 2 };
+        let context_rule = create_test_context_rule(&e);
+
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        let (addr1, _, _) = create_test_signers(&e);
+        // Only 1 signer authenticated, but threshold is 2
+        let authenticated_signers = Vec::from_array(&e, [Signer::Native(addr1)]);
+        let context_rule = create_test_context_rule(&e);
+
+        let context = Context::Contract(ContractContext {
+            contract: Address::generate(&e),
+            fn_name: symbol_short!("test"),
+            args: ().into_val(&e),
+        });
+
+        // Should fail because only 1 signer but threshold is 2
+        enforce(&e, &context, &authenticated_signers, &context_rule, &smart_account);
     });
 }

@@ -10,19 +10,21 @@ pub mod ed25519;
 mod test;
 pub mod utils;
 pub mod webauthn;
-use soroban_sdk::{contractclient, xdr::FromXdr, Bytes, Env, FromVal, Val};
+use soroban_sdk::{contractclient, Bytes, Env, FromVal, Val};
 
 /// Core trait for cryptographic signature verification in smart accounts.
 ///
 /// This trait defines the interface for verifying digital signatures against
 /// cryptographic keys. Implementations handle different signature schemes
-/// (e.g., Ed25519, WebAuthn) and provide a unified interface for the smart
-/// account system.
+/// (e.g., Ed25519, WebAuthn) and provide a unified interface meant to be used
+/// in smart accounts.
 ///
 /// # Type Parameters
 ///
 /// * `SigData` - The signature data type specific to the verification scheme.
-///   Must implement `FromVal<Env, Val>` and FromXdr for Soroban serialization.
+///   Must implement `FromVal<Env, Val>`.
+/// * `KeyData` - The public key type specific to the verification scheme. Must
+///   implement `FromVal<Env, Val>`.
 ///
 /// # Implementation Notes
 ///
@@ -39,16 +41,18 @@ use soroban_sdk::{contractclient, xdr::FromXdr, Bytes, Env, FromVal, Val};
 ///
 /// struct MyVerifier;
 /// impl Verifier for MyVerifier {
-///     type SigData = Bytes;
+///     type KeyData = BytesN<32>;
+///     type SigData = BytesN<64>;
 ///
-///     fn verify(e: &Env, hash: Bytes, key_data: Bytes, sig_data: Bytes) -> bool {
+///     fn verify(e: &Env, hash: Bytes, key_data: BytesN<32>, sig_data: BytesN<64>) -> bool {
 ///         // Implementation specific verification logic
 ///         true
 ///     }
 /// }
 /// ```
 pub trait Verifier {
-    type SigData: FromVal<Env, Val> + FromXdr;
+    type KeyData: FromVal<Env, Val>;
+    type SigData: FromVal<Env, Val>;
 
     /// Verifies a cryptographic signature against a hash and public key.
     ///
@@ -99,7 +103,7 @@ pub trait Verifier {
     ///     // Signature is valid, proceed with authorization
     /// }
     /// ```
-    fn verify(e: &Env, hash: Bytes, key_data: Bytes, sig_data: Bytes) -> bool;
+    fn verify(e: &Env, hash: Bytes, key_data: Self::KeyData, sig_data: Self::SigData) -> bool;
 }
 
 // We need to declare a `VerifierClientInterface` here, instead of using the
@@ -111,5 +115,5 @@ pub trait Verifier {
 #[allow(unused)]
 #[contractclient(name = "VerifierClient")]
 trait VerifierClientInterface {
-    fn verify(e: &Env, hash: Bytes, key_data: Bytes, sig_data: Bytes) -> bool;
+    fn verify(e: &Env, hash: Bytes, key_data: Val, sig_data: Val) -> bool;
 }

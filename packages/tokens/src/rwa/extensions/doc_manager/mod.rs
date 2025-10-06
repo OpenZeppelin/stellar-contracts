@@ -13,7 +13,6 @@
 //! - **Document Updates**: Modify existing document metadata
 //! - **Document Removal**: Remove documents from the contract
 //! - **Document Retrieval**: Get individual or all documents
-//! - **Event Emission**: Emit events for document operations
 //!
 //! ## Usage
 //!
@@ -32,7 +31,7 @@ mod test;
 
 use soroban_sdk::{contracterror, contractevent, Address, BytesN, Env, String, Vec};
 pub use storage::{
-    document_exists, get_all_documents, get_document, get_document_count, remove_document,
+    get_all_documents, get_document, get_document_by_index, get_document_count, remove_document,
     set_document, Document, DocumentStorageKey,
 };
 
@@ -118,7 +117,22 @@ pub trait DocumentManager: RWAToken {
 pub enum DocumentError {
     /// The specified document was not found.
     DocumentNotFound = 380,
+    /// Maximum number of documents has been reached.
+    MaxDocumentsReached = 381,
 }
+
+// ################## CONSTANTS ##################
+
+const DAY_IN_LEDGERS: u32 = 17280;
+pub const DOCUMENT_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const DOCUMENT_TTL_THRESHOLD: u32 = DOCUMENT_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
+/// Max. number of buckets
+pub const MAX_BUCKETS: u32 = 100;
+/// Maximum number of document entries per bucket.
+pub const BUCKET_SIZE: u32 = 50;
+/// Maximum number of documents that can be stored.
+pub const MAX_DOCUMENTS: u32 = BUCKET_SIZE * MAX_BUCKETS; // 5_000
 
 // ################## EVENTS ##################
 

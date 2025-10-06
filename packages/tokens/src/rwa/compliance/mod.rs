@@ -2,6 +2,8 @@ use soroban_sdk::{
     contractclient, contracterror, contractevent, contracttype, Address, Env, String, Vec,
 };
 
+use crate::rwa::utils::token_binder::TokenBinder;
+
 pub mod storage;
 
 #[cfg(test)]
@@ -53,8 +55,16 @@ pub enum ComplianceHook {
 /// pub trait Compliance       // ✅
 /// pub trait Compliance: RWA  // ❌
 /// ```
+///
+/// # Multi-Token Support
+///
+/// To enable a single compliance contract to serve multiple RWA tokens, all
+/// hook functions accept a `token` parameter identifying the calling RWA
+/// token contract. This allows compliance modules to maintain separate state
+/// and apply different business logic per token (e.g., token-specific transfer
+/// limits, per-token balance tracking).
 #[contractclient(name = "ComplianceClient")]
-pub trait Compliance {
+pub trait Compliance: TokenBinder {
     /// Registers a compliance module for a specific hook type.
     /// Only the operator can register modules.
     ///
@@ -113,7 +123,9 @@ pub trait Compliance {
     /// * `from` - The address of the sender.
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens involved in the transfer.
-    fn transferred(e: &Env, from: Address, to: Address, amount: i128);
+    /// * `token` - The address of the token contract that is performing the
+    ///   transfer.
+    fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Address);
 
     /// Called whenever tokens are created on a wallet.
     ///
@@ -125,7 +137,8 @@ pub trait Compliance {
     /// * `e` - Access to the Soroban environment.
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens involved in the minting.
-    fn created(e: &Env, to: Address, amount: i128);
+    /// * `token` - The address of the contract that is performing the minting.
+    fn created(e: &Env, to: Address, amount: i128, token: Address);
 
     /// Called whenever tokens are destroyed from a wallet.
     ///
@@ -137,7 +150,9 @@ pub trait Compliance {
     /// * `e` - Access to the Soroban environment.
     /// * `from` - The address on which tokens are burnt.
     /// * `amount` - The amount of tokens involved in the burn.
-    fn destroyed(e: &Env, from: Address, amount: i128);
+    /// * `token` - The address of the token contract that is performing the
+    ///   burn.
+    fn destroyed(e: &Env, from: Address, amount: i128, token: Address);
 
     /// Checks whether the transfer is compliant.
     ///
@@ -151,11 +166,13 @@ pub trait Compliance {
     /// * `from` - The address of the sender.
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens involved in the transfer.
+    /// * `token` - The address of the token contract that is performing the
+    ///   transfer.
     ///
     /// # Returns
     ///
     /// `true` if all registered modules allow the transfer, `false` otherwise.
-    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool;
+    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool;
 
     /// Checks whether the mint operation is compliant.
     ///
@@ -168,11 +185,13 @@ pub trait Compliance {
     /// * `e` - Access to the Soroban environment.
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens involved in the transfer.
+    /// * `token` - The address of the token contract that is performing the
+    ///   transfer.
     ///
     /// # Returns
     ///
     /// `true` if all registered modules allow the transfer, `false` otherwise.
-    fn can_create(e: &Env, to: Address, amount: i128) -> bool;
+    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool;
 }
 
 // ################## ERRORS ##################
@@ -187,6 +206,8 @@ pub enum ComplianceError {
     ModuleNotRegistered = 361,
     /// Indicates a module bound is exceeded.
     ModuleBoundExceeded = 362,
+    /// Indicates a token is not bound to this compliance contract.
+    TokenNotBound = 363,
 }
 
 // ################## CONSTANTS ##################
@@ -248,6 +269,60 @@ pub fn emit_module_removed(e: &Env, hook: ComplianceHook, module: Address) {
 /// Modules implement this trait to provide specific compliance logic for
 /// different hook types. Each module only needs to implement the methods for
 /// hooks it registers for.
+///
+/// # General Workflow
+///
+/// 1. Token contract calls `set_compliance_address` to set the address of the
+///    compliance contract.
+/// 2. Operator registers compliance modules via `add_module_to()` for specific
+///    hooks.
+/// 3. On token operations (`transfer`, `mint`, `burn`):
+///    - **Before**: Token contract calls validation hooks (`can_transfer`,
+///      `can_create`)
+///    - **After**: Token contract calls notification hooks (`transferred`,
+///      `created`, `destroyed`)
+/// 4. Compliance contract forwards each hook call to all registered modules for
+///    that hook type.
+///
+/// ┌─────────────────┐
+/// │  Token Contract │
+/// └────────┬────────┘
+///          │ 1. set_compliance_address()
+///          ▼
+/// ┌─────────────────────┐
+/// │ Compliance Contract │◄──── 2. add_module_to() / remove_module_from()
+/// └──────────┬──────────┘
+///            │ 3. On transfer/mint/burn:
+///            │
+///            │    - transferred() / created() / destroyed()
+///            │    - can_transfer() / can_create()
+///            ▼
+/// ┌─────────────────────────────────────────────────┐
+/// │           Compliance Modules (1..N)             │
+/// ├─────────────────────────────────────────────────┤
+/// │  • on_transfer()    • can_transfer()            │
+/// │  • on_created()     • can_create()              │
+/// │  • on_destroyed()                               │
+/// └─────────────────────────────────────────────────┘
+///
+/// # Hook Types
+///
+///   - Transferred/Created/Destroyed: Potentially State-modifying hooks (called
+///     after action)
+///   - CanTransfer/CanCreate: Validation hooks (called before action,
+///     read-only)
+///
+/// # Security Note
+///
+/// If the hooks modify state, they should only be called by the compliance
+/// contract to ensure security. `set_compliance_address` and
+/// `get_compliance_address` will become handy in this case.
+///
+/// If the hooks do not modify state, there should be no security concern, and
+/// they can be called by any contract/caller. In this case,
+/// `set_compliance_address` and `get_compliance_address` will probably not
+/// used, and one can provide dummy implementations for them.
+
 #[contractclient(name = "ComplianceModuleClient")]
 pub trait ComplianceModule {
     /// Called when tokens are transferred (for Transfer hook).
@@ -258,7 +333,18 @@ pub trait ComplianceModule {
     /// * `from` - The address of the sender.
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens transferred.
-    fn on_transfer(e: &Env, from: Address, to: Address, amount: i128);
+    /// * `token` - The address of the token contract that triggered the hook.
+    ///
+    /// # Security Note
+    ///
+    /// If this function modifies state, it should be called only by the
+    /// compliance contract. To enforce this, add the following at the start of
+    /// your implementation:
+    ///
+    /// ```ignore
+    /// get_compliance_address(e).require_auth();
+    /// ```
+    fn on_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address);
 
     /// Called when tokens are created/minted (for Created hook).
     ///
@@ -267,7 +353,18 @@ pub trait ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `to` - The address receiving the tokens.
     /// * `amount` - The amount of tokens created.
-    fn on_created(e: &Env, to: Address, amount: i128);
+    /// * `token` - The address of the token contract that triggered the hook.
+    ///
+    /// # Security Note
+    ///
+    /// If this function modifies state, it should be called only by the
+    /// compliance contract. To enforce this, add the following at the start of
+    /// your implementation:
+    ///
+    /// ```ignore
+    /// get_compliance_address(e).require_auth();
+    /// ```
+    fn on_created(e: &Env, to: Address, amount: i128, token: Address);
 
     /// Called when tokens are destroyed/burned (for Destroyed hook).
     ///
@@ -276,9 +373,21 @@ pub trait ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `from` - The address from which tokens are burned.
     /// * `amount` - The amount of tokens destroyed.
-    fn on_destroyed(e: &Env, from: Address, amount: i128);
+    /// * `token` - The address of the token contract that triggered the hook.
+    ///
+    /// # Security Note
+    ///
+    /// If this function modifies state, it should be called only by the
+    /// compliance contract. To enforce this, add the following at the start of
+    /// your implementation:
+    ///
+    /// ```ignore
+    /// get_compliance_address(e).require_auth();
+    /// ```
+    fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address);
 
     /// Called to check if a transfer should be allowed (for CanTransfer hook).
+    /// Returns `true` if the transfer should be allowed, `false` otherwise.
     ///
     /// This is a read-only function and should not modify state.
     ///
@@ -288,14 +397,12 @@ pub trait ComplianceModule {
     /// * `from` - The address of the sender.
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens to transfer.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the transfer should be allowed, `false` otherwise.
-    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool;
+    /// * `token` - The address of the token contract that triggered the hook.
+    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool;
 
     /// Called to check if a mint operation should be allowed (for CanCreate
-    /// hook).
+    /// hook). Returns `true` if the mint operation should be allowed,
+    /// `false` otherwise.
     ///
     /// This is a read-only function and should not modify state.
     ///
@@ -304,16 +411,20 @@ pub trait ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens to mint.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the mint operation should be allowed, `false` otherwise.
-    fn can_create(e: &Env, to: Address, amount: i128) -> bool;
+    /// * `token` - The address of the token contract that triggered the hook.
+    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool;
 
     /// Returns the name of the module for identification purposes.
+    fn name(e: &Env) -> String;
+
+    /// Returns the address of the compliance contract.
+    fn get_compliance_address(e: &Env) -> Address;
+
+    /// Sets the address of the compliance contract.
     ///
-    /// # Returns
+    /// # Arguments
     ///
-    /// A string identifying the module.
-    fn name() -> String;
+    /// * `e` - Access to the Soroban environment.
+    /// * `compliance` - The address of the compliance contract.
+    fn set_compliance_address(e: &Env, compliance: Address);
 }

@@ -70,6 +70,8 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Errors
     ///
+    /// * [`SmartAccountError::TooManyContextRules`] - When the number of
+    ///   context rules exceeds MAX_CONTEXT_RULES (15).
     /// * [`SmartAccountError::NoSignersAndPolicies`] - When both signers and
     ///   policies are empty.
     /// * [`SmartAccountError::TooManySigners`] - When signers exceed
@@ -297,6 +299,8 @@ pub const SMART_ACCOUNT_TTL_THRESHOLD: u32 = SMART_ACCOUNT_EXTEND_AMOUNT - DAY_I
 pub const MAX_POLICIES: u32 = 5;
 /// Maximum number of signers allowed per context rule.
 pub const MAX_SIGNERS: u32 = 15;
+/// Maximum number of context rules allowed per smart account.
+pub const MAX_CONTEXT_RULES: u32 = 15;
 
 // ################## ERRORS ##################
 
@@ -307,8 +311,8 @@ pub const MAX_SIGNERS: u32 = 15;
 pub enum SmartAccountError {
     /// The specified context rule does not exist.
     ContextRuleNotFound = 2000,
-    /// A conflicting context rule already exists.
-    ConflictingContextRule = 2001,
+    /// A duplicate context rule already exists.
+    DuplicateContextRule = 2001,
     /// The provided context cannot be validated against any rule.
     UnvalidatedContext = 2002,
     /// Delegated signature verification failed.
@@ -329,6 +333,8 @@ pub enum SmartAccountError {
     TooManySigners = 2010,
     /// Too many policies in the context rule.
     TooManyPolicies = 2011,
+    /// Too many context rules in the smart account.
+    TooManyContextRules = 2012,
 }
 
 // ################## EVENTS ##################

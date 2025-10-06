@@ -4,16 +4,24 @@
 //! contract can be deployed once and used by multiple smart accounts across the
 //! network for delegated signature verification. Provides cryptographic
 //! verification for Ed25519 signatures against message hashes and public keys.
-use soroban_sdk::{contract, contractimpl, Bytes, Env};
-use stellar_accounts::verifiers::ed25519;
+use soroban_sdk::{contract, contractimpl, Bytes, BytesN, Env};
+use stellar_accounts::verifiers::{ed25519, Verifier};
 
 #[contract]
 pub struct Ed25519VerifierContract;
 
 #[contractimpl]
-impl Ed25519VerifierContract {
+impl Verifier for Ed25519VerifierContract {
+    type KeyData = BytesN<32>;
+    type SigData = BytesN<64>;
+
     /// Verify an Ed25519 signature against a message and public key
-    pub fn verify(e: Env, signature_payload: Bytes, key_data: Bytes, sig_data: Bytes) -> bool {
-        ed25519::verify(&e, signature_payload, key_data, sig_data)
+    fn verify(
+        e: &Env,
+        signature_payload: Bytes,
+        key_data: BytesN<32>,
+        sig_data: BytesN<64>,
+    ) -> bool {
+        ed25519::verify(e, &signature_payload, &key_data, &sig_data)
     }
 }
