@@ -1,4 +1,4 @@
-/// # How Country Data Work
+/// ## How Country Data Work
 ///
 /// Instead of a simple, single country code, this system treats an account's
 /// jurisdictional ties as a collection of "Country Data." Each country data
@@ -17,7 +17,7 @@
 /// - `Custom(Symbol::new(e, "Subsidiary"), 792)` - Custom subsidiary location:
 ///   Turkey
 ///
-/// ## Flexible Country Relations
+/// ### Flexible Country Relations
 ///
 /// This flexible structure allows an account to hold multiple country
 /// relationships and supports mixing of individual and organizational country
@@ -59,7 +59,7 @@
 /// least one initial country data. Afterward, more country data can be added
 /// (up to MAX_COUNTRY_ENTRIES), modified, or removed as needed.
 ///
-/// ## Design Principles
+/// ### Design Principles
 ///
 /// 1. **All Country Data are Equal**: The system treats the initial country
 ///    data and any subsequently added country data the same way. They are all
@@ -106,14 +106,28 @@
 ///     // other methods
 /// }
 /// ```
+///
+/// ## Account Recovery
+///
+/// The system supports account recovery for lost or compromised wallets while
+/// maintaining strict security and audit trail requirements:
+///
+/// - **Recovered accounts cannot have new identities added**: Once an account
+///   has been recovered, it is permanently marked and cannot be reused for new
+///   identities.
+/// - **Cannot recover to an already-recovered account**: An account that was
+///   previously used as a recovery target cannot be used again.
+/// - **Proper sequencing enforced**: The system enforces the correct recovery
+///   sequence: `recover_identity` must be called before `recovery_balance` to
+///   ensure identity verification precedes asset transfer.
 use soroban_sdk::{
     contracttype, panic_with_error, Address, Env, Map, String, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::rwa::identity_registry_storage::{
-    emit_country_data_event, emit_identity_modified, emit_identity_stored, emit_identity_unstored,
-    CountryDataEvent, IRSError, IDENTITY_EXTEND_AMOUNT, IDENTITY_TTL_THRESHOLD,
-    MAX_COUNTRY_ENTRIES,
+    emit_country_data_event, emit_identity_modified, emit_identity_recovered, emit_identity_stored,
+    emit_identity_unstored, CountryDataEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
+    IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_ENTRIES,
 };
 
 /// ISO 3166-1 numeric country code
@@ -192,6 +206,8 @@ pub enum IRSStorageKey {
     Identity(Address),
     /// Maps an account to its complete identity profile
     IdentityProfile(Address),
+    /// Maps old account to new account after recovery
+    RecoveredTo(Address),
 }
 
 // ################## QUERY STATE ##################
@@ -211,7 +227,7 @@ pub enum IRSStorageKey {
 ///
 /// * [`IRSError::IdentityNotFound`] - If no identity is found for the
 ///   `account`.
-pub fn get_identity(e: &Env, account: &Address) -> Address {
+pub fn stored_identity(e: &Env, account: &Address) -> Address {
     let key = IRSStorageKey::Identity(account.clone());
     get_persistent_entry(e, &key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound))
@@ -270,6 +286,19 @@ pub fn get_country_data_entries(e: &Env, account: &Address) -> Vec<CountryData> 
     }
 }
 
+/// Retrieves the recovery target address for a recovered account.
+///
+/// Returns `Some(new_account)` if the account has been recovered to a new
+/// account, or `None` if the account has not been recovered.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `old_account` - The old account address to check.
+pub fn get_recovered_to(e: &Env, old_account: &Address) -> Option<Address> {
+    get_persistent_entry(e, &IRSStorageKey::RecoveredTo(old_account.clone()))
+}
+
 // ################## CHANGE STATE ##################
 
 /// Stores a new identity with a complete identity profile.
@@ -284,8 +313,10 @@ pub fn get_country_data_entries(e: &Env, account: &Address) -> Vec<CountryData> 
 ///
 /// # Errors
 ///
-/// * [`IRSError::IdentityAlreadyExists`] - If an identity is already stored for
-///   the `account`.
+/// * [`IRSError::AccountRecovered`] - If the `account` has been recovered to
+///   another account.
+/// * [`IRSError::IdentityOverwrite`] - If an identity is already stored for the
+///   `account`.
 /// * [`IRSError::EmptyCountryList`] - If `initial_countries` is empty.
 /// * [`IRSError::MaxCountryEntriesReached`] - If the number of
 ///   `initial_countries` exceeds `MAX_COUNTRY_ENTRIES`.
@@ -315,6 +346,11 @@ pub fn add_identity(
     identity_type: IdentityType,
     initial_countries: &Vec<CountryData>,
 ) {
+    // Check if account has been recovered
+    if get_recovered_to(e, account).is_some() {
+        panic_with_error!(e, IRSError::AccountRecovered)
+    }
+
     if initial_countries.is_empty() {
         panic_with_error!(e, IRSError::EmptyCountryList)
     }
@@ -324,7 +360,7 @@ pub fn add_identity(
 
     let identity_key = IRSStorageKey::Identity(account.clone());
     if e.storage().persistent().has(&identity_key) {
-        panic_with_error!(e, IRSError::IdentityAlreadyExists)
+        panic_with_error!(e, IRSError::IdentityOverwrite)
     }
     e.storage().persistent().set(&identity_key, identity);
 
@@ -435,6 +471,88 @@ pub fn remove_identity(e: &Env, account: &Address) {
     }
 }
 
+/// Recovers an identity by transferring it from an old account to a new
+/// account.
+///
+/// This function is typically used in account recovery scenarios where a user
+/// needs to transfer their identity and all associated data (including country
+/// data) from a compromised or lost account to a new account address.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `old_account` - The account address from which to recover the identity.
+/// * `new_account` - The account address to which the identity will be
+///   transferred.
+///
+/// # Errors
+///
+/// * [`IRSError::IdentityNotFound`] - If no identity is found for the
+///   `old_account`.
+/// * [`IRSError::AccountRecovered`] - If the `new_account` has already been
+///   recovered to another account.
+/// * [`IRSError::IdentityOverwrite`] - If the `new_account` is already linked
+///   to an identity.
+///
+/// # Events
+///
+/// * topics - `["identity_recovered", old_account: Address, new_account:
+///   Address]`
+/// * data - `[]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
+pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
+    // Check if new_account has been recovered
+    if get_recovered_to(e, new_account).is_some() {
+        panic_with_error!(e, IRSError::AccountRecovered)
+    }
+
+    // Recover identity
+    let old_identity_key = IRSStorageKey::Identity(old_account.clone());
+    let new_identity_key = IRSStorageKey::Identity(new_account.clone());
+
+    let identity: Address = e
+        .storage()
+        .persistent()
+        .get(&old_identity_key)
+        .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
+
+    // Check if new_account is not already linked to another identity
+    if e.storage().persistent().has(&new_identity_key) {
+        panic_with_error!(e, IRSError::IdentityOverwrite)
+    }
+
+    e.storage().persistent().set(&new_identity_key, &identity);
+    e.storage().persistent().remove(&old_identity_key);
+
+    // Recover identity profile
+    let old_profile_key = IRSStorageKey::IdentityProfile(old_account.clone());
+    let new_profile_key = IRSStorageKey::IdentityProfile(new_account.clone());
+
+    let profile: IdentityProfile = e
+        .storage()
+        .persistent()
+        .get(&old_profile_key)
+        // it would've panicked above if no IdentityProfile
+        .expect("identity profile must be already set");
+
+    e.storage().persistent().set(&new_profile_key, &profile);
+    e.storage().persistent().remove(&old_profile_key);
+
+    // Mark old account as recovered to new account
+    e.storage().persistent().set(&IRSStorageKey::RecoveredTo(old_account.clone()), new_account);
+
+    emit_identity_recovered(e, old_account, new_account);
+}
+
 /// Adds multiple country data entries to an existing identity.
 ///
 /// Does not check for duplicate country data entries.
@@ -474,7 +592,7 @@ pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &
 
     let mut profile: IdentityProfile =
         get_persistent_entry(e, &IRSStorageKey::IdentityProfile(account.clone()))
-            .expect("identity profile must be already set");
+            .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
 
     profile.countries.append(country_data_list);
     if profile.countries.len() > MAX_COUNTRY_ENTRIES {
