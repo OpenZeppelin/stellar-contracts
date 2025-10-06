@@ -31,6 +31,8 @@ fn bind_max() {
     assert_eq!(client.linked_tokens().len(), 200)
 }
 
+// TODO: add test for checking `recovery_address` fails when contract is paused
+// TODO: add nonce-based signature invalidation for claims
 // TODO: add test for checking `recover_balance` fails when contract is paused
 
 // TODO: add below tests
