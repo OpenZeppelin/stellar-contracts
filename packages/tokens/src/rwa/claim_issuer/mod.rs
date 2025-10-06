@@ -66,8 +66,8 @@
 //! pub struct MyContract;
 //!
 //! #[contractimpl]
-//! pub fn __constructor(e: Env, ed25519_key: Bytes) {
-//!     allow_key(&e, &ed25519_key, ED25519_SCHEME_NUM, 42);
+//! pub fn __constructor(e: Env, ed25519_key: Bytes, claim_topics_and_issuers: Address) {
+//!     allow_key(&e, &ed25519_key, claim_topics_and_issuers, ED25519_SCHEME_NUM, 42);
 //! }
 //!
 //! #[contractimpl]

@@ -58,14 +58,14 @@
 //!    fine-grained control over individual claims.
 //!
 //! 2. **Signature invalidation** (`invalidate_claim_signatures`): Invalidates
-//!    all existing claim signatures by incrementing the nonce. This is
-//!    efficient for invalidating multiple signatures at once without storing
-//!    individual revocation entries.
+//!    all existing claim signatures for a specific identity and claim topic by
+//!    incrementing the nonce. This is efficient for invalidating multiple
+//!    signatures at once without storing individual revocation entries.
 //!
-//! A nonce is included by default in every claim message (see
-//! `build_claim_message`) to enable signature invalidation. The message format
-//! is: network_id || claim_issuer || identity || claim_topic || nonce ||
-//! claim_data
+//! A nonce (specific to each identity and claim topic pair) is included by
+//! default in every claim message (see `build_claim_message`) to enable
+//! signature invalidation. The message format is: network_id || claim_issuer ||
+//! identity || claim_topic || nonce || claim_data
 use core::ops::RangeBounds;
 
 use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, Vec};
@@ -599,8 +599,8 @@ pub fn get_current_nonce_for(e: &Env, identity: &Address, claim_topic: u32) -> u
         .unwrap_or(0)
 }
 
-/// Invalidates all claim signatures for an identity and topic by incrementing
-/// the nonce.
+/// Invalidates all claim signatures for a specific identity and claim topic by
+/// incrementing the nonce.
 ///
 /// This provides an efficient way to invalidate all existing claim signatures
 /// without storing individual revocation entries. After calling this function,
