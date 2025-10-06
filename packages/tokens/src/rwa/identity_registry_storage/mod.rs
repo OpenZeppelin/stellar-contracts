@@ -95,7 +95,7 @@
 //!     },
 //! ];
 //!
-//! add_identity(&env, &account, &identity, IdentityType::Individual, &country_data);
+//! add_identity(&e, &account, &identity, IdentityType::Individual, &country_data);
 //! ```
 //!
 //! ### Organization with KYB Data
@@ -130,7 +130,7 @@
 //!     },
 //! ];
 //!
-//! add_identity(&env, &account, &identity, IdentityType::Organization, &country_data);
+//! add_identity(&e, &account, &identity, IdentityType::Organization, &country_data);
 //! ```
 //! ## Constraints
 //!
@@ -139,6 +139,138 @@
 //! - All operations require proper authorization (handled by implementer)
 //! - Metadata can be used to provide additional context for mixed relation
 //!   types
+//!
+//! ## ⚠️ Privacy and Security Considerations
+//!
+//! **IMPORTANT: This implementation stores compliance data in plaintext on the
+//! blockchain, making it publicly accessible to all network participants.**
+//!
+//! ### Public Data Exposure
+//!
+//! All data stored through this module, including:
+//! - Identity types (Individual/Organization)
+//! - Country relationships (citizenship, residence, incorporation, etc.)
+//! - Associated metadata (names, roles, entity types)
+//!
+//! is **public and accessible* to anyone with access to the blockchain.
+//!
+//! ### Risks
+//!
+//! Storing personally identifiable information (PII) and sensitive compliance
+//! data in plaintext on an immutable public ledger creates several risks:
+//!
+//! - **Data Harvesting**: Malicious actors can collect and aggregate sensitive
+//!   user information for fraud, identity theft, or targeted attacks
+//! - **Regulatory Compliance**: May violate data protection regulations (GDPR,
+//!   CCPA, etc.) that require data minimization and the right to erasure
+//! - **Immutability**: Once stored, data cannot be deleted or modified to
+//!   comply with "right to be forgotten" requirements
+//! - **Correlation Attacks**: Public data can be cross-referenced with other
+//!   on-chain or off-chain data sources to de-anonymize users
+//!
+//! ### Privacy-Preserving Alternatives
+//!
+//! For applications requiring stronger privacy guarantees, consider
+//! implementing a commitment-based architecture where only cryptographic
+//! proofs are stored on-chain.
+//!
+//! Examples:
+//!
+//! #### 1. Hash-Based Commitments
+//!
+//! Store only cryptographic hashes of compliance data as `CountryData`:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, BytesN};
+//!
+//! // Use hash commitment as CountryData
+//! #[contracttype]
+//! pub struct HashCommitment {
+//!     pub commitment: BytesN<32>, // SHA-256 hash of compliance data
+//!     pub timestamp: u64,
+//! }
+//!
+//! // Implementation with hash-based CountryData
+//! impl IdentityRegistryStorage for MyContract {
+//!     type CountryData = HashCommitment;
+//!
+//!     // ... trait methods
+//! }
+//! ```
+//!
+//! #### 2. Merkle Tree Commitments
+//!
+//! Store a Merkle root for selective disclosure as `CountryData`:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, BytesN};
+//!
+//! // Use Merkle root as CountryData
+//! #[contracttype]
+//! pub struct MerkleCommitment {
+//!     pub merkle_root: BytesN<32>,
+//!     pub attribute_type: Symbol, // e.g., "citizenship", "residence"
+//! }
+//!
+//! // Implementation with Merkle-based CountryData
+//! impl IdentityRegistryStorage for MyContract {
+//!     type CountryData = MerkleCommitment;
+//!
+//!     // ... trait methods
+//! }
+//! ```
+//!
+//! #### 3. Zero-Knowledge Proofs
+//!
+//! Store verification keys for ZK proofs as `CountryData`:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, BytesN, Symbol};
+//!
+//! // Use ZK verification key as CountryData
+//! #[contracttype]
+//! pub struct ZKCommitment {
+//!     pub verification_key: BytesN<32>,
+//!     pub proof_type: Symbol, // e.g., "citizenship", "age_over_18"
+//! }
+//!
+//! // Implementation with ZK-based CountryData
+//! impl IdentityRegistryStorage for MyContract {
+//!     type CountryData = ZKCommitment;
+//!
+//!     // ... trait methods
+//! }
+//! ```
+//!
+//! #### 4. Off-Chain Storage with On-Chain Attestations
+//!
+//! Store attestation metadata as `CountryData`:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, Address, BytesN, Symbol};
+//!
+//! // Use attestation as CountryData
+//! #[contracttype]
+//! pub struct ComplianceAttestation {
+//!     pub attestor: Address,      // Trusted verifier
+//!     pub data_hash: BytesN<32>,  // Hash of off-chain data
+//!     pub attribute_type: Symbol, // e.g., "citizenship", "residence"
+//! }
+//!
+//! // Implementation with attestation-based CountryData
+//! impl IdentityRegistryStorage for MyContract {
+//!     type CountryData = ComplianceAttestation;
+//!
+//!     // ... trait methods
+//! }
+//! ```
+//!
+//! ### Recommendation
+//!
+//! This implementation is suitable for:
+//! - Non-sensitive jurisdictional data
+//! - Public compliance frameworks where transparency is required
+//! - Testing and development environments
 mod storage;
 
 #[cfg(test)]
