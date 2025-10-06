@@ -45,13 +45,23 @@ pub trait IdentityVerifier {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `user_address` - The user address to verify.
+    /// * `account` - The account to verify.
     ///
     /// # Errors
     ///
     /// * [`crate::rwa::RWAError::IdentityVerificationFailed`] - When the
-    ///   identity of the user address cannot be verified.
-    fn verify_identity(e: &Env, user_address: &Address);
+    ///   identity of the account cannot be verified.
+    fn verify_identity(e: &Env, account: &Address);
+
+    /// Returns the target address for the recovery process for the old account.
+    /// If the old account is not a target of a recovery process, `None` is
+    /// returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `old_account` - The address of the old account.
+    fn recovery_target(e: &Env, old_account: &Address) -> Option<Address>;
 
     /// Sets the identity registry contract of the token.
     /// This function can only be called by the operator with necessary
