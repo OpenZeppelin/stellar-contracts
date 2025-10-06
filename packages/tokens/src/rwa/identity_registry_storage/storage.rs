@@ -541,6 +541,7 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
         .storage()
         .persistent()
         .get(&old_profile_key)
+        // it would've panicked above if no IdentityProfile
         .expect("identity profile must be already set");
 
     e.storage().persistent().set(&new_profile_key, &profile);
