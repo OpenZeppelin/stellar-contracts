@@ -95,7 +95,7 @@
 //!     },
 //! ];
 //!
-//! add_identity(&env, &account, &identity, IdentityType::Individual, &country_data);
+//! add_identity(&e, &account, &identity, IdentityType::Individual, &country_data);
 //! ```
 //!
 //! ### Organization with KYB Data
@@ -130,7 +130,7 @@
 //!     },
 //! ];
 //!
-//! add_identity(&env, &account, &identity, IdentityType::Organization, &country_data);
+//! add_identity(&e, &account, &identity, IdentityType::Organization, &country_data);
 //! ```
 //! ## Constraints
 //!
@@ -139,6 +139,138 @@
 //! - All operations require proper authorization (handled by implementer)
 //! - Metadata can be used to provide additional context for mixed relation
 //!   types
+//!
+//! ## ⚠️ Privacy and Security Considerations
+//!
+//! **IMPORTANT: This implementation stores compliance data in plaintext on the
+//! blockchain, making it publicly accessible to all network participants.**
+//!
+//! ### Public Data Exposure
+//!
+//! All data stored through this module, including:
+//! - Identity types (Individual/Organization)
+//! - Country relationships (citizenship, residence, incorporation, etc.)
+//! - Associated metadata (names, roles, entity types)
+//!
+//! is **public and accessible* to anyone with access to the blockchain.
+//!
+//! ### Risks
+//!
+//! Storing personally identifiable information (PII) and sensitive compliance
+//! data in plaintext on an immutable public ledger creates several risks:
+//!
+//! - **Data Harvesting**: Malicious actors can collect and aggregate sensitive
+//!   user information for fraud, identity theft, or targeted attacks
+//! - **Regulatory Compliance**: May violate data protection regulations (GDPR,
+//!   CCPA, etc.) that require data minimization and the right to erasure
+//! - **Immutability**: Once stored, data cannot be deleted or modified to
+//!   comply with "right to be forgotten" requirements
+//! - **Correlation Attacks**: Public data can be cross-referenced with other
+//!   on-chain or off-chain data sources to de-anonymize users
+//!
+//! ### Privacy-Preserving Alternatives
+//!
+//! For applications requiring stronger privacy guarantees, consider
+//! implementing a commitment-based architecture where only cryptographic
+//! proofs are stored on-chain.
+//!
+//! Examples:
+//!
+//! #### 1. Hash-Based Commitments
+//!
+//! Store only cryptographic hashes of compliance data as `CountryData`:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, BytesN};
+//!
+//! // Use hash commitment as CountryData
+//! #[contracttype]
+//! pub struct HashCommitment {
+//!     pub commitment: BytesN<32>, // SHA-256 hash of compliance data
+//!     pub timestamp: u64,
+//! }
+//!
+//! // Implementation with hash-based CountryData
+//! impl IdentityRegistryStorage for MyContract {
+//!     type CountryData = HashCommitment;
+//!
+//!     // ... trait methods
+//! }
+//! ```
+//!
+//! #### 2. Merkle Tree Commitments
+//!
+//! Store a Merkle root for selective disclosure as `CountryData`:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, BytesN};
+//!
+//! // Use Merkle root as CountryData
+//! #[contracttype]
+//! pub struct MerkleCommitment {
+//!     pub merkle_root: BytesN<32>,
+//!     pub attribute_type: Symbol, // e.g., "citizenship", "residence"
+//! }
+//!
+//! // Implementation with Merkle-based CountryData
+//! impl IdentityRegistryStorage for MyContract {
+//!     type CountryData = MerkleCommitment;
+//!
+//!     // ... trait methods
+//! }
+//! ```
+//!
+//! #### 3. Zero-Knowledge Proofs
+//!
+//! Store verification keys for ZK proofs as `CountryData`:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, BytesN, Symbol};
+//!
+//! // Use ZK verification key as CountryData
+//! #[contracttype]
+//! pub struct ZKCommitment {
+//!     pub verification_key: BytesN<32>,
+//!     pub proof_type: Symbol, // e.g., "citizenship", "age_over_18"
+//! }
+//!
+//! // Implementation with ZK-based CountryData
+//! impl IdentityRegistryStorage for MyContract {
+//!     type CountryData = ZKCommitment;
+//!
+//!     // ... trait methods
+//! }
+//! ```
+//!
+//! #### 4. Off-Chain Storage with On-Chain Attestations
+//!
+//! Store attestation metadata as `CountryData`:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, Address, BytesN, Symbol};
+//!
+//! // Use attestation as CountryData
+//! #[contracttype]
+//! pub struct ComplianceAttestation {
+//!     pub attestor: Address,      // Trusted verifier
+//!     pub data_hash: BytesN<32>,  // Hash of off-chain data
+//!     pub attribute_type: Symbol, // e.g., "citizenship", "residence"
+//! }
+//!
+//! // Implementation with attestation-based CountryData
+//! impl IdentityRegistryStorage for MyContract {
+//!     type CountryData = ComplianceAttestation;
+//!
+//!     // ... trait methods
+//! }
+//! ```
+//!
+//! ### Recommendation
+//!
+//! This implementation is suitable for:
+//! - Non-sensitive jurisdictional data
+//! - Public compliance frameworks where transparency is required
+//! - Testing and development environments
 mod storage;
 
 #[cfg(test)]
@@ -147,8 +279,9 @@ mod test;
 use soroban_sdk::{contracterror, contractevent, Address, Env, FromVal, Val, Vec};
 pub use storage::{
     add_country_data_entries, add_identity, delete_country_data, get_country_data,
-    get_country_data_entries, get_identity, modify_country_data, modify_identity, remove_identity,
-    CountryData, CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
+    get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
+    modify_identity, recover_identity, remove_identity, stored_identity, CountryData,
+    CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
     OrganizationCountryRelation,
 };
 
@@ -218,6 +351,25 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// * data - `[]`
     fn modify_identity(e: &Env, account: Address, identity: Address, operator: Address);
 
+    /// Recovers an identity by transferring it from an old account to a new
+    /// account.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `old_account` - The account address from which to recover the
+    ///   identity.
+    /// * `new_account` - The account address to which the identity will be
+    ///   transferred.
+    /// * `operator` - The address authorizing the invocation.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["identity_recovered", old_account: Address, new_account:
+    ///   Address]`
+    /// * data - `[]`
+    fn recover_identity(e: &Env, old_account: Address, new_account: Address, operator: Address);
+
     /// Retrieves the stored identity for a given account.
     ///
     /// # Arguments
@@ -225,6 +377,17 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// * `e` - The Soroban environment.
     /// * `account` - The account address to query.
     fn stored_identity(e: &Env, account: Address) -> Address;
+
+    /// Retrieves the recovery target address for a recovered account.
+    ///
+    /// Returns `Some(new_account)` if the account has been recovered to a new
+    /// account, or `None` if the account has not been recovered.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `old_account` - The old account address to check.
+    fn get_recovered_to(e: &Env, old_account: Address) -> Option<Address>;
 }
 
 /// Trait for managing multiple country data entries associated with an
@@ -317,7 +480,7 @@ pub trait CountryDataManager: IdentityRegistryStorage {
 #[repr(u32)]
 pub enum IRSError {
     /// An identity already exists for the given account.
-    IdentityAlreadyExists = 320,
+    IdentityOverwrite = 320,
     /// No identity found for the given account.
     IdentityNotFound = 321,
     /// Country data not found at the specified index.
@@ -326,6 +489,8 @@ pub enum IRSError {
     EmptyCountryList = 323,
     /// The maximum number of country entries has been reached.
     MaxCountryEntriesReached = 324,
+    /// Account has been recovered and cannot be used.
+    AccountRecovered = 325,
 }
 
 // ################## CONSTANTS ##################
@@ -407,6 +572,28 @@ pub struct IdentityModified {
 /// * `new_identity` - The new identity address.
 pub fn emit_identity_modified(e: &Env, old_identity: &Address, new_identity: &Address) {
     IdentityModified { old_identity: old_identity.clone(), new_identity: new_identity.clone() }
+        .publish(e);
+}
+
+/// Event emitted when an identity is recovered for a new account.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentityRecovered {
+    #[topic]
+    pub old_account: Address,
+    #[topic]
+    pub new_account: Address,
+}
+
+/// Emits an event when an identity is recovered for a new account.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `old_account` - The previous account address.
+/// * `new_account` - The new account address.
+pub fn emit_identity_recovered(e: &Env, old_account: &Address, new_account: &Address) {
+    IdentityRecovered { old_account: old_account.clone(), new_account: new_account.clone() }
         .publish(e);
 }
 

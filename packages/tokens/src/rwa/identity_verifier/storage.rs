@@ -26,7 +26,9 @@ pub enum IdentityVerifierStorageKey {
 #[allow(unused)]
 #[contractclient(name = "IdentityRegistryStorageClient")]
 trait IdentityRegistryStorage {
-    fn stored_identity(e: &Env, user_address: Address) -> Address;
+    fn stored_identity(e: &Env, account: Address) -> Address;
+
+    fn get_recovered_to(e: &Env, old_account: Address) -> Option<Address>;
 }
 
 /// Returns the Claim Topics and Issuers contract linked to the token.
@@ -69,17 +71,17 @@ pub fn identity_registry_storage(e: &Env) -> Address {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `user_address` - The user address to verify.
+/// * `account` - The account to verify.
 ///
 /// # Errors
 ///
-/// * [`RWAError::IdentityVefificationFailed`] - When the identity of the user
-///   address cannot be verified.
-pub fn verify_identity(e: &Env, user_address: &Address) {
+/// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
+///   account cannot be verified.
+pub fn verify_identity(e: &Env, account: &Address) {
     let irs_addr = identity_registry_storage(e);
     let irs_client = IdentityRegistryStorageClient::new(e, &irs_addr);
 
-    let identity_addr = irs_client.stored_identity(user_address);
+    let identity_addr = irs_client.stored_identity(account);
     let identity_client = IdentityClaimsClient::new(e, &identity_addr);
 
     let cti_addr = claim_topics_and_issuers(e);
@@ -149,6 +151,21 @@ pub fn validate_claim(
     } else {
         false
     }
+}
+
+/// Returns the target address for the recovery process for the old account.
+/// If the old account is not a target of a recovery process, `None` is
+/// returned.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `old_account` - The address of the old account.
+pub fn recovery_target(e: &Env, old_account: &Address) -> Option<Address> {
+    let irs_addr = identity_registry_storage(e);
+    let irs_client = IdentityRegistryStorageClient::new(e, &irs_addr);
+
+    irs_client.get_recovered_to(old_account)
 }
 
 /// Sets the claim topics and issuers contract of the token.

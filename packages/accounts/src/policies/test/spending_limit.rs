@@ -71,7 +71,7 @@ fn install_success() {
 
         install(&e, &params, &context_rule, &smart_account);
 
-        let data = get_spending_limit_data(&e, &context_rule, &smart_account);
+        let data = get_spending_limit_data(&e, context_rule.id, &smart_account);
         assert_eq!(data.spending_limit, 1_000_000);
         assert_eq!(data.period_ledgers, 100);
         assert_eq!(data.spending_history.len(), 0);
@@ -221,13 +221,13 @@ fn enforce_within_limit() {
         assert!(can_enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account));
 
         // Check initial state - should be empty
-        let initial_data = get_spending_limit_data(&e, &context_rule, &smart_account);
+        let initial_data = get_spending_limit_data(&e, context_rule.id, &smart_account);
         assert!(initial_data.spending_history.is_empty());
 
         enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
 
         // Check that spending was recorded
-        let data = get_spending_limit_data(&e, &context_rule, &smart_account);
+        let data = get_spending_limit_data(&e, context_rule.id, &smart_account);
 
         // If this fails, the enforce function didn't save the spending entry
         assert!(!data.spending_history.is_empty());
@@ -341,7 +341,7 @@ fn rolling_window_functionality() {
         enforce(&e, &context5, &context_rule.signers, &context_rule, &smart_account);
 
         // Check that old entries were cleaned up
-        let data = get_spending_limit_data(&e, &context_rule, &smart_account);
+        let data = get_spending_limit_data(&e, context_rule.id, &smart_account);
         // After cleanup, should have second and third transactions
         assert_eq!(data.spending_history.len(), 2);
 
@@ -379,7 +379,7 @@ fn multiple_transactions_within_period() {
 
     // Check total spent: 750,000, should be within limit
     e.as_contract(&address, || {
-        let data = get_spending_limit_data(&e, &context_rule, &smart_account);
+        let data = get_spending_limit_data(&e, context_rule.id, &smart_account);
         assert_eq!(data.spending_history.len(), 5);
     });
 
@@ -414,7 +414,7 @@ fn set_spending_limit_success() {
         // Update the spending limit
         set_spending_limit(&e, 2_000_000, &context_rule, &smart_account);
 
-        let data = get_spending_limit_data(&e, &context_rule, &smart_account);
+        let data = get_spending_limit_data(&e, context_rule.id, &smart_account);
         assert_eq!(data.spending_limit, 2_000_000);
         assert_eq!(data.period_ledgers, 100); // Should remain unchanged
         assert_eq!(data.cached_total_spent, 0); // Should remain unchanged
@@ -458,7 +458,7 @@ fn uninstall_success() {
         install(&e, &params, &context_rule, &smart_account);
 
         // Verify installation
-        let data = get_spending_limit_data(&e, &context_rule, &smart_account);
+        let data = get_spending_limit_data(&e, context_rule.id, &smart_account);
         assert_eq!(data.spending_limit, 1_000_000);
     });
 
@@ -482,7 +482,7 @@ fn get_spending_limit_data_not_installed() {
 
     e.as_contract(&address, || {
         // Try to get data without installing first
-        get_spending_limit_data(&e, &context_rule, &smart_account);
+        get_spending_limit_data(&e, context_rule.id, &smart_account);
     });
 }
 

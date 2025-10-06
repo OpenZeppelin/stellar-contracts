@@ -236,7 +236,7 @@ fn validate_claim_invalid_signature() {
 fn verify_identity_success() {
     let e = Env::default();
     let address = e.register(MockContract, ());
-    let user_address = Address::generate(&e);
+    let account = Address::generate(&e);
 
     e.as_contract(&address, || {
         let (_identity_claims, issuer, irs, cti) = setup_verification_contracts(&e);
@@ -251,7 +251,7 @@ fn verify_identity_success() {
         });
 
         // Should not panic
-        verify_identity(&e, &user_address);
+        verify_identity(&e, &account);
     });
 }
 
@@ -259,7 +259,7 @@ fn verify_identity_success() {
 fn verify_identity_success_with_multiple_issuers() {
     let e = Env::default();
     let address = e.register(MockContract, ());
-    let user_address = Address::generate(&e);
+    let account = Address::generate(&e);
 
     e.as_contract(&address, || {
         let (identity_claims, issuer1, irs, cti) = setup_verification_contracts(&e);
@@ -302,7 +302,7 @@ fn verify_identity_success_with_multiple_issuers() {
         set_claim_topics_and_issuers(&e, &cti);
 
         // Should succeed with second issuer
-        verify_identity(&e, &user_address);
+        verify_identity(&e, &account);
     });
 }
 
@@ -311,7 +311,7 @@ fn verify_identity_success_with_multiple_issuers() {
 fn verify_identity_fails_all_issuers_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
-    let user_address = Address::generate(&e);
+    let account = Address::generate(&e);
 
     e.as_contract(&address, || {
         let (identity_claims, issuer1, irs, cti) = setup_verification_contracts(&e);
@@ -351,7 +351,7 @@ fn verify_identity_fails_all_issuers_invalid() {
         set_identity_registry_storage(&e, &irs);
         set_claim_topics_and_issuers(&e, &cti);
 
-        verify_identity(&e, &user_address);
+        verify_identity(&e, &account);
     });
 }
 
@@ -360,7 +360,7 @@ fn verify_identity_fails_all_issuers_invalid() {
 fn verify_identity_fails_no_matched_ids() {
     let e = Env::default();
     let address = e.register(MockContract, ());
-    let user_address = Address::generate(&e);
+    let account = Address::generate(&e);
 
     e.as_contract(&address, || {
         let (identity_claims, issuer1, irs, cti) = setup_verification_contracts(&e);
@@ -386,6 +386,6 @@ fn verify_identity_fails_no_matched_ids() {
         set_identity_registry_storage(&e, &irs);
         set_claim_topics_and_issuers(&e, &cti);
 
-        verify_identity(&e, &user_address);
+        verify_identity(&e, &account);
     });
 }
