@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, log, panic_with_error, Address, Env, String};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
@@ -330,42 +330,42 @@ impl RWA {
         emit_burn(e, user_address, amount);
     }
 
-    /// Recovery function used to force transfer tokens from a lost wallet to a
-    /// new wallet. This function transfers all tokens and preserves the frozen
-    /// status from the lost wallet to the new wallet. Returns `true` if
+    /// Recovery function used to force transfer tokens from a old account to a
+    /// new account. This function transfers all tokens and preserves the frozen
+    /// status from the old account to the new account. Returns `true` if
     /// recovery was successful, `false` if no tokens to recover.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `lost_wallet` - The address of the wallet that lost access.
-    /// * `new_wallet` - The address of the new wallet to receive the tokens.
+    /// * `old_account` - The address of the wallet that lost access.
+    /// * `new_account` - The address of the new account to receive the tokens.
     /// * `investor_onchain_id` - The onchain ID of the investor for
     ///   verification.
     ///
     /// # Errors
     ///
     /// * [`RWAError::IdentityVerificationFailed`] - When the identity of the
-    ///   new wallet cannot be verified.
-    /// * [`RWAError::IdentityMismatch`] - When the new wallet is not the target
-    ///   of the recovery process for the old wallet.
+    ///   new account cannot be verified.
+    /// * [`RWAError::IdentityMismatch`] - When the new account is not the
+    ///   target of the recovery process for the old wallet.
     ///
     /// # Events
     ///
-    /// * topics - `["transfer", lost_wallet: Address, new_wallet: Address]`
+    /// * topics - `["transfer", old_account: Address, new_account: Address]`
     /// * data - `[amount: i128]`
-    /// * topics - `["recovery_success", lost_wallet: Address, new_wallet:
+    /// * topics - `["recovery_success", old_account: Address, new_account:
     ///   Address, investor_onchain_id: Address]`
     /// * data - `[]`
     ///
     /// # Notes
     ///
     /// This function preserves the frozen status (both partial and full) from
-    /// the lost wallet and applies it to the new wallet, maintaining
+    /// the old account and applies it to the new account, maintaining
     /// regulatory compliance.
     ///
     /// This functions does not concern itself with the Identity Management.
-    /// If the lost wallet's identity should be removed, it should be done on
+    /// If the old account's identity should be removed, it should be done on
     /// the Identity Stack.
     ///
     /// # Security Warning
@@ -373,53 +373,47 @@ impl RWA {
     /// **IMPORTANT**: This function bypasses authorization and compliance
     /// checks. Should only be used by authorized recovery or admin
     /// functions.
-    pub fn recover_balance(e: &Env, lost_wallet: &Address, new_wallet: &Address) -> bool {
-        // Verify identity for the new wallet
+    pub fn recover_balance(e: &Env, old_account: &Address, new_account: &Address) -> bool {
+        // Verify identity for the new account
         let identity_verifier_addr = Self::identity_verifier(e);
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
-        identity_verifier_client.verify_identity(new_wallet);
+        identity_verifier_client.verify_identity(new_account);
 
-        log!(e, "Identity verified for new wallet");
-
-        // Verify that the new wallet is the recovery target for the lost wallet
+        // Verify that the new account is the recovery target for the old account
         let recovery_target = identity_verifier_client
-            .recovery_target(lost_wallet)
+            .recovery_target(old_account)
             .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityMismatch));
 
-        log!(e, "Recovery target set for lost wallet");
-
-        if recovery_target != *new_wallet {
+        if recovery_target != *new_account {
             panic_with_error!(e, RWAError::IdentityMismatch);
         }
 
-        log!(e, "Recovery target verified for lost wallet");
-
-        // Get the balance of the lost wallet, if there is nothing to transfer, return
+        // Get the balance of the old account, if there is nothing to transfer, return
         // false
-        let lost_balance = Base::balance(e, lost_wallet);
+        let lost_balance = Base::balance(e, old_account);
         if lost_balance == 0 {
             return false;
         }
 
         // Store frozen status before transfer
-        let frozen_tokens = Self::get_frozen_tokens(e, lost_wallet);
-        let is_address_frozen = Self::is_frozen(e, lost_wallet);
+        let frozen_tokens = Self::get_frozen_tokens(e, old_account);
+        let is_address_frozen = Self::is_frozen(e, old_account);
 
         // Use forced_transfer to transfer all tokens (this handles unfreezing as
         // needed)
-        Self::forced_transfer(e, lost_wallet, new_wallet, lost_balance);
+        Self::forced_transfer(e, old_account, new_account, lost_balance);
 
-        // Preserve frozen tokens on the new wallet if there were any
+        // Preserve frozen tokens on the new account if there were any
         if frozen_tokens > 0 {
-            Self::freeze_partial_tokens(e, new_wallet, frozen_tokens);
+            Self::freeze_partial_tokens(e, new_account, frozen_tokens);
         }
 
-        // Preserve address frozen status on the new wallet if it was frozen
+        // Preserve address frozen status on the new account if it was frozen
         if is_address_frozen {
-            Self::set_address_frozen(e, &e.current_contract_address(), new_wallet, true);
+            Self::set_address_frozen(e, &e.current_contract_address(), new_account, true);
         }
 
-        emit_recovery_success(e, lost_wallet, new_wallet);
+        emit_recovery_success(e, old_account, new_account);
 
         true
     }

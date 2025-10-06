@@ -153,19 +153,19 @@ pub fn validate_claim(
     }
 }
 
-/// Returns the target address for the recovery process for the lost wallet.
-/// If the lost wallet is not a target of a recovery process, `None` is
+/// Returns the target address for the recovery process for the old account.
+/// If the old account is not a target of a recovery process, `None` is
 /// returned.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `lost_wallet` - The address of the lost wallet.
-pub fn recovery_target(e: &Env, lost_wallet: &Address) -> Option<Address> {
+/// * `old_account` - The address of the old account.
+pub fn recovery_target(e: &Env, old_account: &Address) -> Option<Address> {
     let irs_addr = identity_registry_storage(e);
     let irs_client = IdentityRegistryStorageClient::new(e, &irs_addr);
 
-    irs_client.get_recovered_to(lost_wallet)
+    irs_client.get_recovered_to(old_account)
 }
 
 /// Sets the claim topics and issuers contract of the token.

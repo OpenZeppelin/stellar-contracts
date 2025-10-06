@@ -21,7 +21,7 @@
 //!   identity verification
 //! - **Freezing Mechanisms**: Address-level and partial token freezing
 //!   capabilities
-//! - **Recovery System**: Lost wallet recovery for verified investors
+//! - **Recovery System**: Lost/old account recovery for verified investors
 //! - **Pausable Operations**: Emergency pause functionality for the entire
 //!   token
 //! - **RBAC**: Role-based access control allows to define and set custom
@@ -111,7 +111,7 @@ use crate::fungible::FungibleToken;
 /// - Identity registry integration for KYC/AML compliance
 /// - Modular compliance framework for transfer validation
 /// - Freezing mechanisms for regulatory enforcement
-/// - Recovery system for lost wallet scenarios
+/// - Recovery system for lost/old account scenarios
 /// - Administrative controls for token management
 pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     // ################## CORE TOKEN FUNCTIONS ##################
@@ -188,8 +188,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * data - `[amount: i128]`
     fn burn(e: &Env, user_address: Address, amount: i128, operator: Address);
 
-    /// Recovery function used to force transfer tokens from a lost wallet
-    /// to a new wallet for an investor.
+    /// Recovery function used to force transfer tokens from a old account
+    /// to a new account for an investor.
     /// This function can only be called by the operator with necessary
     /// privileges. RBAC checks are expected to be enforced on the
     /// `operator`.
@@ -197,25 +197,25 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `lost_wallet` - The wallet that the investor lost.
-    /// * `new_wallet` - The newly provided wallet for token transfer.
+    /// * `old_account` - The wallet that the investor lost.
+    /// * `new_account` - The newly provided wallet for token transfer.
     /// * `operator` - The address of the operator.
     ///
     /// # Errors
     ///
     /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
-    ///   new wallet cannot be verified.
+    ///   new account cannot be verified.
     ///
     /// # Events
     ///
-    /// * topics - `["transfer", lost_wallet: Address, new_wallet: Address]`
+    /// * topics - `["transfer", old_account: Address, new_account: Address]`
     /// * data - `[amount: i128]`
-    /// * topics - `["recovery", lost_wallet: Address, new_wallet: Address]`
+    /// * topics - `["recovery", old_account: Address, new_account: Address]`
     /// * data - `[]`
     fn recover_balance(
         e: &Env,
-        lost_wallet: Address,
-        new_wallet: Address,
+        old_account: Address,
+        new_account: Address,
         operator: Address,
     ) -> bool;
 
@@ -406,7 +406,7 @@ pub enum RWAError {
     IdentityRegistryStorageNotSet = 311,
     /// Indicates the identity verifier contract is not set.
     IdentityVerifierNotSet = 312,
-    /// Indicates the lost wallet and new wallet have different identities.
+    /// Indicates the old account and new account have different identities.
     IdentityMismatch = 313,
 }
 
@@ -441,9 +441,9 @@ pub fn emit_token_onchain_id_updated(e: &Env, onchain_id: &Address) {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RecoverySuccess {
     #[topic]
-    pub lost_wallet: Address,
+    pub old_account: Address,
     #[topic]
-    pub new_wallet: Address,
+    pub new_account: Address,
 }
 
 /// Emits an event indicating a successful recovery.
@@ -451,10 +451,11 @@ pub struct RecoverySuccess {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `lost_wallet` - The address of the lost wallet.
-/// * `new_wallet` - The address of the new wallet.
-pub fn emit_recovery_success(e: &Env, lost_wallet: &Address, new_wallet: &Address) {
-    RecoverySuccess { lost_wallet: lost_wallet.clone(), new_wallet: new_wallet.clone() }.publish(e);
+/// * `old_account` - The address of the old account.
+/// * `new_account` - The address of the new account.
+pub fn emit_recovery_success(e: &Env, old_account: &Address, new_account: &Address) {
+    RecoverySuccess { old_account: old_account.clone(), new_account: new_account.clone() }
+        .publish(e);
 }
 
 /// Event emitted when an address is frozen or unfrozen.
