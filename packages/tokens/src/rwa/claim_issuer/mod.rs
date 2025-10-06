@@ -85,7 +85,7 @@
 //!             // Extract signature data
 //!             let signature_data = Ed25519Verifier::extract_signature_data(e, &sig_data);
 //!
-//!             // Check if the public key is allowedfor this topic
+//!             // Check if the public key is allowed for this topic
 //!             if !is_key_allowed_for_topic(
 //!                 e,
 //!                 &signature_data.public_key.to_bytes(),
