@@ -18,8 +18,6 @@ use crate::rwa::{
 /// - Topic branch: `Topics(u32) -> Vec<SigningKey>` Tracks which signing keys
 ///   are assigned to a specific claim topic.
 ///
-/// Visual representation:
-///
 /// ```text
 ///                          ┌─────────────────────────┐
 ///                          │ SigningKey              │
@@ -38,15 +36,30 @@ use crate::rwa::{
 ///     [registry_1, registry_2, ...]         [key_1, key_2, ...]
 /// ```
 ///
-/// - During claim verification, the claim issuer's internal flow typically
-///   needs to check only the topic branch using `is_key_allowed_for_topic()` to
-///   confirm that a given signing key is assigned to the claim topic in this
-///   contract.
-/// - Although the branches are separate, they are updated atomically by
-///   `allow_key()`/`remove_key()`. A signing key cannot be assigned to a topic
-///   without also being assigned to at least one registry. When the last
-///   registry assignment for a key is removed, the key is automatically removed
-///   from the topic branch as well.
+/// ## Key Properties
+///
+/// 1. **Atomic updates**: Although the branches are separate, they are updated
+///    atomically by `allow_key()`/`remove_key()`. A signing key cannot be
+///    assigned to a topic without also being assigned to at least one registry.
+///    When the last registry assignment for a key is removed, the key is
+///    automatically removed from the topic branch as well.
+///
+/// 2. **Rationale for separation**: During claim verification, the claim
+///    issuer's internal flow typically needs to check only the topic branch
+///    using `is_key_allowed_for_topic()` to confirm that a given signing key is
+///    assigned to the claim topic in this contract. This design avoids
+///    redundant cross-contract calls. When the identity verifier calls the
+///    claim issuer, it is assumed to pass a valid topic and only invoke the
+///    claim issuer if it is registered as a trusted issuer in the
+///    `claim_topics_and_issuers` contract. Therefore, the claim issuer only
+///    needs to verify internally that the signing key is still allowed for the
+///    topic.
+///
+/// 3. **Synchronization note**: After initial key assignment, the
+///    `claim_topics_and_issuers` contract may invalidate a topic or remove the
+///    claim issuer. If keeping state synchronized is required, use
+///    `is_key_authorized()` to verify both the topic validity and issuer
+///    registration status.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SigningKey {
@@ -361,7 +374,7 @@ pub fn is_key_allowed_for_registry(
 /// - the current contract is allowed to sign claims for `claim_topic` in
 ///   `registry`.
 ///
-/// It does not modify any storage and does not check signing key assignment.
+/// It does not does not check signing key assignment.
 ///
 /// # Arguments
 ///
