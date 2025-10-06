@@ -13,13 +13,24 @@
 ///   verification
 /// - **Timestamp**: When the document was last modified
 ///
-/// ## Storage Keys
+/// ## Bucket System
 ///
-/// - `Document(BytesN<32>)` - Maps document name to document data
-/// - `DocumentList` - Maintains a list of all document names for enumeration
-use soroban_sdk::{contracttype, panic_with_error, BytesN, Env, String, Vec};
+/// Documents are stored in buckets of 50 entries each. Each bucket is a
+/// `Vec<(BytesN<32>, Document)>` stored under its bucket index. This eliminates
+/// the need for individual document storage entries and significantly reduces
+/// storage costs.
+///
+/// ## Swap-and-Pop Pattern
+///
+/// When removing a document, the last document in the list is moved to fill
+/// the gap left by the removed document. This keeps storage compact and
+/// ensures O(1) removal operations.
+use soroban_sdk::{contracttype, panic_with_error, BytesN, Env, String, TryFromVal, Val, Vec};
 
-use super::{emit_document_removed, emit_document_updated, DocumentError};
+use super::{
+    emit_document_removed, emit_document_updated, DocumentError, BUCKET_SIZE,
+    DOCUMENT_EXTEND_AMOUNT, DOCUMENT_TTL_THRESHOLD, MAX_DOCUMENTS,
+};
 
 /// Represents a document with its metadata.
 #[contracttype]
@@ -37,13 +48,24 @@ pub struct Document {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DocumentStorageKey {
-    /// Maps document name to document data (32-byte identifier).
-    Document(BytesN<32>),
-    /// List of all document names.
-    DocumentList,
+    /// Maps document name to its global index.
+    DocumentIndex(BytesN<32>),
+    /// Maps bucket index to a vector of (name, document) tuples.
+    DocumentBucket(u32),
+    /// Total count of documents.
+    DocumentCount,
 }
 
 // ################## QUERY STATE ##################
+
+/// Gets the total number of documents stored.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+pub fn get_document_count(e: &Env) -> u32 {
+    get_persistent_entry(e, &DocumentStorageKey::DocumentCount).unwrap_or(0)
+}
 
 /// Retrieves the details of a document with a known name.
 ///
@@ -57,31 +79,62 @@ pub enum DocumentStorageKey {
 /// * [`DocumentError::DocumentNotFound`] - If no document exists with the given
 ///   name
 pub fn get_document(e: &Env, name: &BytesN<32>) -> Document {
-    let key = DocumentStorageKey::Document(name.clone());
-    e.storage()
-        .persistent()
-        .get(&key)
-        .unwrap_or_else(|| panic_with_error!(e, DocumentError::DocumentNotFound))
+    let index: u32 = get_persistent_entry(e, &DocumentStorageKey::DocumentIndex(name.clone()))
+        .unwrap_or_else(|| panic_with_error!(e, DocumentError::DocumentNotFound));
+
+    let (_, document) = get_document_by_index(e, index);
+    document
 }
 
-/// Retrieves a full list of all documents attached to the contract.
+/// Returns a document by its global index.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `index` - The global index of the document to retrieve.
+///
+/// # Errors
+///
+/// * [`DocumentError::DocumentNotFound`] - If `index` is out of bounds.
+pub fn get_document_by_index(e: &Env, index: u32) -> (BytesN<32>, Document) {
+    let count = get_document_count(e);
+    if index >= count {
+        panic_with_error!(e, DocumentError::DocumentNotFound)
+    }
+
+    let bucket_index = index / BUCKET_SIZE;
+    let offset_in_bucket = index % BUCKET_SIZE;
+
+    let bucket: Vec<(BytesN<32>, Document)> =
+        get_persistent_entry(e, &DocumentStorageKey::DocumentBucket(bucket_index))
+            .expect("bucket to be present");
+
+    bucket.get(offset_in_bucket).expect("document entry to be present in bucket")
+}
+
+/// Retrieves a full list of all documents.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
 pub fn get_all_documents(e: &Env) -> Vec<(BytesN<32>, Document)> {
-    let list_key = DocumentStorageKey::DocumentList;
-    let document_names: Vec<BytesN<32>> =
-        e.storage().persistent().get(&list_key).unwrap_or_else(|| Vec::new(e));
-
+    let count = get_document_count(e);
     let mut documents = Vec::new(e);
-    for name in document_names.iter() {
-        if let Some(document) =
-            e.storage().persistent().get(&DocumentStorageKey::Document(name.clone()))
-        {
-            documents.push_back((name.clone(), document));
-        }
+
+    if count == 0 {
+        return documents;
     }
+
+    let last_bucket = (count - 1) / BUCKET_SIZE;
+
+    for bucket_idx in 0..=last_bucket {
+        let bucket_key = DocumentStorageKey::DocumentBucket(bucket_idx);
+        let bucket: Vec<(BytesN<32>, Document)> =
+            e.storage().persistent().get(&bucket_key).unwrap_or_else(|| Vec::new(e));
+
+        documents.append(&bucket);
+    }
+
     documents
 }
 
@@ -95,6 +148,11 @@ pub fn get_all_documents(e: &Env) -> Vec<(BytesN<32>, Document)> {
 /// * `name` - The document name (32-byte identifier).
 /// * `uri` - The URI where the document can be accessed.
 /// * `document_hash` - The hash of the document contents.
+///
+/// # Errors
+///
+/// * [`DocumentError::MaxDocumentsReached`] - If the maximum number of
+///   documents has been reached.
 ///
 /// # Events
 ///
@@ -112,35 +170,54 @@ pub fn set_document(e: &Env, name: &BytesN<32>, uri: &String, document_hash: &By
 
     let document = Document { uri: uri.clone(), document_hash: document_hash.clone(), timestamp };
 
-    // Store the document
-    let doc_key = DocumentStorageKey::Document(name.clone());
-    e.storage().persistent().set(&doc_key, &document);
+    // Check if this is a new document or an update
+    let index_key = DocumentStorageKey::DocumentIndex(name.clone());
+    let existing_index: Option<u32> = e.storage().persistent().get(&index_key);
 
-    // Update the document list if this is a new document
-    let list_key = DocumentStorageKey::DocumentList;
-    let mut document_names: Vec<BytesN<32>> =
-        e.storage().persistent().get(&list_key).unwrap_or_else(|| Vec::new(e));
+    if let Some(index) = existing_index {
+        // Extend TTL
+        e.storage().persistent().extend_ttl(
+            &index_key,
+            DOCUMENT_TTL_THRESHOLD,
+            DOCUMENT_EXTEND_AMOUNT,
+        );
+        // Update existing document in its bucket
+        let bucket_index = index / BUCKET_SIZE;
+        let offset_in_bucket = index % BUCKET_SIZE;
+        let bucket_key = DocumentStorageKey::DocumentBucket(bucket_index);
+        let mut bucket: Vec<(BytesN<32>, Document)> =
+            e.storage().persistent().get(&bucket_key).expect("bucket to be present");
 
-    // Check if document name already exists in the list
-    let mut found = false;
-    for existing_name in document_names.iter() {
-        if existing_name == *name {
-            found = true;
-            break;
+        bucket.set(offset_in_bucket, (name.clone(), document.clone()));
+        e.storage().persistent().set(&bucket_key, &bucket);
+    } else {
+        // Add new document
+        let count = get_document_count(e);
+        if count >= MAX_DOCUMENTS {
+            panic_with_error!(e, DocumentError::MaxDocumentsReached)
         }
+
+        e.storage().persistent().set(&index_key, &count);
+
+        let bucket_index = count / BUCKET_SIZE;
+        let bucket_key = DocumentStorageKey::DocumentBucket(bucket_index);
+        let mut bucket: Vec<(BytesN<32>, Document)> =
+            e.storage().persistent().get(&bucket_key).unwrap_or(Vec::new(e));
+
+        bucket.push_back((name.clone(), document.clone()));
+        e.storage().persistent().set(&bucket_key, &bucket);
+
+        e.storage().persistent().set(&DocumentStorageKey::DocumentCount, &(count + 1));
     }
 
-    // Add to list if it's a new document
-    if !found {
-        document_names.push_back(name.clone());
-        e.storage().persistent().set(&list_key, &document_names);
-    }
-
-    // Emit event
     emit_document_updated(e, name, uri, document_hash, timestamp);
 }
 
 /// Removes an existing document from the contract.
+///
+/// Uses a swap-remove pattern: the last document in the list is moved to fill
+/// the gap left by the removed document. This keeps storage compact and
+/// ensures O(1) removal operations, but means document indices can change.
 ///
 /// # Arguments
 ///
@@ -164,54 +241,71 @@ pub fn set_document(e: &Env, name: &BytesN<32>, uri: &String, document_hash: &By
 /// - During contract initialization/construction
 /// - In functions that implement their own authorization logic
 pub fn remove_document(e: &Env, name: &BytesN<32>) {
-    if !document_exists(e, name) {
-        panic_with_error!(e, DocumentError::DocumentNotFound)
+    // Get the index of the document to remove
+    let index_key = DocumentStorageKey::DocumentIndex(name.clone());
+    let document_index: u32 = e
+        .storage()
+        .persistent()
+        .get(&index_key)
+        .unwrap_or_else(|| panic_with_error!(e, DocumentError::DocumentNotFound));
+
+    let count = get_document_count(e);
+    let last_index = count - 1;
+
+    // Get bucket information for the document to remove
+    let doc_bucket_index = document_index / BUCKET_SIZE;
+    let doc_offset = document_index % BUCKET_SIZE;
+
+    // Get bucket information for the last document
+    let last_bucket_index = last_index / BUCKET_SIZE;
+    let last_offset = last_index % BUCKET_SIZE;
+
+    // If this is not the last document, swap it with the last one
+    if document_index != last_index {
+        // Get the last document entry from its bucket
+        let last_bucket_key = DocumentStorageKey::DocumentBucket(last_bucket_index);
+        let last_bucket: Vec<(BytesN<32>, Document)> =
+            e.storage().persistent().get(&last_bucket_key).expect("last bucket to be present");
+        let (last_name, last_doc) =
+            last_bucket.get(last_offset).expect("last document entry to be present");
+
+        // Update the last document's index to point to the removed document's position
+        let last_index_key = DocumentStorageKey::DocumentIndex(last_name.clone());
+        e.storage().persistent().set(&last_index_key, &document_index);
+
+        // Move the last document entry to the removed document's position
+        let doc_bucket_key = DocumentStorageKey::DocumentBucket(doc_bucket_index);
+        let mut doc_bucket: Vec<(BytesN<32>, Document)> =
+            e.storage().persistent().get(&doc_bucket_key).expect("document bucket to be present");
+        doc_bucket.set(doc_offset, (last_name, last_doc));
+        e.storage().persistent().set(&doc_bucket_key, &doc_bucket);
     }
 
-    // Remove the document
-    e.storage().persistent().remove(&DocumentStorageKey::Document(name.clone()));
+    // Remove the last element from its bucket
+    let last_bucket_key = DocumentStorageKey::DocumentBucket(last_bucket_index);
+    let mut last_bucket: Vec<(BytesN<32>, Document)> =
+        e.storage().persistent().get(&last_bucket_key).expect("last bucket to be present");
+    last_bucket.pop_back();
+    e.storage().persistent().set(&last_bucket_key, &last_bucket);
 
-    // Remove from the document list
-    let list_key = DocumentStorageKey::DocumentList;
-    let document_names: Vec<BytesN<32>> =
-        e.storage().persistent().get(&list_key).unwrap_or_else(|| Vec::new(e));
+    e.storage().persistent().remove(&index_key);
 
-    // Find and remove the document name from the list
-    let mut new_names = Vec::new(e);
-    for existing_name in document_names.iter() {
-        if existing_name != *name {
-            new_names.push_back(existing_name.clone());
-        }
-    }
+    e.storage().persistent().set(&DocumentStorageKey::DocumentCount, &last_index);
 
-    e.storage().persistent().set(&list_key, &new_names);
-
-    // Emit event
     emit_document_removed(e, name);
 }
 
-// ################## HELPER FUNCTIONS ##################
+// ################## HELPERS ##################
 
-/// Checks if a document exists with the given name.
+/// Helper function that tries to retrieve a persistent storage value and
+/// extend its TTL if the entry exists.
 ///
 /// # Arguments
 ///
-/// * `e` - The Soroban environment.
-/// * `name` - The document name to check.
-pub fn document_exists(e: &Env, name: &BytesN<32>) -> bool {
-    let key = DocumentStorageKey::Document(name.clone());
-    e.storage().persistent().has(&key)
-}
-
-/// Gets the total number of documents stored.
-///
-/// # Arguments
-///
-/// * `e` - The Soroban environment.
-pub fn get_document_count(e: &Env) -> u32 {
-    let list_key = DocumentStorageKey::DocumentList;
-    let document_names: Vec<BytesN<32>> =
-        e.storage().persistent().get(&list_key).unwrap_or_else(|| Vec::new(e));
-
-    document_names.len()
+/// * `e` - The Soroban reference.
+/// * `key` - The key required to retrieve the underlying storage.
+fn get_persistent_entry<T: TryFromVal<Env, Val>>(e: &Env, key: &DocumentStorageKey) -> Option<T> {
+    e.storage().persistent().get::<_, T>(key).inspect(|_| {
+        e.storage().persistent().extend_ttl(key, DOCUMENT_TTL_THRESHOLD, DOCUMENT_EXTEND_AMOUNT);
+    })
 }
