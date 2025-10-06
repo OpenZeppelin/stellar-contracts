@@ -43,7 +43,7 @@
 //!
 //! - `fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) ->
 //!   bool;` for compliance validation
-//! - `fn verify_identity(e: &Env, user_address: &Address);` for the identity
+//! - `fn verify_identity(e: &Env, account: &Address);` for the identity
 //!   verification
 //!
 //! Hence, the [`RWAToken`] interface also exposes the following functions to
