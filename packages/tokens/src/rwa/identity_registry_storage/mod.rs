@@ -458,7 +458,7 @@ pub struct IdentityRecovered {
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-/// * `old_account` - The previous acccount address.
+/// * `old_account` - The previous account address.
 /// * `new_account` - The new account address.
 pub fn emit_identity_recovered(e: &Env, old_account: &Address, new_account: &Address) {
     IdentityRecovered { old_account: old_account.clone(), new_account: new_account.clone() }
@@ -508,14 +508,17 @@ pub fn emit_country_data_event(
     country_data: &CountryData,
 ) {
     match event_type {
-        CountryDataEvent::Added =>
+        CountryDataEvent::Added => {
             CountryDataAdded { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
-        CountryDataEvent::Removed =>
+                .publish(e)
+        }
+        CountryDataEvent::Removed => {
             CountryDataRemoved { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
-        CountryDataEvent::Modified =>
+                .publish(e)
+        }
+        CountryDataEvent::Modified => {
             CountryDataModified { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
+                .publish(e)
+        }
     }
 }
