@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
+use soroban_sdk::{contracttype, log, panic_with_error, Address, Env, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
@@ -345,8 +345,10 @@ impl RWA {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
+    /// * [`RWAError::IdentityVerificationFailed`] - When the identity of the
     ///   new wallet cannot be verified.
+    /// * [`RWAError::IdentityMismatch`] - When the new wallet is not the target
+    ///   of the recovery process for the old wallet.
     ///
     /// # Events
     ///
@@ -362,22 +364,38 @@ impl RWA {
     /// the lost wallet and applies it to the new wallet, maintaining
     /// regulatory compliance.
     ///
+    /// This functions does not concern itself with the Identity Management.
+    /// If the lost wallet's identity should be removed, it should be done on
+    /// the Identity Stack.
+    ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: This function bypasses authorization and compliance
     /// checks. Should only be used by authorized recovery or admin
     /// functions.
-    pub fn recovery_address(
-        e: &Env,
-        lost_wallet: &Address,
-        new_wallet: &Address,
-        investor_onchain_id: &Address,
-    ) -> bool {
+    pub fn recover_balance(e: &Env, lost_wallet: &Address, new_wallet: &Address) -> bool {
         // Verify identity for the new wallet
         let identity_verifier_addr = Self::identity_verifier(e);
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
         identity_verifier_client.verify_identity(new_wallet);
 
+        log!(e, "Identity verified for new wallet");
+
+        // Verify that the new wallet is the recovery target for the lost wallet
+        let recovery_target = identity_verifier_client
+            .recovery_target(lost_wallet)
+            .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityMismatch));
+
+        log!(e, "Recovery target set for lost wallet");
+
+        if recovery_target != *new_wallet {
+            panic_with_error!(e, RWAError::IdentityMismatch);
+        }
+
+        log!(e, "Recovery target verified for lost wallet");
+
+        // Get the balance of the lost wallet, if there is nothing to transfer, return
+        // false
         let lost_balance = Base::balance(e, lost_wallet);
         if lost_balance == 0 {
             return false;
@@ -401,7 +419,7 @@ impl RWA {
             Self::set_address_frozen(e, &e.current_contract_address(), new_wallet, true);
         }
 
-        emit_recovery_success(e, lost_wallet, new_wallet, investor_onchain_id);
+        emit_recovery_success(e, lost_wallet, new_wallet);
 
         true
     }

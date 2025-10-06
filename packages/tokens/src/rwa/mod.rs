@@ -199,8 +199,6 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * `e` - Access to the Soroban environment.
     /// * `lost_wallet` - The wallet that the investor lost.
     /// * `new_wallet` - The newly provided wallet for token transfer.
-    /// * `investor_onchain_id` - The onchain ID of the investor asking for
-    ///   recovery.
     /// * `operator` - The address of the operator.
     ///
     /// # Errors
@@ -212,14 +210,12 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// * topics - `["transfer", lost_wallet: Address, new_wallet: Address]`
     /// * data - `[amount: i128]`
-    /// * topics - `["recovery", lost_wallet: Address, new_wallet: Address,
-    ///   investor_onchain_id: Address]`
+    /// * topics - `["recovery", lost_wallet: Address, new_wallet: Address]`
     /// * data - `[]`
-    fn recovery_address(
+    fn recover_balance(
         e: &Env,
         lost_wallet: Address,
         new_wallet: Address,
-        investor_onchain_id: Address,
         operator: Address,
     ) -> bool;
 
@@ -410,6 +406,8 @@ pub enum RWAError {
     IdentityRegistryStorageNotSet = 311,
     /// Indicates the identity verifier contract is not set.
     IdentityVerifierNotSet = 312,
+    /// Indicates the lost wallet and new wallet have different identities.
+    IdentityMismatch = 313,
 }
 
 // ################## CONSTANTS ##################
@@ -446,7 +444,6 @@ pub struct RecoverySuccess {
     pub lost_wallet: Address,
     #[topic]
     pub new_wallet: Address,
-    pub investor_onchain_id: Address,
 }
 
 /// Emits an event indicating a successful recovery.
@@ -456,19 +453,8 @@ pub struct RecoverySuccess {
 /// * `e` - Access to the Soroban environment.
 /// * `lost_wallet` - The address of the lost wallet.
 /// * `new_wallet` - The address of the new wallet.
-/// * `investor_onchain_id` - The address of the investor's onchain ID.
-pub fn emit_recovery_success(
-    e: &Env,
-    lost_wallet: &Address,
-    new_wallet: &Address,
-    investor_onchain_id: &Address,
-) {
-    RecoverySuccess {
-        lost_wallet: lost_wallet.clone(),
-        new_wallet: new_wallet.clone(),
-        investor_onchain_id: investor_onchain_id.clone(),
-    }
-    .publish(e);
+pub fn emit_recovery_success(e: &Env, lost_wallet: &Address, new_wallet: &Address) {
+    RecoverySuccess { lost_wallet: lost_wallet.clone(), new_wallet: new_wallet.clone() }.publish(e);
 }
 
 /// Event emitted when an address is frozen or unfrozen.

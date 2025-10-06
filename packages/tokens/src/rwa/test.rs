@@ -1,8 +1,8 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, symbol_short, testutils::Address as _, Address, Env,
-    String,
+    contract, contractimpl, log, panic_with_error, symbol_short, testutils::Address as _, Address,
+    Env, String,
 };
 
 use crate::{
@@ -19,6 +19,22 @@ impl MockIdentityVerifier {
         let result = e.storage().persistent().get(&symbol_short!("id_ok")).unwrap_or(true);
         if !result {
             panic_with_error!(e, RWAError::IdentityVerificationFailed)
+        }
+    }
+
+    pub fn recovery_target(e: &Env, _account: Address) -> Option<Address> {
+        log!(e, "Recovery target requested");
+
+        let res = e.storage().persistent().get(&symbol_short!("recovery"));
+        match res {
+            Some(address) => {
+                log!(e, "Recovery target requested {}", address);
+                Some(address)
+            }
+            None => {
+                log!(e, "Recovery target requested None");
+                None
+            }
         }
     }
 }
@@ -354,22 +370,27 @@ fn unfreeze_more_than_frozen_fails() {
 }
 
 #[test]
-fn recovery_address() {
+fn recover_balance() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
-    let investor_id = Address::generate(&e);
 
     e.as_contract(&address, || {
-        setup_all_contracts(&e);
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Set recovery target in the identity verifier contract's storage
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("recovery"), &new_wallet);
+        });
 
         // Mint tokens to lost wallet
         RWA::mint(&e, &lost_wallet, 100);
         assert_eq!(RWA::balance(&e, &lost_wallet), 100);
 
         // Perform recovery
-        let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
+        let success = RWA::recover_balance(&e, &lost_wallet, &new_wallet);
         assert!(success);
 
         // Verify tokens were transferred
@@ -384,13 +405,18 @@ fn recovery_with_zero_balance_returns_false() {
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
-    let investor_id = Address::generate(&e);
 
     e.as_contract(&address, || {
-        setup_all_contracts(&e);
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Set recovery target in the identity verifier contract's storage
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("recovery"), &new_wallet);
+        });
 
         // No tokens in lost wallet
-        let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
+        let success = RWA::recover_balance(&e, &lost_wallet, &new_wallet);
         assert!(!success); // Should return false for zero balance
     });
 }
@@ -592,15 +618,20 @@ fn forced_transfer_exact_unfreezing() {
 }
 
 #[test]
-fn recovery_address_with_frozen_tokens() {
+fn recover_balance_with_frozen_tokens() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
-    let investor_id = Address::generate(&e);
 
     e.as_contract(&address, || {
-        setup_all_contracts(&e);
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Set recovery target in the identity verifier contract's storage
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("recovery"), &new_wallet);
+        });
 
         // Mint tokens and freeze some
         RWA::mint(&e, &lost_wallet, 100);
@@ -608,7 +639,7 @@ fn recovery_address_with_frozen_tokens() {
         assert_eq!(RWA::get_frozen_tokens(&e, &lost_wallet), 60);
 
         // Perform recovery
-        let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
+        let success = RWA::recover_balance(&e, &lost_wallet, &new_wallet);
         assert!(success);
 
         // Verify tokens were transferred and frozen tokens are preserved
@@ -619,16 +650,21 @@ fn recovery_address_with_frozen_tokens() {
 }
 
 #[test]
-fn recovery_address_with_frozen_address() {
+fn recover_balance_with_frozen_address() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
-    let investor_id = Address::generate(&e);
     let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
-        setup_all_contracts(&e);
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Set recovery target in the identity verifier contract's storage
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("recovery"), &new_wallet);
+        });
 
         // Mint tokens and freeze the address
         RWA::mint(&e, &lost_wallet, 100);
@@ -636,7 +672,7 @@ fn recovery_address_with_frozen_address() {
         assert!(RWA::is_frozen(&e, &lost_wallet));
 
         // Perform recovery
-        let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
+        let success = RWA::recover_balance(&e, &lost_wallet, &new_wallet);
         assert!(success);
 
         // Verify tokens were transferred and frozen status is preserved
@@ -647,16 +683,21 @@ fn recovery_address_with_frozen_address() {
 }
 
 #[test]
-fn recovery_address_with_both_frozen_tokens_and_address() {
+fn recover_balance_with_both_frozen_tokens_and_address() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
     let lost_wallet = Address::generate(&e);
     let new_wallet = Address::generate(&e);
-    let investor_id = Address::generate(&e);
     let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
-        setup_all_contracts(&e);
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Set recovery target in the identity verifier contract's storage
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("recovery"), &new_wallet);
+        });
 
         // Mint tokens, freeze some tokens, and freeze the address
         RWA::mint(&e, &lost_wallet, 100);
@@ -667,7 +708,7 @@ fn recovery_address_with_both_frozen_tokens_and_address() {
         assert!(RWA::is_frozen(&e, &lost_wallet));
 
         // Perform recovery
-        let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
+        let success = RWA::recover_balance(&e, &lost_wallet, &new_wallet);
         assert!(success);
 
         // Verify tokens were transferred and both frozen statuses are preserved
@@ -675,6 +716,55 @@ fn recovery_address_with_both_frozen_tokens_and_address() {
         assert_eq!(RWA::balance(&e, &new_wallet), 100);
         assert_eq!(RWA::get_frozen_tokens(&e, &new_wallet), 80);
         assert!(RWA::is_frozen(&e, &new_wallet));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #313)")]
+fn recover_balance_without_recovery_target_fails() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let lost_wallet = Address::generate(&e);
+    let new_wallet = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let _identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Do NOT set recovery target - this should cause the test to panic
+        // The mock function will return None, which triggers IdentityMismatch error
+
+        // Mint tokens to lost wallet
+        RWA::mint(&e, &lost_wallet, 100);
+
+        // Attempt recovery without setting recovery target - should fail with #313
+        RWA::recover_balance(&e, &lost_wallet, &new_wallet);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #313)")]
+fn recover_balance_with_wrong_recovery_target_fails() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let lost_wallet = Address::generate(&e);
+    let new_wallet = Address::generate(&e);
+    let wrong_wallet = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Set recovery target to wrong_wallet instead of new_wallet
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("recovery"), &wrong_wallet);
+        });
+
+        // Mint tokens to lost wallet
+        RWA::mint(&e, &lost_wallet, 100);
+
+        // Attempt recovery with wrong target - should fail with #313
+        RWA::recover_balance(&e, &lost_wallet, &new_wallet);
     });
 }
 

@@ -53,6 +53,16 @@ pub trait IdentityVerifier {
     ///   identity of the user address cannot be verified.
     fn verify_identity(e: &Env, user_address: &Address);
 
+    /// Returns the target address for the recovery process for the lost wallet.
+    /// If the lost wallet is not a target of a recovery process, `None` is
+    /// returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `lost_wallet` - The address of the lost wallet.
+    fn recovery_target(e: &Env, lost_wallet: &Address) -> Option<Address>;
+
     /// Sets the identity registry contract of the token.
     /// This function can only be called by the operator with necessary
     /// privileges. RBAC checks are expected to be enforced on the
