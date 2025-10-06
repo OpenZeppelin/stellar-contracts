@@ -147,9 +147,10 @@ mod test;
 use soroban_sdk::{contracterror, contractevent, Address, Env, FromVal, Val, Vec};
 pub use storage::{
     add_country_data_entries, add_identity, delete_country_data, get_country_data,
-    get_country_data_entries, get_identity_profile, modify_country_data, modify_identity,
-    recover_identity, remove_identity, stored_identity, CountryData, CountryRelation,
-    IdentityProfile, IdentityType, IndividualCountryRelation, OrganizationCountryRelation,
+    get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
+    modify_identity, recover_identity, remove_identity, stored_identity, CountryData,
+    CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
+    OrganizationCountryRelation,
 };
 
 use crate::rwa::utils::token_binder::TokenBinder;
@@ -244,6 +245,17 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// * `e` - The Soroban environment.
     /// * `account` - The account address to query.
     fn stored_identity(e: &Env, account: Address) -> Address;
+
+    /// Retrieves the recovery target address for a recovered account.
+    ///
+    /// Returns `Some(new_account)` if the account has been recovered to a new
+    /// account, or `None` if the account has not been recovered.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - The Soroban environment.
+    /// * `old_account` - The old account address to check.
+    fn get_recovered_to(e: &Env, old_account: Address) -> Option<Address>;
 }
 
 /// Trait for managing multiple country data entries associated with an
@@ -345,6 +357,8 @@ pub enum IRSError {
     EmptyCountryList = 323,
     /// The maximum number of country entries has been reached.
     MaxCountryEntriesReached = 324,
+    /// Account has been recovered and cannot be used.
+    AccountRecovered = 325,
 }
 
 // ################## CONSTANTS ##################
@@ -494,17 +508,14 @@ pub fn emit_country_data_event(
     country_data: &CountryData,
 ) {
     match event_type {
-        CountryDataEvent::Added => {
+        CountryDataEvent::Added =>
             CountryDataAdded { account: account.clone(), country_data: country_data.clone() }
-                .publish(e)
-        }
-        CountryDataEvent::Removed => {
+                .publish(e),
+        CountryDataEvent::Removed =>
             CountryDataRemoved { account: account.clone(), country_data: country_data.clone() }
-                .publish(e)
-        }
-        CountryDataEvent::Modified => {
+                .publish(e),
+        CountryDataEvent::Modified =>
             CountryDataModified { account: account.clone(), country_data: country_data.clone() }
-                .publish(e)
-        }
+                .publish(e),
     }
 }

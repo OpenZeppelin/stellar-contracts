@@ -5,9 +5,9 @@ use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, Map, Str
 use super::{
     storage::{
         add_country_data_entries, add_identity, delete_country_data, get_country_data,
-        get_country_data_entries, get_identity_profile, modify_country_data, modify_identity,
-        recover_identity, remove_identity, stored_identity, CountryData, CountryRelation,
-        IdentityType, IndividualCountryRelation, OrganizationCountryRelation,
+        get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
+        modify_identity, recover_identity, remove_identity, stored_identity, CountryData,
+        CountryRelation, IdentityType, IndividualCountryRelation, OrganizationCountryRelation,
     },
     MAX_COUNTRY_ENTRIES,
 };
@@ -677,6 +677,10 @@ fn recover_identity_success() {
         // Verify identity is now linked to new account
         assert_eq!(stored_identity(&e, &new_account), identity);
 
+        // Verify recovery link is set
+        let recovered_to = get_recovered_to(&e, &old_account);
+        assert_eq!(recovered_to, Some(new_account.clone()));
+
         // Verify identity profile is transferred
         let profile = get_identity_profile(&e, &new_account);
         assert_eq!(profile.identity_type, IdentityType::Individual);
@@ -769,5 +773,191 @@ fn recover_identity_removes_old_account_identity() {
 
         // Verify old account no longer has identity (should panic)
         stored_identity(&e, &old_account);
+    });
+}
+
+#[test]
+fn get_recovered_to_returns_none_for_non_recovered_account() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+
+        // Add identity but don't recover
+        add_identity(
+            &e,
+            &account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        // Should return None for non-recovered account
+        assert_eq!(get_recovered_to(&e, &account), None);
+    });
+}
+
+#[test]
+fn get_recovered_to_returns_new_account_after_recovery() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let old_account = Address::generate(&e);
+        let new_account = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+
+        // Add identity to old account
+        add_identity(
+            &e,
+            &old_account,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        // Recover identity to new account
+        recover_identity(&e, &old_account, &new_account);
+
+        // Should return new account for recovered old account
+        assert_eq!(get_recovered_to(&e, &old_account), Some(new_account.clone()));
+
+        // New account should not have recovery link
+        assert_eq!(get_recovered_to(&e, &new_account), None);
+    });
+}
+
+#[test]
+fn multiple_recoveries_chain() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account1 = Address::generate(&e);
+        let account2 = Address::generate(&e);
+        let account3 = Address::generate(&e);
+        let identity = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+
+        // Initial identity
+        add_identity(
+            &e,
+            &account1,
+            &identity,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        // First recovery: account1 -> account2
+        recover_identity(&e, &account1, &account2);
+        assert_eq!(get_recovered_to(&e, &account1), Some(account2.clone()));
+
+        // Second recovery: account2 -> account3
+        recover_identity(&e, &account2, &account3);
+        assert_eq!(get_recovered_to(&e, &account2), Some(account3.clone()));
+
+        // Verify chain
+        assert_eq!(get_recovered_to(&e, &account1), Some(account2.clone()));
+        assert_eq!(get_recovered_to(&e, &account2), Some(account3.clone()));
+        assert_eq!(get_recovered_to(&e, &account3), None);
+
+        // Final account has the identity
+        assert_eq!(stored_identity(&e, &account3), identity);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #325)")] // AccountRecovered
+fn add_identity_to_recovered_account_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let old_account = Address::generate(&e);
+        let new_account = Address::generate(&e);
+        let identity1 = Address::generate(&e);
+        let identity2 = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+
+        // Add identity to old account
+        add_identity(
+            &e,
+            &old_account,
+            &identity1,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        // Recover identity to new account
+        recover_identity(&e, &old_account, &new_account);
+
+        // Try to add identity to the recovered old account (should panic)
+        add_identity(
+            &e,
+            &old_account,
+            &identity2,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #325)")] // AccountRecovered
+fn recover_to_already_recovered_account_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let account1 = Address::generate(&e);
+        let account2 = Address::generate(&e);
+        let account3 = Address::generate(&e);
+        let identity1 = Address::generate(&e);
+        let identity2 = Address::generate(&e);
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+
+        // Add identity to account1
+        add_identity(
+            &e,
+            &account1,
+            &identity1,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        // Add identity to account3
+        add_identity(
+            &e,
+            &account3,
+            &identity2,
+            IdentityType::Individual,
+            &vec![&e, country_data.clone()],
+        );
+
+        // Recover account1 to account2
+        recover_identity(&e, &account1, &account2);
+
+        // Try to recover account3 to account1 (account1 was already recovered, should
+        // panic)
+        recover_identity(&e, &account3, &account1);
     });
 }
