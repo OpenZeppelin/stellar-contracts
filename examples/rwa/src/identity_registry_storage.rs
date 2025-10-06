@@ -85,6 +85,10 @@ impl IdentityRegistryStorage for IdentityRegistryContract {
     fn recover_identity(e: &Env, old_account: Address, new_account: Address, operator: Address) {
         identity_storage::recover_identity(e, &old_account, &new_account);
     }
+
+    fn get_recovered_to(e: &Env, old: Address) -> Option<Address> {
+        identity_storage::get_recovered_to(e, &old)
+    }
 }
 
 #[contractimpl]
