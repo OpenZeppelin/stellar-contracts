@@ -41,7 +41,11 @@
 //!
 //! - **Signature Verifiers**: Pre-built verifiers for Ed25519, Secp256k1, and
 //!   Secp256r1 schemes with a common `SignatureVerifier` trait structure
-//! - **Key Management**: Functions for topic-specific key authorization
+//! - **Key Management**: Functions for topic-specific key authorization with
+//!   registry tracking. Each public key is tied to a signature scheme, and a
+//!   signing key (public key + scheme) can be authorized to sign claims for a
+//!   specific topic and registry combination. The same signing key can be
+//!   authorized across multiple topics and registries independently.
 //! - **Claim Revocation**: Revocation tracking
 //!
 //! Implementors are free to use alternative structures for signature
@@ -52,7 +56,7 @@
 //! ```rust
 //! use soroban_sdk::{contract, contractimpl, Address, Bytes, Env};
 //! use stellar_tokens::rwa::claim_issuer::{
-//!     storage::{allow_key, is_claim_revoked, is_key_allowed},
+//!     storage::{allow_key, is_claim_revoked, is_key_allowed_for_topic},
 //!     ClaimIssuer,
 //! };
 //!
@@ -82,7 +86,12 @@
 //!             let signature_data = Ed25519Verifier::extract_signature_data(e, &sig_data);
 //!
 //!             // Check if the public key is authorized for this topic
-//!             if !is_key_allowed(e, &signature_data.public_key.to_bytes(), scheme, claim_topic) {
+//!             if !is_key_allowed_for_topic(
+//!                 e,
+//!                 &signature_data.public_key.to_bytes(),
+//!                 scheme,
+//!                 claim_topic,
+//!             ) {
 //!                 return false;
 //!             }
 //!             let message = Ed25519Verifier::build_message(&identity, claim_topic, &claim_data);
@@ -108,9 +117,10 @@ mod test;
 
 use soroban_sdk::{contractclient, contracterror, contractevent, Address, Bytes, Env};
 pub use storage::{
-    allow_key, is_claim_revoked, is_key_allowed, remove_key, set_claim_revoked,
+    allow_key, get_keys_for_topic, get_registries, is_claim_revoked, is_key_allowed_for_registry,
+    is_key_allowed_for_topic, is_key_authorized, remove_key, set_claim_revoked,
     ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
-    Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier,
+    Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
 };
 
 /// Trait for validating claims issued by this identity to other identities.
@@ -195,6 +205,7 @@ pub trait SignatureVerifier<const N: usize> {
 pub struct KeyAllowed {
     #[topic]
     pub public_key: Bytes,
+    pub registry: Address,
     pub scheme: u32,
     pub claim_topic: u32,
 }
@@ -205,6 +216,7 @@ pub struct KeyAllowed {
 pub struct KeyRemoved {
     #[topic]
     pub public_key: Bytes,
+    pub registry: Address,
     pub scheme: u32,
     pub claim_topic: u32,
 }
@@ -215,10 +227,18 @@ pub struct KeyRemoved {
 ///
 /// * `e` - The Soroban environment.
 /// * `public_key` - The public key involved in the operation.
+/// * `registry` - The address of the `claim_topics_and_issuers` registry.
 /// * `scheme` - The signature scheme used.
 /// * `claim_topic` - Optional claim topic for topic-specific operations.
-pub fn emit_key_allowed(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32) {
-    KeyAllowed { public_key: public_key.clone(), scheme, claim_topic }.publish(e)
+pub fn emit_key_allowed(
+    e: &Env,
+    public_key: &Bytes,
+    registry: &Address,
+    scheme: u32,
+    claim_topic: u32,
+) {
+    KeyAllowed { public_key: public_key.clone(), registry: registry.clone(), scheme, claim_topic }
+        .publish(e)
 }
 
 /// Emits an event for key management operations (allow/remove).
@@ -227,10 +247,18 @@ pub fn emit_key_allowed(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u
 ///
 /// * `e` - The Soroban environment.
 /// * `public_key` - The public key involved in the operation.
+/// * `registry` - The address of the `claim_topics_and_issuers` registry.
 /// * `scheme` - The signature scheme used.
 /// * `claim_topic` - Optional claim topic for topic-specific operations.
-pub fn emit_key_removed(e: &Env, public_key: &Bytes, scheme: u32, claim_topic: u32) {
-    KeyRemoved { public_key: public_key.clone(), scheme, claim_topic }.publish(e)
+pub fn emit_key_removed(
+    e: &Env,
+    public_key: &Bytes,
+    registry: &Address,
+    scheme: u32,
+    claim_topic: u32,
+) {
+    KeyRemoved { public_key: public_key.clone(), registry: registry.clone(), scheme, claim_topic }
+        .publish(e)
 }
 
 /// Event emitted when a claim is revoked.
@@ -285,6 +313,18 @@ pub enum ClaimIssuerError {
     KeyAlreadyAllowed = 352,
     /// The specified key was not found in the allowed keys.
     KeyNotFound = 353,
+    /// The claim issuer is not registered at the claim topics and issuers
+    /// registry.
+    IssuerNotRegistered = 354,
+    /// The claim issuer is not allowed to sign claims about the specified
+    /// claim topic.
+    ClaimTopicNotAllowed = 355,
+    /// Maximum number of signing keys per topic exceeded.
+    MaxKeysPerTopicExceeded = 356,
+    /// Maximum number of registries per signing key exceeded.
+    MaxRegistriesPerKeyExceeded = 357,
+    /// No signing keys found for the specified claim topic.
+    NoKeysForTopic = 358,
 }
 
 // ################## CONSTANTS ##################
@@ -295,3 +335,9 @@ pub const CLAIMS_TTL_THRESHOLD: u32 = CLAIMS_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 pub const KEYS_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const KEYS_TTL_THRESHOLD: u32 = KEYS_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
+/// Maximum number of signing keys allowed per topic.
+pub const MAX_KEYS_PER_TOPIC: u32 = 50;
+
+/// Maximum number of registries allowed per signing key.
+pub const MAX_REGISTRIES_PER_KEY: u32 = 20;
