@@ -1,65 +1,84 @@
+//! ## Signing Keys Management
+//!
+//! This module maintains two correlated storage branches:
+//! - Registry branch: `Registries(SigningKey) -> Vec<Address>` Tracks at which
+//!   `claim_topics_and_issuers` registries a given signing key (public key +
+//!   scheme) is assigned.
+//! - Topic branch: `Topics(u32) -> Vec<SigningKey>` Tracks which signing keys
+//!   are assigned to a specific claim topic.
+//!
+//! ```text
+//!                          ┌─────────────────────────┐
+//!                          │ SigningKey              │
+//!                          │ (public_key + scheme)   │
+//!                          └─────────────────────────┘
+//!                                      │
+//!                    ┌─────────────────┴─────────────────┐
+//!                    │                                   │
+//!                    ▼                                   ▼
+//!        ┌────────────────────────┐          ┌──────────────────────┐
+//!        │ Registries(SigningKey) │          │ Topics(claim_topic)  │
+//!        │ -> Vec<Address>        │          │ -> Vec<SigningKey>   │
+//!        └────────────────────────┘          └──────────────────────┘
+//!                    │                                   │
+//!                    ▼                                   ▼
+//!     [registry_1, registry_2, ...]         [key_1, key_2, ...]
+//! ```
+//!
+//! ## Key Properties
+//!
+//! 1. **Atomic updates**: Although the branches are separate, they are updated
+//!    atomically by `allow_key()`/`remove_key()`. A signing key cannot be
+//!    assigned to a topic without also being assigned to at least one registry.
+//!    When the last registry assignment for a key is removed, the key is
+//!    automatically removed from the topic branch as well.
+//!
+//! 2. **Rationale for separation**: During claim verification, the claim
+//!    issuer's internal flow typically needs to check only the topic branch
+//!    using `is_key_allowed_for_topic()` to confirm that a given signing key is
+//!    assigned to the claim topic in this contract. This design avoids
+//!    redundant cross-contract calls. When the identity verifier calls the
+//!    claim issuer, it is assumed to pass a valid topic and only invoke the
+//!    claim issuer if it is registered as a trusted issuer in the
+//!    `claim_topics_and_issuers` contract. Therefore, the claim issuer only
+//!    needs to verify internally that the signing key is still allowed for the
+//!    topic.
+//!
+//! 3. **Synchronization note**: After initial key assignment, the
+//!    `claim_topics_and_issuers` contract may invalidate a topic or remove the
+//!    `is_key_authorized()` to verify both the topic validity and issuer
+//!    registration status.
+//!
+//! ## Claim Revocation and Signature Invalidation
+//!
+//! This module provides two independent mechanisms for invalidating claims:
+//!
+//! 1. **Per-claim revocation** (`set_claim_revoked`): Revokes a specific claim
+//!    by storing its revocation status under the claim's digest. This allows
+//!    fine-grained control over individual claims.
+//!
+//! 2. **Signature invalidation** (`invalidate_claim_signatures`): Invalidates
+//!    all existing claim signatures by incrementing the nonce. This is
+//!    efficient for invalidating multiple signatures at once without storing
+//!    individual revocation entries.
+//!
+//! A nonce is included by default in every claim message (see
+//! `build_claim_message`) to enable signature invalidation. The message format
+//! is: network_id || claim_issuer || identity || claim_topic || nonce ||
+//! claim_data
 use core::ops::RangeBounds;
 
 use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, Vec};
 
 use crate::rwa::{
     claim_issuer::{
-        emit_key_allowed, emit_key_removed, emit_revocation_event, ClaimIssuerError,
-        SignatureVerifier, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD, KEYS_EXTEND_AMOUNT,
-        KEYS_TTL_THRESHOLD, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
+        emit_key_allowed, emit_key_removed, emit_revocation_event, emit_signatures_invalidated,
+        ClaimIssuerError, SignatureVerifier, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
+        KEYS_EXTEND_AMOUNT, KEYS_TTL_THRESHOLD, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
     },
     claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
 };
 
-/// This module maintains two correlated storage branches:
-/// - Registry branch: `Registries(SigningKey) -> Vec<Address>` Tracks at which
-///   `claim_topics_and_issuers` registries a given signing key (public key +
-///   scheme) is assigned.
-/// - Topic branch: `Topics(u32) -> Vec<SigningKey>` Tracks which signing keys
-///   are assigned to a specific claim topic.
-///
-/// ```text
-///                          ┌─────────────────────────┐
-///                          │ SigningKey              │
-///                          │ (public_key + scheme)   │
-///                          └─────────────────────────┘
-///                                      │
-///                    ┌─────────────────┴─────────────────┐
-///                    │                                   │
-///                    ▼                                   ▼
-///        ┌────────────────────────┐          ┌──────────────────────┐
-///        │ Registries(SigningKey) │          │ Topics(claim_topic)  │
-///        │ -> Vec<Address>        │          │ -> Vec<SigningKey>   │
-///        └────────────────────────┘          └──────────────────────┘
-///                    │                                   │
-///                    ▼                                   ▼
-///     [registry_1, registry_2, ...]         [key_1, key_2, ...]
-/// ```
-///
-/// ## Key Properties
-///
-/// 1. **Atomic updates**: Although the branches are separate, they are updated
-///    atomically by `allow_key()`/`remove_key()`. A signing key cannot be
-///    assigned to a topic without also being assigned to at least one registry.
-///    When the last registry assignment for a key is removed, the key is
-///    automatically removed from the topic branch as well.
-///
-/// 2. **Rationale for separation**: During claim verification, the claim
-///    issuer's internal flow typically needs to check only the topic branch
-///    using `is_key_allowed_for_topic()` to confirm that a given signing key is
-///    assigned to the claim topic in this contract. This design avoids
-///    redundant cross-contract calls. When the identity verifier calls the
-///    claim issuer, it is assumed to pass a valid topic and only invoke the
-///    claim issuer if it is registered as a trusted issuer in the
-///    `claim_topics_and_issuers` contract. Therefore, the claim issuer only
-///    needs to verify internally that the signing key is still allowed for the
-///    topic.
-///
-/// 3. **Synchronization note**: After initial key assignment, the
-///    `claim_topics_and_issuers` contract may invalidate a topic or remove the
-///    claim issuer. If keeping state synchronized is required, use
-///    `is_key_authorized()` to verify both the topic validity and issuer
-///    registration status.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SigningKey {
@@ -77,6 +96,8 @@ pub enum ClaimIssuerStorageKey {
     Registries(SigningKey),
     /// Tracks explicitly revoked claims by claim digest
     RevokedClaim(BytesN<32>),
+    /// Tracks current nonce for a specific identity and claim topics
+    ClaimNonce(Address, u32),
 }
 
 /// Signature data for Ed25519 scheme.
@@ -549,13 +570,85 @@ pub fn remove_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, 
     emit_key_removed(e, public_key, registry, scheme, claim_topic);
 }
 
-// ====================== CLAIM REVOCATION =====================
+// =========== CLAIM REVOCATION & SIGNATURE INVALIDATION ===========
 
-/// Sets the revocation status for a claim.
+/// Returns the current nonce for a specific identity and claim topic.
 ///
-/// The claim is identified by hashing the claim message (claim_issuer ||
-/// identity || claim_topic || claim_data) using keccak256. The resulting digest
-/// is used as the storage key for the revocation status.
+/// The nonce is included in every claim message built by
+/// `build_claim_message()`. When the nonce is incremented via
+/// `invalidate_claim_signatures()`, all previously signed claims become
+/// invalid.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `identity` - The identity address the nonce is for.
+/// * `claim_topic` - The claim topic the nonce is for.
+pub fn get_current_nonce_for(e: &Env, identity: &Address, claim_topic: u32) -> u32 {
+    let nonce_key = ClaimIssuerStorageKey::ClaimNonce(identity.clone(), claim_topic);
+    e.storage()
+        .persistent()
+        .get(&nonce_key)
+        .inspect(|_| {
+            e.storage().persistent().extend_ttl(
+                &nonce_key,
+                CLAIMS_TTL_THRESHOLD,
+                CLAIMS_EXTEND_AMOUNT,
+            );
+        })
+        .unwrap_or(0)
+}
+
+/// Invalidates all claim signatures for an identity and topic by incrementing
+/// the nonce.
+///
+/// This provides an efficient way to invalidate all existing claim signatures
+/// without storing individual revocation entries. After calling this function,
+/// the nonce is incremented, causing all previously signed claims to have
+/// invalid signatures since they were computed with the old nonce.
+///
+/// New claims must be signed with the new nonce (obtained via
+/// `get_current_nonce_for()` or by directly computing the message via
+/// `build_claim_message()`) to be valid.
+///
+/// **Note**: This does NOT affect per-claim revocation status set via
+/// `set_claim_revoked()`. Those revocations persist independently.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `identity` - The identity address to invalidate signatures for.
+/// * `claim_topic` - The claim topic to invalidate signatures for.
+///
+/// # Events
+///
+/// * topics - `["signatures_invalidated", identity: Address, claim_topic: u32]`
+/// * data - `[nonce: u32]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function bypasses authorization checks and should only
+/// be used:
+/// - During contract initialization/construction
+/// - In admin functions that implement their own authorization logic
+///
+/// Using this function in public-facing methods may create significant security
+/// risks as it could allow unauthorized modifications.
+pub fn invalidate_claim_signatures(e: &Env, identity: &Address, claim_topic: u32) {
+    let nonce_key = ClaimIssuerStorageKey::ClaimNonce(identity.clone(), claim_topic);
+    let mut nonce: u32 = e.storage().persistent().get(&nonce_key).unwrap_or(0);
+
+    emit_signatures_invalidated(e, identity, claim_topic, nonce);
+
+    nonce += 1;
+    e.storage().persistent().set(&nonce_key, &nonce);
+}
+
+/// Sets the revocation status for a single claim.
+///
+/// The claim is identified by hashing a nonce-independent identifier consisting
+/// of: network_id || claim_issuer || identity || claim_topic || claim_data.
+/// This ensures that revocation status persists even when the nonce changes.
 ///
 /// # Arguments
 ///
@@ -564,12 +657,6 @@ pub fn remove_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, 
 /// * `claim_topic` - The topic of the claim.
 /// * `claim_data` - The claim data.
 /// * `revoked` - Whether the claim should be marked as revoked.
-///
-/// # Events
-///
-/// * topics - `["claim_revoked", identity: Address, claim_topic: u32, revoked:
-///   bool]`
-/// * data - `[claim_data: Bytes]`
 ///
 /// # Security Warning
 ///
@@ -587,20 +674,22 @@ pub fn set_claim_revoked(
     claim_data: &Bytes,
     revoked: bool,
 ) {
-    let claim_digest =
-        e.crypto().keccak256(&build_claim_message(e, identity, claim_topic, claim_data)).to_bytes();
+    // Build a nonce-independent claim identifier for revocation tracking
+    let claim_digest = e
+        .crypto()
+        .keccak256(&build_claim_identifier(e, identity, claim_topic, claim_data))
+        .to_bytes();
 
-    let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest);
-    e.storage().persistent().set(&key, &revoked);
+    e.storage().persistent().set(&ClaimIssuerStorageKey::RevokedClaim(claim_digest), &revoked);
 
     emit_revocation_event(e, identity, claim_topic, claim_data, revoked);
 }
 
 /// Checks if a claim has been revoked.
 ///
-/// The claim is identified by hashing the claim message (claim_issuer ||
-/// identity || claim_topic || claim_data) using keccak256 and checking the
-/// revocation status stored under that digest.
+/// The claim is identified by hashing a nonce-independent identifier consisting
+/// of: network_id || claim_issuer || identity || claim_topic || claim_data.
+/// This ensures that revocation status persists even when the nonce changes.
 ///
 /// # Arguments
 ///
@@ -609,8 +698,11 @@ pub fn set_claim_revoked(
 /// * `claim_topic` - The topic of the claim.
 /// * `claim_data` - The claim data.
 pub fn is_claim_revoked(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> bool {
-    let claim_digest =
-        e.crypto().keccak256(&build_claim_message(e, identity, claim_topic, claim_data)).to_bytes();
+    // Use the nonce-independent identifier for checking revocation
+    let claim_digest = e
+        .crypto()
+        .keccak256(&build_claim_identifier(e, identity, claim_topic, claim_data))
+        .to_bytes();
 
     let key = ClaimIssuerStorageKey::RevokedClaim(claim_digest);
     e.storage()
@@ -624,11 +716,10 @@ pub fn is_claim_revoked(e: &Env, identity: &Address, claim_topic: u32, claim_dat
 
 // ====================== HELPERS =====================
 
-/// Builds and returns the message to verify for claim signature validation as
-/// Bytes.
+/// Builds and returns the message to verify for claim signature validation.
 ///
-/// The message format is: network_id || claim_issuer || identity || claim_topic
-/// || claim_data
+/// The message format is: network_id || claim_issuer || identity ||
+/// claim_topic || nonce || claim_data
 ///
 /// # Arguments
 ///
@@ -637,6 +728,34 @@ pub fn is_claim_revoked(e: &Env, identity: &Address, claim_topic: u32, claim_dat
 /// * `claim_topic` - The topic of the claim to validate.
 /// * `claim_data` - The claim data to validate.
 pub fn build_claim_message(
+    e: &Env,
+    identity: &Address,
+    claim_topic: u32,
+    claim_data: &Bytes,
+) -> Bytes {
+    let nonce = get_current_nonce_for(e, identity, claim_topic);
+
+    let mut data = Bytes::from_array(e, &e.ledger().network_id().to_array());
+    data.append(&e.current_contract_address().to_xdr(e));
+    data.append(&identity.to_xdr(e));
+    data.extend_from_array(&claim_topic.to_be_bytes());
+    data.extend_from_array(&nonce.to_be_bytes());
+    data.append(claim_data);
+    data
+}
+
+/// Builds a nonce-independent claim identifier for revocation tracking.
+///
+/// The identifier format is: network_id || claim_issuer || identity ||
+/// claim_topic || claim_data (WITHOUT nonce)
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `identity` - The identity address the claim is about.
+/// * `claim_topic` - The topic of the claim.
+/// * `claim_data` - The claim data.
+pub fn build_claim_identifier(
     e: &Env,
     identity: &Address,
     claim_topic: u32,

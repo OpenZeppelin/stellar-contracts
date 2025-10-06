@@ -18,11 +18,11 @@ use soroban_sdk::{
 use crate::rwa::{
     claim_issuer::{
         storage::{
-            allow_key, get_keys_for_topic, get_registries, is_claim_revoked,
-            is_key_allowed_for_registry, is_key_allowed_for_topic, is_key_authorized, remove_key,
-            set_claim_revoked, ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier,
-            Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier,
-            SigningKey,
+            allow_key, get_current_nonce_for, get_keys_for_topic, get_registries,
+            invalidate_claim_signatures, is_claim_revoked, is_key_allowed_for_registry,
+            is_key_allowed_for_topic, is_key_authorized, remove_key, set_claim_revoked,
+            ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
+            Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
         },
         SignatureVerifier, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
     },
@@ -938,5 +938,100 @@ fn is_key_authorized_checks_registry_and_topic() {
 
         // Not authorized in registry_b for topic 42 (issuer not trusted)
         assert!(!is_key_authorized(&e, &registry_b_id, 42));
+    });
+}
+
+// ======= SIGNATURE INVALIDATION TESTS =======
+
+#[test]
+fn get_current_nonce_returns_zero_initially() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        let nonce = get_current_nonce_for(&e, &identity, claim_topic);
+        assert_eq!(nonce, 0);
+    });
+}
+
+#[test]
+fn invalidate_claim_signatures_increments_nonce() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        // Initial nonce is 0
+        assert_eq!(get_current_nonce_for(&e, &identity, claim_topic), 0);
+
+        // Invalidate signatures - nonce should increment to 1
+        invalidate_claim_signatures(&e, &identity, claim_topic);
+        assert_eq!(get_current_nonce_for(&e, &identity, claim_topic), 1);
+
+        // Invalidate again - nonce should increment to 2
+        invalidate_claim_signatures(&e, &identity, claim_topic);
+        assert_eq!(get_current_nonce_for(&e, &identity, claim_topic), 2);
+    });
+}
+
+#[test]
+fn nonce_invalidates_previous_claim_signatures() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
+
+    e.as_contract(&contract_id, || {
+        // Build message with nonce 0
+        let message_nonce_0 =
+            Ed25519Verifier::build_message(&e, &identity, claim_topic, &claim_data);
+
+        // Increment nonce to invalidate all signatures
+        invalidate_claim_signatures(&e, &identity, claim_topic);
+
+        // Build message with nonce 1 - should be different
+        let message_nonce_1 =
+            Ed25519Verifier::build_message(&e, &identity, claim_topic, &claim_data);
+
+        assert_ne!(message_nonce_0, message_nonce_1);
+    });
+}
+
+#[test]
+fn signature_invalidation_vs_per_claim_revocation() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+    let claim_data_1 = Bytes::from_array(&e, &[1, 2, 3]);
+    let claim_data_2 = Bytes::from_array(&e, &[4, 5, 6]);
+
+    e.as_contract(&contract_id, || {
+        // Per-claim revocation: revoke only claim_data_1
+        set_claim_revoked(&e, &identity, claim_topic, &claim_data_1, true);
+        assert!(is_claim_revoked(&e, &identity, claim_topic, &claim_data_1));
+        assert!(!is_claim_revoked(&e, &identity, claim_topic, &claim_data_2));
+
+        // Signature invalidation: increment nonce invalidates all previous SIGNATURES
+        // but does NOT affect per-claim revocation status
+        invalidate_claim_signatures(&e, &identity, claim_topic);
+
+        // The per-claim revocation persists even after nonce change
+        // because we use a nonce-independent identifier for revocation
+        assert!(is_claim_revoked(&e, &identity, claim_topic, &claim_data_1));
+        assert!(!is_claim_revoked(&e, &identity, claim_topic, &claim_data_2));
+
+        // We can still revoke more claims independently
+        set_claim_revoked(&e, &identity, claim_topic, &claim_data_2, true);
+        assert!(is_claim_revoked(&e, &identity, claim_topic, &claim_data_2));
+
+        // And un-revoke a claim if needed
+        set_claim_revoked(&e, &identity, claim_topic, &claim_data_1, false);
+        assert!(!is_claim_revoked(&e, &identity, claim_topic, &claim_data_1));
+        assert!(is_claim_revoked(&e, &identity, claim_topic, &claim_data_2));
     });
 }

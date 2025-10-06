@@ -85,7 +85,7 @@
 //!             // Extract signature data
 //!             let signature_data = Ed25519Verifier::extract_signature_data(e, &sig_data);
 //!
-//!             // Check if the public key is authorized for this topic
+//!             // Check if the public key is allowedfor this topic
 //!             if !is_key_allowed_for_topic(
 //!                 e,
 //!                 &signature_data.public_key.to_bytes(),
@@ -117,7 +117,8 @@ mod test;
 
 use soroban_sdk::{contractclient, contracterror, contractevent, Address, Bytes, Env};
 pub use storage::{
-    allow_key, get_keys_for_topic, get_registries, is_claim_revoked, is_key_allowed_for_registry,
+    allow_key, build_claim_identifier, get_current_nonce_for, get_keys_for_topic, get_registries,
+    invalidate_claim_signatures, is_claim_revoked, is_key_allowed_for_registry,
     is_key_allowed_for_topic, is_key_authorized, remove_key, set_claim_revoked,
     ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
     Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
@@ -173,7 +174,7 @@ pub trait SignatureVerifier<const N: usize> {
     /// Builds the message to verify for claim signature validation.
     ///
     /// The message format is: network_id || claim_issuer || identity ||
-    /// claim_topic || claim_data
+    /// claim_topic || nonce || claim_data
     ///
     /// # Arguments
     ///
@@ -297,6 +298,30 @@ pub fn emit_revocation_event(
         revoked,
     }
     .publish(e);
+}
+
+/// Event emitted when claim signatures are invalidated by incrementing the
+/// nonce.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignaturesInvalidated {
+    #[topic]
+    pub identity: Address,
+    #[topic]
+    pub claim_topic: u32,
+    pub nonce: u32,
+}
+
+/// Emits an event when claim signatures are invalidated.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `identity` - The identity address whose signatures are invalidated.
+/// * `claim_topic` - The claim topic for which signatures are invalidated.
+/// * `nonce` - The nonce value before invalidation.
+pub fn emit_signatures_invalidated(e: &Env, identity: &Address, claim_topic: u32, nonce: u32) {
+    SignaturesInvalidated { identity: identity.clone(), claim_topic, nonce }.publish(e);
 }
 
 // ################## ERRORS ##################
