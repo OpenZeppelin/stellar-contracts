@@ -257,6 +257,7 @@ fn secp256k1_recovery_id_extraction() {
 #[test]
 fn ed25519_verify_success() {
     let e = Env::default();
+    let contract_id = e.register(MockContract, ());
 
     let identity = Address::generate(&e);
     let claim_topic = 42u32;
@@ -272,23 +273,26 @@ fn ed25519_verify_success() {
 
     let public_key: BytesN<32> = BytesN::from_array(&e, verifying_key.as_bytes());
 
-    // Build message using the verifier
-    let message = Ed25519Verifier::build_message(&e, &identity, claim_topic, &claim_data);
+    e.as_contract(&contract_id, || {
+        // Build message using the verifier
+        let message = Ed25519Verifier::build_message(&e, &identity, claim_topic, &claim_data);
 
-    // Convert message to buffer for signing
-    let message_buf = message.to_buffer::<256>();
-    let message_slice = &message_buf.as_slice()[..message.len() as usize];
-    let sig = signing_key.sign(message_slice).to_bytes();
-    let signature = BytesN::<64>::from_array(&e, &sig);
+        // Convert message to buffer for signing
+        let message_buf = message.to_buffer::<256>();
+        let message_slice = &message_buf.as_slice()[..message.len() as usize];
+        let sig = signing_key.sign(message_slice).to_bytes();
+        let signature = BytesN::<64>::from_array(&e, &sig);
 
-    let signature_data = Ed25519SignatureData { public_key, signature };
+        let signature_data = Ed25519SignatureData { public_key, signature };
 
-    assert!(Ed25519Verifier::verify(&e, &message, &signature_data))
+        assert!(Ed25519Verifier::verify(&e, &message, &signature_data))
+    });
 }
 
 #[test]
 fn secp256k1_verify_success() {
     let e = Env::default();
+    let contract_id = e.register(MockContract, ());
 
     let identity = Address::generate(&e);
     let claim_topic = 42u32;
@@ -307,29 +311,32 @@ fn secp256k1_verify_success() {
     pubkey_slice.copy_from_slice(&pubkey);
     let public_key: BytesN<65> = BytesN::from_array(&e, &pubkey_slice);
 
-    // Build message using the verifier
-    let message = Secp256k1Verifier::build_message(&e, &identity, claim_topic, &claim_data);
-    let digest = e.crypto().keccak256(&message);
+    e.as_contract(&contract_id, || {
+        // Build message using the verifier
+        let message = Secp256k1Verifier::build_message(&e, &identity, claim_topic, &claim_data);
+        let digest = e.crypto().keccak256(&message);
 
-    let (signature, recovery_id) =
-        signing_key.sign_prehash_recoverable(&digest.to_array()).unwrap();
+        let (signature, recovery_id) =
+            signing_key.sign_prehash_recoverable(&digest.to_array()).unwrap();
 
-    let sig_slice = signature.to_bytes();
-    let mut sig = [0u8; 64];
-    sig.copy_from_slice(sig_slice.as_slice());
+        let sig_slice = signature.to_bytes();
+        let mut sig = [0u8; 64];
+        sig.copy_from_slice(sig_slice.as_slice());
 
-    let signature_data = Secp256k1SignatureData {
-        public_key,
-        signature: BytesN::from_array(&e, &sig),
-        recovery_id: recovery_id.to_byte() as u32,
-    };
+        let signature_data = Secp256k1SignatureData {
+            public_key,
+            signature: BytesN::from_array(&e, &sig),
+            recovery_id: recovery_id.to_byte() as u32,
+        };
 
-    assert!(Secp256k1Verifier::verify(&e, &message, &signature_data));
+        assert!(Secp256k1Verifier::verify(&e, &message, &signature_data));
+    });
 }
 
 #[test]
 fn secp256r1_verify_success() {
     let e = Env::default();
+    let contract_id = e.register(MockContract, ());
 
     let identity = Address::generate(&e);
     let claim_topic = 42u32;
@@ -348,44 +355,69 @@ fn secp256r1_verify_success() {
     pubkey_slice.copy_from_slice(&pubkey);
     let public_key: BytesN<65> = BytesN::from_array(&e, &pubkey_slice);
 
-    // Build message using the verifier
-    let message = Secp256r1Verifier::build_message(&e, &identity, claim_topic, &claim_data);
-    // For Secp256r1, use SHA256 hash
-    let digest = e.crypto().sha256(&message);
+    e.as_contract(&contract_id, || {
+        // Build message using the verifier
+        let message = Secp256r1Verifier::build_message(&e, &identity, claim_topic, &claim_data);
+        // For Secp256r1, use SHA256 hash
+        let digest = e.crypto().sha256(&message);
 
-    let signature: Secp256r1Signature = signing_key.sign_prehash(&digest.to_array()).unwrap();
+        let signature: Secp256r1Signature = signing_key.sign_prehash(&digest.to_array()).unwrap();
 
-    let sig_slice = signature.normalize_s().unwrap_or(signature).to_bytes();
-    let mut sig = [0u8; 64];
-    sig.copy_from_slice(&sig_slice);
+        let sig_slice = signature.normalize_s().unwrap_or(signature).to_bytes();
+        let mut sig = [0u8; 64];
+        sig.copy_from_slice(&sig_slice);
 
-    let signature_data =
-        Secp256r1SignatureData { public_key, signature: BytesN::from_array(&e, &sig) };
+        let signature_data =
+            Secp256r1SignatureData { public_key, signature: BytesN::from_array(&e, &sig) };
 
-    assert!(Secp256r1Verifier::verify(&e, &message, &signature_data));
+        assert!(Secp256r1Verifier::verify(&e, &message, &signature_data));
+    });
 }
 
 #[test]
 fn signature_verifier_different_inputs_different_messages() {
     let e = Env::default();
+    let contract_id = e.register(MockContract, ());
 
     let identity1 = Address::generate(&e);
     let identity2 = Address::generate(&e);
     let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
 
     // Different identities should produce different messages
-    let message1 = Ed25519Verifier::build_message(&e, &identity1, 1u32, &claim_data);
-    let message2 = Ed25519Verifier::build_message(&e, &identity2, 1u32, &claim_data);
-    assert_ne!(message1, message2);
+    e.as_contract(&contract_id, || {
+        let message1 = Ed25519Verifier::build_message(&e, &identity1, 1u32, &claim_data);
+        let message2 = Ed25519Verifier::build_message(&e, &identity2, 1u32, &claim_data);
+        assert_ne!(message1, message2);
 
-    // Different topics should produce different messages
-    let message3 = Ed25519Verifier::build_message(&e, &identity1, 2u32, &claim_data);
-    assert_ne!(message1, message3);
+        // Different topics should produce different messages
+        let message3 = Ed25519Verifier::build_message(&e, &identity1, 2u32, &claim_data);
+        assert_ne!(message1, message3);
 
-    // Different data should produce different messages
-    let different_data = Bytes::from_array(&e, &[4, 5, 6]);
-    let message4 = Ed25519Verifier::build_message(&e, &identity1, 1u32, &different_data);
-    assert_ne!(message1, message4);
+        // Different data should produce different messages
+        let different_data = Bytes::from_array(&e, &[4, 5, 6]);
+        let message4 = Ed25519Verifier::build_message(&e, &identity1, 1u32, &different_data);
+        assert_ne!(message1, message4);
+    });
+}
+
+#[test]
+fn signature_verifier_build_claim_digest_different_issuers() {
+    let e = Env::default();
+    let contract_id1 = e.register(MockContract, ());
+    let contract_id2 = e.register(MockContract, ());
+
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
+
+    // Use same data on different claim issuers
+    let ed25519_digest_1 = e.as_contract(&contract_id1, || {
+        Ed25519Verifier::build_message(&e, &identity, claim_topic, &claim_data)
+    });
+    let ed25519_digest_2 = e.as_contract(&contract_id2, || {
+        Ed25519Verifier::build_message(&e, &identity, claim_topic, &claim_data)
+    });
+    assert_ne!(ed25519_digest_1, ed25519_digest_2);
 }
 
 #[test]

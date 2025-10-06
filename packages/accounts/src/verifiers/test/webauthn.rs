@@ -9,7 +9,7 @@ use p256::{
     elliptic_curve::sec1::ToEncodedPoint,
     SecretKey as Secp256r1SecretKey,
 };
-use soroban_sdk::{contract, contracttype, crypto::Hash, xdr::ToXdr, Bytes, BytesN, Env};
+use soroban_sdk::{contract, crypto::Hash, Bytes, BytesN, Env};
 
 use crate::verifiers::{
     utils::base64_url_encode,
@@ -21,7 +21,7 @@ use crate::verifiers::{
     },
 };
 
-fn sign(e: &Env, digest: Hash<32>) -> (Bytes, BytesN<64>) {
+fn sign(e: &Env, digest: Hash<32>) -> (BytesN<65>, BytesN<64>) {
     let secret_key_bytes: [u8; 32] = [
         33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55,
         56, 57, 58, 59, 60, 61, 62, 63, 64,
@@ -33,7 +33,7 @@ fn sign(e: &Env, digest: Hash<32>) -> (Bytes, BytesN<64>) {
 
     let mut pubkey_slice = [0u8; 65];
     pubkey_slice.copy_from_slice(&pubkey);
-    let public_key: Bytes = Bytes::from_array(e, &pubkey_slice);
+    let public_key = BytesN::<65>::from_array(e, &pubkey_slice);
 
     let signature: Secp256r1Signature = signing_key.sign_prehash(&digest.to_array()).unwrap();
 
@@ -82,7 +82,7 @@ fn validate_expected_type_valid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2115)")]
+#[should_panic(expected = "Error(Contract, #2113)")]
 fn validate_expected_type_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -119,7 +119,7 @@ fn validate_challenge_valid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2116)")]
+#[should_panic(expected = "Error(Contract, #2114)")]
 fn validate_challenge_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -136,7 +136,7 @@ fn validate_challenge_invalid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2111)")]
+#[should_panic(expected = "Error(Contract, #2110)")]
 fn validate_challenge_invalid_payload_size() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -166,7 +166,7 @@ fn validate_user_present_bit_set_valid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2118)")]
+#[should_panic(expected = "Error(Contract, #2116)")]
 fn validate_user_present_bit_set_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -193,7 +193,7 @@ fn validate_user_verified_bit_set_valid() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2119)")]
+#[should_panic(expected = "Error(Contract, #2117)")]
 fn validate_user_verified_bit_set_invalid() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -246,7 +246,7 @@ fn validate_backup_eligibility_and_state_valid_be0_bs0() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2220)")]
+#[should_panic(expected = "Error(Contract, #2218)")]
 fn validate_backup_eligibility_and_state_invalid_be0_bs1() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -281,7 +281,7 @@ fn webauthn_verify_success() {
     let digest = e.crypto().sha256(&msg);
     let (key_data, signature) = sign(&e, digest);
 
-    let sig_data = WebAuthnSigData { client_data, authenticator_data, signature }.to_xdr(&e);
+    let sig_data = WebAuthnSigData { client_data, authenticator_data, signature };
 
     let signature_payload = Bytes::from_array(&e, &payload);
 
@@ -316,7 +316,7 @@ fn webauthn_verify_fake_signature_fails() {
     // modify signature
     signature.set(0, 123);
 
-    let sig_data = WebAuthnSigData { client_data, authenticator_data, signature }.to_xdr(&e);
+    let sig_data = WebAuthnSigData { client_data, authenticator_data, signature };
 
     let signature_payload = Bytes::from_array(&e, &payload);
 
@@ -325,62 +325,7 @@ fn webauthn_verify_fake_signature_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2110)")]
-fn verify_key_data_invalid() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let payload: [u8; 32] = [1; 32];
-        let signature_payload = Bytes::from_array(&e, &payload);
-
-        // Invalid key data - too small (should be 65 bytes)
-        let key_data = Bytes::from_array(&e, &[1u8; 32]);
-
-        let client_data = encode_client_data(&e, "test_challenge", "webauthn.get");
-        let authenticator_data =
-            encode_authenticator_data(&e, AUTH_DATA_FLAGS_UP | AUTH_DATA_FLAGS_UV);
-        let signature = BytesN::<64>::from_array(&e, &[2u8; 64]);
-
-        let sig_data = WebAuthnSigData { client_data, authenticator_data, signature }.to_xdr(&e);
-
-        verify(&e, &signature_payload, &key_data, &sig_data);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #2112)")]
-fn verify_signature_format_invalid() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let payload: [u8; 32] = [1; 32];
-        let signature_payload = Bytes::from_array(&e, &payload);
-        let key_data = Bytes::from_array(&e, &[1u8; 65]);
-
-        // Invalid XDR data: signature is 63 instead of 64 bytes
-        let client_data = encode_client_data(&e, "test_challenge", "webauthn.get");
-        let authenticator_data =
-            encode_authenticator_data(&e, AUTH_DATA_FLAGS_UP | AUTH_DATA_FLAGS_UV);
-        let signature = BytesN::<63>::from_array(&e, &[2u8; 63]);
-
-        #[contracttype]
-        struct InvalidWebAuthnSigData {
-            pub client_data: Bytes,
-            pub authenticator_data: Bytes,
-            pub signature: BytesN<63>,
-        }
-
-        let invalid_sig_data =
-            InvalidWebAuthnSigData { client_data, authenticator_data, signature }.to_xdr(&e);
-
-        verify(&e, &signature_payload, &key_data, &invalid_sig_data);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #2113)")]
+#[should_panic(expected = "Error(Contract, #2111)")]
 fn verify_client_data_too_long() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -388,7 +333,7 @@ fn verify_client_data_too_long() {
     e.as_contract(&address, || {
         let payload: [u8; 32] = [1; 32];
         let signature_payload = Bytes::from_array(&e, &payload);
-        let key_data = Bytes::from_array(&e, &[1u8; 65]);
+        let key_data = BytesN::<65>::from_array(&e, &[1u8; 65]);
 
         // Create client data that exceeds CLIENT_DATA_MAX_LEN (1024 bytes)
         let large_origin = "x".repeat(CLIENT_DATA_MAX_LEN + 100);
@@ -404,17 +349,17 @@ fn verify_client_data_too_long() {
             client_data: large_client_data,
             authenticator_data,
             signature,
-        }.to_xdr(&e);
+        };
 
         verify(&e, &signature_payload, &key_data, &sig_data);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2117)")]
+#[should_panic(expected = "Error(Contract, #2115)")]
 fn verify_authenticator_data_too_short() {
     let e = Env::default();
-    let key_data = Bytes::from_array(&e, &[1u8; 65]);
+    let key_data = BytesN::<65>::from_array(&e, &[1u8; 65]);
     let payload: [u8; 32] = [1; 32];
     let signature_payload = Bytes::from_array(&e, &payload);
 
@@ -428,7 +373,7 @@ fn verify_authenticator_data_too_short() {
         encode_authenticator_data(&e, AUTH_DATA_FLAGS_UP | AUTH_DATA_FLAGS_UV).slice(0..35);
     let signature = BytesN::<64>::from_array(&e, &[2u8; 64]);
 
-    let sig_data = WebAuthnSigData { client_data, authenticator_data, signature }.to_xdr(&e);
+    let sig_data = WebAuthnSigData { client_data, authenticator_data, signature };
 
     let address = e.register(MockContract, ());
     e.as_contract(&address, || {
@@ -437,7 +382,7 @@ fn verify_authenticator_data_too_short() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2114)")]
+#[should_panic(expected = "Error(Contract, #2112)")]
 fn verify_json_parse_error() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -445,7 +390,7 @@ fn verify_json_parse_error() {
     e.as_contract(&address, || {
         let payload: [u8; 32] = [1; 32];
         let signature_payload = Bytes::from_array(&e, &payload);
-        let key_data = Bytes::from_array(&e, &[1u8; 65]);
+        let key_data = BytesN::<65>::from_array(&e, &[1u8; 65]);
 
         // Invalid JSON - missing closing brace
         let invalid_json = r#"{"type": "webauthn.get", "challenge": "test""#;
@@ -456,8 +401,7 @@ fn verify_json_parse_error() {
         let signature = BytesN::<64>::from_array(&e, &[2u8; 64]);
 
         let sig_data =
-            WebAuthnSigData { client_data: invalid_client_data, authenticator_data, signature }
-                .to_xdr(&e);
+            WebAuthnSigData { client_data: invalid_client_data, authenticator_data, signature };
 
         verify(&e, &signature_payload, &key_data, &sig_data);
     });

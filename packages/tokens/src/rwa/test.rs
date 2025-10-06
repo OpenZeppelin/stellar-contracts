@@ -29,19 +29,25 @@ struct MockCompliance;
 
 #[contractimpl]
 impl MockCompliance {
-    pub fn can_transfer(e: Env, _from: Address, _to: Address, _amount: i128) -> bool {
+    pub fn can_transfer(
+        e: Env,
+        _from: Address,
+        _to: Address,
+        _amount: i128,
+        _contract: Address,
+    ) -> bool {
         e.storage().persistent().get(&symbol_short!("tx_ok")).unwrap_or(true)
     }
 
-    pub fn can_create(e: Env, _to: Address, _amount: i128) -> bool {
+    pub fn can_create(e: Env, _to: Address, _amount: i128, _contract: Address) -> bool {
         e.storage().persistent().get(&symbol_short!("mint_ok")).unwrap_or(true)
     }
 
-    pub fn transferred(_e: Env, _from: Address, _to: Address, _amount: i128) {}
+    pub fn transferred(_e: Env, _from: Address, _to: Address, _amount: i128, _contract: Address) {}
 
-    pub fn created(_e: Env, _to: Address, _amount: i128) {}
+    pub fn created(_e: Env, _to: Address, _amount: i128, _contract: Address) {}
 
-    pub fn destroyed(_e: Env, _from: Address, _amount: i128) {}
+    pub fn destroyed(_e: Env, _from: Address, _amount: i128, _contract: Address) {}
 }
 
 #[contract]
@@ -241,7 +247,7 @@ fn burn_tokens() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #100)")]
+#[should_panic(expected = "Error(Contract, #300)")]
 fn burn_insufficient_balance_fails() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
@@ -605,10 +611,10 @@ fn recovery_address_with_frozen_tokens() {
         let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
         assert!(success);
 
-        // Verify tokens were transferred and frozen tokens cleared
+        // Verify tokens were transferred and frozen tokens are preserved
         assert_eq!(RWA::balance(&e, &lost_wallet), 0);
         assert_eq!(RWA::balance(&e, &new_wallet), 100);
-        assert_eq!(RWA::get_frozen_tokens(&e, &lost_wallet), 0);
+        assert_eq!(RWA::get_frozen_tokens(&e, &new_wallet), 60);
     });
 }
 
@@ -633,10 +639,10 @@ fn recovery_address_with_frozen_address() {
         let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
         assert!(success);
 
-        // Verify tokens were transferred and address unfrozen
+        // Verify tokens were transferred and frozen status is preserved
         assert_eq!(RWA::balance(&e, &lost_wallet), 0);
         assert_eq!(RWA::balance(&e, &new_wallet), 100);
-        assert!(!RWA::is_frozen(&e, &lost_wallet));
+        assert!(RWA::is_frozen(&e, &new_wallet));
     });
 }
 
@@ -664,11 +670,11 @@ fn recovery_address_with_both_frozen_tokens_and_address() {
         let success = RWA::recovery_address(&e, &lost_wallet, &new_wallet, &investor_id);
         assert!(success);
 
-        // Verify tokens were transferred and both frozen status cleared
+        // Verify tokens were transferred and both frozen statuses are preserved
         assert_eq!(RWA::balance(&e, &lost_wallet), 0);
         assert_eq!(RWA::balance(&e, &new_wallet), 100);
-        assert_eq!(RWA::get_frozen_tokens(&e, &lost_wallet), 0);
-        assert!(!RWA::is_frozen(&e, &lost_wallet));
+        assert_eq!(RWA::get_frozen_tokens(&e, &new_wallet), 80);
+        assert!(RWA::is_frozen(&e, &new_wallet));
     });
 }
 

@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
-    fungible::{emit_transfer, Base, ContractOverrides, StorageKey},
+    fungible::{emit_transfer, Base, ContractOverrides},
     rwa::{
         compliance::ComplianceClient, emit_address_frozen, emit_burn, emit_compliance_set,
         emit_identity_verifier_set, emit_mint, emit_recovery_success,
@@ -217,7 +217,7 @@ impl RWA {
 
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        compliance_client.transferred(from, to, &amount);
+        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
 
         emit_transfer(e, from, to, amount);
     }
@@ -266,7 +266,8 @@ impl RWA {
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
 
-        let can_create: bool = compliance_client.can_create(to, &amount);
+        let can_create: bool =
+            compliance_client.can_create(to, &amount, &e.current_contract_address());
 
         if !can_create {
             panic_with_error!(e, RWAError::MintNotCompliant);
@@ -274,7 +275,7 @@ impl RWA {
 
         Base::update(e, None, Some(to), amount);
 
-        compliance_client.created(to, &amount);
+        compliance_client.created(to, &amount, &e.current_contract_address());
 
         emit_mint(e, to, amount);
     }
@@ -303,6 +304,10 @@ impl RWA {
     /// only be used internally or in admin functions that implement their own
     /// authorization logic.
     pub fn burn(e: &Env, user_address: &Address, amount: i128) {
+        if amount > Base::balance(e, user_address) {
+            panic_with_error!(e, RWAError::InsufficientBalance);
+        }
+
         // Check if we need to unfreeze tokens to complete the burn
         let free_tokens = Self::get_free_tokens(e, user_address);
         if free_tokens < amount {
@@ -320,15 +325,15 @@ impl RWA {
 
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        compliance_client.destroyed(user_address, &amount);
+        compliance_client.destroyed(user_address, &amount, &e.current_contract_address());
 
         emit_burn(e, user_address, amount);
     }
 
     /// Recovery function used to force transfer tokens from a lost wallet to a
-    /// new wallet. This function transfers all tokens and clears frozen
-    /// status from the lost wallet. Returns `true` if recovery was
-    /// successful, `false` if no tokens to recover.
+    /// new wallet. This function transfers all tokens and preserves the frozen
+    /// status from the lost wallet to the new wallet. Returns `true` if
+    /// recovery was successful, `false` if no tokens to recover.
     ///
     /// # Arguments
     ///
@@ -353,8 +358,9 @@ impl RWA {
     ///
     /// # Notes
     ///
-    /// This function automatically unfreezes all frozen tokens and clears the
-    /// frozen status of the lost wallet before transferring.
+    /// This function preserves the frozen status (both partial and full) from
+    /// the lost wallet and applies it to the new wallet, maintaining
+    /// regulatory compliance.
     ///
     /// # Security Warning
     ///
@@ -377,28 +383,24 @@ impl RWA {
             return false;
         }
 
-        // Transfer all tokens from lost wallet to new wallet
+        // Store frozen status before transfer
         let frozen_tokens = Self::get_frozen_tokens(e, lost_wallet);
+        let is_address_frozen = Self::is_frozen(e, lost_wallet);
 
-        // If there are frozen tokens, unfreeze them first
+        // Use forced_transfer to transfer all tokens (this handles unfreezing as
+        // needed)
+        Self::forced_transfer(e, lost_wallet, new_wallet, lost_balance);
+
+        // Preserve frozen tokens on the new wallet if there were any
         if frozen_tokens > 0 {
-            e.storage().persistent().set(&RWAStorageKey::FrozenTokens(lost_wallet.clone()), &0i128);
-            emit_tokens_unfrozen(e, lost_wallet, frozen_tokens);
+            Self::freeze_partial_tokens(e, new_wallet, frozen_tokens);
         }
 
-        // Transfer all balance
-        let new_balance = Base::balance(e, new_wallet) + lost_balance;
-        e.storage().persistent().set(&StorageKey::Balance(lost_wallet.clone()), &0i128);
-        e.storage().persistent().set(&StorageKey::Balance(new_wallet.clone()), &new_balance);
-
-        // Clear frozen status if set
-        if Self::is_frozen(e, lost_wallet) {
-            e.storage()
-                .persistent()
-                .set(&RWAStorageKey::AddressFrozen(lost_wallet.clone()), &false);
+        // Preserve address frozen status on the new wallet if it was frozen
+        if is_address_frozen {
+            Self::set_address_frozen(e, &e.current_contract_address(), new_wallet, true);
         }
 
-        emit_transfer(e, lost_wallet, new_wallet, lost_balance);
         emit_recovery_success(e, lost_wallet, new_wallet, investor_onchain_id);
 
         true
@@ -628,7 +630,8 @@ impl RWA {
         // Validate compliance rules for the transfer
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        let can_transfer: bool = compliance_client.can_transfer(from, to, &amount);
+        let can_transfer: bool =
+            compliance_client.can_transfer(from, to, &amount, &e.current_contract_address());
 
         if !can_transfer {
             panic_with_error!(e, RWAError::TransferNotCompliant);
@@ -636,7 +639,7 @@ impl RWA {
 
         Base::update(e, Some(from), Some(to), amount);
 
-        compliance_client.transferred(from, to, &amount);
+        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
 
         emit_transfer(e, from, to, amount);
     }

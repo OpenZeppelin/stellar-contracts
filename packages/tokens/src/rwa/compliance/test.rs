@@ -2,12 +2,15 @@ extern crate std;
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, vec, Address, Env};
 
-use crate::rwa::compliance::{
-    storage::{
-        add_module_to, can_create, can_transfer, created, destroyed, get_modules_for_hook,
-        is_module_registered, remove_module_from, transferred,
+use crate::rwa::{
+    compliance::{
+        storage::{
+            add_module_to, can_create, can_transfer, created, destroyed, get_modules_for_hook,
+            is_module_registered, remove_module_from, transferred,
+        },
+        ComplianceHook, MAX_MODULES,
     },
-    ComplianceHook, MAX_MODULES,
+    utils::token_binder::bind_token,
 };
 
 #[contract]
@@ -320,24 +323,30 @@ struct MockComplianceModule;
 
 #[contractimpl]
 impl MockComplianceModule {
-    pub fn on_transfer(_env: Env, _from: Address, _to: Address, _amount: i128) {
+    pub fn on_transfer(_env: Env, _from: Address, _to: Address, _amount: i128, _contract: Address) {
         // Mock implementation - does nothing but proves it was called
     }
 
-    pub fn on_created(_env: Env, _to: Address, _amount: i128) {
+    pub fn on_created(_env: Env, _to: Address, _amount: i128, _contract: Address) {
         // Mock implementation - does nothing but proves it was called
     }
 
-    pub fn on_destroyed(_env: Env, _from: Address, _amount: i128) {
+    pub fn on_destroyed(_env: Env, _from: Address, _amount: i128, _contract: Address) {
         // Mock implementation - does nothing but proves it was called
     }
 
-    pub fn can_transfer(_env: Env, _from: Address, _to: Address, amount: i128) -> bool {
+    pub fn can_transfer(
+        _env: Env,
+        _from: Address,
+        _to: Address,
+        amount: i128,
+        _contract: Address,
+    ) -> bool {
         // Mock implementation - returns true for even amounts, false for odd amounts
         amount % 2 == 0
     }
 
-    pub fn can_create(_env: Env, _to: Address, amount: i128) -> bool {
+    pub fn can_create(_env: Env, _to: Address, amount: i128, _contract: Address) -> bool {
         // Mock implementation - returns true for even amounts, false for odd amounts
         amount % 2 == 0
     }
@@ -347,6 +356,7 @@ impl MockComplianceModule {
 fn transferred_hook_execution_works() {
     let e = Env::default();
     e.mock_all_auths();
+    let token_contract_address = Address::generate(&e);
     let contract_address = e.register(MockContract, ());
     let module_address = e.register(MockComplianceModule, ());
     let from = Address::generate(&e);
@@ -354,14 +364,14 @@ fn transferred_hook_execution_works() {
     let amount = 1000i128;
 
     e.as_contract(&contract_address, || {
+        // Bind token contract to compliance contract
+        bind_token(&e, &token_contract_address);
+
         // Add module to Transfer hook
         add_module_to(&e, ComplianceHook::Transferred, module_address.clone());
 
-        // Execute transferred hook - should not panic
-        transferred(&e, from.clone(), to.clone(), amount);
-
-        // Test with no modules registered for other hooks
-        transferred(&e, from, to, amount);
+        // Execute transferred hook
+        transferred(&e, from.clone(), to.clone(), amount, token_contract_address.clone());
     });
 }
 
@@ -369,21 +379,21 @@ fn transferred_hook_execution_works() {
 fn created_hook_execution_works() {
     let e = Env::default();
     e.mock_all_auths();
+    let token_contract_address = Address::generate(&e);
     let contract_address = e.register(MockContract, ());
     let module_address = e.register(MockComplianceModule, ());
     let to = Address::generate(&e);
     let amount = 1000i128;
 
     e.as_contract(&contract_address, || {
+        // Bind token contract to compliance contract
+        bind_token(&e, &token_contract_address);
+
         // Add module to Created hook
         add_module_to(&e, ComplianceHook::Created, module_address.clone());
 
-        // Execute created hook - should not panic
-        created(&e, to.clone(), amount);
-
-        // Test with no modules registered
-        let empty_to = Address::generate(&e);
-        created(&e, empty_to, amount);
+        // Execute created hook
+        created(&e, to.clone(), amount, token_contract_address.clone());
     });
 }
 
@@ -391,21 +401,21 @@ fn created_hook_execution_works() {
 fn destroyed_hook_execution_works() {
     let e = Env::default();
     e.mock_all_auths();
+    let token_contract_address = Address::generate(&e);
     let contract_address = e.register(MockContract, ());
     let module_address = e.register(MockComplianceModule, ());
     let from = Address::generate(&e);
     let amount = 1000i128;
 
     e.as_contract(&contract_address, || {
+        // Bind token contract to compliance contract
+        bind_token(&e, &token_contract_address);
+
         // Add module to Destroyed hook
         add_module_to(&e, ComplianceHook::Destroyed, module_address.clone());
 
-        // Execute destroyed hook - should not panic
-        destroyed(&e, from.clone(), amount);
-
-        // Test with no modules registered
-        let empty_from = Address::generate(&e);
-        destroyed(&e, empty_from, amount);
+        // Execute destroyed hook
+        destroyed(&e, from.clone(), amount, token_contract_address.clone());
     });
 }
 
@@ -413,6 +423,7 @@ fn destroyed_hook_execution_works() {
 fn can_transfer_hook_execution_works() {
     let e = Env::default();
     e.mock_all_auths();
+    let token_contract_address = Address::generate(&e);
     let contract_address = e.register(MockContract, ());
     let module_address = e.register(MockComplianceModule, ());
     let from = Address::generate(&e);
@@ -421,18 +432,30 @@ fn can_transfer_hook_execution_works() {
 
     e.as_contract(&contract_address, || {
         // Test with no modules registered - should return true
-        assert!(can_transfer(&e, from.clone(), to.clone(), amount));
+        assert!(can_transfer(&e, from.clone(), to.clone(), amount, token_contract_address.clone()));
 
         // Add module to CanTransfer hook
         add_module_to(&e, ComplianceHook::CanTransfer, module_address.clone());
 
         // Execute can_transfer hook with even amount - should return true
         let even_amount = 1000i128;
-        assert!(can_transfer(&e, from.clone(), to.clone(), even_amount));
+        assert!(can_transfer(
+            &e,
+            from.clone(),
+            to.clone(),
+            even_amount,
+            token_contract_address.clone()
+        ));
 
         // Execute can_transfer hook with odd amount - should return false
         let odd_amount = 1001i128;
-        assert!(!can_transfer(&e, from.clone(), to.clone(), odd_amount));
+        assert!(!can_transfer(
+            &e,
+            from.clone(),
+            to.clone(),
+            odd_amount,
+            token_contract_address.clone()
+        ));
     });
 }
 
@@ -440,6 +463,7 @@ fn can_transfer_hook_execution_works() {
 fn can_transfer_returns_false_when_module_rejects() {
     let e = Env::default();
     e.mock_all_auths();
+    let token_contract_address = Address::generate(&e);
     let contract_address = e.register(MockContract, ());
     let module_address = e.register(MockComplianceModule, ());
     let from = Address::generate(&e);
@@ -451,7 +475,7 @@ fn can_transfer_returns_false_when_module_rejects() {
 
         // Execute can_transfer hook with odd amount - should return false
         let odd_amount = 1001i128;
-        assert!(!can_transfer(&e, from, to, odd_amount));
+        assert!(!can_transfer(&e, from, to, odd_amount, token_contract_address));
     });
 }
 
@@ -459,6 +483,7 @@ fn can_transfer_returns_false_when_module_rejects() {
 fn can_create_hook_execution_works() {
     let e = Env::default();
     e.mock_all_auths();
+    let token_contract_address = Address::generate(&e);
     let contract_address = e.register(MockContract, ());
     let module_address = e.register(MockComplianceModule, ());
     let to = Address::generate(&e);
@@ -466,18 +491,18 @@ fn can_create_hook_execution_works() {
     e.as_contract(&contract_address, || {
         // Test with no modules registered - should return true
         let amount = 1000i128;
-        assert!(can_create(&e, to.clone(), amount));
+        assert!(can_create(&e, to.clone(), amount, token_contract_address.clone()));
 
         // Add module to CanCreate hook
         add_module_to(&e, ComplianceHook::CanCreate, module_address.clone());
 
         // Execute can_create hook with even amount - should return true
         let even_amount = 1000i128;
-        assert!(can_create(&e, to.clone(), even_amount));
+        assert!(can_create(&e, to.clone(), even_amount, token_contract_address.clone()));
 
         // Execute can_create hook with odd amount - should return false
         let odd_amount = 1001i128;
-        assert!(!can_create(&e, to.clone(), odd_amount));
+        assert!(!can_create(&e, to.clone(), odd_amount, token_contract_address.clone()));
     });
 }
 
@@ -485,6 +510,7 @@ fn can_create_hook_execution_works() {
 fn can_create_multiple_modules_all_must_pass() {
     let e = Env::default();
     e.mock_all_auths();
+    let token_contract_address = Address::generate(&e);
     let contract_address = e.register(MockContract, ());
     let module1 = e.register(MockComplianceModule, ());
     let module2 = e.register(MockComplianceModule, ());
@@ -497,10 +523,10 @@ fn can_create_multiple_modules_all_must_pass() {
 
         // Test with even amount - both modules should return true, so result is true
         let even_amount = 1000i128;
-        assert!(can_create(&e, to.clone(), even_amount));
+        assert!(can_create(&e, to.clone(), even_amount, token_contract_address.clone()));
 
         // Test with odd amount - both modules should return false, so result is false
         let odd_amount = 1001i128;
-        assert!(!can_create(&e, to, odd_amount));
+        assert!(!can_create(&e, to, odd_amount, token_contract_address));
     });
 }
