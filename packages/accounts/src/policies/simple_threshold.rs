@@ -194,7 +194,7 @@ pub fn enforce(
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    let threshold = get_threshold(e, context_rule, smart_account);
+    let threshold = get_threshold(e, context_rule.id, smart_account);
 
     if authenticated_signers.len() >= threshold {
         // emit event
