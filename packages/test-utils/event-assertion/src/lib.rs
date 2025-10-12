@@ -1,6 +1,7 @@
 // A conditional attribute that applies `no_std` only for wasm targets.
-// This prevents Cargo from implicitly injecting std::prelude imports into empty crates
-// when building for wasm targets that don't support std (like wasm32v1-none).
+// This prevents Cargo from implicitly injecting std::prelude imports into empty
+// crates when building for wasm targets that don't support std (like
+// wasm32v1-none).
 #![cfg_attr(target_family = "wasm", no_std)]
 
 // Panic handler required for `no_std` wasm targets.
