@@ -7,9 +7,6 @@ publish = false
 version.workspace = true
 
 # This crate is only used for testing, and not compatible with `wasm32` targets.
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies.soroban-sdk]
-workspace = true
-features = ["testutils"]
-
-[dependencies]
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
 stellar-tokens = { workspace = true }

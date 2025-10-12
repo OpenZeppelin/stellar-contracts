@@ -41,8 +41,8 @@ We provide a set of example contracts that demonstrate how to use the library. Y
 2. `cd stellar-contracts/examples`
 3. Take a look at the current folder, and select an example contract you are interested in. We will go with the `fungible-pausable` in this guide.
 4. `cd fungible-pausable`
-5. `cargo build --target wasm32-unknown-unknown --release`
-6. Now, the `target/wasm32-unknown-unknown/release/` directory will contain the compiled contracts. In this case, `target/wasm32-unknown-unknown/release/fungible_pausable_example.wasm` is the compiled wasm file.
+5. `cargo build --target wasm32v1-none --release`
+6. Now, the `target/wasm32v1-none/release/` directory will contain the compiled contracts. In this case, `target/wasm32v1-none/release/fungible_pausable_example.wasm` is the compiled wasm file.
 7. Deploying to the testnet is no different than any other contract. You can follow the instructions in the [Stellar documentation](https://developers.stellar.org/docs/build/smart-contracts/getting-started/deploy-to-testnet).
 
 

@@ -279,7 +279,7 @@ The non-fungible token implementation is designed to be compatible with existing
 
 ### WASM Compilation
 
-- **Target**: `wasm32-unknown-unknown`
+- **Target**: `wasm32v1-none`
 - **Optimization**: Release builds with size optimization
 - **No-std Environment**: Minimal runtime footprint
 
