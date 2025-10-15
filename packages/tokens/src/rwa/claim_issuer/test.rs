@@ -923,11 +923,6 @@ fn is_key_authorized_checks_registry_and_topic() {
 
     // registry_a trusts issuer and allows topic 42
     let registry_a = setup_mock_registry(&e, &contract_id, &[42]);
-    // registry_b allows topic 42 but issuer will NOT be registered as trusted
-    let registry_b_id = e.register(MockClaimTopicsAndIssuersContract, ());
-    let registry_b = ClaimTopicsAndIssuersClient::new(&e, &registry_b_id);
-    let operator = Address::generate(&e);
-    registry_b.add_claim_topic(&42u32, &operator);
 
     e.as_contract(&contract_id, || {
         // Authorized in registry_a for topic 42
@@ -935,7 +930,22 @@ fn is_key_authorized_checks_registry_and_topic() {
 
         // Not authorized in registry_a for topic 43 (topic not allowed)
         assert!(!is_key_authorized(&e, &registry_a, 43));
+    });
+}
 
+#[test]
+#[should_panic(expected = "Error(Contract, #371)")]
+fn is_key_authorized_checks_registry_and_topic_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    // registry_b allows topic 42 but issuer will NOT be registered as trusted
+    let registry_b_id = e.register(MockClaimTopicsAndIssuersContract, ());
+    let registry_b = ClaimTopicsAndIssuersClient::new(&e, &registry_b_id);
+    let operator = Address::generate(&e);
+    registry_b.add_claim_topic(&42u32, &operator);
+
+    e.as_contract(&contract_id, || {
         // Not authorized in registry_b for topic 42 (issuer not trusted)
         assert!(!is_key_authorized(&e, &registry_b_id, 42));
     });
