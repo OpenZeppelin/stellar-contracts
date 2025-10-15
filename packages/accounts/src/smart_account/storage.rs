@@ -126,6 +126,9 @@ pub enum SmartAccountStorageKey {
     NextId,
     /// Storage key defining the fingerprint each context rule.
     Fingerprint(BytesN<32>),
+    /// Storage key for the count of active context rules.
+    /// Used to enforce MAX_CONTEXT_RULES limit.
+    Count,
 }
 
 /// Represents different types of signers in the smart account system.
@@ -594,10 +597,10 @@ pub fn add_context_rule(
     signers: &Vec<Signer>,
     policies: &Map<Address, Val>,
 ) -> ContextRule {
-    let mut id = e.storage().instance().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
+    let id = e.storage().instance().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
 
-    // Check maximum context rules limit
-    if id >= MAX_CONTEXT_RULES {
+    let count = e.storage().instance().get(&SmartAccountStorageKey::Count).unwrap_or(0u32);
+    if count >= MAX_CONTEXT_RULES {
         panic_with_error!(e, SmartAccountError::TooManyContextRules);
     }
 
@@ -658,8 +661,10 @@ pub fn add_context_rule(
     emit_context_rule_added(e, &context_rule);
 
     // Increment next id
-    id += 1;
-    e.storage().instance().set(&SmartAccountStorageKey::NextId, &id);
+    e.storage().instance().set(&SmartAccountStorageKey::NextId, &(id + 1));
+
+    // Increment count
+    e.storage().instance().set(&SmartAccountStorageKey::Count, &(count + 1));
 
     context_rule
 }
@@ -820,6 +825,11 @@ pub fn remove_context_rule(e: &Env, id: u32) {
         ids.remove(pos as u32);
         e.storage().persistent().set(&ids_key, &ids);
     }
+
+    // Decrement count
+    let count: u32 = e.storage().instance().get(&SmartAccountStorageKey::Count).expect("to be set");
+    // if count is set, it can be safely assumed it's greater than 0
+    e.storage().instance().set(&SmartAccountStorageKey::Count, &(count - 1));
 
     // Emit event
     emit_context_rule_removed(e, id);
