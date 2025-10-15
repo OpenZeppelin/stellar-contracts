@@ -410,7 +410,7 @@ impl RWA {
 
         // Preserve address frozen status on the new account if it was frozen
         if is_address_frozen {
-            Self::set_address_frozen(e, &e.current_contract_address(), new_account, true);
+            Self::set_address_frozen(e, new_account, true);
         }
 
         emit_recovery_success(e, old_account, new_account);
@@ -429,8 +429,7 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - `["address_frozen", user_address: Address, is_frozen: bool,
-    ///   caller: Address]`
+    /// * topics - `["address_frozen", user_address: Address, is_frozen: bool]`
     /// * data - `[]`
     ///
     /// # Security Warning
@@ -438,10 +437,10 @@ impl RWA {
     /// **IMPORTANT**: This function bypasses authorization checks and should
     /// only be used internally or in admin functions that implement their own
     /// authorization logic.
-    pub fn set_address_frozen(e: &Env, caller: &Address, user_address: &Address, freeze: bool) {
+    pub fn set_address_frozen(e: &Env, user_address: &Address, freeze: bool) {
         e.storage().persistent().set(&RWAStorageKey::AddressFrozen(user_address.clone()), &freeze);
 
-        emit_address_frozen(e, user_address, freeze, caller);
+        emit_address_frozen(e, user_address, freeze);
     }
 
     /// Freezes a specified amount of tokens for a given address.
