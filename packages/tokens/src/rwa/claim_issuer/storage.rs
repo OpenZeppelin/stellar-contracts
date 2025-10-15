@@ -405,8 +405,7 @@ pub fn is_key_allowed_for_registry(
 pub fn is_key_authorized(e: &Env, registry: &Address, claim_topic: u32) -> bool {
     let registry_client = ClaimTopicsAndIssuersClient::new(e, registry);
 
-    registry_client.is_trusted_issuer(&e.current_contract_address())
-        && registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic)
+    registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic)
 }
 
 /// Allows a public key to sign claims for specific topic and
