@@ -477,8 +477,6 @@ pub struct AddressFrozen {
     pub user_address: Address,
     #[topic]
     pub is_frozen: bool,
-    #[topic]
-    pub caller: Address,
 }
 
 /// Emits an event indicating an address has been frozen or unfrozen.
@@ -488,10 +486,8 @@ pub struct AddressFrozen {
 /// * `e` - Access to the Soroban environment.
 /// * `user_address` - The wallet address that is affected.
 /// * `is_frozen` - The freezing status of the wallet.
-/// * `caller` - The address of the who called the function.
-pub fn emit_address_frozen(e: &Env, user_address: &Address, is_frozen: bool, caller: &Address) {
-    AddressFrozen { user_address: user_address.clone(), is_frozen, caller: caller.clone() }
-        .publish(e);
+pub fn emit_address_frozen(e: &Env, user_address: &Address, is_frozen: bool) {
+    AddressFrozen { user_address: user_address.clone(), is_frozen }.publish(e);
 }
 
 /// Event emitted when tokens are frozen.
