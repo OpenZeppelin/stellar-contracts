@@ -39,31 +39,40 @@
 //! ## Architecture
 //!
 //! The main RWA contract denoted by [`RWAToken`] interface, is expecting two
-//! functions to be available from external contracts:
+//! modules to be available from external contracts:
 //!
-//! - `fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) ->
-//!   bool;` for compliance validation
-//! - `fn verify_identity(e: &Env, account: &Address);` for the identity
-//!   verification
+//! ### Compliance Module:
+//! - `fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token:
+//!   Address) -> bool;`
+//! - `fn can_create(e: &Env, to: Address, amount: i128, token: Address) ->
+//!   bool;`
+//! - `fn created(e: &Env, to: Address, amount: i128, token: Address);`
+//! - `fn destroyed(e: &Env, from: Address, amount: i128, token: Address);`
+//! - `fn transferred(e: &Env, from: Address, to: Address, amount: i128, token:
+//!   Address);`
+//!
+//! ### Identity Verifier Module:
+//! - `fn verify_identity(e: &Env, account: &Address);`
 //!
 //! Hence, the [`RWAToken`] interface also exposes the following functions to
 //! set and get the necessary contracts:
 //!
-//! Compliance (required for `can_transfer()`):
+//! Compliance:
 //! - `set_compliance(e: &Env, compliance: Address, operator: Address)`
 //! - `compliance(e: &Env) -> Address`
 //!
-//! IdentityVerifier (required for `verify_identity()`):
+//! Identity Verifier:
 //! - `set_identity_verifier(e: &Env, identity_verifier: Address, operator:
 //!   Address)`
 //! - `identity_verifier(e: &Env) -> Address`
 //!
-//! As long as these two functions are available to the RWA Token contract,
-//! the [`RWAToken`] interface can be used to create a compliant RWA token.
+//! As long as these two modules and the mentioned functions are available to
+//! the RWA Token contract, the [`RWAToken`] interface can be used to create a
+//! compliant RWA token.
 //!
-//! These two functions `can_transfer() and `verify_identity()` are
-//! deliberately marked as implementation details, to provide flexibility and
-//! allow for alternate approaches for different business needs.
+//! The above mentioned functions are deliberately marked as implementation
+//! details, to provide flexibility and allow for alternate approaches for
+//! different business needs.
 //!
 //! The concrete implementation for these functions can be found in the modules
 //! below. These modules act as the default implementations for the most common
@@ -75,8 +84,10 @@
 //!   topics
 //! - **Compliance**: Modular compliance rules and validation framework
 //! - **Identity Claims**: Integration with identity registries for KYC/AML
-//! - **Identity Storage Registry**: Registry for storing all the information
+//! - **Identity Registry Storage**: Registry for storing all the information
 //!   necessary for identities
+//! - **Identity Verifier**: Interface for the identity verification process,
+//!   connects the RWA token to the identity stack
 //! - **Extensions**: Optional extensions providing additional functionality
 //!   like document management
 
