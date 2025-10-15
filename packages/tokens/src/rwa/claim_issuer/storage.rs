@@ -133,7 +133,7 @@ pub struct Secp256k1SignatureData {
 /// bytes)
 pub struct Ed25519Verifier;
 
-impl SignatureVerifier<32> for Ed25519Verifier {
+impl SignatureVerifier for Ed25519Verifier {
     type SignatureData = Ed25519SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
@@ -167,7 +167,7 @@ impl SignatureVerifier<32> for Ed25519Verifier {
 /// bytes)
 pub struct Secp256r1Verifier;
 
-impl SignatureVerifier<32> for Secp256r1Verifier {
+impl SignatureVerifier for Secp256r1Verifier {
     type SignatureData = Secp256r1SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
@@ -207,7 +207,7 @@ impl SignatureVerifier<32> for Secp256r1Verifier {
 /// bytes) || recovery_id (4 bytes)
 pub struct Secp256k1Verifier;
 
-impl SignatureVerifier<32> for Secp256k1Verifier {
+impl SignatureVerifier for Secp256k1Verifier {
     type SignatureData = Secp256k1SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
