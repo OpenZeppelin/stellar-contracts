@@ -29,7 +29,7 @@ fn create_test_name(e: &Env, name: &str) -> BytesN<32> {
 }
 
 fn document_exists(e: &Env, name: &BytesN<32>) -> bool {
-    let key = DocumentStorageKey::DocumentIndex(name.clone());
+    let key = DocumentStorageKey::Index(name.clone());
     e.storage().persistent().has(&key)
 }
 
@@ -321,7 +321,7 @@ fn max_documents_limit() {
     let hash = create_test_hash(&e, "content");
 
     e.as_contract(&contract_id, || {
-        e.storage().persistent().set(&DocumentStorageKey::DocumentCount, &MAX_DOCUMENTS);
+        e.storage().persistent().set(&DocumentStorageKey::Count, &MAX_DOCUMENTS);
         let name = create_test_name(&e, "one_too_many");
         set_document(&e, &name, &uri, &hash);
     });
