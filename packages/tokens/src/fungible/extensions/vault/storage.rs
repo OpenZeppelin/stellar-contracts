@@ -603,7 +603,7 @@ impl Vault {
     /// assets.
     ///
     /// Implements the formula:
-    /// shares = (assets × (totalAssets + 1)) / (totalSupply + 10^offset)
+    /// assets = (shares × (totalAssets + 1)) / (totalSupply + 10^offset)
     ///
     /// # Arguments
     ///
@@ -642,7 +642,7 @@ impl Vault {
             .checked_add(pow)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
 
-        // (assets × (totalAssets + 1)) / (totalSupply + 10^offset)
+        // (shares × (totalAssets + 1)) / (totalSupply + 10^offset)
         muldiv(e, x, y, denominator, rounding)
     }
 

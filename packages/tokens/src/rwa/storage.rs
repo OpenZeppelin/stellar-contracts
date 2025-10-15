@@ -340,8 +340,6 @@ impl RWA {
     /// * `e` - Access to the Soroban environment.
     /// * `old_account` - The address of the wallet that lost access.
     /// * `new_account` - The address of the new account to receive the tokens.
-    /// * `investor_onchain_id` - The onchain ID of the investor for
-    ///   verification.
     ///
     /// # Errors
     ///
@@ -355,7 +353,7 @@ impl RWA {
     /// * topics - `["transfer", old_account: Address, new_account: Address]`
     /// * data - `[amount: i128]`
     /// * topics - `["recovery_success", old_account: Address, new_account:
-    ///   Address, investor_onchain_id: Address]`
+    ///   Address]`
     /// * data - `[]`
     ///
     /// # Notes

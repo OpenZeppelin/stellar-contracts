@@ -128,7 +128,7 @@ pub const WEIGHTED_THRESHOLD_TTL_THRESHOLD: u32 = WEIGHTED_THRESHOLD_EXTEND_AMOU
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `context_rule` - The context rule ID for this policy.
+/// * `context_rule_id` - The context rule ID for this policy.
 /// * `smart_account` - The address of the smart account.
 ///
 /// # Errors
