@@ -153,7 +153,7 @@ pub trait ClaimIssuer {
 /// Each signature scheme implements this trait to provide a consistent
 /// interface for claim validation while allowing for scheme-specific
 /// implementation details.
-pub trait SignatureVerifier<const N: usize> {
+pub trait SignatureVerifier {
     /// The signature data type for this signature scheme.
     type SignatureData;
 
