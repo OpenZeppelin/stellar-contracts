@@ -87,7 +87,7 @@ fn add_claim_fails() {
     let (issuer, topic, scheme, signature, data, uri) = setup_test_data(&e);
 
     e.as_contract(&issuer, || {
-        // Set mock claim issuer to return true
+        // Set mock claim issuer to panic
         e.storage().persistent().set(&symbol_short!("not_valid"), &true);
     });
 
