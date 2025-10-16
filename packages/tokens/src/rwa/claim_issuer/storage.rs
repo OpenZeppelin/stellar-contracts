@@ -133,7 +133,7 @@ pub struct Secp256k1SignatureData {
 /// bytes)
 pub struct Ed25519Verifier;
 
-impl SignatureVerifier<32> for Ed25519Verifier {
+impl SignatureVerifier for Ed25519Verifier {
     type SignatureData = Ed25519SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
@@ -167,7 +167,7 @@ impl SignatureVerifier<32> for Ed25519Verifier {
 /// bytes)
 pub struct Secp256r1Verifier;
 
-impl SignatureVerifier<32> for Secp256r1Verifier {
+impl SignatureVerifier for Secp256r1Verifier {
     type SignatureData = Secp256r1SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
@@ -207,7 +207,7 @@ impl SignatureVerifier<32> for Secp256r1Verifier {
 /// bytes) || recovery_id (4 bytes)
 pub struct Secp256k1Verifier;
 
-impl SignatureVerifier<32> for Secp256k1Verifier {
+impl SignatureVerifier for Secp256k1Verifier {
     type SignatureData = Secp256k1SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
@@ -390,12 +390,7 @@ pub fn is_key_allowed_for_registry(
 /// Checks whether the current contract (claim issuer) is authorized at a given
 /// `claim_topics_and_issuers` registry for a specific claim topic.
 ///
-/// This helper verifies both conditions:
-/// - the current contract is a trusted issuer in `registry`, and
-/// - the current contract is allowed to sign claims for `claim_topic` in
-///   `registry`.
-///
-/// It does not does not check signing key assignment.
+/// It does not check signing key assignment.
 ///
 /// # Arguments
 ///
@@ -405,8 +400,7 @@ pub fn is_key_allowed_for_registry(
 pub fn is_key_authorized(e: &Env, registry: &Address, claim_topic: u32) -> bool {
     let registry_client = ClaimTopicsAndIssuersClient::new(e, registry);
 
-    registry_client.is_trusted_issuer(&e.current_contract_address())
-        && registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic)
+    registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic)
 }
 
 /// Allows a public key to sign claims for specific topic and
