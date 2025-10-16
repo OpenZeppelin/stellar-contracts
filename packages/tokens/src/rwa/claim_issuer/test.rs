@@ -661,8 +661,37 @@ fn bidirectional_mapping_multiple_keys_same_topic() {
 }
 
 #[test]
+fn bidirectional_mapping_same_key_multiple_topics_same_registry() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry = setup_mock_registry(&e, &contract_id, &[42, 43]);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+
+    e.as_contract(&contract_id, || {
+        // Add same key for topic 42 at registry
+        allow_key(&e, &public_key, &registry, scheme, 42);
+
+        // Add same key for topic 43 at same registry - should succeed
+        allow_key(&e, &public_key, &registry, scheme, 43);
+
+        // Verify key is allowed for both topics
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, 42));
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, 43));
+
+        // Verify Pairs mapping has both (topic, registry) pairs
+        let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+        let registries = get_registries(&e, &signing_key);
+        assert_eq!(registries.len(), 2);
+        assert_eq!(registries.get(0).unwrap(), registry);
+        assert_eq!(registries.get(1).unwrap(), registry);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #352)")]
-fn bidirectional_mapping_same_key_same_registry_fails() {
+fn bidirectional_mapping_same_key_same_registry_same_topic_fails() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
     let registry = setup_mock_registry(&e, &contract_id, &[42]);
@@ -830,26 +859,6 @@ fn max_registries_per_key_exceeded() {
         // Try to add one more - should panic
         let extra_registry = setup_mock_registry(&e, &contract_id, &[MAX_REGISTRIES_PER_KEY]);
         allow_key(&e, &public_key, &extra_registry, scheme, MAX_REGISTRIES_PER_KEY);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #352)")]
-fn allow_key_multiple_topics_one_registry_fails() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-
-    let public_key = Bytes::from_array(&e, &[1u8; 32]);
-    let scheme = 1u32;
-    let topic1 = 42u32;
-    let topic2 = 84u32;
-
-    let registry_id = setup_mock_registry(&e, &contract_id, &[topic1, topic2]);
-
-    e.as_contract(&contract_id, || {
-        allow_key(&e, &public_key, &registry_id, scheme, topic1);
-        // Key already registered for this registry although for different topic
-        allow_key(&e, &public_key, &registry_id, scheme, topic2);
     });
 }
 
