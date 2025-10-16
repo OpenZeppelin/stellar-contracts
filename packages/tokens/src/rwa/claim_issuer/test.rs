@@ -834,6 +834,26 @@ fn max_registries_per_key_exceeded() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #352)")]
+fn allow_key_multiple_topics_one_registry_fails() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+    let topic1 = 42u32;
+    let topic2 = 84u32;
+
+    let registry_id = setup_mock_registry(&e, &contract_id, &[topic1, topic2]);
+
+    e.as_contract(&contract_id, || {
+        allow_key(&e, &public_key, &registry_id, scheme, topic1);
+        // Key already registed for this registry although for different topic
+        allow_key(&e, &public_key, &registry_id, scheme, topic2);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #354)")]
 fn allow_key_issuer_not_registered() {
     let e = Env::default();
@@ -916,6 +936,63 @@ fn is_key_allowed_for_registry_works() {
         // Remove from registry1
         remove_key(&e, &public_key, &registry1, scheme, topic);
         assert!(!is_key_allowed_for_registry(&e, &public_key, scheme, &registry1));
+    });
+}
+
+#[test]
+fn remove_key_prevents_dangling_keys_across_multiple_topics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry1 = setup_mock_registry(&e, &contract_id, &[42, 99]);
+    let registry2 = setup_mock_registry(&e, &contract_id, &[42, 99]);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+    let topic1 = 42u32;
+    let topic2 = 99u32;
+
+    e.as_contract(&contract_id, || {
+        // Setup: Associate key K with two topic-registry pairs:
+        // (T1, R1) and (T2, R2)
+        allow_key(&e, &public_key, &registry1, scheme, topic1);
+        allow_key(&e, &public_key, &registry2, scheme, topic2);
+
+        // Verify initial state
+        let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+        let registries = get_registries(&e, &signing_key);
+        assert_eq!(registries.len(), 2);
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, topic1));
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, topic2));
+
+        // Step 1: Remove key from (T1, R1)
+        remove_key(&e, &public_key, &registry1, scheme, topic1);
+
+        // K is immediately removed from T1 since no more (T1, *) pairs exist
+        assert!(!is_key_allowed_for_topic(&e, &public_key, scheme, topic1));
+
+        // After removing (T1, R1), only (T2, R2) remains
+        let registries = get_registries(&e, &signing_key);
+        assert_eq!(registries.len(), 1);
+        assert_eq!(registries.get(0).unwrap(), registry2);
+        // K still exists in T2 because (T2, R2) still exists
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, topic2));
+
+        // Step 2: Remove key from (T2, R2) - this is the last registry pair
+        remove_key(&e, &public_key, &registry2, scheme, topic2);
+
+        // After removing the last registry pair, the key should NOT be allowed for ANY
+        // topic
+        assert!(!is_key_allowed_for_topic(&e, &public_key, scheme, topic1));
+        assert!(!is_key_allowed_for_topic(&e, &public_key, scheme, topic2));
+
+        // Verify complete cleanup - no storage entries should remain
+        let topics_key1 = ClaimIssuerStorageKey::Topics(topic1);
+        let topics_key2 = ClaimIssuerStorageKey::Topics(topic2);
+        let registries_key = ClaimIssuerStorageKey::Registries(signing_key);
+
+        assert!(!e.storage().persistent().has(&topics_key1));
+        assert!(!e.storage().persistent().has(&topics_key2));
+        assert!(!e.storage().persistent().has(&registries_key));
     });
 }
 
