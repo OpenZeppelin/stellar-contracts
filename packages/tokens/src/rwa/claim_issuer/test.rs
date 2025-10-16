@@ -848,7 +848,7 @@ fn allow_key_multiple_topics_one_registry_fails() {
 
     e.as_contract(&contract_id, || {
         allow_key(&e, &public_key, &registry_id, scheme, topic1);
-        // Key already registed for this registry although for different topic
+        // Key already registered for this registry although for different topic
         allow_key(&e, &public_key, &registry_id, scheme, topic2);
     });
 }
