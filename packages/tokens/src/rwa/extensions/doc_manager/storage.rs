@@ -202,7 +202,7 @@ pub fn set_document(e: &Env, name: &BytesN<32>, uri: &String, document_hash: &By
         let bucket_index = count / BUCKET_SIZE;
         let bucket_key = DocumentStorageKey::Bucket(bucket_index);
         let mut bucket: Vec<(BytesN<32>, Document)> =
-            e.storage().persistent().get(&bucket_key).unwrap_or(Vec::new(e));
+            e.storage().persistent().get(&bucket_key).unwrap_or_else(|| Vec::new(e));
 
         bucket.push_back((name.clone(), document.clone()));
         e.storage().persistent().set(&bucket_key, &bucket);

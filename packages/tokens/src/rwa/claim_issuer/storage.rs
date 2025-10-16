@@ -471,7 +471,7 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
     if !is_key_allowed_for_topic(e, &signing_key.public_key, scheme, claim_topic) {
         let key = ClaimIssuerStorageKey::Topics(claim_topic);
         let mut topic_keys: Vec<SigningKey> =
-            e.storage().persistent().get(&key).unwrap_or(Vec::new(e));
+            e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
 
         if topic_keys.len() >= MAX_KEYS_PER_TOPIC {
             panic_with_error!(e, ClaimIssuerError::MaxKeysPerTopicExceeded)
@@ -484,7 +484,7 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
     // Update Registries mapping: SigningKey -> Vec<Address>
     let regsitries_storage_key = ClaimIssuerStorageKey::Registries(signing_key);
     let mut registries: Vec<(u32, Address)> =
-        e.storage().persistent().get(&regsitries_storage_key).unwrap_or(Vec::new(e));
+        e.storage().persistent().get(&regsitries_storage_key).unwrap_or_else(|| Vec::new(e));
 
     // Check if this registry is already added for this key, even for a different
     // topic
