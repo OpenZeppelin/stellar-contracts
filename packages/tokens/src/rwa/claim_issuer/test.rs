@@ -22,10 +22,10 @@ use crate::rwa::{
         storage::{
             allow_key, decode_claim_data_expiration, encode_claim_data_expiration,
             get_current_nonce_for, get_keys_for_topic, get_registries, invalidate_claim_signatures,
-            is_claim_expired, is_claim_revoked, is_key_allowed_for_registry,
-            is_key_allowed_for_topic, is_key_authorized, remove_key, set_claim_revoked,
-            ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
-            Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
+            is_authorized_for, is_claim_expired, is_claim_revoked, is_key_allowed_for_registry,
+            is_key_allowed_for_topic, remove_key, set_claim_revoked, ClaimIssuerStorageKey,
+            Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier,
+            Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
         },
         SignatureVerifier, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
     },
@@ -997,7 +997,7 @@ fn remove_key_prevents_dangling_keys_across_multiple_topics() {
 }
 
 #[test]
-fn is_key_authorized_checks_registry_and_topic() {
+fn is_authorized_for_checks_registry_and_topic() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
@@ -1011,13 +1011,13 @@ fn is_key_authorized_checks_registry_and_topic() {
 
     e.as_contract(&contract_id, || {
         // Authorized in registry_a for topic 42
-        assert!(is_key_authorized(&e, &registry_a, 42));
+        assert!(is_authorized_for(&e, &registry_a, 42));
 
         // Not authorized in registry_a for topic 43 (topic not allowed)
-        assert!(!is_key_authorized(&e, &registry_a, 43));
+        assert!(!is_authorized_for(&e, &registry_a, 43));
 
         // Not authorized in registry_b for topic 42 (issuer not trusted)
-        assert!(!is_key_authorized(&e, &registry_b_id, 42));
+        assert!(!is_authorized_for(&e, &registry_b_id, 42));
     });
 }
 

@@ -147,10 +147,10 @@ use soroban_sdk::{contractclient, contracterror, contractevent, Address, Bytes, 
 pub use storage::{
     allow_key, build_claim_identifier, decode_claim_data_expiration, encode_claim_data_expiration,
     get_current_nonce_for, get_keys_for_topic, get_registries, invalidate_claim_signatures,
-    is_claim_expired, is_claim_revoked, is_key_allowed_for_registry, is_key_allowed_for_topic,
-    is_key_authorized, remove_key, set_claim_revoked, ClaimIssuerStorageKey, Ed25519SignatureData,
-    Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData,
-    Secp256r1Verifier, SigningKey,
+    is_authorized_for, is_claim_expired, is_claim_revoked, is_key_allowed_for_registry,
+    is_key_allowed_for_topic, remove_key, set_claim_revoked, ClaimIssuerStorageKey,
+    Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier,
+    Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
 };
 
 /// Trait for validating claims issued by this identity to other identities.

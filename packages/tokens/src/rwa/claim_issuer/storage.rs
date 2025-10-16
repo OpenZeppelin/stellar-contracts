@@ -43,7 +43,7 @@
 //!
 //! 3. **Synchronization note**: After initial key assignment, the
 //!    `claim_topics_and_issuers` contract may invalidate a topic or remove the
-//!    issuer's trusted status. Use `is_key_authorized()` to verify both the
+//!    issuer's trusted status. Use `is_authorized_for()` to verify both the
 //!    topic validity and issuer registration status when needed.
 //!
 //! ## Claim Revocation and Signature Invalidation
@@ -412,7 +412,7 @@ pub fn is_key_allowed_for_registry(
 /// * `e` - The Soroban environment.
 /// * `registry` - The registry address to check against.
 /// * `claim_topic` - The claim topic to check authorization for.
-pub fn is_key_authorized(e: &Env, registry: &Address, claim_topic: u32) -> bool {
+pub fn is_authorized_for(e: &Env, registry: &Address, claim_topic: u32) -> bool {
     let registry_client = ClaimTopicsAndIssuersClient::new(e, registry);
 
     registry_client.is_trusted_issuer(&e.current_contract_address())
