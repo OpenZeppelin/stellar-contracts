@@ -22,10 +22,10 @@ use crate::rwa::{
         storage::{
             allow_key, decode_claim_data_expiration, encode_claim_data_expiration,
             get_current_nonce_for, get_keys_for_topic, get_registries, invalidate_claim_signatures,
-            is_claim_expired, is_claim_revoked, is_key_allowed_for_registry,
-            is_key_allowed_for_topic, is_key_authorized, remove_key, set_claim_revoked,
-            ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
-            Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
+            is_authorized_for, is_claim_expired, is_claim_revoked, is_key_allowed_for_registry,
+            is_key_allowed_for_topic, remove_key, set_claim_revoked, ClaimIssuerStorageKey,
+            Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier,
+            Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
         },
         SignatureVerifier, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
     },
@@ -617,10 +617,10 @@ fn bidirectional_mapping_remove_key() {
         let topics_key = ClaimIssuerStorageKey::Topics(topic);
         assert!(!e.storage().persistent().has(&topics_key));
 
-        // Verify Registries mapping cleaned up
+        // Verify Pairs mapping cleaned up
         let signing_key = SigningKey { public_key: public_key.clone(), scheme };
-        let registries_key = ClaimIssuerStorageKey::Registries(signing_key);
-        assert!(!e.storage().persistent().has(&registries_key));
+        let pairs_key = ClaimIssuerStorageKey::Pairs(signing_key);
+        assert!(!e.storage().persistent().has(&pairs_key));
     });
 }
 
@@ -661,8 +661,37 @@ fn bidirectional_mapping_multiple_keys_same_topic() {
 }
 
 #[test]
+fn bidirectional_mapping_same_key_multiple_topics_same_registry() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry = setup_mock_registry(&e, &contract_id, &[42, 43]);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+
+    e.as_contract(&contract_id, || {
+        // Add same key for topic 42 at registry
+        allow_key(&e, &public_key, &registry, scheme, 42);
+
+        // Add same key for topic 43 at same registry - should succeed
+        allow_key(&e, &public_key, &registry, scheme, 43);
+
+        // Verify key is allowed for both topics
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, 42));
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, 43));
+
+        // Verify Pairs mapping has both (topic, registry) pairs
+        let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+        let registries = get_registries(&e, &signing_key);
+        assert_eq!(registries.len(), 2);
+        assert_eq!(registries.get(0).unwrap(), registry);
+        assert_eq!(registries.get(1).unwrap(), registry);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #352)")]
-fn bidirectional_mapping_same_key_same_registry_fails() {
+fn bidirectional_mapping_same_key_same_registry_same_topic_fails() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
     let registry = setup_mock_registry(&e, &contract_id, &[42]);
@@ -920,7 +949,64 @@ fn is_key_allowed_for_registry_works() {
 }
 
 #[test]
-fn is_key_authorized_checks_registry_and_topic() {
+fn remove_key_prevents_dangling_keys_across_multiple_topics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let registry1 = setup_mock_registry(&e, &contract_id, &[42, 99]);
+    let registry2 = setup_mock_registry(&e, &contract_id, &[42, 99]);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+    let topic1 = 42u32;
+    let topic2 = 99u32;
+
+    e.as_contract(&contract_id, || {
+        // Setup: Associate key K with two topic-registry pairs:
+        // (T1, R1) and (T2, R2)
+        allow_key(&e, &public_key, &registry1, scheme, topic1);
+        allow_key(&e, &public_key, &registry2, scheme, topic2);
+
+        // Verify initial state
+        let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+        let registries = get_registries(&e, &signing_key);
+        assert_eq!(registries.len(), 2);
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, topic1));
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, topic2));
+
+        // Step 1: Remove key from (T1, R1)
+        remove_key(&e, &public_key, &registry1, scheme, topic1);
+
+        // K is immediately removed from T1 since no more (T1, *) pairs exist
+        assert!(!is_key_allowed_for_topic(&e, &public_key, scheme, topic1));
+
+        // After removing (T1, R1), only (T2, R2) remains
+        let registries = get_registries(&e, &signing_key);
+        assert_eq!(registries.len(), 1);
+        assert_eq!(registries.get(0).unwrap(), registry2);
+        // K still exists in T2 because (T2, R2) still exists
+        assert!(is_key_allowed_for_topic(&e, &public_key, scheme, topic2));
+
+        // Step 2: Remove key from (T2, R2) - this is the last registry pair
+        remove_key(&e, &public_key, &registry2, scheme, topic2);
+
+        // After removing the last registry pair, the key should NOT be allowed for ANY
+        // topic
+        assert!(!is_key_allowed_for_topic(&e, &public_key, scheme, topic1));
+        assert!(!is_key_allowed_for_topic(&e, &public_key, scheme, topic2));
+
+        // Verify complete cleanup - no storage entries should remain
+        let topics_key1 = ClaimIssuerStorageKey::Topics(topic1);
+        let topics_key2 = ClaimIssuerStorageKey::Topics(topic2);
+        let pairs_key = ClaimIssuerStorageKey::Pairs(signing_key);
+
+        assert!(!e.storage().persistent().has(&topics_key1));
+        assert!(!e.storage().persistent().has(&topics_key2));
+        assert!(!e.storage().persistent().has(&pairs_key));
+    });
+}
+
+#[test]
+fn is_authorized_for_checks_registry_and_topic() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
@@ -929,10 +1015,10 @@ fn is_key_authorized_checks_registry_and_topic() {
 
     e.as_contract(&contract_id, || {
         // Authorized in registry_a for topic 42
-        assert!(is_key_authorized(&e, &registry_a, 42));
+        assert!(is_authorized_for(&e, &registry_a, 42));
 
         // Not authorized in registry_a for topic 43 (topic not allowed)
-        assert!(!is_key_authorized(&e, &registry_a, 43));
+        assert!(!is_authorized_for(&e, &registry_a, 43));
     });
 }
 
@@ -950,7 +1036,7 @@ fn is_key_authorized_checks_registry_and_topic_panics() {
 
     e.as_contract(&contract_id, || {
         // Not authorized in registry_b for topic 42 (issuer not trusted)
-        assert!(!is_key_authorized(&e, &registry_b_id, 42));
+        assert!(!is_authorized_for(&e, &registry_b_id, 42));
     });
 }
 
