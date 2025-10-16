@@ -48,29 +48,30 @@
 //!    `claim_topics_and_issuers` contract may invalidate a topic or remove the
 //!    `is_key_authorized()` to verify both the topic validity and issuer
 //!    registration status.
-/// ## Claim Revocation and Signature Invalidation
-///
-/// This module provides three independent mechanisms for invalidating claims:
-///
-/// 1. **Passive expiration**: Helper functions encode/decode expiration
-///    metadata (`created_at` and `valid_until` timestamps) within claim data.
-///    Claims automatically expire after their `valid_until` timestamp without
-///    requiring active on-chain management. This provides secure-by-default
-///    behavior.
-///
-/// 2. **Per-claim revocation** (`set_claim_revoked`): Revokes a specific claim
-///    by storing its revocation status under the claim's digest. This allows
-///    fine-grained control over individual claims.
-///
-/// 3. **Signature invalidation** (`invalidate_claim_signatures`): Invalidates
-///    all existing claim signatures for a specific identity and claim topic by
-///    incrementing the nonce. This is efficient for invalidating multiple
-///    signatures at once without storing individual revocation entries.
-///
-/// A nonce (specific to each identity and claim topic pair) is included by
-/// default in every claim message (see `build_claim_message`) to enable
-/// signature invalidation. The message format is: network_id || claim_issuer ||
-/// identity || claim_topic || nonce || claim_data
+//!
+//! ## Claim Revocation and Signature Invalidation
+//!
+//! This module provides three independent mechanisms for invalidating claims:
+//!
+//! 1. **Passive expiration**: Helper functions encode/decode expiration
+//!    metadata (`created_at` and `valid_until` timestamps) within claim data.
+//!    Claims automatically expire after their `valid_until` timestamp without
+//!    requiring active on-chain management. This provides secure-by-default
+//!    behavior.
+//!
+//! 2. **Per-claim revocation** (`set_claim_revoked`): Revokes a specific claim
+//!    by storing its revocation status under the claim's digest. This allows
+//!    fine-grained control over individual claims.
+//!
+//! 3. **Signature invalidation** (`invalidate_claim_signatures`): Invalidates
+//!    all existing claim signatures for a specific identity and claim topic by
+//!    incrementing the nonce. This is efficient for invalidating multiple
+//!    signatures at once without storing individual revocation entries.
+//!
+//! A nonce (specific to each identity and claim topic pair) is included by
+//! default in every claim message (see `build_claim_message`) to enable
+//! signature invalidation. The message format is: network_id || claim_issuer ||
+//! identity || claim_topic || nonce || claim_data
 use core::ops::RangeBounds;
 
 use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, Vec};
