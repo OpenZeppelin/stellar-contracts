@@ -15,7 +15,7 @@ The design leverages Protocol 23 improvements for marginal storage read costs an
 
 ## Core Components
 
-![context rule](https://github.com/OpenZeppelin/stellar-contracts/blob/smart-account/packages/accounts/docs/SmartAccount-ContextRules.png "Context Rule Structure")
+![context rule](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/docs/SmartAccount-ContextRules.png "Context Rule Structure")
 
 ### 1. Smart Account Trait
 
@@ -71,7 +71,7 @@ Signer::Native(Address)
 
 - Any Soroban address (contract or account)
 - Verification uses `require_auth_for_args(payload)`
-- **Caveat**: Requires manual authorization entry crafting, because it can be detected in a simulation mode
+- **Caveat**: Requires manual authorization entry crafting, because it is not returned in a simulation mode
 
 #### Delegated Signers
 
@@ -85,7 +85,7 @@ Signer::Delegated(Address, Bytes)
   - **Flexibility**: Can easily adapt to emerging authentication methods (zk-proofs, email signing)
   - **Low setup cost**: Reuse verifier contracts across accounts
 
-![delegated signers with verifying contracts](https://github.com/OpenZeppelin/stellar-contracts/blob/smart-account/packages/accounts/docs/DelegatedSigner.png "Delegated Signers with Verifier Contracts")
+![delegated signers with verifying contracts](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/docs/DelegatedSigner.png "Delegated Signers with Verifier Contracts")
 
 ### 4. Verifiers
 
@@ -93,9 +93,10 @@ Verifiers are specialized contracts that handle cryptographic signature verifica
 
 ```rust
 pub trait Verifier {
-    type SigData: FromVal<Env, Val> + FromXdr;
+    type KeyData: FromVal<Env, Val>;
+    type SigData: FromVal<Env, Val>;
 
-    fn verify(e: &Env, hash: Bytes, key_data: Bytes, sig_data: Self::SigData) -> bool;
+    fn verify(e: &Env, hash: Bytes, key_data: Self::KeyData, sig_data: Self::SigData) -> bool;
 }
 ```
 
