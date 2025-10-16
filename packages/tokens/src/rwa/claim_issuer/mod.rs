@@ -46,17 +46,37 @@
 //!   signing key (public key + scheme) can be authorized to sign claims for a
 //!   specific topic and registry combination. The same signing key can be
 //!   authorized across multiple topics and registries independently.
-//! - **Claim Revocation**: Revocation tracking
+//! - **Claim Invalidation**: Three mechanisms for invalidating claims:
+//!   - **Passive Expiration**: Helper functions to encode/decode expiration
+//!     metadata (`created_at` and `valid_until` timestamps) within claim data,
+//!     allowing claims to automatically expire without on-chain action
+//!   - **Per-claim Revocation**: Fine-grained revocation of individual claims
+//!   - **Signature Invalidation**: Efficient bulk invalidation via nonce
+//!     increment
+//!
+//! ## Recommended Claim Data Encoding with Expiration
+//!
+//! To enable passive expiration, this module provides helper functions to
+//! encode expiration metadata within the `claim_data` parameter:
+//!
+//! - `encode_claim_data_expiration`: Prepends `created_at` (u64, 8 bytes) and
+//!   `valid_until` (u64, 8 bytes) timestamps to claim data
+//! - `decode_claim_data_expiration`: Extracts timestamps and actual claim data
+//! - `is_claim_expired`: Convenience function to check expiration
 //!
 //! Implementors are free to use alternative structures for signature
-//! verification, key management, or any other aspect of claim validation.
+//! verification, key management, expiration mechanism, or any other aspect of
+//! claim validation.
 //!
 //! ## Example Usage
 //!
 //! ```rust
 //! use soroban_sdk::{contract, contractimpl, Address, Bytes, Env};
 //! use stellar_tokens::rwa::claim_issuer::{
-//!     storage::{allow_key, is_claim_revoked, is_key_allowed_for_topic},
+//!     storage::{
+//!         allow_key, decode_claim_data_expiration, is_claim_expired, is_claim_revoked,
+//!         is_key_allowed_for_topic,
+//!     },
 //!     ClaimIssuer,
 //! };
 //!
@@ -94,9 +114,17 @@
 //!             ) {
 //!                 return false;
 //!             }
-//!             let message = Ed25519Verifier::build_message(&identity, claim_topic, &claim_data);
 //!
-//!             // Optionally check claim was not revoked.
+//!             // Check claim has not expired, assuming claim_data was correctly encoded
+//!             if is_claim_expired(e, &claim_data) {
+//!                 return false;
+//!             }
+//!
+//!             // Build message for signature verification
+//!             let message =
+//!                 Ed25519Verifier::build_message(e, &identity, claim_topic, &claim_data);
+//!
+//!             // Optionally check claim was not revoked
 //!             if is_claim_revoked(e, &identity, claim_topic, &claim_data) {
 //!                 return false;
 //!             }
@@ -117,11 +145,12 @@ mod test;
 
 use soroban_sdk::{contractclient, contracterror, contractevent, Address, Bytes, Env};
 pub use storage::{
-    allow_key, build_claim_identifier, get_current_nonce_for, get_keys_for_topic, get_registries,
-    invalidate_claim_signatures, is_claim_revoked, is_key_allowed_for_registry,
-    is_key_allowed_for_topic, is_key_authorized, remove_key, set_claim_revoked,
-    ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
-    Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
+    allow_key, build_claim_identifier, decode_claim_data_expiration, encode_claim_data_expiration,
+    get_current_nonce_for, get_keys_for_topic, get_registries, invalidate_claim_signatures,
+    is_claim_expired, is_claim_revoked, is_key_allowed_for_registry, is_key_allowed_for_topic,
+    is_key_authorized, remove_key, set_claim_revoked, ClaimIssuerStorageKey, Ed25519SignatureData,
+    Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData,
+    Secp256r1Verifier, SigningKey,
 };
 
 /// Trait for validating claims issued by this identity to other identities.
@@ -350,6 +379,8 @@ pub enum ClaimIssuerError {
     MaxRegistriesPerKeyExceeded = 357,
     /// No signing keys found for the specified claim topic.
     NoKeysForTopic = 358,
+    /// Invalid claim data encoding.
+    InvalidClaimDataExpiration = 359,
 }
 
 // ################## CONSTANTS ##################

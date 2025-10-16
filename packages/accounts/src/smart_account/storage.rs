@@ -12,7 +12,7 @@
 //!   contracts for custom cryptographic verification (e.g., different signature
 //!   schemes)
 //!
-//! ### **What** - Context Rules  
+//! ### **What** - Context Rules
 //! - Rules define authorization requirements for specific contexts (contract
 //!   calls, deployments).
 //! - Each rule must contain at least one signer or one policy and can have an
@@ -76,7 +76,7 @@
 //!     policies: [],
 //! }
 //!
-//! // Rule 2: User group - 3 of 5 signers, with spending limit policy  
+//! // Rule 2: User group - 3 of 5 signers, with spending limit policy
 //! ContextRule {
 //!     context_type: CallContract(token_contract),
 //!     signers: [user1, user2, user3, user4, user5],
@@ -126,6 +126,9 @@ pub enum SmartAccountStorageKey {
     NextId,
     /// Storage key defining the fingerprint each context rule.
     Fingerprint(BytesN<32>),
+    /// Storage key for the count of active context rules.
+    /// Used to enforce MAX_CONTEXT_RULES limit.
+    Count,
 }
 
 /// Represents different types of signers in the smart account system.
@@ -205,10 +208,11 @@ pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
     let signers_key = SmartAccountStorageKey::Signers(id);
-    let signers: Vec<Signer> = get_persistent_entry(e, &signers_key).unwrap_or(Vec::new(e));
+    let signers: Vec<Signer> = get_persistent_entry(e, &signers_key).unwrap_or_else(|| Vec::new(e));
 
     let policies_key = SmartAccountStorageKey::Policies(id);
-    let policies: Vec<Address> = get_persistent_entry(e, &policies_key).unwrap_or(Vec::new(e));
+    let policies: Vec<Address> =
+        get_persistent_entry(e, &policies_key).unwrap_or_else(|| Vec::new(e));
 
     ContextRule {
         id,
@@ -229,7 +233,7 @@ pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
 /// * `context_rule_type` - The type of context rules to retrieve.
 pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<ContextRule> {
     let ids_key = SmartAccountStorageKey::Ids(context_rule_type.clone());
-    let ids: Vec<u32> = get_persistent_entry(e, &ids_key).unwrap_or(Vec::new(e));
+    let ids: Vec<u32> = get_persistent_entry(e, &ids_key).unwrap_or_else(|| Vec::new(e));
 
     Vec::from_iter(e, ids.iter().map(|id| get_context_rule(e, id)))
 }
@@ -244,10 +248,12 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
 /// * `context_key` - The context type to find valid rules for.
 pub fn get_valid_context_rules(e: &Env, context_key: &ContextRuleType) -> Vec<ContextRule> {
     let matched_ids_key = SmartAccountStorageKey::Ids(context_key.clone());
-    let matched_ids: Vec<u32> = get_persistent_entry(e, &matched_ids_key).unwrap_or(Vec::new(e));
+    let matched_ids: Vec<u32> =
+        get_persistent_entry(e, &matched_ids_key).unwrap_or_else(|| Vec::new(e));
 
     let default_ids_key = SmartAccountStorageKey::Ids(ContextRuleType::Default);
-    let default_ids: Vec<u32> = get_persistent_entry(e, &default_ids_key).unwrap_or(Vec::new(e));
+    let default_ids: Vec<u32> =
+        get_persistent_entry(e, &default_ids_key).unwrap_or_else(|| Vec::new(e));
 
     let get_rules = |ids: Vec<u32>| -> Vec<ContextRule> {
         let mut rules = Vec::new(e);
@@ -594,16 +600,17 @@ pub fn add_context_rule(
     signers: &Vec<Signer>,
     policies: &Map<Address, Val>,
 ) -> ContextRule {
-    let mut id = e.storage().instance().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
+    let id = e.storage().instance().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
 
-    // Check maximum context rules limit
-    if id >= MAX_CONTEXT_RULES {
+    let count = e.storage().instance().get(&SmartAccountStorageKey::Count).unwrap_or(0u32);
+    if count >= MAX_CONTEXT_RULES {
         panic_with_error!(e, SmartAccountError::TooManyContextRules);
     }
 
     let ids_key = SmartAccountStorageKey::Ids(context_type.clone());
     // Don't extend TTL here since we set this key later in the same function
-    let mut same_key_ids: Vec<u32> = e.storage().persistent().get(&ids_key).unwrap_or(Vec::new(e));
+    let mut same_key_ids: Vec<u32> =
+        e.storage().persistent().get(&ids_key).unwrap_or_else(|| Vec::new(e));
 
     // Check for duplicate signers
     let mut unique_signers = Vec::new(e);
@@ -658,8 +665,10 @@ pub fn add_context_rule(
     emit_context_rule_added(e, &context_rule);
 
     // Increment next id
-    id += 1;
-    e.storage().instance().set(&SmartAccountStorageKey::NextId, &id);
+    e.storage().instance().set(&SmartAccountStorageKey::NextId, &(id + 1));
+
+    // Increment count
+    e.storage().instance().set(&SmartAccountStorageKey::Count, &(count + 1));
 
     context_rule
 }
@@ -814,12 +823,18 @@ pub fn remove_context_rule(e: &Env, id: u32) {
     // Remove from ids list
     let ids_key = SmartAccountStorageKey::Ids(context_rule.context_type);
     // Don't extend TTL here since we set this key later in the same function
-    let mut ids = e.storage().persistent().get::<_, Vec<u32>>(&ids_key).unwrap_or(Vec::new(e));
+    let mut ids =
+        e.storage().persistent().get::<_, Vec<u32>>(&ids_key).unwrap_or_else(|| Vec::new(e));
 
     if let Some(pos) = ids.iter().rposition(|i| i == id) {
         ids.remove(pos as u32);
         e.storage().persistent().set(&ids_key, &ids);
     }
+
+    // Decrement count
+    let count: u32 = e.storage().instance().get(&SmartAccountStorageKey::Count).expect("to be set");
+    // if count is set, it can be safely assumed it's greater than 0
+    e.storage().instance().set(&SmartAccountStorageKey::Count, &(count - 1));
 
     // Emit event
     emit_context_rule_removed(e, id);

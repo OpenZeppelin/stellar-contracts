@@ -1181,3 +1181,70 @@ fn add_context_rule_too_many_rules_fails() {
         );
     });
 }
+
+#[test]
+fn add_context_rule_count_allows_reuse_after_removal() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let signers = create_test_signers(&e);
+        let policies_map = Map::new(&e);
+
+        // Add MAX_CONTEXT_RULES (15) rules successfully
+        let mut rule_ids = Vec::new(&e);
+        for i in 0..MAX_CONTEXT_RULES {
+            let contract_addr = Address::generate(&e);
+            let context_type = ContextRuleType::CallContract(contract_addr);
+
+            let rule = add_context_rule(
+                &e,
+                &context_type,
+                &String::from_str(&e, "test_rule"),
+                Some(i + 100),
+                &signers,
+                &policies_map,
+            );
+            rule_ids.push_back(rule.id);
+        }
+
+        // At this point, count should be MAX_CONTEXT_RULES and we cannot add more
+        // Remove the first rule
+        remove_context_rule(&e, rule_ids.get(0).unwrap());
+
+        // Now we should be able to add a new rule because count was decremented
+        let new_contract_addr = Address::generate(&e);
+        let new_context_type = ContextRuleType::CallContract(new_contract_addr);
+
+        let new_rule = add_context_rule(
+            &e,
+            &new_context_type,
+            &String::from_str(&e, "new_rule"),
+            None,
+            &signers,
+            &policies_map,
+        );
+
+        // Verify the new rule was added successfully
+        assert_eq!(new_rule.id, MAX_CONTEXT_RULES);
+
+        // Remove multiple rules
+        remove_context_rule(&e, rule_ids.get(1).unwrap());
+        remove_context_rule(&e, rule_ids.get(2).unwrap());
+
+        // Add two more rules to verify count tracking
+        for i in 0..2 {
+            let contract_addr = Address::generate(&e);
+            let context_type = ContextRuleType::CallContract(contract_addr);
+
+            add_context_rule(
+                &e,
+                &context_type,
+                &String::from_str(&e, "additional_rule"),
+                Some(200 + i),
+                &signers,
+                &policies_map,
+            );
+        }
+    });
+}

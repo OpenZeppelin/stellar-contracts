@@ -12,14 +12,17 @@ use p256::{
     SecretKey as Secp256r1SecretKey,
 };
 use soroban_sdk::{
-    contract, contractimpl, testutils::Address as _, Address, Bytes, BytesN, Env, Map, Vec,
+    contract, contractimpl,
+    testutils::{Address as _, Ledger as _},
+    Address, Bytes, BytesN, Env, Map, Vec,
 };
 
 use crate::rwa::{
     claim_issuer::{
         storage::{
-            allow_key, get_current_nonce_for, get_keys_for_topic, get_registries,
-            invalidate_claim_signatures, is_claim_revoked, is_key_allowed_for_registry,
+            allow_key, decode_claim_data_expiration, encode_claim_data_expiration,
+            get_current_nonce_for, get_keys_for_topic, get_registries, invalidate_claim_signatures,
+            is_claim_expired, is_claim_revoked, is_key_allowed_for_registry,
             is_key_allowed_for_topic, is_key_authorized, remove_key, set_claim_revoked,
             ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData,
             Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
@@ -923,11 +926,6 @@ fn is_key_authorized_checks_registry_and_topic() {
 
     // registry_a trusts issuer and allows topic 42
     let registry_a = setup_mock_registry(&e, &contract_id, &[42]);
-    // registry_b allows topic 42 but issuer will NOT be registered as trusted
-    let registry_b_id = e.register(MockClaimTopicsAndIssuersContract, ());
-    let registry_b = ClaimTopicsAndIssuersClient::new(&e, &registry_b_id);
-    let operator = Address::generate(&e);
-    registry_b.add_claim_topic(&42u32, &operator);
 
     e.as_contract(&contract_id, || {
         // Authorized in registry_a for topic 42
@@ -935,7 +933,22 @@ fn is_key_authorized_checks_registry_and_topic() {
 
         // Not authorized in registry_a for topic 43 (topic not allowed)
         assert!(!is_key_authorized(&e, &registry_a, 43));
+    });
+}
 
+#[test]
+#[should_panic(expected = "Error(Contract, #371)")]
+fn is_key_authorized_checks_registry_and_topic_panics() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    // registry_b allows topic 42 but issuer will NOT be registered as trusted
+    let registry_b_id = e.register(MockClaimTopicsAndIssuersContract, ());
+    let registry_b = ClaimTopicsAndIssuersClient::new(&e, &registry_b_id);
+    let operator = Address::generate(&e);
+    registry_b.add_claim_topic(&42u32, &operator);
+
+    e.as_contract(&contract_id, || {
         // Not authorized in registry_b for topic 42 (issuer not trusted)
         assert!(!is_key_authorized(&e, &registry_b_id, 42));
     });
@@ -1033,5 +1046,123 @@ fn signature_invalidation_vs_per_claim_revocation() {
         set_claim_revoked(&e, &identity, claim_topic, &claim_data_1, false);
         assert!(!is_claim_revoked(&e, &identity, claim_topic, &claim_data_1));
         assert!(is_claim_revoked(&e, &identity, claim_topic, &claim_data_2));
+    });
+}
+
+// ======= EXPIRATION TESTS =======
+
+#[test]
+fn encode_decode_claim_data_expiration() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let created_at = e.ledger().timestamp();
+        let valid_until = created_at + 86400;
+        let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
+
+        let encoded = encode_claim_data_expiration(&e, created_at, valid_until, &claim_data);
+
+        let (decoded_created_at, decoded_valid_until, decoded_claim_data) =
+            decode_claim_data_expiration(&e, &encoded);
+
+        assert_eq!(decoded_created_at, created_at);
+        assert_eq!(decoded_valid_until, valid_until);
+        assert_eq!(decoded_claim_data, claim_data);
+    });
+}
+
+#[test]
+fn is_claim_expired_returns_false_for_future_expiration() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let created_at = e.ledger().timestamp();
+        let valid_until = created_at + 3600;
+        let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
+
+        let encoded = encode_claim_data_expiration(&e, created_at, valid_until, &claim_data);
+
+        assert!(!is_claim_expired(&e, &encoded));
+    });
+}
+
+#[test]
+fn is_claim_expired_returns_true_for_past_expiration() {
+    let e = Env::default();
+    e.ledger().with_mut(|li| li.timestamp = 10000); // Set ledger timestamp to 10000
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        // Use timestamps in the past relative to ledger timestamp
+        let created_at = 1000u64;
+        let valid_until = 2000u64;
+        let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
+
+        let encoded = encode_claim_data_expiration(&e, created_at, valid_until, &claim_data);
+
+        // Current ledger timestamp (10000) is much higher than valid_until (2000)
+        assert!(is_claim_expired(&e, &encoded));
+    });
+}
+
+#[test]
+fn is_claim_expired_returns_true_for_current_timestamp() {
+    let e = Env::default();
+    e.ledger().with_mut(|li| li.timestamp = 5000); // Set ledger timestamp to 5000
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        // Create claim that expires at current time
+        let created_at = 4900u64;
+        let valid_until = 5000u64; // Expires exactly at current ledger time
+        let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
+
+        let encoded = encode_claim_data_expiration(&e, created_at, valid_until, &claim_data);
+
+        // Should be expired since current_time (5000) >= valid_until (5000)
+        assert!(is_claim_expired(&e, &encoded));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #359)")]
+fn decode_claim_data_expiration_fails_on_short_data() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let short_data = Bytes::from_array(&e, &[1, 2, 3]);
+        decode_claim_data_expiration(&e, &short_data);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #359)")]
+fn encode_claim_data_fails_when_valid_until_equals_created_at() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let timestamp = e.ledger().timestamp();
+        let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
+
+        encode_claim_data_expiration(&e, timestamp, timestamp, &claim_data);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #359)")]
+fn encode_claim_data_fails_when_valid_until_less_than_created_at() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let created_at = e.ledger().timestamp();
+        let valid_until = created_at.saturating_sub(100);
+        let claim_data = Bytes::from_array(&e, &[1, 2, 3]);
+
+        encode_claim_data_expiration(&e, created_at, valid_until, &claim_data);
     });
 }
