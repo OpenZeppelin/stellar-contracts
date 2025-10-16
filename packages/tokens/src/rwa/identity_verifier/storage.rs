@@ -144,10 +144,7 @@ pub fn validate_claim(
             &claim.signature,
             &claim.data,
         );
-        match validation {
-            Ok(Ok(is_valid)) => is_valid,
-            _ => false,
-        }
+        matches!(validation, Ok(Ok(_)))
     } else {
         false
     }

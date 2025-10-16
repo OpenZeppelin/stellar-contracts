@@ -99,7 +99,7 @@
 //!         scheme: u32,
 //!         sig_data: Bytes,
 //!         claim_data: Bytes,
-//!     ) -> bool {
+//!     ) {
 //!         // scheme number has a meaning only within the claim issuer
 //!         if scheme == 101 {
 //!             // Extract signature data
@@ -156,7 +156,8 @@ pub use storage::{
 /// Trait for validating claims issued by this identity to other identities.
 #[contractclient(name = "ClaimIssuerClient")]
 pub trait ClaimIssuer {
-    /// Validates whether a claim is valid for a given identity.
+    /// Validates whether a claim is valid for a given identity. Panics if claim
+    /// is invalid.
     ///
     /// # Arguments
     ///
@@ -174,7 +175,7 @@ pub trait ClaimIssuer {
         scheme: u32,
         sig_data: Bytes,
         claim_data: Bytes,
-    ) -> bool;
+    );
 }
 
 /// Trait for signature verification schemes.
@@ -213,15 +214,15 @@ pub trait SignatureVerifier {
     /// * `claim_data` - The claim data to validate.
     fn build_message(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> Bytes;
 
-    /// Validates a claim signature using the parsed signature data and returns
-    /// true if valid.
+    /// Validates a claim signature using the parsed signature data and panics
+    /// if claim is invalid.
     ///
     /// # Arguments
     ///
     /// * `e` - The Soroban environment.
     /// * `message` - The claim message.
     /// * `signature_data` - The parsed signature data.
-    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) -> bool;
+    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData);
 
     /// Returns the expected signature data length for this scheme.
     fn expected_sig_data_len() -> u32;
@@ -381,6 +382,8 @@ pub enum ClaimIssuerError {
     NoKeysForTopic = 358,
     /// Invalid claim data encoding.
     InvalidClaimDataExpiration = 359,
+    /// Recovery of the Secp256k1 public key failed.
+    Secp256k1RecoveryFailed = 360,
 }
 
 // ################## CONSTANTS ##################

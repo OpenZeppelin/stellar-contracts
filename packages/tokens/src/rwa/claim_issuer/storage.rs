@@ -154,9 +154,8 @@ impl SignatureVerifier for Ed25519Verifier {
         build_claim_message(e, identity, claim_topic, claim_data)
     }
 
-    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) -> bool {
+    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) {
         e.crypto().ed25519_verify(&signature_data.public_key, message, &signature_data.signature);
-        true
     }
 
     fn expected_sig_data_len() -> u32 {
@@ -188,7 +187,7 @@ impl SignatureVerifier for Secp256r1Verifier {
         build_claim_message(e, identity, claim_topic, claim_data)
     }
 
-    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) -> bool {
+    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) {
         // For Secp256r1, use the claim digest directly
         let claim_digest = e.crypto().sha256(message);
         e.crypto().secp256r1_verify(
@@ -196,7 +195,6 @@ impl SignatureVerifier for Secp256r1Verifier {
             &claim_digest,
             &signature_data.signature,
         );
-        true
     }
 
     fn expected_sig_data_len() -> u32 {
@@ -237,7 +235,7 @@ impl SignatureVerifier for Secp256k1Verifier {
         build_claim_message(e, identity, claim_topic, claim_data)
     }
 
-    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) -> bool {
+    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) {
         // For Secp256k1, recover public key and compare
         let claim_digest = e.crypto().keccak256(message);
         let recovered_key = e.crypto().secp256k1_recover(
@@ -245,7 +243,10 @@ impl SignatureVerifier for Secp256k1Verifier {
             &signature_data.signature,
             signature_data.recovery_id,
         );
-        signature_data.public_key == recovered_key
+
+        if signature_data.public_key != recovered_key {
+            panic_with_error!(e, ClaimIssuerError::Secp256k1RecoveryFailed)
+        }
     }
 
     fn expected_sig_data_len() -> u32 {
