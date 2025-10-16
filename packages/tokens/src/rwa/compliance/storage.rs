@@ -5,7 +5,7 @@ use crate::rwa::{
         emit_module_added, emit_module_removed, ComplianceError, ComplianceHook,
         ComplianceModuleClient, COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
     },
-    utils::token_binder::linked_tokens,
+    utils::token_binder::is_token_bound,
 };
 
 /// Storage keys for the modular compliance contract.
@@ -363,9 +363,8 @@ pub fn require_auth_from_bound_token(e: &Env, token: &Address) {
     token.require_auth();
 
     // Check if the token contract is bound to this compliance contract
-    let bound_tokens = linked_tokens(e);
-
-    if !bound_tokens.contains(token) {
+    // Use is_token_bound for memory efficiency (loads one bucket at a time)
+    if !is_token_bound(e, token) {
         panic_with_error!(e, ComplianceError::TokenNotBound);
     }
 }

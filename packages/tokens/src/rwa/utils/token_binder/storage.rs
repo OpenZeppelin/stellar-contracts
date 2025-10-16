@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, TryFromVal, Val, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map, TryFromVal, Val, Vec};
 
 use crate::rwa::utils::token_binder::{
     emit_token_bound, emit_token_unbound, TokenBinderError, BUCKET_SIZE, MAX_TOKENS,
@@ -248,9 +248,12 @@ pub fn bind_tokens(e: &Env, tokens: &Vec<Address>) {
         panic_with_error!(e, TokenBinderError::BindBatchDuplicates)
     }
 
-    // Get all tokens to avoid unnecessary storage reads when checking if tokens to
-    // add were already bound.
+    // Build a Map of already-bound tokens for O(1) lookups instead of O(n)
     let already_bound = linked_tokens(e);
+    let mut bound_map = Map::<Address, ()>::new(e);
+    for i in 0..already_bound.len() {
+        bound_map.set(already_bound.get_unchecked(i), ());
+    }
 
     // Fill buckets sequentially until all tokens are stored.
     let mut i: u32 = 0;
@@ -267,7 +270,7 @@ pub fn bind_tokens(e: &Env, tokens: &Vec<Address>) {
 
         while i < end {
             let token = tokens.get(i).expect("value to be present");
-            if already_bound.contains(&token) {
+            if bound_map.contains_key(token.clone()) {
                 panic_with_error!(e, TokenBinderError::TokenAlreadyBound)
             }
             bucket.push_back(token.clone());
