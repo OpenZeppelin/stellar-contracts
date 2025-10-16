@@ -1,11 +1,12 @@
 //! ## Signing Keys Management
 //!
 //! This module maintains two correlated storage branches:
-//! - Registry branch: `Registries(SigningKey) -> Vec<Address>` Tracks at which
-//!   `claim_topics_and_issuers` registries a given signing key (public key +
-//!   scheme) is assigned.
-//! - Topic branch: `Topics(u32) -> Vec<SigningKey>` Tracks which signing keys
-//!   are assigned to a specific claim topic.
+//! - Registry-Topic pairs branch: `Pairs(SigningKey) -> Vec<(u32, Address)>`
+//!   tracks the topic-registry pairs for which a given signing key (public key
+//!   + scheme) is authorized. Each entry represents a specific authorization,
+//!     the key can sign for a particular topic at a particular registry.
+//! - Topic branch: `Topics(u32) -> Vec<SigningKey>` tracks which signing keys
+//!   are authorized to sign claims for a specific topic.
 //!
 //! ```text
 //!                          ┌─────────────────────────┐
@@ -17,47 +18,49 @@
 //!                    │                                   │
 //!                    ▼                                   ▼
 //!        ┌────────────────────────┐          ┌──────────────────────┐
-//!        │ Registries(SigningKey) │          │ Topics(claim_topic)  │
-//!        │ -> Vec<Address>        │          │ -> Vec<SigningKey>   │
+//!        │ Pairs(SigningKey)      │          │ Topics(claim_topic)  │
+//!        │ -> Vec<(topic, addr)>  │          │ -> Vec<SigningKey>   │
 //!        └────────────────────────┘          └──────────────────────┘
 //!                    │                                   │
 //!                    ▼                                   ▼
-//!     [registry_1, registry_2, ...]         [key_1, key_2, ...]
+//!   [(topic1, reg1), (topic2, reg2), ...]    [key_1, key_2, ...]
 //! ```
 //!
 //! ## Key Properties
 //!
-//! 1. **Atomic updates**: Although the branches are separate, they are updated
-//!    atomically by `allow_key()`/`remove_key()`. A signing key cannot be
-//!    assigned to a topic without also being assigned to at least one registry.
-//!    When the last registry assignment for a key is removed, the key is
-//!    automatically removed from the topic branch as well.
+//! 1. **Atomic updates**: The branches are updated atomically by
+//!    `allow_key()`/`remove_key()`. When a `(topic, registry)` pair is removed
+//!    and no other pairs exist for that topic, the key is automatically removed
+//!    from the topic branch. This maintains the invariant: a key in a topic
+//!    must have at least one associated registry for that topic.
 //!
-//! 2. **Rationale for separation**: During claim verification, the claim
-//!    issuer's internal flow typically needs to check only the topic branch
-//!    using `is_key_allowed_for_topic()` to confirm that a given signing key is
-//!    assigned to the claim topic in this contract. This design avoids
-//!    redundant cross-contract calls. When the identity verifier calls the
-//!    claim issuer, it is assumed to pass a valid topic and only invoke the
-//!    claim issuer if it is registered as a trusted issuer in the
-//!    `claim_topics_and_issuers` contract. Therefore, the claim issuer only
-//!    needs to verify internally that the signing key is still allowed for the
-//!    topic.
+//! 2. **Efficient validation**: During claim verification, the claim issuer
+//!    checks only the topic branch using `is_key_allowed_for_topic()` to
+//!    confirm that a signing key is authorized for the claim topic. This design
+//!    avoids redundant cross-contract calls, because when the identity verifier
+//!    calls the claim issuer, it is assumed to pass a valid topic and only
+//!    invoke the claim issuer if it is a trusted issuer.
 //!
 //! 3. **Synchronization note**: After initial key assignment, the
 //!    `claim_topics_and_issuers` contract may invalidate a topic or remove the
-//!    `is_key_authorized()` to verify both the topic validity and issuer
-//!    registration status.
+//!    issuer's trusted status. Use `is_authorized_for()` to verify both the
+//!    topic validity and issuer registration status when needed.
 //!
 //! ## Claim Revocation and Signature Invalidation
 //!
-//! This module provides two independent mechanisms for invalidating claims:
+//! This module provides three independent mechanisms for invalidating claims:
 //!
-//! 1. **Per-claim revocation** (`set_claim_revoked`): Revokes a specific claim
+//! 1. **Passive expiration**: Helper functions encode/decode expiration
+//!    metadata (`created_at` and `valid_until` timestamps) within claim data.
+//!    Claims automatically expire after their `valid_until` timestamp without
+//!    requiring active on-chain management. This provides secure-by-default
+//!    behavior.
+//!
+//! 2. **Per-claim revocation** (`set_claim_revoked`): Revokes a specific claim
 //!    by storing its revocation status under the claim's digest. This allows
 //!    fine-grained control over individual claims.
 //!
-//! 2. **Signature invalidation** (`invalidate_claim_signatures`): Invalidates
+//! 3. **Signature invalidation** (`invalidate_claim_signatures`): Invalidates
 //!    all existing claim signatures for a specific identity and claim topic by
 //!    incrementing the nonce. This is efficient for invalidating multiple
 //!    signatures at once without storing individual revocation entries.
@@ -90,10 +93,10 @@ pub struct SigningKey {
 #[contracttype]
 #[derive(Clone)]
 pub enum ClaimIssuerStorageKey {
-    /// topic -> Vec<SigningKey>
+    /// Maps Topic -> Vec<SigningKey>
     Topics(u32),
-    /// SigningKey -> Vec<registry>
-    Registries(SigningKey),
+    /// Maps SigningKey -> Vec<(Topic, Registry)>
+    Pairs(SigningKey),
     /// Tracks explicitly revoked claims by claim digest
     RevokedClaim(BytesN<32>),
     /// Tracks current nonce for a specific identity and claim topics
@@ -133,7 +136,7 @@ pub struct Secp256k1SignatureData {
 /// bytes)
 pub struct Ed25519Verifier;
 
-impl SignatureVerifier<32> for Ed25519Verifier {
+impl SignatureVerifier for Ed25519Verifier {
     type SignatureData = Ed25519SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
@@ -151,9 +154,8 @@ impl SignatureVerifier<32> for Ed25519Verifier {
         build_claim_message(e, identity, claim_topic, claim_data)
     }
 
-    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) -> bool {
+    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) {
         e.crypto().ed25519_verify(&signature_data.public_key, message, &signature_data.signature);
-        true
     }
 
     fn expected_sig_data_len() -> u32 {
@@ -167,7 +169,7 @@ impl SignatureVerifier<32> for Ed25519Verifier {
 /// bytes)
 pub struct Secp256r1Verifier;
 
-impl SignatureVerifier<32> for Secp256r1Verifier {
+impl SignatureVerifier for Secp256r1Verifier {
     type SignatureData = Secp256r1SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
@@ -185,7 +187,7 @@ impl SignatureVerifier<32> for Secp256r1Verifier {
         build_claim_message(e, identity, claim_topic, claim_data)
     }
 
-    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) -> bool {
+    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) {
         // For Secp256r1, use the claim digest directly
         let claim_digest = e.crypto().sha256(message);
         e.crypto().secp256r1_verify(
@@ -193,7 +195,6 @@ impl SignatureVerifier<32> for Secp256r1Verifier {
             &claim_digest,
             &signature_data.signature,
         );
-        true
     }
 
     fn expected_sig_data_len() -> u32 {
@@ -207,7 +208,7 @@ impl SignatureVerifier<32> for Secp256r1Verifier {
 /// bytes) || recovery_id (4 bytes)
 pub struct Secp256k1Verifier;
 
-impl SignatureVerifier<32> for Secp256k1Verifier {
+impl SignatureVerifier for Secp256k1Verifier {
     type SignatureData = Secp256k1SignatureData;
 
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData {
@@ -234,7 +235,7 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
         build_claim_message(e, identity, claim_topic, claim_data)
     }
 
-    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) -> bool {
+    fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData) {
         // For Secp256k1, recover public key and compare
         let claim_digest = e.crypto().keccak256(message);
         let recovered_key = e.crypto().secp256k1_recover(
@@ -242,7 +243,10 @@ impl SignatureVerifier<32> for Secp256k1Verifier {
             &signature_data.signature,
             signature_data.recovery_id,
         );
-        signature_data.public_key == recovered_key
+
+        if signature_data.public_key != recovered_key {
+            panic_with_error!(e, ClaimIssuerError::Secp256k1RecoveryFailed)
+        }
     }
 
     fn expected_sig_data_len() -> u32 {
@@ -295,19 +299,24 @@ pub fn get_keys_for_topic(e: &Env, claim_topic: u32) -> Vec<SigningKey> {
 /// * [`ClaimIssuerError::KeyNotFound`] - If the key is not found for this
 ///   topic.
 pub fn get_registries(e: &Env, signing_key: &SigningKey) -> Vec<Address> {
-    let registries_storage_key = ClaimIssuerStorageKey::Registries(signing_key.clone());
+    let pairs_storage_key = ClaimIssuerStorageKey::Pairs(signing_key.clone());
 
-    e.storage()
+    let iter = e
+        .storage()
         .persistent()
-        .get::<_, Vec<Address>>(&registries_storage_key)
+        .get::<_, Vec<(u32, Address)>>(&pairs_storage_key)
         .inspect(|_| {
             e.storage().persistent().extend_ttl(
-                &registries_storage_key,
+                &pairs_storage_key,
                 KEYS_TTL_THRESHOLD,
                 KEYS_EXTEND_AMOUNT,
             );
         })
         .unwrap_or_else(|| panic_with_error!(e, ClaimIssuerError::KeyNotFound))
+        .iter()
+        .map(|(_, addr)| addr);
+
+    Vec::from_iter(e, iter)
 }
 
 /// Checks if a public key and its scheme are allowed to sign claims for a
@@ -373,15 +382,16 @@ pub fn is_key_allowed_for_registry(
     registry: &Address,
 ) -> bool {
     let signing_key = SigningKey { public_key: public_key.clone(), scheme };
-    let registries_key = ClaimIssuerStorageKey::Registries(signing_key);
+    let pairs_storage_key = ClaimIssuerStorageKey::Pairs(signing_key);
 
-    if let Some(registries) = e.storage().persistent().get::<_, Vec<Address>>(&registries_key) {
+    if let Some(pairs) = e.storage().persistent().get::<_, Vec<(u32, Address)>>(&pairs_storage_key)
+    {
         e.storage().persistent().extend_ttl(
-            &registries_key,
+            &pairs_storage_key,
             KEYS_TTL_THRESHOLD,
             KEYS_EXTEND_AMOUNT,
         );
-        return registries.iter().any(|addr| addr == *registry);
+        return pairs.iter().any(|(_, addr)| addr == *registry);
     }
 
     false
@@ -390,23 +400,17 @@ pub fn is_key_allowed_for_registry(
 /// Checks whether the current contract (claim issuer) is authorized at a given
 /// `claim_topics_and_issuers` registry for a specific claim topic.
 ///
-/// This helper verifies both conditions:
-/// - the current contract is a trusted issuer in `registry`, and
-/// - the current contract is allowed to sign claims for `claim_topic` in
-///   `registry`.
-///
-/// It does not does not check signing key assignment.
+/// It does not check signing key assignment.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
 /// * `registry` - The registry address to check against.
 /// * `claim_topic` - The claim topic to check authorization for.
-pub fn is_key_authorized(e: &Env, registry: &Address, claim_topic: u32) -> bool {
+pub fn is_authorized_for(e: &Env, registry: &Address, claim_topic: u32) -> bool {
     let registry_client = ClaimTopicsAndIssuersClient::new(e, registry);
 
-    registry_client.is_trusted_issuer(&e.current_contract_address())
-        && registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic)
+    registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic)
 }
 
 /// Allows a public key to sign claims for specific topic and
@@ -427,8 +431,8 @@ pub fn is_key_authorized(e: &Env, registry: &Address, claim_topic: u32) -> bool 
 ///   registered at the `claim_topics_and_issuers` registry.
 /// * [`ClaimIssuerError::ClaimTopicNotAllowed`] - If this claim issuer is not
 ///   allowed to sign claims about the `claim_topic`.
-/// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If the key is already allowed
-///   for this topic.
+/// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If this exact (key, topic,
+///   registry) combination is already registered.
 ///
 /// # Events
 ///
@@ -467,7 +471,7 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
     if !is_key_allowed_for_topic(e, &signing_key.public_key, scheme, claim_topic) {
         let key = ClaimIssuerStorageKey::Topics(claim_topic);
         let mut topic_keys: Vec<SigningKey> =
-            e.storage().persistent().get(&key).unwrap_or(Vec::new(e));
+            e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
 
         if topic_keys.len() >= MAX_KEYS_PER_TOPIC {
             panic_with_error!(e, ClaimIssuerError::MaxKeysPerTopicExceeded)
@@ -477,25 +481,23 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
         e.storage().persistent().set(&key, &topic_keys);
     }
 
-    // Update Registries mapping: SigningKey -> Vec<Address>
-    let registries_key = ClaimIssuerStorageKey::Registries(signing_key);
-    let mut registries: Vec<Address> =
-        e.storage().persistent().get(&registries_key).unwrap_or(Vec::new(e));
+    // Update Pairs mapping: SigningKey -> Vec<(u32, Address)>
+    let pairs_storage_key = ClaimIssuerStorageKey::Pairs(signing_key);
+    let mut pairs: Vec<(u32, Address)> =
+        e.storage().persistent().get(&pairs_storage_key).unwrap_or_else(|| Vec::new(e));
 
-    // Check if this registry is already added for this key
-    for existing_registry in registries.iter() {
-        if existing_registry == *registry {
-            panic_with_error!(e, ClaimIssuerError::KeyAlreadyAllowed)
-        }
+    // Check if this exact (topic, registry) pair already exists
+    if pairs.contains((claim_topic, registry.clone())) {
+        panic_with_error!(e, ClaimIssuerError::KeyAlreadyAllowed)
     }
 
-    registries.push_back(registry.clone());
+    pairs.push_back((claim_topic, registry.clone()));
 
-    if registries.len() >= MAX_REGISTRIES_PER_KEY {
+    if pairs.len() >= MAX_REGISTRIES_PER_KEY {
         panic_with_error!(e, ClaimIssuerError::MaxRegistriesPerKeyExceeded)
     }
 
-    e.storage().persistent().set(&registries_key, &registries);
+    e.storage().persistent().set(&pairs_storage_key, &pairs);
 
     emit_key_allowed(e, public_key, registry, scheme, claim_topic);
 }
@@ -528,25 +530,29 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
 pub fn remove_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, claim_topic: u32) {
     let signing_key = SigningKey { public_key: public_key.clone(), scheme };
 
-    // Remove registry from Registries mapping
-    let registries_key = ClaimIssuerStorageKey::Registries(signing_key.clone());
-    let mut registries: Vec<Address> = e
+    // Remove pair from Pairs mapping
+    let pairs_storage_key = ClaimIssuerStorageKey::Pairs(signing_key.clone());
+    let mut pairs: Vec<(u32, Address)> = e
         .storage()
         .persistent()
-        .get(&registries_key)
+        .get(&pairs_storage_key)
         .unwrap_or_else(|| panic_with_error!(e, ClaimIssuerError::KeyNotFound));
 
-    // Find and remove the specific registry
-    match registries.first_index_of(registry) {
-        Some(pos) => registries.remove_unchecked(pos),
+    // Find and remove the specific (topic, registry) pair
+    match pairs.first_index_of((claim_topic, registry.clone())) {
+        Some(pos) => pairs.remove_unchecked(pos),
         None => panic_with_error!(e, ClaimIssuerError::KeyNotFound),
     }
 
-    // Update or remove Registries mapping
-    if registries.is_empty() {
-        e.storage().persistent().remove(&registries_key);
+    // Update or remove Pairs mapping
+    if pairs.is_empty() {
+        e.storage().persistent().remove(&pairs_storage_key);
+    } else {
+        e.storage().persistent().set(&pairs_storage_key, &pairs);
+    }
 
-        // If no more registries, also remove the key from Topics mapping
+    // If no more pairs (claim_topic, *), update Topics mapping
+    if !pairs.iter().any(|(topic, _)| topic == claim_topic) {
         let topics_storage_key = ClaimIssuerStorageKey::Topics(claim_topic);
         let mut topic_keys: Vec<SigningKey> = e
             .storage()
@@ -563,8 +569,6 @@ pub fn remove_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, 
         } else {
             e.storage().persistent().set(&topics_storage_key, &topic_keys);
         }
-    } else {
-        e.storage().persistent().set(&registries_key, &registries);
     }
 
     emit_key_removed(e, public_key, registry, scheme, claim_topic);
@@ -712,6 +716,103 @@ pub fn is_claim_revoked(e: &Env, identity: &Address, claim_topic: u32, claim_dat
             e.storage().persistent().extend_ttl(&key, CLAIMS_TTL_THRESHOLD, CLAIMS_EXTEND_AMOUNT)
         })
         .unwrap_or_default()
+}
+
+// ====================== CLAIM EXPIRATION =====================
+
+/// Encodes claim data with expiration metadata.
+///
+/// This is a recommended encoding that prepends `created_at` (u64) and
+/// `valid_until` (u64) timestamps to the actual claim data. This allows claims
+/// to passively expire without requiring a separate parameter or active
+/// on-chain management.
+///
+/// Encoded format: created_at (8 bytes) || valid_until (8 bytes) || claim_data
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `created_at` - The ledger timestamp when the claim was created.
+/// * `valid_until` - The ledger timestamp after which the claim expires.
+/// * `claim_data` - The actual claim data.
+///
+/// # Errors
+///
+/// * [`ClaimIssuerError::InvalidClaimDataExpiration`] - If `valid_until` is not
+///   greater than `created_at`.
+pub fn encode_claim_data_expiration(
+    e: &Env,
+    created_at: u64,
+    valid_until: u64,
+    claim_data: &Bytes,
+) -> Bytes {
+    if valid_until <= created_at {
+        panic_with_error!(e, ClaimIssuerError::InvalidClaimDataExpiration)
+    }
+
+    let mut encoded = Bytes::new(e);
+    encoded.extend_from_array(&created_at.to_be_bytes());
+    encoded.extend_from_array(&valid_until.to_be_bytes());
+    encoded.append(claim_data);
+    encoded
+}
+
+/// Decodes claim data with expiration metadata.
+///
+/// Extracts the `created_at` and `valid_until` timestamps from claim data
+/// encoded using [`encode_claim_data_expiration`].
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `encoded_claim_data` - The encoded claim data.
+///
+/// # Returns
+///
+/// Returns `(created_at, valid_until, claim_data)` tuple.
+///
+/// # Errors
+///
+/// * [`ClaimIssuerError::InvalidClaimDataExpiration`] - If the encoded data is
+///   too short (less than 16 bytes).
+pub fn decode_claim_data_expiration(e: &Env, encoded_claim_data: &Bytes) -> (u64, u64, Bytes) {
+    if encoded_claim_data.len() < 16 {
+        panic_with_error!(e, ClaimIssuerError::InvalidClaimDataExpiration)
+    }
+
+    let created_at_bytes = extract_from_bytes(e, encoded_claim_data, ..8);
+    let valid_until_bytes = extract_from_bytes(e, encoded_claim_data, 8..16);
+    let claim_data = encoded_claim_data.slice(16..);
+
+    let created_at = u64::from_be_bytes(created_at_bytes.to_array());
+
+    let valid_until = u64::from_be_bytes(valid_until_bytes.to_array());
+
+    (created_at, valid_until, claim_data)
+}
+
+/// Validates claim expiration from encoded claim data.
+///
+/// This is a convenience function that decodes the claim data and checks if the
+/// claim has expired based on the `valid_until` timestamp.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `encoded_claim_data` - The encoded claim data with expiration metadata.
+///
+/// # Returns
+///
+/// Returns `true` if the claim has expired (current timestamp >= valid_until),
+/// `false` otherwise.
+///
+/// # Errors
+///
+/// * [`ClaimIssuerError::InvalidClaimDataExpiration`] - If the encoded data is
+///   invalid.
+pub fn is_claim_expired(e: &Env, encoded_claim_data: &Bytes) -> bool {
+    let (_, valid_until, _) = decode_claim_data_expiration(e, encoded_claim_data);
+    e.ledger().timestamp() >= valid_until
 }
 
 // ====================== HELPERS =====================

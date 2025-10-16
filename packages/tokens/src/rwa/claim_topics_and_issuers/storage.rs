@@ -535,12 +535,13 @@ fn validate_topics_exist(e: &Env, topics: &Vec<u32>) {
 /// * [`ClaimTopicsAndIssuersError::ClaimTopicAlreadyExists`] - If duplicates
 ///   are found.
 fn validate_no_duplicate_topics(e: &Env, topics: &Vec<u32>) {
+    // Check for duplicates using Map for O(n) complexity instead of O(n²)
+    let mut seen = Map::<u32, ()>::new(e);
     for i in 0..topics.len() {
         let topic = topics.get_unchecked(i);
-        for j in (i + 1)..topics.len() {
-            if topics.get_unchecked(j) == topic {
-                panic_with_error!(e, ClaimTopicsAndIssuersError::ClaimTopicAlreadyExists);
-            }
+        if seen.contains_key(topic) {
+            panic_with_error!(e, ClaimTopicsAndIssuersError::ClaimTopicAlreadyExists);
         }
+        seen.set(topic, ());
     }
 }

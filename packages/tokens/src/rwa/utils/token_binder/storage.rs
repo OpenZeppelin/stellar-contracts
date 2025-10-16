@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, TryFromVal, Val, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map, TryFromVal, Val, Vec};
 
 use crate::rwa::utils::token_binder::{
     emit_token_bound, emit_token_unbound, TokenBinderError, BUCKET_SIZE, MAX_TOKENS,
@@ -82,7 +82,7 @@ pub fn get_token_index(e: &Env, token: &Address) -> u32 {
     for bucket_idx in 0..=last_bucket {
         let bucket: Vec<Address> =
             get_persistent_entry(e, &TokenBinderStorageKey::TokenBucket(bucket_idx))
-                .unwrap_or(Vec::new(e));
+                .unwrap_or_else(|| Vec::new(e));
 
         if let Some(relative_index) = bucket.first_index_of(token) {
             return bucket_idx * BUCKET_SIZE + relative_index;
@@ -110,7 +110,7 @@ pub fn is_token_bound(e: &Env, token: &Address) -> bool {
     for bucket_idx in 0..=last_bucket {
         let bucket: Vec<Address> =
             get_persistent_entry(e, &TokenBinderStorageKey::TokenBucket(bucket_idx))
-                .unwrap_or(Vec::new(e));
+                .unwrap_or_else(|| Vec::new(e));
         if bucket.contains(token.clone()) {
             return true;
         }
@@ -135,7 +135,7 @@ pub fn linked_tokens(e: &Env) -> Vec<Address> {
     for bucket_idx in 0..=last_bucket {
         let bucket: Vec<Address> =
             get_persistent_entry(e, &TokenBinderStorageKey::TokenBucket(bucket_idx))
-                .unwrap_or(Vec::new(e));
+                .unwrap_or_else(|| Vec::new(e));
 
         tokens.append(&bucket);
     }
@@ -185,7 +185,8 @@ pub fn bind_token(e: &Env, token: &Address) {
 
     let bucket_index = count / BUCKET_SIZE;
     let key = TokenBinderStorageKey::TokenBucket(bucket_index);
-    let mut bucket: Vec<Address> = e.storage().persistent().get(&key).unwrap_or(Vec::new(e));
+    let mut bucket: Vec<Address> =
+        e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
 
     bucket.push_back(token.clone());
     e.storage().persistent().set(&key, &bucket);
@@ -242,22 +243,31 @@ pub fn bind_tokens(e: &Env, tokens: &Vec<Address>) {
     if count + tokens.len() > MAX_TOKENS {
         panic_with_error!(e, TokenBinderError::MaxTokensReached)
     }
-    let has_dups =
-        (1..tokens.len()).any(|i| tokens.slice(i..).contains(tokens.get(i - 1).unwrap()));
-    if has_dups {
-        panic_with_error!(e, TokenBinderError::BindBatchDuplicates)
+
+    // Check for duplicates using Map for O(n) complexity instead of O(n²)
+    let mut seen = Map::<Address, ()>::new(e);
+    for i in 0..tokens.len() {
+        let token = tokens.get_unchecked(i);
+        if seen.contains_key(token.clone()) {
+            panic_with_error!(e, TokenBinderError::BindBatchDuplicates)
+        }
+        seen.set(token, ());
     }
 
-    // Get all tokens to avoid unnecessary storage reads when checking if tokens to
-    // add were already bound.
+    // Build a Map of already-bound tokens for O(1) lookups instead of O(n)
     let already_bound = linked_tokens(e);
+    let mut bound_map = Map::<Address, ()>::new(e);
+    for i in 0..already_bound.len() {
+        bound_map.set(already_bound.get_unchecked(i), ());
+    }
 
     // Fill buckets sequentially until all tokens are stored.
     let mut i: u32 = 0;
     while i < tokens.len() {
         let bucket_index = count / BUCKET_SIZE;
         let key = TokenBinderStorageKey::TokenBucket(bucket_index);
-        let mut bucket: Vec<Address> = e.storage().persistent().get(&key).unwrap_or(Vec::new(e));
+        let mut bucket: Vec<Address> =
+            e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
 
         // Capacity left in this bucket
         let used = bucket.len();
@@ -267,7 +277,7 @@ pub fn bind_tokens(e: &Env, tokens: &Vec<Address>) {
 
         while i < end {
             let token = tokens.get(i).expect("value to be present");
-            if already_bound.contains(&token) {
+            if bound_map.contains_key(token.clone()) {
                 panic_with_error!(e, TokenBinderError::TokenAlreadyBound)
             }
             bucket.push_back(token.clone());
@@ -328,7 +338,7 @@ pub fn unbind_token(e: &Env, token: &Address) {
         let token_offset = token_index % BUCKET_SIZE;
         let token_key = TokenBinderStorageKey::TokenBucket(token_bucket_index);
         let mut token_bucket: Vec<Address> =
-            e.storage().persistent().get(&token_key).unwrap_or(Vec::new(e));
+            e.storage().persistent().get(&token_key).unwrap_or_else(|| Vec::new(e));
         token_bucket.set(token_offset, last_token.clone());
         e.storage().persistent().set(&token_key, &token_bucket);
     }
@@ -337,7 +347,7 @@ pub fn unbind_token(e: &Env, token: &Address) {
     let last_bucket_index = last_index / BUCKET_SIZE;
     let last_key = TokenBinderStorageKey::TokenBucket(last_bucket_index);
     let mut last_bucket: Vec<Address> =
-        e.storage().persistent().get(&last_key).unwrap_or(Vec::new(e));
+        e.storage().persistent().get(&last_key).unwrap_or_else(|| Vec::new(e));
     // if empty pop_back returns None
     last_bucket.pop_back();
 
