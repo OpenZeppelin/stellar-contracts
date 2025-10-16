@@ -617,10 +617,10 @@ fn bidirectional_mapping_remove_key() {
         let topics_key = ClaimIssuerStorageKey::Topics(topic);
         assert!(!e.storage().persistent().has(&topics_key));
 
-        // Verify Registries mapping cleaned up
+        // Verify Pairs mapping cleaned up
         let signing_key = SigningKey { public_key: public_key.clone(), scheme };
-        let registries_key = ClaimIssuerStorageKey::Registries(signing_key);
-        assert!(!e.storage().persistent().has(&registries_key));
+        let pairs_key = ClaimIssuerStorageKey::Pairs(signing_key);
+        assert!(!e.storage().persistent().has(&pairs_key));
     });
 }
 
@@ -988,11 +988,11 @@ fn remove_key_prevents_dangling_keys_across_multiple_topics() {
         // Verify complete cleanup - no storage entries should remain
         let topics_key1 = ClaimIssuerStorageKey::Topics(topic1);
         let topics_key2 = ClaimIssuerStorageKey::Topics(topic2);
-        let registries_key = ClaimIssuerStorageKey::Registries(signing_key);
+        let pairs_key = ClaimIssuerStorageKey::Pairs(signing_key);
 
         assert!(!e.storage().persistent().has(&topics_key1));
         assert!(!e.storage().persistent().has(&topics_key2));
-        assert!(!e.storage().persistent().has(&registries_key));
+        assert!(!e.storage().persistent().has(&pairs_key));
     });
 }
 

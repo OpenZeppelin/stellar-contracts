@@ -1,11 +1,11 @@
 //! ## Signing Keys Management
 //!
 //! This module maintains two correlated storage branches:
-//! - Registry branch: `Registries(SigningKey) -> Vec<(u32, Address)>` Tracks
-//!   the topic-registry pairs for which a given signing key (public key +
-//!   scheme) is authorized. Each entry represents a specific authorization: the
-//!   key can sign for a particular topic at a particular registry.
-//! - Topic branch: `Topics(u32) -> Vec<SigningKey>` Tracks which signing keys
+//! - Registry-Topic pairs branch: `Pairs(SigningKey) -> Vec<(u32, Address)>`
+//!   tracks the topic-registry pairs for which a given signing key (public key
+//!   + scheme) is authorized. Each entry represents a specific authorization,
+//!     the key can sign for a particular topic at a particular registry.
+//! - Topic branch: `Topics(u32) -> Vec<SigningKey>` tracks which signing keys
 //!   are authorized to sign claims for a specific topic.
 //!
 //! ```text
@@ -18,7 +18,7 @@
 //!                    │                                   │
 //!                    ▼                                   ▼
 //!        ┌────────────────────────┐          ┌──────────────────────┐
-//!        │ Registries(SigningKey) │          │ Topics(claim_topic)  │
+//!        │ Pairs(SigningKey)      │          │ Topics(claim_topic)  │
 //!        │ -> Vec<(topic, addr)>  │          │ -> Vec<SigningKey>   │
 //!        └────────────────────────┘          └──────────────────────┘
 //!                    │                                   │
@@ -96,7 +96,7 @@ pub enum ClaimIssuerStorageKey {
     /// Maps Topic -> Vec<SigningKey>
     Topics(u32),
     /// Maps SigningKey -> Vec<(Topic, Registry)>
-    Registries(SigningKey),
+    Pairs(SigningKey),
     /// Tracks explicitly revoked claims by claim digest
     RevokedClaim(BytesN<32>),
     /// Tracks current nonce for a specific identity and claim topics
@@ -298,15 +298,15 @@ pub fn get_keys_for_topic(e: &Env, claim_topic: u32) -> Vec<SigningKey> {
 /// * [`ClaimIssuerError::KeyNotFound`] - If the key is not found for this
 ///   topic.
 pub fn get_registries(e: &Env, signing_key: &SigningKey) -> Vec<Address> {
-    let registries_storage_key = ClaimIssuerStorageKey::Registries(signing_key.clone());
+    let pairs_storage_key = ClaimIssuerStorageKey::Pairs(signing_key.clone());
 
     let iter = e
         .storage()
         .persistent()
-        .get::<_, Vec<(u32, Address)>>(&registries_storage_key)
+        .get::<_, Vec<(u32, Address)>>(&pairs_storage_key)
         .inspect(|_| {
             e.storage().persistent().extend_ttl(
-                &registries_storage_key,
+                &pairs_storage_key,
                 KEYS_TTL_THRESHOLD,
                 KEYS_EXTEND_AMOUNT,
             );
@@ -381,17 +381,16 @@ pub fn is_key_allowed_for_registry(
     registry: &Address,
 ) -> bool {
     let signing_key = SigningKey { public_key: public_key.clone(), scheme };
-    let regsitries_storage_key = ClaimIssuerStorageKey::Registries(signing_key);
+    let pairs_storage_key = ClaimIssuerStorageKey::Pairs(signing_key);
 
-    if let Some(registries) =
-        e.storage().persistent().get::<_, Vec<(u32, Address)>>(&regsitries_storage_key)
+    if let Some(pairs) = e.storage().persistent().get::<_, Vec<(u32, Address)>>(&pairs_storage_key)
     {
         e.storage().persistent().extend_ttl(
-            &regsitries_storage_key,
+            &pairs_storage_key,
             KEYS_TTL_THRESHOLD,
             KEYS_EXTEND_AMOUNT,
         );
-        return registries.iter().any(|(_, addr)| addr == *registry);
+        return pairs.iter().any(|(_, addr)| addr == *registry);
     }
 
     false
@@ -431,13 +430,21 @@ pub fn is_authorized_for(e: &Env, registry: &Address, claim_topic: u32) -> bool 
 ///   registered at the `claim_topics_and_issuers` registry.
 /// * [`ClaimIssuerError::ClaimTopicNotAllowed`] - If this claim issuer is not
 ///   allowed to sign claims about the `claim_topic`.
-/// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If the key is already allowed
-///   for this topic.
+/// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If the key is already registered
+///   at this registry (for any topic, including the current one).
 ///
 /// # Events
 ///
 /// * topics - `["key_allowed", public_key: Bytes]`
 /// * data - `[registry: Address, scheme: u32, claim_topic: u32]`
+///
+/// # Note
+///
+/// This function enforces a strict policy: **a signing key can only be
+/// associated with ONE topic per registry**. If a key is already registered for
+/// any topic at a given registry, attempting to add the same key for a
+/// different topic at that same registry will fail. This prevents a key from
+/// becoming "global" within a registry (i.e., valid for all topics).
 ///
 /// # Security Warning
 ///
@@ -481,24 +488,24 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
         e.storage().persistent().set(&key, &topic_keys);
     }
 
-    // Update Registries mapping: SigningKey -> Vec<Address>
-    let regsitries_storage_key = ClaimIssuerStorageKey::Registries(signing_key);
-    let mut registries: Vec<(u32, Address)> =
-        e.storage().persistent().get(&regsitries_storage_key).unwrap_or_else(|| Vec::new(e));
+    // Update Pairs mapping: SigningKey -> Vec<(u32, Address)>
+    let pairs_storage_key = ClaimIssuerStorageKey::Pairs(signing_key);
+    let mut pairs: Vec<(u32, Address)> =
+        e.storage().persistent().get(&pairs_storage_key).unwrap_or_else(|| Vec::new(e));
 
     // Check if this registry is already added for this key, even for a different
     // topic
-    if registries.iter().any(|(_, reg)| reg == *registry) {
+    if pairs.iter().any(|(_, reg)| reg == *registry) {
         panic_with_error!(e, ClaimIssuerError::KeyAlreadyAllowed)
     }
 
-    registries.push_back((claim_topic, registry.clone()));
+    pairs.push_back((claim_topic, registry.clone()));
 
-    if registries.len() >= MAX_REGISTRIES_PER_KEY {
+    if pairs.len() >= MAX_REGISTRIES_PER_KEY {
         panic_with_error!(e, ClaimIssuerError::MaxRegistriesPerKeyExceeded)
     }
 
-    e.storage().persistent().set(&regsitries_storage_key, &registries);
+    e.storage().persistent().set(&pairs_storage_key, &pairs);
 
     emit_key_allowed(e, public_key, registry, scheme, claim_topic);
 }
@@ -531,29 +538,29 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
 pub fn remove_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, claim_topic: u32) {
     let signing_key = SigningKey { public_key: public_key.clone(), scheme };
 
-    // Remove registry from Registries mapping
-    let regsitries_storage_key = ClaimIssuerStorageKey::Registries(signing_key.clone());
-    let mut registries: Vec<(u32, Address)> = e
+    // Remove pair from Pairs mapping
+    let pairs_storage_key = ClaimIssuerStorageKey::Pairs(signing_key.clone());
+    let mut pairs: Vec<(u32, Address)> = e
         .storage()
         .persistent()
-        .get(&regsitries_storage_key)
+        .get(&pairs_storage_key)
         .unwrap_or_else(|| panic_with_error!(e, ClaimIssuerError::KeyNotFound));
 
-    // Find and remove the specific registry
-    match registries.first_index_of((claim_topic, registry.clone())) {
-        Some(pos) => registries.remove_unchecked(pos),
+    // Find and remove the specific (topic, registry) pair
+    match pairs.first_index_of((claim_topic, registry.clone())) {
+        Some(pos) => pairs.remove_unchecked(pos),
         None => panic_with_error!(e, ClaimIssuerError::KeyNotFound),
     }
 
-    // Update or remove Registries mapping
-    if registries.is_empty() {
-        e.storage().persistent().remove(&regsitries_storage_key);
+    // Update or remove Pairs mapping
+    if pairs.is_empty() {
+        e.storage().persistent().remove(&pairs_storage_key);
     } else {
-        e.storage().persistent().set(&regsitries_storage_key, &registries);
+        e.storage().persistent().set(&pairs_storage_key, &pairs);
     }
 
     // If no more pairs (claim_topic, *), update Topics mapping
-    if !registries.iter().any(|(topic, _)| topic == claim_topic) {
+    if !pairs.iter().any(|(topic, _)| topic == claim_topic) {
         let topics_storage_key = ClaimIssuerStorageKey::Topics(claim_topic);
         let mut topic_keys: Vec<SigningKey> = e
             .storage()
