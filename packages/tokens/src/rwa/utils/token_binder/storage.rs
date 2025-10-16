@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, TryFromVal, Val, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map, TryFromVal, Val, Vec};
 
 use crate::rwa::utils::token_binder::{
     emit_token_bound, emit_token_unbound, TokenBinderError, BUCKET_SIZE, MAX_TOKENS,
@@ -243,10 +243,15 @@ pub fn bind_tokens(e: &Env, tokens: &Vec<Address>) {
     if count + tokens.len() > MAX_TOKENS {
         panic_with_error!(e, TokenBinderError::MaxTokensReached)
     }
-    let has_dups =
-        (1..tokens.len()).any(|i| tokens.slice(i..).contains(tokens.get(i - 1).unwrap()));
-    if has_dups {
-        panic_with_error!(e, TokenBinderError::BindBatchDuplicates)
+
+    // Check for duplicates using Map for O(n) complexity instead of O(n²)
+    let mut seen = Map::<Address, ()>::new(e);
+    for i in 0..tokens.len() {
+        let token = tokens.get_unchecked(i);
+        if seen.contains_key(token.clone()) {
+            panic_with_error!(e, TokenBinderError::BindBatchDuplicates)
+        }
+        seen.set(token, ());
     }
 
     // Get all tokens to avoid unnecessary storage reads when checking if tokens to
