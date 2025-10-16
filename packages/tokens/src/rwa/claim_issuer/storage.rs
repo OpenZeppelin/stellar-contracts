@@ -51,13 +51,19 @@
 //!
 //! ## Claim Revocation and Signature Invalidation
 //!
-//! This module provides two independent mechanisms for invalidating claims:
+//! This module provides three independent mechanisms for invalidating claims:
 //!
-//! 1. **Per-claim revocation** (`set_claim_revoked`): Revokes a specific claim
+//! 1. **Passive expiration**: Helper functions encode/decode expiration
+//!    metadata (`created_at` and `valid_until` timestamps) within claim data.
+//!    Claims automatically expire after their `valid_until` timestamp without
+//!    requiring active on-chain management. This provides secure-by-default
+//!    behavior.
+//!
+//! 2. **Per-claim revocation** (`set_claim_revoked`): Revokes a specific claim
 //!    by storing its revocation status under the claim's digest. This allows
 //!    fine-grained control over individual claims.
 //!
-//! 2. **Signature invalidation** (`invalidate_claim_signatures`): Invalidates
+//! 3. **Signature invalidation** (`invalidate_claim_signatures`): Invalidates
 //!    all existing claim signatures for a specific identity and claim topic by
 //!    incrementing the nonce. This is efficient for invalidating multiple
 //!    signatures at once without storing individual revocation entries.
@@ -706,6 +712,103 @@ pub fn is_claim_revoked(e: &Env, identity: &Address, claim_topic: u32, claim_dat
             e.storage().persistent().extend_ttl(&key, CLAIMS_TTL_THRESHOLD, CLAIMS_EXTEND_AMOUNT)
         })
         .unwrap_or_default()
+}
+
+// ====================== CLAIM EXPIRATION =====================
+
+/// Encodes claim data with expiration metadata.
+///
+/// This is a recommended encoding that prepends `created_at` (u64) and
+/// `valid_until` (u64) timestamps to the actual claim data. This allows claims
+/// to passively expire without requiring a separate parameter or active
+/// on-chain management.
+///
+/// Encoded format: created_at (8 bytes) || valid_until (8 bytes) || claim_data
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `created_at` - The ledger timestamp when the claim was created.
+/// * `valid_until` - The ledger timestamp after which the claim expires.
+/// * `claim_data` - The actual claim data.
+///
+/// # Errors
+///
+/// * [`ClaimIssuerError::InvalidClaimDataExpiration`] - If `valid_until` is not
+///   greater than `created_at`.
+pub fn encode_claim_data_expiration(
+    e: &Env,
+    created_at: u64,
+    valid_until: u64,
+    claim_data: &Bytes,
+) -> Bytes {
+    if valid_until <= created_at {
+        panic_with_error!(e, ClaimIssuerError::InvalidClaimDataExpiration)
+    }
+
+    let mut encoded = Bytes::new(e);
+    encoded.extend_from_array(&created_at.to_be_bytes());
+    encoded.extend_from_array(&valid_until.to_be_bytes());
+    encoded.append(claim_data);
+    encoded
+}
+
+/// Decodes claim data with expiration metadata.
+///
+/// Extracts the `created_at` and `valid_until` timestamps from claim data
+/// encoded using [`encode_claim_data_expiration`].
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `encoded_claim_data` - The encoded claim data.
+///
+/// # Returns
+///
+/// Returns `(created_at, valid_until, claim_data)` tuple.
+///
+/// # Errors
+///
+/// * [`ClaimIssuerError::InvalidClaimDataExpiration`] - If the encoded data is
+///   too short (less than 16 bytes).
+pub fn decode_claim_data_expiration(e: &Env, encoded_claim_data: &Bytes) -> (u64, u64, Bytes) {
+    if encoded_claim_data.len() < 16 {
+        panic_with_error!(e, ClaimIssuerError::InvalidClaimDataExpiration)
+    }
+
+    let created_at_bytes = extract_from_bytes(e, encoded_claim_data, ..8);
+    let valid_until_bytes = extract_from_bytes(e, encoded_claim_data, 8..16);
+    let claim_data = encoded_claim_data.slice(16..);
+
+    let created_at = u64::from_be_bytes(created_at_bytes.to_array());
+
+    let valid_until = u64::from_be_bytes(valid_until_bytes.to_array());
+
+    (created_at, valid_until, claim_data)
+}
+
+/// Validates claim expiration from encoded claim data.
+///
+/// This is a convenience function that decodes the claim data and checks if the
+/// claim has expired based on the `valid_until` timestamp.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `encoded_claim_data` - The encoded claim data with expiration metadata.
+///
+/// # Returns
+///
+/// Returns `true` if the claim has expired (current timestamp >= valid_until),
+/// `false` otherwise.
+///
+/// # Errors
+///
+/// * [`ClaimIssuerError::InvalidClaimDataExpiration`] - If the encoded data is
+///   invalid.
+pub fn is_claim_expired(e: &Env, encoded_claim_data: &Bytes) -> bool {
+    let (_, valid_until, _) = decode_claim_data_expiration(e, encoded_claim_data);
+    e.ledger().timestamp() >= valid_until
 }
 
 // ====================== HELPERS =====================
