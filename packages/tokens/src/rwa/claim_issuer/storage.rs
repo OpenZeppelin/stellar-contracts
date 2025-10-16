@@ -431,8 +431,8 @@ pub fn is_authorized_for(e: &Env, registry: &Address, claim_topic: u32) -> bool 
 ///   registered at the `claim_topics_and_issuers` registry.
 /// * [`ClaimIssuerError::ClaimTopicNotAllowed`] - If this claim issuer is not
 ///   allowed to sign claims about the `claim_topic`.
-/// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If the key is already registered
-///   at this registry (for any topic, including the current one).
+/// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If this exact (key, topic,
+///   registry) combination is already registered.
 ///
 /// # Events
 ///
@@ -494,9 +494,8 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
     let mut pairs: Vec<(u32, Address)> =
         e.storage().persistent().get(&pairs_storage_key).unwrap_or_else(|| Vec::new(e));
 
-    // Check if this registry is already added for this key, even for a different
-    // topic
-    if pairs.iter().any(|(_, reg)| reg == *registry) {
+    // Check if this exact (topic, registry) pair already exists
+    if pairs.contains((claim_topic, registry.clone())) {
         panic_with_error!(e, ClaimIssuerError::KeyAlreadyAllowed)
     }
 

@@ -5,7 +5,8 @@ mod test;
 
 use soroban_sdk::{contractclient, contracterror, contractevent, Address, Env, Vec};
 pub use storage::{
-    bind_token, bind_tokens, get_token_by_index, get_token_index, linked_tokens, unbind_token,
+    bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound, linked_tokens,
+    unbind_token,
 };
 
 /// Trait for managing token bindings to periphery contracts.
