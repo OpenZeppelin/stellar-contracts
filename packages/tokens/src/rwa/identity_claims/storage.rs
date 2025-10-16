@@ -99,9 +99,7 @@ pub fn add_claim(
     let claim_issuer_client = ClaimIssuerClient::new(e, issuer);
     let identity = e.current_contract_address();
 
-    if !claim_issuer_client.is_claim_valid(&identity, &topic, &scheme, signature, data) {
-        panic_with_error!(e, ClaimsError::ClaimNotValid)
-    }
+    claim_issuer_client.is_claim_valid(&identity, &topic, &scheme, signature, data);
 
     let claim_id = generate_claim_id(e, issuer, topic);
 

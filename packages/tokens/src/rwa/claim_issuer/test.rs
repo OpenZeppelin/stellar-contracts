@@ -288,7 +288,7 @@ fn ed25519_verify_success() {
 
         let signature_data = Ed25519SignatureData { public_key, signature };
 
-        assert!(Ed25519Verifier::verify(&e, &message, &signature_data))
+        Ed25519Verifier::verify(&e, &message, &signature_data)
     });
 }
 
@@ -332,7 +332,56 @@ fn secp256k1_verify_success() {
             recovery_id: recovery_id.to_byte() as u32,
         };
 
-        assert!(Secp256k1Verifier::verify(&e, &message, &signature_data));
+        Secp256k1Verifier::verify(&e, &message, &signature_data);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #360)")]
+fn secp256k1_verify_fails() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4, 5]);
+
+    let secret_key_bytes: [u8; 32] = [
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+        26, 27, 28, 29, 30, 31, 32,
+    ];
+    let secret_key = Secp256k1SecretKey::from_slice(&secret_key_bytes).unwrap();
+    let signing_key = Secp256k1SigningKey::from(&secret_key);
+
+    let pubkey = secret_key.public_key().to_encoded_point(false).to_bytes().to_vec();
+
+    let mut pubkey_slice = [0u8; 65];
+    pubkey_slice.copy_from_slice(&pubkey);
+
+    // Alter pubkey
+    pubkey_slice[2] += 1;
+
+    let public_key: BytesN<65> = BytesN::from_array(&e, &pubkey_slice);
+
+    e.as_contract(&contract_id, || {
+        // Build message using the verifier
+        let message = Secp256k1Verifier::build_message(&e, &identity, claim_topic, &claim_data);
+        let digest = e.crypto().keccak256(&message);
+
+        let (signature, recovery_id) =
+            signing_key.sign_prehash_recoverable(&digest.to_array()).unwrap();
+
+        let sig_slice = signature.to_bytes();
+        let mut sig = [0u8; 64];
+        sig.copy_from_slice(sig_slice.as_slice());
+
+        let signature_data = Secp256k1SignatureData {
+            public_key,
+            signature: BytesN::from_array(&e, &sig),
+            recovery_id: recovery_id.to_byte() as u32,
+        };
+
+        Secp256k1Verifier::verify(&e, &message, &signature_data);
     });
 }
 
@@ -373,7 +422,7 @@ fn secp256r1_verify_success() {
         let signature_data =
             Secp256r1SignatureData { public_key, signature: BytesN::from_array(&e, &sig) };
 
-        assert!(Secp256r1Verifier::verify(&e, &message, &signature_data));
+        Secp256r1Verifier::verify(&e, &message, &signature_data);
     });
 }
 

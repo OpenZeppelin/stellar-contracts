@@ -1,8 +1,8 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, map, symbol_short, testutils::Address as _, vec, Address,
-    Bytes, BytesN, Env, Map, Vec,
+    contract, contracterror, contractimpl, contracttype, map, panic_with_error, symbol_short,
+    testutils::Address as _, vec, Address, Bytes, BytesN, Env, Map, Vec,
 };
 
 use crate::rwa::{
@@ -58,6 +58,11 @@ impl MockIdentityClaims {
     }
 }
 
+#[contracterror]
+pub enum MockError {
+    Invalid = 1,
+}
+
 #[contract]
 pub struct MockClaimIssuer;
 
@@ -70,8 +75,10 @@ impl ClaimIssuer for MockClaimIssuer {
         _scheme: u32,
         _sig_data: Bytes,
         _claim_data: Bytes,
-    ) -> bool {
-        e.storage().persistent().get(&symbol_short!("claim_ok")).unwrap_or(false)
+    ) {
+        if !e.storage().persistent().get(&symbol_short!("claim_ok")).unwrap_or(false) {
+            panic_with_error!(e, &MockError::Invalid)
+        }
     }
 }
 
