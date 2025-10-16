@@ -439,14 +439,6 @@ pub fn is_authorized_for(e: &Env, registry: &Address, claim_topic: u32) -> bool 
 /// * topics - `["key_allowed", public_key: Bytes]`
 /// * data - `[registry: Address, scheme: u32, claim_topic: u32]`
 ///
-/// # Note
-///
-/// This function enforces a strict policy: **a signing key can only be
-/// associated with ONE topic per registry**. If a key is already registered for
-/// any topic at a given registry, attempting to add the same key for a
-/// different topic at that same registry will fail. This prevents a key from
-/// becoming "global" within a registry (i.e., valid for all topics).
-///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks and should only
