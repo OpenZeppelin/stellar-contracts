@@ -11,9 +11,10 @@ use crate::rwa::{
 };
 
 pub mod mock_claim_issuer {
-    use soroban_sdk::symbol_short;
+    use soroban_sdk::{panic_with_error, symbol_short};
 
     use super::*;
+    use crate::rwa::identity_claims::ClaimsError;
 
     #[contract]
     pub struct Contract;
@@ -27,8 +28,10 @@ pub mod mock_claim_issuer {
             _scheme: u32,
             _sig_data: Bytes,
             _claim_data: Bytes,
-        ) -> bool {
-            e.storage().persistent().get(&symbol_short!("valid")).unwrap_or(true)
+        ) {
+            if e.storage().persistent().get(&symbol_short!("not_valid")).unwrap_or(false) {
+                panic_with_error!(e, ClaimsError::ClaimNotValid)
+            }
         }
     }
 }
@@ -84,8 +87,8 @@ fn add_claim_fails() {
     let (issuer, topic, scheme, signature, data, uri) = setup_test_data(&e);
 
     e.as_contract(&issuer, || {
-        // Set mock claim issuer to return false
-        e.storage().persistent().set(&symbol_short!("valid"), &false);
+        // Set mock claim issuer to panic
+        e.storage().persistent().set(&symbol_short!("not_valid"), &true);
     });
 
     e.as_contract(&contract_id, || {

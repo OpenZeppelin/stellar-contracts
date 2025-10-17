@@ -285,7 +285,6 @@ fn forced_transfer() {
 fn address_freezing() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
-    let caller = Address::generate(&e);
     let user = Address::generate(&e);
 
     e.as_contract(&address, || {
@@ -293,11 +292,11 @@ fn address_freezing() {
         assert!(!RWA::is_frozen(&e, &user));
 
         // Freeze the address
-        RWA::set_address_frozen(&e, &caller, &user, true);
+        RWA::set_address_frozen(&e, &user, true);
         assert!(RWA::is_frozen(&e, &user));
 
         // Unfreeze the address
-        RWA::set_address_frozen(&e, &caller, &user, false);
+        RWA::set_address_frozen(&e, &user, false);
         assert!(!RWA::is_frozen(&e, &user));
     });
 }
@@ -643,7 +642,6 @@ fn recover_balance_with_frozen_address() {
     let address = e.register(MockRWAContract, ());
     let old_account = Address::generate(&e);
     let new_account = Address::generate(&e);
-    let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
         let identity_verifier = set_and_return_identity_verifier(&e);
@@ -656,7 +654,7 @@ fn recover_balance_with_frozen_address() {
 
         // Mint tokens and freeze the address
         RWA::mint(&e, &old_account, 100);
-        RWA::set_address_frozen(&e, &caller, &old_account, true);
+        RWA::set_address_frozen(&e, &old_account, true);
         assert!(RWA::is_frozen(&e, &old_account));
 
         // Perform recovery
@@ -676,7 +674,6 @@ fn recover_balance_with_both_frozen_tokens_and_address() {
     let address = e.register(MockRWAContract, ());
     let old_account = Address::generate(&e);
     let new_account = Address::generate(&e);
-    let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
         let identity_verifier = set_and_return_identity_verifier(&e);
@@ -690,7 +687,7 @@ fn recover_balance_with_both_frozen_tokens_and_address() {
         // Mint tokens, freeze some tokens, and freeze the address
         RWA::mint(&e, &old_account, 100);
         RWA::freeze_partial_tokens(&e, &old_account, 80);
-        RWA::set_address_frozen(&e, &caller, &old_account, true);
+        RWA::set_address_frozen(&e, &old_account, true);
 
         assert_eq!(RWA::get_frozen_tokens(&e, &old_account), 80);
         assert!(RWA::is_frozen(&e, &old_account));
@@ -799,7 +796,6 @@ fn transfer_fails_when_from_address_frozen() {
     let address = e.register(MockRWAContract, ());
     let from = Address::generate(&e);
     let to = Address::generate(&e);
-    let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
         setup_all_contracts(&e);
@@ -807,7 +803,7 @@ fn transfer_fails_when_from_address_frozen() {
         RWA::mint(&e, &from, 100);
 
         // Freeze the from address
-        RWA::set_address_frozen(&e, &caller, &from, true);
+        RWA::set_address_frozen(&e, &from, true);
 
         // Try to transfer - should fail with AddressFrozen error
         RWA::transfer(&e, &from, &to, 50);
@@ -822,7 +818,6 @@ fn transfer_fails_when_to_address_frozen() {
     let address = e.register(MockRWAContract, ());
     let from = Address::generate(&e);
     let to = Address::generate(&e);
-    let caller = Address::generate(&e);
 
     e.as_contract(&address, || {
         setup_all_contracts(&e);
@@ -830,7 +825,7 @@ fn transfer_fails_when_to_address_frozen() {
         RWA::mint(&e, &from, 100);
 
         // Freeze the to address
-        RWA::set_address_frozen(&e, &caller, &to, true);
+        RWA::set_address_frozen(&e, &to, true);
 
         // Try to transfer - should fail with AddressFrozen error
         RWA::transfer(&e, &from, &to, 50);
