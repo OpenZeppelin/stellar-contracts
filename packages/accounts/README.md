@@ -62,26 +62,26 @@ In addition, a single smart account can hold multiple context rules across its c
 
 Signers define who can authorize operations. There are two variants:
 
-#### Native Signers
+#### Delegated Signers
 
 ```rust
-Signer::Native(Address)
+Signer::Delegated(Address)
 ```
 
 - Any Soroban address (contract or account)
 - Verification uses `require_auth_for_args(payload)`
 - This model requires manual authorization entry crafting, because it is not returned in a simulation mode.
 
-#### Delegated Signers
+#### External Signers
 
 ```rust
-Signer::Delegated(Address, Bytes)
+Signer::External(Address, Bytes)
 ```
 - External verifier contract + public key data
 - Offloads signature verification to specialized contracts
 This model scales to diverse cryptographic schemes, is flexible enough to accommodate new authentication methods (from passkeys to zk-proofs), and minimizes setup cost by allowing many accounts to reuse the same verifier contracts.
 
-![delegated signers with verifying contracts](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/docs/DelegatedSigner.png "Delegated Signers with Verifier Contracts")
+![external signers with verifying contracts](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/docs/DelegatedSigner.png "External Signers with Verifier Contracts")
 
 ### 4. Verifiers
 
@@ -270,9 +270,9 @@ create_context_rule(
     name: "Treasury Operations",
     valid_until: None,
     signers: vec![
-        Signer::Delegated(ed25519_verifier, alice_pubkey),
-        Signer::Delegated(secp256k1_verifier, bob_pubkey),
-        Signer::Native(carol_contract)
+        Signer::External(ed25519_verifier, alice_pubkey),
+        Signer::External(secp256k1_verifier, bob_pubkey),
+        Signer::Delegated(carol_contract)
     ],
     policies: map![&e, (threshold_policy, two_of_three)]
 )
@@ -358,9 +358,9 @@ add_policy(
 );
 ```
 
-### 4. Choose or Deploy Verifier Contracts (For Delegated Signers)
+### 4. Choose or Deploy Verifier Contracts (For External Signers)
 
-For delegated signers, there are two options:
+For external signers, there are two options:
 
 **Option A: Use Ecosystem Verifiers (Recommended)**
 

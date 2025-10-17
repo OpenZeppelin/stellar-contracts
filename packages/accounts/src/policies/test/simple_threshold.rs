@@ -26,9 +26,9 @@ fn create_test_signers(e: &Env) -> (Address, Address, Address) {
 fn create_test_context_rule(e: &Env) -> ContextRule {
     let (addr1, addr2, addr3) = create_test_signers(e);
     let mut signers = Vec::new(e);
-    signers.push_back(Signer::Native(addr1));
-    signers.push_back(Signer::Native(addr2));
-    signers.push_back(Signer::Native(addr3));
+    signers.push_back(Signer::Delegated(addr1));
+    signers.push_back(Signer::Delegated(addr2));
+    signers.push_back(Signer::Delegated(addr3));
     let policies = Vec::new(e);
     ContextRule {
         id: 1,
@@ -107,7 +107,7 @@ fn can_enforce_sufficient_signers() {
         install(&e, &params, &context_rule, &smart_account);
 
         let authenticated_signers =
-            Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
+            Vec::from_array(&e, [Signer::Delegated(addr1), Signer::Delegated(addr2)]);
 
         let context = Context::Contract(ContractContext {
             contract: Address::generate(&e),
@@ -137,7 +137,7 @@ fn can_enforce_insufficient_signers() {
 
         install(&e, &params, &context_rule, &smart_account);
 
-        let authenticated_signers = Vec::from_array(&e, [Signer::Native(addr1)]);
+        let authenticated_signers = Vec::from_array(&e, [Signer::Delegated(addr1)]);
 
         let context = Context::Contract(ContractContext {
             contract: Address::generate(&e),
@@ -159,7 +159,7 @@ fn can_enforce_not_installed() {
     let smart_account = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let authenticated_signers = Vec::from_array(&e, [Signer::Native(Address::generate(&e))]);
+        let authenticated_signers = Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]);
         let context_rule = create_test_context_rule(&e);
 
         let context = Context::Contract(ContractContext {
@@ -186,7 +186,7 @@ fn enforce_success() {
     let authenticated_signers = e.as_contract(&address, || {
         let (addr1, addr2, _) = create_test_signers(&e);
         let authenticated_signers =
-            Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
+            Vec::from_array(&e, [Signer::Delegated(addr1), Signer::Delegated(addr2)]);
         let params = SimpleThresholdAccountParams { threshold: 2 };
         let context_rule = create_test_context_rule(&e);
 
@@ -293,7 +293,7 @@ fn enforce_not_installed_fails() {
     e.as_contract(&address, || {
         let (addr1, addr2, _) = create_test_signers(&e);
         let authenticated_signers =
-            Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
+            Vec::from_array(&e, [Signer::Delegated(addr1), Signer::Delegated(addr2)]);
         let context_rule = create_test_context_rule(&e);
 
         let context = Context::Contract(ContractContext {
@@ -326,7 +326,7 @@ fn enforce_threshold_not_met_fails() {
     e.as_contract(&address, || {
         let (addr1, _, _) = create_test_signers(&e);
         // Only 1 signer authenticated, but threshold is 2
-        let authenticated_signers = Vec::from_array(&e, [Signer::Native(addr1)]);
+        let authenticated_signers = Vec::from_array(&e, [Signer::Delegated(addr1)]);
         let context_rule = create_test_context_rule(&e);
 
         let context = Context::Contract(ContractContext {

@@ -52,7 +52,7 @@ fn create_test_signers(e: &Env) -> Vec<Signer> {
     let addr1 = Address::generate(e);
     let addr2 = Address::generate(e);
 
-    Vec::from_array(e, [Signer::Native(addr1), Signer::Native(addr2)])
+    Vec::from_array(e, [Signer::Delegated(addr1), Signer::Delegated(addr2)])
 }
 
 fn create_test_policies(e: &Env) -> Vec<Address> {
@@ -70,7 +70,7 @@ fn compute_fingerprint_different_signers_different_fingerprint() {
     let context_type = ContextRuleType::CallContract(contract_addr);
     let signers1 = create_test_signers(&e);
     let addr3 = Address::generate(&e);
-    let signers2 = Vec::from_array(&e, [Signer::Native(addr3)]);
+    let signers2 = Vec::from_array(&e, [Signer::Delegated(addr3)]);
     let policies = Vec::new(&e);
 
     e.as_contract(&address, || {
@@ -89,8 +89,8 @@ fn compute_fingerprint_same_signers_different_order_same_fingerprint() {
     let addr1 = Address::generate(&e);
     let addr2 = Address::generate(&e);
     let signers1 =
-        Vec::from_array(&e, [Signer::Native(addr1.clone()), Signer::Native(addr2.clone())]);
-    let signers2 = Vec::from_array(&e, [Signer::Native(addr2), Signer::Native(addr1)]);
+        Vec::from_array(&e, [Signer::Delegated(addr1.clone()), Signer::Delegated(addr2.clone())]);
+    let signers2 = Vec::from_array(&e, [Signer::Delegated(addr2), Signer::Delegated(addr1)]);
     let policies = Vec::new(&e);
 
     e.as_contract(&address, || {
@@ -165,19 +165,19 @@ fn compute_fingerprint_mixed_signer_same_fingerprint() {
     let key_data1 = Bytes::from_array(&e, &[1, 2, 3, 4]);
     let key_data2 = Bytes::from_array(&e, &[5, 6, 3, 4]);
 
-    let native_signer = Signer::Native(native_addr);
-    let delegated_signer1 = Signer::Delegated(verifier1, key_data1);
-    let delegated_signer2 = Signer::Delegated(verifier2, key_data2);
+    let native_signer = Signer::Delegated(native_addr);
+    let external_signer1 = Signer::External(verifier1, key_data1);
+    let external_signer2 = Signer::External(verifier2, key_data2);
 
     let signers1 = Vec::from_array(
         &e,
-        [native_signer.clone(), delegated_signer1.clone(), delegated_signer2.clone()],
+        [native_signer.clone(), external_signer1.clone(), external_signer2.clone()],
     );
     let signers2 = Vec::from_array(
         &e,
-        [delegated_signer1.clone(), native_signer.clone(), delegated_signer2.clone()],
+        [external_signer1.clone(), native_signer.clone(), external_signer2.clone()],
     );
-    let signers3 = Vec::from_array(&e, [native_signer, delegated_signer2, delegated_signer1]);
+    let signers3 = Vec::from_array(&e, [native_signer, external_signer2, external_signer1]);
     let policies = Vec::new(&e);
 
     e.as_contract(&address, || {
@@ -198,7 +198,7 @@ fn compute_fingerprint_duplicate_signers_fails() {
     let context_type = ContextRuleType::CallContract(contract_addr);
     let addr1 = Address::generate(&e);
     let duplicate_signers =
-        Vec::from_array(&e, [Signer::Native(addr1.clone()), Signer::Native(addr1)]);
+        Vec::from_array(&e, [Signer::Delegated(addr1.clone()), Signer::Delegated(addr1)]);
     let policies = Vec::new(&e);
 
     e.as_contract(&address, || {
@@ -374,7 +374,7 @@ fn add_signer_updates_fingerprint() {
         let contract_addr = Address::generate(&e);
         let context_type = ContextRuleType::CallContract(contract_addr.clone());
         let addr1 = Address::generate(&e);
-        let mut signers = Vec::from_array(&e, [Signer::Native(addr1)]);
+        let mut signers = Vec::from_array(&e, [Signer::Delegated(addr1)]);
 
         // Add rule with one signer
         let rule = add_context_rule(
@@ -389,7 +389,7 @@ fn add_signer_updates_fingerprint() {
         assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp1.clone())));
 
         // Add another signer
-        let signer2 = Signer::Native(Address::generate(&e));
+        let signer2 = Signer::Delegated(Address::generate(&e));
         add_signer(&e, rule.id, &signer2);
 
         signers.push_back(signer2);
@@ -513,11 +513,13 @@ fn fingerprint_prevents_duplicate_rules_across_modifications() {
         let addr2 = Address::generate(&e);
         let addr3 = Address::generate(&e);
 
-        let signers_1_2 =
-            Vec::from_array(&e, [Signer::Native(addr1.clone()), Signer::Native(addr2.clone())]);
+        let signers_1_2 = Vec::from_array(
+            &e,
+            [Signer::Delegated(addr1.clone()), Signer::Delegated(addr2.clone())],
+        );
         let signers_1_2_3 = Vec::from_array(
             &e,
-            [Signer::Native(addr1), Signer::Native(addr2), Signer::Native(addr3.clone())],
+            [Signer::Delegated(addr1), Signer::Delegated(addr2), Signer::Delegated(addr3.clone())],
         );
 
         // Add rule with signers [addr1, addr2]
@@ -543,7 +545,7 @@ fn fingerprint_prevents_duplicate_rules_across_modifications() {
         );
 
         // Remove addr3 and policy from rule2
-        remove_signer(&e, rule2.id, &Signer::Native(addr3));
+        remove_signer(&e, rule2.id, &Signer::Delegated(addr3));
         remove_policy(&e, rule2.id, &policy);
 
         // Now rule2 has [addr1, addr2] with no policies, which conflicts with rule1
