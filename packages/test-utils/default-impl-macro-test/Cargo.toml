@@ -10,8 +10,8 @@ version.workspace = true
 crate-type = ["lib"]
 doctest = false
 
-
-[dev-dependencies]
+# This crate is only used for testing, and not compatible with `wasm32` targets.
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 stellar-access = { workspace = true }
 stellar-macros = { workspace = true }
