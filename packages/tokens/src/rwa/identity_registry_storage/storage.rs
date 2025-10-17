@@ -130,9 +130,6 @@ use crate::rwa::identity_registry_storage::{
     IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_ENTRIES,
 };
 
-/// ISO 3166-1 numeric country code
-pub type CountryCode = u32;
-
 /// Represents the type of identity holder
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -142,19 +139,20 @@ pub enum IdentityType {
 }
 
 /// Represents different types of country relationships for individuals
+/// ISO 3166-1 numeric country code
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum IndividualCountryRelation {
     /// Country of residence
-    Residence(CountryCode),
+    Residence(u32),
     /// Country of citizenship
-    Citizenship(CountryCode),
+    Citizenship(u32),
     /// Country where funds originate
-    SourceOfFunds(CountryCode),
+    SourceOfFunds(u32),
     /// Tax residency (can differ from residence)
-    TaxResidency(CountryCode),
+    TaxResidency(u32),
     /// Custom country type for future extensions
-    Custom(Symbol, CountryCode),
+    Custom(Symbol, u32),
 }
 
 /// Represents different types of country relationships for organizations
@@ -162,15 +160,15 @@ pub enum IndividualCountryRelation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum OrganizationCountryRelation {
     /// Country of incorporation/registration
-    Incorporation(CountryCode),
+    Incorporation(u32),
     /// Countries where organization operates
-    OperatingJurisdiction(CountryCode),
+    OperatingJurisdiction(u32),
     /// Tax jurisdiction
-    TaxJurisdiction(CountryCode),
+    TaxJurisdiction(u32),
     /// Country where funds originate
-    SourceOfFunds(CountryCode),
+    SourceOfFunds(u32),
     /// Custom country type for future extensions
-    Custom(Symbol, CountryCode),
+    Custom(Symbol, u32),
 }
 
 /// Unified country relationship that can be either individual or organizational
