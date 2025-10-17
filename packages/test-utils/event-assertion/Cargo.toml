@@ -6,6 +6,10 @@ repository.workspace = true
 publish = false
 version.workspace = true
 
+[lib]
+crate-type = ["lib"]
+doctest = false
+
 # This crate is only used for testing, and not compatible with `wasm32` targets.
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

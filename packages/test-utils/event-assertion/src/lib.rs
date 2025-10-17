@@ -4,14 +4,6 @@
 // wasm32v1-none).
 #![cfg_attr(target_family = "wasm", no_std)]
 
-// Panic handler required for `no_std` wasm targets.
-// Halts execution by entering an infinite loop, causing a wasm trap.
-#[cfg(all(target_family = "wasm", not(test)))]
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
-}
-
 // The entire implementation is only compiled for non-wasm targets.
 // This is a test utility crate that's not needed in wasm environments.
 #[cfg(not(target_family = "wasm"))]
