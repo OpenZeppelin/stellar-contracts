@@ -72,7 +72,7 @@ fn create_test_signers(e: &Env) -> Vec<Signer> {
     let addr1 = Address::generate(e);
     let addr2 = Address::generate(e);
 
-    Vec::from_array(e, [Signer::Native(addr1), Signer::Native(addr2)])
+    Vec::from_array(e, [Signer::Delegated(addr1), Signer::Delegated(addr2)])
 }
 
 fn create_test_policies(e: &Env) -> Vec<Address> {
@@ -211,14 +211,14 @@ fn do_check_auth_authentication_fails() {
         let contract_addr = Address::generate(&e);
         let context_type = ContextRuleType::CallContract(contract_addr.clone());
 
-        // Create rule with delegated signer
+        // Create rule with external signer
         let key_data = Bytes::from_array(&e, &[1, 2, 3, 4]);
-        let delegated_signer = Signer::Delegated(verifier_addr.clone(), key_data.clone());
-        let signers = Vec::from_array(&e, [delegated_signer.clone()]);
+        let external_signer = Signer::External(verifier_addr.clone(), key_data.clone());
+        let signers = Vec::from_array(&e, [external_signer.clone()]);
         add_context_rule(
             &e,
             &context_type,
-            &String::from_str(&e, "delegated_rule"),
+            &String::from_str(&e, "external_rule"),
             None,
             &signers,
             &Map::new(&e),
@@ -233,7 +233,7 @@ fn do_check_auth_authentication_fails() {
         let auth_contexts = Vec::from_array(&e, [context]);
 
         let mut signature_map = Map::new(&e);
-        signature_map.set(delegated_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
+        signature_map.set(external_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
         let signatures = Signatures(signature_map);
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
@@ -526,7 +526,7 @@ fn can_enforce_all_policies_one_fails() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #2003)")]
-fn authenticate_delegated_signer_verification_fails() {
+fn authenticate_external_signer_verification_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let verifier_addr = e.register(MockVerifierContract, ());
@@ -534,7 +534,7 @@ fn authenticate_delegated_signer_verification_fails() {
     e.as_contract(&address, || {
         let key_data = Bytes::from_array(&e, &[1, 2, 3, 4]);
         let sig_data = Bytes::from_array(&e, &[5, 6, 7, 8]);
-        let signer = Signer::Delegated(verifier_addr.clone(), key_data.clone());
+        let signer = Signer::External(verifier_addr.clone(), key_data.clone());
 
         // Set verifier to return false
         e.as_contract(&verifier_addr, || {
@@ -562,8 +562,8 @@ fn authenticate_mixed_signers_success() {
         let native_addr = Address::generate(&e);
         let key_data = Bytes::from_array(&e, &[1u8; 32]);
 
-        let native_signer = Signer::Native(native_addr);
-        let delegated_signer = Signer::Delegated(verifier_addr.clone(), key_data);
+        let native_signer = Signer::Delegated(native_addr);
+        let external_signer = Signer::External(verifier_addr.clone(), key_data);
 
         // Set verifier to return true
         e.as_contract(&verifier_addr, || {
@@ -572,7 +572,7 @@ fn authenticate_mixed_signers_success() {
 
         let mut signature_map = Map::new(&e);
         signature_map.set(native_signer, Bytes::new(&e));
-        signature_map.set(delegated_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
+        signature_map.set(external_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
 
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
@@ -606,21 +606,23 @@ fn get_authenticated_signers_partial_match() {
         let addr2 = Address::generate(&e);
         let addr3 = Address::generate(&e);
 
-        let rule_signers =
-            Vec::from_array(&e, [Signer::Native(addr1.clone()), Signer::Native(addr2.clone())]);
+        let rule_signers = Vec::from_array(
+            &e,
+            [Signer::Delegated(addr1.clone()), Signer::Delegated(addr2.clone())],
+        );
 
         let all_signers = Vec::from_array(
             &e,
             [
-                Signer::Native(addr1.clone()),
-                Signer::Native(addr3), // addr2 is missing, addr3 is extra
+                Signer::Delegated(addr1.clone()),
+                Signer::Delegated(addr3), // addr2 is missing, addr3 is extra
             ],
         );
 
         let authenticated = get_authenticated_signers(&e, &rule_signers, &all_signers);
 
         assert_eq!(authenticated.len(), 1); // Only addr1 matches
-        assert_eq!(authenticated.get(0).unwrap(), Signer::Native(addr1));
+        assert_eq!(authenticated.get(0).unwrap(), Signer::Delegated(addr1));
     });
 }
 
@@ -635,9 +637,10 @@ fn get_authenticated_signers_no_match() {
         let addr3 = Address::generate(&e);
         let addr4 = Address::generate(&e);
 
-        let rule_signers = Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
+        let rule_signers =
+            Vec::from_array(&e, [Signer::Delegated(addr1), Signer::Delegated(addr2)]);
 
-        let all_signers = Vec::from_array(&e, [Signer::Native(addr3), Signer::Native(addr4)]);
+        let all_signers = Vec::from_array(&e, [Signer::Delegated(addr3), Signer::Delegated(addr4)]);
 
         let authenticated = get_authenticated_signers(&e, &rule_signers, &all_signers);
 
@@ -762,7 +765,7 @@ fn get_valid_context_rules_only_defaults() {
         // fingerprints
         let signers = create_test_signers(&e);
         let addr3 = Address::generate(&e);
-        let signers2 = Vec::from_array(&e, [Signer::Native(addr3)]);
+        let signers2 = Vec::from_array(&e, [Signer::Delegated(addr3)]);
 
         add_context_rule(
             &e,
@@ -1056,8 +1059,8 @@ fn get_context_rules_multiple_rules() {
         let signers = create_test_signers(&e);
         let addr3 = Address::generate(&e);
         let addr4 = Address::generate(&e);
-        let signers2 = Vec::from_array(&e, [Signer::Native(addr3)]);
-        let signers3 = Vec::from_array(&e, [Signer::Native(addr4)]);
+        let signers2 = Vec::from_array(&e, [Signer::Delegated(addr3)]);
+        let signers3 = Vec::from_array(&e, [Signer::Delegated(addr4)]);
 
         let rule1 = add_context_rule(
             &e,
@@ -1122,8 +1125,8 @@ fn add_context_rule_duplicate_signer_fails() {
         let policies_map = create_test_policies_map(&e);
 
         // Create signers with duplicate
-        let signer1 = Signer::Native(Address::generate(&e));
-        let signer2 = Signer::Native(Address::generate(&e));
+        let signer1 = Signer::Delegated(Address::generate(&e));
+        let signer2 = Signer::Delegated(Address::generate(&e));
         let duplicate_signer = signer1.clone(); // Duplicate of signer1
 
         let mut signers = Vec::new(&e);

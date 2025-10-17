@@ -62,8 +62,8 @@ impl Policy for MockPolicyContract {
 }
 
 fn create_test_signers(e: &Env) -> Vec<Signer> {
-    let signer1 = Signer::Native(Address::generate(e));
-    let signer2 = Signer::Native(Address::generate(e));
+    let signer1 = Signer::Delegated(Address::generate(e));
+    let signer2 = Signer::Delegated(Address::generate(e));
     Vec::from_array(e, [signer1, signer2])
 }
 
@@ -93,7 +93,7 @@ fn add_signer_success() {
     let rule = setup_test_rule(&e, &address);
 
     e.as_contract(&address, || {
-        let new_signer = Signer::Native(Address::generate(&e));
+        let new_signer = Signer::Delegated(Address::generate(&e));
 
         add_signer(&e, rule.id, &new_signer);
 
@@ -111,7 +111,7 @@ fn add_signer_nonexistent_rule_fails() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let new_signer = Signer::Native(Address::generate(&e));
+        let new_signer = Signer::Delegated(Address::generate(&e));
         add_signer(&e, 999, &new_signer); // Non-existent rule ID
     });
 }
@@ -156,7 +156,7 @@ fn remove_signer_nonexistent_rule_fails() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let signer = Signer::Native(Address::generate(&e));
+        let signer = Signer::Delegated(Address::generate(&e));
         remove_signer(&e, 999, &signer); // Non-existent rule ID
     });
 }
@@ -170,7 +170,7 @@ fn remove_signer_not_found_fails() {
     let rule = setup_test_rule(&e, &address);
 
     e.as_contract(&address, || {
-        let nonexistent_signer = Signer::Native(Address::generate(&e));
+        let nonexistent_signer = Signer::Delegated(Address::generate(&e));
         remove_signer(&e, rule.id, &nonexistent_signer); // Signer not in rule
     });
 }
@@ -383,7 +383,7 @@ fn validate_signers_and_policies_success() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let signers = Vec::from_array(&e, [Signer::Native(Address::generate(&e))]);
+        let signers = Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]);
         let policies = Vec::from_array(&e, [Address::generate(&e)]);
 
         // Should not panic
@@ -415,7 +415,7 @@ fn validate_signers_and_policies_too_many_signers_fails() {
         let mut signers = Vec::new(&e);
         // Add more than MAX_SIGNERS (15)
         for _ in 0..=MAX_SIGNERS {
-            signers.push_back(Signer::Native(Address::generate(&e)));
+            signers.push_back(Signer::Delegated(Address::generate(&e)));
         }
         let policies = Vec::new(&e);
 

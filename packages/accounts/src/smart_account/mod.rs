@@ -315,8 +315,8 @@ pub enum SmartAccountError {
     DuplicateContextRule = 2001,
     /// The provided context cannot be validated against any rule.
     UnvalidatedContext = 2002,
-    /// Delegated signature verification failed.
-    DelegatedVerificationFailed = 2003,
+    /// External signature verification failed.
+    ExternalVerificationFailed = 2003,
     /// Context rule must have at least one signer or policy.
     NoSignersAndPolicies = 2004,
     /// The valid_until timestamp is in the past.

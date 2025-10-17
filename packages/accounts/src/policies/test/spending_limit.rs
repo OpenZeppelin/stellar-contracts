@@ -26,9 +26,9 @@ fn create_signers(e: &Env) -> (Address, Address, Address) {
 fn create_context_rule(e: &Env) -> ContextRule {
     let (addr1, addr2, addr3) = create_signers(e);
     let mut signers = Vec::new(e);
-    signers.push_back(Signer::Native(addr1));
-    signers.push_back(Signer::Native(addr2));
-    signers.push_back(Signer::Native(addr3));
+    signers.push_back(Signer::Delegated(addr1));
+    signers.push_back(Signer::Delegated(addr2));
+    signers.push_back(Signer::Delegated(addr3));
     let policies = Vec::new(e);
     ContextRule {
         id: 1,

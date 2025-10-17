@@ -52,14 +52,14 @@ fn create_account() {
     let policy = e.register(MockPolicyContract, ());
     let signers = vec![
         &e,
-        Signer::Delegated(
+        Signer::External(
             verifier.clone(),
             Bytes::from_array(
                 &e,
                 b"4cb5abf6ad79fbf5abbccafcc269d85cd2651ed4b885b5869f241aedf0a5ba29",
             ),
         ),
-        Signer::Delegated(
+        Signer::External(
             verifier.clone(),
             Bytes::from_array(
                 &e,

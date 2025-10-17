@@ -135,11 +135,11 @@ pub enum SmartAccountStorageKey {
 #[contracttype]
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Signer {
-    /// A native Soroban address that uses built-in signature verification.
-    Native(Address),
-    /// A delegated signer with custom verification logic.
+    /// A delegated signer that uses built-in signature verification.
+    Delegated(Address),
+    /// An external signer with custom verification logic.
     /// Contains the verifier contract address and the public key data.
-    Delegated(Address, Bytes),
+    External(Address, Bytes),
 }
 
 /// A collection of signatures mapped to their respective signers.
@@ -365,22 +365,22 @@ pub fn get_validated_context(
 ///
 /// # Errors
 ///
-/// * [`SmartAccountError::DelegatedVerificationFailed`] - When a delegated
+/// * [`SmartAccountError::ExternalVerificationFailed`] - When an external
 ///   signature fails verification through its verifier contract.
 pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signers: &Map<Signer, Bytes>) {
     for (signer, sig_data) in signers.iter() {
         match signer {
-            Signer::Delegated(verifier, key_data) => {
+            Signer::External(verifier, key_data) => {
                 let sig_payload = Bytes::from_array(e, &signature_payload.to_bytes().to_array());
                 if !VerifierClient::new(e, &verifier).verify(
                     &sig_payload,
                     &key_data.into_val(e),
                     &sig_data.into_val(e),
                 ) {
-                    panic_with_error!(e, SmartAccountError::DelegatedVerificationFailed)
+                    panic_with_error!(e, SmartAccountError::ExternalVerificationFailed)
                 }
             }
-            Signer::Native(addr) => {
+            Signer::Delegated(addr) => {
                 let args = (signature_payload.clone(),).into_val(e);
                 addr.require_auth_for_args(args)
             }
@@ -465,7 +465,7 @@ pub fn validate_signers_and_policies(e: &Env, signers: &Vec<Signer>, policies: &
 ///
 /// # Errors
 ///
-/// * [`SmartAccountError::DelegatedVerificationFailed`] - When signature
+/// * [`SmartAccountError::ExternalVerificationFailed`] - When signature
 ///   verification fails.
 /// * [`SmartAccountError::UnvalidatedContext`] - When a context cannot be
 ///   validated against any rule.

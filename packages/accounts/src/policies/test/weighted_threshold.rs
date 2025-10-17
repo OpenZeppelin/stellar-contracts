@@ -20,8 +20,8 @@ fn create_test_weights(e: &Env) -> (Map<Signer, u32>, Address, Address) {
     let addr2 = Address::generate(e);
 
     let mut weights = Map::new(e);
-    weights.set(Signer::Native(addr1.clone()), 100u32);
-    weights.set(Signer::Native(addr2.clone()), 50u32);
+    weights.set(Signer::Delegated(addr1.clone()), 100u32);
+    weights.set(Signer::Delegated(addr2.clone()), 50u32);
 
     (weights, addr1, addr2)
 }
@@ -29,8 +29,8 @@ fn create_test_weights(e: &Env) -> (Map<Signer, u32>, Address, Address) {
 fn create_test_context_rule(e: &Env) -> ContextRule {
     let (_, addr1, addr2) = create_test_weights(e);
     let mut signers = Vec::new(e);
-    signers.push_back(Signer::Native(addr1));
-    signers.push_back(Signer::Native(addr2));
+    signers.push_back(Signer::Delegated(addr1));
+    signers.push_back(Signer::Delegated(addr2));
     let policies = Vec::new(e);
     ContextRule {
         id: 1,
@@ -120,7 +120,7 @@ fn calculate_weight_success() {
 
         install(&e, &params, &context_rule, &smart_account);
 
-        let signers = Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
+        let signers = Vec::from_array(&e, [Signer::Delegated(addr1), Signer::Delegated(addr2)]);
         let total_weight = calculate_weight(&e, &signers, &context_rule, &smart_account);
 
         assert_eq!(total_weight, 150);
@@ -142,7 +142,7 @@ fn calculate_weight_partial_signers() {
 
         install(&e, &params, &context_rule, &smart_account);
 
-        let signers = Vec::from_array(&e, [Signer::Native(addr1)]);
+        let signers = Vec::from_array(&e, [Signer::Delegated(addr1)]);
         let total_weight = calculate_weight(&e, &signers, &context_rule, &smart_account);
 
         assert_eq!(total_weight, 100);
@@ -169,8 +169,8 @@ fn calculate_weight_signer_without_weight() {
         let signers = Vec::from_array(
             &e,
             [
-                Signer::Native(addr1),          // This has weight 100
-                Signer::Native(unknown_signer), // This has no weight assigned
+                Signer::Delegated(addr1),          // This has weight 100
+                Signer::Delegated(unknown_signer), // This has no weight assigned
             ],
         );
 
@@ -189,7 +189,7 @@ fn calculate_weight_not_installed_fails() {
     let smart_account = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let signers = Vec::from_array(&e, [Signer::Native(Address::generate(&e))]);
+        let signers = Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]);
         let context_rule = create_test_context_rule(&e);
         calculate_weight(&e, &signers, &context_rule, &smart_account);
     });
@@ -209,8 +209,8 @@ fn calculate_weight_overflow_fails() {
         let addr2 = Address::generate(&e);
 
         let mut weights = Map::new(&e);
-        weights.set(Signer::Native(addr1.clone()), u32::MAX);
-        weights.set(Signer::Native(addr2.clone()), 1u32);
+        weights.set(Signer::Delegated(addr1.clone()), u32::MAX);
+        weights.set(Signer::Delegated(addr2.clone()), 1u32);
 
         let params = WeightedThresholdAccountParams { signer_weights: weights, threshold: 100 };
         let context_rule = create_test_context_rule(&e);
@@ -224,8 +224,8 @@ fn calculate_weight_overflow_fails() {
         let signers = Vec::from_array(
             &e,
             [
-                Signer::Native(addr1), // This will have weight u32::MAX
-                Signer::Native(addr2), // This will have weight 1
+                Signer::Delegated(addr1), // This will have weight u32::MAX
+                Signer::Delegated(addr2), // This will have weight 1
             ],
         );
         let context_rule = create_test_context_rule(&e);
@@ -248,7 +248,7 @@ fn can_enforce_sufficient_weight() {
 
         install(&e, &params, &context_rule, &smart_account);
 
-        let authenticated_signers = Vec::from_array(&e, [Signer::Native(addr1)]);
+        let authenticated_signers = Vec::from_array(&e, [Signer::Delegated(addr1)]);
 
         let context = Context::Contract(soroban_sdk::auth::ContractContext {
             contract: Address::generate(&e),
@@ -278,7 +278,7 @@ fn can_enforce_insufficient_weight() {
 
         install(&e, &params, &context_rule, &smart_account);
 
-        let authenticated_signers = Vec::from_array(&e, [Signer::Native(addr2)]);
+        let authenticated_signers = Vec::from_array(&e, [Signer::Delegated(addr2)]);
 
         let context = Context::Contract(soroban_sdk::auth::ContractContext {
             contract: Address::generate(&e),
@@ -300,7 +300,7 @@ fn can_enforce_not_installed() {
     let smart_account = Address::generate(&e);
 
     e.as_contract(&address, || {
-        let authenticated_signers = Vec::from_array(&e, [Signer::Native(Address::generate(&e))]);
+        let authenticated_signers = Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]);
         let context_rule = create_test_context_rule(&e);
 
         let context = Context::Contract(soroban_sdk::auth::ContractContext {
@@ -326,7 +326,7 @@ fn enforce_success() {
 
     let authenticated_signers = e.as_contract(&address, || {
         let (weights, addr1, _) = create_test_weights(&e);
-        let authenticated_signers = Vec::from_array(&e, [Signer::Native(addr1)]);
+        let authenticated_signers = Vec::from_array(&e, [Signer::Delegated(addr1)]);
         let params = WeightedThresholdAccountParams { signer_weights: weights, threshold: 75 };
         let context_rule = create_test_context_rule(&e);
 
@@ -408,8 +408,8 @@ fn install_math_overflow_fails() {
     e.as_contract(&address, || {
         let mut weights = Map::new(&e);
         // Create weights that will overflow when added together
-        weights.set(Signer::Native(Address::generate(&e)), u32::MAX);
-        weights.set(Signer::Native(Address::generate(&e)), 1u32);
+        weights.set(Signer::Delegated(Address::generate(&e)), u32::MAX);
+        weights.set(Signer::Delegated(Address::generate(&e)), 1u32);
 
         let params = WeightedThresholdAccountParams { signer_weights: weights, threshold: 100 };
         let context_rule = create_test_context_rule(&e);
@@ -436,7 +436,7 @@ fn set_signer_weight_success() {
 
     e.as_contract(&address, || {
         let context_rule = create_test_context_rule(&e);
-        let new_signer = Signer::Native(Address::generate(&e));
+        let new_signer = Signer::Delegated(Address::generate(&e));
         set_signer_weight(&e, &new_signer, 25, &context_rule, &smart_account);
 
         let updated_weights = get_signer_weights(&e, &context_rule, &smart_account);
@@ -472,7 +472,7 @@ fn set_signer_weight_not_installed_fails() {
 
     e.as_contract(&address, || {
         let context_rule = create_test_context_rule(&e);
-        let new_signer = Signer::Native(Address::generate(&e));
+        let new_signer = Signer::Delegated(Address::generate(&e));
 
         // Try to set signer weight without installing the policy first
         set_signer_weight(&e, &new_signer, 25, &context_rule, &smart_account);
@@ -548,7 +548,7 @@ fn set_signer_weight_makes_threshold_unreachable_fails() {
     e.as_contract(&address, || {
         // Reduce signer1's weight from 100 to 10, making total weight 60 (10+50)
         // This makes threshold 75 unreachable
-        set_signer_weight(&e, &Signer::Native(signer1), 10, &context_rule, &smart_account);
+        set_signer_weight(&e, &Signer::Delegated(signer1), 10, &context_rule, &smart_account);
     });
 }
 
@@ -564,7 +564,7 @@ fn enforce_not_installed_fails() {
     e.as_contract(&address, || {
         let (_, addr1, addr2) = create_test_weights(&e);
         let authenticated_signers =
-            Vec::from_array(&e, [Signer::Native(addr1), Signer::Native(addr2)]);
+            Vec::from_array(&e, [Signer::Delegated(addr1), Signer::Delegated(addr2)]);
         let context_rule = create_test_context_rule(&e);
 
         let context = Context::Contract(soroban_sdk::auth::ContractContext {
@@ -598,7 +598,7 @@ fn enforce_threshold_not_met_fails() {
     e.as_contract(&address, || {
         let (_, _, addr2) = create_test_weights(&e);
         // Only addr2 authenticated with weight 50, but threshold is 75
-        let authenticated_signers = Vec::from_array(&e, [Signer::Native(addr2)]);
+        let authenticated_signers = Vec::from_array(&e, [Signer::Delegated(addr2)]);
         let context_rule = create_test_context_rule(&e);
 
         let context = Context::Contract(soroban_sdk::auth::ContractContext {
