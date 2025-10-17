@@ -12,7 +12,7 @@ In practical terms, a smart account is a contract that manages the composition o
 
 ## Core Components
 
-![context rule](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/docs/SmartAccount-ContextRules.png "Context Rule Structure")
+![context rule](./docs/SmartAccount-ContextRules.png "Context Rule Structure")
 
 ### 1. Smart Account Trait
 
@@ -81,7 +81,7 @@ Signer::External(Address, Bytes)
 - Offloads signature verification to specialized contracts
 This model scales to diverse cryptographic schemes, is flexible enough to accommodate new authentication methods (from passkeys to zk-proofs), and minimizes setup cost by allowing many accounts to reuse the same verifier contracts.
 
-![external signers with verifying contracts](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/docs/DelegatedSigner.png "External Signers with Verifier Contracts")
+![external signers with verifying contracts](./docs/ExternalSigner.png "External Signers with Verifier Contracts")
 
 ### 4. Verifiers
 
