@@ -1,17 +1,14 @@
 # Soroban Smart Accounts
 
-A comprehensive smart account framework for Soroban that enables flexible, programmable authorization through context rules, signers, and policies.
+This package provides a comprehensive smart account framework for Soroban, enabling flexible, programmable authorization. Instead of hard‑coding signature checks, smart accounts organize authorization as a composition of context rules, signers, and policies. The result is a system that reads naturally, scales to complex requirements, and remains auditable.
 
 ## Overview
 
-Smart accounts in Soroban are contracts that implement the `CustomAccountInterface`, allowing them to define custom authorization logic beyond simple signature verification. This framework provides a modular, context-centric approach to authorization that separates:
+Smart accounts in Soroban implement `CustomAccountInterface` and define authorization as data and behavior that can be evolved over time. The framework is context‑centric:
 
-- **Who** can authorize (signers)
-- **What** they can authorize (context rules)
-- **How** authorization is enforced (policies)
+It distinguishes who is allowed to act (signers), what they are allowed to do (context rules), and how those permissions are enforced (policies). Under the hood, Protocol 23 improvements make this design practical, with marginal storage read costs and substantially cheaper cross‑contract calls, so composing multiple checks is efficient enough for production.
 
-The design leverages Protocol 23 improvements for marginal storage read costs and significantly reduced cross-contract call costs.
-
+In practical terms, a smart account is a contract that manages the composition of authorization intents coming from multiple sources. Those sources can be policies (for example, a spending limit) and signing keys that may use different cryptographic curves. The goal is to enable flexible combinations of authentication methods by allowing several authorization mechanisms to work together seamlessly. For instance, a wallet might require both a session policy and a passkey that expires in 24 hours, and treat this combination as a single composite “key” that the client uses to authorize actions.
 
 ## Core Components
 
@@ -38,7 +35,7 @@ pub trait SmartAccount: CustomAccountInterface {
 
 ### 2. Context Rules
 
-Context rules are the fundamental building blocks that define authorization requirements for specific operations:
+Context rules function like routing tables for authorization: for each context, they specify scope, lifetime, and the conditions, signers and policies, that must match before execution proceeds:
 
 #### Structure
 
@@ -51,6 +48,8 @@ Context rules are the fundamental building blocks that define authorization requ
 - **Valid Until**: Optional expiration (ledger sequence)
 - **Signers**: List of authorized signers (max: 15)
 - **Policies**: Map of policy contracts and their parameters (max: 5)
+
+In addition, a single smart account can hold multiple context rules across its contexts. The maximum number of context rules per smart account is 15.
 
 #### Key Properties
 
@@ -71,7 +70,7 @@ Signer::Native(Address)
 
 - Any Soroban address (contract or account)
 - Verification uses `require_auth_for_args(payload)`
-- **Caveat**: Requires manual authorization entry crafting, because it is not returned in a simulation mode
+- This model requires manual authorization entry crafting, because it is not returned in a simulation mode.
 
 #### Delegated Signers
 
@@ -80,16 +79,17 @@ Signer::Delegated(Address, Bytes)
 ```
 - External verifier contract + public key data
 - Offloads signature verification to specialized contracts
-- Advantages:
-  - **Scalability**: Support for any cryptographic scheme
-  - **Flexibility**: Can easily adapt to emerging authentication methods (zk-proofs, email signing)
-  - **Low setup cost**: Reuse verifier contracts across accounts
+This model scales to diverse cryptographic schemes, is flexible enough to accommodate new authentication methods (from passkeys to zk-proofs), and minimizes setup cost by allowing many accounts to reuse the same verifier contracts.
 
 ![delegated signers with verifying contracts](https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/accounts/docs/DelegatedSigner.png "Delegated Signers with Verifier Contracts")
 
 ### 4. Verifiers
 
-Verifiers are specialized contracts that handle cryptographic signature verification. The main idea is to offload signature verification to trusted, immutable verifier contracts, similar to the mechanism described in EIP-7913.
+Verifiers serve as cryptographic oracles for signature validation: specialized, trusted contracts that validate signatures on behalf of smart accounts. Drawing inspiration from EIP‑7913, a single verifier contract can validate signatures for any number of keys. Each key is represented as a `(verifier_address, public_key)` pair (ref. the section above), where the verifier address points to shared verification logic and the public key identifies the specific signer.
+
+This architecture offers several advantages. Once a verifier is deployed, new keys can be used immediately without any on‑chain setup or deployment expenses. The model supports diverse cryptographic schemes: secp256r1 for mobile devices, secp256k1, ed25519, BLS, and RSA for institutional keys, as well as emerging authentication methods like zero‑knowledge proofs and email‑based signing. Keys remain address‑less, maintaining clear boundaries between accounts (which hold assets) and the keys that control them. Because verification logic is centralized in well‑audited, immutable contracts, the ecosystem shares both security guarantees and deployment costs. Well‑known verifier addresses build trust, and the entire network benefits from reduced overhead.
+
+Verifiers should be implemented as pure verification functions with no internal state and shouldn't be upgradeable once deployed, ensuring trustlessness.
 
 ```rust
 pub trait Verifier {
@@ -100,21 +100,9 @@ pub trait Verifier {
 }
 ```
 
-#### Implementation Requirements
-
-- No internal state, pure verification functions
-- Cannot be upgraded once deployed (trustless operation)
-
-#### Benefits of Shared Verifiers
-
-1. **Security**: Centralized, audited verification logic reduces attack surface
-2. **Efficiency**: Shared deployment costs across the ecosystem
-3. **Scalability**: Easy adoption of new cryptographic schemes
-4. **Trust**: Well-known, immutable contract addresses build ecosystem confidence
-
 ### 5. Policies
 
-Policies provide programmable authorization logic that can be attached to context rules:
+Policies act as enforcement modules attached to context rules: they perform read‑only prechecks and, when authorized, can update state to enforce limits or workflows.
 
 ```rust
 pub trait Policy {
@@ -136,9 +124,15 @@ pub trait Policy {
 
 #### Lifecycle
 
-1. Installation: Configure and attach to a smart account and its context rule
-2. Enforcement: Validate authorization and optionally change state
-3. Uninstallation: Clean up and remove 
+Policies follow a well-defined lifecycle that integrates with context rule management and the authorization matching algorithm.
+
+**Installation** occurs when a new context rule is created with attached policies. The smart account calls `install()` on each policy contract, passing account-specific and context-specific parameters. This initialization step allows policies to configure their logic (for example, a threshold policy might define the required number of signatures for that particular account and context rule, while a spending limit policy might set daily or per-transaction caps). Installation ensures that each policy has the necessary state and configuration ready before authorization checks begin.
+
+**Pre-check validation** happens during authorization. When the matching algorithm iterates over context rules and their associated policies, it calls `can_enforce()` on each policy as a read-only pre-check. This function examines the current state without modifying it, for instance, verifying that a spending limit has not been exceeded or that enough signers are present. Policies that fail this check cause the algorithm to move to the next context rule.
+
+**Enforcement** is triggered when a context rule successfully matches. Once all policies in the matched rule pass their `can_enforce()` checks, the smart account calls `enforce()` on each policy. This state-changing hook allows policies to update counters, emit events, record timestamps, or perform other mutations that track authorization activity. For example, a spending limit policy might deduct from the available balance and emit an event documenting the transaction.
+
+**Uninstallation** occurs when a context rule is removed from the smart account. The account calls `uninstall()` on each attached policy, allowing them to clean up any stored data associated with that specific account and context rule pairing. This ensures that policies do not leave orphaned state in storage. 
 
 #### Policy Examples
 
@@ -147,6 +141,22 @@ pub trait Policy {
 - Multisig: Threshold-based authorization
 - Session Policies: Temporary, scoped permissions
 - Recovery Policies: Account recovery mechanisms
+
+#### Caveats
+
+**Signer Set Divergence in Threshold Policies**
+
+Threshold policies (both simple and weighted) store authorization requirements that are validated at installation time. However, policies are not automatically notified when signers are added to or removed from their parent context rule. This creates a state divergence that can lead to operational issues.
+
+If signers are removed after policy installation, the total available signatures or weight may fall below the stored threshold, making it impossible to meet the authorization requirement and permanently blocking actions governed by that policy. For example, a 5-of-5 multisig where two signers are removed leaves only three signers, making the threshold of five unreachable.
+
+Conversely, if signers are added without updating the threshold, the security guarantee silently weakens. A strict 3-of-3 multisig becomes a 3-of-5 multisig after adding two signers, reducing the required approval from 100% to 60% without any explicit warning.
+
+Administrators must manually update thresholds and weights when modifying signer sets. Before removing signers, verify that the threshold remains achievable. After adding signers, adjust thresholds or assign weights to maintain the desired security level. Ideally, these updates should occur in the same transaction as the signer modifications.
+
+**Pre-check Constraints**
+
+The `can_enforce()` function must be idempotent, side-effect free, and efficient. It may read from storage but must not modify it. This constraint exists because the matching algorithm may call `can_enforce()` multiple times during rule evaluation, and failed checks should not leave any persistent changes.
 
 ### 6. Execution Entry Point
 
@@ -158,11 +168,13 @@ pub trait ExecutionEntryPoint {
 }
 ```
 
-This prevents re-entry issues when policies need to authenticate back to their owner smart account.
+This trait provides a secure mechanism for updating policy configuration after installation. As noted in the caveats above, administrators must manually adjust thresholds and weights when modifying signer sets. The execution entry point allows the smart account to call policy update functions (such as `set_threshold()` or `set_signer_weight()`) in a controlled manner, ensuring that configuration changes are properly authorized by the account itself. This enables administrators to maintain security invariants when adding or removing signers, ideally bundling signer modifications and threshold adjustments into a single authorized transaction.
 
 ## Authorization Flow
 
-The smart account uses the following matching algorithm to determine authorization:
+Authorization is determined by matching the current call context against the account’s context rules. Rules are gathered, ordered by recency, and evaluated until one satisfies the requirements. If a matching rule is found, its policies (if any) are enforced. Otherwise, authorization fails.
+
+The evaluation proceeds as follows:
 
 ### 1. Rule Collection
 
@@ -191,6 +203,15 @@ For each rule in order:
 - **Success**: Authorization granted, transaction proceeds
 - **Failure**: Authorization denied, transaction reverts
 
+#### Example
+
+Consider a call in the `CallContract(dex_address)` context. The client presents two authorization entries: an ed25519 key and a passkey signature. The smart account maintains two relevant rules:
+
+- A default rule with three ed25519 keys.
+- A newer `CallContract(dex_address)` rule that requires both the ed25519 key and the passkey, along with a daily spend policy.
+
+During evaluation, non‑expired rules are gathered and ordered by recency. The specific `CallContract(dex_address)` rule is evaluated first. The account authenticates the ed25519 key and the passkey. Because the rule includes policies, the account verifies that all policies can be enforced. Since checks pass, the policies are enforced (e.g., spending counters are updated) and authorization succeeds. If the specific rule did not match, evaluation would continue to the default rule; if no rule matched, authorization would fail.
+
 ## Use Cases
 
 ### 1. Session Logins (Web3 dApps)
@@ -201,7 +222,7 @@ create_context_rule(
     context_type: CallContract(defi_app_address),
     name: "DeFi Session",
     valid_until: Some(current_ledger + 24_hours),
-    signers: vec![&e, session_key],
+    signers: vec![&e, ed25519_key],
     policies: map![&E, (spending_limit_policy, spending_params)]
 )
 ```
@@ -317,7 +338,7 @@ add_context_rule(
 
 ### 3. Add Policies (Optional)
 
-For policies, you have two options:
+For policies, there are two options:
 
 **Option A: Use Ecosystem Policies (Recommended)**
 - Use pre-deployed, audited policy contracts for common use cases that are trusted by the ecosystem and cover standard scenarios
@@ -339,7 +360,7 @@ add_policy(
 
 ### 4. Choose or Deploy Verifier Contracts (For Delegated Signers)
 
-For delegated signers, you have two options:
+For delegated signers, there are two options:
 
 **Option A: Use Ecosystem Verifiers (Recommended)**
 
@@ -355,17 +376,19 @@ For delegated signers, you have two options:
 
 ## Caveats
 
-- Multiple context rules for the same context can co-exist, in which case the one added most recently takes precedence.
-- For straightforward applications like a threshold-based multisig, the entire policy is a simple check (e.g., number of signers > threshold). While this might seem excessive, embedding business logic within the smart account would compromise the separation of concerns.
-- The smart account framework's design assumes that its components are independent contracts that interact with each other, leading to multiple cross-contract calls during the authorization lifecycle. Although Protocol 23 significantly reduced the cost of these calls, some overhead in terms of cost and resources still exists. Consequently, the implementation imposes maximum limits on the number of signers and policies per context rule.
+- Multiple context rules for the same context can co‑exist; the most recently added one takes precedence.
+- For simple cases like threshold‑based multisig, using a policy may feel verbose compared to embedding logic directly in the account, but keeping business rules in policies preserves separation of concerns and allows for a greater flexibility.
+- Authorization composes independent contracts (the smart account, verifiers, and policies). Protocol 23 makes cross‑contract calls cheap, but not free, so the framework sets explicit limits to keep costs predictable:
+  - Maximum signers per context rule: 15
+  - Maximum policies per context rule: 5
+  - Maximum context rules per smart account: 15
 
 ## Crate Structure
 
-This crate is organized into three main submodules that provide building blocks for implementing smart accounts. These submodules can be used independently or together, allowing developers to implement only the components they need, create custom smart account architectures, mix and match different authentication methods, and build specialized authorization policies.
+This crate is organized into three submodules that provide building blocks for implementing smart accounts. These submodules can be used independently or together, allowing developers to implement only the components they need, create custom smart account architectures, mix and match different authentication methods, and build specialized authorization policies.
 
 1. **smart_account**
-- `SmartAccount` and `ExecutionEntryPoint` traits
-- Context rule management, signer/policy storage functions
+- context rule management, signer/policy storage functions for implementing the `SmartAccount` trait
 
 2. **verifiers**
 - `ed25519` and `webauthn` (passkey authentication) utility functions for implementing the `Verifier` trait
