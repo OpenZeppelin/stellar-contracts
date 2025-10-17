@@ -1,9 +1,10 @@
 //! # WebAuthn Verifier Contract
 //!
 //! A reusable verifier contract for WebAuthn (passkey) signature verification.
-//! This contract can be deployed once and used by multiple smart accounts across
-//! the network for delegated signature verification. Provides cryptographic
-//! verification for WebAuthn signatures against message hashes and public keys.
+//! This contract can be deployed once and used by multiple smart accounts
+//! across the network for delegated signature verification. Provides
+//! cryptographic verification for WebAuthn signatures against message hashes
+//! and public keys.
 //!
 //! Unlike simpler signature schemes, WebAuthn signature data is a complex
 //! structure containing authenticator data, client data JSON, and the signature
