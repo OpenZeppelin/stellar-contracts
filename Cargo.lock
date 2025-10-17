@@ -945,6 +945,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "multisig-webauthn-verifier-example"
+version = "0.4.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-accounts",
+]
+
+[[package]]
 name = "nft-access-control-example"
 version = "0.4.1"
 dependencies = [
