@@ -166,10 +166,11 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
+    /// * [`RWAError::IdentityVerificationFailed`] - When the identity of the
     ///   recipient address cannot be verified.
     /// * [`RWAError::AddressFrozen`] - When the recipient address is frozen.
-    /// * [`PausableError::EnforcedPause`] - When the contract is paused.
+    /// * [`stellar_contract_utils::pausable::PausableError::EnforcedPause`] -
+    ///   When the contract is paused.
     ///
     /// # Events
     ///
@@ -214,7 +215,7 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Errors
     ///
-    /// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
+    /// * [`RWAError::IdentityVerificationFailed`] - When the identity of the
     ///   new account cannot be verified.
     ///
     /// # Events

@@ -93,7 +93,7 @@ pub struct SigningKey {
 #[contracttype]
 #[derive(Clone)]
 pub enum ClaimIssuerStorageKey {
-    /// Maps Topic -> Vec<SigningKey>
+    /// Maps Topic -> `Vec<SigningKey>`
     Topics(u32),
     /// Maps SigningKey -> Vec<(Topic, Registry)>
     Pairs(SigningKey),

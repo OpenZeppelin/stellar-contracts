@@ -12,7 +12,7 @@ use crate::rwa::{
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum DataKey {
-    /// Maps ComplianceHook -> Vec<Address> for registered modules
+    /// Maps ComplianceHook -> `Vec<Address>` for registered modules
     HookModules(ComplianceHook),
 }
 
@@ -186,7 +186,7 @@ pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
 ///
 /// # Errors
 ///
-/// * refer to [`require_auth_from_bound_contract`]
+/// * refer to [`require_auth_from_bound_token`]
 ///
 /// # Cross-Contract Calls
 ///
@@ -216,7 +216,7 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Add
 ///
 /// # Errors
 ///
-/// * refer to [`require_auth_from_bound_contract`]
+/// * refer to [`require_auth_from_bound_token`]
 ///
 /// # Cross-Contract Calls
 ///
@@ -246,7 +246,7 @@ pub fn created(e: &Env, to: Address, amount: i128, token: Address) {
 ///
 /// # Errors
 ///
-/// * refer to [`require_auth_from_bound_contract`]
+/// * refer to [`require_auth_from_bound_token`]
 ///
 /// # Cross-Contract Calls
 ///

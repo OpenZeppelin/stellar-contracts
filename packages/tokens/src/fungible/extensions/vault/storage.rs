@@ -761,7 +761,7 @@ impl Vault {
     /// # Notes
     ///
     /// For more information about virtual decimals offset, see:
-    /// https://docs.openzeppelin.com/contracts/5.x/erc4626
+    /// <https://docs.openzeppelin.com/contracts/5.x/erc4626>
     pub fn get_decimals_offset(e: &Env) -> u32 {
         e.storage().instance().get(&VaultStorageKey::VirtualDecimalsOffset).unwrap_or(0)
     }
