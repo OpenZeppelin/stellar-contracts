@@ -29,7 +29,7 @@ use soroban_sdk::{contracttype, panic_with_error, BytesN, Env, String, TryFromVa
 
 use super::{
     emit_document_removed, emit_document_updated, DocumentError, BUCKET_SIZE,
-    DOCUMENT_EXTEND_AMOUNT, DOCUMENT_TTL_THRESHOLD, MAX_DOCUMENTS,
+    DOCUMENT_EXTEND_AMOUNT, DOCUMENT_TTL_THRESHOLD, MAX_DOCUMENTS, MAX_URI_LEN,
 };
 
 /// Represents a document with its metadata.
@@ -153,6 +153,8 @@ pub fn get_all_documents(e: &Env) -> Vec<(BytesN<32>, Document)> {
 ///
 /// * [`DocumentError::MaxDocumentsReached`] - If the maximum number of
 ///   documents has been reached.
+/// * [`DocumentError::UriTooLong`] - If the URI exceeds the maximum allowed
+///   length of 200 characters.
 ///
 /// # Events
 ///
@@ -166,6 +168,11 @@ pub fn get_all_documents(e: &Env) -> Vec<(BytesN<32>, Document)> {
 /// - During contract initialization/construction
 /// - In functions that implement their own authorization logic
 pub fn set_document(e: &Env, name: &BytesN<32>, uri: &String, document_hash: &BytesN<32>) {
+    // Validate URI length
+    if uri.len() > MAX_URI_LEN {
+        panic_with_error!(e, DocumentError::UriTooLong)
+    }
+
     let timestamp = e.ledger().timestamp();
 
     let document = Document { uri: uri.clone(), document_hash: document_hash.clone(), timestamp };

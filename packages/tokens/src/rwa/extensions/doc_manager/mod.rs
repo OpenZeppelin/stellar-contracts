@@ -119,6 +119,8 @@ pub enum DocumentError {
     DocumentNotFound = 380,
     /// Maximum number of documents has been reached.
     MaxDocumentsReached = 381,
+    /// The URI exceeds the maximum allowed length.
+    UriTooLong = 382,
 }
 
 // ################## CONSTANTS ##################
@@ -133,6 +135,8 @@ pub const MAX_BUCKETS: u32 = 100;
 pub const BUCKET_SIZE: u32 = 50;
 /// Maximum number of documents that can be stored.
 pub const MAX_DOCUMENTS: u32 = BUCKET_SIZE * MAX_BUCKETS; // 5_000
+/// Maximum length for document URI.
+pub const MAX_URI_LEN: u32 = 200;
 
 // ################## EVENTS ##################
 
