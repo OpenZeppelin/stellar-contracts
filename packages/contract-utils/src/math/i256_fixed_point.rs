@@ -68,7 +68,7 @@ pub(crate) fn mul_div_ceil(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
     }
 
     if z.clone() < zero || r <= zero {
-        // ceiling is taken by default for a negative or zero result
+        // ceil is taken by default for a negative or zero result
         r.div(z)
     } else {
         // floor is taken by default for a positive result
