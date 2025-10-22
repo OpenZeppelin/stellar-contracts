@@ -24,7 +24,7 @@ SOFTWARE.
 // Based on the Soroban fixed-point mathematics library
 // Original implementation: https://github.com/script3/soroban-fixed-point-math
 
-use soroban_sdk::Env;
+use soroban_sdk::{contracterror, Env};
 
 // @dev - more detail about the forced panic can be found here: https://github.com/stellar/rs-soroban-env/pull/1091
 //
@@ -49,4 +49,18 @@ pub trait SorobanFixedPoint: Sized {
     /// This method will panic if the denominator is 0, a phantom overflow
     /// occurs, or the result does not fit in Self.
     fn fixed_mul_ceil(&self, env: &Env, y: &Self, denominator: &Self) -> Self;
+}
+
+// ################## ERRORS ##################
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum SorobanFixedPointError {
+    /// The operation failed because the denominator is 0.
+    ZeroDenominator = 1500,
+    /// The operation failed because a phantom overflow occurred.
+    PhantomOverflow = 1501,
+    /// The operation failed because the result does not fit in Self.
+    ResultOverflow = 1502,
 }

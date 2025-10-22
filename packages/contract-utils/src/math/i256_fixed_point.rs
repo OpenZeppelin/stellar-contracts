@@ -24,9 +24,9 @@ SOFTWARE.
 // Based on the Soroban fixed-point mathematics library
 // Original implementation: https://github.com/script3/soroban-fixed-point-math
 
-use soroban_sdk::{Env, I256};
+use soroban_sdk::{panic_with_error, Env, I256};
 
-use crate::math::soroban_fixed_point::SorobanFixedPoint;
+use crate::math::soroban_fixed_point::{SorobanFixedPoint, SorobanFixedPointError};
 
 impl SorobanFixedPoint for I256 {
     fn fixed_mul_floor(&self, env: &Env, y: &I256, denominator: &I256) -> I256 {
@@ -42,13 +42,18 @@ impl SorobanFixedPoint for I256 {
 pub(crate) fn mul_div_floor(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
     let zero = I256::from_i32(env, 0);
     let r = x.mul(y);
+
+    if z.clone() == zero {
+        panic_with_error!(env, SorobanFixedPointError::ZeroDenominator);
+    }
+
     if r < zero || (r > zero && z.clone() < zero) {
-        // ceiling is taken by default for a negative result
+        // ceil is taken by default for a negative result
         let remainder = r.rem_euclid(z);
         let one = I256::from_i32(env, 1);
         r.div(z).sub(if remainder > zero { &one } else { &zero })
     } else {
-        // floor taken by default for a positive or zero result
+        // floor is taken by default for a positive or zero result
         r.div(z)
     }
 }
@@ -58,11 +63,15 @@ pub(crate) fn mul_div_ceil(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
     let zero = I256::from_i32(env, 0);
     let r = x.mul(y);
 
+    if z.clone() == zero {
+        panic_with_error!(env, SorobanFixedPointError::ZeroDenominator);
+    }
+
     if z.clone() < zero || r <= zero {
-        // ceiling is taken by default for a negative or zero result
+        // ceil is taken by default for a negative or zero result
         r.div(z)
     } else {
-        // floor taken by default for a positive result
+        // floor is taken by default for a positive result
         let remainder = r.rem_euclid(z);
         let one = I256::from_i32(env, 1);
         r.div(z).add(if remainder > zero { &one } else { &zero })
