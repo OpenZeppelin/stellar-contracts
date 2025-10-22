@@ -368,24 +368,19 @@ pub enum ClaimIssuerError {
     KeyAlreadyAllowed = 352,
     /// The specified key was not found in the allowed keys.
     KeyNotFound = 353,
-    /// The claim issuer is not registered at the claim topics and issuers
-    /// registry.
-    IssuerNotRegistered = 354,
     /// The claim issuer is not allowed to sign claims about the specified
     /// claim topic.
-    ClaimTopicNotAllowed = 355,
-    /// Maximum number of signing keys per topic exceeded.
-    MaxKeysPerTopicExceeded = 356,
-    /// Maximum number of registries per signing key exceeded.
-    MaxRegistriesPerKeyExceeded = 357,
+    NotAllowed = 354,
+    /// Maximum limit exceeded (keys per topic or registries per key).
+    LimitExceeded = 355,
     /// No signing keys found for the specified claim topic.
-    NoKeysForTopic = 358,
+    NoKeysForTopic = 356,
     /// Invalid claim data encoding.
-    InvalidClaimDataExpiration = 359,
+    InvalidClaimDataExpiration = 357,
     /// Recovery of the Secp256k1 public key failed.
-    Secp256k1RecoveryFailed = 360,
-    /// Indicates overflow when adding two values
-    MathOverflow = 361,
+    Secp256k1RecoveryFailed = 358,
+    /// Indicates overflow when adding two values.
+    MathOverflow = 359,
 }
 
 // ################## CONSTANTS ##################

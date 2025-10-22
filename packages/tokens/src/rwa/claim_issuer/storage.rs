@@ -427,12 +427,12 @@ pub fn is_authorized_for(e: &Env, registry: &Address, claim_topic: u32) -> bool 
 /// # Errors
 ///
 /// * [`ClaimIssuerError::KeyIsEmpty`] - If attempting to allow an empty key.
-/// * [`ClaimIssuerError::IssuerNotRegistered`] - If this claim issuer is not
-///   registered at the `claim_topics_and_issuers` registry.
-/// * [`ClaimIssuerError::ClaimTopicNotAllowed`] - If this claim issuer is not
+/// * [`ClaimIssuerError::NotAllowed`] - If this claim issuer is not
 ///   allowed to sign claims about the `claim_topic`.
 /// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If this exact (key, topic,
 ///   registry) combination is already registered.
+/// * [`ClaimIssuerError::LimitExceeded`] - If maximum keys per topic or
+///   registries per key limit is exceeded.
 ///
 /// # Events
 ///
@@ -455,14 +455,9 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
 
     let registry_client = ClaimTopicsAndIssuersClient::new(e, registry);
 
-    // Check claim issuer is registered at claim_topics_and_issuers registry
-    if !registry_client.is_trusted_issuer(&e.current_contract_address()) {
-        panic_with_error!(e, ClaimIssuerError::IssuerNotRegistered)
-    }
-
     // Check claim issuer can sign claim about a specific topic
     if !registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic) {
-        panic_with_error!(e, ClaimIssuerError::ClaimTopicNotAllowed)
+        panic_with_error!(e, ClaimIssuerError::NotAllowed)
     }
 
     let signing_key = SigningKey { public_key: public_key.clone(), scheme };
@@ -474,7 +469,7 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
             e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
 
         if topic_keys.len() >= MAX_KEYS_PER_TOPIC {
-            panic_with_error!(e, ClaimIssuerError::MaxKeysPerTopicExceeded)
+            panic_with_error!(e, ClaimIssuerError::LimitExceeded)
         }
 
         topic_keys.push_back(signing_key.clone());
@@ -494,7 +489,7 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
     pairs.push_back((claim_topic, registry.clone()));
 
     if pairs.len() >= MAX_REGISTRIES_PER_KEY {
-        panic_with_error!(e, ClaimIssuerError::MaxRegistriesPerKeyExceeded)
+        panic_with_error!(e, ClaimIssuerError::LimitExceeded)
     }
 
     e.storage().persistent().set(&pairs_storage_key, &pairs);
