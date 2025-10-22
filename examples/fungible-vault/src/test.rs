@@ -347,7 +347,7 @@ fn test_deposit_max_validation() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #122)")]
+#[should_panic(expected = "Error(Contract, #407)")]
 fn test_withdraw_exceeds_max() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -373,7 +373,7 @@ fn test_withdraw_exceeds_max() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #123)")]
+#[should_panic(expected = "Error(Contract, #408)")]
 fn test_redeem_exceeds_max() {
     let e = Env::default();
     let admin = Address::generate(&e);
