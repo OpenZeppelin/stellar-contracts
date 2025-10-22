@@ -624,6 +624,11 @@ pub fn get_current_nonce_for(e: &Env, identity: &Address, claim_topic: u32) -> u
 /// * `identity` - The identity address to invalidate signatures for.
 /// * `claim_topic` - The claim topic to invalidate signatures for.
 ///
+/// # Errors
+///
+/// * [`ClaimIssuerError::MathOverflow`] - If the nonce has reached `u32::MAX`
+///   and cannot be incremented further.
+///
 /// # Events
 ///
 /// * topics - `["signatures_invalidated", identity: Address, claim_topic: u32]`
@@ -644,7 +649,9 @@ pub fn invalidate_claim_signatures(e: &Env, identity: &Address, claim_topic: u32
 
     emit_signatures_invalidated(e, identity, claim_topic, nonce);
 
-    nonce += 1;
+    nonce = nonce
+        .checked_add(1)
+        .unwrap_or_else(|| panic_with_error!(e, ClaimIssuerError::MathOverflow));
     e.storage().persistent().set(&nonce_key, &nonce);
 }
 

@@ -1184,6 +1184,27 @@ fn signature_invalidation_vs_per_claim_revocation() {
     });
 }
 
+#[test]
+#[should_panic(expected = "Error(Contract, #361)")]
+fn invalidate_claim_signatures_nonce_overflow() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        // Set nonce to u32::MAX
+        let nonce_key = ClaimIssuerStorageKey::ClaimNonce(identity.clone(), claim_topic);
+        e.storage().persistent().set(&nonce_key, &u32::MAX);
+
+        // Verify nonce is at max
+        assert_eq!(get_current_nonce_for(&e, &identity, claim_topic), u32::MAX);
+
+        // Attempt to invalidate signatures - should panic with MathOverflow (361)
+        invalidate_claim_signatures(&e, &identity, claim_topic);
+    });
+}
+
 // ======= EXPIRATION TESTS =======
 
 #[test]

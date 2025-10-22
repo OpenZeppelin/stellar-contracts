@@ -384,6 +384,8 @@ pub enum ClaimIssuerError {
     InvalidClaimDataExpiration = 359,
     /// Recovery of the Secp256k1 public key failed.
     Secp256k1RecoveryFailed = 360,
+    /// Indicates overflow when adding two values
+    MathOverflow = 361,
 }
 
 // ################## CONSTANTS ##################
