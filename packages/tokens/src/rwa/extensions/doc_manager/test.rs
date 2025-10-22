@@ -4,8 +4,8 @@ use soroban_sdk::{contract, Bytes, BytesN, Env, String, Vec};
 
 use crate::rwa::extensions::doc_manager::{
     storage::{
-        get_all_documents, get_document, get_document_by_index, get_document_count,
-        remove_document, set_document,
+        get_document, get_document_by_index, get_document_count, get_documents, remove_document,
+        set_document,
     },
     DocumentStorageKey, BUCKET_SIZE, MAX_DOCUMENTS, MAX_URI_LEN,
 };
@@ -128,18 +128,19 @@ fn remove_document_not_found() {
 }
 
 #[test]
-fn get_all_documents_empty() {
+fn get_documents_empty() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
-        let documents = get_all_documents(&e);
+        // Should return empty vector when bucket is empty
+        let documents = get_documents(&e, 0);
         assert_eq!(documents.len(), 0);
     });
 }
 
 #[test]
-fn get_all_documents_multiple() {
+fn get_documents_multiple() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
@@ -161,7 +162,8 @@ fn get_all_documents_multiple() {
         set_document(&e, &name2, &uri2, &hash2);
         set_document(&e, &name3, &uri3, &hash3);
 
-        let documents = get_all_documents(&e);
+        // Get documents from bucket 0
+        let documents = get_documents(&e, 0);
         assert_eq!(documents.len(), 3);
 
         // Verify all documents are present
@@ -177,7 +179,7 @@ fn get_all_documents_multiple() {
 }
 
 #[test]
-fn get_all_documents_after_removal() {
+fn get_documents_after_removal() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
 
@@ -198,7 +200,8 @@ fn get_all_documents_after_removal() {
         // Remove one document
         remove_document(&e, &name1);
 
-        let documents = get_all_documents(&e);
+        // Get documents from bucket 0
+        let documents = get_documents(&e, 0);
         assert_eq!(documents.len(), 1);
         let (doc_name, _doc) = documents.get(0).unwrap();
         assert_eq!(doc_name, name2);

@@ -112,30 +112,17 @@ pub fn get_document_by_index(e: &Env, index: u32) -> (BytesN<32>, Document) {
     bucket.get(offset_in_bucket).expect("document entry to be present in bucket")
 }
 
-/// Retrieves a full list of all documents.
+/// Retrieves documents from a specific bucket.
+///
+/// Returns an empty vector if the bucket is empty or doesn't exist.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-pub fn get_all_documents(e: &Env) -> Vec<(BytesN<32>, Document)> {
-    let count = get_document_count(e);
-    let mut documents = Vec::new(e);
-
-    if count == 0 {
-        return documents;
-    }
-
-    let last_bucket = (count - 1) / BUCKET_SIZE;
-
-    for bucket_idx in 0..=last_bucket {
-        let bucket_key = DocumentStorageKey::Bucket(bucket_idx);
-        let bucket: Vec<(BytesN<32>, Document)> =
-            e.storage().persistent().get(&bucket_key).unwrap_or_else(|| Vec::new(e));
-
-        documents.append(&bucket);
-    }
-
-    documents
+/// * `bucket_index` - The index of the bucket to retrieve documents from.
+pub fn get_documents(e: &Env, bucket_index: u32) -> Vec<(BytesN<32>, Document)> {
+    let bucket_key = DocumentStorageKey::Bucket(bucket_index);
+    get_persistent_entry(e, &bucket_key).unwrap_or_else(|| Vec::new(e))
 }
 
 // ################## UPDATE STATE ##################

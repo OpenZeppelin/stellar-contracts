@@ -31,7 +31,7 @@ mod test;
 
 use soroban_sdk::{contracterror, contractevent, Address, BytesN, Env, String, Vec};
 pub use storage::{
-    get_all_documents, get_document, get_document_by_index, get_document_count, remove_document,
+    get_document, get_document_by_index, get_document_count, get_documents, remove_document,
     set_document, Document, DocumentStorageKey,
 };
 
@@ -100,12 +100,15 @@ pub trait DocumentManager: RWAToken {
     /// * data - `[]`
     fn remove_document(e: &Env, name: BytesN<32>, operator: Address);
 
-    /// Retrieves a full list of all documents attached to the contract.
+    /// Retrieves documents from a specific bucket.
+    ///
+    /// Returns an empty vector if the bucket is empty or doesn't exist.
     ///
     /// # Arguments
     ///
     /// * `e` - The Soroban environment.
-    fn get_all_documents(e: &Env) -> Vec<(BytesN<32>, Document)>;
+    /// * `bucket_index` - The index of the bucket to retrieve documents from.
+    fn get_documents(e: &Env, bucket_index: u32) -> Vec<(BytesN<32>, Document)>;
 }
 
 // ################## ERRORS ##################
