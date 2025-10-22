@@ -63,6 +63,4 @@ pub enum SorobanFixedPointError {
     PhantomOverflow = 1501,
     /// The operation failed because the result does not fit in Self.
     ResultOverflow = 1502,
-    /// The operation failed because the one of the operands is negative.
-    NegativeOperand = 1503,
 }
