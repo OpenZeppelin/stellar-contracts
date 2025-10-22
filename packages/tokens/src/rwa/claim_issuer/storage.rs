@@ -427,8 +427,8 @@ pub fn is_authorized_for(e: &Env, registry: &Address, claim_topic: u32) -> bool 
 /// # Errors
 ///
 /// * [`ClaimIssuerError::KeyIsEmpty`] - If attempting to allow an empty key.
-/// * [`ClaimIssuerError::NotAllowed`] - If this claim issuer is not
-///   allowed to sign claims about the `claim_topic`.
+/// * [`ClaimIssuerError::NotAllowed`] - If this claim issuer is not allowed to
+///   sign claims about the `claim_topic`.
 /// * [`ClaimIssuerError::KeyAlreadyAllowed`] - If this exact (key, topic,
 ///   registry) combination is already registered.
 /// * [`ClaimIssuerError::LimitExceeded`] - If maximum keys per topic or
