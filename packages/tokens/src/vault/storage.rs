@@ -1,9 +1,10 @@
 use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
 use stellar_contract_utils::math::fixed_point::{muldiv, Rounding};
 
-use crate::fungible::{Base, ContractOverrides};
-
-use crate::vault::{emit_deposit, emit_withdraw, VaultTokenError, MAX_DECIMALS_OFFSET};
+use crate::{
+    fungible::{Base, ContractOverrides},
+    vault::{emit_deposit, emit_withdraw, VaultTokenError, MAX_DECIMALS_OFFSET},
+};
 
 pub struct Vault;
 
@@ -506,8 +507,8 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`VaultTokenError::MathOverflow`] - When the sum of underlying
-    ///   asset decimals and offset exceeds the maximum value.
+    /// * [`VaultTokenError::MathOverflow`] - When the sum of underlying asset
+    ///   decimals and offset exceeds the maximum value.
     pub fn decimals(e: &Env) -> u32 {
         Self::get_underlying_asset_decimals(e)
             .checked_add(Self::get_decimals_offset(e))
@@ -532,8 +533,8 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`VaultTokenError::VaultAssetAddressAlreadySet`] - When attempting
-    ///   to set the asset address after it has already been initialized.
+    /// * [`VaultTokenError::VaultAssetAddressAlreadySet`] - When attempting to
+    ///   set the asset address after it has already been initialized.
     ///
     /// # Security Warning
     ///
@@ -580,9 +581,9 @@ impl Vault {
     ///
     /// * [`VaultTokenError::VaultVirtualDecimalsOffsetAlreadySet`] - When
     ///   attempting to set the offset after it has already been initialized.
-    /// * [`VaultTokenError::VaultMaxDecimalsOffsetExceeded`] - When
-    ///   attempting to set the offset to a value higher than the suggested
-    ///   maximum allowed.
+    /// * [`VaultTokenError::VaultMaxDecimalsOffsetExceeded`] - When attempting
+    ///   to set the offset to a value higher than the suggested maximum
+    ///   allowed.
     ///
     /// # Security Warning
     ///
