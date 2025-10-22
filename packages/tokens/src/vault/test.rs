@@ -457,6 +457,25 @@ fn query_asset_not_set() {
 }
 
 #[test]
+fn convert_zero_assets() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let initial_supply = 1_000_000_000_000_000_000i128;
+    let decimals_offset = 6;
+
+    // Create contracts
+    let asset_address = create_asset_contract(&e, initial_supply, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
+
+    e.as_contract(&vault_address, || {
+        // Converting 0 assets should return 0 shares
+        assert_eq!(Vault::convert_to_shares(&e, 0), 0);
+        assert_eq!(Vault::preview_deposit(&e, 0), 0);
+        assert_eq!(Vault::preview_withdraw(&e, 0), 0);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #403)")]
 fn invalid_assets_amount() {
     let e = Env::default();
