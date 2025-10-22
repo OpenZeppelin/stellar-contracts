@@ -75,7 +75,7 @@ pub fn identity_registry_storage(e: &Env) -> Address {
 ///
 /// # Errors
 ///
-/// * [`RWAError::IdentityVefificationFailed`] - When the identity of the
+/// * [`RWAError::IdentityVerificationFailed`] - When the identity of the
 ///   account cannot be verified.
 pub fn verify_identity(e: &Env, account: &Address) {
     let irs_addr = identity_registry_storage(e);

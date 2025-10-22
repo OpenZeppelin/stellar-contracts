@@ -23,6 +23,60 @@ pub enum VaultStorageKey {
     VirtualDecimalsOffset,
 }
 
+/// # Inflation Attack (Donation Attack) Mitigation
+///
+/// ## Vulnerability Overview
+///
+/// In empty (or nearly empty) vaults, deposits are at high risk of being stolen
+/// through a "donation" to the vault that inflates the price of a share.
+/// This is variously known as a **donation attack** or **inflation attack** and
+/// is essentially a problem of slippage.
+///
+/// ## Attack Mechanism
+///
+/// 1. Attacker observes a pending deposit transaction in the mempool
+/// 2. Attacker frontruns by directly transferring assets to the vault
+///    (donation)
+/// 3. This inflates the share price before the victim's deposit is processed
+/// 4. Victim receives fewer shares than expected due to inflated price
+/// 5. Attacker redeems their shares, capturing value from the victim's deposit
+///
+/// ## Mitigation Strategies
+///
+/// ### 1. Initial Deposit Protection
+///
+/// Vault deployers can protect against this attack by making an initial deposit
+/// of a non-trivial amount of the asset, such that price manipulation becomes
+/// infeasible. This "dead shares" approach makes the attack economically
+/// unviable.
+///
+/// ### 2. Virtual Assets and Shares (Configurable Decimals Offset)
+///
+/// This implementation introduces configurable virtual assets and shares to
+/// help developers mitigate the risk. The decimals offset (accessible via
+/// [`Vault::get_decimals_offset()`]) corresponds to an offset in the decimal
+/// representation between the underlying asset's decimals and the vault
+/// decimals.
+///
+/// While not fully preventing the attack, analysis shows that the default
+/// offset (0) makes it non-profitable even if an attacker is able to capture
+/// value from multiple user deposits, as a result of the value being captured
+/// by the virtual shares (out of the attacker's donation) matching the
+/// attacker's expected gains. With a larger offset, the attack becomes orders
+/// of magnitude more expensive than it is profitable.
+///
+/// The drawback of this approach is that the virtual shares do capture (a very
+/// small) part of the value being accrued to the vault. Also, if the vault
+/// experiences losses, the users try to exit the vault, the virtual shares and
+/// assets will cause the first user to exit to experience reduced losses in
+/// detriment to the last users that will experience bigger losses.
+///
+/// If this is not the preferred solution, implementers can still use the
+/// default offset of 0 and implement their own safeguards.
+///
+/// ## References
+///
+/// <https://docs.openzeppelin.com/contracts/5.x/erc4626>
 impl Vault {
     // ################## QUERY STATE ##################
 
@@ -760,8 +814,10 @@ impl Vault {
     ///
     /// # Notes
     ///
-    /// For more information about virtual decimals offset, see:
-    /// https://docs.openzeppelin.com/contracts/5.x/erc4626
+    /// For more information about virtual decimals offset and its role in
+    /// mitigating inflation attacks, see the implementation-level
+    /// documentation: [Inflation Attack (Donation Attack)
+    /// Mitigation](Vault)
     pub fn get_decimals_offset(e: &Env) -> u32 {
         e.storage().instance().get(&VaultStorageKey::VirtualDecimalsOffset).unwrap_or(0)
     }

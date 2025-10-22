@@ -47,11 +47,14 @@ As a contributor, you are expected to fork this repository, work on your own for
     # run tests
     cargo test
 
+    # build
+    cargo build --target wasm32v1-none --release
+
     # run linter
     cargo clippy --all-targets --all-features -- -D warnings
 
     # run formatter
-    cargo fmt --all -- --check
+    cargo +nightly fmt --all -- --check
 
     # run documentation checks
     cargo doc --all --no-deps
