@@ -260,7 +260,7 @@ fn admin_transfer_cancel_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1210)")]
+#[should_panic(expected = "Error(Contract, #2000)")]
 fn unauthorized_role_grant_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -278,7 +278,7 @@ fn unauthorized_role_grant_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1210)")]
+#[should_panic(expected = "Error(Contract, #2000)")]
 fn unauthorized_role_revoke_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -299,7 +299,7 @@ fn unauthorized_role_revoke_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1217)")]
+#[should_panic(expected = "Error(Contract, #2007)")]
 fn renounce_nonexistent_role_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -328,7 +328,7 @@ fn get_admin_with_no_admin_set_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1212)")]
+#[should_panic(expected = "Error(Contract, #2002)")]
 fn get_role_member_with_out_of_bounds_index_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -351,7 +351,7 @@ fn get_role_member_with_out_of_bounds_index_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1211)")]
+#[should_panic(expected = "Error(Contract, #2001)")]
 fn admin_transfer_fails_when_no_admin_set() {
     let e = Env::default();
     e.mock_all_auths();
@@ -460,7 +460,7 @@ fn remove_from_role_enumeration_for_last_account_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1218)")]
+#[should_panic(expected = "Error(Contract, #2008)")]
 fn remove_from_role_enumeration_with_nonexistent_role_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -475,7 +475,7 @@ fn remove_from_role_enumeration_with_nonexistent_role_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1217)")]
+#[should_panic(expected = "Error(Contract, #2007)")]
 fn remove_from_role_enumeration_with_account_not_in_role_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -539,7 +539,7 @@ fn remove_role_admin_no_auth_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1216)")]
+#[should_panic(expected = "Error(Contract, #2006)")]
 fn set_admin_when_already_set_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -561,7 +561,7 @@ fn set_admin_when_already_set_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1213)")]
+#[should_panic(expected = "Error(Contract, #2003)")]
 fn remove_role_admin_no_auth_panics_with_nonexistent_role() {
     let e = Env::default();
     e.mock_all_auths();
@@ -596,7 +596,7 @@ fn remove_role_accounts_count_no_auth_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1214)")]
+#[should_panic(expected = "Error(Contract, #2004)")]
 fn remove_role_accounts_count_no_auth_does_not_remove_nonzero_count() {
     let e = Env::default();
     e.mock_all_auths();
@@ -617,7 +617,7 @@ fn remove_role_accounts_count_no_auth_does_not_remove_nonzero_count() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1215)")]
+#[should_panic(expected = "Error(Contract, #2005)")]
 fn remove_role_accounts_count_no_auth_panics_with_nonexistent_role() {
     let e = Env::default();
     e.mock_all_auths();
@@ -650,7 +650,7 @@ fn renounce_admin_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1211)")]
+#[should_panic(expected = "Error(Contract, #2001)")]
 fn renounce_admin_fails_when_no_admin_set() {
     let e = Env::default();
     e.mock_all_auths();

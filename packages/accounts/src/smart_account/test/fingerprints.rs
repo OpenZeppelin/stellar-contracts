@@ -190,7 +190,7 @@ fn compute_fingerprint_mixed_signer_same_fingerprint() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2007)")]
+#[should_panic(expected = "Error(Contract, #3007)")]
 fn compute_fingerprint_duplicate_signers_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -207,7 +207,7 @@ fn compute_fingerprint_duplicate_signers_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2009)")]
+#[should_panic(expected = "Error(Contract, #3009)")]
 fn compute_fingerprint_duplicate_policies_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -239,7 +239,7 @@ fn validate_and_set_fingerprint_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2001)")]
+#[should_panic(expected = "Error(Contract, #3001)")]
 fn validate_and_set_fingerprint_duplicate_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -258,7 +258,7 @@ fn validate_and_set_fingerprint_duplicate_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2001)")]
+#[should_panic(expected = "Error(Contract, #3001)")]
 fn validate_and_set_fingerprint_same_valid_until_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -275,7 +275,7 @@ fn validate_and_set_fingerprint_same_valid_until_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2001)")]
+#[should_panic(expected = "Error(Contract, #3001)")]
 fn add_context_rule_duplicate_fingerprint_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -501,7 +501,7 @@ fn remove_policy_updates_fingerprint() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2001)")]
+#[should_panic(expected = "Error(Contract, #3001)")]
 fn fingerprint_prevents_duplicate_rules_across_modifications() {
     let e = Env::default();
     let address = e.register(MockContract, ());

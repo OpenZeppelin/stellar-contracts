@@ -69,7 +69,7 @@ fn role_transfer_cancel_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1200)")]
+#[should_panic(expected = "Error(Contract, #2200)")]
 fn accept_transfer_with_no_pending_transfer_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -88,7 +88,7 @@ fn accept_transfer_with_no_pending_transfer_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1202)")]
+#[should_panic(expected = "Error(Contract, #2202)")]
 fn cannot_cancel_with_invalid_pending_address() {
     let e = Env::default();
     e.mock_all_auths();
@@ -113,7 +113,7 @@ fn cannot_cancel_with_invalid_pending_address() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1201)")]
+#[should_panic(expected = "Error(Contract, #2201)")]
 fn transfer_with_invalid_live_until_ledger_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -134,7 +134,7 @@ fn transfer_with_invalid_live_until_ledger_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1200)")]
+#[should_panic(expected = "Error(Contract, #2200)")]
 fn cancel_transfer_when_there_is_no_pending_transfer_panics() {
     let e = Env::default();
     e.mock_all_auths();
