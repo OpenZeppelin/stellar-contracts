@@ -26,7 +26,6 @@ stellar-contracts/
 │       │   └── non_fungible/    # Non-fungible token implementation
 │       └── lib.rs
 ├── examples/                    # Example contract implementations
-├── docs/                        # Documentation
 └── audits/                      # Security audit reports
 ```
 
