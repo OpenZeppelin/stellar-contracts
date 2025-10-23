@@ -21,7 +21,6 @@ OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stel
   - [`test-utils/`](packages/test-utils): Utilities for testing
   - [`tokens/`](packages/tokens): Various token types (fungible, non-fungible, real-world assets, vaults)
 - `examples/`: Example contracts
-- `docs/`: Documentation
 - `audits/`: Audit reports
 
 

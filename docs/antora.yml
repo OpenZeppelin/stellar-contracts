@@ -1,8 +1,0 @@
-name: stellar-contracts
-title: Stellar Contracts
-version: 0.4.0
-nav:
-  - modules/ROOT/nav.adoc
-asciidoc:
-  attributes:
-    page-sidebar-collapse-default: false
