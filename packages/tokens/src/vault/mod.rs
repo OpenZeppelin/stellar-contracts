@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractevent, Address, Env};
+use soroban_sdk::{contracterror, contractevent, Address, Env};
 pub use storage::Vault;
 
 use crate::fungible::FungibleToken;
@@ -48,8 +48,8 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultAssetAddressNotSet`] -
-    ///   When the vault's underlying asset address has not been initialized.
+    /// * [`crate::vault::VaultTokenError::VaultAssetAddressNotSet`] - When the
+    ///   vault's underlying asset address has not been initialized.
     fn query_asset(e: &Env) -> Address;
 
     /// Returns the total amount of underlying assets held by the vault.
@@ -63,8 +63,8 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultAssetAddressNotSet`] -
-    ///   When the vault's underlying asset address has not been initialized.
+    /// * [`crate::vault::VaultTokenError::VaultAssetAddressNotSet`] - When the
+    ///   vault's underlying asset address has not been initialized.
     fn total_assets(e: &Env) -> i128;
 
     /// Converts an amount of underlying assets to the equivalent amount of
@@ -77,10 +77,10 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultInvalidAssetsAmount`] -
-    ///   When assets < 0.
-    /// * [`crate::fungible::FungibleTokenError::MathOverflow`] - When
-    ///   mathematical operations result in overflow.
+    /// * [`crate::vault::VaultTokenError::VaultInvalidAssetsAmount`] - When
+    ///   assets < 0.
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     fn convert_to_shares(e: &Env, assets: i128) -> i128;
 
     /// Converts an amount of vault shares to the equivalent amount of
@@ -93,10 +93,10 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultInvalidSharesAmount`] -
-    ///   When shares < 0.
-    /// * [`crate::fungible::FungibleTokenError::MathOverflow`] - When
-    ///   mathematical operations result in overflow.
+    /// * [`crate::vault::VaultTokenError::VaultInvalidSharesAmount`] - When
+    ///   shares < 0.
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     fn convert_to_assets(e: &Env, shares: i128) -> i128;
 
     /// Returns the maximum amount of underlying assets that can be deposited
@@ -118,10 +118,10 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultInvalidAssetsAmount`] -
-    ///   When assets < 0.
-    /// * [`crate::fungible::FungibleTokenError::MathOverflow`] - When
-    ///   mathematical operations result in overflow.
+    /// * [`crate::vault::VaultTokenError::VaultInvalidAssetsAmount`] - When
+    ///   assets < 0.
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     fn preview_deposit(e: &Env, assets: i128) -> i128;
 
     /// Deposits underlying assets into the vault and mints vault shares
@@ -137,13 +137,13 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultExceededMaxDeposit`] -
-    ///   When attempting to deposit more assets than the maximum allowed for
-    ///   the receiver.
-    /// * [`crate::fungible::FungibleTokenError::VaultInvalidAssetsAmount`] -
-    ///   When `assets < 0`.
-    /// * [`crate::fungible::FungibleTokenError::MathOverflow`] - When
-    ///   mathematical operations result in overflow.
+    /// * [`crate::vault::VaultTokenError::VaultExceededMaxDeposit`] - When
+    ///   attempting to deposit more assets than the maximum allowed for the
+    ///   receiver.
+    /// * [`crate::vault::VaultTokenError::VaultInvalidAssetsAmount`] - When
+    ///   `assets < 0`.
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     ///
     /// # Events
     ///
@@ -177,10 +177,10 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultInvalidSharesAmount`] -
-    ///   When shares < 0.
-    /// * [`crate::fungible::FungibleTokenError::MathOverflow`] - When
-    ///   mathematical operations result in overflow.
+    /// * [`crate::vault::VaultTokenError::VaultInvalidSharesAmount`] - When
+    ///   shares < 0.
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     fn preview_mint(e: &Env, shares: i128) -> i128;
 
     /// Mints a specific amount of vault shares to the receiver by depositing
@@ -197,13 +197,13 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultExceededMaxMint`] - When
+    /// * [`crate::vault::VaultTokenError::VaultExceededMaxMint`] - When
     ///   attempting to mint more shares than the maximum allowed for the
     ///   receiver.
-    /// * [`crate::fungible::FungibleTokenError::VaultInvalidSharesAmount`] -
-    ///   When `shares < 0`.
-    /// * [`crate::fungible::FungibleTokenError::MathOverflow`] - When
-    ///   mathematical operations result in overflow.
+    /// * [`crate::vault::VaultTokenError::VaultInvalidSharesAmount`] - When
+    ///   `shares < 0`.
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     ///
     /// # Events
     ///
@@ -228,10 +228,10 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultInvalidSharesAmount`] -
-    ///   When shares < 0.
-    /// * [`crate::fungible::FungibleTokenError::MathOverflow`] - When
-    ///   mathematical operations result in overflow.
+    /// * [`crate::vault::VaultTokenError::VaultInvalidSharesAmount`] - When
+    ///   shares < 0.
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     fn max_withdraw(e: &Env, owner: Address) -> i128;
 
     /// Simulates and returns the amount of vault shares that would be burned
@@ -244,10 +244,10 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultInvalidAssetsAmount`] -
-    ///   When assets < 0.
-    /// * [`crate::fungible::FungibleTokenError::MathOverflow`] - When
-    ///   mathematical operations result in overflow.
+    /// * [`crate::vault::VaultTokenError::VaultInvalidAssetsAmount`] - When
+    ///   assets < 0.
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     fn preview_withdraw(e: &Env, assets: i128) -> i128;
 
     /// Withdraws a specific amount of underlying assets from the vault
@@ -264,9 +264,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultExceededMaxWithdraw`] -
-    ///   When attempting to withdraw more assets than the maximum allowed for
-    ///   the owner.
+    /// * [`crate::vault::VaultTokenError::VaultExceededMaxWithdraw`] - When
+    ///   attempting to withdraw more assets than the maximum allowed for the
+    ///   owner.
     ///
     /// # Events
     ///
@@ -306,10 +306,10 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultInvalidSharesAmount`] -
-    ///   When shares < 0.
-    /// * [`crate::fungible::FungibleTokenError::MathOverflow`] - When
-    ///   mathematical operations result in overflow.
+    /// * [`crate::vault::VaultTokenError::VaultInvalidSharesAmount`] - When
+    ///   shares < 0.
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     fn preview_redeem(e: &Env, shares: i128) -> i128;
 
     /// Redeems a specific amount of vault shares for underlying assets,
@@ -325,13 +325,13 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// # Errors
     ///
-    /// * [`crate::fungible::FungibleTokenError::VaultExceededMaxRedeem`] - When
+    /// * [`crate::vault::VaultTokenError::VaultExceededMaxRedeem`] - When
     ///   attempting to redeem more shares than the maximum allowed for the
     ///   owner.
-    /// * [`crate::fungible::FungibleTokenError::VaultInvalidSharesAmount`] -
-    ///   When `shares < 0`.
-    /// * [`crate::fungible::FungibleTokenError::MathOverflow`] - When
-    ///   mathematical operations result in overflow.
+    /// * [`crate::vault::VaultTokenError::VaultInvalidSharesAmount`] - When
+    ///   `shares < 0`.
+    /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
+    ///   operations result in overflow.
     ///
     /// # Events
     ///
@@ -346,6 +346,41 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// Authorization for the operator must be handled at a higher level.
     fn redeem(e: &Env, shares: i128, receiver: Address, owner: Address, operator: Address) -> i128;
 }
+
+// ################## ERRORS ##################
+
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum VaultTokenError {
+    /// Indicates access to uninitialized vault asset address.
+    VaultAssetAddressNotSet = 400,
+    /// Indicates that vault asset address is already set.
+    VaultAssetAddressAlreadySet = 401,
+    /// Indicates that vault virtual decimals offset is already set.
+    VaultVirtualDecimalsOffsetAlreadySet = 402,
+    /// Indicates the amount is not a valid vault assets value.
+    VaultInvalidAssetsAmount = 403,
+    /// Indicates the amount is not a valid vault shares value.
+    VaultInvalidSharesAmount = 404,
+    /// Attempted to deposit more assets than the max amount for address.
+    VaultExceededMaxDeposit = 405,
+    /// Attempted to mint more shares than the max amount for address.
+    VaultExceededMaxMint = 406,
+    /// Attempted to withdraw more assets than the max amount for address.
+    VaultExceededMaxWithdraw = 407,
+    /// Attempted to redeem more shares than the max amount for address.
+    VaultExceededMaxRedeem = 408,
+    /// Maximum number of decimals offset exceeded
+    VaultMaxDecimalsOffsetExceeded = 409,
+    /// Indicates overflow due to mathematical operations
+    MathOverflow = 410,
+}
+
+// ################## CONSTANTS ##################
+
+// Suggested upper-bound for decimals to maximize both security and UX
+pub const MAX_DECIMALS_OFFSET: u32 = 10;
 
 // ################## EVENTS ##################
 

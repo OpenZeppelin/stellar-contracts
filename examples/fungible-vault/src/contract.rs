@@ -2,9 +2,9 @@
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_macros::default_impl;
-use stellar_tokens::fungible::{
+use stellar_tokens::{
+    fungible::{Base, FungibleToken},
     vault::{FungibleVault, Vault},
-    Base, FungibleToken,
 };
 
 #[contract]

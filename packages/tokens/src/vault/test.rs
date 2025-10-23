@@ -2,7 +2,10 @@ extern crate std;
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env};
 
-use crate::fungible::{vault::Vault, Base, MAX_DECIMALS_OFFSET};
+use crate::{
+    fungible::Base,
+    vault::{Vault, MAX_DECIMALS_OFFSET},
+};
 
 // Simple mock contract for vault testing
 #[contract]
@@ -348,7 +351,7 @@ fn conversion_with_existing_assets() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #122)")]
+#[should_panic(expected = "Error(Contract, #407)")]
 fn withdraw_exceeds_max() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -377,7 +380,7 @@ fn withdraw_exceeds_max() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #123)")]
+#[should_panic(expected = "Error(Contract, #408)")]
 fn redeem_exceeds_max() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -405,7 +408,7 @@ fn redeem_exceeds_max() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #116)")]
+#[should_panic(expected = "Error(Contract, #401)")]
 fn asset_address_already_set() {
     let e = Env::default();
     let asset_address1 = Address::generate(&e);
@@ -419,7 +422,7 @@ fn asset_address_already_set() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #117)")]
+#[should_panic(expected = "Error(Contract, #402)")]
 fn decimals_offset_already_set() {
     let e = Env::default();
     let asset_address = Address::generate(&e);
@@ -432,7 +435,7 @@ fn decimals_offset_already_set() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #124)")]
+#[should_panic(expected = "Error(Contract, #409)")]
 fn decimals_offset_exceeded() {
     let e = Env::default();
     let asset_address = Address::generate(&e);
@@ -442,7 +445,7 @@ fn decimals_offset_exceeded() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #115)")]
+#[should_panic(expected = "Error(Contract, #400)")]
 fn query_asset_not_set() {
     let e = Env::default();
     let contract_address = e.register(MockVaultContract, ());
@@ -454,7 +457,26 @@ fn query_asset_not_set() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #118)")]
+fn convert_zero_assets() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let initial_supply = 1_000_000_000_000_000_000i128;
+    let decimals_offset = 6;
+
+    // Create contracts
+    let asset_address = create_asset_contract(&e, initial_supply, &admin);
+    let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
+
+    e.as_contract(&vault_address, || {
+        // Converting 0 assets should return 0 shares
+        assert_eq!(Vault::convert_to_shares(&e, 0), 0);
+        assert_eq!(Vault::preview_deposit(&e, 0), 0);
+        assert_eq!(Vault::preview_withdraw(&e, 0), 0);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #403)")]
 fn invalid_assets_amount() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -472,7 +494,7 @@ fn invalid_assets_amount() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #119)")]
+#[should_panic(expected = "Error(Contract, #404)")]
 fn invalid_shares_amount() {
     let e = Env::default();
     let admin = Address::generate(&e);

@@ -310,31 +310,31 @@ pub const MAX_CONTEXT_RULES: u32 = 15;
 #[repr(u32)]
 pub enum SmartAccountError {
     /// The specified context rule does not exist.
-    ContextRuleNotFound = 2000,
+    ContextRuleNotFound = 3000,
     /// A duplicate context rule already exists.
-    DuplicateContextRule = 2001,
+    DuplicateContextRule = 3001,
     /// The provided context cannot be validated against any rule.
-    UnvalidatedContext = 2002,
+    UnvalidatedContext = 3002,
     /// External signature verification failed.
-    ExternalVerificationFailed = 2003,
+    ExternalVerificationFailed = 3003,
     /// Context rule must have at least one signer or policy.
-    NoSignersAndPolicies = 2004,
+    NoSignersAndPolicies = 3004,
     /// The valid_until timestamp is in the past.
-    PastValidUntil = 2005,
+    PastValidUntil = 3005,
     /// The specified signer was not found.
-    SignerNotFound = 2006,
+    SignerNotFound = 3006,
     /// The signer already exists in the context rule.
-    DuplicateSigner = 2007,
+    DuplicateSigner = 3007,
     /// The specified policy was not found.
-    PolicyNotFound = 2008,
+    PolicyNotFound = 3008,
     /// The policy already exists in the context rule.
-    DuplicatePolicy = 2009,
+    DuplicatePolicy = 3009,
     /// Too many signers in the context rule.
-    TooManySigners = 2010,
+    TooManySigners = 3010,
     /// Too many policies in the context rule.
-    TooManyPolicies = 2011,
+    TooManyPolicies = 3011,
     /// Too many context rules in the smart account.
-    TooManyContextRules = 2012,
+    TooManyContextRules = 3012,
 }
 
 // ################## EVENTS ##################
