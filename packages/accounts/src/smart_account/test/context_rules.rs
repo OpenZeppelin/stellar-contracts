@@ -201,7 +201,7 @@ fn do_check_auth_multiple_contexts_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2003)")]
+#[should_panic(expected = "Error(Contract, #3003)")]
 fn do_check_auth_authentication_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -242,7 +242,7 @@ fn do_check_auth_authentication_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2002)")]
+#[should_panic(expected = "Error(Contract, #3002)")]
 fn do_check_auth_context_validation_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -373,7 +373,7 @@ fn add_context_rule_different_context_types() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2005)")]
+#[should_panic(expected = "Error(Contract, #3005)")]
 fn add_context_rule_past_valid_until_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -429,7 +429,7 @@ fn update_context_rule_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2000)")]
+#[should_panic(expected = "Error(Contract, #3000)")]
 fn update_context_rule_nonexistent_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -441,7 +441,7 @@ fn update_context_rule_nonexistent_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2005)")]
+#[should_panic(expected = "Error(Contract, #3005)")]
 fn update_context_rule_past_valid_until_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -474,7 +474,7 @@ fn remove_context_rule_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2000)")]
+#[should_panic(expected = "Error(Contract, #3000)")]
 fn remove_context_rule_nonexistent_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -525,7 +525,7 @@ fn can_enforce_all_policies_one_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2003)")]
+#[should_panic(expected = "Error(Contract, #3003)")]
 fn authenticate_external_signer_verification_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -962,7 +962,7 @@ fn get_validated_context_create_contract_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2002)")]
+#[should_panic(expected = "Error(Contract, #3002)")]
 fn get_validated_context_call_contract_with_policies_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -991,7 +991,7 @@ fn get_validated_context_call_contract_with_policies_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2002)")]
+#[should_panic(expected = "Error(Contract, #3002)")]
 fn get_validated_context_insufficient_signers_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -1019,7 +1019,7 @@ fn get_validated_context_insufficient_signers_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2002)")]
+#[should_panic(expected = "Error(Contract, #3002)")]
 fn get_validated_context_no_matching_rules_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -1114,7 +1114,7 @@ fn get_context_rules_empty_result() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2007)")]
+#[should_panic(expected = "Error(Contract, #3007)")]
 fn add_context_rule_duplicate_signer_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -1146,7 +1146,7 @@ fn add_context_rule_duplicate_signer_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2012)")]
+#[should_panic(expected = "Error(Contract, #3012)")]
 fn add_context_rule_too_many_rules_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());

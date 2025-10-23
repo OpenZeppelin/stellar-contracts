@@ -336,15 +336,15 @@ pub trait AccessControl {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum AccessControlError {
-    Unauthorized = 1210,
-    AdminNotSet = 1211,
-    IndexOutOfBounds = 1212,
-    AdminRoleNotFound = 1213,
-    RoleCountIsNotZero = 1214,
-    RoleNotFound = 1215,
-    AdminAlreadySet = 1216,
-    RoleNotHeld = 1217,
-    RoleIsEmpty = 1218,
+    Unauthorized = 2000,
+    AdminNotSet = 2001,
+    IndexOutOfBounds = 2002,
+    AdminRoleNotFound = 2003,
+    RoleCountIsNotZero = 2004,
+    RoleNotFound = 2005,
+    AdminAlreadySet = 2006,
+    RoleNotHeld = 2007,
+    RoleIsEmpty = 2008,
 }
 
 // ################## CONSTANTS ##################

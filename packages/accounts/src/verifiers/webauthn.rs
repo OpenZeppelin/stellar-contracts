@@ -115,7 +115,7 @@ pub struct WebAuthnSigData {
 ///
 /// # Reference
 ///
-/// Step 11 in https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+/// Step 11 in <https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion>
 pub fn validate_expected_type(e: &Env, client_data_json: &ClientDataJson) {
     let type_field = String::from_str(e, "webauthn.get");
     if String::from_str(e, client_data_json.type_field) != type_field {
@@ -145,7 +145,7 @@ pub fn validate_expected_type(e: &Env, client_data_json: &ClientDataJson) {
 ///
 /// # Reference
 ///
-/// Step 12 in https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+/// Step 12 in <https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion>
 pub fn validate_challenge(e: &Env, client_data_json: &ClientDataJson, signature_payload: &Bytes) {
     let signature_payload: BytesN<32> = extract_from_bytes(e, signature_payload, 0..32)
         .unwrap_or_else(|| panic_with_error!(e, WebAuthnError::SignaturePayloadInvalid));
@@ -178,9 +178,9 @@ pub fn validate_challenge(e: &Env, client_data_json: &ClientDataJson, signature_
 ///
 /// # Reference
 ///
-/// Step 16 in https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+/// Step 16 in <https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion>
 pub fn validate_user_present_bit_set(e: &Env, flags: u8) {
-    // Validates that the https://www.w3.org/TR/webauthn-2/#up bit is set.
+    // Validates that the <https://www.w3.org/TR/webauthn-2/#up> bit is set.
     if (flags & AUTH_DATA_FLAGS_UP) == 0 {
         panic_with_error!(e, WebAuthnError::PresentBitNotSet)
     }
@@ -211,7 +211,7 @@ pub fn validate_user_present_bit_set(e: &Env, flags: u8) {
 ///
 /// # Reference
 ///
-/// Step 17 in https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+/// Step 17 in <https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion>
 pub fn validate_user_verified_bit_set(e: &Env, flags: u8) {
     if (flags & AUTH_DATA_FLAGS_UV) == 0 {
         panic_with_error!(e, WebAuthnError::VerifiedBitNotSet)
@@ -296,7 +296,7 @@ pub fn validate_backup_eligibility_and_state(e: &Env, flags: u8) {
 ///
 /// # Reference
 ///
-/// https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+/// <https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion>
 pub fn verify(
     e: &Env,
     signature_payload: &Bytes,

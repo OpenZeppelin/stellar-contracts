@@ -223,7 +223,7 @@ create_context_rule(
     name: "DeFi Session",
     valid_until: Some(current_ledger + 24_hours),
     signers: vec![&e, ed25519_key],
-    policies: map![&E, (spending_limit_policy, spending_params)]
+    policies: map![&e, (spending_limit_policy, spending_params)]
 )
 ```
 
@@ -252,7 +252,7 @@ create_context_rule(
     context_type: Default,
     name: "Portfolio AI",
     valid_until: Some(current_ledger + 7_days),
-    signers: vec![ai_agent_key],
+    signers: vec![&e, ai_agent_key],
     policies: map![
         &e,
         (whitelist_policy, allowed_functions),
@@ -270,6 +270,7 @@ create_context_rule(
     name: "Treasury Operations",
     valid_until: None,
     signers: vec![
+        &e,
         Signer::External(ed25519_verifier, alice_pubkey),
         Signer::External(secp256k1_verifier, bob_pubkey),
         Signer::Delegated(carol_contract)
@@ -312,7 +313,7 @@ impl SmartAccount for MySmartAccount {
     ) -> ContextRule {
         e.current_contract_address().require_auth();
 
-        add_context_rule(e, &context_type, name, valid_until, signers, policies)
+        add_context_rule(e, &context_type, &name, &valid_until, &signers, &policies)
     }
     // Implement all other methods
 }
@@ -322,12 +323,14 @@ impl CustomAccountInterface for MySmartAccount {
     type Signature = Signatures;
 
     fn __check_auth(
-        env: Env,
+        e: Env,
         signature_payload: Hash<32>,
         signatures: Signatures,
         auth_context: Vec<Context>,
     ) -> Result<(), SmartAccountError> {
         do_check_auth(e, signature_payload, signatures, auth_contexts)
+
+        Ok(())
     }
 }
 ```
@@ -337,12 +340,12 @@ impl CustomAccountInterface for MySmartAccount {
 ```rust
 // Create an admin rule
 add_context_rule(
-    &env,
+    &e,
     ContextRuleType::Default,
-    String::from_str(&env, "Admin Access"),
+    String::from_str(&e, "Admin Access"),
     None, // No expiration
-    vec![&env, admin_signer],
-    Map::new(&env)
+    vec![&e, admin_signer],
+    map![&e]
 );
 ```
 
@@ -361,7 +364,7 @@ For policies, there are two options:
 ```rust
 // Add a spending limit policy
 add_policy(
-    &env,
+    &e,
     admin_rule.id,
     spending_policy_address,
     spending_limit_params
