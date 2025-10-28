@@ -281,7 +281,17 @@ create_context_rule(
 
 ## Getting Started
 
-### 1. Implement the Smart Account Trait
+### 1. Installation
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+# We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
+stellar-accounts = "=0.5.0"
+```
+
+### 2. Implement the Smart Account Trait
 
 ```rust
 use stellar_accounts::smart_account::{
@@ -325,7 +335,7 @@ impl CustomAccountInterface for MySmartAccount {
 }
 ```
 
-### 2. Create Context Rules
+### 3. Create Context Rules
 
 ```rust
 // Create an admin rule
@@ -339,7 +349,7 @@ add_context_rule(
 );
 ```
 
-### 3. Add Policies (Optional)
+### 4. Add Policies (Optional)
 
 For policies, there are two options:
 
@@ -361,7 +371,7 @@ add_policy(
 );
 ```
 
-### 4. Choose or Deploy Verifier Contracts (For External Signers)
+### 5. Choose or Deploy Verifier Contracts (For External Signers)
 
 For external signers, there are two options:
 

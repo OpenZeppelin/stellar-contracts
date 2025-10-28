@@ -96,13 +96,13 @@ pub struct WeightedThresholdAccountParams {
 #[repr(u32)]
 pub enum WeightedThresholdError {
     /// The smart account does not have a weighted threshold policy installed.
-    SmartAccountNotInstalled = 2210,
+    SmartAccountNotInstalled = 3210,
     /// The threshold value is invalid.
-    InvalidThreshold = 2211,
+    InvalidThreshold = 3211,
     /// A mathematical operation would overflow.
-    MathOverflow = 2212,
+    MathOverflow = 3212,
     /// The transaction is not allowed by this policy.
-    NotAllowed = 2213,
+    NotAllowed = 3213,
 }
 
 /// Storage keys for weighted threshold policy data.

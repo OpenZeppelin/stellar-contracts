@@ -54,9 +54,9 @@ We recommend pinning to a specific version, because rapid iterations are expecte
 
 ```toml
 [dependencies]
-stellar-tokens = "=0.4.0"
-stellar-access = "=0.4.0"
-stellar-contract-utils = "=0.4.0"
+stellar-tokens = "=0.5.0"
+stellar-access = "=0.5.0"
+stellar-contract-utils = "=0.5.0"
 ```
 
 ## Notes
