@@ -50,23 +50,23 @@ pub const AUTHENTICATOR_DATA_MIN_LEN: usize = 37;
 #[repr(u32)]
 pub enum WebAuthnError {
     /// The signature payload is invalid or has incorrect format.
-    SignaturePayloadInvalid = 2110,
+    SignaturePayloadInvalid = 3110,
     /// The client data exceeds the maximum allowed length.
-    ClientDataTooLong = 2111,
+    ClientDataTooLong = 3111,
     /// Failed to parse JSON from client data.
-    JsonParseError = 2112,
+    JsonParseError = 3112,
     /// The type field in client data is not "webauthn.get".
-    TypeFieldInvalid = 2113,
+    TypeFieldInvalid = 3113,
     /// The challenge in client data does not match expected value.
-    ChallengeInvalid = 2114,
+    ChallengeInvalid = 3114,
     /// The authenticator data format is invalid or too short.
-    AuthDataFormatInvalid = 2115,
+    AuthDataFormatInvalid = 3115,
     /// The User Present (UP) bit is not set in authenticator flags.
-    PresentBitNotSet = 2116,
+    PresentBitNotSet = 3116,
     /// The User Verified (UV) bit is not set in authenticator flags.
-    VerifiedBitNotSet = 2117,
+    VerifiedBitNotSet = 3117,
     /// Invalid relationship between Backup Eligibility and State bits.
-    BackupEligibilityAndStateNotSet = 2218,
+    BackupEligibilityAndStateNotSet = 3118,
 }
 
 /// Parsed client data JSON structure for WebAuthn authentication.

@@ -80,7 +80,7 @@ fn install_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2222)")]
+#[should_panic(expected = "Error(Contract, #3222)")]
 fn install_invalid_spending_limit() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -100,7 +100,7 @@ fn install_invalid_spending_limit() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2222)")]
+#[should_panic(expected = "Error(Contract, #3222)")]
 fn install_invalid_period() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -240,7 +240,7 @@ fn enforce_within_limit() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2221)")]
+#[should_panic(expected = "Error(Contract, #3221)")]
 fn enforce_exceeds_limit() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -262,7 +262,7 @@ fn enforce_exceeds_limit() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2223)")]
+#[should_panic(expected = "Error(Contract, #3223)")]
 fn enforce_no_singers() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -422,7 +422,7 @@ fn set_spending_limit_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2222)")]
+#[should_panic(expected = "Error(Contract, #3222)")]
 fn set_invalid_spending_limit() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -473,7 +473,7 @@ fn uninstall_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2220)")]
+#[should_panic(expected = "Error(Contract, #3220)")]
 fn get_spending_limit_data_not_installed() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -591,7 +591,7 @@ fn can_enforce_on_non_contract_context() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2223)")]
+#[should_panic(expected = "Error(Contract, #3223)")]
 fn enforce_non_transfer_context_errors() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -621,7 +621,7 @@ fn enforce_non_transfer_context_errors() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2223)")]
+#[should_panic(expected = "Error(Contract, #3223)")]
 fn enforce_on_non_contract_context_errors() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -646,7 +646,7 @@ fn enforce_on_non_contract_context_errors() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2223)")]
+#[should_panic(expected = "Error(Contract, #3223)")]
 fn enforce_invalid_amount_arg_errors() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -682,7 +682,7 @@ fn enforce_invalid_amount_arg_errors() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2223)")]
+#[should_panic(expected = "Error(Contract, #3223)")]
 fn enforce_missing_amount_arg_errors() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -717,7 +717,7 @@ fn enforce_missing_amount_arg_errors() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2224)")]
+#[should_panic(expected = "Error(Contract, #3224)")]
 fn enforce_history_capacity_exceeded() {
     let e = Env::default();
     let address = e.register(MockContract, ());

@@ -78,11 +78,11 @@ pub struct SimpleThresholdAccountParams {
 #[repr(u32)]
 pub enum SimpleThresholdError {
     /// The smart account does not have a simple threshold policy installed.
-    SmartAccountNotInstalled = 2200,
+    SmartAccountNotInstalled = 3200,
     /// When threshold is 0 or exceeds the number of available signers.
-    InvalidThreshold = 2201,
+    InvalidThreshold = 3201,
     /// The transaction is not allowed by this policy.
-    NotAllowed = 2202,
+    NotAllowed = 3202,
 }
 
 /// Storage keys for simple threshold policy data.
