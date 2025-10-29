@@ -1,14 +1,10 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
-#[cfg(not(feature = "certora"))]
 use crate::{
     ownable::{
         emit_ownership_renounced, emit_ownership_transfer, emit_ownership_transfer_completed,
-    }
-};
-
-use crate::{
-    ownable::OwnableError,
+        OwnableError,
+    },
     role_transfer::{accept_transfer, transfer_role},
 };
 

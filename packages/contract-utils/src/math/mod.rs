@@ -4,3 +4,6 @@ mod i256_fixed_point;
 mod soroban_fixed_point;
 
 mod test;
+
+#[cfg(feature = "certora")]
+pub mod spec;

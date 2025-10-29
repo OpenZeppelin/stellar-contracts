@@ -29,7 +29,7 @@ use soroban_sdk::{unwrap::UnwrapOptimized, Env, I256};
 use crate::math::soroban_fixed_point::SorobanFixedPoint;
 
 /// Performs floor(r / z)
-fn div_floor(r: i128, z: i128) -> Option<i128> {
+pub fn div_floor(r: i128, z: i128) -> Option<i128> {
     if r < 0 || (r > 0 && z < 0) {
         // ceiling is taken by default for a negative result
         let remainder = r.checked_rem_euclid(z)?;
@@ -41,7 +41,7 @@ fn div_floor(r: i128, z: i128) -> Option<i128> {
 }
 
 /// Performs ceil(r / z)
-fn div_ceil(r: i128, z: i128) -> Option<i128> {
+pub fn div_ceil(r: i128, z: i128) -> Option<i128> {
     if r <= 0 || z < 0 {
         // ceiling is taken by default for a negative or zero result
         r.checked_div(z)
@@ -63,7 +63,7 @@ impl SorobanFixedPoint for i128 {
 }
 
 /// Performs floor(x * y / z)
-fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
+pub fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
     match x.checked_mul(*y) {
         Some(r) => div_floor(r, *z).unwrap_optimized(),
         None => {
@@ -81,7 +81,7 @@ fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
 }
 
 /// Performs floor(x * y / z)
-fn scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
+pub fn scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
     match x.checked_mul(*y) {
         Some(r) => div_ceil(r, *z).unwrap_optimized(),
         None => {
