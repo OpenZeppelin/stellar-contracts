@@ -1,0 +1,59 @@
+{
+    "CLI_package_name": "",
+    "CLI_version": "",
+    "branch": "certora",
+    "certora_ci_client": null,
+    "conf": {
+        "build_script": "../certora_build.py",
+        "msg": "Sanity Rules for OZ contract_utils crate, pausable",
+        "optimistic_loop": true,
+        "prover_version": "master",
+        "rule": [
+            "paused_sanity",
+            "pause_sanity",
+            "unpause_sanity",
+            "when_not_paused_sanity",
+            "when_paused_sanity"
+        ],
+        "server": "prover"
+    },
+    "conf_path": "packages/contract-utils/confs/pausable_sanity.conf",
+    "cwd_relative": "packages/contract-utils/confs",
+    "dirty": true,
+    "group_id": null,
+    "jar_flag_info": [
+        "-globalTimeout,cloud_global_timeout,string",
+        "-coinbaseFeaturesMode,coinbase_mode,boolean",
+        "-coverageInfo,coverage_info,string",
+        "-enforceRequireReasonInCVL,enforce_require_reason,boolean",
+        "-userGlobalTimeout,global_timeout,string",
+        "-includeEmptyFallback,include_empty_fallback,boolean",
+        "-independentSatisfies,independent_satisfy,boolean",
+        "-b,loop_iter,string",
+        "-multiAssertCheck,multi_assert_check,boolean",
+        "-multipleCEX,multi_example,string",
+        "-noCalltraceStorageInformation,no_calltrace_storage_information,boolean",
+        "-assumeUnwindCond,optimistic_loop,boolean",
+        "-smt_preciseBitwiseOps,precise_bitwise_ops,boolean",
+        "-resourceFiles,prover_resource_files,list",
+        "-rule,rule,list",
+        "-ruleSanityChecks,rule_sanity,string",
+        "-saveVerifierResults,save_verifier_results,boolean",
+        "-ciMode,short_output,boolean",
+        "-t,smt_timeout,string",
+        "-smt_useBV,smt_use_bv,boolean",
+        "-json,tool_output,string",
+        "-unusedSummaryHardFail,unused_summary_hard_fail,string",
+        "-usePerRuleCache,use_per_rule_cache,string"
+    ],
+    "java_version": "21.0.1",
+    "main_spec": null,
+    "origin": "git@github.com:Certora/stellar-contracts.git",
+    "python_version": "3.9.23",
+    "raw_args": [
+        "/Users/chandrakananandi/research/EVMVerifier/build_out/certoraSorobanProver.py",
+        "pausable_sanity.conf"
+    ],
+    "revision": "124b0b430e2f6aa86be712e01474a01026623b47",
+    "timestamp": "1761773873.813483"
+}

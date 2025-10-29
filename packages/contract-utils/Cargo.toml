@@ -14,9 +14,16 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+cvlr = { workspace = true, default-features = false }
+cvlr-soroban = { workspace = true }
+cvlr-soroban-macros = { workspace = true }
+cvlr-soroban-derive = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 proptest = { workspace = true }
 hex-literal = { workspace = true }
 stellar-event-assertion = { workspace = true }
+
+[features]
+certora = []

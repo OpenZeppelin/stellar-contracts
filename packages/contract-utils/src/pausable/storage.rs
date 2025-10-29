@@ -56,6 +56,7 @@ pub fn paused(e: &Env) -> bool {
 pub fn pause(e: &Env) {
     when_not_paused(e);
     e.storage().instance().set(&PausableStorageKey::Paused, &true);
+    #[cfg(not(feature = "certora"))]
     emit_paused(e);
 }
 
@@ -92,6 +93,7 @@ pub fn pause(e: &Env) {
 pub fn unpause(e: &Env) {
     when_paused(e);
     e.storage().instance().set(&PausableStorageKey::Paused, &false);
+    #[cfg(not(feature = "certora"))]
     emit_unpaused(e);
 }
 

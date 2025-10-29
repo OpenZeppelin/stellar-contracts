@@ -47,6 +47,9 @@
 //! to see it all in action, check out the `examples/pausable/src/contract.rs`
 //! file.
 
+#[cfg(feature = "certora")]
+pub mod spec;
+
 mod storage;
 
 #[cfg(test)]
