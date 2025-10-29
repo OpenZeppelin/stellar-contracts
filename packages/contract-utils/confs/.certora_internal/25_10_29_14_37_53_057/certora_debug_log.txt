@@ -1,4 +1,0 @@
-Saving last configuration file to .certora_internal/25_10_29_14_37_53_057/run.conf
-Copying /Users/chandrakananandi/research/stellar-contracts/packages/contract-utils/confs/pausable_sanity.conf to .certora_internal/25_10_29_14_37_53_057/.certora_sources/contract-utils/confs/pausable_sanity.conf
-Copying /Users/chandrakananandi/research/stellar-contracts/packages/contract-utils/certora_build.py to .certora_internal/25_10_29_14_37_53_057/.certora_sources/contract-utils/certora_build.py
-Skipping directory /Users/chandrakananandi/research/stellar-contracts/packages
