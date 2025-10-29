@@ -86,6 +86,11 @@
 //! 1. When accounts were assigned to a role but later all were removed.
 //! 2. When a role never existed in the first place.
 
+#[allow(unused_variables)]
+
+#[cfg(feature = "certora")]
+pub mod spec;
+
 mod storage;
 
 #[cfg(test)]

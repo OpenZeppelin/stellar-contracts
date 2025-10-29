@@ -75,3 +75,19 @@ lto = true
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true
+
+[workspace.dependencies.cvlr]
+version = "0.4.0"
+default-features = false
+
+[workspace.dependencies.cvlr-soroban]
+git = "https://github.com/Certora/cvlr-soroban.git"
+# path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban"
+
+[workspace.dependencies.cvlr-soroban-macros]
+git = "https://github.com/Certora/cvlr-soroban.git"
+# path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-macros"
+
+[workspace.dependencies.cvlr-soroban-derive]
+git = "https://github.com/Certora/cvlr-soroban.git"
+# path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-derive"
