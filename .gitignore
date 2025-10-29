@@ -1,3 +1,6 @@
+# certora
+.certora_internal
+
 **/target/
 /.idea
 .DS_Store
