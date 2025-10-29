@@ -1,10 +1,14 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
+#[cfg(not(feature = "certora"))]
 use crate::{
     ownable::{
         emit_ownership_renounced, emit_ownership_transfer, emit_ownership_transfer_completed,
-        OwnableError,
-    },
+    }
+};
+
+use crate::{
+    ownable::OwnableError,
     role_transfer::{accept_transfer, transfer_role},
 };
 
@@ -78,6 +82,7 @@ pub fn transfer_ownership(e: &Env, new_owner: &Address, live_until_ledger: u32) 
 
     transfer_role(e, new_owner, &OwnableStorageKey::PendingOwner, live_until_ledger);
 
+    #[cfg(not(feature = "certora"))]
     emit_ownership_transfer(e, &owner, new_owner, live_until_ledger);
 }
 
@@ -102,6 +107,7 @@ pub fn transfer_ownership(e: &Env, new_owner: &Address, live_until_ledger: u32) 
 pub fn accept_ownership(e: &Env) {
     let new_owner = accept_transfer(e, &OwnableStorageKey::Owner, &OwnableStorageKey::PendingOwner);
 
+    #[cfg(not(feature = "certora"))]
     emit_ownership_transfer_completed(e, &new_owner);
 }
 
@@ -136,6 +142,7 @@ pub fn renounce_ownership(e: &Env) {
     }
 
     e.storage().instance().remove(&OwnableStorageKey::Owner);
+    #[cfg(not(feature = "certora"))]
     emit_ownership_renounced(e, &owner);
 }
 

@@ -1,6 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
 
-
 #[cfg(not(feature = "certora"))]
 use crate::{
     access_control::{

@@ -1,1 +1,1 @@
-pub mod access_sanity_rules;
+pub mod access_control_sanity_rules;

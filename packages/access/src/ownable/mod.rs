@@ -30,6 +30,9 @@
 //! Not providing a direct ownership transfer is a deliberate design decision to
 //! help avoid mistakes by transferring to a wrong address.
 
+#[cfg(feature = "certora")]
+pub mod spec;
+
 mod storage;
 
 #[cfg(test)]
