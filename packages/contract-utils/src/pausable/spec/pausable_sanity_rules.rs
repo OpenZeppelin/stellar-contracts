@@ -26,11 +26,11 @@ pub fn unpause_sanity(e: Env) {
 #[rule]
 pub fn when_not_paused_sanity(e: Env) {
     when_not_paused(&e);
-    cvlr_assert!(false); // should not reach
+    cvlr_assert!(false);
 }
 
 #[rule]
 pub fn when_paused_sanity(e: Env) {
     when_paused(&e);
-    cvlr_assert!(false); // should not reach
+    cvlr_assert!(false);
 }
