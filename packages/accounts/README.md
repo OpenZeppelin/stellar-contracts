@@ -132,7 +132,7 @@ Policies follow a well-defined lifecycle that integrates with context rule manag
 
 **Enforcement** is triggered when a context rule successfully matches. Once all policies in the matched rule pass their `can_enforce()` checks, the smart account calls `enforce()` on each policy. This state-changing hook allows policies to update counters, emit events, record timestamps, or perform other mutations that track authorization activity. For example, a spending limit policy might deduct from the available balance and emit an event documenting the transaction.
 
-**Uninstallation** occurs when a context rule is removed from the smart account. The account calls `uninstall()` on each attached policy, allowing them to clean up any stored data associated with that specific account and context rule pairing. This ensures that policies do not leave orphaned state in storage. 
+**Uninstallation** occurs when a context rule is removed from the smart account. The account calls `uninstall()` on each attached policy, allowing them to clean up any stored data associated with that specific account and context rule pairing. This ensures that policies do not leave orphaned state in storage.
 
 #### Policy Examples
 
@@ -288,7 +288,7 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-accounts = "=0.5.0"
+stellar-accounts = "=0.5.1"
 ```
 
 ### 2. Implement the Smart Account Trait
