@@ -117,11 +117,11 @@ fn identity_verifier(e: &Env) -> Address;
 
 To deploy a compliant RWA token and make it functional:
 
-1. **Deploy Core RWA Token**: Implements the RWAToken trait
-2. **Deploy/Connect Compliance Contract**: Implements compliance validation logic
-3. **Deploy/Connect Identity Verifier**: Implements identity verification logic
-4. **Configure Connections**: Use setter functions to link contracts
-5. **Configure Rules**: Set up compliance modules and identity requirements
+1. **Deploy Core RWA Token**
+2. **Deploy/Connect Compliance Contract**
+3. **Deploy/Connect Identity Verifier**
+4. **Configure Connections**
+5. **Configure Rules** (Set up compliance modules and identity requirements)
 
 ```rust
 use soroban_sdk::{Address, Env, String};
