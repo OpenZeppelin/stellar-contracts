@@ -150,12 +150,6 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// * topics - `["deposit", operator: Address, from: Address, receiver:
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
-    ///
-    /// # Security Warning
-    ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
     fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128;
 
     /// Returns the maximum amount of vault shares that can be minted
@@ -210,12 +204,6 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// * topics - `["deposit", operator: Address, from: Address, receiver:
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
-    ///
-    /// # Security Warning
-    ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
     fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128;
 
     /// Returns the maximum amount of underlying assets that can be
@@ -273,12 +261,6 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// * topics - `["withdraw", operator: Address, receiver: Address, owner:
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
-    ///
-    /// # Security Warning
-    ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
     fn withdraw(
         e: &Env,
         assets: i128,
@@ -338,12 +320,6 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// * topics - `["withdraw", operator: Address, receiver: Address, owner:
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
-    ///
-    /// # Security Warning
-    ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// Authorization for the operator must be handled at a higher level.
     fn redeem(e: &Env, shares: i128, receiver: Address, owner: Address, operator: Address) -> i128;
 }
 
