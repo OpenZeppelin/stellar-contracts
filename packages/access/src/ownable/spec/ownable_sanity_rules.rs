@@ -1,8 +1,9 @@
-
+use crate::ownable::spec::contract::FVHarnessContract;
 use cvlr::{cvlr_assert};
 use cvlr_soroban::{nondet_address};
 use cvlr_soroban_derive::rule;
 use cvlr::nondet::Nondet;
+use cvlr::clog;
 
 use soroban_sdk::{Env};
 
@@ -44,5 +45,13 @@ pub fn renounce_ownership_sanity(e: Env) {
 #[rule]
 pub fn enforce_owner_auth_sanity(e: Env) {
     enforce_owner_auth(&e);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn fv_harness_contract_sanity_dummy(e: Env) {
+    let owner = nondet_address();
+    FVHarnessContract::__constructor(&e, owner);
+    FVHarnessContract::get_owner(&e);
     cvlr_assert!(false);
 }

@@ -1894,6 +1894,7 @@ dependencies = [
  "cvlr-soroban-macros",
  "soroban-sdk",
  "stellar-event-assertion",
+ "stellar-macros",
 ]
 
 [[package]]
