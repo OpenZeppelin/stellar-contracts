@@ -3,17 +3,14 @@
 //! Demonstrates an example usage of the Consecutive extension, enabling
 //! efficient batch minting in a single transaction.
 
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use stellar_access::ownable::{set_owner, Ownable};
+use stellar_macros::{default_impl, only_owner};
 use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
     consecutive::{Consecutive, NonFungibleConsecutive},
     Base, ContractOverrides, NonFungibleToken,
 };
-
-#[contracttype]
-pub enum DataKey {
-    Owner,
-}
 
 #[contract]
 pub struct ExampleContract;
@@ -21,7 +18,7 @@ pub struct ExampleContract;
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        e.storage().instance().set(&DataKey::Owner, &owner);
+        set_owner(e, &owner);
         Base::set_metadata(
             e,
             String::from_str(e, "www.mytoken.com"),
@@ -30,10 +27,8 @@ impl ExampleContract {
         );
     }
 
+    #[only_owner]
     pub fn batch_mint(e: &Env, to: Address, amount: u32) -> u32 {
-        let owner: Address =
-            e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
-        owner.require_auth();
         Consecutive::batch_mint(e, &to, amount)
     }
 }
@@ -108,3 +103,7 @@ impl NonFungibleBurnable for ExampleContract {
         Self::ContractType::burn_from(e, &spender, &from, token_id);
     }
 }
+
+#[default_impl]
+#[contractimpl]
+impl Ownable for ExampleContract {}

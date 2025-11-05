@@ -612,6 +612,8 @@ name = "fungible-capped-example"
 version = "0.5.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -632,6 +634,7 @@ name = "fungible-pausable-example"
 version = "0.5.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
  "stellar-contract-utils",
  "stellar-macros",
  "stellar-tokens",
@@ -967,6 +970,8 @@ name = "nft-consecutive-example"
 version = "0.5.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -975,6 +980,7 @@ name = "nft-enumerable-example"
 version = "0.5.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
  "stellar-macros",
  "stellar-tokens",
 ]
@@ -994,6 +1000,7 @@ name = "nft-sequential-minting-example"
 version = "0.5.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
  "stellar-macros",
  "stellar-tokens",
 ]
@@ -1081,6 +1088,7 @@ name = "pausable-example"
 version = "0.5.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
  "stellar-contract-utils",
  "stellar-macros",
 ]

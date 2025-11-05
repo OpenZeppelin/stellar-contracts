@@ -1,6 +1,6 @@
 //! Pausable Example Contract.
 //!
-//! Demonstrates an example usage of `stellar_pausable` moddule by
+//! Demonstrates an example usage of Pausable module by
 //! implementing an emergency stop mechanism that can be triggered only by the
 //! owner account.
 //!
@@ -10,12 +10,12 @@
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, panic_with_error, Address, Env,
 };
+use stellar_access::ownable::{enforce_owner_auth, set_owner, Ownable};
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
-use stellar_macros::{when_not_paused, when_paused};
+use stellar_macros::{default_impl, when_not_paused, when_paused};
 
 #[contracttype]
 pub enum DataKey {
-    Owner,
     Counter,
 }
 
@@ -32,7 +32,7 @@ pub struct ExampleContract;
 #[contractimpl]
 impl ExampleContract {
     pub fn __constructor(e: &Env, owner: Address) {
-        e.storage().instance().set(&DataKey::Owner, &owner);
+        set_owner(e, &owner);
         e.storage().instance().set(&DataKey::Counter, &0);
     }
 
@@ -61,12 +61,12 @@ impl Pausable for ExampleContract {
     }
 
     fn pause(e: &Env, caller: Address) {
-        // When `ownable` module is available,
-        // the following checks should be equivalent to:
-        // `ownable::only_owner(&e);`
-        caller.require_auth();
-        let owner: Address =
-            e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
+        // The `caller` parameter is required by the Pausable trait.
+        // Alternatively, instead of using Ownable, you can combine Pausable
+        // with the Access Control module and apply the
+        // #[only_role(caller, "manager")] attribute.
+        // For reference, see the `Fungible AllowList Example`.
+        let owner: Address = enforce_owner_auth(e);
         if owner != caller {
             panic_with_error!(e, ExampleContractError::Unauthorized);
         }
@@ -75,12 +75,12 @@ impl Pausable for ExampleContract {
     }
 
     fn unpause(e: &Env, caller: Address) {
-        // When `ownable` module is available,
-        // the following checks should be equivalent to:
-        // `ownable::only_owner(&e);`
-        caller.require_auth();
-        let owner: Address =
-            e.storage().instance().get(&DataKey::Owner).expect("owner should be set");
+        // The `caller` parameter is required by the Pausable trait.
+        // Alternatively, instead of using Ownable, you can combine Pausable
+        // with the Access Control module and apply the
+        // #[only_role(caller, "manager")] attribute.
+        // For reference, see the `Fungible AllowList Example`.
+        let owner: Address = enforce_owner_auth(e);
         if owner != caller {
             panic_with_error!(e, ExampleContractError::Unauthorized);
         }
@@ -88,3 +88,7 @@ impl Pausable for ExampleContract {
         pausable::unpause(e);
     }
 }
+
+#[default_impl]
+#[contractimpl]
+impl Ownable for ExampleContract {}

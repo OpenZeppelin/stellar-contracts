@@ -9,7 +9,6 @@ use stellar_macros::{default_impl, only_owner};
 
 #[contracttype]
 pub enum DataKey {
-    Owner,
     Counter,
 }
 

@@ -36,10 +36,12 @@ impl FungibleToken for MockAssetContract {
 
 fn create_vault_client<'a>(
     e: &Env,
+    owner_address: &Address,
     asset_address: &Address,
     decimals_offset: u32,
 ) -> ExampleContractClient<'a> {
-    let vault_address = e.register(ExampleContract, (asset_address, decimals_offset));
+    let vault_address =
+        e.register(ExampleContract, (owner_address, asset_address, decimals_offset));
     ExampleContractClient::new(e, &vault_address)
 }
 
@@ -64,7 +66,8 @@ fn test_vault_initialization() {
     let asset_address = asset_client.address.clone();
 
     // Create vault contract
-    let vault_client = create_vault_client(&e, &asset_address, decimals_offset);
+    let vault_admin = Address::generate(&e);
+    let vault_client = create_vault_client(&e, &vault_admin, &asset_address, decimals_offset);
 
     // Test vault initialization
     assert_eq!(vault_client.query_asset(), asset_address);
@@ -87,7 +90,8 @@ fn test_vault_deposit() {
     let asset_address = asset_client.address.clone();
 
     // Create vault contract
-    let vault_client = create_vault_client(&e, &asset_address, decimals_offset);
+    let vault_admin = Address::generate(&e);
+    let vault_client = create_vault_client(&e, &vault_admin, &asset_address, decimals_offset);
 
     e.mock_all_auths();
 
@@ -123,7 +127,8 @@ fn test_vault_mint() {
     let asset_address = asset_client.address.clone();
 
     // Create vault contract
-    let vault_client = create_vault_client(&e, &asset_address, decimals_offset);
+    let vault_admin = Address::generate(&e);
+    let vault_client = create_vault_client(&e, &vault_admin, &asset_address, decimals_offset);
 
     e.mock_all_auths();
 
@@ -154,7 +159,8 @@ fn test_vault_withdraw() {
     // Create contracts
     let asset_client = create_asset_client(&e, initial_supply, &admin);
     let asset_address = asset_client.address.clone();
-    let vault_client = create_vault_client(&e, &asset_address, decimals_offset);
+    let vault_admin = Address::generate(&e);
+    let vault_client = create_vault_client(&e, &vault_admin, &asset_address, decimals_offset);
 
     e.mock_all_auths();
 
@@ -183,7 +189,8 @@ fn test_vault_redeem() {
     // Create contracts
     let asset_client = create_asset_client(&e, initial_supply, &admin);
     let asset_address = asset_client.address.clone();
-    let vault_client = create_vault_client(&e, &asset_address, decimals_offset);
+    let vault_admin = Address::generate(&e);
+    let vault_client = create_vault_client(&e, &vault_admin, &asset_address, decimals_offset);
 
     e.mock_all_auths();
 
@@ -217,7 +224,8 @@ fn test_conversion_functions() {
     // Create contracts
     let asset_client = create_asset_client(&e, initial_supply, &admin);
     let asset_address = asset_client.address.clone();
-    let vault_client = create_vault_client(&e, &asset_address, decimals_offset);
+    let vault_admin = Address::generate(&e);
+    let vault_client = create_vault_client(&e, &vault_admin, &asset_address, decimals_offset);
 
     e.mock_all_auths();
 
@@ -259,7 +267,8 @@ fn test_max_functions() {
     // Create contracts
     let asset_client = create_asset_client(&e, initial_supply, &admin);
     let asset_address = asset_client.address.clone();
-    let vault_client = create_vault_client(&e, &asset_address, decimals_offset);
+    let vault_admin = Address::generate(&e);
+    let vault_client = create_vault_client(&e, &vault_admin, &asset_address, decimals_offset);
 
     e.mock_all_auths();
 
@@ -293,7 +302,8 @@ fn test_multiple_users_deposit_withdraw() {
     // Create contracts
     let asset_client = create_asset_client(&e, initial_supply, &admin);
     let asset_address = asset_client.address.clone();
-    let vault_client = create_vault_client(&e, &asset_address, decimals_offset);
+    let vault_admin = Address::generate(&e);
+    let vault_client = create_vault_client(&e, &vault_admin, &asset_address, decimals_offset);
 
     e.mock_all_auths();
 
@@ -331,7 +341,8 @@ fn test_deposit_max_validation() {
     // Create contracts
     let asset_client = create_asset_client(&e, initial_supply, &admin);
     let asset_address = asset_client.address.clone();
-    let vault_client = create_vault_client(&e, &asset_address, decimals_offset);
+    let vault_admin = Address::generate(&e);
+    let vault_client = create_vault_client(&e, &vault_admin, &asset_address, decimals_offset);
 
     e.mock_all_auths();
 
@@ -359,7 +370,8 @@ fn test_withdraw_exceeds_max() {
     // Create contracts
     let asset_client = create_asset_client(&e, initial_supply, &admin);
     let asset_address = asset_client.address.clone();
-    let vault_client = create_vault_client(&e, &asset_address, decimals_offset);
+    let vault_admin = Address::generate(&e);
+    let vault_client = create_vault_client(&e, &vault_admin, &asset_address, decimals_offset);
 
     e.mock_all_auths();
 
@@ -385,7 +397,8 @@ fn test_redeem_exceeds_max() {
     // Create contracts
     let asset_client = create_asset_client(&e, initial_supply, &admin);
     let asset_address = asset_client.address.clone();
-    let vault_client = create_vault_client(&e, &asset_address, decimals_offset);
+    let vault_admin = Address::generate(&e);
+    let vault_client = create_vault_client(&e, &vault_admin, &asset_address, decimals_offset);
 
     e.mock_all_auths();
 

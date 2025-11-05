@@ -29,7 +29,7 @@ impl ExampleContract {
 
         access_control::set_admin(e, &admin);
 
-        // create a role "manager" and grant it to `manager`
+        // Create a role "manager" and grant it to `manager`
         access_control::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
 
         // Allow the admin to transfer tokens
@@ -45,6 +45,7 @@ impl ExampleContract {
 impl FungibleToken for ExampleContract {
     type ContractType = AllowList;
 }
+
 #[contractimpl]
 impl FungibleAllowList for ExampleContract {
     fn allowed(e: &Env, account: Address) -> bool {
