@@ -20,6 +20,9 @@ impl ExampleContract {
             String::from_str(e, "My Token"),
             String::from_str(e, "TKN"),
         );
+        // Examples of how you can create a role and grant it to an address:
+        // grant_role_no_auth(e, &admin, &minter, &symbol_short!("minter"));
+        // grant_role_no_auth(e, &admin, &burner, &symbol_short!("burner"));
     }
 
     #[only_admin]
@@ -27,14 +30,14 @@ impl ExampleContract {
         vec![&e, String::from_str(e, "seems sus")]
     }
 
-    // we want `require_auth()` provided by the macro, since there is no
+    // We want `require_auth()` provided by the macro, since there is no
     // `require_auth()` in `Base::mint`.
     #[only_role(caller, "minter")]
     pub fn mint(e: &Env, caller: Address, to: Address, token_id: u32) {
         Base::mint(e, &to, token_id)
     }
 
-    // allows either minter or burner role, does not enforce `require_auth` in the
+    // Allows either minter or burner role, does not enforce `require_auth` in the
     // macro
     #[has_any_role(caller, ["minter", "burner"])]
     pub fn multi_role_action(e: &Env, caller: Address) -> String {
@@ -42,7 +45,7 @@ impl ExampleContract {
         String::from_str(e, "multi_role_action_success")
     }
 
-    // allows either minter or burner role AND enforces `require_auth` in the macro
+    // Allows either minter or burner role AND enforces `require_auth` in the macro
     #[only_any_role(caller, ["minter", "burner"])]
     pub fn multi_role_auth_action(e: &Env, caller: Address) -> String {
         String::from_str(e, "multi_role_auth_action_success")
@@ -55,11 +58,11 @@ impl NonFungibleToken for ExampleContract {
     type ContractType = Base;
 }
 
-// for this contract, the `burn*` functions are only meant to be called by
+// For this contract, the `burn*` functions are only meant to be called by
 // specific people with the `burner` role
 #[contractimpl]
 impl NonFungibleBurnable for ExampleContract {
-    // we DON'T want `require_auth()` provided by the macro, since there is already
+    // We DON'T want `require_auth()` provided by the macro, since there is already
     // `require_auth()` in `Base::burn`
     #[has_role(from, "burner")]
     fn burn(e: &Env, from: Address, token_id: u32) {

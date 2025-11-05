@@ -4,10 +4,11 @@
 //! implementing a capped mint mechanism, and setting the maximum supply
 //! at the constructor.
 //!
-//! **IMPORTANT**: this example is for demonstration purposes, and authorization
-//! is not taken into consideration
+//! **IMPORTANT**: this example is for demonstration purposes.
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use stellar_access::ownable::{set_owner, Ownable};
+use stellar_macros::{default_impl, only_owner};
 use stellar_tokens::fungible::{
     capped::{check_cap, set_cap},
     Base, FungibleToken,
@@ -18,10 +19,12 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, cap: i128) {
+    pub fn __constructor(e: &Env, owner: Address, cap: i128) {
+        set_owner(e, &owner);
         set_cap(e, cap);
     }
 
+    #[only_owner]
     pub fn mint(e: &Env, account: Address, amount: i128) {
         check_cap(e, amount);
         Base::mint(e, &account, amount);
@@ -68,3 +71,7 @@ impl FungibleToken for ExampleContract {
         Self::ContractType::symbol(e)
     }
 }
+
+#[default_impl]
+#[contractimpl]
+impl Ownable for ExampleContract {}

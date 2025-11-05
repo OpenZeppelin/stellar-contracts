@@ -1,6 +1,7 @@
 //! Tokenized Vault Example Contract.
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use stellar_access::ownable::{set_owner, Ownable};
 use stellar_macros::default_impl;
 use stellar_tokens::{
     fungible::{Base, FungibleToken},
@@ -12,7 +13,8 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, asset: Address, decimals_offset: u32) {
+    pub fn __constructor(e: &Env, owner: Address, asset: Address, decimals_offset: u32) {
+        set_owner(e, &owner);
         // Asset and decimal offset should be configured once during initialization.
         Vault::set_asset(e, asset);
         Vault::set_decimals_offset(e, decimals_offset);
@@ -34,6 +36,7 @@ impl FungibleToken for ExampleContract {
 
     // Allows override of decimals and other base functions.
 
+    // Overriding decimals function for demonstration purposes:
     fn decimals(e: &Env) -> u32 {
         Vault::decimals(e)
     }
@@ -42,6 +45,8 @@ impl FungibleToken for ExampleContract {
 #[contractimpl]
 impl FungibleVault for ExampleContract {
     // Allows override of public vault functions.
+    // The `#[default_impl]` attribute can also be used, but
+    // ensure that proper authorization checks are implemented.
 
     fn query_asset(e: &Env) -> Address {
         Vault::query_asset(e)
@@ -117,3 +122,7 @@ impl FungibleVault for ExampleContract {
         Vault::redeem(e, shares, receiver, owner, operator)
     }
 }
+
+#[default_impl]
+#[contractimpl]
+impl Ownable for ExampleContract {}
