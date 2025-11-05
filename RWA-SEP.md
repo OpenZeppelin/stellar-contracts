@@ -120,8 +120,7 @@ To deploy a compliant RWA token and make it functional:
 1. **Deploy Core RWA Token**
 2. **Deploy/Connect Compliance Contract**
 3. **Deploy/Connect Identity Verifier**
-4. **Configure Connections**
-5. **Configure Rules** (Set up compliance modules and identity requirements)
+4. **Configure Connections**: Link the RWA token to its compliance and identity verifier contracts using `set_compliance()` and `set_identity_verifier()`. Additionally, configure internal connections within the compliance stack (e.g., linking compliance contract to compliance modules) and identity stack (e.g., linking identity verifier to claim topics/issuers or custom registries) as needed for your implementation.
 
 ```rust
 use soroban_sdk::{Address, Env, String};
@@ -736,3 +735,5 @@ Through our (OpenZeppelin) collaboration with Tokeny, Stellar, we identified key
 **Identity System Migration**:
 - Abstract identity verification enables migration between verification approaches
 - Gradual migration strategies for existing user bases
+
+For general contract upgrade patterns and best practices, refer to [SEP-49: Upgradeable Contracts](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0049.md).
