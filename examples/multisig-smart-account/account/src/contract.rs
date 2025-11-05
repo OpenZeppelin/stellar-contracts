@@ -16,7 +16,10 @@ use stellar_accounts::smart_account::{
     update_context_rule_valid_until, ContextRule, ContextRuleType, ExecutionEntryPoint, Signatures,
     Signer, SmartAccount, SmartAccountError,
 };
+use stellar_contract_utils::upgradeable::UpgradeableInternal;
+use stellar_macros::Upgradeable;
 
+#[derive(Upgradeable)]
 #[contract]
 pub struct MultisigContract;
 
@@ -125,5 +128,11 @@ impl ExecutionEntryPoint for MultisigContract {
         e.current_contract_address().require_auth();
 
         e.invoke_contract::<Val>(&target, &target_fn, target_args);
+    }
+}
+
+impl UpgradeableInternal for MultisigContract {
+    fn _require_auth(e: &Env, _operator: &Address) {
+        e.current_contract_address().require_auth();
     }
 }
