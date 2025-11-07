@@ -12,7 +12,7 @@ Discussion: TBD
 ```
 
 ## Summary
-This proposal defines a standard contract interface for Real World Asset (RWA) tokens on Stellar. RWA tokens represent tokenized real-world assets such as securities, bonds, real estate, or other regulated financial instruments that require compliance with regulatory frameworks.
+This proposal defines a standard contract interface for Real World Asset (RWA) tokens on Stellar. RWA tokens represent tokenized real-world assets such as securities, bonds, real estate, or other regulated financial instruments that require compliance with regulatory frameworks. RWA tokens are **permissioned tokens**, ensuring that only eligible investors can hold and transfer these tokens.
 
 This standard is based on the T-REX (Token for Regulated Exchanges) framework, as implemented in ERC-3643 (https://github.com/ERC-3643/ERC-3643), but introduces significant architectural improvements for flexibility and modularity.
 
@@ -27,16 +27,14 @@ Real World Assets (RWAs) represent a significant opportunity for blockchain adop
 
 The T-REX standard provides a comprehensive framework for compliant security tokens. This SEP adapts T-REX to the Stellar ecosystem, enabling:
 
-- **Modular compliance framework** with pluggable compliance rules
+- **Modular hook-based compliance framework** with pluggable compliance rules
 - **Flexible identity verification** supporting multiple approaches (claim-based, Merkle tree, zero-knowledge, etc.)
 - **Sophisticated freezing mechanisms** at both address and token levels
 - **Administrative controls** with role-based access control (RBAC)
-- **Recovery systems** for institutional-grade wallet management
-- **Compliance hooks** for regulatory reporting
 
 ## Architecture Overview
 
-Based on extensive research and collaboration with industry experts, this RWA standard introduces an approach built around **loose coupling** and **implementation abstraction**, addressing key limitations identified in existing standards.
+This RWA standard introduces an approach built around **loose coupling** and **implementation abstraction**.
 
 ### Core Design Principles
 
@@ -52,33 +50,25 @@ The Stellar T-REX consists of several interconnected but loosely coupled compone
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────────┐
 │   RWA Token     │───▶│   Compliance     │───▶│  Compliance Modules │
-│   (Core)        │    │   Contract       │    │  (Pluggable Rules)  │
+│   (Core)        │    │                  │    │  (Pluggable Rules)  │
 └─────────────────┘    └──────────────────┘    └─────────────────────┘
          │
          ▼
 ┌─────────────────┐    ┌──────────────────┐    ┌──────────────────┐
-│ Identity        │───▶│ Claim Topics &   │    │ Custom Identity  │
-│ Verifier        │    │ Issuers          │───▶│ Registry         │
+│ Identity        │───▶│ Claim Topics &   │    │ Identity Registry│
+│ Verifier        │    │ Issuers          │───▶│                  │
 └─────────────────┘    └──────────────────┘    └──────────────────┘
 ```
 
-### Flexibility Through Abstraction
-
-The architecture supports multiple implementation strategies:
-
-- **Identity Verification**: Merkle trees, Zero-Knowledge proofs, claim-based systems, or custom approaches
-- **Compliance Rules**: Modular hook-based system supporting diverse regulatory requirements
-- **Access Control**: Integration with external RBAC systems
-
-This design enables the same core RWA interface to work with vastly different regulatory and technical requirements.
+This design enables the same core RWA token interface to work with vastly different regulatory and technical requirements for identity verification, such as Merkle trees, Zero-Knowledge proofs, claim-based systems, and others. Furthermore, the modular hook-based system supports diverse regulatory requirements through pluggable compliance rules.
 
 ## Interface
 
-The RWA token interface extends the **fungible token** ([SEP-41](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0041.md)) functionality with regulatory compliance features.
+The RWA token interface extends the **fungible token** ([SEP-41](https://github.com/stellar/stellar-protocol/blob/master/ecosystem/sep-0041.md)) with regulatory required features: freezing, pausing and recovery.
 
 ### Architecture Overview
 
-The RWA Token contract requires only **two external functions** to operate:
+The RWA token contract requires only **two external functions** to operate:
 
 ```rust
 // Compliance validation - returns true if transfer is allowed
@@ -88,8 +78,8 @@ fn can_transfer(e: &Env, from: Address, to: Address, amount: i128) -> bool;
 fn verify_identity(e: &Env, user_address: &Address);
 ```
 
-- `can_transfer()` is expected to be exposed from a compliance contract.
-- `verify_identity()` is expected to be exposed from an identity verifier contract.
+- `can_transfer()` is expected to be exposed from a "Compliance" contract.
+- `verify_identity()` is expected to be exposed from an "Identity Verifier" contract.
 
 These functions are **deliberately abstracted** as implementation details, enabling:
 - **Regulatory Flexibility**: Different jurisdictions can implement different compliance logic
@@ -101,7 +91,7 @@ In other words, the only thing required by this RWA token design, is that the RW
 
 ### Contract Connection Interface
 
-The RWA Token provides simple setter/getter functions for external contracts:
+The RWA token provides simple setter/getter functions for external contracts:
 
 ```rust
 // Compliance Contract Management
@@ -201,8 +191,8 @@ pub trait RWAToken: TokenInterface {
     /// * data - `[amount: i128]`
     fn burn(e: &Env, user_address: Address, amount: i128, operator: Address);
 
-    /// Recovery function used to force transfer tokens from a lost wallet
-    /// to a new wallet for an investor.
+    /// Recovery function used to force transfer tokens from a old account
+    /// to a new account for an investor.
     /// This function can only be called by the operator with necessary
     /// privileges. RBAC checks are expected to be enforced on the
     /// `operator`.
@@ -210,24 +200,21 @@ pub trait RWAToken: TokenInterface {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `lost_wallet` - The wallet that the investor lost.
-    /// * `new_wallet` - The newly provided wallet for token transfer.
-    /// * `investor_onchain_id` - The onchain ID of the investor asking for
-    ///   recovery.
+    /// * `old_account` - The wallet that the investor lost.
+    /// * `new_account` - The newly provided wallet for token transfer.
     /// * `operator` - The address of the operator.
     ///
     /// # Events
     ///
-    /// * topics - `["transfer", lost_wallet: Address, new_wallet: Address]`
+    /// * topics - `["transfer", old_account: Address, new_account: Address]`
     /// * data - `[amount: i128]`
-    /// * topics - `["recovery", lost_wallet: Address, new_wallet: Address,
+    /// * topics - `["recovery", old_account: Address, new_account: Address,
     ///   investor_onchain_id: Address]`
     /// * data - `[]`
-    fn recovery_address(
+    fn recover_balance(
         e: &Env,
-        lost_wallet: Address,
-        new_wallet: Address,
-        investor_onchain_id: Address,
+        old_account: Address,
+        new_account: Address,
         operator: Address,
     ) -> bool;
 
@@ -429,9 +416,8 @@ The recovery event is emitted when tokens are successfully recovered from a lost
 
 **Topics:**
 - `Symbol` with value `"recovery"`
-- `Address`: the lost wallet address
-- `Address`: the new wallet address
-- `Address`: the investor's onchain ID
+- `Address`: the old account address
+- `Address`: the new account address
 
 **Data:**
 - Empty array `[]`
@@ -488,7 +474,7 @@ The identity verifier set event is emitted when the identity verifier contract i
 **Data:**
 - Empty array `[]`
 
-## Component Deep Dive
+## Reference Implementation: Component Deep Dive
 
 ### 1. Identity Verification System
 
@@ -549,26 +535,26 @@ Our claim-based reference implementation demonstrates the full complexity of tra
               │
               ├────▶┌───────────────────────────┐
               │     │ Identity Registry Storage │
-              │     │ (User Profiles)           │
+              │     │ (Investor Profiles)       │
               │     └───────────────────────────┘
               │
               ├────▶┌───────────────────────────┐
               │     │ Identity Claims           │
-              │     │ (Claim Validation)        │
+              │     │ (Investor Claims Storage) │
               │     └───────────────────────────┘
               │
               └────▶┌───────────────────────────┐
                     │ Claim Issuer              │
-                    │ (Signature Validation)    │
+                    │ (Claims Validation)       │
                     └───────────────────────────┘
 ```
 
 **Key Components:**
 
-- **ClaimTopicsAndIssuers**: Merged registry managing both trusted issuers and required claim types (KYC=1, AML=2, etc.)
-- **IdentityRegistryStorage**: Component storing identity profiles with country relations and metadata
-- **IdentityClaims**: Validates cryptographic claims using multiple signature schemes (Ed25519, Secp256k1, Secp256r1), with an emphasis on interoperability with the evolving OnchainID specification (https://github.com/ERC-3643/ERCs/blob/erc-oid/ERCS/erc-xxxx.md).
-- **ClaimIssuer**: Builds and validates cryptographic claims about user attributes
+- **ClaimTopicsAndIssuers**: Registry contract managing both trusted issuers and required claim types (KYC=1, AML=2, etc.).
+- **IdentityRegistryStorage**: Component storing investors identity profiles with country relations and metadata.
+- **IdentityClaims**: Required for every investor as a separate contract or as an extension to existing identity management systems. Its goal is to store cryptographic claims issued to that investor by trusted claim issuers. This component is under investor's control. Its structure mirrors the evolving OnchainID specification (https://github.com/ERC-3643/ERCs/blob/erc-oid/ERCS/erc-xxxx.md).
+- **ClaimIssuer**: Conracts belonging to trusted 3rd parties to validate cryptographic claims about investors' attributes by ususing multiple signature schemes (Ed25519, Secp256k1, Secp256r1).
 
 ### 2. Compliance System
 
@@ -615,7 +601,7 @@ pub enum ComplianceHook {
 
 **Jurisdiction Restrictions Module**:
 - Hook: `CanTransfer`
-- Logic: Block transfers between incompatible jurisdictions
+- Logic: Restrict transfers to blocked jurisdictions
 
 **Holding Period Module**:
 - Hook: `CanTransfer` + `Created`
@@ -644,7 +630,7 @@ Compliance contracts are designed to be **shared across multiple RWA tokens**, r
 
 #### Freezing Mechanisms
 
-Based on regulatory requirements research, the system supports multiple freezing strategies:
+The system supports multiple freezing strategies to accomodate for different regulatory requirements:
 
 **Address-Level Freezing**:
 ```rust
@@ -665,24 +651,19 @@ fn get_frozen_tokens(e: &Env, user_address: Address) -> i128;
 
 #### Recovery System
 
-Institutional-grade wallet recovery for high-value securities:
+Two distinct recovery flows are supported:
+
+1. Identity Recovery: Managed in the Identity Stack (Identity Registry Storage), transfers the identity contract reference and profile (including country data) from old account to new account, and creates a recovery mapping.
 
 ```rust
-fn recovery_address(
-    e: &Env,
-    lost_wallet: Address,
-    new_wallet: Address,
-    investor_onchain_id: Address,
-    operator: Address
-) -> bool;
+fn recover_identity(e: &Env, old_account: Address, new_account: Address, operator: Address);
 ```
 
-**Recovery Process**:
-1. **Identity Verification**: Verify investor's onchain identity matches the lost wallet
-2. **Authorization Check**: Ensure operator has recovery permissions
-3. **Balance Transfer**: Move all tokens from lost wallet to new wallet
-4. **Identity Update**: Update identity registry to map new wallet to existing identity
-5. **Audit Trail**: Emit comprehensive events for regulatory reporting
+2. Balance Recovery: Managed by the RWA token, transfers tokens from old to new account after verifying the identity recovery mapping exists
+
+```rust
+fn recover_balance(e: &Env, old_account: Address, new_account: Address, operator: Address) -> bool;
+```
 
 #### Forced Transfers
 
@@ -700,15 +681,13 @@ fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, operator: 
 
 RWA tokens require proper access control to ensure that sensitive operations are only performed by authorized entities:
 
-- **Operator Authorization**: All administrative functions require proper operator authorization using Soroban's built-in authorization mechanisms
+- **Operator Authorization**: All administrative functions require `operator` authorization
 - **Flexible Access Control**: While the RWA interface itself doesn't prescribe a specific access control model, implementations can integrate with external access control systems as needed
 - **Compliance Integration**: Access control permissions should be integrated with compliance rules to ensure regulatory requirements are met
 
-## Research-Driven Design Decisions
+### Deviations from ERC-3643
 
-### Addressing ERC-3643 Limitations
-
-Through our (OpenZeppelin) collaboration with Tokeny, Stellar, we identified key limitations in existing RWA standards:
+Several limitations in the original ERC-3643 standard and its reference implementation were identified and respectively addressed:
 
 **1. Tight Coupling Issues**
 - **Problem**: ERC-3643 tightly couples identity verification with specific contract structures
