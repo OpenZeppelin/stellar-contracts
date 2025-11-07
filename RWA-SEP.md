@@ -630,7 +630,7 @@ Compliance contracts are designed to be **shared across multiple RWA tokens**, r
 
 #### Freezing Mechanisms
 
-The system supports multiple freezing strategies to accomodate for different regulatory requirements:
+The system supports multiple freezing strategies to accommodate for different regulatory requirements:
 
 **Address-Level Freezing**:
 ```rust
