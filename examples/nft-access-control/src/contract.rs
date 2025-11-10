@@ -12,14 +12,9 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, admin: Address) {
+    pub fn __constructor(e: &Env, uri: String, name: String, symbol: String, admin: Address) {
         set_admin(e, &admin);
-        Base::set_metadata(
-            e,
-            String::from_str(e, "www.mytoken.com"),
-            String::from_str(e, "My Token"),
-            String::from_str(e, "TKN"),
-        );
+        Base::set_metadata(e, uri, name, symbol);
     }
 
     #[only_admin]
