@@ -13,16 +13,16 @@ crate-type = ["lib", "cdylib"]
 doctest = false
 
 [dependencies]
-soroban-sdk = { workspace = true }
+soroban-sdk = { workspace = true}
 cvlr = { workspace = true, default-features = false }
 cvlr-soroban = { workspace = true }
 cvlr-soroban-macros = { workspace = true }
 cvlr-soroban-derive = { workspace = true }
-stellar-macros = { workspace = true }
+base64ct = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 stellar-event-assertion = { workspace = true }
 
 [features]
-certora = []
+certora  = []

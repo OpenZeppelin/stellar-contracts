@@ -40,7 +40,8 @@ categories = ["no-std", "wasm"]
 version = "0.4.1"
 
 [workspace.dependencies]
-soroban-sdk = "23.0.2"
+# soroban-sdk = {package = "soroban-sdk", version = "23.0.2", default-features = false}
+soroban-sdk = {package = "soroban-sdk", version = "=22.0.8", default-features = false}
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
@@ -52,6 +53,7 @@ k256 = "0.13.4"
 p256 = "0.13.2"
 serde = { version = "1", default-features = false }
 serde-json-core = { version = "0.6.0", default-features = false }
+base64ct = { version = "=1.6.0" }
 
 # members
 stellar-access = { path = "packages/access" }
@@ -81,13 +83,16 @@ version = "0.4.0"
 default-features = false
 
 [workspace.dependencies.cvlr-soroban]
-git = "https://github.com/Certora/cvlr-soroban.git"
+git = "https://github.com/chandrakananandi/cvlr-soroban.git"
+branch = "soroban-22.0.8"
 # path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban"
 
 [workspace.dependencies.cvlr-soroban-macros]
-git = "https://github.com/Certora/cvlr-soroban.git"
+git = "https://github.com/chandrakananandi/cvlr-soroban.git"
+branch = "soroban-22.0.8"
 # path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-macros"
 
 [workspace.dependencies.cvlr-soroban-derive]
-git = "https://github.com/Certora/cvlr-soroban.git"
+git = "https://github.com/chandrakananandi/cvlr-soroban.git"
+branch = "soroban-22.0.8"
 # path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-derive"

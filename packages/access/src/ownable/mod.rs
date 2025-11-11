@@ -38,7 +38,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env};
+use soroban_sdk::{contracterror, Address, Env};
 
 pub use crate::ownable::storage::{
     accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
@@ -138,7 +138,7 @@ pub enum OwnableError {
 // ################## EVENTS ##################
 
 /// Event emitted when an ownership transfer is initiated.
-#[contractevent]
+// #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipTransfer {
     pub old_owner: Address,
@@ -161,16 +161,16 @@ pub fn emit_ownership_transfer(
     new_owner: &Address,
     live_until_ledger: u32,
 ) {
-    OwnershipTransfer {
-        old_owner: old_owner.clone(),
-        new_owner: new_owner.clone(),
-        live_until_ledger,
-    }
-    .publish(e);
+    // OwnershipTransfer {
+    //     old_owner: old_owner.clone(),
+    //     new_owner: new_owner.clone(),
+    //     live_until_ledger,
+    // }
+    // .publish(e);
 }
 
 /// Event emitted when an ownership transfer is completed.
-#[contractevent]
+// #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipTransferCompleted {
     pub new_owner: Address,
@@ -183,11 +183,11 @@ pub struct OwnershipTransferCompleted {
 /// * `e` - Access to the Soroban environment.
 /// * `new_owner` - The address of the new owner.
 pub fn emit_ownership_transfer_completed(e: &Env, new_owner: &Address) {
-    OwnershipTransferCompleted { new_owner: new_owner.clone() }.publish(e);
+    // OwnershipTransferCompleted { new_owner: new_owner.clone() }.publish(e);
 }
 
 /// Event emitted when ownership is renounced.
-#[contractevent]
+// #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipRenounced {
     pub old_owner: Address,
@@ -200,5 +200,5 @@ pub struct OwnershipRenounced {
 /// * `e` - Access to the Soroban environment.
 /// * `old_owner` - The address of the owner who renounced ownership.
 pub fn emit_ownership_renounced(e: &Env, old_owner: &Address) {
-    OwnershipRenounced { old_owner: old_owner.clone() }.publish(e);
+    // OwnershipRenounced { old_owner: old_owner.clone() }.publish(e);
 }

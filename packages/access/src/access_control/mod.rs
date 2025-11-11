@@ -94,7 +94,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env, Symbol};
+use soroban_sdk::{contracterror, Address, Env, Symbol};
 
 pub use crate::access_control::storage::{
     accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
@@ -104,6 +104,7 @@ pub use crate::access_control::storage::{
     revoke_role, revoke_role_no_auth, set_admin, set_role_admin, set_role_admin_no_auth,
     transfer_admin_role, AccessControlStorageKey,
 };
+
 
 pub trait AccessControl {
     /// Returns `Some(index)` if the account has the specified role,
@@ -359,12 +360,12 @@ pub const ROLE_TTL_THRESHOLD: u32 = ROLE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 // ################## EVENTS ##################
 
 /// Event emitted when a role is granted.
-#[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoleGranted {
-    #[topic]
+    // #[topic]
     pub role: Symbol,
-    #[topic]
+    // #[topic]
     pub account: Address,
     pub caller: Address,
 }
@@ -378,16 +379,16 @@ pub struct RoleGranted {
 /// * `account` - The account that received the role.
 /// * `caller` - The account that granted the role.
 pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
-    RoleGranted { role: role.clone(), account: account.clone(), caller: caller.clone() }.publish(e);
+    // RoleGranted { role: role.clone(), account: account.clone(), caller: caller.clone() }.publish(e);
 }
 
 /// Event emitted when a role is revoked.
-#[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoleRevoked {
-    #[topic]
+    // #[topic]
     pub role: Symbol,
-    #[topic]
+    // #[topic]
     pub account: Address,
     pub caller: Address,
 }
@@ -402,14 +403,14 @@ pub struct RoleRevoked {
 /// * `caller` - The account that revoked the role (either the admin or the
 ///   account itself).
 pub fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
-    RoleRevoked { role: role.clone(), account: account.clone(), caller: caller.clone() }.publish(e);
+    // RoleRevoked { role: role.clone(), account: account.clone(), caller: caller.clone() }.publish(e);
 }
 
 /// Event emitted when a role admin is changed.
-#[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoleAdminChanged {
-    #[topic]
+    // #[topic]
     pub role: Symbol,
     pub previous_admin_role: Symbol,
     pub new_admin_role: Symbol,
@@ -429,19 +430,19 @@ pub fn emit_role_admin_changed(
     previous_admin_role: &Symbol,
     new_admin_role: &Symbol,
 ) {
-    RoleAdminChanged {
-        role: role.clone(),
-        previous_admin_role: previous_admin_role.clone(),
-        new_admin_role: new_admin_role.clone(),
-    }
-    .publish(e);
+    // RoleAdminChanged {
+    //     role: role.clone(),
+    //     previous_admin_role: previous_admin_role.clone(),
+    //     new_admin_role: new_admin_role.clone(),
+    // }
+    // .publish(e);
 }
 
 /// Event emitted when an admin transfer is initiated.
-#[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AdminTransferInitiated {
-    #[topic]
+    // #[topic]
     pub current_admin: Address,
     pub new_admin: Address,
     pub live_until_ledger: u32,
@@ -462,19 +463,19 @@ pub fn emit_admin_transfer_initiated(
     new_admin: &Address,
     live_until_ledger: u32,
 ) {
-    AdminTransferInitiated {
-        current_admin: current_admin.clone(),
-        new_admin: new_admin.clone(),
-        live_until_ledger,
-    }
-    .publish(e);
+    // AdminTransferInitiated {
+    //     current_admin: current_admin.clone(),
+    //     new_admin: new_admin.clone(),
+    //     live_until_ledger,
+    // }
+    // .publish(e);
 }
 
 /// Event emitted when an admin transfer is completed.
-#[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AdminTransferCompleted {
-    #[topic]
+    // #[topic]
     pub new_admin: Address,
     pub previous_admin: Address,
 }
@@ -487,15 +488,15 @@ pub struct AdminTransferCompleted {
 /// * `previous_admin` - The previous admin.
 /// * `new_admin` - The new admin who accepted the transfer.
 pub fn emit_admin_transfer_completed(e: &Env, previous_admin: &Address, new_admin: &Address) {
-    AdminTransferCompleted { new_admin: new_admin.clone(), previous_admin: previous_admin.clone() }
-        .publish(e);
+    // AdminTransferCompleted { new_admin: new_admin.clone(), previous_admin: previous_admin.clone() }
+        // .publish(e);
 }
 
 /// Event emitted when the admin role is renounced.
-#[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AdminRenounced {
-    #[topic]
+    // #[topic]
     pub admin: Address,
 }
 
@@ -506,5 +507,5 @@ pub struct AdminRenounced {
 /// * `e` - Access to Soroban environment.
 /// * `admin` - The admin that renounced the role.
 pub fn emit_admin_renounced(e: &Env, admin: &Address) {
-    AdminRenounced { admin: admin.clone() }.publish(e);
+    // AdminRenounced { admin: admin.clone() }.publish(e);
 }

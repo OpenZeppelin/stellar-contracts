@@ -55,7 +55,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env};
+use soroban_sdk::{contracterror, Address, Env};
 
 pub use crate::pausable::storage::{pause, paused, unpause, when_not_paused, when_paused};
 
@@ -143,7 +143,7 @@ pub enum PausableError {
 // ################## EVENTS ##################
 
 /// Event emitted when the contract is paused.
-#[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Paused {}
 
@@ -153,11 +153,11 @@ pub struct Paused {}
 ///
 /// * `e` - The Soroban environment.
 pub fn emit_paused(e: &Env) {
-    Paused {}.publish(e);
+    // Paused {}.publish(e);
 }
 
 /// Event emitted when the contract is unpaused.
-#[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Unpaused {}
 
@@ -167,5 +167,5 @@ pub struct Unpaused {}
 ///
 /// * `e` - The Soroban environment.
 pub fn emit_unpaused(e: &Env) {
-    Unpaused {}.publish(e);
+    // Unpaused {}.publish(e);
 }

@@ -53,7 +53,7 @@ mod test;
 
 use core::marker::PhantomData;
 
-use soroban_sdk::{contracterror, contractevent, Bytes, Env, Val};
+use soroban_sdk::{contracterror, Bytes, Env, Val};
 
 use crate::crypto::hasher::Hasher;
 pub use crate::merkle_distributor::storage::MerkleDistributorStorageKey;
@@ -87,14 +87,14 @@ pub const MERKLE_CLAIMED_TTL_THRESHOLD: u32 = MERKLE_CLAIMED_EXTEND_AMOUNT - DAY
 // ################## EVENTS ##################
 
 /// Event emitted when the merkle root is set.
-#[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SetRoot {
     pub root: Bytes,
 }
 
 /// Event emitted when an index is claimed.
-#[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug)]
 pub struct SetClaimed {
     pub index: Val,
@@ -107,7 +107,7 @@ pub struct SetClaimed {
 /// * `e` - The Soroban environment.
 /// * `root` - The merkle root.
 pub fn emit_set_root(e: &Env, root: Bytes) {
-    SetRoot { root }.publish(e);
+    // SetRoot { root }.publish(e);
 }
 
 /// Emits an event when an index is claimed.
@@ -117,5 +117,5 @@ pub fn emit_set_root(e: &Env, root: Bytes) {
 /// * `e` - The Soroban environment.
 /// * `index` - The index that was claimed.
 pub fn emit_set_claimed(e: &Env, index: Val) {
-    SetClaimed { index }.publish(e);
+    // SetClaimed { index }.publish(e);
 }

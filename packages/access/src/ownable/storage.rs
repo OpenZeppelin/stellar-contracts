@@ -134,6 +134,8 @@ pub fn renounce_ownership(e: &Env) {
     let key = OwnableStorageKey::PendingOwner;
 
     if e.storage().temporary().get::<_, Address>(&key).is_some() {
+        #[cfg(feature = "certora")]
+        cvlr::cvlr_assert!(false);
         panic_with_error!(e, OwnableError::TransferInProgress);
     }
 
@@ -141,6 +143,36 @@ pub fn renounce_ownership(e: &Env) {
     #[cfg(not(feature = "certora"))]
     emit_ownership_renounced(e, &owner);
 }
+
+#[cfg(feature = "certora")]
+pub static mut GHOST: u32 = 0;
+
+pub fn renounce_ownership_1(e: &Env) {
+    let owner = enforce_owner_auth(e);
+    let key = OwnableStorageKey::PendingOwner;
+
+    if e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner).is_some() {
+        #[cfg(feature = "certora")]
+        unsafe { GHOST = 1 };
+    }
+
+    e.storage().instance().remove(&OwnableStorageKey::Owner);
+    #[cfg(not(feature = "certora"))]
+    emit_ownership_renounced(e, &owner);
+}
+
+
+// pub fn renounce_ownership_1(e: &Env) -> Result<(), OwnableError> {
+//     let owner = enforce_owner_auth(e);
+//     let key = OwnableStorageKey::PendingOwner;
+
+//     if e.storage().instance().get::<_, Address>(&key).is_some() {
+//         return Err(OwnableError::TransferInProgress);
+//     }
+
+//     e.storage().instance().remove(&OwnableStorageKey::Owner);
+//     Ok(())
+// }
 
 // ################## LOW-LEVEL HELPERS ##################
 
