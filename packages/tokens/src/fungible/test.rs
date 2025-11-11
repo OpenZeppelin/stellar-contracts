@@ -5,7 +5,7 @@ use soroban_sdk::{
     contract, symbol_short,
     testutils::{
         storage::{Instance, Persistent},
-        Address as _, AuthorizedFunction, Events, Ledger,
+        Address as _, AuthorizedFunction, Events, Ledger, MuxedAddress as _,
     },
     vec, Address, Env, IntoVal, MuxedAddress, String,
 };
@@ -220,7 +220,7 @@ fn transfer_works() {
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_fungible_mint(&from, 100);
-        event_assert.assert_fungible_transfer(&from, &recipient, 50);
+        event_assert.assert_fungible_transfer(&from, &recipient, None, 50);
     });
 }
 
@@ -239,6 +239,27 @@ fn transfer_zero_works() {
 
         let events = e.events().all();
         assert_eq!(events.len(), 1);
+    });
+}
+
+#[test]
+fn transfer_muxed_address_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let from = Address::generate(&e);
+    let recipient = MuxedAddress::generate(&e);
+
+    e.as_contract(&address, || {
+        Base::mint(&e, &from, 100);
+        Base::transfer(&e, &from, &recipient, 50);
+        assert_eq!(Base::balance(&e, &from), 50);
+        assert_eq!(Base::balance(&e, &recipient.address()), 50);
+
+        let mut event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        event_assert.assert_fungible_mint(&from, 100);
+        event_assert.assert_fungible_transfer(&from, &recipient.address(), recipient.id(), 50);
     });
 }
 
@@ -292,7 +313,7 @@ fn approve_and_transfer_from() {
         event_assert.assert_event_count(3);
         event_assert.assert_fungible_mint(&owner, 100);
         event_assert.assert_fungible_approve(&owner, &spender, 50, 1000);
-        event_assert.assert_fungible_transfer(&owner, &recipient, 30);
+        event_assert.assert_fungible_transfer(&owner, &recipient, None, 30);
     });
 }
 
