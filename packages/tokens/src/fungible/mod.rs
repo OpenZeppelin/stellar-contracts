@@ -347,6 +347,7 @@ pub struct Transfer {
 /// * `e` - Access to Soroban environment.
 /// * `from` - The address holding the tokens.
 /// * `to` - The address receiving the transferred tokens.
+/// * `to_muxed_id` - Optional muxed ID to be emitted in the event data.
 /// * `amount` - The amount of tokens to be transferred.
 pub fn emit_transfer(
     e: &Env,

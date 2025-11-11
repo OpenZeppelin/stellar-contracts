@@ -32,7 +32,7 @@ use soroban_sdk::{Address, Env, MuxedAddress, String};
 ///         Self::ContractType::balance(e, &account)
 ///     }
 ///
-///     fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
+///     fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
 ///         Self::ContractType::transfer(e, &from, &to, amount);
 ///     }
 ///
@@ -51,7 +51,7 @@ use soroban_sdk::{Address, Env, MuxedAddress, String};
 ///         Base::balance(e, &account)
 ///     }
 ///
-///     fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
+///     fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
 ///         Base::transfer(e, &from, &to, amount);
 ///     }
 ///
