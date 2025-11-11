@@ -20,7 +20,7 @@
 //!
 //! ```ignore
 //! #[when_not_paused]
-//! fn transfer(e: &env, from: Address, to: Address) {
+//! fn transfer(e: &env, from: Address, to: MuxedAddress) {
 //!     /* this body will execute ONLY when NOT_PAUSED */
 //! }
 //! ```
