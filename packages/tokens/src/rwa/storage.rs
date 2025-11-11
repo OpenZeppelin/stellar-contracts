@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Env, MuxedAddress, String, contracttype, panic_with_error};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{

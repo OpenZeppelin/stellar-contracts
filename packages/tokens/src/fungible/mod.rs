@@ -77,7 +77,7 @@ mod test;
 
 pub use extensions::{allowlist, blocklist, burnable, capped};
 pub use overrides::{Base, ContractOverrides};
-use soroban_sdk::{Address, Env, MuxedAddress, String, contracterror, contractevent};
+use soroban_sdk::{contracterror, contractevent, Address, Env, MuxedAddress, String};
 pub use storage::{AllowanceData, AllowanceKey, StorageKey};
 pub use utils::{sac_admin_generic, sac_admin_wrapper};
 
@@ -348,8 +348,14 @@ pub struct Transfer {
 /// * `from` - The address holding the tokens.
 /// * `to` - The address receiving the transferred tokens.
 /// * `amount` - The amount of tokens to be transferred.
-pub fn emit_transfer(e: &Env, from: &Address, to: &Address, to_muxed_id: Option<u64>, amount: i128) {
-    Transfer { from: from.clone(), to: to.clone(), to_muxed_id,  amount }.publish(e);
+pub fn emit_transfer(
+    e: &Env,
+    from: &Address,
+    to: &Address,
+    to_muxed_id: Option<u64>,
+    amount: i128,
+) {
+    Transfer { from: from.clone(), to: to.clone(), to_muxed_id, amount }.publish(e);
 }
 
 /// Event emitted when an allowance is approved.

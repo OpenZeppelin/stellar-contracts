@@ -1,6 +1,6 @@
 extern crate std;
 
-use soroban_sdk::{Address, Env, MuxedAddress, contract, testutils::Address as _};
+use soroban_sdk::{contract, testutils::Address as _, Address, Env, MuxedAddress};
 
 use crate::fungible::{extensions::blocklist::storage::BlockList, Base};
 

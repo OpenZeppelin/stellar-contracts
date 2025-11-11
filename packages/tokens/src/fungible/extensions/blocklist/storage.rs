@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Env, MuxedAddress, contracttype, panic_with_error};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress};
 
 use crate::fungible::{
     extensions::blocklist::{emit_user_blocked, emit_user_unblocked},

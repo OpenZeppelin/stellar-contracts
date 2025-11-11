@@ -10,7 +10,8 @@
 //! [`stellar_fungible::burnable::FungibleBurnable`].
 
 use soroban_sdk::{
-    Address, Env, MuxedAddress, String, Symbol, contract, contracterror, contractimpl, panic_with_error, symbol_short
+    contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env,
+    MuxedAddress, String, Symbol,
 };
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_macros::when_not_paused;

@@ -1,4 +1,6 @@
-use soroban_sdk::{Address, Env, MuxedAddress, String, Symbol, contracttype, panic_with_error, symbol_short};
+use soroban_sdk::{
+    contracttype, panic_with_error, symbol_short, Address, Env, MuxedAddress, String, Symbol,
+};
 
 use crate::fungible::{
     emit_approve, emit_mint, emit_transfer, Base, FungibleTokenError, BALANCE_EXTEND_AMOUNT,
