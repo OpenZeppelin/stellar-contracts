@@ -7,7 +7,7 @@ use soroban_sdk::{
         storage::{Instance, Persistent},
         Address as _, AuthorizedFunction, Events, Ledger,
     },
-    vec, Address, Env, IntoVal, String,
+    vec, Address, Env, IntoVal, MuxedAddress, String,
 };
 use stellar_event_assertion::EventAssertion;
 
@@ -213,7 +213,7 @@ fn transfer_works() {
 
     e.as_contract(&address, || {
         Base::mint(&e, &from, 100);
-        Base::transfer(&e, &from, &recipient, 50);
+        Base::transfer(&e, &from, &MuxedAddress::from(recipient.clone()), 50);
         assert_eq!(Base::balance(&e, &from), 50);
         assert_eq!(Base::balance(&e, &recipient), 50);
 
@@ -233,7 +233,7 @@ fn transfer_zero_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::transfer(&e, &from, &recipient, 0);
+        Base::transfer(&e, &from, &MuxedAddress::from(recipient.clone()), 0);
         assert_eq!(Base::balance(&e, &from), 0);
         assert_eq!(Base::balance(&e, &recipient), 0);
 
@@ -259,7 +259,7 @@ fn extend_balance_ttl_thru_transfer() {
         e.ledger().with_mut(|l| {
             l.sequence_number += ttl;
         });
-        Base::transfer(&e, &from, &recipient, 50);
+        Base::transfer(&e, &from, &MuxedAddress::from(recipient.clone()), 50);
         let ttl = e.storage().persistent().get_ttl(&key);
         assert_eq!(ttl, BALANCE_EXTEND_AMOUNT);
     });
@@ -307,7 +307,7 @@ fn transfer_insufficient_balance_fails() {
 
     e.as_contract(&address, || {
         Base::mint(&e, &from, 50);
-        Base::transfer(&e, &from, &recipient, 100);
+        Base::transfer(&e, &from, &MuxedAddress::from(recipient.clone()), 100);
     });
 }
 
@@ -460,7 +460,7 @@ fn transfer_requires_auth() {
 
     e.as_contract(&address, || {
         Base::mint(&e, &from, amount);
-        Base::transfer(&e, &from, &to, amount);
+        Base::transfer(&e, &from, &MuxedAddress::from(to.clone()), amount);
     });
 
     let auths = e.auths();

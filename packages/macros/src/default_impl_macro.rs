@@ -83,7 +83,7 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
-                fn transfer(e: &soroban_sdk::Env, from: soroban_sdk::Address, to: soroban_sdk::Address, amount: i128) {
+                fn transfer(e: &soroban_sdk::Env, from: soroban_sdk::Address, to: soroban_sdk::MuxedAddress, amount: i128) {
                     Self::ContractType::transfer(e, &from, &to, amount);
                 }
             },

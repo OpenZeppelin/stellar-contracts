@@ -10,8 +10,7 @@
 //! [`stellar_fungible::burnable::FungibleBurnable`].
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env, String,
-    Symbol,
+    Address, Env, MuxedAddress, String, Symbol, contract, contracterror, contractimpl, panic_with_error, symbol_short
 };
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_macros::when_not_paused;
@@ -99,7 +98,7 @@ impl FungibleToken for ExampleContract {
     }
 
     #[when_not_paused]
-    fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
+    fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
         Self::ContractType::transfer(e, &from, &to, amount);
     }
 
