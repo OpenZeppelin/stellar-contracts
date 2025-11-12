@@ -46,7 +46,7 @@ pub fn generate_role_check(
     let expanded = quote! {
         #(#fn_attrs)*
         #fn_vis #fn_sig {
-            stellar_access::access_control::ensure_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, #role_str));
+            stellar_access::access_control::ensure_role(#env_arg, &soroban_sdk::Symbol::new(#env_arg, #role_str), #param_reference);
             #auth_check
             #fn_block
         }

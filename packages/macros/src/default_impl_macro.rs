@@ -31,18 +31,18 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
-                fn grant_role(e: &soroban_sdk::Env, caller: soroban_sdk::Address, account: soroban_sdk::Address, role: soroban_sdk::Symbol) {
-                    stellar_access::access_control::grant_role(e, &caller, &account, &role);
+                fn grant_role(e: &soroban_sdk::Env, account: soroban_sdk::Address, role: soroban_sdk::Symbol, caller: soroban_sdk::Address) {
+                    stellar_access::access_control::grant_role(e, &account, &role, &caller);
                 }
             },
             syn::parse_quote! {
-                fn revoke_role(e: &soroban_sdk::Env, caller: soroban_sdk::Address, account: soroban_sdk::Address, role: soroban_sdk::Symbol) {
-                    stellar_access::access_control::revoke_role(e, &caller, &account, &role);
+                fn revoke_role(e: &soroban_sdk::Env, account: soroban_sdk::Address, role: soroban_sdk::Symbol, caller: soroban_sdk::Address ) {
+                    stellar_access::access_control::revoke_role(e, &account, &role, &caller);
                 }
             },
             syn::parse_quote! {
-                fn renounce_role(e: &soroban_sdk::Env, caller: soroban_sdk::Address, role: soroban_sdk::Symbol) {
-                    stellar_access::access_control::renounce_role(e, &caller, &role);
+                fn renounce_role(e: &soroban_sdk::Env, role: soroban_sdk::Symbol, caller: soroban_sdk::Address) {
+                    stellar_access::access_control::renounce_role(e, &role, &caller);
                 }
             },
             syn::parse_quote! {

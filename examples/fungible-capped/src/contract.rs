@@ -22,9 +22,9 @@ impl ExampleContract {
         set_cap(e, cap);
     }
 
-    pub fn mint(e: &Env, account: Address, amount: i128) {
+    pub fn mint(e: &Env, to: Address, amount: i128) {
         check_cap(e, amount);
-        Base::mint(e, &account, amount);
+        Base::mint(e, &to, amount);
     }
 }
 

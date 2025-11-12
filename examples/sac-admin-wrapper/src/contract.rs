@@ -12,7 +12,7 @@ impl ExampleContract {
         access_control::set_admin(e, &default_admin);
 
         // create a role "manager" and grant it to `manager`
-        access_control::grant_role_no_auth(e, &default_admin, &manager, &symbol_short!("manager"));
+        access_control::grant_role_no_auth(e, &manager, &symbol_short!("manager"), &default_admin);
 
         fungible::sac_admin_wrapper::set_sac_address(e, &sac);
     }
