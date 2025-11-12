@@ -38,7 +38,7 @@ repository = "https://github.com/OpenZeppelin/stellar-contracts"
 documentation = "https://docs.openzeppelin.com/stellar-contracts/"
 keywords = ["stellar", "soroban", "smart-contracts", "standards"]
 categories = ["no-std", "wasm"]
-version = "0.4.1"
+version = "0.5.1"
 
 [workspace.dependencies]
 # soroban-sdk = {package = "soroban-sdk", version = "23.0.2", default-features = false}

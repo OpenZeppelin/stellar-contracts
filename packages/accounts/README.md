@@ -132,7 +132,7 @@ Policies follow a well-defined lifecycle that integrates with context rule manag
 
 **Enforcement** is triggered when a context rule successfully matches. Once all policies in the matched rule pass their `can_enforce()` checks, the smart account calls `enforce()` on each policy. This state-changing hook allows policies to update counters, emit events, record timestamps, or perform other mutations that track authorization activity. For example, a spending limit policy might deduct from the available balance and emit an event documenting the transaction.
 
-**Uninstallation** occurs when a context rule is removed from the smart account. The account calls `uninstall()` on each attached policy, allowing them to clean up any stored data associated with that specific account and context rule pairing. This ensures that policies do not leave orphaned state in storage. 
+**Uninstallation** occurs when a context rule is removed from the smart account. The account calls `uninstall()` on each attached policy, allowing them to clean up any stored data associated with that specific account and context rule pairing. This ensures that policies do not leave orphaned state in storage.
 
 #### Policy Examples
 
@@ -223,7 +223,7 @@ create_context_rule(
     name: "DeFi Session",
     valid_until: Some(current_ledger + 24_hours),
     signers: vec![&e, ed25519_key],
-    policies: map![&E, (spending_limit_policy, spending_params)]
+    policies: map![&e, (spending_limit_policy, spending_params)]
 )
 ```
 
@@ -252,7 +252,7 @@ create_context_rule(
     context_type: Default,
     name: "Portfolio AI",
     valid_until: Some(current_ledger + 7_days),
-    signers: vec![ai_agent_key],
+    signers: vec![&e, ai_agent_key],
     policies: map![
         &e,
         (whitelist_policy, allowed_functions),
@@ -270,6 +270,7 @@ create_context_rule(
     name: "Treasury Operations",
     valid_until: None,
     signers: vec![
+        &e,
         Signer::External(ed25519_verifier, alice_pubkey),
         Signer::External(secp256k1_verifier, bob_pubkey),
         Signer::Delegated(carol_contract)
@@ -280,7 +281,17 @@ create_context_rule(
 
 ## Getting Started
 
-### 1. Implement the Smart Account Trait
+### 1. Installation
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+# We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
+stellar-accounts = "=0.5.1"
+```
+
+### 2. Implement the Smart Account Trait
 
 ```rust
 use stellar_accounts::smart_account::{
@@ -302,7 +313,7 @@ impl SmartAccount for MySmartAccount {
     ) -> ContextRule {
         e.current_contract_address().require_auth();
 
-        add_context_rule(e, &context_type, name, valid_until, signers, policies)
+        add_context_rule(e, &context_type, &name, &valid_until, &signers, &policies)
     }
     // Implement all other methods
 }
@@ -312,31 +323,33 @@ impl CustomAccountInterface for MySmartAccount {
     type Signature = Signatures;
 
     fn __check_auth(
-        env: Env,
+        e: Env,
         signature_payload: Hash<32>,
         signatures: Signatures,
         auth_context: Vec<Context>,
     ) -> Result<(), SmartAccountError> {
         do_check_auth(e, signature_payload, signatures, auth_contexts)
+
+        Ok(())
     }
 }
 ```
 
-### 2. Create Context Rules
+### 3. Create Context Rules
 
 ```rust
 // Create an admin rule
 add_context_rule(
-    &env,
+    &e,
     ContextRuleType::Default,
-    String::from_str(&env, "Admin Access"),
+    String::from_str(&e, "Admin Access"),
     None, // No expiration
-    vec![&env, admin_signer],
-    Map::new(&env)
+    vec![&e, admin_signer],
+    map![&e]
 );
 ```
 
-### 3. Add Policies (Optional)
+### 4. Add Policies (Optional)
 
 For policies, there are two options:
 
@@ -351,14 +364,14 @@ For policies, there are two options:
 ```rust
 // Add a spending limit policy
 add_policy(
-    &env,
+    &e,
     admin_rule.id,
     spending_policy_address,
     spending_limit_params
 );
 ```
 
-### 4. Choose or Deploy Verifier Contracts (For External Signers)
+### 5. Choose or Deploy Verifier Contracts (For External Signers)
 
 For external signers, there are two options:
 

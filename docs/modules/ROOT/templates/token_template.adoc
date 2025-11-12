@@ -1,8 +1,0 @@
-:source-highlighter: highlight.js
-:highlightjs-languages: rust
-:github-icon: pass:[<svg class="icon"><use href="#github-icon"/></svg>]
-= XXX Token Standard
-
-== Purpose
-
-== Extensions

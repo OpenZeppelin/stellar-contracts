@@ -14,13 +14,13 @@ OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stel
 ## Project Structure
 
 - `packages/`: Source code
-  - `access/`: Role-based access controls and ownable
-  - `contract-utils/`: Utilities for contracts (pausable, upgradeable, crypography, etc.)
-  - `macros/`: Proc and derive macros for some of the modules (`#[only_owner]`, `#[when_not_paused]`, `#[derive(Upgradeable)]`, etc.)
-  - `test-utils/`: Utilities for testing
-  - `tokens/`: Various token types (fungible, non-fungible, etc.)
+  - [`access/`](packages/access): Role-based access controls and ownable
+  - [`accounts/`](packages/accounts): Smart accounts with custom authentication and authorization
+  - [`contract-utils/`](packages/contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
+  - [`macros/`](packages/macros): Proc and derive macros for some of the modules (`#[only_owner]`, `#[when_not_paused]`, `#[derive(Upgradeable)]`, etc.)
+  - [`test-utils/`](packages/test-utils): Utilities for testing
+  - [`tokens/`](packages/tokens): Various token types (fungible, non-fungible, real-world assets, vaults)
 - `examples/`: Example contracts
-- `docs/`: Documentation
 - `audits/`: Audit reports
 
 
@@ -54,9 +54,9 @@ We recommend pinning to a specific version, because rapid iterations are expecte
 
 ```toml
 [dependencies]
-stellar-tokens = "=0.4.0"
-stellar-access = "=0.4.0"
-stellar-contract-utils = "=0.4.0"
+stellar-tokens = "=0.5.1"
+stellar-access = "=0.5.1"
+stellar-contract-utils = "=0.5.1"
 ```
 
 ## Notes

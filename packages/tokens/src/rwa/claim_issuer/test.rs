@@ -337,7 +337,7 @@ fn secp256k1_verify_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #360)")]
+#[should_panic(expected = "Error(Contract, #358)")]
 fn secp256k1_verify_fails() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -867,7 +867,7 @@ fn bidirectional_mapping_same_key_different_topics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #356)")]
+#[should_panic(expected = "Error(Contract, #355)")]
 fn max_keys_per_topic_exceeded() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -890,7 +890,7 @@ fn max_keys_per_topic_exceeded() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #357)")]
+#[should_panic(expected = "Error(Contract, #355)")]
 fn max_registries_per_key_exceeded() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -913,23 +913,6 @@ fn max_registries_per_key_exceeded() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #354)")]
-fn allow_key_issuer_not_registered() {
-    let e = Env::default();
-    let contract_id = e.register(MockContract, ());
-    let registry_id = e.register(MockClaimTopicsAndIssuersContract, ());
-
-    let public_key = Bytes::from_array(&e, &[1u8; 32]);
-    let scheme = 1u32;
-    let topic = 42u32;
-
-    e.as_contract(&contract_id, || {
-        // Try to allow key without being registered - should panic
-        allow_key(&e, &public_key, &registry_id, scheme, topic);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #355)")]
 fn allow_key_topic_not_allowed() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -957,7 +940,7 @@ fn allow_key_topic_not_allowed() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #358)")]
+#[should_panic(expected = "Error(Contract, #356)")]
 fn get_keys_for_topic_panics_when_no_keys() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -1184,6 +1167,27 @@ fn signature_invalidation_vs_per_claim_revocation() {
     });
 }
 
+#[test]
+#[should_panic(expected = "Error(Contract, #359)")]
+fn invalidate_claim_signatures_nonce_overflow() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let identity = Address::generate(&e);
+    let claim_topic = 42u32;
+
+    e.as_contract(&contract_id, || {
+        // Set nonce to u32::MAX
+        let nonce_key = ClaimIssuerStorageKey::ClaimNonce(identity.clone(), claim_topic);
+        e.storage().persistent().set(&nonce_key, &u32::MAX);
+
+        // Verify nonce is at max
+        assert_eq!(get_current_nonce_for(&e, &identity, claim_topic), u32::MAX);
+
+        // Attempt to invalidate signatures - should panic with MathOverflow (361)
+        invalidate_claim_signatures(&e, &identity, claim_topic);
+    });
+}
+
 // ======= EXPIRATION TESTS =======
 
 #[test]
@@ -1262,7 +1266,7 @@ fn is_claim_expired_returns_true_for_current_timestamp() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #359)")]
+#[should_panic(expected = "Error(Contract, #357)")]
 fn decode_claim_data_expiration_fails_on_short_data() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -1274,7 +1278,7 @@ fn decode_claim_data_expiration_fails_on_short_data() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #359)")]
+#[should_panic(expected = "Error(Contract, #357)")]
 fn encode_claim_data_fails_when_valid_until_equals_created_at() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());
@@ -1288,7 +1292,7 @@ fn encode_claim_data_fails_when_valid_until_equals_created_at() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #359)")]
+#[should_panic(expected = "Error(Contract, #357)")]
 fn encode_claim_data_fails_when_valid_until_less_than_created_at() {
     let e = Env::default();
     let contract_id = e.register(MockContract, ());

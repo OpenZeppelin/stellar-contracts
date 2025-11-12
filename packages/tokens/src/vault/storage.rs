@@ -1,9 +1,9 @@
 use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
 use stellar_contract_utils::math::fixed_point::{muldiv, Rounding};
 
-use crate::fungible::{
-    vault::{emit_deposit, emit_withdraw},
-    Base, ContractOverrides, FungibleTokenError, MAX_DECIMALS_OFFSET,
+use crate::{
+    fungible::{Base, ContractOverrides},
+    vault::{emit_deposit, emit_withdraw, VaultTokenError, MAX_DECIMALS_OFFSET},
 };
 
 pub struct Vault;
@@ -23,6 +23,60 @@ pub enum VaultStorageKey {
     VirtualDecimalsOffset,
 }
 
+/// # Inflation Attack (Donation Attack) Mitigation
+///
+/// ## Vulnerability Overview
+///
+/// In empty (or nearly empty) vaults, deposits are at high risk of being stolen
+/// through a "donation" to the vault that inflates the price of a share.
+/// This is variously known as a **donation attack** or **inflation attack** and
+/// is essentially a problem of slippage.
+///
+/// ## Attack Mechanism
+///
+/// 1. Attacker observes a pending deposit transaction in the mempool
+/// 2. Attacker frontruns by directly transferring assets to the vault
+///    (donation)
+/// 3. This inflates the share price before the victim's deposit is processed
+/// 4. Victim receives fewer shares than expected due to inflated price
+/// 5. Attacker redeems their shares, capturing value from the victim's deposit
+///
+/// ## Mitigation Strategies
+///
+/// ### 1. Initial Deposit Protection
+///
+/// Vault deployers can protect against this attack by making an initial deposit
+/// of a non-trivial amount of the asset, such that price manipulation becomes
+/// infeasible. This "dead shares" approach makes the attack economically
+/// unviable.
+///
+/// ### 2. Virtual Assets and Shares (Configurable Decimals Offset)
+///
+/// This implementation introduces configurable virtual assets and shares to
+/// help developers mitigate the risk. The decimals offset (accessible via
+/// [`Vault::get_decimals_offset()`]) corresponds to an offset in the decimal
+/// representation between the underlying asset's decimals and the vault
+/// decimals.
+///
+/// While not fully preventing the attack, analysis shows that the default
+/// offset (0) makes it non-profitable even if an attacker is able to capture
+/// value from multiple user deposits, as a result of the value being captured
+/// by the virtual shares (out of the attacker's donation) matching the
+/// attacker's expected gains. With a larger offset, the attack becomes orders
+/// of magnitude more expensive than it is profitable.
+///
+/// The drawback of this approach is that the virtual shares do capture (a very
+/// small) part of the value being accrued to the vault. Also, if the vault
+/// experiences losses, the users try to exit the vault, the virtual shares and
+/// assets will cause the first user to exit to experience reduced losses in
+/// detriment to the last users that will experience bigger losses.
+///
+/// If this is not the preferred solution, implementers can still use the
+/// default offset of 0 and implement their own safeguards.
+///
+/// ## References
+///
+/// <https://docs.openzeppelin.com/contracts/5.x/erc4626>
 impl Vault {
     // ################## QUERY STATE ##################
 
@@ -35,7 +89,7 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::VaultAssetAddressNotSet`] - When the vault's
+    /// * [`VaultTokenError::VaultAssetAddressNotSet`] - When the vault's
     ///   underlying asset address has not been initialized.
     ///
     /// # ERC-4626 Compliance Note
@@ -64,7 +118,7 @@ impl Vault {
         e.storage()
             .instance()
             .get(&VaultStorageKey::AssetAddress)
-            .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::VaultAssetAddressNotSet))
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::VaultAssetAddressNotSet))
     }
 
     /// Returns the total amount of underlying assets held by the vault.
@@ -262,7 +316,7 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::VaultExceededMaxDeposit`] - When attempting to
+    /// * [`VaultTokenError::VaultExceededMaxDeposit`] - When attempting to
     ///   deposit more assets than the maximum allowed for the receiver.
     /// * also refer to [`Self::preview_deposit()`] errors.
     ///
@@ -289,7 +343,7 @@ impl Vault {
     ) -> i128 {
         let max_assets = Self::max_deposit(e, receiver.clone());
         if assets > max_assets {
-            panic_with_error!(e, FungibleTokenError::VaultExceededMaxDeposit);
+            panic_with_error!(e, VaultTokenError::VaultExceededMaxDeposit);
         }
         let shares: i128 = Self::preview_deposit(e, assets);
         Self::deposit_internal(e, &receiver, assets, shares, &from, &operator);
@@ -310,7 +364,7 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::VaultExceededMaxMint`] - When attempting to mint
+    /// * [`VaultTokenError::VaultExceededMaxMint`] - When attempting to mint
     ///   more shares than the maximum allowed for the receiver.
     /// * also refer to [`Self::preview_mint()`] errors.
     ///
@@ -337,7 +391,7 @@ impl Vault {
     ) -> i128 {
         let max_shares = Self::max_mint(e, receiver.clone());
         if shares > max_shares {
-            panic_with_error!(e, FungibleTokenError::VaultExceededMaxMint);
+            panic_with_error!(e, VaultTokenError::VaultExceededMaxMint);
         }
         let assets: i128 = Self::preview_mint(e, shares);
         Self::deposit_internal(e, &receiver, assets, shares, &from, &operator);
@@ -358,7 +412,7 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::VaultExceededMaxWithdraw`] - When attempting to
+    /// * [`VaultTokenError::VaultExceededMaxWithdraw`] - When attempting to
     ///   withdraw more assets than the maximum allowed for the owner.
     ///
     /// # Events
@@ -384,7 +438,7 @@ impl Vault {
     ) -> i128 {
         let max_assets = Self::max_withdraw(e, owner.clone());
         if assets > max_assets {
-            panic_with_error!(e, FungibleTokenError::VaultExceededMaxWithdraw);
+            panic_with_error!(e, VaultTokenError::VaultExceededMaxWithdraw);
         }
         let shares: i128 = Self::preview_withdraw(e, assets);
         Self::withdraw_internal(e, &receiver, &owner, assets, shares, &operator);
@@ -404,7 +458,7 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::VaultExceededMaxRedeem`] - When attempting to
+    /// * [`VaultTokenError::VaultExceededMaxRedeem`] - When attempting to
     ///   redeem more shares than the maximum allowed for the owner.
     /// * also refer to [`Self::preview_redeem()`] errors.
     ///
@@ -431,7 +485,7 @@ impl Vault {
     ) -> i128 {
         let max_shares = Self::max_redeem(e, owner.clone());
         if shares > max_shares {
-            panic_with_error!(e, FungibleTokenError::VaultExceededMaxRedeem);
+            panic_with_error!(e, VaultTokenError::VaultExceededMaxRedeem);
         }
         let assets = Self::preview_redeem(e, shares);
         Self::withdraw_internal(e, &receiver, &owner, assets, shares, &operator);
@@ -453,12 +507,12 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::MathOverflow`] - When the sum of underlying
-    ///   asset decimals and offset exceeds the maximum value.
+    /// * [`VaultTokenError::MathOverflow`] - When the sum of underlying asset
+    ///   decimals and offset exceeds the maximum value.
     pub fn decimals(e: &Env) -> u32 {
         Self::get_underlying_asset_decimals(e)
             .checked_add(Self::get_decimals_offset(e))
-            .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow))
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow))
     }
 
     // ################## LOW-LEVEL HELPERS ##################
@@ -479,8 +533,8 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::VaultAssetAddressAlreadySet`] - When attempting
-    ///   to set the asset address after it has already been initialized.
+    /// * [`VaultTokenError::VaultAssetAddressAlreadySet`] - When attempting to
+    ///   set the asset address after it has already been initialized.
     ///
     /// # Security Warning
     ///
@@ -494,7 +548,7 @@ impl Vault {
     pub fn set_asset(e: &Env, asset: Address) {
         // Check if asset is already set
         if e.storage().instance().has(&VaultStorageKey::AssetAddress) {
-            panic_with_error!(e, FungibleTokenError::VaultAssetAddressAlreadySet);
+            panic_with_error!(e, VaultTokenError::VaultAssetAddressAlreadySet);
         }
 
         e.storage().instance().set(&VaultStorageKey::AssetAddress, &asset);
@@ -525,11 +579,11 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::VaultVirtualDecimalsOffsetAlreadySet`] - When
+    /// * [`VaultTokenError::VaultVirtualDecimalsOffsetAlreadySet`] - When
     ///   attempting to set the offset after it has already been initialized.
-    /// * [`FungibleTokenError::VaultMaxDecimalsOffsetExceeded`] - When
-    ///   attempting to set the offset to a value higher than the suggested
-    ///   maximum allowed.
+    /// * [`VaultTokenError::VaultMaxDecimalsOffsetExceeded`] - When attempting
+    ///   to set the offset to a value higher than the suggested maximum
+    ///   allowed.
     ///
     /// # Security Warning
     ///
@@ -542,11 +596,11 @@ impl Vault {
     /// pattern.
     pub fn set_decimals_offset(e: &Env, offset: u32) {
         if offset > MAX_DECIMALS_OFFSET {
-            panic_with_error!(e, FungibleTokenError::VaultMaxDecimalsOffsetExceeded);
+            panic_with_error!(e, VaultTokenError::VaultMaxDecimalsOffsetExceeded);
         }
         // Check if virtual decimals offset is already set
         if e.storage().instance().has(&VaultStorageKey::VirtualDecimalsOffset) {
-            panic_with_error!(e, FungibleTokenError::VaultVirtualDecimalsOffsetAlreadySet);
+            panic_with_error!(e, VaultTokenError::VaultVirtualDecimalsOffsetAlreadySet);
         }
         e.storage().instance().set(&VaultStorageKey::VirtualDecimalsOffset, &offset);
     }
@@ -565,12 +619,12 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::VaultInvalidAssetsAmount`] - When `assets < 0`.
-    /// * [`FungibleTokenError::MathOverflow`] - When mathematical operations
+    /// * [`VaultTokenError::VaultInvalidAssetsAmount`] - When `assets < 0`.
+    /// * [`VaultTokenError::MathOverflow`] - When mathematical operations
     ///   result in overflow.
     pub fn convert_to_shares_with_rounding(e: &Env, assets: i128, rounding: Rounding) -> i128 {
         if assets < 0 {
-            panic_with_error!(e, FungibleTokenError::VaultInvalidAssetsAmount);
+            panic_with_error!(e, VaultTokenError::VaultInvalidAssetsAmount);
         }
         if assets == 0 {
             return 0;
@@ -582,17 +636,17 @@ impl Vault {
         // Virtual offset = 10^offset
         let pow = 10_i128
             .checked_pow(Self::get_decimals_offset(e))
-            .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
         // Effective total supply = totalSupply + virtual offset
         let y = Self::total_supply(e)
             .checked_add(pow)
-            .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
         // Effective total assets = totalAssets + 1 (prevents division by zero)
         let denominator = Self::total_assets(e)
             .checked_add(1_i128)
-            .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
         // (assets × (totalSupply + 10^offset)) / (totalAssets + 1)
         muldiv(e, x, y, denominator, rounding)
@@ -613,12 +667,12 @@ impl Vault {
     ///
     /// # Errors
     ///
-    /// * [`FungibleTokenError::VaultInvalidSharesAmount`] - When `shares < 0`.
-    /// * [`FungibleTokenError::MathOverflow`] - When mathematical operations
+    /// * [`VaultTokenError::VaultInvalidSharesAmount`] - When `shares < 0`.
+    /// * [`VaultTokenError::MathOverflow`] - When mathematical operations
     ///   result in overflow.
     pub fn convert_to_assets_with_rounding(e: &Env, shares: i128, rounding: Rounding) -> i128 {
         if shares < 0 {
-            panic_with_error!(e, FungibleTokenError::VaultInvalidSharesAmount);
+            panic_with_error!(e, VaultTokenError::VaultInvalidSharesAmount);
         }
         if shares == 0 {
             return 0;
@@ -630,17 +684,17 @@ impl Vault {
         // Effective total assets = totalAssets + 1 (prevents division by zero)
         let y = Self::total_assets(e)
             .checked_add(1_i128)
-            .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
         // Virtual offset = 10^offset
         let pow = 10_i128
             .checked_pow(Self::get_decimals_offset(e))
-            .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
         // Effective total supply = totalSupply + virtual offset
         let denominator = Self::total_supply(e)
             .checked_add(pow)
-            .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::MathOverflow));
+            .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
         // (shares × (totalAssets + 1)) / (totalSupply + 10^offset)
         muldiv(e, x, y, denominator, rounding)
@@ -760,8 +814,10 @@ impl Vault {
     ///
     /// # Notes
     ///
-    /// For more information about virtual decimals offset, see:
-    /// https://docs.openzeppelin.com/contracts/5.x/erc4626
+    /// For more information about virtual decimals offset and its role in
+    /// mitigating inflation attacks, see the implementation-level
+    /// documentation: [Inflation Attack (Donation Attack)
+    /// Mitigation](Vault)
     pub fn get_decimals_offset(e: &Env) -> u32 {
         e.storage().instance().get(&VaultStorageKey::VirtualDecimalsOffset).unwrap_or(0)
     }

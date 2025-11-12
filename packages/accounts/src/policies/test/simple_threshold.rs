@@ -60,7 +60,7 @@ fn install_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2201)")]
+#[should_panic(expected = "Error(Contract, #3201)")]
 fn install_zero_threshold_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -77,7 +77,7 @@ fn install_zero_threshold_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2200)")]
+#[should_panic(expected = "Error(Contract, #3200)")]
 fn smart_account_get_threshold_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -234,7 +234,7 @@ fn set_threshold_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2201)")]
+#[should_panic(expected = "Error(Contract, #3201)")]
 fn set_threshold_zero_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -282,7 +282,7 @@ fn uninstall_success() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2200)")]
+#[should_panic(expected = "Error(Contract, #3200)")]
 fn enforce_not_installed_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -308,7 +308,7 @@ fn enforce_not_installed_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #2202)")]
+#[should_panic(expected = "Error(Contract, #3202)")]
 fn enforce_threshold_not_met_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());

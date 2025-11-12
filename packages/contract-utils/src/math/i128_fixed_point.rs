@@ -24,9 +24,9 @@ SOFTWARE.
 // Based on the Soroban fixed-point mathematics library
 // Original implementation: https://github.com/script3/soroban-fixed-point-math
 
-use soroban_sdk::{unwrap::UnwrapOptimized, Env, I256};
+use soroban_sdk::{panic_with_error, Env, I256};
 
-use crate::math::soroban_fixed_point::SorobanFixedPoint;
+use crate::math::soroban_fixed_point::{SorobanFixedPoint, SorobanFixedPointError};
 
 /// Performs floor(r / z)
 pub fn div_floor(r: i128, z: i128) -> Option<i128> {
@@ -65,7 +65,8 @@ impl SorobanFixedPoint for i128 {
 /// Performs floor(x * y / z)
 pub fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
     match x.checked_mul(*y) {
-        Some(r) => div_floor(r, *z).unwrap_optimized(),
+        Some(r) => div_floor(r, *z)
+            .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ZeroDenominator)),
         None => {
             // scale to i256 and retry
             let res = crate::math::i256_fixed_point::mul_div_floor(
@@ -74,8 +75,8 @@ pub fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
                 &I256::from_i128(env, *y),
                 &I256::from_i128(env, *z),
             );
-            // will panic if result is not representable in i128
-            res.to_i128().unwrap_optimized()
+            res.to_i128()
+                .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ResultOverflow))
         }
     }
 }
@@ -83,7 +84,8 @@ pub fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
 /// Performs floor(x * y / z)
 pub fn scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
     match x.checked_mul(*y) {
-        Some(r) => div_ceil(r, *z).unwrap_optimized(),
+        Some(r) => div_ceil(r, *z)
+            .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ZeroDenominator)),
         None => {
             // scale to i256 and retry
             let res = crate::math::i256_fixed_point::mul_div_ceil(
@@ -92,8 +94,8 @@ pub fn scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
                 &I256::from_i128(env, *y),
                 &I256::from_i128(env, *z),
             );
-            // will panic if result is not representable in i128
-            res.to_i128().unwrap_optimized()
+            res.to_i128()
+                .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ResultOverflow))
         }
     }
 }

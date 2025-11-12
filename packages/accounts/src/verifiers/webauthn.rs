@@ -50,23 +50,23 @@ pub const AUTHENTICATOR_DATA_MIN_LEN: usize = 37;
 #[repr(u32)]
 pub enum WebAuthnError {
     /// The signature payload is invalid or has incorrect format.
-    SignaturePayloadInvalid = 2110,
+    SignaturePayloadInvalid = 3110,
     /// The client data exceeds the maximum allowed length.
-    ClientDataTooLong = 2111,
+    ClientDataTooLong = 3111,
     /// Failed to parse JSON from client data.
-    JsonParseError = 2112,
+    JsonParseError = 3112,
     /// The type field in client data is not "webauthn.get".
-    TypeFieldInvalid = 2113,
+    TypeFieldInvalid = 3113,
     /// The challenge in client data does not match expected value.
-    ChallengeInvalid = 2114,
+    ChallengeInvalid = 3114,
     /// The authenticator data format is invalid or too short.
-    AuthDataFormatInvalid = 2115,
+    AuthDataFormatInvalid = 3115,
     /// The User Present (UP) bit is not set in authenticator flags.
-    PresentBitNotSet = 2116,
+    PresentBitNotSet = 3116,
     /// The User Verified (UV) bit is not set in authenticator flags.
-    VerifiedBitNotSet = 2117,
+    VerifiedBitNotSet = 3117,
     /// Invalid relationship between Backup Eligibility and State bits.
-    BackupEligibilityAndStateNotSet = 2218,
+    BackupEligibilityAndStateNotSet = 3118,
 }
 
 /// Parsed client data JSON structure for WebAuthn authentication.
@@ -115,7 +115,7 @@ pub struct WebAuthnSigData {
 ///
 /// # Reference
 ///
-/// Step 11 in https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+/// Step 11 in <https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion>
 pub fn validate_expected_type(e: &Env, client_data_json: &ClientDataJson) {
     let type_field = String::from_str(e, "webauthn.get");
     if String::from_str(e, client_data_json.type_field) != type_field {
@@ -145,7 +145,7 @@ pub fn validate_expected_type(e: &Env, client_data_json: &ClientDataJson) {
 ///
 /// # Reference
 ///
-/// Step 12 in https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+/// Step 12 in <https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion>
 pub fn validate_challenge(e: &Env, client_data_json: &ClientDataJson, signature_payload: &Bytes) {
     let signature_payload: BytesN<32> = extract_from_bytes(e, signature_payload, 0..32)
         .unwrap_or_else(|| panic_with_error!(e, WebAuthnError::SignaturePayloadInvalid));
@@ -178,9 +178,9 @@ pub fn validate_challenge(e: &Env, client_data_json: &ClientDataJson, signature_
 ///
 /// # Reference
 ///
-/// Step 16 in https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+/// Step 16 in <https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion>
 pub fn validate_user_present_bit_set(e: &Env, flags: u8) {
-    // Validates that the https://www.w3.org/TR/webauthn-2/#up bit is set.
+    // Validates that the <https://www.w3.org/TR/webauthn-2/#up> bit is set.
     if (flags & AUTH_DATA_FLAGS_UP) == 0 {
         panic_with_error!(e, WebAuthnError::PresentBitNotSet)
     }
@@ -211,7 +211,7 @@ pub fn validate_user_present_bit_set(e: &Env, flags: u8) {
 ///
 /// # Reference
 ///
-/// Step 17 in https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+/// Step 17 in <https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion>
 pub fn validate_user_verified_bit_set(e: &Env, flags: u8) {
     if (flags & AUTH_DATA_FLAGS_UV) == 0 {
         panic_with_error!(e, WebAuthnError::VerifiedBitNotSet)
@@ -296,7 +296,7 @@ pub fn validate_backup_eligibility_and_state(e: &Env, flags: u8) {
 ///
 /// # Reference
 ///
-/// https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion
+/// <https://www.w3.org/TR/webauthn-2/#sctn-verifying-assertion>
 pub fn verify(
     e: &Env,
     signature_payload: &Bytes,

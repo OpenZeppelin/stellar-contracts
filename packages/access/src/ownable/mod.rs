@@ -130,9 +130,9 @@ pub trait Ownable {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum OwnableError {
-    OwnerNotSet = 1220,
-    TransferInProgress = 1221,
-    OwnerAlreadySet = 1222,
+    OwnerNotSet = 2100,
+    TransferInProgress = 2101,
+    OwnerAlreadySet = 2102,
 }
 
 // ################## EVENTS ##################

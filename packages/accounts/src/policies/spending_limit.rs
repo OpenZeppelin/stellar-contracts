@@ -74,15 +74,15 @@ pub struct SpendingEntry {
 #[repr(u32)]
 pub enum SpendingLimitError {
     /// The smart account does not have a spending limit policy installed.
-    SmartAccountNotInstalled = 2220,
+    SmartAccountNotInstalled = 3220,
     /// The spending limit has been exceeded.
-    SpendingLimitExceeded = 2221,
+    SpendingLimitExceeded = 3221,
     /// The spending limit or period is invalid.
-    InvalidLimitOrPeriod = 2222,
+    InvalidLimitOrPeriod = 3222,
     /// The transaction is not allowed by this policy.
-    NotAllowed = 2223,
+    NotAllowed = 3223,
     /// The spending history has reached maximum capacity.
-    HistoryCapacityExceeded = 2224,
+    HistoryCapacityExceeded = 3224,
 }
 
 /// Storage keys for spending limit policy data.

@@ -98,7 +98,7 @@ fn enforce_owner_auth_works() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1220)")]
+#[should_panic(expected = "Error(Contract, #2100)")]
 fn enforce_owner_auth_panics_if_renounced() {
     let e = Env::default();
     let owner = Address::generate(&e);
@@ -122,7 +122,7 @@ fn enforce_owner_auth_panics_if_renounced() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1221)")]
+#[should_panic(expected = "Error(Contract, #2101)")]
 fn renounce_fails_if_pending_transfer_exists() {
     let e = Env::default();
     let owner = Address::generate(&e);
@@ -142,7 +142,7 @@ fn renounce_fails_if_pending_transfer_exists() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1222)")]
+#[should_panic(expected = "Error(Contract, #2102)")]
 fn set_owner_when_already_set_panics() {
     let e = Env::default();
     e.mock_all_auths();
