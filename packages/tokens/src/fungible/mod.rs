@@ -329,7 +329,7 @@ pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 // ################## EVENTS ##################
 
 /// Event emitted when tokens are transferred between addresses.
-#[contractevent(topics = ["transfer"], data_format = "map")]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Transfer {
     #[topic]
