@@ -1805,6 +1805,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-governance"
+version = "0.5.1"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "stellar-macros"
 version = "0.5.1"
 dependencies = [
