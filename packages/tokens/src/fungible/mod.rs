@@ -196,7 +196,7 @@ pub trait FungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `{ to_muxed_id: Option<u64>, amount: i128 }: Map`
+    /// * data - `{ to_muxed_id: Option<u64>, amount: i128 }`
     fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128);
 
     /// Transfers `amount` of tokens from `from` to `to` using the

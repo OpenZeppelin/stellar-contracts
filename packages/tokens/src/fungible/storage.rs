@@ -342,7 +342,7 @@ impl Base {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `{ to_muxed_id: Option<u64>, amount: i128 }: Map`
+    /// * data - `{ to_muxed_id: Option<u64>, amount: i128 }`
     ///
     /// # Notes
     ///
