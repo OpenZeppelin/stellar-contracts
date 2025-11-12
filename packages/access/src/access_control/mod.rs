@@ -99,6 +99,9 @@ use soroban_sdk::{contracterror, Address, Env, Symbol};
 #[cfg(not(feature = "certora"))]
 use soroban_sdk::{contractevent};
 
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
+
 pub use crate::access_control::storage::{
     accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
     ensure_if_admin_or_admin_role, ensure_role, get_admin, get_role_admin, get_role_member,
@@ -363,12 +366,12 @@ pub const ROLE_TTL_THRESHOLD: u32 = ROLE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 // ################## EVENTS ##################
 
 /// Event emitted when a role is granted.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoleGranted {
-    // #[topic]
+    #[topic]
     pub role: Symbol,
-    // #[topic]
+    #[topic]
     pub account: Address,
     pub caller: Address,
 }
@@ -387,12 +390,12 @@ pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, caller: &Add
 }
 
 /// Event emitted when a role is revoked.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoleRevoked {
-    // #[topic]
+    #[topic]
     pub role: Symbol,
-    // #[topic]
+    #[topic]
     pub account: Address,
     pub caller: Address,
 }
@@ -412,10 +415,10 @@ pub fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, caller: &Add
 }
 
 /// Event emitted when a role admin is changed.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoleAdminChanged {
-    // #[topic]
+    #[topic]
     pub role: Symbol,
     pub previous_admin_role: Symbol,
     pub new_admin_role: Symbol,
@@ -445,10 +448,10 @@ pub fn emit_role_admin_changed(
 }
 
 /// Event emitted when an admin transfer is initiated.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AdminTransferInitiated {
-    // #[topic]
+    #[topic]
     pub current_admin: Address,
     pub new_admin: Address,
     pub live_until_ledger: u32,
@@ -479,10 +482,10 @@ pub fn emit_admin_transfer_initiated(
 }
 
 /// Event emitted when an admin transfer is completed.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AdminTransferCompleted {
-    // #[topic]
+    #[topic]
     pub new_admin: Address,
     pub previous_admin: Address,
 }
@@ -501,10 +504,10 @@ pub fn emit_admin_transfer_completed(e: &Env, previous_admin: &Address, new_admi
 }
 
 /// Event emitted when the admin role is renounced.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AdminRenounced {
-    // #[topic]
+    #[topic]
     pub admin: Address,
 }
 

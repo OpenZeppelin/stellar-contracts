@@ -62,9 +62,15 @@
 //! ```
 
 use soroban_sdk::{
-    auth::Context, contracterror, contractevent, contracttype, panic_with_error, Address, Env, Map,
+    auth::Context, contracterror, contracttype, panic_with_error, Address, Env, Map,
     Vec,
 };
+
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::{contractevent};
 
 // re-export
 use crate::smart_account::{ContextRule, Signer};
@@ -300,6 +306,7 @@ pub fn enforce(
 
     if total_weight >= params.threshold {
         // emit event
+        #[cfg(not(feature = "certora"))]
         WeightedPolicyEnforced {
             smart_account: smart_account.clone(),
             context: context.clone(),

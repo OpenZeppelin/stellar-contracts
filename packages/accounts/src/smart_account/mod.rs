@@ -2,9 +2,16 @@ mod storage;
 #[cfg(test)]
 mod test;
 use soroban_sdk::{
-    auth::CustomAccountInterface, contractclient, contracterror, contractevent, Address, Env, Map,
+    auth::CustomAccountInterface, contractclient, contracterror, Address, Env, Map,
     String, Symbol, Val, Vec,
 };
+
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::{contractevent};
+
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, do_check_auth, get_context_rule,
     get_context_rules, get_validated_context, remove_context_rule, remove_policy, remove_signer,
@@ -364,6 +371,7 @@ pub struct ContextRuleAdded {
 /// * topics - `["context_rule_added", context_rule_id: u32]`
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
 ///   Option<u32>, signers: Vec<Signer>, policies: Vec<Address>]`
+#[cfg(not(feature = "certora"))]
 pub fn emit_context_rule_added(e: &Env, context_rule: &ContextRule) {
     ContextRuleAdded {
         context_rule_id: context_rule.id,
@@ -400,6 +408,7 @@ pub struct ContextRuleUpdated {
 /// * topics - `["context_rule_updated", context_rule_id: u32]`
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
 ///   Option<u32>]`
+#[cfg(not(feature = "certora"))]
 pub fn emit_context_rule_updated(e: &Env, context_rule_id: u32, meta: &Meta) {
     ContextRuleUpdated {
         context_rule_id,
@@ -429,6 +438,7 @@ pub struct ContextRuleRemoved {
 ///
 /// * topics - `["context_rule_removed", context_rule_id: u32]`
 /// * data - `[]`
+#[cfg(not(feature = "certora"))]
 pub fn emit_context_rule_removed(e: &Env, context_rule_id: u32) {
     ContextRuleRemoved { context_rule_id }.publish(e);
 }
@@ -454,6 +464,7 @@ pub struct SignerAdded {
 ///
 /// * topics - `["signer_added", context_rule_id: u32]`
 /// * data - `[signer: Signer]`
+#[cfg(not(feature = "certora"))]
 pub fn emit_signer_added(e: &Env, context_rule_id: u32, signer: &Signer) {
     SignerAdded { context_rule_id, signer: signer.clone() }.publish(e);
 }
@@ -479,6 +490,7 @@ pub struct SignerRemoved {
 ///
 /// * topics - `["signer_removed", context_rule_id: u32]`
 /// * data - `[signer: Signer]`
+#[cfg(not(feature = "certora"))]
 pub fn emit_signer_removed(e: &Env, context_rule_id: u32, signer: &Signer) {
     SignerRemoved { context_rule_id, signer: signer.clone() }.publish(e);
 }
@@ -506,6 +518,7 @@ pub struct PolicyAdded {
 ///
 /// * topics - `["policy_added", context_rule_id: u32]`
 /// * data - `[policy: Address, install_param: Val]`
+#[cfg(not(feature = "certora"))]
 pub fn emit_policy_added(e: &Env, context_rule_id: u32, policy: &Address, install_param: Val) {
     PolicyAdded { context_rule_id, policy: policy.clone(), install_param }.publish(e);
 }
@@ -531,6 +544,7 @@ pub struct PolicyRemoved {
 ///
 /// * topics - `["policy_removed", context_rule_id: u32]`
 /// * data - `[policy: Address]`
+#[cfg(not(feature = "certora"))]
 pub fn emit_policy_removed(e: &Env, context_rule_id: u32, policy: &Address) {
     PolicyRemoved { context_rule_id, policy: policy.clone() }.publish(e);
 }

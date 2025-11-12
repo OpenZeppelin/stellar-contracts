@@ -53,6 +53,12 @@ mod test;
 
 use core::marker::PhantomData;
 
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
+
 use soroban_sdk::{contracterror, Bytes, Env, Val};
 
 use crate::crypto::hasher::Hasher;
@@ -87,14 +93,14 @@ pub const MERKLE_CLAIMED_TTL_THRESHOLD: u32 = MERKLE_CLAIMED_EXTEND_AMOUNT - DAY
 // ################## EVENTS ##################
 
 /// Event emitted when the merkle root is set.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SetRoot {
     pub root: Bytes,
 }
 
 /// Event emitted when an index is claimed.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug)]
 pub struct SetClaimed {
     pub index: Val,

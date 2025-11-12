@@ -97,14 +97,21 @@ use soroban_sdk::{
 };
 
 use crate::{
-    policies::PolicyClient,
+    policies::{self, PolicyClient},
     smart_account::{
-        emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
-        emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
         SmartAccountError, MAX_CONTEXT_RULES, MAX_POLICIES, MAX_SIGNERS,
         SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
     },
     verifiers::VerifierClient,
+};
+
+#[cfg(not(feature = "certora"))]
+use crate::{
+    policies::PolicyClient,
+    smart_account::{
+        emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
+        emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
+    }
 };
 
 /// Storage keys for smart account data.
@@ -235,7 +242,19 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
     let ids_key = SmartAccountStorageKey::Ids(context_rule_type.clone());
     let ids: Vec<u32> = get_persistent_entry(e, &ids_key).unwrap_or_else(|| Vec::new(e));
 
-    Vec::from_iter(e, ids.iter().map(|id| get_context_rule(e, id)))
+    #[cfg(not(feature = "certora"))]
+    {
+        Vec::from_iter(e, ids.iter().map(|id| get_context_rule(e, id)))
+    }
+
+    #[cfg(feature = "certora")]
+    {
+        let mut v: Vec<ContextRule> = Vec::new(e);
+        for id in ids.iter() {
+            v.push_back(get_context_rule(e, id));
+        }
+        return v
+    }
 }
 
 /// Retrieves all valid (non-expired) context rules for a specific context type,
@@ -477,12 +496,22 @@ pub fn do_check_auth(
 ) -> Result<(), SmartAccountError> {
     authenticate(e, signature_payload, &signatures.0);
 
+    #[cfg(not(feature = "certora"))]
     let validated_contexts = Vec::from_iter(
         e,
         auth_contexts
             .iter()
             .map(|context| get_validated_context(e, &context, &signatures.0.keys())),
     );
+
+    #[cfg(feature = "certora")]
+    let validated_contexts = {
+        let mut tmp = Vec::new(e);
+        for context in auth_contexts {
+            tmp.push_back(get_validated_context(e, &context, &signatures.0.keys()));
+        }
+        tmp
+    };
 
     // After collecting validated context rules and authenticated signers, call for
     // every policy `PolicyClient::enforce` to trigger the state-changing
@@ -546,7 +575,10 @@ pub fn compute_fingerprint(
         }
     }
 
+    #[cfg(not(feature = "certora"))]
     let mut rule_data = context_type.to_xdr(e);
+    #[cfg(feature = "certora")]
+    let mut rule_data = context_type.clone().to_xdr(e);
     rule_data.append(&sorted_signers.to_xdr(e));
     rule_data.append(&sorted_policies.to_xdr(e));
 
@@ -628,7 +660,16 @@ pub fn add_context_rule(
         }
     }
 
+    #[cfg(not(feature = "certora"))]
     let policies_vec = Vec::from_iter(e, policies.keys());
+    #[cfg(feature = "certora")]
+    let policies_vec = {
+        let mut tmp = Vec::new(e);
+        for key in policies.keys() {
+            tmp.push_back(key);
+        }
+        tmp
+    };
 
     validate_signers_and_policies(e, &unique_signers, &policies_vec);
     validate_and_set_fingerprint(e, context_type, &unique_signers, &policies_vec);
@@ -662,6 +703,7 @@ pub fn add_context_rule(
     }
 
     // Emit event
+    #[cfg(not(feature = "certora"))]
     emit_context_rule_added(e, &context_rule);
 
     // Increment next id
@@ -717,6 +759,7 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: &String) -> ContextRule 
     };
 
     // Emit event
+    #[cfg(not(feature = "certora"))]
     emit_context_rule_updated(e, id, &meta);
 
     context_rule
@@ -774,6 +817,7 @@ pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32
     };
 
     // Emit event
+    #[cfg(not(feature = "certora"))]
     emit_context_rule_updated(e, id, &meta);
 
     context_rule
@@ -837,6 +881,7 @@ pub fn remove_context_rule(e: &Env, id: u32) {
     e.storage().instance().set(&SmartAccountStorageKey::Count, &(count - 1));
 
     // Emit event
+    #[cfg(not(feature = "certora"))]
     emit_context_rule_removed(e, id);
 }
 
@@ -896,6 +941,7 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
     e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
     // Emit event
+    #[cfg(not(feature = "certora"))]
     emit_signer_added(e, id, signer);
 }
 
@@ -947,6 +993,7 @@ pub fn remove_signer(e: &Env, id: u32, signer: &Signer) {
         e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
         // Emit event
+        #[cfg(not(feature = "certora"))]
         emit_signer_removed(e, id, signer);
     } else {
         panic_with_error!(e, SmartAccountError::SignerNotFound)
@@ -1006,6 +1053,7 @@ pub fn add_policy(e: &Env, id: u32, policy: &Address, install_param: Val) {
     e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
 
     // Emit event
+    #[cfg(not(feature = "certora"))]
     emit_policy_added(e, id, policy, install_param);
 }
 
@@ -1054,6 +1102,7 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
         e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
 
         // Emit event
+        #[cfg(not(feature = "certora"))]
         emit_policy_removed(e, id, policy);
     } else {
         panic_with_error!(e, SmartAccountError::PolicyNotFound)

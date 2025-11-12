@@ -57,6 +57,12 @@ mod test;
 
 use soroban_sdk::{contracterror, Address, Env};
 
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
+
 pub use crate::pausable::storage::{pause, paused, unpause, when_not_paused, when_paused};
 
 pub trait Pausable {
@@ -143,7 +149,7 @@ pub enum PausableError {
 // ################## EVENTS ##################
 
 /// Event emitted when the contract is paused.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Paused {}
 
@@ -157,7 +163,7 @@ pub fn emit_paused(e: &Env) {
 }
 
 /// Event emitted when the contract is unpaused.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Unpaused {}
 

@@ -46,8 +46,14 @@
 //! security degradation.**
 
 use soroban_sdk::{
-    auth::Context, contracterror, contractevent, contracttype, panic_with_error, Address, Env, Vec,
+    auth::Context, contracterror, contracttype, panic_with_error, Address, Env, Vec,
 };
+
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
 
 use crate::smart_account::ContextRule;
 // re-export
@@ -198,6 +204,7 @@ pub fn enforce(
 
     if authenticated_signers.len() >= threshold {
         // emit event
+        #[cfg(not(feature = "certora"))]
         SimplePolicyEnforced {
             smart_account: smart_account.clone(),
             context: context.clone(),

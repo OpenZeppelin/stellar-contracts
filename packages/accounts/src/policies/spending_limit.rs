@@ -15,9 +15,15 @@
 //! ```
 use soroban_sdk::{
     auth::{Context, ContractContext},
-    contracterror, contractevent, contracttype, panic_with_error, symbol_short, Address, Env,
+    contracterror, contracttype, panic_with_error, symbol_short, Address, Env,
     TryFromVal, Vec,
 };
+
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::{contractevent};
 
 use crate::smart_account::{ContextRule, Signer};
 
@@ -289,6 +295,7 @@ pub fn enforce(
 
                         e.storage().persistent().set(&key, &data);
 
+                        #[cfg(not(feature = "certora"))]
                         SpendingLimitPolicyEnforced {
                             smart_account: smart_account.clone(),
                             context: context.clone(),

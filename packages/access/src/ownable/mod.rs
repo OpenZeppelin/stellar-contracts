@@ -43,6 +43,10 @@ use soroban_sdk::{contracterror, Address, Env};
 #[cfg(not(feature = "certora"))]
 use soroban_sdk::{contractevent};
 
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::{contractevent};
+
+
 pub use crate::ownable::storage::{
     accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
     transfer_ownership, OwnableStorageKey,
@@ -141,7 +145,7 @@ pub enum OwnableError {
 // ################## EVENTS ##################
 
 /// Event emitted when an ownership transfer is initiated.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipTransfer {
     pub old_owner: Address,
@@ -174,7 +178,7 @@ pub fn emit_ownership_transfer(
 }
 
 /// Event emitted when an ownership transfer is completed.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipTransferCompleted {
     pub new_owner: Address,
@@ -192,7 +196,7 @@ pub fn emit_ownership_transfer_completed(e: &Env, new_owner: &Address) {
 }
 
 /// Event emitted when ownership is renounced.
-#[cfg_attr(not(feature="certora"), contractevent)]
+#[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipRenounced {
     pub old_owner: Address,
