@@ -26,6 +26,7 @@ members = [
     "packages/macros",
     "packages/test-utils/*",
     "packages/tokens",
+    "certora/access"
 ]
 exclude = ["examples/upgradeable/testdata"]
 

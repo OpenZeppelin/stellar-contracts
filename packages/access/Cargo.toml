@@ -19,6 +19,7 @@ cvlr-soroban = { workspace = true }
 cvlr-soroban-macros = { workspace = true }
 cvlr-soroban-derive = { workspace = true }
 base64ct = { workspace = true }
+stellar-macros = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }

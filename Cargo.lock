@@ -3,6 +3,21 @@
 version = 4
 
 [[package]]
+name = "access-control-harness"
+version = "0.4.1"
+dependencies = [
+ "base64ct",
+ "cvlr",
+ "cvlr-soroban",
+ "cvlr-soroban-derive",
+ "cvlr-soroban-macros",
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-event-assertion",
+ "stellar-macros",
+]
+
+[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1878,6 +1893,7 @@ dependencies = [
  "cvlr-soroban-macros",
  "soroban-sdk",
  "stellar-event-assertion",
+ "stellar-macros",
 ]
 
 [[package]]
