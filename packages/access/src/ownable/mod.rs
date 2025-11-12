@@ -40,6 +40,9 @@ mod test;
 
 use soroban_sdk::{contracterror, Address, Env};
 
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
 pub use crate::ownable::storage::{
     accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
     transfer_ownership, OwnableStorageKey,
@@ -138,7 +141,7 @@ pub enum OwnableError {
 // ################## EVENTS ##################
 
 /// Event emitted when an ownership transfer is initiated.
-// #[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipTransfer {
     pub old_owner: Address,
@@ -155,22 +158,23 @@ pub struct OwnershipTransfer {
 /// * `new_owner` - The address of the proposed new owner.
 /// * `live_until_ledger` - The ledger number until which the new owner can
 ///   accept the transfer.
+#[cfg(not(feature = "certora"))]
 pub fn emit_ownership_transfer(
     e: &Env,
     old_owner: &Address,
     new_owner: &Address,
     live_until_ledger: u32,
 ) {
-    // OwnershipTransfer {
-    //     old_owner: old_owner.clone(),
-    //     new_owner: new_owner.clone(),
-    //     live_until_ledger,
-    // }
-    // .publish(e);
+    OwnershipTransfer {
+        old_owner: old_owner.clone(),
+        new_owner: new_owner.clone(),
+        live_until_ledger,
+    }
+    .publish(e);
 }
 
 /// Event emitted when an ownership transfer is completed.
-// #[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipTransferCompleted {
     pub new_owner: Address,
@@ -182,12 +186,13 @@ pub struct OwnershipTransferCompleted {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `new_owner` - The address of the new owner.
+#[cfg(not(feature = "certora"))]
 pub fn emit_ownership_transfer_completed(e: &Env, new_owner: &Address) {
-    // OwnershipTransferCompleted { new_owner: new_owner.clone() }.publish(e);
+    OwnershipTransferCompleted { new_owner: new_owner.clone() }.publish(e);
 }
 
 /// Event emitted when ownership is renounced.
-// #[contractevent]
+#[cfg_attr(not(feature="certora"), contractevent)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OwnershipRenounced {
     pub old_owner: Address,
@@ -199,6 +204,7 @@ pub struct OwnershipRenounced {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `old_owner` - The address of the owner who renounced ownership.
+#[cfg(not(feature = "certora"))]
 pub fn emit_ownership_renounced(e: &Env, old_owner: &Address) {
-    // OwnershipRenounced { old_owner: old_owner.clone() }.publish(e);
+    OwnershipRenounced { old_owner: old_owner.clone() }.publish(e);
 }

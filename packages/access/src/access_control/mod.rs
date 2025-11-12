@@ -96,6 +96,9 @@ mod test;
 
 use soroban_sdk::{contracterror, Address, Env, Symbol};
 
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
 pub use crate::access_control::storage::{
     accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
     ensure_if_admin_or_admin_role, ensure_role, get_admin, get_role_admin, get_role_member,
@@ -378,8 +381,9 @@ pub struct RoleGranted {
 /// * `role` - The role that was granted.
 /// * `account` - The account that received the role.
 /// * `caller` - The account that granted the role.
+#[cfg(not(feature = "certora"))]
 pub fn emit_role_granted(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
-    // RoleGranted { role: role.clone(), account: account.clone(), caller: caller.clone() }.publish(e);
+    RoleGranted { role: role.clone(), account: account.clone(), caller: caller.clone() }.publish(e);
 }
 
 /// Event emitted when a role is revoked.
@@ -402,8 +406,9 @@ pub struct RoleRevoked {
 /// * `account` - The account that lost the role.
 /// * `caller` - The account that revoked the role (either the admin or the
 ///   account itself).
+#[cfg(not(feature = "certora"))]
 pub fn emit_role_revoked(e: &Env, role: &Symbol, account: &Address, caller: &Address) {
-    // RoleRevoked { role: role.clone(), account: account.clone(), caller: caller.clone() }.publish(e);
+    RoleRevoked { role: role.clone(), account: account.clone(), caller: caller.clone() }.publish(e);
 }
 
 /// Event emitted when a role admin is changed.
@@ -424,18 +429,19 @@ pub struct RoleAdminChanged {
 /// * `role` - The role whose admin is changing.
 /// * `previous_admin_role` - The previous admin role.
 /// * `new_admin_role` - The new admin role.
+#[cfg(not(feature = "certora"))]
 pub fn emit_role_admin_changed(
     e: &Env,
     role: &Symbol,
     previous_admin_role: &Symbol,
     new_admin_role: &Symbol,
 ) {
-    // RoleAdminChanged {
-    //     role: role.clone(),
-    //     previous_admin_role: previous_admin_role.clone(),
-    //     new_admin_role: new_admin_role.clone(),
-    // }
-    // .publish(e);
+    RoleAdminChanged {
+        role: role.clone(),
+        previous_admin_role: previous_admin_role.clone(),
+        new_admin_role: new_admin_role.clone(),
+    }
+    .publish(e);
 }
 
 /// Event emitted when an admin transfer is initiated.
@@ -457,18 +463,19 @@ pub struct AdminTransferInitiated {
 /// * `new_admin` - The proposed new admin.
 /// * `live_until_ledger` - The ledger number at which the pending transfer will
 ///   expire. If this value is `0`, it means the pending transfer is cancelled.
+#[cfg(not(feature = "certora"))]
 pub fn emit_admin_transfer_initiated(
     e: &Env,
     current_admin: &Address,
     new_admin: &Address,
     live_until_ledger: u32,
 ) {
-    // AdminTransferInitiated {
-    //     current_admin: current_admin.clone(),
-    //     new_admin: new_admin.clone(),
-    //     live_until_ledger,
-    // }
-    // .publish(e);
+    AdminTransferInitiated {
+        current_admin: current_admin.clone(),
+        new_admin: new_admin.clone(),
+        live_until_ledger,
+    }
+    .publish(e);
 }
 
 /// Event emitted when an admin transfer is completed.
@@ -487,9 +494,10 @@ pub struct AdminTransferCompleted {
 /// * `e` - Access to Soroban environment.
 /// * `previous_admin` - The previous admin.
 /// * `new_admin` - The new admin who accepted the transfer.
+#[cfg(not(feature = "certora"))]
 pub fn emit_admin_transfer_completed(e: &Env, previous_admin: &Address, new_admin: &Address) {
-    // AdminTransferCompleted { new_admin: new_admin.clone(), previous_admin: previous_admin.clone() }
-        // .publish(e);
+    AdminTransferCompleted { new_admin: new_admin.clone(), previous_admin: previous_admin.clone() }
+        .publish(e);
 }
 
 /// Event emitted when the admin role is renounced.
@@ -506,6 +514,7 @@ pub struct AdminRenounced {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `admin` - The admin that renounced the role.
+#[cfg(not(feature = "certora"))]
 pub fn emit_admin_renounced(e: &Env, admin: &Address) {
-    // AdminRenounced { admin: admin.clone() }.publish(e);
+    AdminRenounced { admin: admin.clone() }.publish(e);
 }
