@@ -14,7 +14,7 @@ COMMAND = "just build"
 # JSON FIELDS
 PROJECT_DIR = (SCRIPT_DIR / "../").resolve()
 SOURCES = ["contract_utils/src/**/*.rs"]
-EXECUTABLES = "../target/wasm32v1-none/release/stellar_contract_utils.wasm"
+EXECUTABLES = "../target/wasm32-unknown-unknown/release/stellar_contract_utils.wasm"
 
 VERBOSE = False
 
