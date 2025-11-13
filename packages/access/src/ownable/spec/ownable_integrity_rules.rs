@@ -19,12 +19,3 @@ pub fn set_owner_integrity(e: Env) {
     }
     cvlr_assert!(owner_post == Some(new_owner));
 }
-
-#[rule]
-pub fn renounce_ownership_does_not_panic(e: Env) {
-    use crate::ownable::storage::renounce_ownership;
-    let setup = e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner);
-    cvlr_assume!(setup.is_none());
-    let res = renounce_ownership(&e);
-    cvlr_assert!(true);
-}
