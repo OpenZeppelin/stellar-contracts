@@ -7,7 +7,7 @@
 //! **IMPORTANT**: this example is for demonstration purposes, and authorization
 //! is not taken into consideration
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
+use soroban_sdk::{contract, contractimpl, Address, Env, MuxedAddress, String};
 use stellar_tokens::fungible::{
     capped::{check_cap, set_cap},
     Base, FungibleToken,
@@ -44,7 +44,7 @@ impl FungibleToken for ExampleContract {
         Self::ContractType::allowance(e, &owner, &spender)
     }
 
-    fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
+    fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
         Self::ContractType::transfer(e, &from, &to, amount);
     }
 

@@ -59,7 +59,13 @@ mod implementation {
             None
         }
 
-        pub fn assert_fungible_transfer(&mut self, from: &Address, to: &Address, amount: i128) {
+        pub fn assert_fungible_transfer(
+            &mut self,
+            from: &Address,
+            to: &Address,
+            muxed_id: Option<u64>,
+            amount: i128,
+        ) {
             let transfer_event = self.find_event_by_symbol("transfer");
 
             assert!(transfer_event.is_some(), "Transfer event not found in event log");
@@ -76,12 +82,16 @@ mod implementation {
             let event_from: Address = topics.get_unchecked(1).into_val(self.env);
             let event_to: Address = topics.get_unchecked(2).into_val(self.env);
 
-            let data_map: Map<Symbol, i128> = data.into_val(self.env);
-            let event_amount = data_map.get(Symbol::new(self.env, "amount")).unwrap();
+            let data_map: Map<Symbol, Val> = data.into_val(self.env);
+            let event_amount: i128 =
+                data_map.get(symbol_short!("amount")).unwrap().into_val(self.env);
+            let event_muxed_id: Option<u64> =
+                data_map.get(Symbol::new(self.env, "to_muxed_id")).unwrap().into_val(self.env);
 
             assert_eq!(&event_from, from, "Transfer event has wrong from address");
             assert_eq!(&event_to, to, "Transfer event has wrong to address");
             assert_eq!(event_amount, amount, "Transfer event has wrong amount");
+            assert_eq!(event_muxed_id, muxed_id, "Transfer event has wrong muxed id");
         }
 
         pub fn assert_non_fungible_transfer(
