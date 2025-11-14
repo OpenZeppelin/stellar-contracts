@@ -143,6 +143,7 @@ pub struct OperationScheduled {
 /// * `predecessor` - The predecessor operation ID.
 /// * `salt` - The salt for uniqueness.
 /// * `delay` - The delay in ledgers.
+#[allow(clippy::too_many_arguments)]
 pub fn emit_operation_scheduled(
     e: &Env,
     id: &BytesN<32>,
