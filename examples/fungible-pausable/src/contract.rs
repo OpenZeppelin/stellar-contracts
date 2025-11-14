@@ -38,14 +38,14 @@ impl ExampleContract {
     }
 
     #[when_not_paused]
-    pub fn mint(e: &Env, account: Address, amount: i128) {
+    pub fn mint(e: &Env, to: Address, amount: i128) {
         // When `ownable` module is available,
         // the following checks should be equivalent to:
         // `ownable::only_owner(&e);`
         let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
         owner.require_auth();
 
-        Base::mint(e, &account, amount);
+        Base::mint(e, &to, amount);
     }
 }
 

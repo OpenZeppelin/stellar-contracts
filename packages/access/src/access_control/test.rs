@@ -30,7 +30,7 @@ fn admin_functions_work() {
         set_admin(&e, &admin);
 
         // Admin can grant roles
-        grant_role(&e, &admin, &user, &USER_ROLE);
+        grant_role(&e, &user, &USER_ROLE, &admin);
         assert!(has_role(&e, &user, &USER_ROLE).is_some());
 
         // Test events
@@ -40,7 +40,7 @@ fn admin_functions_work() {
 
     e.as_contract(&address, || {
         // Admin can revoke roles
-        revoke_role(&e, &admin, &user, &USER_ROLE);
+        revoke_role(&e, &user, &USER_ROLE, &admin);
         assert!(has_role(&e, &user, &USER_ROLE).is_none());
 
         // Test events
@@ -62,11 +62,11 @@ fn role_management_works() {
         set_admin(&e, &admin);
 
         // Grant roles to multiple users
-        grant_role(&e, &admin, &user1, &USER_ROLE);
+        grant_role(&e, &user1, &USER_ROLE, &admin);
     });
 
     e.as_contract(&address, || {
-        grant_role(&e, &admin, &user2, &USER_ROLE);
+        grant_role(&e, &user2, &USER_ROLE, &admin);
 
         // Check role count
         assert_eq!(get_role_member_count(&e, &USER_ROLE), 2);
@@ -78,7 +78,7 @@ fn role_management_works() {
 
     e.as_contract(&address, || {
         // Revoke role from first user
-        revoke_role(&e, &admin, &user1, &USER_ROLE);
+        revoke_role(&e, &user1, &USER_ROLE, &admin);
 
         // Check updated count and enumeration
         assert_eq!(get_role_member_count(&e, &USER_ROLE), 1);
@@ -104,16 +104,16 @@ fn role_admin_management_works() {
 
     e.as_contract(&address, || {
         // Grant MANAGER_ROLE to manager
-        grant_role(&e, &admin, &manager, &MANAGER_ROLE);
+        grant_role(&e, &manager, &MANAGER_ROLE, &admin);
 
         // Manager can now grant USER_ROLE
-        grant_role(&e, &manager, &user, &USER_ROLE);
+        grant_role(&e, &user, &USER_ROLE, &manager);
         assert!(has_role(&e, &user, &USER_ROLE).is_some());
     });
 
     e.as_contract(&address, || {
         // Manager can revoke USER_ROLE
-        revoke_role(&e, &manager, &user, &USER_ROLE);
+        revoke_role(&e, &user, &USER_ROLE, &manager);
         assert!(has_role(&e, &user, &USER_ROLE).is_none());
     });
 }
@@ -186,11 +186,11 @@ fn renounce_role_works() {
         set_admin(&e, &admin);
 
         // Grant role to user
-        grant_role(&e, &admin, &user, &USER_ROLE);
+        grant_role(&e, &user, &USER_ROLE, &admin);
         assert!(has_role(&e, &user, &USER_ROLE).is_some());
 
         // User can renounce their own role
-        renounce_role(&e, &user, &USER_ROLE);
+        renounce_role(&e, &USER_ROLE, &user);
         assert!(has_role(&e, &user, &USER_ROLE).is_none());
     });
 }
@@ -273,7 +273,7 @@ fn unauthorized_role_grant_panics() {
         set_admin(&e, &admin);
 
         // Unauthorized user attempts to grant role
-        grant_role(&e, &other, &user, &USER_ROLE);
+        grant_role(&e, &user, &USER_ROLE, &other);
     });
 }
 
@@ -291,10 +291,10 @@ fn unauthorized_role_revoke_panics() {
         set_admin(&e, &admin);
 
         // Grant role to user
-        grant_role(&e, &admin, &user, &USER_ROLE);
+        grant_role(&e, &user, &USER_ROLE, &admin);
 
         // Unauthorized user attempts to revoke role
-        revoke_role(&e, &other, &user, &USER_ROLE);
+        revoke_role(&e, &user, &USER_ROLE, &other);
     });
 }
 
@@ -311,7 +311,7 @@ fn renounce_nonexistent_role_panics() {
         set_admin(&e, &admin);
 
         // User attempts to renounce role they don't have
-        renounce_role(&e, &user, &USER_ROLE);
+        renounce_role(&e, &USER_ROLE, &user);
     });
 }
 
@@ -340,7 +340,7 @@ fn get_role_member_with_out_of_bounds_index_panics() {
         set_admin(&e, &admin);
 
         // Grant role to create one member
-        grant_role(&e, &admin, &user, &USER_ROLE);
+        grant_role(&e, &user, &USER_ROLE, &admin);
 
         // Verify count is 1
         assert_eq!(get_role_member_count(&e, &USER_ROLE), 1);
@@ -504,11 +504,11 @@ fn ensure_if_admin_or_admin_role_allows_role_admin_without_contract_admin() {
         set_role_admin_no_auth(&e, &USER_ROLE, &MANAGER_ROLE);
 
         // Grant MANAGER_ROLE to manager directly
-        grant_role_no_auth(&e, &manager, &manager, &MANAGER_ROLE);
+        grant_role_no_auth(&e, &manager, &MANAGER_ROLE, &manager);
 
         // This should not panic - manager should be authorized for USER_ROLE operations
         // even though there's no contract admin
-        ensure_if_admin_or_admin_role(&e, &manager, &USER_ROLE);
+        ensure_if_admin_or_admin_role(&e, &USER_ROLE, &manager);
     });
 }
 

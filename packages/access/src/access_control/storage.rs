@@ -145,10 +145,10 @@ pub fn set_admin(e: &Env, admin: &Address) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be the admin or has the
-///   `AdminRole` privileges for this role.
 /// * `account` - The account to grant the role to.
 /// * `role` - The role to grant.
+/// * `caller` - The address of the caller, must be the admin or has the
+///   `AdminRole` privileges for this role.
 ///
 /// # Errors
 ///
@@ -162,10 +162,10 @@ pub fn set_admin(e: &Env, admin: &Address) {
 /// # Notes
 ///
 /// * Authorization for `caller` is required.
-pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
+pub fn grant_role(e: &Env, account: &Address, role: &Symbol, caller: &Address) {
     caller.require_auth();
-    ensure_if_admin_or_admin_role(e, caller, role);
-    grant_role_no_auth(e, caller, account, role);
+    ensure_if_admin_or_admin_role(e, role, caller);
+    grant_role_no_auth(e, account, role, caller);
 }
 
 /// Low-level function to grant a role to an account without performing
@@ -176,9 +176,9 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller.
 /// * `account` - The account to grant the role to.
 /// * `role` - The role to grant.
+/// * `caller` - The address of the caller.
 ///
 /// # Events
 ///
@@ -194,7 +194,7 @@ pub fn grant_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
 ///
 /// Using this function in public-facing methods creates significant security
 /// risks as it could allow unauthorized role assignments.
-pub fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
+pub fn grant_role_no_auth(e: &Env, account: &Address, role: &Symbol, caller: &Address) {
     // Return early if account already has the role
     if has_role(e, account, role).is_some() {
         return;
@@ -209,10 +209,10 @@ pub fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &S
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller, must be the admin or has the
-///   `AdminRole` privileges for this role.
 /// * `account` - The account to revoke the role from.
 /// * `role` - The role to revoke.
+/// * `caller` - The address of the caller, must be the admin or has the
+///   `AdminRole` privileges for this role.
 ///
 /// # Errors
 ///
@@ -227,10 +227,10 @@ pub fn grant_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &S
 /// # Notes
 ///
 /// * Authorization for `caller` is required.
-pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
+pub fn revoke_role(e: &Env, account: &Address, role: &Symbol, caller: &Address) {
     caller.require_auth();
-    ensure_if_admin_or_admin_role(e, caller, role);
-    revoke_role_no_auth(e, caller, account, role);
+    ensure_if_admin_or_admin_role(e, role, caller);
+    revoke_role_no_auth(e, account, role, caller);
 }
 
 /// Low-level function to revoke a role from an account without performing
@@ -239,9 +239,9 @@ pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) 
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller.
 /// * `account` - The account to revoke the role from.
 /// * `role` - The role to revoke.
+/// * `caller` - The address of the caller.
 ///
 /// # Errors
 ///
@@ -263,7 +263,7 @@ pub fn revoke_role(e: &Env, caller: &Address, account: &Address, role: &Symbol) 
 ///
 /// Using this function in public-facing methods creates significant security
 /// risks as it could allow unauthorized role revocations.
-pub fn revoke_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &Symbol) {
+pub fn revoke_role_no_auth(e: &Env, account: &Address, role: &Symbol, caller: &Address) {
     // Check if account has the role
     if has_role(e, account, role).is_none() {
         panic_with_error!(e, AccessControlError::RoleNotHeld);
@@ -283,9 +283,9 @@ pub fn revoke_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
+/// * `role` - The role to renounce.
 /// * `caller` - The address of the caller, must be the account that has the
 ///   role.
-/// * `role` - The role to renounce.
 ///
 /// # Errors
 ///
@@ -301,7 +301,7 @@ pub fn revoke_role_no_auth(e: &Env, caller: &Address, account: &Address, role: &
 /// # Notes
 ///
 /// * Authorization for `caller` is required.
-pub fn renounce_role(e: &Env, caller: &Address, role: &Symbol) {
+pub fn renounce_role(e: &Env, role: &Symbol, caller: &Address) {
     caller.require_auth();
 
     // Check if account has the role
@@ -554,14 +554,14 @@ pub fn remove_role_accounts_count_no_auth(e: &Env, role: &Symbol) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller to check permissions for.
 /// * `role` - The role to check admin privileges for.
+/// * `caller` - The address of the caller to check permissions for.
 ///
 /// # Errors
 ///
 /// * [`AccessControlError::Unauthorized`] - If the caller is neither the
 ///   contract admin nor has the admin role.
-pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
+pub fn ensure_if_admin_or_admin_role(e: &Env, role: &Symbol, caller: &Address) {
     // Check if caller is contract admin (if one is set)
     let is_admin = match get_admin(e) {
         Some(admin) => caller == &admin,
@@ -587,14 +587,14 @@ pub fn ensure_if_admin_or_admin_role(e: &Env, caller: &Address, role: &Symbol) {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `caller` - The address of the caller to check the role for.
 /// * `role` - The role to check for.
+/// * `caller` - The address of the caller to check the role for.
 ///
 /// # Errors
 ///
 /// * [`AccessControlError::Unauthorized`] - If the caller does not have the
 ///   specified role.
-pub fn ensure_role(e: &Env, caller: &Address, role: &Symbol) {
+pub fn ensure_role(e: &Env, role: &Symbol, caller: &Address) {
     if has_role(e, caller, role).is_none() {
         panic_with_error!(e, AccessControlError::Unauthorized);
     }
