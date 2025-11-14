@@ -55,7 +55,8 @@ use soroban_sdk::{contracterror, contractevent, Address, BytesN, Env, Symbol, Va
 pub use crate::timelock::storage::{
     cancel_operation, execute_operation, get_min_delay, get_operation_state, get_timestamp,
     hash_operation, is_operation, is_operation_done, is_operation_pending, is_operation_ready,
-    schedule_operation, set_min_delay, Operation, OperationState, TimelockStorageKey,
+    schedule_operation, set_execute_operation, set_min_delay, Operation, OperationState,
+    TimelockStorageKey,
 };
 
 // ################## ERRORS ##################

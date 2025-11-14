@@ -48,7 +48,7 @@ pub enum OperationState {
 
 /// Storage keys for the timelock module.
 #[derive(Clone)]
-#[soroban_sdk::contracttype]
+#[contracttype]
 pub enum TimelockStorageKey {
     /// Minimum delay in ledgers for operations
     MinDelay,
@@ -283,6 +283,12 @@ pub fn schedule_operation(e: &Env, operation: &Operation, delay: u32) -> BytesN<
 /// **IMPORTANT**: This function does not perform authorization checks.
 /// The caller must ensure proper authorization before calling this function.
 pub fn execute_operation(e: &Env, operation: &Operation) -> Val {
+    set_execute_operation(e, operation);
+
+    e.invoke_contract::<Val>(&operation.target, &operation.function, operation.args.clone())
+}
+
+pub fn set_execute_operation(e: &Env, operation: &Operation) -> Val {
     let id = hash_operation(e, operation);
 
     // Check operation is ready
@@ -309,8 +315,6 @@ pub fn execute_operation(e: &Env, operation: &Operation) -> Val {
         &operation.predecessor,
         &operation.salt,
     );
-
-    e.invoke_contract::<Val>(&operation.target, &operation.function, operation.args.clone())
 }
 
 /// Cancels a scheduled operation.

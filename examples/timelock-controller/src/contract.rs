@@ -1,49 +1,133 @@
 //! Timelock Controller Example Contract.
 //!
-//! This contract demonstrates a complete timelock controller implementation with role-based
-//! access control, similar to OpenZeppelin's Solidity TimelockController.
+//! This contract demonstrates a complete timelock controller implementation
+//! with role-based access control, similar to OpenZeppelin's Solidity
+//! TimelockController.
 //!
 //! # Roles
 //!
-//! - **Admin**: Can manage all roles and update the minimum delay. By default, the contract
-//!   itself is the admin, meaning admin operations must go through the timelock process.
-//! - **Proposer**: Can schedule operations. Proposers are also automatically granted the
-//!   Canceller role.
+//! - **Admin**: Can manage all roles and update the minimum delay. By default,
+//!   the contract itself is the admin, meaning admin operations must go through
+//!   the timelock process.
+//! - **Proposer**: Can schedule operations. Proposers are also automatically
+//!   granted the Canceller role.
 //! - **Executor**: Can execute operations that are ready.
 //! - **Canceller**: Can cancel pending operations.
 //!
 //! # Usage
 //!
+//! ## Standard Operations (External Contracts)
+//!
 //! 1. Deploy the contract with initial proposers, executors, and minimum delay
 //! 2. Proposers schedule operations with a delay >= minimum delay
-//! 3. After the delay passes, executors can execute the operations
+//! 3. After the delay passes, executors call `execute_op` to execute operations
 //! 4. Cancellers can cancel operations before they are executed
 //!
-//! # Self-Administration
+//! ## Self-Administration
 //!
-//! The contract is self-administered by default, meaning the contract address itself has the
-//! admin role. This ensures that administrative actions (like changing the minimum delay or
-//! managing roles) must go through the timelock process, providing transparency and allowing
-//! users to react to proposed changes.
+//! When the contract is deployed with `admin` set to `None`, the contract
+//! address itself becomes the admin, enabling self-administration. For
+//! self-administration operations (e.g., updating the minimum delay):
+//!
+//! 1. Proposer schedules the operation targeting the timelock contract itself
+//! 2. After the delay passes, call the admin function directly (not via
+//!    `execute_op`)
+//! 3. The `CustomAccountInterface` implementation validates the operation is
+//!    ready and marks it as executed
+//!
+//! This approach ensures administrative changes go through the timelock
+//! process.
+//!
+//! ## Optional External Admin
+//!
+//! An optional external admin can be provided during deployment to aid with
+//! initial configuration of roles after deployment without being subject to
+//! delay. However, this role should be subsequently renounced in favor of
+//! administration through timelocked proposals to ensure all administrative
+//! actions have proper oversight and transparency.
 
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol, Val, Vec};
-use stellar_access::access_control::{grant_role_no_auth, set_admin, AccessControl};
-use stellar_governance::timelock::{cancel_operation, execute_operation, schedule_operation};
-use stellar_governance::timelock::{
-    get_min_delay as timelock_get_min_delay, get_operation_state, get_timestamp,
-    hash_operation as timelock_hash_operation, is_operation, is_operation_done,
-    is_operation_pending, is_operation_ready, set_min_delay as timelock_set_min_delay, Operation,
-    OperationState,
+use soroban_sdk::{
+    auth::{Context, ContractContext, CustomAccountInterface},
+    contract, contractimpl, contracttype,
+    crypto::Hash,
+    panic_with_error, symbol_short, Address, BytesN, Env, Symbol, Val, Vec,
 };
-use stellar_macros::{default_impl, only_role};
+use stellar_access::access_control::{grant_role_no_auth, set_admin, AccessControl};
+use stellar_governance::timelock::{
+    cancel_operation, execute_operation, get_min_delay as timelock_get_min_delay,
+    get_operation_state, get_timestamp, hash_operation as timelock_hash_operation, is_operation,
+    is_operation_done, is_operation_pending, is_operation_ready, schedule_operation,
+    set_execute_operation, set_min_delay as timelock_set_min_delay, Operation, OperationState,
+    TimelockError,
+};
+use stellar_macros::{default_impl, only_admin, only_role};
 
 // Role constants
 const PROPOSER_ROLE: Symbol = symbol_short!("proposer");
 const EXECUTOR_ROLE: Symbol = symbol_short!("executor");
 const CANCELLER_ROLE: Symbol = symbol_short!("canceller");
 
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct OperationMeta {
+    pub predecessor: BytesN<32>,
+    pub salt: BytesN<32>,
+}
+
 #[contract]
 pub struct TimelockController;
+
+#[contractimpl]
+impl CustomAccountInterface for TimelockController {
+    type Error = TimelockError;
+    type Signature = Vec<OperationMeta>;
+
+    /// Custom authorization check for self-administration operations.
+    ///
+    /// This enables the timelock contract to execute operations on itself when
+    /// the admin is set to the contract's own address. Unlike external
+    /// operations which use `execute_op`, self-administration operations are
+    /// executed by calling the admin function directly (e.g., `update_delay`).
+    ///
+    /// The `__check_auth` implementation validates that:
+    /// - The operation targets the timelock contract itself
+    /// - The operation was properly scheduled and is ready for execution
+    /// - The predecessor and salt match the scheduled operation
+    ///
+    /// The caller must construct an `OperationMeta` signature containing the
+    /// `predecessor` and `salt` values that were used when scheduling the
+    /// operation, allowing this function to validate and mark the operation as
+    /// executed.
+    fn __check_auth(
+        e: Env,
+        _signature_payload: Hash<32>,
+        context_meta: Vec<OperationMeta>,
+        auth_contexts: Vec<Context>,
+    ) -> Result<(), Self::Error> {
+        for (context, meta) in auth_contexts.iter().zip(context_meta) {
+            match context.clone() {
+                // TODO: How to check the role of the executor?
+                Context::Contract(ContractContext { contract, fn_name, args }) => {
+                    // allow only for self-administration
+                    if contract != e.current_contract_address() {
+                        panic_with_error!(&e, TimelockError::Unauthorized)
+                    }
+
+                    let op = Operation {
+                        target: contract,
+                        function: fn_name,
+                        args,
+                        predecessor: meta.predecessor,
+                        salt: meta.salt,
+                    };
+                    set_execute_operation(&e, &op);
+                }
+                _ => unimplemented!(),
+            }
+        }
+        Ok(())
+    }
+}
 
 #[contractimpl]
 impl TimelockController {
@@ -61,10 +145,12 @@ impl TimelockController {
     ///
     /// # Notes
     ///
-    /// - The contract itself is always granted the admin role for self-administration.
+    /// - The contract itself is always granted the admin role for
+    ///   self-administration.
     /// - Proposers are automatically granted the canceller role.
-    /// - If an external admin is provided, they should renounce their admin role after
-    ///   initial configuration to ensure all admin actions go through the timelock.
+    /// - If an external admin is provided, they should renounce their admin
+    ///   role after initial configuration to ensure all admin actions go
+    ///   through the timelock.
     pub fn __constructor(
         e: &Env,
         min_delay: u32,
@@ -101,10 +187,12 @@ impl TimelockController {
     /// * `target` - The target contract address.
     /// * `function` - The function name to invoke.
     /// * `args` - The arguments to pass to the function.
-    /// * `predecessor` - The predecessor operation ID (use empty bytes for none).
+    /// * `predecessor` - The predecessor operation ID (use empty bytes for
+    ///   none).
     /// * `salt` - Salt for uniqueness (use empty bytes for default).
     /// * `delay` - The delay in ledgers before the operation can be executed.
-    /// * `proposer` - The address proposing the operation (must have proposer role).
+    /// * `proposer` - The address proposing the operation (must have proposer
+    ///   role).
     ///
     /// # Returns
     ///
@@ -132,6 +220,10 @@ impl TimelockController {
 
     /// Executes a scheduled operation that is ready.
     ///
+    /// **Note**: This function is only for executing operations on external
+    /// contracts. For self-administration operations (where target is this
+    /// timelock contract), call the admin function directly instead.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
@@ -140,7 +232,8 @@ impl TimelockController {
     /// * `args` - The arguments to pass to the function.
     /// * `predecessor` - The predecessor operation ID.
     /// * `salt` - Salt for uniqueness.
-    /// * `executor` - The address executing the operation (must have executor role).
+    /// * `executor` - The address executing the operation (must have executor
+    ///   role).
     ///
     /// # Returns
     ///
@@ -170,7 +263,8 @@ impl TimelockController {
     ///
     /// * `e` - Access to Soroban environment.
     /// * `operation_id` - The unique identifier of the operation to cancel.
-    /// * `canceller` - The address cancelling the operation (must have canceller role).
+    /// * `canceller` - The address cancelling the operation (must have
+    ///   canceller role).
     ///
     /// # Notes
     ///
@@ -193,9 +287,8 @@ impl TimelockController {
     /// * Authorization for `admin` is required.
     /// * This function should typically be called through the timelock itself
     ///   (self-administration) to ensure transparency.
+    #[only_admin]
     pub fn update_delay(e: &Env, new_delay: u32) {
-        // TODO: what to do here?
-        e.current_contract_address().require_auth();
         timelock_set_min_delay(e, new_delay);
     }
 
