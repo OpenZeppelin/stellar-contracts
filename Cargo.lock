@@ -1960,6 +1960,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "timelock-controller-example"
+version = "0.5.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-governance",
+ "stellar-macros",
+]
+
+[[package]]
 name = "typenum"
 version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
