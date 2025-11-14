@@ -288,7 +288,7 @@ pub fn execute_operation(e: &Env, operation: &Operation) -> Val {
     e.invoke_contract::<Val>(&operation.target, &operation.function, operation.args.clone())
 }
 
-pub fn set_execute_operation(e: &Env, operation: &Operation) -> Val {
+pub fn set_execute_operation(e: &Env, operation: &Operation) {
     let id = hash_operation(e, operation);
 
     // Check operation is ready
