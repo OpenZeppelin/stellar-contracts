@@ -83,16 +83,16 @@ version = "0.4.0"
 default-features = false
 
 [workspace.dependencies.cvlr-soroban]
-git = "https://github.com/chandrakananandi/cvlr-soroban.git"
-branch = "soroban-22.0.8"
-# path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban"
+# git = "https://github.com/chandrakananandi/cvlr-soroban.git"
+# branch = "soroban-22.0.8"
+path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban"
 
 [workspace.dependencies.cvlr-soroban-macros]
-git = "https://github.com/chandrakananandi/cvlr-soroban.git"
-branch = "soroban-22.0.8"
-# path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-macros"
+# git = "https://github.com/chandrakananandi/cvlr-soroban.git"
+# branch = "soroban-22.0.8"
+path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-macros"
 
 [workspace.dependencies.cvlr-soroban-derive]
-git = "https://github.com/chandrakananandi/cvlr-soroban.git"
-branch = "soroban-22.0.8"
-# path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-derive"
+# git = "https://github.com/chandrakananandi/cvlr-soroban.git"
+# branch = "soroban-22.0.8"
+path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-derive"

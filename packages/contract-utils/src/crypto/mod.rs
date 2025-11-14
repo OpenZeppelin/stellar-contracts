@@ -7,3 +7,6 @@ pub mod sha256;
 
 #[cfg(test)]
 mod test;
+
+#[cfg(feature = "certora")]
+pub mod spec;

@@ -27,3 +27,4 @@ stellar-event-assertion = { workspace = true }
 
 [features]
 certora  = []
+default = ["certora"]

@@ -32,3 +32,4 @@ hex-literal = { workspace = true }
 
 [features]
 certora  = []
+default = ["certora"]
