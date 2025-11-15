@@ -6,14 +6,12 @@ version = 4
 name = "access-control-harness"
 version = "0.5.1"
 dependencies = [
- "base64ct",
  "cvlr",
  "cvlr-soroban",
  "cvlr-soroban-derive",
  "cvlr-soroban-macros",
  "soroban-sdk",
  "stellar-access",
- "stellar-event-assertion",
  "stellar-macros",
 ]
 
@@ -447,6 +445,7 @@ dependencies = [
 [[package]]
 name = "cvlr-soroban"
 version = "0.4.0"
+source = "git+https://github.com/chandrakananandi/cvlr-soroban.git?branch=soroban-22.0.8#4aa67165df3428eaa1a3d8c5ca8dc2780521f755"
 dependencies = [
  "cvlr-asserts",
  "cvlr-log",
@@ -457,6 +456,7 @@ dependencies = [
 [[package]]
 name = "cvlr-soroban-derive"
 version = "0.4.0"
+source = "git+https://github.com/chandrakananandi/cvlr-soroban.git?branch=soroban-22.0.8#4aa67165df3428eaa1a3d8c5ca8dc2780521f755"
 dependencies = [
  "darling 0.20.11",
  "proc-macro2",
@@ -468,6 +468,7 @@ dependencies = [
 [[package]]
 name = "cvlr-soroban-macros"
 version = "0.4.0"
+source = "git+https://github.com/chandrakananandi/cvlr-soroban.git?branch=soroban-22.0.8#4aa67165df3428eaa1a3d8c5ca8dc2780521f755"
 
 [[package]]
 name = "darling"
@@ -1183,6 +1184,19 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 name = "ownable-example"
 version = "0.5.1"
 dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+]
+
+[[package]]
+name = "ownable-harness"
+version = "0.5.1"
+dependencies = [
+ "cvlr",
+ "cvlr-soroban",
+ "cvlr-soroban-derive",
+ "cvlr-soroban-macros",
  "soroban-sdk",
  "stellar-access",
  "stellar-macros",

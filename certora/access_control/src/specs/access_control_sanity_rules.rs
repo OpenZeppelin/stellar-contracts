@@ -1,0 +1,132 @@
+
+use cvlr::{cvlr_assert};
+use cvlr_soroban::{nondet_address, nondet_symbol};
+use cvlr_soroban_derive::rule;
+use cvlr::nondet::Nondet;
+
+use soroban_sdk::{Env};
+
+use crate::access_control_contract::FVHarnessAccessControlContract;
+use stellar_access::access_control::AccessControl;
+
+#[rule]
+pub fn has_role_sanity(e: Env) {
+    let role = nondet_symbol();
+    let account = nondet_address();
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    FVHarnessAccessControlContract::has_role(&e, account, role);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn get_admin_sanity(e: Env) {
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    FVHarnessAccessControlContract::get_admin(&e);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn get_role_member_count_sanity(e: Env) {
+    let role = nondet_symbol();
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    let _ = FVHarnessAccessControlContract::get_role_member_count(&e, role);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn get_role_member_sanity(e: Env) {
+    let role = nondet_symbol();
+    let i = u32::nondet();
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    let _ = FVHarnessAccessControlContract::get_role_member(&e, role, i);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn get_role_admin_sanity(e: Env) {
+    let role = nondet_symbol();
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    let _ = FVHarnessAccessControlContract::get_role_admin(&e, role);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn set_admin_sanity(e: Env) {
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn grant_role_sanity(e: Env) {
+    let role = nondet_symbol();
+    let caller = nondet_address();
+    let account = nondet_address();
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    FVHarnessAccessControlContract::grant_role(&e, caller, account, role);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn revoke_role_sanity(e: Env) {
+    let role = nondet_symbol();
+    let caller = nondet_address();
+    let account = nondet_address();
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    FVHarnessAccessControlContract::revoke_role(&e, caller, account, role);
+    cvlr_assert!(false);
+}
+
+
+#[rule]
+pub fn renounce_role_sanity(e: Env) {
+    let role = nondet_symbol();
+    let caller = nondet_address();
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    FVHarnessAccessControlContract::renounce_role(&e, caller, role);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn transfer_admin_role_sanity(e: Env) {
+    let new_admin = nondet_address();
+    let live_until_ledger = u32::nondet();
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    FVHarnessAccessControlContract::transfer_admin_role(&e, new_admin, live_until_ledger);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn accept_admin_transfer_sanity(e: Env) {
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    FVHarnessAccessControlContract::accept_admin_transfer(&e);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn set_role_admin_sanity(e: Env) {
+    let role = nondet_symbol();
+    let admin_role = nondet_symbol();
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    FVHarnessAccessControlContract::set_role_admin(&e, role, admin_role);
+    cvlr_assert!(false);
+}
+
+#[rule]
+pub fn renounce_admin_sanity(e: Env) {
+    let admin = nondet_address();
+    FVHarnessAccessControlContract::__constructor(&e, admin);
+    FVHarnessAccessControlContract::renounce_admin(&e);
+    cvlr_assert!(false);
+}

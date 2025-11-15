@@ -13,8 +13,8 @@ COMMAND = "just build"
 
 # JSON FIELDS
 PROJECT_DIR = (SCRIPT_DIR / "../").resolve()
-SOURCES = ["access/src/**/*.rs"]
-EXECUTABLES = "../target/wasm32-unknown-unknown/release/stellar_access.wasm"
+SOURCES = ["access/src/**/*.rs", "../packages/**/*.rs"]
+EXECUTABLES = "../target/wasm32-unknown-unknown/release/ownable_harness.wasm"
 
 VERBOSE = False
 

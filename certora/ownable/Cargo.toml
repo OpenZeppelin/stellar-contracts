@@ -1,29 +1,30 @@
 [package]
-name = "stellar-access"
+name = "ownable-harness"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 version.workspace = true
 publish = true
-description = "Access Control, Ownable, and Role Transfer utilities for Stellar contracts."
+description = "Ownable FV harness"
 
 
 [lib]
-crate-type = ["lib", "cdylib"]
+crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true}
+stellar-access = { workspace = true }
+stellar-macros = { workspace = true }
+
 cvlr = { workspace = true, default-features = false }
 cvlr-soroban = { workspace = true }
 cvlr-soroban-macros = { workspace = true }
 cvlr-soroban-derive = { workspace = true }
-base64ct = { workspace = true }
-stellar-macros = { workspace = true }
+
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-stellar-event-assertion = { workspace = true }
 
 [features]
-certora  = []
+certora = ["stellar-access/certora"]

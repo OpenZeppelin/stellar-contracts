@@ -19,4 +19,4 @@ stellar-macros = { workspace = true }
 soroban-sdk = { workspace = true, features = ["testutils"] }
 
 [features]
-certora = []
+certora = ["stellar-access/certora"]
