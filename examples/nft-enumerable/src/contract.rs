@@ -22,14 +22,9 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, owner: Address) {
+    pub fn __constructor(e: &Env, uri: String, name: String, symbol: String, owner: Address) {
         e.storage().instance().set(&DataKey::Owner, &owner);
-        Base::set_metadata(
-            e,
-            String::from_str(e, "www.mytoken.com"),
-            String::from_str(e, "My Token"),
-            String::from_str(e, "TKN"),
-        );
+        Base::set_metadata(e, uri, name, symbol);
     }
 
     pub fn mint(e: &Env, to: Address) -> u32 {

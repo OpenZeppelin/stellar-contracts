@@ -7,8 +7,8 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env) {
-        Base::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
+    pub fn __constructor(e: &Env, name: String, symbol: String) {
+        Base::set_metadata(e, 7, name, symbol);
     }
 
     pub fn mint(e: &Env, to: Address, amount: i128) {
@@ -23,7 +23,9 @@ impl FungibleToken for ExampleContract {
 }
 
 fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {
-    let address = e.register(ExampleContract, ());
+    let name = String::from_str(e, "My Token");
+    let symbol = String::from_str(e, "TKN");
+    let address = e.register(ExampleContract, (name, symbol));
     ExampleContractClient::new(e, &address)
 }
 

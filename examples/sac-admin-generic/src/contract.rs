@@ -36,13 +36,18 @@ pub struct SacAdminExampleContract;
 
 #[contractimpl]
 impl SacAdminExampleContract {
-    pub fn __constructor(e: Env, sac: Address, chief: BytesN<32>, operator: BytesN<32>) {
+    pub fn __constructor(
+        e: Env,
+        sac: Address,
+        chief: BytesN<32>,
+        operator: BytesN<32>,
+        max: i128,
+        curr: i128,
+    ) {
         set_sac_address(&e, &sac);
         e.storage().instance().set(&SacDataKey::Chief, &chief);
         e.storage().instance().set(&SacDataKey::Operator(operator.clone()), &true);
-        e.storage()
-            .instance()
-            .set(&SacDataKey::MintingLimit(operator), &(1_000_000_000i128, 0i128));
+        e.storage().instance().set(&SacDataKey::MintingLimit(operator), &(max, curr));
     }
 
     pub fn get_sac_address(e: &Env) -> Address {

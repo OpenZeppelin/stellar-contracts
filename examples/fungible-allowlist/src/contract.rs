@@ -19,13 +19,15 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, admin: Address, manager: Address, initial_supply: i128) {
-        Base::set_metadata(
-            e,
-            18,
-            String::from_str(e, "AllowList Token"),
-            String::from_str(e, "ALT"),
-        );
+    pub fn __constructor(
+        e: &Env,
+        name: String,
+        symbol: String,
+        admin: Address,
+        manager: Address,
+        initial_supply: i128,
+    ) {
+        Base::set_metadata(e, 18, name, symbol);
 
         access_control::set_admin(e, &admin);
 

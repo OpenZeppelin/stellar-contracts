@@ -47,6 +47,8 @@ fn test_sac_generic() {
             sac.address(),
             BytesN::from_array(&e, chief.verifying_key().as_bytes()),
             BytesN::from_array(&e, operator.verifying_key().as_bytes()),
+            1_000_000_000i128,
+            0i128,
         ),
     );
 

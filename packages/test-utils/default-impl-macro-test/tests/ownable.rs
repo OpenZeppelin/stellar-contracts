@@ -15,9 +15,9 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, owner: Address) {
+    pub fn __constructor(e: &Env, name: String, symbol: String, owner: Address) {
         set_owner(e, &owner);
-        Base::set_metadata(e, 7, String::from_str(e, "My Token"), String::from_str(e, "TKN"));
+        Base::set_metadata(e, 7, name, symbol);
     }
 
     #[only_owner]
@@ -37,7 +37,9 @@ impl FungibleToken for ExampleContract {
 impl Ownable for ExampleContract {}
 
 fn create_client<'a>(e: &Env, owner: &Address) -> ExampleContractClient<'a> {
-    let address = e.register(ExampleContract, (owner,));
+    let name = String::from_str(e, "My Token");
+    let symbol = String::from_str(e, "TKN");
+    let address = e.register(ExampleContract, (name, symbol, owner));
     ExampleContractClient::new(e, &address)
 }
 

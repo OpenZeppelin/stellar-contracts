@@ -141,6 +141,12 @@ pub struct MyContract;
 
 #[contractimpl]
 impl MyContract {
+    // deploy this contract with the Stellar CLI:
+    //
+    // stellar contract deploy \
+    // --wasm path/to/file.wasm \
+    // -- \
+    // --owner <owner_address>
     pub fn __constructor(e: &Env, owner: Address) {
         // Contract initialization
     }

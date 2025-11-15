@@ -21,13 +21,21 @@ pub struct MyContract;
 
 #[contractimpl]
 impl MyContract {
-    pub fn __constructor(e: &Env, initial_owner: Address) {
+    // deploy this contract with the Stellar CLI:
+    //
+    // stellar contract deploy \
+    // --wasm path/to/file.wasm \
+    // -- \
+    // --name "My Token" \
+    // --symbol MTK \
+    // --initial_owner <initial_owner_address>
+    pub fn __constructor(e: &Env, name: String, symbol: String, initial_owner: Address) {
         // Set token metadata
         Base::set_metadata(
             e,
             8, // 8 decimals
-            String::from_str(e, "My Token"),
-            String::from_str(e, "MTK"),
+            name,
+            symbol,
         );
 
         // Set the contract owner
@@ -84,13 +92,16 @@ pub struct MyNFTContract;
 
 #[contractimpl]
 impl MyNFTContract {
-    pub fn __constructor(e: &Env) {
-        Base::set_metadata(
-            e,
-            String::from_str(e, "www.mygame.com"),
-            String::from_str(e, "My Game Items Collection"),
-            String::from_str(e, "MGMC"),
-        );
+    // deploy this contract with the Stellar CLI:
+    //
+    // stellar contract deploy \
+    // --wasm path/to/file.wasm \
+    // -- \
+    // --uri "www.mygame.com" \
+    // --name "My Game Items Collection" \
+    // --symbol MGMC
+    pub fn __constructor(e: &Env, uri: String, name: String, symbol: String) {
+        Base::set_metadata(e, uri, name, symbol);
     }
 
     pub fn award_item(e: &Env, to: Address) -> u32 {
@@ -105,7 +116,6 @@ impl NonFungibleToken for MyNFTContract {
     type ContractType = Base;
 }
 
-- [`examples/fungible-merkle-airdrop/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-merkle-airdrop) - Airdrop with merkle proofs
 #[default_impl]
 #[contractimpl]
 impl NonFungibleBurnable for MyNFTContract {}
@@ -145,6 +155,7 @@ stellar-macros = "=0.5.1"
 See the following examples in the repository:
 - [`examples/fungible-pausable/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-pausable) - Pausable fungible token
 - [`examples/nft-sequential-minting/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/nft-sequential-minting) - Basic non-fungible token
+- [`examples/fungible-merkle-airdrop/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-merkle-airdrop) - Airdrop with merkle proofs
 
 ## License
 

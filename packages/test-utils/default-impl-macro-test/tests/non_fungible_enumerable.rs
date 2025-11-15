@@ -10,13 +10,8 @@ pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env) {
-        Base::set_metadata(
-            e,
-            String::from_str(e, "www.mytoken.com"),
-            String::from_str(e, "My Token"),
-            String::from_str(e, "TKN"),
-        );
+    pub fn __constructor(e: &Env, uri: String, name: String, symbol: String) {
+        Base::set_metadata(e, uri, name, symbol);
     }
 
     pub fn mint(e: &Env, to: Address, token_id: u32) {
@@ -35,7 +30,10 @@ impl NonFungibleToken for ExampleContract {
 impl NonFungibleEnumerable for ExampleContract {}
 
 fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {
-    let address = e.register(ExampleContract, ());
+    let uri = String::from_str(e, "www.mytoken.com");
+    let name = String::from_str(e, "My Token");
+    let symbol = String::from_str(e, "TKN");
+    let address = e.register(ExampleContract, (uri, name, symbol));
     ExampleContractClient::new(e, &address)
 }
 
