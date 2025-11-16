@@ -27,7 +27,10 @@ members = [
     "packages/test-utils/*",
     "packages/tokens",
     "certora/access_control",
-    "certora/ownable"
+    "certora/ownable",
+    "certora/pausable",
+    "certora/upgradeable",
+    "certora/math"
 ]
 exclude = ["examples/upgradeable/testdata"]
 

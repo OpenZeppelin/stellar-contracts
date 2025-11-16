@@ -1,0 +1,9 @@
+export RUSTFLAGS := "-C strip=none" 
+
+target := "../../target"
+
+build:
+    cargo +nightly-2024-11-22 build --target=wasm32-unknown-unknown --release --features certora
+
+clean:
+    rm -rf {{target}}

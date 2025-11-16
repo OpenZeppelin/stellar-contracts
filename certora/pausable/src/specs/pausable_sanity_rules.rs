@@ -1,9 +1,10 @@
 use cvlr::{cvlr_assert};
 use cvlr_soroban_derive::rule;
 
-use soroban_sdk::{Env, Symbol};
+use soroban_sdk::{Env};
 
-use crate::pausable::*;
+use stellar_contract_utils::pausable::*;
+
 
 #[rule]
 pub fn paused_sanity(e: Env) {

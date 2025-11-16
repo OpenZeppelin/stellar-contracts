@@ -1,5 +1,7 @@
 # certora
 .certora_internal
+emv-*
+local.conf
 
 **/target/
 /.idea

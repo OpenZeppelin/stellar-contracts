@@ -14,7 +14,7 @@ COMMAND = "just build"
 # JSON FIELDS
 PROJECT_DIR = (SCRIPT_DIR / "../").resolve()
 SOURCES = ["../certora/**/*.rs", "../packages/**/*.rs"]
-EXECUTABLES = "../target/wasm32-unknown-unknown/release/access_control_harness.wasm"
+EXECUTABLES = "../target/wasm32-unknown-unknown/release/math_harness.wasm"
 
 VERBOSE = False
 

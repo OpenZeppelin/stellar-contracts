@@ -72,8 +72,6 @@
 //! you can also find a helper `Upgrader` contract that performs upgrade+migrate
 //! in a single transaction.
 
-#[cfg(feature = "certora")]
-pub mod spec;
 
 mod storage;
 

@@ -3,7 +3,7 @@ use cvlr_soroban_derive::rule;
 
 use soroban_sdk::{Env};
 
-use crate::upgradeable::*;
+use stellar_contract_utils::upgradeable::*;
 
 #[rule]
 pub fn enable_migration_sanity(e: Env) {

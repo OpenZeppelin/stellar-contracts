@@ -3,7 +3,7 @@ use cvlr_soroban_derive::rule;
 use cvlr::nondet::Nondet;
 
 use soroban_sdk::{Env};
-use crate::math::i128_fixed_point::*;
+use stellar_contract_utils::math::i128_fixed_point::*;
 
 // TODO: need 256 support
 
