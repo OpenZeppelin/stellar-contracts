@@ -28,6 +28,15 @@ pub struct SpendingLimitPolicyContract;
 impl Policy for SpendingLimitPolicyContract {
     type AccountParams = spending_limit::SpendingLimitAccountParams;
 
+    /// Check if the spending limit policy can be enforced.
+    ///
+    /// Verifies that the transaction amount does not exceed the remaining
+    /// spending limit for the current time period.
+    ///
+    /// # Returns
+    ///
+    /// * `true` if the spending limit allows the transaction
+    /// * `false` otherwise
     fn can_enforce(
         e: &Env,
         context: Context,
@@ -44,6 +53,10 @@ impl Policy for SpendingLimitPolicyContract {
         )
     }
 
+    /// Enforce the spending limit policy.
+    ///
+    /// Records the transaction amount and updates the spending history.
+    /// This is called after `can_enforce` returns true.
     fn enforce(
         e: &Env,
         context: Context,
@@ -54,6 +67,9 @@ impl Policy for SpendingLimitPolicyContract {
         spending_limit::enforce(e, &context, &authenticated_signers, &context_rule, &smart_account)
     }
 
+    /// Install the spending limit policy for a smart account.
+    ///
+    /// Stores the spending limit configuration for the given context rule.
     fn install(
         e: &Env,
         install_params: Self::AccountParams,
@@ -63,6 +79,10 @@ impl Policy for SpendingLimitPolicyContract {
         spending_limit::install(e, &install_params, &context_rule, &smart_account)
     }
 
+    /// Uninstall the spending limit policy for a smart account.
+    ///
+    /// Removes the spending limit configuration and history for the given
+    /// context rule.
     fn uninstall(e: &Env, context_rule: ContextRule, smart_account: Address) {
         spending_limit::uninstall(e, &context_rule, &smart_account)
     }
