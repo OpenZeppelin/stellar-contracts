@@ -21,7 +21,7 @@ impl ExampleContract {
     }
 
     #[has_role(caller, "minter")]
-    pub fn mint(e: &Env, caller: Address, to: Address, amount: i128) {
+    pub fn mint(e: &Env, to: Address, amount: i128, caller: Address) {
         Base::mint(e, &to, amount);
     }
 }
@@ -51,5 +51,5 @@ fn default_impl_fungible_grant_role() {
 
     e.mock_all_auths();
 
-    client.grant_role(&owner, &owner, &Symbol::new(&e, "minter"));
+    client.grant_role(&owner, &Symbol::new(&e, "minter"), &owner);
 }

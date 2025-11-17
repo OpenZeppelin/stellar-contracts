@@ -48,7 +48,7 @@ impl MyContract {
     }
 
     pub fn mint(e: &Env, to: Address, token_id: u32, caller: Address) {
-        access_control::ensure_role(e, &caller, &symbol_short!("minter"));
+        access_control::ensure_role(e, &symbol_short!("minter"), &caller );
         caller.require_auth();
         // minting
     }

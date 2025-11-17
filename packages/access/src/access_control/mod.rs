@@ -166,10 +166,10 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the admin or have the
-    ///   `RoleAdmin` for the `role`.
     /// * `account` - The account to grant the role to.
     /// * `role` - The role to grant.
+    /// * `caller` - The address of the caller, must be the admin or have the
+    ///   `RoleAdmin` for the `role`.
     ///
     /// # Errors
     ///
@@ -180,7 +180,7 @@ pub trait AccessControl {
     ///
     /// * topics - `["role_granted", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
-    fn grant_role(e: &Env, caller: Address, account: Address, role: Symbol);
+    fn grant_role(e: &Env, account: Address, role: Symbol, caller: Address);
 
     /// Revokes a role from an account.
     /// To revoke your own role, please use [`AccessControl::renounce_role()`]
@@ -189,10 +189,10 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `caller` - The address of the caller, must be the admin or has the
-    ///   `RoleAdmin` for the `role`.
     /// * `account` - The account to revoke the role from.
     /// * `role` - The role to revoke.
+    /// * `caller` - The address of the caller, must be the admin or has the
+    ///   `RoleAdmin` for the `role`.
     ///
     /// # Errors
     ///
@@ -206,7 +206,7 @@ pub trait AccessControl {
     ///
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
-    fn revoke_role(e: &Env, caller: Address, account: Address, role: Symbol);
+    fn revoke_role(e: &Env, account: Address, role: Symbol, caller: Address);
 
     /// Allows an account to renounce a role assigned to itself.
     /// Users can only renounce roles for their own account.
@@ -214,9 +214,9 @@ pub trait AccessControl {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
+    /// * `role` - The role to renounce.
     /// * `caller` - The address of the caller, must be the account that has the
     ///   role.
-    /// * `role` - The role to renounce.
     ///
     /// # Errors
     ///
@@ -228,7 +228,7 @@ pub trait AccessControl {
     ///
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
-    fn renounce_role(e: &Env, caller: Address, role: Symbol);
+    fn renounce_role(e: &Env, role: Symbol, caller: Address);
 
     /// Initiates the admin role transfer.
     /// Admin privileges for the current admin are not revoked until the

@@ -1,4 +1,6 @@
-use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env, String, Symbol};
+use soroban_sdk::{
+    contracttype, panic_with_error, symbol_short, Address, Env, MuxedAddress, String, Symbol,
+};
 
 use crate::fungible::{
     emit_approve, emit_mint, emit_transfer, Base, FungibleTokenError, BALANCE_EXTEND_AMOUNT,
@@ -340,15 +342,15 @@ impl Base {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[amount: i128]`
+    /// * data - `[to_muxed_id: Option<u64>, amount: i128]`
     ///
     /// # Notes
     ///
     /// Authorization for `from` is required.
-    pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+    pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         from.require_auth();
-        Base::update(e, Some(from), Some(to), amount);
-        emit_transfer(e, from, to, amount);
+        Base::update(e, Some(from), Some(&to.address()), amount);
+        emit_transfer(e, from, &to.address(), to.id(), amount);
     }
 
     /// Transfers `amount` of tokens from `from` to `to` using the
@@ -381,7 +383,7 @@ impl Base {
         spender.require_auth();
         Base::spend_allowance(e, from, spender, amount);
         Base::update(e, Some(from), Some(to), amount);
-        emit_transfer(e, from, to, amount);
+        emit_transfer(e, from, to, None, amount);
     }
 
     /// Transfers `amount` of tokens from `from` to `to` or alternatively

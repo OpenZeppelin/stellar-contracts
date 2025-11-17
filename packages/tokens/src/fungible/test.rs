@@ -5,9 +5,9 @@ use soroban_sdk::{
     contract, symbol_short,
     testutils::{
         storage::{Instance, Persistent},
-        Address as _, AuthorizedFunction, Events, Ledger,
+        Address as _, AuthorizedFunction, Events, Ledger, MuxedAddress as _,
     },
-    vec, Address, Env, IntoVal, String,
+    vec, Address, Env, IntoVal, MuxedAddress, String,
 };
 use stellar_event_assertion::EventAssertion;
 
@@ -213,14 +213,14 @@ fn transfer_works() {
 
     e.as_contract(&address, || {
         Base::mint(&e, &from, 100);
-        Base::transfer(&e, &from, &recipient, 50);
+        Base::transfer(&e, &from, &MuxedAddress::from(recipient.clone()), 50);
         assert_eq!(Base::balance(&e, &from), 50);
         assert_eq!(Base::balance(&e, &recipient), 50);
 
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_fungible_mint(&from, 100);
-        event_assert.assert_fungible_transfer(&from, &recipient, 50);
+        event_assert.assert_fungible_transfer(&from, &recipient, None, 50);
     });
 }
 
@@ -233,12 +233,33 @@ fn transfer_zero_works() {
     let recipient = Address::generate(&e);
 
     e.as_contract(&address, || {
-        Base::transfer(&e, &from, &recipient, 0);
+        Base::transfer(&e, &from, &MuxedAddress::from(recipient.clone()), 0);
         assert_eq!(Base::balance(&e, &from), 0);
         assert_eq!(Base::balance(&e, &recipient), 0);
 
         let events = e.events().all();
         assert_eq!(events.len(), 1);
+    });
+}
+
+#[test]
+fn transfer_muxed_address_works() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let from = Address::generate(&e);
+    let recipient = MuxedAddress::generate(&e);
+
+    e.as_contract(&address, || {
+        Base::mint(&e, &from, 100);
+        Base::transfer(&e, &from, &recipient, 50);
+        assert_eq!(Base::balance(&e, &from), 50);
+        assert_eq!(Base::balance(&e, &recipient.address()), 50);
+
+        let mut event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(2);
+        event_assert.assert_fungible_mint(&from, 100);
+        event_assert.assert_fungible_transfer(&from, &recipient.address(), recipient.id(), 50);
     });
 }
 
@@ -259,7 +280,7 @@ fn extend_balance_ttl_thru_transfer() {
         e.ledger().with_mut(|l| {
             l.sequence_number += ttl;
         });
-        Base::transfer(&e, &from, &recipient, 50);
+        Base::transfer(&e, &from, &MuxedAddress::from(recipient.clone()), 50);
         let ttl = e.storage().persistent().get_ttl(&key);
         assert_eq!(ttl, BALANCE_EXTEND_AMOUNT);
     });
@@ -292,7 +313,7 @@ fn approve_and_transfer_from() {
         event_assert.assert_event_count(3);
         event_assert.assert_fungible_mint(&owner, 100);
         event_assert.assert_fungible_approve(&owner, &spender, 50, 1000);
-        event_assert.assert_fungible_transfer(&owner, &recipient, 30);
+        event_assert.assert_fungible_transfer(&owner, &recipient, None, 30);
     });
 }
 
@@ -307,7 +328,7 @@ fn transfer_insufficient_balance_fails() {
 
     e.as_contract(&address, || {
         Base::mint(&e, &from, 50);
-        Base::transfer(&e, &from, &recipient, 100);
+        Base::transfer(&e, &from, &MuxedAddress::from(recipient.clone()), 100);
     });
 }
 
@@ -460,7 +481,7 @@ fn transfer_requires_auth() {
 
     e.as_contract(&address, || {
         Base::mint(&e, &from, amount);
-        Base::transfer(&e, &from, &to, amount);
+        Base::transfer(&e, &from, &MuxedAddress::from(to.clone()), amount);
     });
 
     let auths = e.auths();

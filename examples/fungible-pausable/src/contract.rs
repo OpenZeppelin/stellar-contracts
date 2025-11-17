@@ -10,8 +10,8 @@
 //! [`stellar_fungible::burnable::FungibleBurnable`].
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env, String,
-    Symbol,
+    contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env,
+    MuxedAddress, String, Symbol,
 };
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_macros::when_not_paused;
@@ -44,14 +44,14 @@ impl ExampleContract {
     }
 
     #[when_not_paused]
-    pub fn mint(e: &Env, account: Address, amount: i128) {
+    pub fn mint(e: &Env, to: Address, amount: i128) {
         // When `ownable` module is available,
         // the following checks should be equivalent to:
         // `ownable::only_owner(&e);`
         let owner: Address = e.storage().instance().get(&OWNER).expect("owner should be set");
         owner.require_auth();
 
-        Base::mint(e, &account, amount);
+        Base::mint(e, &to, amount);
     }
 }
 
@@ -105,7 +105,7 @@ impl FungibleToken for ExampleContract {
     }
 
     #[when_not_paused]
-    fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
+    fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
         Self::ContractType::transfer(e, &from, &to, amount);
     }
 

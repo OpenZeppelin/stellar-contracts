@@ -25,7 +25,7 @@ impl ExampleContract {
     // we want `require_auth()` provided by the macro, since there is no
     // `require_auth()` in `Base::mint`.
     #[only_role(caller, "minter")]
-    pub fn mint(e: &Env, caller: Address, to: Address, token_id: u32) {
+    pub fn mint(e: &Env, to: Address, token_id: u32, caller: Address) {
         Base::mint(e, &to, token_id)
     }
 
