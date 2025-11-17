@@ -11,6 +11,7 @@ use stellar_access::ownable::*;
 use crate::ownable_contract::FVHarnessOwnableContract;
 
 #[rule]
+// status: issue "unreachable"
 pub fn transfer_ownership_panics_if_unauth(e: Env) {
     let new_owner = nondet_address();
     clog!(cvlr_soroban::Addr(&new_owner));
@@ -22,5 +23,16 @@ pub fn transfer_ownership_panics_if_unauth(e: Env) {
         cvlr_assume!(!is_auth(owner_internal));
     }
     FVHarnessOwnableContract::transfer_ownership(&e, new_owner.clone(), live_until_ledger);
+    cvlr_assert!(false);
+}
+
+#[rule]
+// status: issue "unreachable"
+pub fn transfer_ownship_panics_if_owner_not_set(e: Env) {
+    let new_owner = nondet_address();
+    let live_until_ledger = u32::nondet();
+    let owner = FVHarnessOwnableContract::get_owner(&e);
+    cvlr_assert!(owner == None);
+    FVHarnessOwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
     cvlr_assert!(false);
 }
