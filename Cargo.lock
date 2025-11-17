@@ -772,7 +772,7 @@ dependencies = [
 name = "fungible-merkle-airdrop-example"
 version = "0.5.1"
 dependencies = [
- "hex-literal 1.1.0",
+ "hex-literal",
  "soroban-sdk",
  "stellar-access",
  "stellar-contract-utils",
@@ -882,12 +882,6 @@ name = "hex-literal"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fe2267d4ed49bc07b63801559be28c718ea06c4738b7a03c94df7386d2cde46"
-
-[[package]]
-name = "hex-literal"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e712f64ec3850b98572bffac52e2c6f282b29fe6c5fa6d42334b30be438d95c1"
 
 [[package]]
 name = "hmac"
@@ -1047,6 +1041,19 @@ name = "memchr"
 version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
+
+[[package]]
+name = "merkle-distributor-harness"
+version = "0.5.1"
+dependencies = [
+ "cvlr",
+ "cvlr-soroban",
+ "cvlr-soroban-derive",
+ "cvlr-soroban-macros",
+ "soroban-sdk",
+ "stellar-contract-utils",
+ "stellar-macros",
+]
 
 [[package]]
 name = "merkle-voting-example"
@@ -1754,7 +1761,7 @@ dependencies = [
  "elliptic-curve",
  "generic-array",
  "getrandom 0.2.16",
- "hex-literal 0.4.1",
+ "hex-literal",
  "hmac",
  "k256",
  "num-derive",
@@ -1943,7 +1950,7 @@ dependencies = [
  "cvlr-soroban-derive",
  "cvlr-soroban-macros",
  "ed25519-dalek",
- "hex-literal 1.1.0",
+ "hex-literal",
  "p256",
  "serde",
  "serde-json-core",
@@ -1960,7 +1967,7 @@ dependencies = [
  "cvlr-soroban",
  "cvlr-soroban-derive",
  "cvlr-soroban-macros",
- "hex-literal 1.1.0",
+ "hex-literal",
  "proptest",
  "soroban-sdk",
  "stellar-event-assertion",

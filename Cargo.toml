@@ -30,7 +30,8 @@ members = [
     "certora/ownable",
     "certora/pausable",
     "certora/upgradeable",
-    "certora/math"
+    "certora/math",
+    "certora/merkle_distributor"
 ]
 exclude = ["examples/upgradeable/testdata"]
 
@@ -45,13 +46,15 @@ categories = ["no-std", "wasm"]
 version = "0.5.1"
 
 [workspace.dependencies]
+# certora change
 soroban-sdk = {package = "soroban-sdk", version = "=22.0.8", default-features = false}
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
 soroban-test-helpers = "0.2.3"
-hex-literal = "1.0.0"
+# certora change
+hex-literal = "0.4.0" # only used in tests, helps fix rust-analyzer issues
 ed25519-dalek = "2.1.1"
 k256 = "0.13.4"
 p256 = "0.13.2"

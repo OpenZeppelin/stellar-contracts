@@ -113,7 +113,8 @@ pub struct SetClaimed {
 /// * `e` - The Soroban environment.
 /// * `root` - The merkle root.
 pub fn emit_set_root(e: &Env, root: Bytes) {
-    // SetRoot { root }.publish(e);
+    #[cfg(not(feature = "certora"))]
+    SetRoot { root }.publish(e);
 }
 
 /// Emits an event when an index is claimed.
@@ -123,5 +124,6 @@ pub fn emit_set_root(e: &Env, root: Bytes) {
 /// * `e` - The Soroban environment.
 /// * `index` - The index that was claimed.
 pub fn emit_set_claimed(e: &Env, index: Val) {
-    // SetClaimed { index }.publish(e);
+    #[cfg(not(feature = "certora"))]
+    SetClaimed { index }.publish(e);
 }
