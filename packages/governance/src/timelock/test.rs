@@ -108,7 +108,7 @@ fn initial_operation_state() {
 fn schedule_operation_success() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
-    e.ledger().set_sequence_number(1000);
+    e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         set_min_delay(&e, 100);
@@ -169,7 +169,7 @@ fn schedule_operation_already_scheduled() {
 fn operation_state_transitions() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
-    e.ledger().set_sequence_number(1000);
+    e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         set_min_delay(&e, 100);
@@ -181,11 +181,11 @@ fn operation_state_transitions() {
         assert_eq!(get_operation_state(&e, &id), OperationState::Waiting);
 
         // Still waiting before delay
-        e.ledger().set_sequence_number(1050);
+        e.ledger().set_timestamp(1050);
         assert_eq!(get_operation_state(&e, &id), OperationState::Waiting);
 
         // Ready after delay
-        e.ledger().set_sequence_number(1100);
+        e.ledger().set_timestamp(1100);
         assert_eq!(get_operation_state(&e, &id), OperationState::Ready);
         assert!(is_operation_ready(&e, &id));
 
@@ -201,13 +201,13 @@ fn operation_state_transitions() {
 fn execute_operation_success() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
-    e.ledger().set_sequence_number(1000);
+    e.ledger().set_timestamp(1000);
 
     let target = e.as_contract(&contract_address, || {
         set_min_delay(&e, 100);
         let operation = create_operation(&e);
         schedule_operation(&e, &operation, 100);
-        e.ledger().set_sequence_number(1100);
+        e.ledger().set_timestamp(1100);
 
         execute_operation(&e, &operation);
         operation.target
@@ -223,7 +223,7 @@ fn execute_operation_success() {
 fn execute_operation_not_ready() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
-    e.ledger().set_sequence_number(1000);
+    e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         set_min_delay(&e, 100);
@@ -240,13 +240,13 @@ fn execute_operation_not_ready() {
 fn execute_operation_already_done() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
-    e.ledger().set_sequence_number(1000);
+    e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         set_min_delay(&e, 100);
         let operation = create_operation(&e);
         schedule_operation(&e, &operation, 100);
-        e.ledger().set_sequence_number(1100);
+        e.ledger().set_timestamp(1100);
 
         execute_operation(&e, &operation);
         execute_operation(&e, &operation); // Try to execute again
@@ -257,7 +257,7 @@ fn execute_operation_already_done() {
 fn cancel_operation_success() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
-    e.ledger().set_sequence_number(1000);
+    e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         set_min_delay(&e, 100);
@@ -291,13 +291,13 @@ fn cancel_operation_not_pending() {
 fn cancel_operation_already_done() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
-    e.ledger().set_sequence_number(1000);
+    e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         set_min_delay(&e, 100);
         let operation = create_operation(&e);
         let id = schedule_operation(&e, &operation, 100);
-        e.ledger().set_sequence_number(1100);
+        e.ledger().set_timestamp(1100);
 
         execute_operation(&e, &operation);
         cancel_operation(&e, &id);
@@ -308,7 +308,7 @@ fn cancel_operation_already_done() {
 fn predecessor_dependency() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
-    e.ledger().set_sequence_number(1000);
+    e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         set_min_delay(&e, 100);
@@ -325,7 +325,7 @@ fn predecessor_dependency() {
         let id2 = schedule_operation(&e, &operation2, 100);
 
         // Move time forward
-        e.ledger().set_sequence_number(1100);
+        e.ledger().set_timestamp(1100);
 
         // Execute operation1 first
         execute_operation(&e, &operation1);
@@ -343,7 +343,7 @@ fn predecessor_dependency() {
 fn predecessor_dependency_fails_when_not_executed() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
-    e.ledger().set_sequence_number(1000);
+    e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         set_min_delay(&e, 100);
@@ -360,7 +360,7 @@ fn predecessor_dependency_fails_when_not_executed() {
         schedule_operation(&e, &operation2, 100);
 
         // Move time forward
-        e.ledger().set_sequence_number(1100);
+        e.ledger().set_timestamp(1100);
 
         // Try to execute operation2 before operation1 - should panic
         execute_operation(&e, &operation2);

@@ -30,7 +30,7 @@ impl TargetContract {
 }
 
 #[test]
-fn test_initialization() {
+fn initialization() {
     let e = Env::default();
     e.mock_all_auths();
 
@@ -56,7 +56,7 @@ fn test_initialization() {
 }
 
 #[test]
-fn test_schedule_and_execute_operation() {
+fn schedule_and_execute_operation() {
     let e = Env::default();
     e.mock_all_auths();
 
@@ -111,7 +111,7 @@ fn test_schedule_and_execute_operation() {
 }
 
 #[test]
-fn test_cancel_operation() {
+fn cancel_operation() {
     let e = Env::default();
     e.mock_all_auths();
 
@@ -149,7 +149,7 @@ fn test_cancel_operation() {
 
 #[test]
 #[should_panic(expected = "#4001")]
-fn test_schedule_with_insufficient_delay() {
+fn schedule_with_insufficient_delay() {
     let e = Env::default();
     e.mock_all_auths();
 
@@ -178,7 +178,7 @@ fn test_schedule_with_insufficient_delay() {
 
 #[test]
 #[should_panic(expected = "#4002")]
-fn test_execute_before_ready() {
+fn execute_before_ready() {
     let e = Env::default();
     e.mock_all_auths();
 
@@ -217,7 +217,7 @@ fn test_execute_before_ready() {
 }
 
 #[test]
-fn test_hash_operation_deterministic() {
+fn hash_operation_deterministic() {
     let e = Env::default();
 
     let target = Address::generate(&e);
