@@ -1,4 +1,4 @@
-use cvlr::{cvlr_assert, cvlr_assume, cvlr_satisfy};
+use cvlr::{cvlr_assert, cvlr_assume};
 use cvlr_soroban::{nondet_address};
 use cvlr_soroban_derive::rule;
 
@@ -8,6 +8,10 @@ use soroban_sdk::{Env, Address};
 use stellar_access::ownable::*;
 
 use crate::ownable_contract::FVHarnessOwnableContract;
+
+// TODO:
+// non-panic for transfer_ownership
+// non-panic for accept_ownership
 
 #[rule]
 pub fn renounce_ownership_does_not_panic(e: Env) {
@@ -25,3 +29,5 @@ pub fn renounce_ownership_does_not_panic(e: Env) {
     FVHarnessOwnableContract::renounce_ownership(&e);
     cvlr_assert!(true);
 }
+
+// non-panic for owner_restricted_function
