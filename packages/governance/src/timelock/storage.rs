@@ -50,16 +50,16 @@ pub enum OperationState {
 #[derive(Clone)]
 #[contracttype]
 pub enum TimelockStorageKey {
-    /// Minimum delay in ledgers for operations
+    /// Minimum delay in seconds for operations
     MinDelay,
-    /// Maps operation ID to the ledger number when it becomes ready
-    /// Value is 0 for unset, 1 for done, or ledger number for scheduled
-    Timestamps(BytesN<32>),
+    /// Maps operation ID to the timestamp when it becomes ready
+    /// Value is 0 for unset, 1 for done, or Unix timestamp for scheduled
+    Timestamp(BytesN<32>),
 }
 
 // ################## QUERY STATE ##################
 
-/// Returns the minimum delay in ledgers required for operations.
+/// Returns the minimum delay in seconds required for operations.
 ///
 /// # Arguments
 ///
@@ -67,7 +67,7 @@ pub enum TimelockStorageKey {
 ///
 /// # Returns
 ///
-/// The minimum delay in ledgers.
+/// The minimum delay in seconds.
 ///
 /// # Errors
 ///
@@ -79,7 +79,7 @@ pub fn get_min_delay(e: &Env) -> u32 {
         .unwrap_or_else(|| panic_with_error!(e, TimelockError::MinDelayNotSet))
 }
 
-/// Returns the ledger number at which an operation becomes ready.
+/// Returns the timestamp at which an operation becomes ready.
 ///
 /// # Arguments
 ///
@@ -90,10 +90,10 @@ pub fn get_min_delay(e: &Env) -> u32 {
 ///
 /// - `UNSET_TIMESTAMP` for unset operations
 /// - `DONE_TIMESTAMP` for done operations
-/// - Ledger number when the operation becomes ready for scheduled operations
-pub fn get_timestamp(e: &Env, operation_id: &BytesN<32>) -> u32 {
-    let key = TimelockStorageKey::Timestamps(operation_id.clone());
-    if let Some(timestamp) = e.storage().persistent().get::<_, u32>(&key) {
+/// - Unix timestamp when the operation becomes ready for scheduled operations
+pub fn get_timestamp(e: &Env, operation_id: &BytesN<32>) -> u64 {
+    let key = TimelockStorageKey::Timestamp(operation_id.clone());
+    if let Some(timestamp) = e.storage().persistent().get::<_, u64>(&key) {
         e.storage().persistent().extend_ttl(&key, TIMELOCK_TTL_THRESHOLD, TIMELOCK_EXTEND_AMOUNT);
         timestamp
     } else {
@@ -112,13 +112,13 @@ pub fn get_timestamp(e: &Env, operation_id: &BytesN<32>) -> u32 {
 ///
 /// The current [`OperationState`] of the operation.
 pub fn get_operation_state(e: &Env, operation_id: &BytesN<32>) -> OperationState {
-    let timestamp = get_timestamp(e, operation_id);
-    let current_ledger = e.ledger().sequence();
+    let ready_timestamp = get_timestamp(e, operation_id);
+    let current_timestamp = e.ledger().timestamp();
 
-    match timestamp {
+    match ready_timestamp {
         UNSET_TIMESTAMP => OperationState::Unset,
         DONE_TIMESTAMP => OperationState::Done,
-        ready_ledger if ready_ledger > current_ledger => OperationState::Waiting,
+        ready if ready > current_timestamp => OperationState::Waiting,
         _ => OperationState::Ready,
     }
 }
@@ -166,12 +166,12 @@ pub fn is_operation_done(e: &Env, operation_id: &BytesN<32>) -> bool {
 
 // ################## CHANGE STATE ##################
 
-/// Sets the minimum delay for future operations.
+/// Sets the minimum delay required for operations.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `min_delay` - The minimum delay in ledgers.
+/// * `min_delay` - The new minimum delay in seconds.
 ///
 /// # Events
 ///
@@ -195,7 +195,7 @@ pub fn set_min_delay(e: &Env, min_delay: u32) {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `operation` - The operation to schedule.
-/// * `delay` - The delay in ledgers before the operation can be executed.
+/// * `delay` - The delay in seconds before the operation can be executed.
 ///
 /// # Returns
 ///
@@ -234,12 +234,11 @@ pub fn schedule_operation(e: &Env, operation: &Operation, delay: u32) -> BytesN<
         panic_with_error!(e, TimelockError::InsufficientDelay);
     }
 
-    // Calculate ready ledger
-    let current_ledger = e.ledger().sequence();
-    let ready_ledger = current_ledger + delay;
+    let current_timestamp = e.ledger().timestamp();
+    let ready_timestamp = current_timestamp + (delay as u64);
 
-    let key = TimelockStorageKey::Timestamps(id.clone());
-    e.storage().persistent().set(&key, &ready_ledger);
+    let key = TimelockStorageKey::Timestamp(id.clone());
+    e.storage().persistent().set(&key, &ready_timestamp);
 
     emit_operation_scheduled(
         e,
@@ -298,7 +297,7 @@ pub fn set_execute_operation(e: &Env, operation: &Operation) {
         panic_with_error!(e, TimelockError::UnexecutedPredecessor);
     }
 
-    let key = TimelockStorageKey::Timestamps(id.clone());
+    let key = TimelockStorageKey::Timestamp(id.clone());
     e.storage().persistent().set(&key, &DONE_TIMESTAMP);
 
     emit_operation_executed(
@@ -338,7 +337,7 @@ pub fn cancel_operation(e: &Env, operation_id: &BytesN<32>) {
         panic_with_error!(e, TimelockError::InvalidOperationState);
     }
 
-    let key = TimelockStorageKey::Timestamps(operation_id.clone());
+    let key = TimelockStorageKey::Timestamp(operation_id.clone());
     e.storage().persistent().remove(&key);
 
     emit_operation_cancelled(e, operation_id);

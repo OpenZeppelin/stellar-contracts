@@ -136,7 +136,7 @@ impl TimelockController {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `min_delay` - Initial minimum delay in ledgers for operations.
+    /// * `min_delay` - Initial minimum delay in seconds for operations.
     /// * `proposers` - Accounts to be granted proposer and canceller roles.
     /// * `executors` - Accounts to be granted executor role.
     /// * `admin` - Optional account to be granted admin role for initial setup.
@@ -190,7 +190,7 @@ impl TimelockController {
     /// * `predecessor` - The predecessor operation ID (use empty bytes for
     ///   none).
     /// * `salt` - Salt for uniqueness (use empty bytes for default).
-    /// * `delay` - The delay in ledgers before the operation can be executed.
+    /// * `delay` - The delay in seconds before the operation can be executed.
     /// * `proposer` - The address proposing the operation (must have proposer
     ///   role).
     ///
@@ -280,7 +280,7 @@ impl TimelockController {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `new_delay` - The new minimum delay in ledgers.
+    /// * `new_delay` - The new minimum delay in seconds.
     ///
     /// # Notes
     ///
@@ -292,7 +292,7 @@ impl TimelockController {
         timelock_set_min_delay(e, new_delay);
     }
 
-    /// Returns the minimum delay in ledgers required for operations.
+    /// Returns the minimum delay in seconds required for operations.
     pub fn get_min_delay(e: &Env) -> u32 {
         timelock_get_min_delay(e)
     }
@@ -310,8 +310,8 @@ impl TimelockController {
         timelock_hash_operation(e, &operation)
     }
 
-    /// Returns the ledger number at which an operation becomes ready.
-    pub fn get_timestamp(e: &Env, operation_id: BytesN<32>) -> u32 {
+    /// Returns the timestamp at which an operation becomes ready.
+    pub fn get_timestamp(e: &Env, operation_id: BytesN<32>) -> u64 {
         get_timestamp(e, &operation_id)
     }
 
