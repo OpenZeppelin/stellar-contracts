@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Env, String};
+use soroban_sdk::{Address, Env, MuxedAddress, String};
 
 /// Based on the extension, some default behavior of
 /// [`crate::fungible::FungibleToken`] might have to be overridden. This is a
@@ -32,7 +32,7 @@ use soroban_sdk::{Address, Env, String};
 ///         Self::ContractType::balance(e, &account)
 ///     }
 ///
-///     fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
+///     fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
 ///         Self::ContractType::transfer(e, &from, &to, amount);
 ///     }
 ///
@@ -51,7 +51,7 @@ use soroban_sdk::{Address, Env, String};
 ///         Base::balance(e, &account)
 ///     }
 ///
-///     fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
+///     fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
 ///         Base::transfer(e, &from, &to, amount);
 ///     }
 ///
@@ -71,7 +71,7 @@ pub trait ContractOverrides {
         Base::allowance(e, owner, spender)
     }
 
-    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+    fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         Base::transfer(e, from, to, amount);
     }
 

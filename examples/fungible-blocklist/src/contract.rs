@@ -37,7 +37,7 @@ impl ExampleContract {
 
         // create a role "manager" and grant it to `manager`
 
-        access_control::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
+        access_control::grant_role_no_auth(e, &manager, &symbol_short!("manager"), &admin);
 
         // Mint initial supply to the admin
         Base::mint(e, &admin, initial_supply);

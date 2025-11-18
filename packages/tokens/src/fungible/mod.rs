@@ -77,7 +77,7 @@ mod test;
 
 pub use extensions::{allowlist, blocklist, burnable, capped};
 pub use overrides::{Base, ContractOverrides};
-use soroban_sdk::{contracterror, contractevent, Address, Env, String};
+use soroban_sdk::{contracterror, contractevent, Address, Env, MuxedAddress, String};
 pub use storage::{AllowanceData, AllowanceKey, StorageKey};
 pub use utils::{sac_admin_generic, sac_admin_wrapper};
 
@@ -196,8 +196,8 @@ pub trait FungibleToken {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[amount: i128]`
-    fn transfer(e: &Env, from: Address, to: Address, amount: i128);
+    /// * data - `[to_muxed_id: Option<u64>, amount: i128]`
+    fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128);
 
     /// Transfers `amount` of tokens from `from` to `to` using the
     /// allowance mechanism. `amount` is then deducted from `spender`
@@ -336,6 +336,7 @@ pub struct Transfer {
     pub from: Address,
     #[topic]
     pub to: Address,
+    pub to_muxed_id: Option<u64>,
     pub amount: i128,
 }
 
@@ -346,9 +347,16 @@ pub struct Transfer {
 /// * `e` - Access to Soroban environment.
 /// * `from` - The address holding the tokens.
 /// * `to` - The address receiving the transferred tokens.
+/// * `to_muxed_id` - Optional muxed ID to be emitted in the event data.
 /// * `amount` - The amount of tokens to be transferred.
-pub fn emit_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-    Transfer { from: from.clone(), to: to.clone(), amount }.publish(e);
+pub fn emit_transfer(
+    e: &Env,
+    from: &Address,
+    to: &Address,
+    to_muxed_id: Option<u64>,
+    amount: i128,
+) {
+    Transfer { from: from.clone(), to: to.clone(), to_muxed_id, amount }.publish(e);
 }
 
 /// Event emitted when an allowance is approved.

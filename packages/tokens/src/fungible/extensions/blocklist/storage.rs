@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress};
 
 use crate::fungible::{
     extensions::blocklist::{emit_user_blocked, emit_user_unblocked},
@@ -9,7 +9,7 @@ use crate::fungible::{
 pub struct BlockList;
 
 impl ContractOverrides for BlockList {
-    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+    fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         BlockList::transfer(e, from, to, amount);
     }
 
@@ -136,8 +136,8 @@ impl BlockList {
     /// * [`FungibleTokenError::UserBlocked`] - When either `from` or `to` is
     ///   blocked.
     /// * Also refer to [`Base::transfer`] errors.
-    pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        if BlockList::blocked(e, from) || BlockList::blocked(e, to) {
+    pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
+        if BlockList::blocked(e, from) || BlockList::blocked(e, &to.address()) {
             panic_with_error!(e, FungibleTokenError::UserBlocked);
         }
 

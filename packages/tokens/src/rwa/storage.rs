@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
@@ -32,8 +32,8 @@ pub enum RWAStorageKey {
 pub struct RWA;
 
 impl ContractOverrides for RWA {
-    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        RWA::transfer(e, from, to, amount);
+    fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
+        RWA::transfer(e, from, &to.address(), amount);
     }
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
@@ -219,7 +219,7 @@ impl RWA {
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
         compliance_client.transferred(from, to, &amount, &e.current_contract_address());
 
-        emit_transfer(e, from, to, amount);
+        emit_transfer(e, from, to, None, amount);
     }
 
     /// Mints `amount` tokens to `to`.
@@ -650,7 +650,7 @@ impl RWA {
 
         compliance_client.transferred(from, to, &amount, &e.current_contract_address());
 
-        emit_transfer(e, from, to, amount);
+        emit_transfer(e, from, to, None, amount);
     }
 
     /// This is a wrapper around [`Base::update()`] to enable

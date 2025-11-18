@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress};
 
 use crate::fungible::{
     extensions::allowlist::{emit_user_allowed, emit_user_disallowed},
@@ -9,7 +9,7 @@ use crate::fungible::{
 pub struct AllowList;
 
 impl ContractOverrides for AllowList {
-    fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+    fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         AllowList::transfer(e, from, to, amount);
     }
 
@@ -136,8 +136,8 @@ impl AllowList {
     /// * [`FungibleTokenError::UserNotAllowed`] - When either `from` or `to` is
     ///   not allowed.
     /// * Also refer to [`Base::transfer`] errors.
-    pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        if !AllowList::allowed(e, from) || !AllowList::allowed(e, to) {
+    pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
+        if !AllowList::allowed(e, from) || !AllowList::allowed(e, &to.address()) {
             panic_with_error!(e, FungibleTokenError::UserNotAllowed);
         }
         Base::transfer(e, from, to, amount);

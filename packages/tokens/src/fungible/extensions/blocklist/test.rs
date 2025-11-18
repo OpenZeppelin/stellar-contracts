@@ -1,6 +1,6 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env};
+use soroban_sdk::{contract, testutils::Address as _, Address, Env, MuxedAddress};
 
 use crate::fungible::{extensions::blocklist::storage::BlockList, Base};
 
@@ -59,7 +59,7 @@ fn transfer_with_unblocked_users_works() {
         Base::mint(&e, &user1, 100);
 
         // Transfer tokens from user1 to user2
-        BlockList::transfer(&e, &user1, &user2, 50);
+        BlockList::transfer(&e, &user1, &MuxedAddress::from(user2.clone()), 50);
 
         // Verify balances
         assert_eq!(Base::balance(&e, &user1), 50);
@@ -126,7 +126,7 @@ fn transfer_with_sender_blocked_panics() {
         Base::mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 (blocked) to user2
-        BlockList::transfer(&e, &user1, &user2, 50);
+        BlockList::transfer(&e, &user1, &MuxedAddress::from(user2.clone()), 50);
     });
 }
 
@@ -147,7 +147,7 @@ fn transfer_with_receiver_blocked_panics() {
         Base::mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 to user2 (blocked)
-        BlockList::transfer(&e, &user1, &user2, 50);
+        BlockList::transfer(&e, &user1, &MuxedAddress::from(user2.clone()), 50);
     });
 }
 

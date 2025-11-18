@@ -37,14 +37,14 @@ fn setup_roles(e: &Env, client: &ExampleContractClient, admin: &Address) -> Test
     client.set_role_admin(&Symbol::new(e, "burner"), &Symbol::new(e, "burner_admin"));
 
     // Grant admin roles
-    client.grant_role(admin, &minter_admin, &Symbol::new(e, "minter_admin"));
-    client.grant_role(admin, &burner_admin, &Symbol::new(e, "burner_admin"));
+    client.grant_role(&minter_admin, &Symbol::new(e, "minter_admin"), admin);
+    client.grant_role(&burner_admin, &Symbol::new(e, "burner_admin"), admin);
 
     // Admins grant operational roles
-    client.grant_role(&minter_admin, &minter1, &Symbol::new(e, "minter"));
-    client.grant_role(&minter_admin, &minter2, &Symbol::new(e, "minter"));
-    client.grant_role(&burner_admin, &burner1, &Symbol::new(e, "burner"));
-    client.grant_role(&burner_admin, &burner2, &Symbol::new(e, "burner"));
+    client.grant_role(&minter1, &Symbol::new(e, "minter"), &minter_admin);
+    client.grant_role(&minter2, &Symbol::new(e, "minter"), &minter_admin);
+    client.grant_role(&burner1, &Symbol::new(e, "burner"), &burner_admin);
+    client.grant_role(&burner2, &Symbol::new(e, "burner"), &burner_admin);
 
     TestAccounts { minter_admin, burner_admin, minter1, minter2, burner1, burner2, outsider }
 }
@@ -59,8 +59,8 @@ fn minters_can_mint() {
 
     let accounts = setup_roles(&e, &client, &admin);
 
-    client.mint(&accounts.minter1, &accounts.minter1, &1);
-    client.mint(&accounts.minter2, &accounts.minter2, &2);
+    client.mint(&accounts.minter1, &1, &accounts.minter1);
+    client.mint(&accounts.minter2, &2, &accounts.minter2);
 }
 
 #[test]
@@ -74,7 +74,7 @@ fn non_minters_cannot_mint() {
 
     let accounts = setup_roles(&e, &client, &admin);
 
-    client.mint(&accounts.outsider, &accounts.outsider, &3);
+    client.mint(&accounts.outsider, &3, &accounts.outsider);
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn burners_can_burn() {
 
     let accounts = setup_roles(&e, &client, &admin);
 
-    client.mint(&accounts.minter1, &accounts.burner1, &10);
+    client.mint(&accounts.burner1, &10, &accounts.minter1);
     client.burn(&accounts.burner1, &10);
 }
 
@@ -102,7 +102,7 @@ fn non_burners_cannot_burn() {
 
     let accounts = setup_roles(&e, &client, &admin);
 
-    client.mint(&accounts.minter1, &accounts.outsider, &11);
+    client.mint(&accounts.minter1, &11, &accounts.outsider);
     client.burn(&accounts.outsider, &11);
 }
 
@@ -117,7 +117,7 @@ fn burners_can_burn_from() {
     let accounts = setup_roles(&e, &client, &admin);
 
     // Mint to someone else
-    client.mint(&accounts.minter1, &accounts.outsider, &20);
+    client.mint(&accounts.outsider, &20, &accounts.minter1);
     client.approve(&accounts.outsider, &accounts.burner2, &20, &1000);
 
     // burner2 burns on behalf of outsider
@@ -136,7 +136,7 @@ fn non_burners_cannot_burn_from() {
     let accounts = setup_roles(&e, &client, &admin);
 
     // Mint to burner1
-    client.mint(&accounts.minter1, &accounts.burner1, &21);
+    client.mint(&accounts.minter1, &21, &accounts.burner1);
 
     // Outsider tries to burn on behalf of burner1
     client.burn_from(&accounts.outsider, &accounts.burner1, &21);
@@ -153,10 +153,10 @@ fn minter_admin_can_grant_role() {
     let accounts = setup_roles(&e, &client, &admin);
 
     let new_minter = Address::generate(&e);
-    client.grant_role(&accounts.minter_admin, &new_minter, &symbol_short!("minter"));
+    client.grant_role(&new_minter, &symbol_short!("minter"), &accounts.minter_admin);
 
     // Mint with new_minter to verify
-    client.mint(&new_minter, &new_minter, &100);
+    client.mint(&new_minter, &100, &new_minter);
 }
 
 #[test]
@@ -171,7 +171,7 @@ fn burner_admin_can_revoke_role() {
     let accounts = setup_roles(&e, &client, &admin);
 
     // Revoke burner's role
-    client.revoke_role(&accounts.burner_admin, &accounts.burner1, &symbol_short!("burner"));
+    client.revoke_role(&accounts.burner1, &symbol_short!("burner"), &accounts.burner_admin);
 
     // burner1 should now panic if it tries to burn
     client.burn(&accounts.burner1, &10);
@@ -189,7 +189,7 @@ fn non_admin_cannot_grant_role() {
     let accounts = setup_roles(&e, &client, &admin);
 
     let new_minter = Address::generate(&e);
-    client.grant_role(&accounts.outsider, &new_minter, &symbol_short!("minter"));
+    client.grant_role(&new_minter, &symbol_short!("minter"), &accounts.outsider);
 }
 
 #[test]
@@ -203,7 +203,7 @@ fn non_admin_cannot_revoke_role() {
 
     let accounts = setup_roles(&e, &client, &admin);
 
-    client.revoke_role(&accounts.outsider, &accounts.burner1, &symbol_short!("burner"));
+    client.revoke_role(&accounts.burner1, &symbol_short!("burner"), &accounts.outsider);
 }
 
 #[test]
@@ -246,13 +246,13 @@ fn admin_transfer_works() {
         invoke: &MockAuthInvoke {
             contract: &client.address,
             fn_name: "grant_role",
-            args: (new_admin.clone(), random_user.clone(), symbol_short!("minter")).into_val(&e),
+            args: (random_user.clone(), symbol_short!("minter"), new_admin.clone()).into_val(&e),
             sub_invokes: &[],
         },
     }]);
 
     // Sanity check: new admin can now grant a role
-    client.grant_role(&new_admin, &random_user, &symbol_short!("minter"));
+    client.grant_role(&random_user, &symbol_short!("minter"), &new_admin);
 }
 
 #[test]

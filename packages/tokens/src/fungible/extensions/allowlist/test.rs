@@ -1,6 +1,6 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env};
+use soroban_sdk::{contract, testutils::Address as _, Address, Env, MuxedAddress};
 
 use crate::fungible::{extensions::allowlist::storage::AllowList, Base};
 
@@ -65,7 +65,7 @@ fn transfer_with_allowed_users_works() {
         Base::mint(&e, &user1, 100);
 
         // Transfer tokens from user1 to user2
-        AllowList::transfer(&e, &user1, &user2, 50);
+        AllowList::transfer(&e, &user1, &MuxedAddress::from(user2.clone()), 50);
 
         // Verify balances
         assert_eq!(Base::balance(&e, &user1), 50);
@@ -138,7 +138,7 @@ fn transfer_with_sender_not_allowed_panics() {
         Base::mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 (not allowed) to user2
-        AllowList::transfer(&e, &user1, &user2, 50);
+        AllowList::transfer(&e, &user1, &MuxedAddress::from(user2.clone()), 50);
     });
 }
 
@@ -159,7 +159,7 @@ fn transfer_with_receiver_not_allowed_panics() {
         Base::mint(&e, &user1, 100);
 
         // Try to transfer tokens from user1 to user2 (not allowed)
-        AllowList::transfer(&e, &user1, &user2, 50);
+        AllowList::transfer(&e, &user1, &MuxedAddress::from(user2.clone()), 50);
     });
 }
 
