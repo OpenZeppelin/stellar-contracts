@@ -34,11 +34,6 @@ impl FVHarnessAccessControlContract {
     #[has_role(caller2, "role2")]
     pub fn role1_and_role2_func(e: &Env, caller1: Address, caller2: Address) {
     }
-
-    #[has_role(caller, "role1")]
-    #[has_role(caller, "role2")]
-    pub fn both_role1_role2_func(e: &Env, caller: Address) {
-    }
 }
 
 #[default_impl]
