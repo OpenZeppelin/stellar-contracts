@@ -52,8 +52,9 @@ pub enum OperationState {
 pub enum TimelockStorageKey {
     /// Minimum delay in seconds for operations
     MinDelay,
-    /// Maps operation ID to the timestamp when it becomes ready
-    /// Value is 0 for unset, 1 for done, or Unix timestamp for scheduled
+    /// Maps operation ID to the timestamp when it will be in a
+    /// [`OperationState::Ready`] state (Note: value is 0 for
+    /// [`OperationState::Unset`], 1 for [`OperationState:Done`]).
     Timestamp(BytesN<32>),
 }
 
