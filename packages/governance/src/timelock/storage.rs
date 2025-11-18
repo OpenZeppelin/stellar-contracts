@@ -223,7 +223,6 @@ pub fn set_min_delay(e: &Env, min_delay: u32) {
 pub fn schedule_operation(e: &Env, operation: &Operation, delay: u32) -> BytesN<32> {
     let id = hash_operation(e, operation);
 
-    // Check if operation is already scheduled
     if is_operation(e, &id) {
         panic_with_error!(e, TimelockError::OperationAlreadyScheduled);
     }
@@ -231,7 +230,6 @@ pub fn schedule_operation(e: &Env, operation: &Operation, delay: u32) -> BytesN<
     // Get minimum delay (will panic if not set)
     let min_delay = get_min_delay(e);
 
-    // Check delay is sufficient
     if delay < min_delay {
         panic_with_error!(e, TimelockError::InsufficientDelay);
     }
@@ -240,7 +238,6 @@ pub fn schedule_operation(e: &Env, operation: &Operation, delay: u32) -> BytesN<
     let current_ledger = e.ledger().sequence();
     let ready_ledger = current_ledger + delay;
 
-    // Store the timestamp
     let key = TimelockStorageKey::Timestamps(id.clone());
     e.storage().persistent().set(&key, &ready_ledger);
 
@@ -291,7 +288,6 @@ pub fn execute_operation(e: &Env, operation: &Operation) -> Val {
 pub fn set_execute_operation(e: &Env, operation: &Operation) {
     let id = hash_operation(e, operation);
 
-    // Check operation is ready
     if !is_operation_ready(e, &id) {
         panic_with_error!(e, TimelockError::InvalidOperationState);
     }
@@ -302,7 +298,6 @@ pub fn set_execute_operation(e: &Env, operation: &Operation) {
         panic_with_error!(e, TimelockError::UnexecutedPredecessor);
     }
 
-    // Mark as done
     let key = TimelockStorageKey::Timestamps(id.clone());
     e.storage().persistent().set(&key, &DONE_TIMESTAMP);
 
@@ -339,12 +334,10 @@ pub fn set_execute_operation(e: &Env, operation: &Operation) {
 /// **IMPORTANT**: This function does not perform authorization checks.
 /// The caller must ensure proper authorization before calling this function.
 pub fn cancel_operation(e: &Env, operation_id: &BytesN<32>) {
-    // Check operation is pending
     if !is_operation_pending(e, operation_id) {
         panic_with_error!(e, TimelockError::InvalidOperationState);
     }
 
-    // Remove the timestamp
     let key = TimelockStorageKey::Timestamps(operation_id.clone());
     e.storage().persistent().remove(&key);
 
@@ -368,24 +361,13 @@ pub fn cancel_operation(e: &Env, operation_id: &BytesN<32>) {
 ///
 /// A 32-byte hash uniquely identifying the operation.
 pub fn hash_operation(e: &Env, operation: &Operation) -> BytesN<32> {
-    // Serialize all operation components
     let mut data = Bytes::new(e);
 
-    // Append target address
     data.append(&operation.target.clone().to_xdr(e));
-
-    // Append function symbol
     data.append(&operation.function.clone().to_xdr(e));
-
-    // Append args
     data.append(&operation.args.clone().to_xdr(e));
-
-    // Append predecessor
     data.append(&operation.predecessor.clone().into());
-
-    // Append salt
     data.append(&operation.salt.clone().into());
 
-    // Hash the concatenated data
     e.crypto().keccak256(&data).into()
 }
