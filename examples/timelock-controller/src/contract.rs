@@ -166,13 +166,13 @@ impl TimelockController {
 
         // Register proposers and cancellers
         for proposer in proposers.iter() {
-            grant_role_no_auth(e, &admin_addr, &proposer, &PROPOSER_ROLE);
-            grant_role_no_auth(e, &admin_addr, &proposer, &CANCELLER_ROLE);
+            grant_role_no_auth(e, &proposer, &PROPOSER_ROLE, &admin_addr);
+            grant_role_no_auth(e, &proposer, &CANCELLER_ROLE, &admin_addr);
         }
 
         // Register executors
         for executor in executors.iter() {
-            grant_role_no_auth(e, &admin_addr, &executor, &EXECUTOR_ROLE);
+            grant_role_no_auth(e, &executor, &EXECUTOR_ROLE, &admin_addr);
         }
 
         // Set minimum delay

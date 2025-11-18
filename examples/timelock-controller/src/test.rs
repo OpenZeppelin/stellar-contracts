@@ -90,7 +90,7 @@ fn test_schedule_and_execute_operation() {
     assert!(!client.is_operation_ready(&operation_id));
 
     // Advance ledgers to make operation ready
-    e.ledger().with_mut(|li| li.sequence_number += 10);
+    e.ledger().with_mut(|li| li.timestamp += 10);
 
     // Check operation is ready
     assert!(client.is_operation_ready(&operation_id));
