@@ -30,6 +30,7 @@ extern crate std;
 
 #[cfg(test)]
 mod test_soroban_fixed_point {
+
     use soroban_sdk::Env;
 
     use crate::math::soroban_fixed_point::SorobanFixedPoint;
@@ -670,5 +671,227 @@ mod test_i256_errors {
         let result = x.fixed_mul_ceil(&env, &y, &denominator);
 
         assert_eq!(result, I256::from_i128(&env, -500));
+    }
+}
+
+#[cfg(test)]
+mod test_wad {
+    use soroban_sdk::Env;
+
+    use crate::math::wad::*;
+
+    #[test]
+    fn test_from_ratio_half() {
+        let e = Env::default();
+
+        let half = Wad::from_ratio(&e, 1, 2);
+        assert_eq!(half, Wad::from_integer(&e, 1) / 2);
+    }
+
+    #[test]
+    fn test_from_token_amount_less_decimals() {
+        let e = Env::default();
+        let amount: i128 = 1_000_000; // 1 token with 6 decimals
+        let wad = Wad::from_token_amount(&e, amount, 6);
+        assert_eq!(wad, Wad::from_integer(&e, 1));
+    }
+
+    #[test]
+    fn test_from_token_amount_more_decimals() {
+        let e = Env::default();
+        let amount: i128 = 100_000_000_000_000_000_000; // 1 token with 20 decimals
+        let wad = Wad::from_token_amount(&e, amount, 20);
+        assert_eq!(wad, Wad::from_integer(&e, 1));
+    }
+
+    #[test]
+    fn test_to_token_amount_roundtrip() {
+        let e = Env::default();
+        let wad = Wad::from_integer(&e, 1);
+        let amount_6 = wad.to_token_amount(&e, 6);
+        assert_eq!(amount_6, 1_000_000);
+
+        let amount_18 = wad.to_token_amount(&e, 18);
+        assert_eq!(amount_18, WAD_SCALE);
+    }
+
+    #[test]
+    fn test_wad_mul_and_div_operators() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 3);
+        let b = Wad::from_integer(&e, 2);
+
+        let prod = a * b;
+        assert_eq!(prod, Wad::from_integer(&e, 6));
+
+        let quotient = prod / b;
+        assert_eq!(quotient, a);
+    }
+
+    #[test]
+    fn test_wad_add_sub_operators() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 5);
+        let b = Wad::from_integer(&e, 3);
+
+        let sum = a + b;
+        assert_eq!(sum, Wad::from_integer(&e, 8));
+
+        let diff = a - b;
+        assert_eq!(diff, Wad::from_integer(&e, 2));
+    }
+
+    #[test]
+    fn test_wad_mul_int() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 2);
+        let result = a * 3;
+        assert_eq!(result, Wad::from_integer(&e, 6));
+
+        let result2 = 3 * a;
+        assert_eq!(result2, Wad::from_integer(&e, 6));
+    }
+
+    #[test]
+    fn test_wad_div_int() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 6);
+        let result = a / 2;
+        assert_eq!(result, Wad::from_integer(&e, 3));
+    }
+
+    #[test]
+    fn test_wad_negation() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 5);
+        let neg_a = -a;
+        assert_eq!(neg_a, Wad::from_integer(&e, -5));
+    }
+
+    #[test]
+    fn test_price_to_wad() {
+        let e = Env::default();
+        let price_units: i128 = 1_000_000; // 1.0 with 6 decimals
+        let wad_price = Wad::from_price(&e, price_units, 6);
+        assert_eq!(wad_price, Wad::from_integer(&e, 1));
+    }
+
+    #[test]
+    fn test_wad_min_max() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 1);
+        let b = Wad::from_integer(&e, 2);
+
+        assert_eq!(a.min(b), a);
+        assert_eq!(a.max(b), b);
+    }
+
+    #[test]
+    fn test_wad_comparison() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 1);
+        let b = Wad::from_integer(&e, 2);
+
+        assert!(a < b);
+        assert!(b > a);
+        assert!(a <= b);
+        assert!(b >= a);
+        assert_eq!(a, a);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #1600)")]
+    fn test_from_integer_overflow() {
+        let e = Env::default();
+        let _ = Wad::from_integer(&e, i128::MAX);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #1600)")]
+    fn test_from_ratio_overflow() {
+        let e = Env::default();
+        let _ = Wad::from_ratio(&e, i128::MAX, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #1601)")]
+    fn test_from_ratio_division_by_zero() {
+        let e = Env::default();
+        let _ = Wad::from_ratio(&e, 100, 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_add_overflow() {
+        let a = Wad::from_raw(i128::MAX);
+        let b = Wad::from_raw(1);
+        let _ = a + b;
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_sub_overflow() {
+        let a = Wad::from_raw(i128::MIN);
+        let b = Wad::from_raw(1);
+        let _ = a - b;
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_mul_overflow() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, i128::MAX / WAD_SCALE);
+        let b = Wad::from_integer(&e, 2);
+        let _ = a * b;
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_div_by_zero() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 1);
+        let b = Wad::from_raw(0);
+        let _ = a / b;
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_mul_int_overflow() {
+        let a = Wad::from_raw(i128::MAX);
+        let _ = a * 2;
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_div_int_by_zero() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 1);
+        let _ = a / 0;
+    }
+
+    #[test]
+    fn test_checked_add() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 1);
+        let b = Wad::from_integer(&e, 2);
+        let result = a.checked_add(b);
+        assert_eq!(result, Some(Wad::from_integer(&e, 3)));
+    }
+
+    #[test]
+    fn test_checked_add_overflow() {
+        let a = Wad::from_raw(i128::MAX);
+        let b = Wad::from_raw(1);
+        let result = a.checked_add(b);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_checked_div_by_zero() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 1);
+        let b = Wad::from_raw(0);
+        let result = a.checked_div(b);
+        assert_eq!(result, None);
     }
 }
