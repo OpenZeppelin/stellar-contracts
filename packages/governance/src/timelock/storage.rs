@@ -254,12 +254,21 @@ pub fn schedule_operation(e: &Env, operation: &Operation, delay: u32) -> BytesN<
     id
 }
 
-/// Executes a scheduled operation.
+/// Executes a scheduled operation by invoking the target contract.
+///
+/// This is a wrapper around [`set_execute_operation`] that also performs the
+/// cross-contract invocation. For self-administration scenarios where the
+/// target is the timelock contract itself, use [`set_execute_operation`]
+/// directly instead.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `operation` - The operation to execute.
+///
+/// # Returns
+///
+/// The return value from the invoked contract function.
 ///
 /// # Errors
 ///
@@ -284,6 +293,36 @@ pub fn execute_operation(e: &Env, operation: &Operation) -> Val {
     e.invoke_contract::<Val>(&operation.target, &operation.function, operation.args.clone())
 }
 
+/// Validates and marks an operation as executed without invoking the target.
+///
+/// This function performs all the validation and state updates for executing
+/// an operation, but does not perform the cross-contract invocation. It is
+/// used by [`execute_operation`] and can be called directly for
+/// self-administration scenarios where the timelock contract needs to execute
+/// operations on itself.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `operation` - The operation to validate and mark as executed.
+///
+/// # Errors
+///
+/// * [`TimelockError::InvalidOperationState`] - If the operation is not ready
+///   for execution.
+/// * [`TimelockError::UnexecutedPredecessor`] - If the predecessor operation
+///   has not been executed.
+///
+/// # Events
+///
+/// * topics - `["operation_executed", id: BytesN<32>, target: Address]`
+/// * data - `[function: Symbol, args: Vec<Val>, predecessor: BytesN<32>, salt:
+///   BytesN<32>]`
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function does not perform authorization checks.
+/// The caller must ensure proper authorization before calling this function.
 pub fn set_execute_operation(e: &Env, operation: &Operation) {
     let id = hash_operation(e, operation);
 
