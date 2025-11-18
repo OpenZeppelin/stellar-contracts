@@ -5,7 +5,7 @@ use soroban_sdk::{
 use crate::timelock::{
     emit_min_delay_changed, emit_operation_cancelled, emit_operation_executed,
     emit_operation_scheduled, TimelockError, DONE_TIMESTAMP, TIMELOCK_EXTEND_AMOUNT,
-    TIMELOCK_TTL_THRESHOLD,
+    TIMELOCK_TTL_THRESHOLD, UNSET_TIMESTAMP,
 };
 
 // ################## TYPES ##################
@@ -88,8 +88,8 @@ pub fn get_min_delay(e: &Env) -> u32 {
 ///
 /// # Returns
 ///
-/// - `0` for unset operations
-/// - `1` for done operations
+/// - `UNSET_TIMESTAMP` for unset operations
+/// - `DONE_TIMESTAMP` for done operations
 /// - Ledger number when the operation becomes ready for scheduled operations
 pub fn get_timestamp(e: &Env, operation_id: &BytesN<32>) -> u32 {
     let key = TimelockStorageKey::Timestamps(operation_id.clone());
@@ -97,7 +97,7 @@ pub fn get_timestamp(e: &Env, operation_id: &BytesN<32>) -> u32 {
         e.storage().persistent().extend_ttl(&key, TIMELOCK_TTL_THRESHOLD, TIMELOCK_EXTEND_AMOUNT);
         timestamp
     } else {
-        0
+        UNSET_TIMESTAMP
     }
 }
 
@@ -116,7 +116,7 @@ pub fn get_operation_state(e: &Env, operation_id: &BytesN<32>) -> OperationState
     let current_ledger = e.ledger().sequence();
 
     match timestamp {
-        0 => OperationState::Unset,
+        UNSET_TIMESTAMP => OperationState::Unset,
         DONE_TIMESTAMP => OperationState::Done,
         ready_ledger if ready_ledger > current_ledger => OperationState::Waiting,
         _ => OperationState::Ready,

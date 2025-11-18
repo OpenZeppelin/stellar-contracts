@@ -92,6 +92,9 @@ pub const TIMELOCK_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 /// TTL extension amount for storage entries (in ledgers)
 pub const TIMELOCK_TTL_THRESHOLD: u32 = TIMELOCK_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
+/// Sentinel value for an operation that has not been scheduled.
+pub const UNSET_TIMESTAMP: u32 = 0;
+
 /// Sentinel value used to mark an operation as done.
 /// Using 1 instead of 0 to distinguish from unset operations.
 pub const DONE_TIMESTAMP: u32 = 1;
