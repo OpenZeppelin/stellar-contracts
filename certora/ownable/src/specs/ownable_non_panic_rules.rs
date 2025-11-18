@@ -8,12 +8,16 @@ use soroban_sdk::{Env, Address};
 use stellar_access::ownable::*;
 
 use crate::ownable_contract::FVHarnessOwnableContract;
+use crate::specs::helper::get_pending_owner;
+// These rules require the prover arg "prover_args": ["-trapAsAssert true"] to consider also panicking paths.
 
 // TODO:
 // non-panic for transfer_ownership
 // non-panic for accept_ownership
 
 #[rule]
+// if PendingOwner is set as an address and (missing!) owner autherizes renounce ownership does not panic.
+// status: 
 pub fn renounce_ownership_does_not_panic(e: Env) {
     // use cvlr_soroban::require_storage_tag;
     
@@ -24,7 +28,7 @@ pub fn renounce_ownership_does_not_panic(e: Env) {
     // WIP: will have this macro for setting storage up automatically.
     // require_storage_tag(OwnableStorageKey::PendingOwner.into_val(&e), 77);
 
-    let setup = e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner);
+    let setup = get_pending_owner(&e);
     cvlr_assume!(setup.is_none());
     FVHarnessOwnableContract::renounce_ownership(&e);
     cvlr_assert!(true);
