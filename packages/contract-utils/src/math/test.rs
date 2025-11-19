@@ -922,7 +922,8 @@ mod test_wad {
     fn test_to_token_amount_overflow_high_decimals() {
         let e = Env::default();
         let wad = Wad::from_raw(i128::MAX);
-        let _ = wad.to_token_amount(&e, 30); // 30 decimals requires multiplication, will overflow
+        let _ = wad.to_token_amount(&e, 30); // 30 decimals requires
+                                             // multiplication, will overflow
     }
 
     #[test]
