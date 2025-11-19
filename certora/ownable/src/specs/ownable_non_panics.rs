@@ -7,7 +7,7 @@ use soroban_sdk::{Env};
 
 use stellar_access::ownable::*;
 
-use crate::ownable_contract::FVHarnessOwnableContract;
+use crate::ownable_contract::OwnableContract;
 use crate::specs::helper::get_pending_owner;
 // These rules require the prover arg "prover_args": ["-trapAsAssert true"] to consider also panicking paths.
 
@@ -30,7 +30,7 @@ pub fn renounce_ownership_does_not_panic(e: Env) {
 
     let setup = get_pending_owner(&e);
     cvlr_assume!(setup.is_none());
-    FVHarnessOwnableContract::renounce_ownership(&e);
+    OwnableContract::renounce_ownership(&e);
     cvlr_assert!(true);
 }
 

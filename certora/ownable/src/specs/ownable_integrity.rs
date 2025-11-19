@@ -4,11 +4,11 @@ use cvlr_soroban_derive::rule;
 use cvlr::clog;
 use cvlr::nondet::Nondet;
 
-use soroban_sdk::{Env,Address};
+use soroban_sdk::{Env};
 
 use stellar_access::ownable::*;
 
-use crate::ownable_contract::FVHarnessOwnableContract;
+use crate::ownable_contract::OwnableContract;
 use crate::specs::helper::get_pending_owner;
 
 #[rule]
@@ -18,8 +18,8 @@ pub fn constructor_integrity(e: Env) {
     let new_owner = nondet_address();
     clog!(cvlr_soroban::Addr(&new_owner));
 
-    FVHarnessOwnableContract::__constructor(&e, new_owner.clone());
-    let owner_post = FVHarnessOwnableContract::get_owner(&e);
+    OwnableContract::__constructor(&e, new_owner.clone());
+    let owner_post = OwnableContract::get_owner(&e);
     
     if let Some(owner_post_internal) = owner_post.clone() {
         clog!(cvlr_soroban::Addr(&owner_post_internal));
@@ -28,7 +28,8 @@ pub fn constructor_integrity(e: Env) {
 }
 
 #[rule]
-// transfer_ownership with a live ledger above current sets the pending owner to input.
+// transfer_ownership with live_until_ledger > current_ledger
+// sets the pending owner to new_owner and does not change the owner
 // status: verified
 pub fn transfer_ownership_integrity(e: Env) {
     let new_owner = nondet_address();
@@ -38,17 +39,19 @@ pub fn transfer_ownership_integrity(e: Env) {
     let current_ledger = e.ledger().sequence();
     clog!(current_ledger);
     cvlr_assume!(live_until_ledger > current_ledger); // assuming a proper transfer
-
-    FVHarnessOwnableContract::transfer_ownership(&e, new_owner.clone(), live_until_ledger);
+    let owner_pre = OwnableContract::get_owner(&e);
+    OwnableContract::transfer_ownership(&e, new_owner.clone(), live_until_ledger);
     
     let pending_owner = get_pending_owner(&e);
     if let Some(pending_owner_internal) = pending_owner.clone() {
         clog!(cvlr_soroban::Addr(&pending_owner_internal));
     }
-
+    let owner = OwnableContract::get_owner(&e);
     cvlr_assert!(pending_owner == Some(new_owner));
+    cvlr_assert!(owner == owner_pre);
     // TODO : assert about TTL.
 }
+
 
 #[rule]
 // transfer_ownership with a live ledger 0 removes the pending owner.
@@ -61,7 +64,7 @@ pub fn remove_transfer_ownership_integrity(e: Env) {
     let current_ledger = e.ledger().sequence();
     clog!(current_ledger);
 
-    FVHarnessOwnableContract::transfer_ownership(&e, new_owner.clone(), live_until_ledger);
+    OwnableContract::transfer_ownership(&e, new_owner.clone(), live_until_ledger);
 
     let pending_owner = get_pending_owner(&e);
     cvlr_assert!(pending_owner == None);
@@ -77,9 +80,9 @@ pub fn accept_ownership_integrity(e: Env) {
         clog!(cvlr_soroban::Addr(&pending_owner_internal));
     }
 
-    FVHarnessOwnableContract::accept_ownership(&e);
+    OwnableContract::accept_ownership(&e);
 
-    let owner = FVHarnessOwnableContract::get_owner(&e);
+    let owner = OwnableContract::get_owner(&e);
     if let Some(owner_internal) = owner.clone() {
         clog!(cvlr_soroban::Addr(&owner_internal));
     }
@@ -99,9 +102,9 @@ pub fn accept_ownership_integrity(e: Env) {
 // status: verified
 pub fn renounce_ownership_integrity(e: Env) {
 
-    FVHarnessOwnableContract::renounce_ownership(&e);
+    OwnableContract::renounce_ownership(&e);
 
-    let owner = FVHarnessOwnableContract::get_owner(&e);
+    let owner = OwnableContract::get_owner(&e);
 
     cvlr_assert!(owner == None);
 }

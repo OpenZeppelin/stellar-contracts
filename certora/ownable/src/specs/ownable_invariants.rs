@@ -8,19 +8,19 @@ use soroban_sdk::{Env};
 
 use stellar_access::ownable::*;
 
-use crate::ownable_contract::FVHarnessOwnableContract;
+use crate::ownable_contract::OwnableContract;
 use crate::specs::helper::get_pending_owner;
 
 // invariant: owner != None -> holds in all cases except for renounce_ownership
 
 // helpers
 pub fn assume_pre_owner_is_set(e: Env) {
-    let owner_pre = FVHarnessOwnableContract::get_owner(&e);
+    let owner_pre = OwnableContract::get_owner(&e);
     cvlr_assume!(owner_pre != None);
 }
 
 pub fn assert_post_owner_is_set(e: Env) {
-    let owner_post = FVHarnessOwnableContract::get_owner(&e);
+    let owner_post = OwnableContract::get_owner(&e);
     cvlr_assert!(owner_post != None);
 }
 
@@ -28,7 +28,7 @@ pub fn assert_post_owner_is_set(e: Env) {
 // status: verified
 pub fn after_constructor_owner_is_set(e: Env) {
     let new_owner = nondet_address();
-    FVHarnessOwnableContract::__constructor(&e.clone(), new_owner);
+    OwnableContract::__constructor(&e.clone(), new_owner);
     assert_post_owner_is_set(e);
 }
 
@@ -38,7 +38,7 @@ pub fn after_transfer_ownership_pending_owner_is_set(e: Env) {
     assume_pre_owner_is_set(e.clone());
     let new_owner = nondet_address();
     let live_until_ledger = u32::nondet();
-    FVHarnessOwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
+    OwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
     assert_post_owner_is_set(e);
 }
 
@@ -46,7 +46,7 @@ pub fn after_transfer_ownership_pending_owner_is_set(e: Env) {
 // status: verified
 pub fn after_accept_ownership_owner_is_set(e: Env) {
     assume_pre_owner_is_set(e.clone());
-    FVHarnessOwnableContract::accept_ownership(&e);
+    OwnableContract::accept_ownership(&e);
     assert_post_owner_is_set(e);
 }
 
@@ -56,7 +56,7 @@ pub fn after_accept_ownership_owner_is_set(e: Env) {
 // status: verified
 pub fn after_owner_restricted_function_owner_is_set(e: Env) {
     assume_pre_owner_is_set(e.clone());
-    FVHarnessOwnableContract::owner_restricted_function(&e);
+    OwnableContract::owner_restricted_function(&e);
     assert_post_owner_is_set(e);
 }
 
@@ -65,7 +65,7 @@ pub fn after_owner_restricted_function_owner_is_set(e: Env) {
 // helpers
 pub fn assume_pre_pending_owner_implies_owner(e: Env) {
     let pending_owner = get_pending_owner(&e);
-    let owner = FVHarnessOwnableContract::get_owner(&e);
+    let owner = OwnableContract::get_owner(&e);
     if let Some(_) = pending_owner.clone() {
         cvlr_assume!(owner != None);
     }
@@ -73,7 +73,7 @@ pub fn assume_pre_pending_owner_implies_owner(e: Env) {
 
 pub fn assert_post_pending_owner_implies_owner(e: Env) {
     let pending_owner = get_pending_owner(&e);
-    let owner = FVHarnessOwnableContract::get_owner(&e);
+    let owner = OwnableContract::get_owner(&e);
     if let Some(_) = pending_owner.clone() {
         cvlr_assert!(owner != None);
     }
@@ -83,7 +83,7 @@ pub fn assert_post_pending_owner_implies_owner(e: Env) {
 // status: verified
 pub fn after_constructor_pending_owner_implies_owner(e: Env) {
     let new_owner = nondet_address();
-    FVHarnessOwnableContract::__constructor(&e, new_owner);
+    OwnableContract::__constructor(&e, new_owner);
     assert_post_pending_owner_implies_owner(e);
 }
 
@@ -93,7 +93,7 @@ pub fn after_transfer_ownership_pending_owner_implies_owner(e: Env) {
     assume_pre_pending_owner_implies_owner(e.clone());
     let new_owner = nondet_address();
     let live_until_ledger = u32::nondet();
-    FVHarnessOwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
+    OwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
     assert_post_pending_owner_implies_owner(e);
 }
 
@@ -101,7 +101,7 @@ pub fn after_transfer_ownership_pending_owner_implies_owner(e: Env) {
 // status: vacuity issue!
 pub fn after_accept_ownership_pending_owner_implies_owner(e: Env) {
     assume_pre_pending_owner_implies_owner(e.clone());
-    FVHarnessOwnableContract::accept_ownership(&e);
+    OwnableContract::accept_ownership(&e);
     assert_post_pending_owner_implies_owner(e);
 }
 
@@ -109,7 +109,7 @@ pub fn after_accept_ownership_pending_owner_implies_owner(e: Env) {
 // status: vacuity issue!
 pub fn after_renounce_ownership_pending_owner_implies_owner(e: Env) {
     assume_pre_pending_owner_implies_owner(e.clone());
-    FVHarnessOwnableContract::renounce_ownership(&e);
+    OwnableContract::renounce_ownership(&e);
     assert_post_pending_owner_implies_owner(e);
 }
 
@@ -117,6 +117,6 @@ pub fn after_renounce_ownership_pending_owner_implies_owner(e: Env) {
 // status: verified
 pub fn after_owner_restricted_function_pending_owner_implies_owner(e: Env) {
     assume_pre_pending_owner_implies_owner(e.clone());
-    FVHarnessOwnableContract::owner_restricted_function(&e);
+    OwnableContract::owner_restricted_function(&e);
     assert_post_pending_owner_implies_owner(e);
 }
