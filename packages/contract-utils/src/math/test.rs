@@ -705,6 +705,17 @@ mod test_wad {
     }
 
     #[test]
+    #[should_panic(expected = "attempt to multiply with overflow")]
+    fn test_from_token_amount_invalid_decimals() {
+        let e = Env::default();
+
+        let amount = 1_000_000;
+        let invalid_decimals = 57u8;
+
+        let _ = Wad::from_token_amount(&e, amount, invalid_decimals);
+    }
+
+    #[test]
     fn test_to_token_amount_roundtrip() {
         let e = Env::default();
         let wad = Wad::from_integer(&e, 1);
@@ -1034,5 +1045,55 @@ mod test_wad {
         let a = Wad::from_integer(&e, 10);
         let result = a.checked_div_int(0);
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_neg_positive() {
+        let e = Env::default();
+        let positive = Wad::from_integer(&e, 5);
+        let negative = -positive;
+        assert_eq!(negative, Wad::from_integer(&e, -5));
+    }
+
+    #[test]
+    fn test_neg_negative() {
+        let e = Env::default();
+        let negative = Wad::from_integer(&e, -5);
+        let positive = -negative;
+        assert_eq!(positive, Wad::from_integer(&e, 5));
+    }
+
+    #[test]
+    fn test_neg_zero() {
+        let zero = Wad::from_raw(0);
+        let neg_zero = -zero;
+        assert_eq!(neg_zero, Wad::from_raw(0));
+    }
+
+    #[test]
+    fn test_abs_positive() {
+        let e = Env::default();
+        let positive = Wad::from_integer(&e, 5);
+        assert_eq!(positive.abs(), Wad::from_integer(&e, 5));
+    }
+
+    #[test]
+    fn test_abs_negative() {
+        let e = Env::default();
+        let negative = Wad::from_integer(&e, -5);
+        assert_eq!(negative.abs(), Wad::from_integer(&e, 5));
+    }
+
+    #[test]
+    fn test_abs_zero() {
+        let zero = Wad::from_raw(0);
+        assert_eq!(zero.abs(), Wad::from_raw(0));
+    }
+
+    #[test]
+    fn test_abs_with_fractional() {
+        let negative_fraction = Wad::from_raw(-500_000_000_000_000_000); // -0.5
+        let positive_fraction = Wad::from_raw(500_000_000_000_000_000); // 0.5
+        assert_eq!(negative_fraction.abs(), positive_fraction);
     }
 }

@@ -5,7 +5,57 @@ use core::{
 
 use soroban_sdk::{contracterror, panic_with_error, Env};
 
-/// Fixed-point decimal with 18 decimal places (WAD precision)
+/// Fixed-point decimal number with 18 decimal places of precision.
+///
+/// `Wad` represents decimal numbers using a fixed-point representation where
+/// 1.0 is stored as `1_000_000_000_000_000_000` (10^18). This provides precise
+/// decimal arithmetic suitable for financial calculations in smart contracts.
+///
+/// # Truncation
+///
+/// All arithmetic operations truncate toward zero rather than rounding:
+/// - `5 / 2 = 2` (not 2.5 or 3)
+/// - `-5 / 2 = -2` (not -2.5 or -3)
+///
+/// ## Precision
+///
+/// Due to truncation on each multiplication/division, the order of operations
+/// can affect results:
+///
+/// ```ignore
+/// let a = Wad::from_integer(&e, 1000);
+/// let b = Wad::from_raw(55_000_000_000_000_000);  // 0.055
+/// let c = Wad::from_raw(8_333_333_333_333_333);   // ~0.00833
+///
+/// let result1 = a * b * c;      // Truncates after first multiplication
+/// let result2 = a * (b * c);    // Truncates after inner multiplication
+/// // result1 and result2 may differ by ~10^-16 due to different truncation points
+/// ```
+///
+/// **Typical precision loss:** ~10^-15 to 10^-16 in relative terms, which is
+/// negligible when converting to typical token precision (6-8 decimals).
+///
+/// # Examples
+///
+/// ```ignore
+/// use soroban_sdk::Env;
+/// use contract_utils::math::wad::Wad;
+///
+/// let e = Env::default();
+///
+/// // Creating Wad values
+/// let five = Wad::from_integer(&e, 5);           // 5.0
+/// let half = Wad::from_ratio(&e, 1, 2);          // 0.5
+/// let price = Wad::from_token_amount(&e, 1_500_000, 6); // 1.5 (from USDC)
+///
+/// // Arithmetic
+/// let sum = five + half;                          // 5.5
+/// let product = five * half;                      // 2.5
+/// let quotient = five / half;                     // 10.0
+///
+/// // Converting back to token amounts
+/// let usdc_amount = product.to_token_amount(&e, 6); // 2_500_000 (2.5 USDC)
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Wad(i128);
 
@@ -103,6 +153,7 @@ impl Wad {
     /// Creates a Wad from a token amount with specified decimals.
     ///
     /// Converts a token's native representation to WAD (18 decimals).
+    /// Truncates toward zero when scaling down (token_decimals > 18).
     ///
     /// # Arguments
     ///
@@ -146,6 +197,7 @@ impl Wad {
     /// Converts Wad to a token amount with specified decimals.
     ///
     /// Converts from WAD (18 decimals) back to a token's native representation.
+    /// Truncates toward zero when scaling down (token_decimals < 18).
     ///
     /// # Arguments
     ///
@@ -271,12 +323,16 @@ impl Wad {
     }
 
     /// Checked multiplication (Wad * Wad). Returns `None` on overflow.
+    ///
+    /// Result is truncated toward zero after division by WAD_SCALE
     pub fn checked_mul(self, rhs: Wad) -> Option<Wad> {
         self.0.checked_mul(rhs.0).map(|product| Wad(product / WAD_SCALE))
     }
 
     /// Checked division (Wad / Wad). Returns `None` on overflow or division by
     /// zero.
+    ///
+    /// Result is truncated toward zero.
     pub fn checked_div(self, rhs: Wad) -> Option<Wad> {
         if rhs.0 == 0 {
             return None;
@@ -295,6 +351,19 @@ impl Wad {
             return None;
         }
         Some(Wad(self.0 / n))
+    }
+
+    /// Returns the absolute value of the Wad.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let e = Env::default();
+    /// let negative = Wad::from_integer(&e, -5);
+    /// assert_eq!(negative.abs(), Wad::from_integer(&e, 5));
+    /// ```
+    pub fn abs(self) -> Self {
+        Wad(self.0.abs())
     }
 }
 
@@ -317,6 +386,7 @@ impl Sub for Wad {
 }
 
 // Wad * Wad: fixed-point multiplication (a * b) / WAD_SCALE
+// Result is truncated toward zero.
 impl Mul for Wad {
     type Output = Wad;
 
@@ -326,6 +396,7 @@ impl Mul for Wad {
 }
 
 // Wad / Wad: fixed-point division (a * WAD_SCALE) / b
+// Result is truncated toward zero.
 impl Div for Wad {
     type Output = Wad;
 
