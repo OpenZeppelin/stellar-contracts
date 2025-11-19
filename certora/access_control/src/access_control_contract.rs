@@ -3,10 +3,10 @@ use soroban_sdk::{contract, contractimpl, Address, Env};
 use stellar_macros::{default_impl, has_any_role, has_role, only_admin, only_any_role, only_role};
 
 #[contract]
-pub struct FVHarnessAccessControlContract;
+pub struct AccessControlContract;
 
 #[contractimpl]
-impl FVHarnessAccessControlContract {
+impl AccessControlContract {
      pub fn __constructor(e: &Env, admin: Address) {
         set_admin(e, &admin);
     }
@@ -38,4 +38,4 @@ impl FVHarnessAccessControlContract {
 
 #[default_impl]
 #[contractimpl]
-impl AccessControl for FVHarnessAccessControlContract {}
+impl AccessControl for AccessControlContract {}
