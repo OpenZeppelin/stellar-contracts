@@ -130,7 +130,7 @@ pub fn get_operation_state(e: &Env, operation_id: &BytesN<32>) -> OperationState
 ///
 /// * `e` - Access to Soroban environment.
 /// * `operation_id` - The unique identifier of the operation.
-pub fn is_operation(e: &Env, operation_id: &BytesN<32>) -> bool {
+pub fn operation_exists(e: &Env, operation_id: &BytesN<32>) -> bool {
     get_operation_state(e, operation_id) != OperationState::Unset
 }
 
@@ -224,7 +224,7 @@ pub fn set_min_delay(e: &Env, min_delay: u32) {
 pub fn schedule_operation(e: &Env, operation: &Operation, delay: u32) -> BytesN<32> {
     let id = hash_operation(e, operation);
 
-    if is_operation(e, &id) {
+    if operation_exists(e, &id) {
         panic_with_error!(e, TimelockError::OperationAlreadyScheduled);
     }
 

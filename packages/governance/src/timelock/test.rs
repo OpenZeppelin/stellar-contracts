@@ -4,7 +4,7 @@ use soroban_sdk::{
 
 use crate::timelock::{
     cancel_operation, execute_operation, get_min_delay, get_operation_state, get_timestamp,
-    hash_operation, is_operation, is_operation_done, is_operation_pending, is_operation_ready,
+    hash_operation, is_operation_done, is_operation_pending, is_operation_ready, operation_exists,
     schedule_operation, set_min_delay, Operation, OperationState,
 };
 
@@ -97,7 +97,7 @@ fn initial_operation_state() {
 
         assert_eq!(get_operation_state(&e, &id), OperationState::Unset);
         assert_eq!(get_timestamp(&e, &id), 0);
-        assert!(!is_operation(&e, &id));
+        assert!(!operation_exists(&e, &id));
         assert!(!is_operation_pending(&e, &id));
         assert!(!is_operation_ready(&e, &id));
         assert!(!is_operation_done(&e, &id));
@@ -119,7 +119,7 @@ fn schedule_operation_success() {
         assert_eq!(id, hash_operation(&e, &operation));
         assert_eq!(get_operation_state(&e, &id), OperationState::Waiting);
         assert_eq!(get_timestamp(&e, &id), 1150); // 1000 + 150
-        assert!(is_operation(&e, &id));
+        assert!(operation_exists(&e, &id));
         assert!(is_operation_pending(&e, &id));
         assert!(!is_operation_ready(&e, &id));
         assert!(!is_operation_done(&e, &id));
@@ -269,7 +269,7 @@ fn cancel_operation_success() {
         cancel_operation(&e, &id);
 
         assert_eq!(get_operation_state(&e, &id), OperationState::Unset);
-        assert!(!is_operation(&e, &id));
+        assert!(!operation_exists(&e, &id));
     });
 }
 

@@ -86,7 +86,7 @@ fn schedule_and_execute_operation() {
         &proposer,
     );
 
-    assert!(client.is_operation(&operation_id));
+    assert!(client.operation_exists(&operation_id));
     assert!(client.is_operation_pending(&operation_id));
     assert!(!client.is_operation_ready(&operation_id));
 
@@ -136,7 +136,7 @@ fn schedule_and_execute_operation_no_executors() {
         &proposer,
     );
 
-    assert!(client.is_operation(&operation_id));
+    assert!(client.operation_exists(&operation_id));
     assert!(client.is_operation_pending(&operation_id));
     assert!(!client.is_operation_ready(&operation_id));
 
@@ -203,7 +203,7 @@ fn schedule_and_execute_self_admin_operation() {
         );
 
     // Check operation is pending
-    assert!(client.is_operation(&operation_id));
+    assert!(client.operation_exists(&operation_id));
     assert!(client.is_operation_pending(&operation_id));
     assert!(!client.is_operation_ready(&operation_id));
 
@@ -290,7 +290,7 @@ fn cancel_operation() {
     client.cancel_op(&operation_id, &proposer);
 
     // Check operation is no longer existing
-    assert!(!client.is_operation(&operation_id));
+    assert!(!client.operation_exists(&operation_id));
 }
 
 #[test]

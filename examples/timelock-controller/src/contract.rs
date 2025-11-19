@@ -88,6 +88,13 @@
 //! This approach ensures administrative changes go through the timelock
 //! process.
 //!
+//! **Note**: Self-administration requires special handling because Soroban does
+//! not allow re-entrancy: a contract cannot call its own public functions
+//! during execution (e.g., `execute_op` cannot internally call `update_delay`
+//! on the same contract). To work around this, the `CustomAccountInterface`
+//! implementation validates and marks operations as executed without performing
+//! the cross-contract call, allowing admin functions to be called directly.
+//!
 //! ## Optional External Admin
 //!
 //! An optional external admin can be provided during deployment to aid with
@@ -107,10 +114,10 @@ use stellar_access::access_control::{
 };
 use stellar_governance::timelock::{
     cancel_operation, execute_operation, get_min_delay as timelock_get_min_delay,
-    get_operation_state, get_timestamp, hash_operation as timelock_hash_operation, is_operation,
-    is_operation_done, is_operation_pending, is_operation_ready, schedule_operation,
-    set_execute_operation, set_min_delay as timelock_set_min_delay, Operation, OperationState,
-    TimelockError,
+    get_operation_state, get_timestamp, hash_operation as timelock_hash_operation,
+    is_operation_done, is_operation_pending, is_operation_ready, operation_exists,
+    schedule_operation, set_execute_operation, set_min_delay as timelock_set_min_delay, Operation,
+    OperationState, TimelockError,
 };
 use stellar_macros::{default_impl, only_admin, only_role};
 
@@ -401,8 +408,8 @@ impl TimelockController {
     }
 
     /// Returns whether an operation exists (scheduled or done).
-    pub fn is_operation(e: &Env, operation_id: BytesN<32>) -> bool {
-        is_operation(e, &operation_id)
+    pub fn operation_exists(e: &Env, operation_id: BytesN<32>) -> bool {
+        operation_exists(e, &operation_id)
     }
 
     /// Returns whether an operation is pending (waiting or ready).
