@@ -167,6 +167,7 @@ impl CustomAccountInterface for TimelockController {
                         panic_with_error!(&e, TimelockError::Unauthorized)
                     }
 
+                    // If no accounts have EXECUTOR_ROLE, anyone can execute a ready operation
                     if get_role_member_count(&e, &EXECUTOR_ROLE) != 0 {
                         // Check the role and the authorization of the executor
                         let args_for_auth = (
@@ -196,7 +197,7 @@ impl CustomAccountInterface for TimelockController {
                     };
                     set_execute_operation(&e, &op);
                 }
-                _ => unimplemented!(),
+                _ => panic_with_error!(&e, TimelockError::Unauthorized),
             }
         }
         Ok(())
@@ -305,7 +306,7 @@ impl TimelockController {
     /// * `predecessor` - The predecessor operation ID.
     /// * `salt` - Salt for uniqueness.
     /// * `executor` - The address executing the operation (must have executor
-    ///   role).
+    ///   role if Some).
     ///
     /// # Returns
     ///
@@ -324,9 +325,10 @@ impl TimelockController {
         args: Vec<Val>,
         predecessor: BytesN<32>,
         salt: BytesN<32>,
-        executor: Address,
+        executor: Option<Address>,
     ) -> Val {
         if get_role_member_count(e, &EXECUTOR_ROLE) != 0 {
+            let executor = executor.expect("to be present");
             ensure_role(e, &EXECUTOR_ROLE, &executor);
             executor.require_auth();
         }

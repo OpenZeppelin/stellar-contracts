@@ -324,7 +324,6 @@ fn predecessor_dependency() {
 
         let id2 = schedule_operation(&e, &operation2, 100);
 
-        // Move time forward
         e.ledger().set_timestamp(1100);
 
         // Execute operation1 first
@@ -359,7 +358,6 @@ fn predecessor_dependency_fails_when_not_executed() {
 
         schedule_operation(&e, &operation2, 100);
 
-        // Move time forward
         e.ledger().set_timestamp(1100);
 
         // Try to execute operation2 before operation1 - should panic
