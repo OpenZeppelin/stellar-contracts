@@ -1,5 +1,5 @@
 use cvlr::{cvlr_assert, cvlr_assume};
-use cvlr_soroban::{nondet_address};
+use cvlr_soroban::{nondet_address, is_auth};
 use cvlr_soroban_derive::rule;
 
 
@@ -28,8 +28,14 @@ pub fn renounce_ownership_does_not_panic(e: Env) {
     // WIP: will have this macro for setting storage up automatically.
     // require_storage_tag(OwnableStorageKey::PendingOwner.into_val(&e), 77);
 
-    let setup = get_pending_owner(&e);
-    cvlr_assume!(setup.is_none());
+    let pending_owner = get_pending_owner(&e);
+    cvlr_assume!(pending_owner.is_none());
+    let owner = OwnableContract::get_owner(&e);
+    cvlr_assume!(owner.is_some());
+    if let Some(owner_internal) = owner.clone() {
+        cvlr_assume!(is_auth(owner_internal));
+    }
+    
     OwnableContract::renounce_ownership(&e);
     cvlr_assert!(true);
 }

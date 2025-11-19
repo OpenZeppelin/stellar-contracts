@@ -40,15 +40,21 @@ pub fn transfer_ownership_integrity(e: Env) {
     clog!(current_ledger);
     cvlr_assume!(live_until_ledger > current_ledger); // assuming a proper transfer
     let owner_pre = OwnableContract::get_owner(&e);
+    if let Some(owner_pre_internal) = owner_pre.clone() {
+        clog!(cvlr_soroban::Addr(&owner_pre_internal));
+    }
     OwnableContract::transfer_ownership(&e, new_owner.clone(), live_until_ledger);
     
     let pending_owner = get_pending_owner(&e);
     if let Some(pending_owner_internal) = pending_owner.clone() {
         clog!(cvlr_soroban::Addr(&pending_owner_internal));
     }
-    let owner = OwnableContract::get_owner(&e);
+    let owner_post = OwnableContract::get_owner(&e);
+    if let Some(owner_post_internal) = owner_post.clone() {
+        clog!(cvlr_soroban::Addr(&owner_post_internal));
+    }
+    cvlr_assert!(owner_post == owner_pre);
     cvlr_assert!(pending_owner == Some(new_owner));
-    cvlr_assert!(owner == owner_pre);
     // TODO : assert about TTL.
 }
 

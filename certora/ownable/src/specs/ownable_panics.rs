@@ -45,6 +45,45 @@ pub fn transfer_ownership_panics_if_owner_not_set(e: Env) {
 }
 
 #[rule]
+// transfer_ownership panics if live_until_ledger = 0 and PendingOwner = None
+// status: 
+pub fn transfer_ownership_panics_if_live_until_ledger_0_and_pending_owner_none(e: Env) {
+    let new_owner = nondet_address();
+    let live_until_ledger = 0;
+    let pending_owner = get_pending_owner(&e);
+    cvlr_assume!(pending_owner == None);
+    OwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
+    cvlr_assert!(false);
+}
+
+#[rule]
+// trasfer_ownership panics if live_until_ledger = 0 and PendingOwner != new_owner
+// status: 
+pub fn transfer_ownership_panics_if_live_until_ledger_0_and_diff_pending_owner(e: Env) {
+    let new_owner = nondet_address();
+    let live_until_ledger = 0;
+    let pending_owner = get_pending_owner(&e);
+    if let Some(pending_owner_internal) = pending_owner.clone() {
+        cvlr_assume!(pending_owner_internal != new_owner);
+    }
+    OwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
+    cvlr_assert!(false);
+}
+
+#[rule]
+// transfer_ownership panics if the live_until_ledger is in the past.
+// status: 
+pub fn transfer_ownership_panics_if_live_until_ledger_in_the_past(e: Env) {
+    let new_owner = nondet_address();
+    let live_until_ledger = u32::nondet();
+    cvlr_assume!(live_until_ledger < e.ledger().sequence());
+    cvlr_assume!(live_until_ledger > 0);
+    OwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
+    cvlr_assert!(false);
+}
+// TODO: there is another case where the ledger is more than allowed TTL extensions
+
+#[rule]
 // accept_ownership panics if the not authorized by the pending owner.
 // status: verified
 pub fn accept_ownership_panics_if_unauth_by_pending_owner(e: Env) {
