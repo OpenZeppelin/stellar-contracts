@@ -30,8 +30,7 @@ members = [
     "certora/ownable",
     "certora/pausable",
     "certora/upgradeable",
-    "certora/math",
-    "certora/merkle_distributor"
+    "certora/math"
 ]
 exclude = ["examples/upgradeable/testdata"]
 

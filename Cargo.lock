@@ -1043,19 +1043,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
-name = "merkle-distributor-harness"
-version = "0.5.1"
-dependencies = [
- "cvlr",
- "cvlr-soroban",
- "cvlr-soroban-derive",
- "cvlr-soroban-macros",
- "soroban-sdk",
- "stellar-contract-utils",
- "stellar-macros",
-]
-
-[[package]]
 name = "merkle-voting-example"
 version = "0.5.1"
 dependencies = [
