@@ -5,10 +5,10 @@ use soroban_sdk::{contract, contractimpl, Address, Env};
 use stellar_macros::{default_impl, only_owner};
 
 #[contract]
-pub struct FVHarnessOwnableContract;
+pub struct OwnableContract;
 
 #[contractimpl]
-impl FVHarnessOwnableContract {
+impl OwnableContract {
     pub fn __constructor(e: &Env, owner: Address) {
         set_owner(e, &owner);
     }
@@ -20,4 +20,4 @@ impl FVHarnessOwnableContract {
 
 #[default_impl]
 #[contractimpl]
-impl Ownable for FVHarnessOwnableContract {}
+impl Ownable for OwnableContract {}
