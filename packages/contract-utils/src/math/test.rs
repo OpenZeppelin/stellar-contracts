@@ -894,4 +894,144 @@ mod test_wad {
         let result = a.checked_div(b);
         assert_eq!(result, None);
     }
+
+    #[test]
+    fn test_to_integer() {
+        let wad = Wad::from_raw(5_500_000_000_000_000_000); // 5.5 in WAD
+        assert_eq!(wad.to_integer(), 5); // truncates to 5
+    }
+
+    #[test]
+    fn test_from_token_amount_exact_18_decimals() {
+        let e = Env::default();
+        let amount: i128 = 1_000_000_000_000_000_000; // 1 token with 18 decimals
+        let wad = Wad::from_token_amount(&e, amount, 18);
+        assert_eq!(wad.raw(), amount); // no conversion needed
+    }
+
+    #[test]
+    fn test_to_token_amount_exact_18_decimals() {
+        let e = Env::default();
+        let wad = Wad::from_raw(1_000_000_000_000_000_000);
+        let amount = wad.to_token_amount(&e, 18);
+        assert_eq!(amount, 1_000_000_000_000_000_000); // no conversion needed
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #1600)")]
+    fn test_to_token_amount_overflow_high_decimals() {
+        let e = Env::default();
+        let wad = Wad::from_raw(i128::MAX);
+        let _ = wad.to_token_amount(&e, 30); // 30 decimals requires multiplication, will overflow
+    }
+
+    #[test]
+    fn test_raw_accessor() {
+        let wad = Wad::from_raw(12345);
+        assert_eq!(wad.raw(), 12345);
+    }
+
+    #[test]
+    fn test_from_raw_constructor() {
+        let wad = Wad::from_raw(98765);
+        assert_eq!(wad.raw(), 98765);
+    }
+
+    #[test]
+    fn test_min_returns_other() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 5);
+        let b = Wad::from_integer(&e, 3);
+        assert_eq!(a.min(b), b); // returns other (b) since b < a
+    }
+
+    #[test]
+    fn test_max_returns_other() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 3);
+        let b = Wad::from_integer(&e, 5);
+        assert_eq!(a.max(b), b); // returns other (b) since b > a
+    }
+
+    #[test]
+    fn test_checked_sub_success() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 5);
+        let b = Wad::from_integer(&e, 3);
+        let result = a.checked_sub(b);
+        assert_eq!(result, Some(Wad::from_integer(&e, 2)));
+    }
+
+    #[test]
+    fn test_checked_sub_overflow() {
+        let a = Wad::from_raw(i128::MIN);
+        let b = Wad::from_raw(1);
+        let result = a.checked_sub(b);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_checked_mul_success() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 2);
+        let b = Wad::from_integer(&e, 3);
+        let result = a.checked_mul(b);
+        assert_eq!(result, Some(Wad::from_integer(&e, 6)));
+    }
+
+    #[test]
+    fn test_checked_mul_overflow() {
+        let a = Wad::from_raw(i128::MAX);
+        let b = Wad::from_raw(2);
+        let result = a.checked_mul(b);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_checked_div_success() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 6);
+        let b = Wad::from_integer(&e, 2);
+        let result = a.checked_div(b);
+        assert_eq!(result, Some(Wad::from_integer(&e, 3)));
+    }
+
+    #[test]
+    fn test_checked_div_overflow() {
+        let a = Wad::from_raw(i128::MAX);
+        let b = Wad::from_raw(1);
+        let result = a.checked_div(b); // MAX * WAD_SCALE will overflow
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_checked_mul_int_success() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 2);
+        let result = a.checked_mul_int(5);
+        assert_eq!(result, Some(Wad::from_integer(&e, 10)));
+    }
+
+    #[test]
+    fn test_checked_mul_int_overflow() {
+        let a = Wad::from_raw(i128::MAX);
+        let result = a.checked_mul_int(2);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn test_checked_div_int_success() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 10);
+        let result = a.checked_div_int(2);
+        assert_eq!(result, Some(Wad::from_integer(&e, 5)));
+    }
+
+    #[test]
+    fn test_checked_div_int_by_zero() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 10);
+        let result = a.checked_div_int(0);
+        assert_eq!(result, None);
+    }
 }
