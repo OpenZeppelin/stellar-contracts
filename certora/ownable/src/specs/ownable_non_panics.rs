@@ -16,9 +16,12 @@ use crate::specs::helper::get_pending_owner;
 // non-panic for accept_ownership
 
 #[rule]
-// if PendingOwner is set as an address and (missing!) owner autherizes renounce ownership does not panic.
+// requires
+// pending_owner is an address
+// pending_owner is none
+// 
 // status: 
-pub fn renounce_ownership_does_not_panic(e: Env) {
+pub fn renounce_ownership_non_panic(e: Env) {
     // use cvlr_soroban::require_storage_tag;
     
     // setup storage: needed for now. 
