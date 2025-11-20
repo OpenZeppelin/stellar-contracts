@@ -39,7 +39,9 @@ fn create_vault_client<'a>(
     asset_address: &Address,
     decimals_offset: u32,
 ) -> ExampleContractClient<'a> {
-    let vault_address = e.register(ExampleContract, (asset_address, decimals_offset));
+    let name = String::from_str(e, "Vault Token");
+    let symbol = String::from_str(e, "VLT");
+    let vault_address = e.register(ExampleContract, (name, symbol, asset_address, decimals_offset));
     ExampleContractClient::new(e, &vault_address)
 }
 

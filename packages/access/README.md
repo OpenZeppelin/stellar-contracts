@@ -32,6 +32,12 @@ pub struct MyContract;
 
 #[contractimpl]
 impl MyContract {
+    // deploy this contract with the Stellar CLI:
+    //
+    // stellar contract deploy \
+    // --wasm path/to/file.wasm \
+    // -- \
+    // --admin <admin_address>
     pub fn __constructor(e: &Env, admin: Address) {
         access_control::set_admin(e, &admin);
     }
@@ -89,6 +95,12 @@ pub struct MyContract;
 
 #[contractimpl]
 impl MyContract {
+    // deploy this contract with the Stellar CLI:
+    //
+    // stellar contract deploy \
+    // --wasm path/to/file.wasm \
+    // -- \
+    // --owner <owner_address>
     pub fn __constructor(e: &Env, owner: Address) {
         ownable::set_owner(e, &owner);
     }
