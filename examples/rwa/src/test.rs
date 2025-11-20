@@ -1,6 +1,6 @@
 extern crate std;
 
-use soroban_sdk::{testutils::Address as _, vec, Address, Env};
+use soroban_sdk::{testutils::Address as _, vec, Address, Env, String};
 
 use crate::identity_registry_storage::{IdentityRegistryContract, IdentityRegistryContractClient};
 
@@ -9,7 +9,9 @@ fn create_client<'a>(
     admin: &Address,
     manager: &Address,
 ) -> IdentityRegistryContractClient<'a> {
-    let address = e.register(IdentityRegistryContract, (admin, manager));
+    let name = String::from_str(e, "RWA Token");
+    let symbol = String::from_str(e, "RWA");
+    let address = e.register(IdentityRegistryContract, (name, symbol, admin, manager));
     IdentityRegistryContractClient::new(e, &address)
 }
 
