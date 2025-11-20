@@ -918,6 +918,8 @@ version = "0.5.1"
 dependencies = [
  "soroban-sdk",
  "stellar-accounts",
+ "stellar-contract-utils",
+ "stellar-macros",
 ]
 
 [[package]]

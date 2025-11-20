@@ -26,9 +26,19 @@ impl Verifier for WebauthnVerifierContract {
 
     /// Verify a WebAuthn signature against a message and public key.
     ///
-    /// The `sig_data` parameter must be an XDR-encoded `WebAuthnSigData`
-    /// structure containing the authenticator data, client data JSON, and
-    /// signature components required for WebAuthn verification.
+    /// # Arguments
+    ///
+    /// * `signature_payload` - The message hash that was signed
+    /// * `key_data` - The 65-byte secp256r1 public key (uncompressed format)
+    /// * `sig_data` - XDR-encoded `WebAuthnSigData` structure containing:
+    ///   - Authenticator data
+    ///   - Client data JSON
+    ///   - Signature components
+    ///
+    /// # Returns
+    ///
+    /// * `true` if the signature is valid
+    /// * `false` otherwise
     fn verify(e: &Env, signature_payload: Bytes, key_data: BytesN<65>, sig_data: Bytes) -> bool {
         let sig_struct =
             WebAuthnSigData::from_xdr(e, &sig_data).expect("WebAuthnSigData wrong format");
