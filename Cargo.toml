@@ -19,10 +19,12 @@ members = [
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
     "examples/multisig-smart-account/*",
+    "examples/timelock-controller",
     "examples/upgradeable/*",
     "packages/accounts",
     "packages/access",
     "packages/contract-utils",
+    "packages/governance",
     "packages/macros",
     "packages/test-utils/*",
     "packages/tokens",
@@ -58,6 +60,7 @@ stellar-access = { path = "packages/access" }
 stellar-accounts = { path = "packages/accounts" }
 stellar-contract-utils = { path = "packages/contract-utils" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
+stellar-governance = { path = "packages/governance" }
 stellar-tokens = { path = "packages/tokens" }
 stellar-macros = { path = "packages/macros" }
 
@@ -71,7 +74,7 @@ panic = "abort"
 codegen-units = 1
 lto = true
 
-# For more information about this profile see https://soroban.stellar.org/docs/basic-tutorials/logging#cargotoml-profile
+# For more information about this profile see https://developers.stellar.org/docs/build/smart-contracts/example-contracts/logging#cargotoml-profile
 [profile.release-with-logs]
 inherits = "release"
 debug-assertions = true
