@@ -136,6 +136,7 @@ pub fn renounce_ownership(e: &Env) {
     }
 
     e.storage().instance().remove(&OwnableStorageKey::Owner);
+
     emit_ownership_renounced(e, &owner);
 }
 
