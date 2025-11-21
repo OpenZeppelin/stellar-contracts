@@ -966,6 +966,14 @@ mod test_wad {
     }
 
     #[test]
+    fn test_max_returns_self() {
+        let e = Env::default();
+        let a = Wad::from_integer(&e, 5);
+        let b = Wad::from_integer(&e, 3);
+        assert_eq!(a.max(b), a); // returns self (a) since a > b
+    }
+
+    #[test]
     fn test_checked_sub_success() {
         let e = Env::default();
         let a = Wad::from_integer(&e, 5);
