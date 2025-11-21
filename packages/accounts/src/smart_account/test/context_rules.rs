@@ -55,7 +55,12 @@ impl Policy for MockPolicyContract {
 
     fn install(_e: &Env, _param: Val, _rule: ContextRule, _smart_account: Address) {}
 
-    fn uninstall(_e: &Env, _rule: ContextRule, _smart_account: Address) {}
+    fn uninstall(e: &Env, _rule: ContextRule, _smart_account: Address) {
+        let block_uninstall = e.storage().persistent().get(&symbol_short!("veto")).unwrap_or(false);
+        if block_uninstall {
+            panic!("Veto Uninstall Policy")
+        }
+    }
 }
 
 #[contract]
@@ -467,7 +472,30 @@ fn remove_context_rule_success() {
         let retrieved_rule = get_context_rule(&e, rule.id);
         assert_eq!(retrieved_rule.id, rule.id);
 
-        // Remove the rule
+        remove_context_rule(&e, rule.id);
+        assert_eq!(e.events().all().len(), 1);
+    });
+
+    let rule = e.as_contract(&address, || {
+        let contract_addr = Address::generate(&e);
+
+        add_context_rule(
+            &e,
+            &ContextRuleType::CallContract(contract_addr),
+            &String::from_str(&e, "test_rule"),
+            None,
+            &create_test_signers(&e),
+            &create_test_policies_map(&e),
+        )
+    });
+
+    // `unistall` of the first policy panics
+    e.as_contract(&rule.policies.get_unchecked(0), || {
+        e.storage().persistent().set(&symbol_short!("veto"), &true);
+    });
+
+    // Removal succeeds
+    e.as_contract(&address, || {
         remove_context_rule(&e, rule.id);
         assert_eq!(e.events().all().len(), 1);
     });

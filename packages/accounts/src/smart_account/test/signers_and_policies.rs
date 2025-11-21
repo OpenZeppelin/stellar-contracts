@@ -2,7 +2,7 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl,
+    contract, contractimpl, symbol_short,
     testutils::{Address as _, Events},
     Address, Env, Map, String, Val, Vec,
 };
@@ -58,7 +58,12 @@ impl Policy for MockPolicyContract {
     ) {
     }
 
-    fn uninstall(_e: &Env, _rule: ContextRule, _smart_account: Address) {}
+    fn uninstall(e: &Env, _rule: ContextRule, _smart_account: Address) {
+        let block_uninstall = e.storage().persistent().get(&symbol_short!("veto")).unwrap_or(false);
+        if block_uninstall {
+            panic!("Veto Uninstall Policy")
+        }
+    }
 }
 
 fn create_test_signers(e: &Env) -> Vec<Signer> {
@@ -297,6 +302,20 @@ fn remove_policy_success() {
         assert_eq!(e.events().all().len(), 2);
         assert_eq!(updated_rule.policies.len(), 0);
         assert!(!updated_rule.policies.contains(&policy_address));
+    });
+
+    // case when `unistall` of the policy panics
+    e.as_contract(&policy_address, || {
+        e.storage().persistent().set(&symbol_short!("veto"), &true);
+    });
+
+    e.as_contract(&address, || {
+        let install_param: Val = Val::from_void().into();
+
+        add_policy(&e, rule.id, &policy_address, install_param);
+
+        // Removal succeeds
+        remove_policy(&e, rule.id, &policy_address);
     });
 }
 
