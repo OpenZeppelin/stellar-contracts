@@ -5,7 +5,7 @@ use core::{
 
 use soroban_sdk::{panic_with_error, Env};
 
-use crate::math::soroban_fixed_point::SorobanFixedPointError;
+use crate::math::SorobanFixedPointError;
 
 /// Fixed-point decimal number with 18 decimal places of precision.
 ///

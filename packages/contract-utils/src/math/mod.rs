@@ -6,6 +6,8 @@ pub mod wad;
 
 mod test;
 
+use soroban_sdk::contracterror;
+
 // ################## ERRORS ##################
 
 #[contracterror]

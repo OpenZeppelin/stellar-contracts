@@ -26,7 +26,7 @@ SOFTWARE.
 
 use soroban_sdk::{panic_with_error, Env, I256};
 
-use crate::math::soroban_fixed_point::{SorobanFixedPoint, SorobanFixedPointError};
+use crate::math::{soroban_fixed_point::SorobanFixedPoint, SorobanFixedPointError};
 
 /// Performs floor(r / z)
 fn div_floor(r: i128, z: i128) -> Option<i128> {
