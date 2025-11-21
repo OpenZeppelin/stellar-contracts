@@ -3,7 +3,9 @@ use core::{
     ops::{Add, Div, Mul, Neg, Sub},
 };
 
-use soroban_sdk::{contracterror, panic_with_error, Env};
+use soroban_sdk::{panic_with_error, Env};
+
+use crate::math::soroban_fixed_point::SorobanFixedPointError;
 
 /// Fixed-point decimal number with 18 decimal places of precision.
 ///
@@ -63,19 +65,10 @@ pub const WAD_SCALE: i128 = 1_000_000_000_000_000_000;
 
 // ################## ERRORS ##################
 
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum WadError {
-    /// Arithmetic overflow occurred
-    Overflow = 1600,
-    /// Division by zero
-    DivisionByZero = 1601,
-    /// Invalid decimal conversion (token_decimals too large)
-    InvalidDecimals = 1602,
-}
-
-fn pow10(exp: u32) -> i128 {
+fn pow10(e: &Env, exp: u32) -> i128 {
+    if exp > 38 {
+        panic_with_error!(e, SorobanFixedPointError::Overflow);
+    }
     10_i128.pow(exp)
 }
 
@@ -92,7 +85,8 @@ impl Wad {
     ///
     /// # Errors
     ///
-    /// * [`WadError::Overflow`] - When the multiplication overflows i128.
+    /// * [`SorobanFixedPointError::Overflow`] - When the multiplication
+    ///   overflows i128.
     ///
     /// # Examples
     ///
@@ -105,7 +99,9 @@ impl Wad {
     ///
     /// Compare with [`Wad::from_raw`] which does NOT apply WAD scaling.
     pub fn from_integer(e: &Env, n: i128) -> Self {
-        Wad(n.checked_mul(WAD_SCALE).unwrap_or_else(|| panic_with_error!(e, WadError::Overflow)))
+        Wad(n
+            .checked_mul(WAD_SCALE)
+            .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow)))
     }
 
     /// Converts Wad back to an integer by removing WAD scaling.
@@ -132,8 +128,9 @@ impl Wad {
     ///
     /// # Errors
     ///
-    /// * [`WadError::DivisionByZero`] - When `den` is zero.
-    /// * [`WadError::Overflow`] - When the multiplication overflows i128.
+    /// * [`SorobanFixedPointError::DivisionByZero`] - When `den` is zero.
+    /// * [`SorobanFixedPointError::Overflow`] - When the multiplication
+    ///   overflows i128.
     ///
     /// # Examples
     ///
@@ -143,10 +140,11 @@ impl Wad {
     /// ```
     pub fn from_ratio(e: &Env, num: i128, den: i128) -> Self {
         if den == 0 {
-            panic_with_error!(e, WadError::DivisionByZero)
+            panic_with_error!(e, SorobanFixedPointError::DivisionByZero)
         }
-        let scaled =
-            num.checked_mul(WAD_SCALE).unwrap_or_else(|| panic_with_error!(e, WadError::Overflow));
+        let scaled = num
+            .checked_mul(WAD_SCALE)
+            .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow));
         Wad(scaled / den)
     }
 
@@ -163,8 +161,8 @@ impl Wad {
     ///
     /// # Errors
     ///
-    /// * [`WadError::Overflow`] - When the scaling multiplication overflows
-    ///   i128.
+    /// * [`SorobanFixedPointError::Overflow`] - When the scaling multiplication
+    ///   overflows i128.
     ///
     /// # Examples
     ///
@@ -183,13 +181,13 @@ impl Wad {
             Wad(amount)
         } else if token_decimals < 18 {
             let diff = 18u32 - token_decimals as u32;
-            let factor = pow10(diff);
+            let factor = pow10(e, diff);
             Wad(amount
                 .checked_mul(factor)
-                .unwrap_or_else(|| panic_with_error!(e, WadError::Overflow)))
+                .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow)))
         } else {
             let diff = token_decimals as u32 - 18u32;
-            let factor = pow10(diff);
+            let factor = pow10(e, diff);
             Wad(amount / factor)
         }
     }
@@ -206,8 +204,8 @@ impl Wad {
     ///
     /// # Errors
     ///
-    /// * [`WadError::Overflow`] - When the scaling multiplication overflows
-    ///   i128 (occurs when `token_decimals > 18`).
+    /// * [`SorobanFixedPointError::Overflow`] - When the scaling multiplication
+    ///   overflows i128 (occurs when `token_decimals > 18`).
     ///
     /// # Examples
     ///
@@ -221,12 +219,14 @@ impl Wad {
             self.0
         } else if token_decimals < 18 {
             let diff = 18u32 - token_decimals as u32;
-            let factor = pow10(diff);
+            let factor = pow10(e, diff);
             self.0 / factor
         } else {
             let diff = token_decimals as u32 - 18u32;
-            let factor = pow10(diff);
-            self.0.checked_mul(factor).unwrap_or_else(|| panic_with_error!(e, WadError::Overflow))
+            let factor = pow10(e, diff);
+            self.0
+                .checked_mul(factor)
+                .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
         }
     }
 

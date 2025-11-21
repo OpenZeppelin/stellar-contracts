@@ -57,10 +57,8 @@ pub trait SorobanFixedPoint: Sized {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum SorobanFixedPointError {
-    /// The operation failed because the denominator is 0.
-    ZeroDenominator = 1500,
-    /// The operation failed because a phantom overflow occurred.
-    PhantomOverflow = 1501,
-    /// The operation failed because the result does not fit in Self.
-    ResultOverflow = 1502,
+    /// Arithmetic overflow occurred
+    Overflow = 1500,
+    /// Division by zero
+    DivisionByZero = 1501,
 }

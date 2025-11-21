@@ -217,7 +217,7 @@ mod test_muldiv {
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1500)")]
+    #[should_panic(expected = "Error(Contract, #1501)")]
     fn test_muldiv_zero_denominator() {
         let env = Env::default();
         let x: i128 = 100;
@@ -247,7 +247,7 @@ mod test_i128_errors {
     use crate::math::soroban_fixed_point::SorobanFixedPoint;
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1500)")]
+    #[should_panic(expected = "Error(Contract, #1501)")]
     fn test_fixed_mul_floor_zero_denominator() {
         let env = Env::default();
         let x: i128 = 100;
@@ -258,7 +258,7 @@ mod test_i128_errors {
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1500)")]
+    #[should_panic(expected = "Error(Contract, #1501)")]
     fn test_fixed_mul_ceil_zero_denominator() {
         let env = Env::default();
         let x: i128 = 100;
@@ -269,7 +269,7 @@ mod test_i128_errors {
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1502)")]
+    #[should_panic(expected = "Error(Contract, #1500)")]
     fn test_fixed_mul_floor_result_overflow() {
         let env = Env::default();
         // This will overflow i128 even after scaling to I256
@@ -281,7 +281,7 @@ mod test_i128_errors {
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1502)")]
+    #[should_panic(expected = "Error(Contract, #1500)")]
     fn test_fixed_mul_ceil_result_overflow() {
         let env = Env::default();
         // This will overflow i128 even after scaling to I256
@@ -532,7 +532,7 @@ mod test_i256_errors {
     use crate::math::soroban_fixed_point::SorobanFixedPoint;
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1500)")]
+    #[should_panic(expected = "Error(Contract, #1501)")]
     fn test_fixed_mul_floor_zero_denominator() {
         let env = Env::default();
         let x: I256 = I256::from_i128(&env, 100);
@@ -543,7 +543,7 @@ mod test_i256_errors {
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1500)")]
+    #[should_panic(expected = "Error(Contract, #1501)")]
     fn test_fixed_mul_ceil_zero_denominator() {
         let env = Env::default();
         let x: I256 = I256::from_i128(&env, 100);
@@ -705,7 +705,7 @@ mod test_wad {
     }
 
     #[test]
-    #[should_panic(expected = "attempt to multiply with overflow")]
+    #[should_panic(expected = "Error(Contract, #1500)")]
     fn test_from_token_amount_invalid_decimals() {
         let e = Env::default();
 
@@ -811,21 +811,21 @@ mod test_wad {
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1600)")]
+    #[should_panic(expected = "Error(Contract, #1500)")]
     fn test_from_integer_overflow() {
         let e = Env::default();
         let _ = Wad::from_integer(&e, i128::MAX);
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1600)")]
+    #[should_panic(expected = "Error(Contract, #1500)")]
     fn test_from_ratio_overflow() {
         let e = Env::default();
         let _ = Wad::from_ratio(&e, i128::MAX, 1);
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1601)")]
+    #[should_panic(expected = "Error(Contract, #1501)")]
     fn test_from_ratio_division_by_zero() {
         let e = Env::default();
         let _ = Wad::from_ratio(&e, 100, 0);
@@ -929,7 +929,7 @@ mod test_wad {
     }
 
     #[test]
-    #[should_panic(expected = "Error(Contract, #1600)")]
+    #[should_panic(expected = "Error(Contract, #1500)")]
     fn test_to_token_amount_overflow_high_decimals() {
         let e = Env::default();
         let wad = Wad::from_raw(i128::MAX);
