@@ -26,7 +26,7 @@ SOFTWARE.
 
 use soroban_sdk::{panic_with_error, Env, I256};
 
-use crate::math::soroban_fixed_point::{SorobanFixedPoint, SorobanFixedPointError};
+use crate::math::{soroban_fixed_point::SorobanFixedPoint, SorobanFixedPointError};
 
 /// Performs floor(r / z)
 fn div_floor(r: i128, z: i128) -> Option<i128> {
@@ -66,7 +66,7 @@ impl SorobanFixedPoint for i128 {
 fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
     match x.checked_mul(*y) {
         Some(r) => div_floor(r, *z)
-            .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ZeroDenominator)),
+            .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::DivisionByZero)),
         None => {
             // scale to i256 and retry
             let res = crate::math::i256_fixed_point::mul_div_floor(
@@ -76,7 +76,7 @@ fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
                 &I256::from_i128(env, *z),
             );
             res.to_i128()
-                .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ResultOverflow))
+                .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::Overflow))
         }
     }
 }
@@ -85,7 +85,7 @@ fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
 fn scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
     match x.checked_mul(*y) {
         Some(r) => div_ceil(r, *z)
-            .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ZeroDenominator)),
+            .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::DivisionByZero)),
         None => {
             // scale to i256 and retry
             let res = crate::math::i256_fixed_point::mul_div_ceil(
@@ -95,7 +95,7 @@ fn scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
                 &I256::from_i128(env, *z),
             );
             res.to_i128()
-                .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ResultOverflow))
+                .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::Overflow))
         }
     }
 }
