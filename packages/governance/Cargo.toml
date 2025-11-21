@@ -1,0 +1,19 @@
+[package]
+name = "stellar-governance"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+publish = true
+description = "Governance Utilities for Stellar contracts."
+
+
+[lib]
+crate-type = ["lib", "cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
