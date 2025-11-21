@@ -661,3 +661,27 @@ fn renounce_admin_fails_when_no_admin_set() {
         renounce_admin(&e);
     });
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2009)")]
+fn renounce_admin_fails_when_transfer_in_progress() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let new_admin = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        // Set up an admin
+        set_admin(&e, &admin);
+
+        // Start an admin transfer (this sets PendingAdmin)
+        transfer_admin_role(&e, &new_admin, 1000);
+    });
+
+    e.as_contract(&address, || {
+        // Try to renounce admin while transfer is in progress
+        // This should panic with TransferInProgress error
+        renounce_admin(&e);
+    });
+}
