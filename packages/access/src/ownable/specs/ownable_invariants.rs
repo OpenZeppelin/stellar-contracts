@@ -5,7 +5,7 @@ use cvlr_soroban_derive::rule;
 
 
 use soroban_sdk::{Env};
-
+use cvlr::clog;
 use crate::ownable::{specs::{helper::get_pending_owner, ownable_contract::OwnableContract}, *};
 
 // invariant: owner != None -> holds in all cases except for renounce_ownership
@@ -76,7 +76,7 @@ pub fn after_accept_ownership_owner_is_set_sanity(e: Env) {
     cvlr_assert!(false)
 }
 
-// for the case renounce_ownership obviously does not work -- and this is fine.
+// for the case renounce_ownership it's obviously true - and expected
 
 /////////
 #[rule]
@@ -99,19 +99,23 @@ pub fn after_owner_restricted_function_owner_is_set_sanity(e: Env) {
 
 // helpers
 pub fn assume_pre_pending_owner_implies_owner(e: &Env) {
-    let key = OwnableStorageKey::PendingOwner;
-    let pending_owner = e.storage().temporary().get::<_, Address>(&key);
+    let pending_owner_pre = get_pending_owner(&e);
     let owner = OwnableContract::get_owner(&e);
-    if pending_owner.is_some() {
+    if let Some(owner_internal) = owner.clone() {
+        clog!(cvlr_soroban::Addr(&owner_internal));
+    }
+    if pending_owner_pre.is_some() {
         cvlr_assume!(owner.is_some());
     }
 }
 
 pub fn assert_post_pending_owner_implies_owner(e: &Env) {
-    let key = OwnableStorageKey::PendingOwner;
-    let pending_owner = e.storage().temporary().get::<_, Address>(&key);
+    let pending_owner_post = get_pending_owner(&e);
     let owner = OwnableContract::get_owner(&e);
-    if pending_owner.is_some() {
+    if let Some(owner_internal) = owner.clone() {
+        clog!(cvlr_soroban::Addr(&owner_internal));
+    }
+    if pending_owner_post.is_some() {
         cvlr_assert!(owner.is_some());
     }
 }
@@ -174,7 +178,7 @@ pub fn after_accept_ownership_pending_owner_implies_owner_sanity(e: Env) {
 
 /////////
 #[rule]
-// status: verified
+// status: violated -- weird!
 pub fn after_renounce_ownership_pending_owner_implies_owner(e: Env) {
     assume_pre_pending_owner_implies_owner(&e);
     OwnableContract::renounce_ownership(&e);
