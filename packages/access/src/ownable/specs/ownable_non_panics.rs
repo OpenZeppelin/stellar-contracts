@@ -7,8 +7,8 @@ use soroban_sdk::{Address, Env};
 
 use crate::ownable::specs::ownable_contract::OwnableContract;
 use crate::ownable::*;
-
 use crate::{ownable::{OwnableStorageKey, specs::helper::get_pending_owner}};
+
 // These rules require the prover arg "prover_args": ["-trapAsAssert true"] to consider also panicking paths.
 
 #[rule]
@@ -101,7 +101,6 @@ pub fn renounce_ownership_non_panic(e: Env) {
     cvlr_assert!(true);
 }
 
-// non-panic for owner_restricted_function
 #[rule]
 // requires
 // storage setup
