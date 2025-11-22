@@ -11,8 +11,6 @@ use crate::ownable::*;
 
 use crate::ownable::specs::helper::get_pending_owner;
 
-// TODO: renounce_ownership_panics_if_pending_ownership_transfer violated
-
 // panic rules should all "pass" to be considered verified, even though they assert false.
 
 // package functions
@@ -133,7 +131,8 @@ pub fn renounce_ownership_panics_if_owner_not_set(e: Env) {
 // renounce_ownership panics if there is a pending ownership transfer.
 // status: failed
 pub fn renounce_ownership_panics_if_pending_ownership_transfer(e: Env) {
-    let pending_owner = get_pending_owner(&e);
+    let key = OwnableStorageKey::PendingOwner;
+    let pending_owner = e.storage().temporary().get::<_, Address>(&key);
     cvlr_assume!(pending_owner.is_some());
     OwnableContract::renounce_ownership(&e);
     cvlr_assert!(false);

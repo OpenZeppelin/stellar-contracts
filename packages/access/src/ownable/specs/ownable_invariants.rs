@@ -8,8 +8,6 @@ use soroban_sdk::{Env};
 
 use crate::ownable::{specs::{helper::get_pending_owner, ownable_contract::OwnableContract}, *};
 
-// TODO: after_renounce_ownership_pending_owner_implies_owner violated
-
 // invariant: owner != None -> holds in all cases except for renounce_ownership
 
 // helpers
@@ -101,7 +99,9 @@ pub fn after_owner_restricted_function_owner_is_set_sanity(e: Env) {
 
 // helpers
 pub fn assume_pre_pending_owner_implies_owner(e: &Env) {
-    let pending_owner = get_pending_owner(&e);
+    // let pending_owner = get_pending_owner(&e);
+    let key = OwnableStorageKey::PendingOwner;
+    let pending_owner = e.storage().temporary().get::<_, Address>(&key);
     let owner = OwnableContract::get_owner(&e);
     if pending_owner.is_some() {
         cvlr_assume!(owner.is_some());
@@ -109,7 +109,9 @@ pub fn assume_pre_pending_owner_implies_owner(e: &Env) {
 }
 
 pub fn assert_post_pending_owner_implies_owner(e: &Env) {
-    let pending_owner = get_pending_owner(&e);
+    // let pending_owner = get_pending_owner(&e);
+    let key = OwnableStorageKey::PendingOwner;
+    let pending_owner = e.storage().temporary().get::<_, Address>(&key);
     let owner = OwnableContract::get_owner(&e);
     if pending_owner.is_some() {
         cvlr_assert!(owner.is_some());
