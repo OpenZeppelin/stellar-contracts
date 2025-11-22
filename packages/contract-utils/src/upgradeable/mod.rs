@@ -78,6 +78,9 @@ mod storage;
 #[cfg(test)]
 mod test;
 
+#[cfg(feature = "certora")]
+pub mod specs;
+
 use soroban_sdk::{contractclient, contracterror, Address, BytesN, Env, FromVal, Val};
 
 pub use crate::upgradeable::storage::{

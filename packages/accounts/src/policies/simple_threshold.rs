@@ -45,6 +45,7 @@
 //! **Failure to follow this process may result in permanent DoS or silent
 //! security degradation.**
 
+use cvlr::nondet::Nondet;
 use soroban_sdk::{
     auth::Context, contracterror, contracttype, panic_with_error, Address, Env, Vec,
 };
@@ -76,6 +77,14 @@ pub struct SimplePolicyEnforced {
 pub struct SimpleThresholdAccountParams {
     /// The minimum number of signers required for authorization.
     pub threshold: u32,
+}
+
+impl Nondet for SimpleThresholdAccountParams {
+    fn nondet() -> Self {
+        SimpleThresholdAccountParams {
+            threshold: u32::nondet(),
+        }
+    }
 }
 
 /// Error codes for simple threshold policy operations.

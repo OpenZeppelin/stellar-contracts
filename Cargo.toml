@@ -25,12 +25,7 @@ members = [
     "packages/contract-utils",
     "packages/macros",
     "packages/test-utils/*",
-    "packages/tokens",
-    "certora/access_control",
-    "certora/ownable",
-    "certora/pausable",
-    "certora/upgradeable",
-    "certora/math"
+    "packages/tokens"
 ]
 exclude = ["examples/upgradeable/testdata"]
 
@@ -89,16 +84,16 @@ version = "0.4.0"
 default-features = false
 
 [workspace.dependencies.cvlr-soroban]
-git = "https://github.com/chandrakananandi/cvlr-soroban.git"
-branch = "soroban-22.0.8"
-# path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban"
+# git = "https://github.com/chandrakananandi/cvlr-soroban.git"
+# branch = "soroban-22.0.8"
+path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban"
 
 [workspace.dependencies.cvlr-soroban-macros]
-git = "https://github.com/chandrakananandi/cvlr-soroban.git"
-branch = "soroban-22.0.8"
-# path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-macros"
+# git = "https://github.com/chandrakananandi/cvlr-soroban.git"
+# branch = "soroban-22.0.8"
+path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-macros"
 
 [workspace.dependencies.cvlr-soroban-derive]
-git = "https://github.com/chandrakananandi/cvlr-soroban.git"
-branch = "soroban-22.0.8"
-# path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-derive"
+# git = "https://github.com/chandrakananandi/cvlr-soroban.git"
+# branch = "soroban-22.0.8"
+path = "/Users/chandrakananandi/research/cvlr-soroban/cvlr-soroban-derive"

@@ -13,6 +13,10 @@ pub mod simple_threshold;
 pub mod spending_limit;
 #[cfg(test)]
 mod test;
+
+#[cfg(feature = "certora")]
+pub mod specs;
+
 pub mod weighted_threshold;
 
 /// Core trait for authorization policies in smart accounts.

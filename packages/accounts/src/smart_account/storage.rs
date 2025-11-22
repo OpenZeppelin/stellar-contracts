@@ -84,6 +84,8 @@
 //! }
 //! ```
 
+use cvlr::nondet::Nondet;
+use cvlr_soroban::{nondet_address, nondet_bytes_n, nondet_string, nondet_vec};
 use soroban_sdk::{
     auth::{
         Context, ContractContext, ContractExecutable, CreateContractHostFnContext,
@@ -166,6 +168,17 @@ pub enum ContextRuleType {
     CreateContract(BytesN<32>),
 }
 
+impl Nondet for ContextRuleType {
+    fn nondet() -> Self {
+        match u8::nondet() % 3 {
+            0 => ContextRuleType::Default,
+            1 => ContextRuleType::CallContract(nondet_address()),
+            2 => ContextRuleType::CreateContract(nondet_bytes_n()),
+            _ => panic!("unreachable")
+        }
+    }
+}
+
 /// Metadata for a context rule.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
@@ -194,6 +207,19 @@ pub struct ContextRule {
     pub policies: Vec<Address>,
     /// Optional expiration ledger sequence for the rule.
     pub valid_until: Option<u32>,
+}
+
+impl Nondet for ContextRule {
+    fn nondet() -> Self {
+        ContextRule {
+            id: u32::nondet(),
+            context_type: ContextRuleType::nondet(),
+            name: nondet_string(),
+            signers: nondet_vec(),
+            policies: nondet_vec(),
+            valid_until: Option::<u32>::nondet(),
+        }
+    }
 }
 
 // ################## QUERY STATE ##################

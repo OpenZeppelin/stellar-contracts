@@ -12,6 +12,9 @@ pub mod utils;
 pub mod webauthn;
 use soroban_sdk::{contractclient, Bytes, Env, FromVal, Val};
 
+#[cfg(feature = "certora")]
+pub mod specs;
+
 /// Core trait for cryptographic signature verification in smart accounts.
 ///
 /// This trait defines the interface for verifying digital signatures against

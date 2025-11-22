@@ -19,6 +19,11 @@ pub use storage::{
     Signatures, Signer,
 };
 
+
+#[cfg(feature = "certora")]
+pub mod specs;
+
+
 /// Core trait for smart account functionality, extending Soroban's
 /// CustomAccountInterface with context rule management capabilities.
 ///
@@ -548,3 +553,5 @@ pub struct PolicyRemoved {
 pub fn emit_policy_removed(e: &Env, context_rule_id: u32, policy: &Address) {
     PolicyRemoved { context_rule_id, policy: policy.clone() }.publish(e);
 }
+
+
