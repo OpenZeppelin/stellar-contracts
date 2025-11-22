@@ -1,9 +1,6 @@
 use core::task::Context;
 
-use cvlr::{
-    cvlr_assert,
-    nondet::*,
-};
+use cvlr::{cvlr_assert, nondet::*};
 use cvlr_soroban::{nondet_address, nondet_map, nondet_vec};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env, Vec};
@@ -31,7 +28,8 @@ pub fn calculate_weight_sanity(e: Env) {
     let signers = nondet_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
-    let _ = crate::policies::weighted_threshold::calculate_weight(&e, &signers, &ctx_rule, &account_id);
+    let _ =
+        crate::policies::weighted_threshold::calculate_weight(&e, &signers, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -55,7 +53,13 @@ pub fn enforce_weighted_threshold_sanity(e: Env, context: soroban_sdk::auth::Con
     let auth_signers = nondet_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account: Address = nondet_address();
-    let _ = crate::policies::weighted_threshold::enforce(&e, &context, &auth_signers, &ctx_rule, &account);
+    let _ = crate::policies::weighted_threshold::enforce(
+        &e,
+        &context,
+        &auth_signers,
+        &ctx_rule,
+        &account,
+    );
     cvlr_assert!(false);
 }
 
@@ -74,7 +78,13 @@ pub fn set_signer_weight_sanity(e: Env) {
     let weight: u32 = nondet();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
-    crate::policies::weighted_threshold::set_signer_weight(&e, &signer, weight, &ctx_rule, &account_id);
+    crate::policies::weighted_threshold::set_signer_weight(
+        &e,
+        &signer,
+        weight,
+        &ctx_rule,
+        &account_id,
+    );
     cvlr_assert!(false);
 }
 

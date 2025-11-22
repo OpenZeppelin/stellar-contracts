@@ -3,7 +3,13 @@ use cvlr_soroban::{nondet_address, nondet_bytes, nondet_vec};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::Env;
 
-use crate::{policies::spending_limit::{SpendingLimitAccountParams, can_enforce, enforce, get_spending_limit_data, install, set_spending_limit, uninstall}, smart_account::ContextRule};
+use crate::{
+    policies::spending_limit::{
+        can_enforce, enforce, get_spending_limit_data, install, set_spending_limit, uninstall,
+        SpendingLimitAccountParams,
+    },
+    smart_account::ContextRule,
+};
 
 #[rule]
 pub fn get_spending_limit_sanity(e: Env) {

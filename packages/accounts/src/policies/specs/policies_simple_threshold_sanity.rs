@@ -8,7 +8,10 @@ use cvlr_soroban::{nondet_address, nondet_vec};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env, Vec};
 
-use crate::{policies::simple_threshold::SimpleThresholdAccountParams, smart_account::{ContextRule, Signer}};
+use crate::{
+    policies::simple_threshold::SimpleThresholdAccountParams,
+    smart_account::{ContextRule, Signer},
+};
 
 #[rule]
 pub fn get_simple_threshold_sanity(e: Env) {
@@ -38,10 +41,15 @@ pub fn enforce_simple_threshold_sanity(e: Env, context: soroban_sdk::auth::Conte
     let auth_signers = nondet_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account: Address = nondet_address();
-    let _ = crate::policies::simple_threshold::enforce(&e, &context, &auth_signers, &ctx_rule, &account);
+    let _ = crate::policies::simple_threshold::enforce(
+        &e,
+        &context,
+        &auth_signers,
+        &ctx_rule,
+        &account,
+    );
     cvlr_assert!(false);
 }
-
 
 #[rule]
 pub fn set_simple_threshold_sanity(e: Env) {
