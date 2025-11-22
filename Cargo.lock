@@ -432,6 +432,7 @@ dependencies = [
 [[package]]
 name = "cvlr-soroban"
 version = "0.4.0"
+source = "git+https://github.com/chandrakananandi/cvlr-soroban.git?branch=soroban-22.0.8#0edff4c27b94729ab8ba5bf57cf3faff5e007062"
 dependencies = [
  "cvlr-asserts",
  "cvlr-log",
@@ -442,6 +443,7 @@ dependencies = [
 [[package]]
 name = "cvlr-soroban-derive"
 version = "0.4.0"
+source = "git+https://github.com/chandrakananandi/cvlr-soroban.git?branch=soroban-22.0.8#0edff4c27b94729ab8ba5bf57cf3faff5e007062"
 dependencies = [
  "darling 0.20.11",
  "proc-macro2",
@@ -453,6 +455,7 @@ dependencies = [
 [[package]]
 name = "cvlr-soroban-macros"
 version = "0.4.0"
+source = "git+https://github.com/chandrakananandi/cvlr-soroban.git?branch=soroban-22.0.8#0edff4c27b94729ab8ba5bf57cf3faff5e007062"
 
 [[package]]
 name = "darling"

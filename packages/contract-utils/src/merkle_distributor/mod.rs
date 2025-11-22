@@ -51,6 +51,10 @@ mod storage;
 #[cfg(test)]
 mod test;
 
+#[cfg(feature = "certora")]
+pub mod specs;
+
+
 use core::marker::PhantomData;
 
 #[cfg(not(feature = "certora"))]
@@ -112,8 +116,8 @@ pub struct SetClaimed {
 ///
 /// * `e` - The Soroban environment.
 /// * `root` - The merkle root.
+#[cfg(not(feature = "certora"))]
 pub fn emit_set_root(e: &Env, root: Bytes) {
-    #[cfg(not(feature = "certora"))]
     SetRoot { root }.publish(e);
 }
 
@@ -123,7 +127,7 @@ pub fn emit_set_root(e: &Env, root: Bytes) {
 ///
 /// * `e` - The Soroban environment.
 /// * `index` - The index that was claimed.
+#[cfg(not(feature = "certora"))]
 pub fn emit_set_claimed(e: &Env, index: Val) {
-    #[cfg(not(feature = "certora"))]
     SetClaimed { index }.publish(e);
 }
