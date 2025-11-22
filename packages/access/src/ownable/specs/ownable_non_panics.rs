@@ -1,4 +1,4 @@
-use cvlr::{cvlr_assert, cvlr_assume};
+use cvlr::{cvlr_assert, cvlr_assume,cvlr_satisfy};
 use cvlr_soroban::{nondet_address, is_auth};
 use cvlr_soroban_derive::rule;
 use cvlr::nondet::Nondet;
@@ -85,7 +85,7 @@ pub fn transfer_ownership_non_panic_sanity(e: Env) {
     }
 
     OwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
-    cvlr_assert!(false);
+    cvlr_satisfy!(true);
 }
 
 #[rule]
@@ -126,7 +126,7 @@ pub fn accept_ownership_non_panic_sanity(e: Env) {
         cvlr_assume!(is_auth(pending_owner_internal));
     }
     OwnableContract::accept_ownership(&e);
-    cvlr_assert!(false);
+    cvlr_satisfy!(true);
 }
 
 #[rule]
@@ -169,7 +169,7 @@ pub fn renounce_ownership_non_panic_sanity(e: Env) {
         cvlr_assume!(is_auth(owner_internal));
     }
     OwnableContract::renounce_ownership(&e);
-    cvlr_assert!(false);
+    cvlr_satisfy!(true);
 }
 
 #[rule]
@@ -210,5 +210,5 @@ pub fn owner_restricted_function_non_panic_sanity(e: Env) {
         cvlr_assume!(is_auth(owner_internal));
     }
     OwnableContract::owner_restricted_function(&e);
-    cvlr_assert!(false);
+    cvlr_satisfy!(true);
 }

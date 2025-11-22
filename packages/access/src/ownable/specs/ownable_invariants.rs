@@ -1,4 +1,4 @@
-use cvlr::{cvlr_assert, cvlr_assume};
+use cvlr::{cvlr_assert, cvlr_assume,cvlr_satisfy};
 use cvlr_soroban::{nondet_address};
 use cvlr::nondet::Nondet;
 use cvlr_soroban_derive::rule;
@@ -35,7 +35,7 @@ pub fn after_constructor_owner_is_set(e: Env) {
 pub fn after_constructor_owner_is_set_sanity(e: Env) {
     let new_owner = nondet_address();
     OwnableContract::__constructor(&e, new_owner);
-    cvlr_assert!(false);
+    cvlr_satisfy!(true);
 }
 
 /////////
@@ -56,7 +56,7 @@ pub fn after_transfer_ownership_pending_owner_is_set_sanity(e: Env) {
     let new_owner = nondet_address();
     let live_until_ledger = u32::nondet();
     OwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
-    cvlr_assert!(false);
+    cvlr_satisfy!(true);
 }
 
 /////////
@@ -73,7 +73,7 @@ pub fn after_accept_ownership_owner_is_set(e: Env) {
 pub fn after_accept_ownership_owner_is_set_sanity(e: Env) {
     assume_pre_owner_is_set(e.clone());
     OwnableContract::accept_ownership(&e);
-    cvlr_assert!(false)
+    cvlr_satisfy!(true)
 }
 
 // for the case renounce_ownership it's obviously true - and expected
@@ -92,7 +92,7 @@ pub fn after_owner_restricted_function_owner_is_set(e: Env) {
 pub fn after_owner_restricted_function_owner_is_set_sanity(e: Env) {
     assume_pre_owner_is_set(e.clone());
     OwnableContract::owner_restricted_function(&e);
-    cvlr_assert!(false)
+    cvlr_satisfy!(true)
 }
 
 // invariant: pending_owner != none implies owner != none
@@ -134,7 +134,7 @@ pub fn after_constructor_pending_owner_implies_owner(e: Env) {
 pub fn after_constructor_pending_owner_implies_owner_sanity(e: Env) {
     let new_owner = nondet_address();
     OwnableContract::__constructor(&e, new_owner);
-    cvlr_assert!(false);
+    cvlr_satisfy!(true);
 }
 
 
@@ -156,7 +156,7 @@ pub fn after_transfer_ownership_pending_owner_implies_owner_sanity(e: Env) {
     let new_owner = nondet_address();
     let live_until_ledger = u32::nondet();
     OwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
-    cvlr_assert!(false);
+    cvlr_satisfy!(true);
 }
 
 /////////
@@ -173,7 +173,7 @@ pub fn after_accept_ownership_pending_owner_implies_owner(e: Env) {
 pub fn after_accept_ownership_pending_owner_implies_owner_sanity(e: Env) {
     assume_pre_pending_owner_implies_owner(&e);
     OwnableContract::accept_ownership(&e);
-    cvlr_assert!(false);
+    cvlr_satisfy!(true);
 }
 
 /////////
@@ -190,7 +190,7 @@ pub fn after_renounce_ownership_pending_owner_implies_owner(e: Env) {
 pub fn after_renounce_ownership_pending_owner_implies_owner_sanity(e: Env) {
     assume_pre_pending_owner_implies_owner(&e);
     OwnableContract::renounce_ownership(&e);
-    cvlr_assert!(false)
+    cvlr_satisfy!(true)
 }
 
 /////////
@@ -207,5 +207,5 @@ pub fn after_owner_restricted_function_pending_owner_implies_owner(e: Env) {
 pub fn after_owner_restricted_function_pending_owner_implies_owner_sanity(e: Env) {
     assume_pre_pending_owner_implies_owner(&e);
     OwnableContract::owner_restricted_function(&e);
-    cvlr_assert!(false);
+    cvlr_satisfy!(true);
 }

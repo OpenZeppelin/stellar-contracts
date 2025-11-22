@@ -1,4 +1,4 @@
-use cvlr::{cvlr_assert, cvlr_assume};
+use cvlr::{cvlr_assert, cvlr_assume,cvlr_satisfy};
 use cvlr_soroban::{nondet_address};
 use cvlr_soroban_derive::rule;
 use cvlr::clog;
