@@ -174,7 +174,7 @@ pub fn after_accept_ownership_pending_owner_implies_owner_sanity(e: Env) {
 
 /////////
 #[rule]
-// status: violated
+// status: verified
 pub fn after_renounce_ownership_pending_owner_implies_owner(e: Env) {
     assume_pre_pending_owner_implies_owner(&e);
     OwnableContract::renounce_ownership(&e);
@@ -199,6 +199,7 @@ pub fn after_owner_restricted_function_pending_owner_implies_owner(e: Env) {
 }
 
 #[rule]
+// status: verified
 pub fn after_owner_restricted_function_pending_owner_implies_owner_sanity(e: Env) {
     assume_pre_pending_owner_implies_owner(&e);
     OwnableContract::owner_restricted_function(&e);

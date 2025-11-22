@@ -19,8 +19,7 @@ use crate::{ownable::OwnableStorageKey};
 // requires
 // pending_owner is an address
 // pending_owner is none
-// 
-// status: 
+// status: verified
 pub fn renounce_ownership_non_panic(e: Env) {
     // use cvlr_soroban::require_storage_tag;
     
@@ -32,7 +31,7 @@ pub fn renounce_ownership_non_panic(e: Env) {
     // require_storage_tag(OwnableStorageKey::PendingOwner.into_val(&e), 77);
 
     let pending_owner = e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner);
-    cvlr_assume!(pending_owner.is_none());
+    // cvlr_assume!(pending_owner.is_none());
     let owner = OwnableContract::get_owner(&e);
     cvlr_assume!(owner.is_some());
     if let Some(owner_internal) = owner.clone() {

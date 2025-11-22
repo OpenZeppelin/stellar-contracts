@@ -129,7 +129,7 @@ pub fn renounce_ownership_panics_if_owner_not_set(e: Env) {
 
 #[rule]
 // renounce_ownership panics if there is a pending ownership transfer.
-// status: failed
+// status: verified
 pub fn renounce_ownership_panics_if_pending_ownership_transfer(e: Env) {
     let key = OwnableStorageKey::PendingOwner;
     let pending_owner = e.storage().temporary().get::<_, Address>(&key);
