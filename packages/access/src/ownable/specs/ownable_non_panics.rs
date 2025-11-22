@@ -133,7 +133,7 @@ pub fn accept_ownership_non_panic_sanity(e: Env) {
 // requires
 // storage setup
 // pending_owner is none
-// status: verified
+// status: violated - why?
 pub fn renounce_ownership_non_panic(e: Env) {
     // // use cvlr_soroban::require_storage_tag;
     // // setup storage: needed for now. 
@@ -159,7 +159,7 @@ pub fn renounce_ownership_non_panic(e: Env) {
 
 #[rule]
 // sanity
-// status: verified - but has 'unreachable' - review
+// status: verified
 pub fn renounce_ownership_non_panic_sanity(e: Env) {
     let none: Option<Address> = None::<Address>;
     e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &none);
