@@ -53,6 +53,42 @@ pub fn transfer_ownership_non_panic(e: Env) {
 }
 
 #[rule]
+// sanity
+// status: verified
+pub fn transfer_ownership_non_panic_sanity(e: Env) {
+    let address1 = nondet_address();
+    e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &address1);
+
+    let address2 = nondet_address();
+    e.storage().instance().set(&OwnableStorageKey::Owner, &address2);
+    
+    let new_owner = nondet_address().clone();
+    let live_until_ledger = u32::nondet();
+
+    let owner = OwnableContract::get_owner(&e);
+    cvlr_assume!(owner.is_some());
+    if let Some(owner_internal) = owner.clone() {
+        cvlr_assume!(is_auth(owner_internal));
+    }
+
+    let pending_owner = get_pending_owner(&e);
+    if let Some(pending_owner_internal) = pending_owner.clone() {
+        cvlr_assume!(pending_owner_internal == new_owner);
+    }
+
+    if live_until_ledger == 0 {
+        cvlr_assume!(pending_owner.is_some());
+    }
+    else {
+        cvlr_assume!(live_until_ledger >= e.ledger().sequence());
+        cvlr_assume!(live_until_ledger <= e.ledger().max_live_until_ledger());
+    }
+
+    OwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
+    cvlr_assert!(false);
+}
+
+#[rule]
 // requires
 // storage setup
 // pending_owner is some
@@ -75,22 +111,42 @@ pub fn accept_ownership_non_panic(e: Env) {
 }
 
 #[rule]
+// sanity
+// status: verified
+pub fn accept_ownership_non_panic_sanity(e: Env) {
+    let address1 = nondet_address();
+    e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &address1);
+
+    let address2 = nondet_address();
+    e.storage().instance().set(&OwnableStorageKey::Owner, &address2);
+
+    let pending_owner = get_pending_owner(&e);
+    cvlr_assume!(pending_owner.is_some());
+    if let Some(pending_owner_internal) = pending_owner.clone() {
+        cvlr_assume!(is_auth(pending_owner_internal));
+    }
+    OwnableContract::accept_ownership(&e);
+    cvlr_assert!(false);
+}
+
+#[rule]
 // requires
 // storage setup
 // pending_owner is none
 // status: verified
 pub fn renounce_ownership_non_panic(e: Env) {
-    // use cvlr_soroban::require_storage_tag;
-    
-    // setup storage: needed for now. 
-    let address = nondet_address();
-    e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &address);
+    // // use cvlr_soroban::require_storage_tag;
+    // // setup storage: needed for now. 
+    // let address = nondet_address();
+    // e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &address);
+    // // WIP: will have this macro for setting storage up automatically.
+    // // require_storage_tag(OwnableStorageKey::PendingOwner.into_val(&e), 77);
+    // let pending_owner = e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner);
+    // cvlr_assume!(pending_owner.is_none());
 
-    // WIP: will have this macro for setting storage up automatically.
-    // require_storage_tag(OwnableStorageKey::PendingOwner.into_val(&e), 77);
+    let none: Option<Address> = None::<Address>;
+    e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &none);
 
-    let pending_owner = e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner);
-    cvlr_assume!(pending_owner.is_none());
     let owner = OwnableContract::get_owner(&e);
     cvlr_assume!(owner.is_some());
     if let Some(owner_internal) = owner.clone() {
@@ -99,6 +155,21 @@ pub fn renounce_ownership_non_panic(e: Env) {
     
     OwnableContract::renounce_ownership(&e);
     cvlr_assert!(true);
+}
+
+#[rule]
+// sanity
+// status: verified - but has 'unreachable' - review
+pub fn renounce_ownership_non_panic_sanity(e: Env) {
+    let none: Option<Address> = None::<Address>;
+    e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &none);
+    let owner = OwnableContract::get_owner(&e);
+    cvlr_assume!(owner.is_some());
+    if let Some(owner_internal) = owner.clone() {
+        cvlr_assume!(is_auth(owner_internal));
+    }
+    OwnableContract::renounce_ownership(&e);
+    cvlr_assert!(false);
 }
 
 #[rule]
@@ -121,4 +192,23 @@ pub fn owner_restricted_function_non_panic(e: Env) {
     }
     OwnableContract::owner_restricted_function(&e);
     cvlr_assert!(true);
+}
+
+#[rule]
+// sanity
+// status: verified
+pub fn owner_restricted_function_non_panic_sanity(e: Env) {
+    let address1 = nondet_address();
+    e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &address1);
+
+    let address2 = nondet_address();
+    e.storage().instance().set(&OwnableStorageKey::Owner, &address2);
+
+    let owner = OwnableContract::get_owner(&e);
+    cvlr_assume!(owner.is_some());
+    if let Some(owner_internal) = owner.clone() {
+        cvlr_assume!(is_auth(owner_internal));
+    }
+    OwnableContract::owner_restricted_function(&e);
+    cvlr_assert!(false);
 }
