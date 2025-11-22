@@ -29,7 +29,7 @@ pub fn grant_role_integrity(e: Env) {
     let role = nondet_symbol();
     crate::access_control::grant_role(&e, &caller, &account, &role);
     let account_has_role = crate::access_control::has_role(&e, &account, &role);
-    cvlr_assert!(account_has_role != None);
+    cvlr_assert!(account_has_role.is_some());
 }
 
 #[rule]
@@ -40,7 +40,7 @@ pub fn revoke_role_integrity(e: Env) {
     let role = nondet_symbol();
     AccessControlContract::revoke_role(&e, caller.clone(), account.clone(), role.clone());
     let account_has_role = AccessControlContract::has_role(&e, account.clone(), role.clone());
-    cvlr_assert!(account_has_role == None);
+    cvlr_assert!(account_has_role.is_none());
 }
 
 #[rule]
@@ -50,7 +50,7 @@ pub fn renounce_role_integrity(e: Env) {
     let role = nondet_symbol();
     AccessControlContract::renounce_role(&e, caller.clone(), role.clone());
     let account_has_role = AccessControlContract::has_role(&e, caller.clone(), role.clone());
-    cvlr_assert!(account_has_role == None);
+    cvlr_assert!(account_has_role.is_none());
 }
 
 #[rule]
