@@ -13,6 +13,7 @@
 //!     period_ledgers: 17280,      // ~1 day in ledgers
 //! }
 //! ```
+use cvlr::nondet::Nondet;
 use soroban_sdk::{
     auth::{Context, ContractContext},
     contracterror, contracttype, panic_with_error, symbol_short, Address, Env,
@@ -48,6 +49,15 @@ pub struct SpendingLimitAccountParams {
     pub spending_limit: i128,
     /// The period in ledgers over which the spending limit applies.
     pub period_ledgers: u32,
+}
+
+impl Nondet for SpendingLimitAccountParams {
+    fn nondet() -> Self {
+        SpendingLimitAccountParams {
+            spending_limit: i128::nondet(),
+            period_ledgers: u32::nondet(),
+        }
+    }
 }
 
 /// Internal storage structure for spending limit tracking.

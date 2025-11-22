@@ -1,2 +1,3 @@
 pub mod policies_simple_threshold_sanity;
 pub mod policies_weighted_threshold_sanity;
+pub mod policies_spending_limit_sanity;

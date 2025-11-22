@@ -34,6 +34,16 @@ pub fn can_enforce_simple_threshold_sanity(e: Env, context: soroban_sdk::auth::C
 }
 
 #[rule]
+pub fn enforce_simple_threshold_sanity(e: Env, context: soroban_sdk::auth::Context) {
+    let auth_signers = nondet_vec();
+    let ctx_rule: ContextRule = ContextRule::nondet();
+    let account: Address = nondet_address();
+    let _ = crate::policies::simple_threshold::enforce(&e, &context, &auth_signers, &ctx_rule, &account);
+    cvlr_assert!(false);
+}
+
+
+#[rule]
 pub fn set_simple_threshold_sanity(e: Env) {
     let threshold: u32 = u32::nondet();
     let ctx_rule: ContextRule = ContextRule::nondet();

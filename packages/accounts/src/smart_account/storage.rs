@@ -85,7 +85,7 @@
 //! ```
 
 use cvlr::nondet::Nondet;
-use cvlr_soroban::{nondet_address, nondet_bytes_n, nondet_string, nondet_vec};
+use cvlr_soroban::{nondet_address, nondet_bytes, nondet_bytes_n, nondet_string, nondet_vec};
 use soroban_sdk::{
     auth::{
         Context, ContractContext, ContractExecutable, CreateContractHostFnContext,
@@ -115,6 +115,7 @@ use crate::{
         emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
     }
 };
+
 
 /// Storage keys for smart account data.
 #[contracttype]
@@ -149,6 +150,16 @@ pub enum Signer {
     /// An external signer with custom verification logic.
     /// Contains the verifier contract address and the public key data.
     External(Address, Bytes),
+}
+
+impl Nondet for Signer {
+    fn nondet() -> Self {
+        if bool::nondet() {
+            Signer::Delegated(nondet_address())
+        } else {
+            Signer::External(nondet_address(), nondet_bytes())
+        }
+    }
 }
 
 /// A collection of signatures mapped to their respective signers.

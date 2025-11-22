@@ -61,6 +61,8 @@
 //! }
 //! ```
 
+use cvlr::nondet::*;
+use cvlr_soroban::nondet_map;
 use soroban_sdk::{
     auth::Context, contracterror, contracttype, panic_with_error, Address, Env, Map,
     Vec,
@@ -94,6 +96,16 @@ pub struct WeightedThresholdAccountParams {
     pub signer_weights: Map<Signer, u32>,
     /// The minimum total weight required for authorization.
     pub threshold: u32,
+}
+
+impl Nondet for WeightedThresholdAccountParams {
+    fn nondet() -> Self {
+        WeightedThresholdAccountParams {
+            signer_weights: nondet_map(),
+            threshold: nondet(),
+        }
+    }
+    
 }
 
 /// Error codes for weighted threshold policy operations.
