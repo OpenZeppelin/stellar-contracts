@@ -13,7 +13,7 @@ use crate::pausable::storage::PausableStorageKey;
 #[rule]
 // requires
 // unpaused
-// status
+// status: verified
 pub fn pause_non_panic(e: Env) {
     // storage set up
     let bool = bool::nondet();    
@@ -27,6 +27,7 @@ pub fn pause_non_panic(e: Env) {
 
 #[rule]
 // sanity
+// status: verified
 pub fn pause_non_panic_sanity(e: Env) {
     // storage set up
     let bool = bool::nondet();    
@@ -41,7 +42,7 @@ pub fn pause_non_panic_sanity(e: Env) {
 #[rule]
 // requires
 // paused
-// status
+// status: verified
 pub fn unpause_non_panic(e: Env) {
     // storage set up
     let bool = bool::nondet();    
@@ -55,6 +56,7 @@ pub fn unpause_non_panic(e: Env) {
 
 #[rule]
 // sanity
+// status: verified
 pub fn unpause_non_panic_sanity(e: Env) {
     // storage set up
     let bool = bool::nondet();    
@@ -69,7 +71,7 @@ pub fn unpause_non_panic_sanity(e: Env) {
 #[rule]
 // requires
 // unpaused
-// status
+// status: verified
 pub fn when_not_paused_non_panic(e: Env) {
     // storage set up
     let bool = bool::nondet();    
@@ -82,6 +84,7 @@ pub fn when_not_paused_non_panic(e: Env) {
 
 #[rule]
 // sanity
+// status: verified
 pub fn when_not_paused_non_panic_sanity(e: Env) {
     // storage set up
     let bool = bool::nondet();    
@@ -94,7 +97,7 @@ pub fn when_not_paused_non_panic_sanity(e: Env) {
 #[rule]
 // requires
 // paused
-// status
+// status: verified
 pub fn when_paused_non_panic(e: Env) {
     // storage set up
     let bool = bool::nondet();    
@@ -107,6 +110,7 @@ pub fn when_paused_non_panic(e: Env) {
 
 #[rule]
 // sanity
+// status: verified
 pub fn when_paused_non_panic_sanity(e: Env) {
     // storage set up
     let bool = bool::nondet();    
