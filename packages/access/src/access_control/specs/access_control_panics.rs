@@ -234,7 +234,7 @@ pub fn accept_admin_transfer_panics_if_pending_admin_not_set(e: Env) {
 
 #[rule]
 // set_role_admin panics if not authorized by the admin
-// status:
+// status: verified
 pub fn set_role_admin_panics_if_unauth_by_admin(e: Env) {
     let role = nondet_symbol();
     let admin_role = nondet_symbol();
@@ -248,7 +248,7 @@ pub fn set_role_admin_panics_if_unauth_by_admin(e: Env) {
 
 #[rule]
 // set_role_admin panics if the admin is not set
-// status:
+// status: verified
 pub fn set_role_admin_panics_if_admin_not_set(e: Env) {
     let role = nondet_symbol();
     let admin_role = nondet_symbol();
