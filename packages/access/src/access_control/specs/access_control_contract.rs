@@ -9,7 +9,7 @@ pub struct AccessControlContract;
 
 #[contractimpl]
 impl AccessControlContract {
-    pub fn __constructor(e: &Env, admin: Address) {
+    pub fn access_control_constructor(e: &Env, admin: Address) {
         set_admin(e, &admin);
     }
     #[only_admin]

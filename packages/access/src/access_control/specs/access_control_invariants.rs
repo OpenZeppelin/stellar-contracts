@@ -26,7 +26,7 @@ pub fn assert_post_admin_is_set(e: Env) {
 // status: verified 
 pub fn after_constructor_admin_is_set(e: Env) {
     let admin = nondet_address();
-    AccessControlContract::__constructor(&e, admin);
+    AccessControlContract::access_control_constructor(&e, admin);
     assert_post_admin_is_set(e);
 }
 
@@ -34,7 +34,7 @@ pub fn after_constructor_admin_is_set(e: Env) {
 // status: verified
 pub fn after_constructor_admin_is_set_sanity(e: Env) {
     let admin = nondet_address();
-    AccessControlContract::__constructor(&e, admin);
+    AccessControlContract::access_control_constructor(&e, admin);
     cvlr_satisfy!(true);
 }
 
@@ -183,7 +183,7 @@ pub fn assert_post_pending_admin_implies_admin(e: &Env) {
 // status: verified
 pub fn after_constructor_pending_admin_implies_admin(e: Env) {
     let admin = nondet_address();
-    AccessControlContract::__constructor(&e, admin);
+    AccessControlContract::access_control_constructor(&e, admin);
     assert_post_pending_admin_implies_admin(&e);
 }
 
@@ -191,7 +191,7 @@ pub fn after_constructor_pending_admin_implies_admin(e: Env) {
 // status: verified
 pub fn after_constructor_pending_admin_implies_admin_sanity(e: Env) {
     let admin = nondet_address();
-    AccessControlContract::__constructor(&e, admin);
+    AccessControlContract::access_control_constructor(&e, admin);
     cvlr_satisfy!(true);
 }
 

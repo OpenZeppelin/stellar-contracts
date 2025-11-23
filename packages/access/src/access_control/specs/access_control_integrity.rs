@@ -14,7 +14,7 @@ use crate::access_control::{AccessControl, specs::{access_control_contract::Acce
 pub fn access_control_constructor_integrity(e: Env) {
     let admin = nondet_address();
     clog!(cvlr_soroban::Addr(&admin));
-    AccessControlContract::__constructor(&e, admin.clone());
+    AccessControlContract::access_control_constructor(&e, admin.clone());
     let admin_post = AccessControlContract::get_admin(&e);
     if let Some(admin_post_internal) = &admin_post {
         clog!(cvlr_soroban::Addr(&admin_post_internal));
