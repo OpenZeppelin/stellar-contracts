@@ -11,6 +11,7 @@ use cvlr::clog;
 use soroban_sdk::{Env};
 use crate::access_control::{AccessControl, specs::{access_control_contract::AccessControlContract, helper::get_pending_admin}};
 
+// TODO: role counts are accurate - with ghosts 
 
 // invariant: admin != None -> holds in all cases except for renounce_admin
 
