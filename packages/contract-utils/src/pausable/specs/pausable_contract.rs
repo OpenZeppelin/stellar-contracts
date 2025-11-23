@@ -13,11 +13,11 @@ impl PausableContract {
     }
 
     #[when_not_paused]
-    pub fn when_not_paused_function(e: &Env) {
+    pub fn when_not_paused_func(e: &Env) {
     }
 
     #[when_paused]
-    pub fn when_paused_function(e: &Env) {
+    pub fn when_paused_func(e: &Env) {
     }
 }
 
