@@ -124,8 +124,8 @@ pub fn renounce_role_panics_if_caller_unauth(e: Env) {
 pub fn renounce_role_panics_if_caller_does_not_have_role(e: Env) {
     let caller = nondet_address();
     clog!(cvlr_soroban::Addr(&caller));
-    let role = nondet_symbol();
-    let caller_has_role = AccessControlContract::has_role(&e, caller.clone(), role.clone());
+    let role: soroban_sdk::Symbol = nondet_symbol();
+    let caller_has_role: Option<u32> = AccessControlContract::has_role(&e, caller.clone(), role.clone());
     cvlr_assume!(caller_has_role.is_none());
     AccessControlContract::renounce_role(&e, caller.clone(), role.clone());
     cvlr_assert!(false);
@@ -229,6 +229,32 @@ pub fn accept_admin_transfer_panics_if_pending_admin_not_set(e: Env) {
     let pending_admin = get_pending_admin(&e);
     cvlr_assume!(pending_admin.is_none());
     AccessControlContract::accept_admin_transfer(&e);
+    cvlr_assert!(false);
+}
+
+#[rule]
+// set_role_admin panics if not authorized by the admin
+// status:
+pub fn set_role_admin_panics_if_unauth_by_admin(e: Env) {
+    let role = nondet_symbol();
+    let admin_role = nondet_symbol();
+    let admin = AccessControlContract::get_admin(&e);
+    if let Some(admin_internal) = admin.clone() {
+        cvlr_assume!(!is_auth(admin_internal));
+    }
+    AccessControlContract::set_role_admin(&e, role.clone(), admin_role.clone());
+    cvlr_assert!(false);
+}
+
+#[rule]
+// set_role_admin panics if the admin is not set
+// status:
+pub fn set_role_admin_panics_if_admin_not_set(e: Env) {
+    let role = nondet_symbol();
+    let admin_role = nondet_symbol();
+    let admin = AccessControlContract::get_admin(&e);
+    cvlr_assume!(admin.is_none());
+    AccessControlContract::set_role_admin(&e, role.clone(), admin_role.clone());
     cvlr_assert!(false);
 }
 
