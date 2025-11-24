@@ -26,6 +26,11 @@ pub fn storage_setup_pending_admin(e: Env) {
     e.storage().temporary().set(&AccessControlStorageKey::PendingAdmin, &pending_admin);
 }
 
+pub fn storage_setup_pending_admin_none(e: Env) {
+    let pending_admin: Option<Address> = None::<Address>;
+    e.storage().temporary().set(&AccessControlStorageKey::PendingAdmin, &pending_admin.clone());
+}
+
 pub fn storage_setup_role_admin(e: Env, role: Symbol) {
     let role_admin_key: AccessControlStorageKey = AccessControlStorageKey::RoleAdmin(role.clone());
     let symbol = nondet_symbol();
@@ -100,7 +105,7 @@ pub fn grant_role_non_panic(e: Env) {
 
 #[rule]
 // sanity
-// status
+// status: verified
 pub fn grant_role_non_panic_sanity(e: Env) {
     let caller = nondet_address();
     let account = nondet_address();
@@ -135,7 +140,7 @@ pub fn grant_role_non_panic_sanity(e: Env) {
 // caller is admin or has admin_role
 // account has the role
 // role is not empty
-// status
+// status: 54 min timeout
 pub fn revoke_role_non_panic(e: Env) {
     let caller = nondet_address();
     let account = nondet_address();
@@ -170,7 +175,7 @@ pub fn revoke_role_non_panic(e: Env) {
 
 #[rule]
 // sanity
-// status
+// status: verified
 pub fn revoke_role_non_panic_sanity(e: Env) {
     let caller = nondet_address();
     let account = nondet_address();
@@ -209,7 +214,7 @@ pub fn revoke_role_non_panic_sanity(e: Env) {
 // auth by caller
 // caller has the role
 // role is not empty
-// status
+// status: verified
 pub fn renounce_role_non_panic(e: Env) { 
     let caller = nondet_address();
     let role = nondet_symbol();
@@ -229,7 +234,7 @@ pub fn renounce_role_non_panic(e: Env) {
 
 #[rule]
 // sanity
-// status
+// status: verified
 pub fn renounce_role_non_panic_sanity(e: Env) { 
     let caller = nondet_address();
     let role = nondet_symbol();
@@ -254,7 +259,7 @@ pub fn renounce_role_non_panic_sanity(e: Env) {
 // admin auth
 // if there is a pending owner they are the same
 // live until ledger is appropriate
-// status:
+// status: verified
 pub fn transfer_admin_role_non_panic(e: Env) {
     let new_admin = nondet_address().clone();
     let live_until_ledger = u32::nondet();
@@ -287,7 +292,7 @@ pub fn transfer_admin_role_non_panic(e: Env) {
 
 #[rule]
 // sanity
-// status
+// status: verified
 pub fn transfer_admin_role_non_panic_sanity(e: Env) {
     let new_admin = nondet_address().clone();
     let live_until_ledger = u32::nondet();
@@ -323,7 +328,7 @@ pub fn transfer_admin_role_non_panic_sanity(e: Env) {
 // storage setup
 // pending admin exists
 // pending admin auth
-// status
+// status: verified
 pub fn accept_admin_transfer_non_panic(e: Env) {
 
     storage_setup_pending_admin(e.clone());
@@ -340,7 +345,7 @@ pub fn accept_admin_transfer_non_panic(e: Env) {
 
 #[rule]
 // sanity
-// status
+// status: verified
 pub fn accept_admin_transfer_non_panic_sanity(e: Env) {
     storage_setup_pending_admin(e.clone());
     storage_setup_admin(e.clone());
@@ -359,11 +364,12 @@ pub fn accept_admin_transfer_non_panic_sanity(e: Env) {
 // storage setup
 // admin exists
 // admin auth
-// status
+// status: verified
 pub fn set_role_admin_non_panic(e: Env) {
     let role = nondet_symbol();
     let admin_role = nondet_symbol();
     storage_setup_admin(e.clone());
+    storage_setup_role_admin(e.clone(), role.clone());
     let admin = AccessControlContract::get_admin(&e);
     cvlr_assume!(admin.is_some());
     if let Some(admin_internal) = admin.clone() {
@@ -375,11 +381,12 @@ pub fn set_role_admin_non_panic(e: Env) {
 
 #[rule]
 // sanity
-// status
+// status: verified
 pub fn set_role_admin_non_panic_sanity(e: Env) {
     let role = nondet_symbol();
     let admin_role = nondet_symbol();
     storage_setup_admin(e.clone());
+    storage_setup_role_admin(e.clone(), role.clone());
     let admin = AccessControlContract::get_admin(&e);
     cvlr_assume!(admin.is_some());
     if let Some(admin_internal) = admin.clone() {
@@ -395,34 +402,30 @@ pub fn set_role_admin_non_panic_sanity(e: Env) {
 // admin exists
 // admin auth
 // no pending admin
-// status
+// status: verified
 pub fn renounce_admin_non_panic(e: Env) {
     storage_setup_admin(e.clone());
-    storage_setup_pending_admin(e.clone());
+    storage_setup_pending_admin_none(e.clone());
     let admin = AccessControlContract::get_admin(&e);
     cvlr_assume!(admin.is_some());
     if let Some(admin_internal) = admin.clone() {
         cvlr_assume!(is_auth(admin_internal));
     }
-    let pending_admin = get_pending_admin(&e);
-    cvlr_assume!(pending_admin.is_none());
     AccessControlContract::renounce_admin(&e);
     cvlr_assert!(true);
 }
 
 #[rule]
 // sanity
-// status
+// status: verified
 pub fn renounce_admin_non_panic_sanity(e: Env) {
     storage_setup_admin(e.clone());
-    storage_setup_pending_admin(e.clone());
+    storage_setup_pending_admin_none(e.clone());
     let admin = AccessControlContract::get_admin(&e);
     cvlr_assume!(admin.is_some());
     if let Some(admin_internal) = admin.clone() {
         cvlr_assume!(is_auth(admin_internal));
     }
-    let pending_admin = get_pending_admin(&e);
-    cvlr_assume!(pending_admin.is_none());
     AccessControlContract::renounce_admin(&e);
     cvlr_satisfy!(true);
 }
