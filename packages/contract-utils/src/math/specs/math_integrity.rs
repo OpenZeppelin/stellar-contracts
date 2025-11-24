@@ -31,11 +31,9 @@ pub fn fixed_mul_floor_integrity(e: &Env) {
     clog!(result);
     let expected_result = x * y / z;
     clog!(expected_result);
-
     let max_rounding_error = abs(1/z);
     clog!(max_rounding_error);
     clog!(expected_result - max_rounding_error);
-    
     cvlr_assert!(result <= expected_result);
     cvlr_assert!(result >= expected_result - max_rounding_error);
 }

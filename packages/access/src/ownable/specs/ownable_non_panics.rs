@@ -133,7 +133,7 @@ pub fn accept_ownership_non_panic_sanity(e: Env) {
 // requires
 // storage setup
 // pending_owner is none
-// status: violated - why?
+// status: violated - the storage setup with none doesn't work - review
 pub fn renounce_ownership_non_panic(e: Env) {
     // // use cvlr_soroban::require_storage_tag;
     // // setup storage: needed for now. 
