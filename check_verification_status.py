@@ -156,15 +156,41 @@ def get_directory(path: str) -> str:
     return str(Path(path).parent)
 
 
-def format_summary(analyses: List[FileAnalysis], output_format: str = "table") -> str:
+def get_relative_path(file_path: str, root_dir: Path) -> str:
+    """Convert absolute file path to relative path, removing root and packages/ prefix."""
+    try:
+        # Convert to Path and make relative to root
+        path = Path(file_path)
+        if path.is_absolute():
+            try:
+                relative = path.relative_to(root_dir)
+            except ValueError:
+                # If not relative to root, return as is
+                return file_path
+        else:
+            relative = path
+        
+        # Convert to string and remove packages/ prefix if present
+        path_str = str(relative)
+        if path_str.startswith("packages/"):
+            path_str = path_str[len("packages/"):]
+        
+        return path_str
+    except Exception:
+        return file_path
+
+
+def format_summary(analyses: List[FileAnalysis], output_format: str = "table", root_dir: Path = None) -> str:
     """Format the analysis results."""
+    if root_dir is None:
+        root_dir = Path.cwd()
     if output_format == "json":
-        return format_json(analyses)
+        return format_json(analyses, root_dir)
     else:
-        return format_table(analyses)
+        return format_table(analyses, root_dir)
 
 
-def format_table(analyses: List[FileAnalysis]) -> str:
+def format_table(analyses: List[FileAnalysis], root_dir: Path) -> str:
     """Format results as a table."""
     output = []
     
@@ -179,8 +205,8 @@ def format_table(analyses: List[FileAnalysis]) -> str:
     output.append("")
     output.append(f"Project Total:")
     output.append(f"  Total Rules: {total_rules}")
-    output.append(f"  Verified: {total_verified} ({100*total_verified/total_rules:.1f}%)" if total_rules > 0 else "  Verified: 0")
-    output.append(f"  Unverified: {total_unverified} ({100*total_unverified/total_rules:.1f}%)" if total_rules > 0 else "  Unverified: 0")
+    output.append(f"  Verified: {total_verified}")
+    output.append(f"  Unverified: {total_unverified}")
     output.append("")
     
     # Group by directory
@@ -188,7 +214,7 @@ def format_table(analyses: List[FileAnalysis]) -> str:
     
     for analysis in analyses:
         if analysis.total_rules > 0:
-            dir_path = get_directory(analysis.file_path)
+            dir_path = get_relative_path(get_directory(analysis.file_path), root_dir)
             dir_stats[dir_path]["total"] += analysis.total_rules
             dir_stats[dir_path]["verified"] += analysis.verified_rules
             dir_stats[dir_path]["unverified"] += analysis.unverified_rules
@@ -202,9 +228,6 @@ def format_table(analyses: List[FileAnalysis]) -> str:
         stats = dir_stats[dir_path]
         output.append(f"{dir_path}:")
         output.append(f"  Total: {stats['total']}, Verified: {stats['verified']}, Unverified: {stats['unverified']}")
-        if stats['total'] > 0:
-            pct = 100 * stats['verified'] / stats['total']
-            output.append(f"  Verification Rate: {pct:.1f}%")
         output.append("")
     
     # By file
@@ -215,7 +238,8 @@ def format_table(analyses: List[FileAnalysis]) -> str:
     
     for analysis in sorted(analyses, key=lambda x: x.file_path):
         if analysis.total_rules > 0:
-            output.append(f"{analysis.file_path}:")
+            rel_path = get_relative_path(analysis.file_path, root_dir)
+            output.append(f"{rel_path}:")
             output.append(f"  Total: {analysis.total_rules}, Verified: {analysis.verified_rules}, Unverified: {analysis.unverified_rules}")
             
             # List unverified rules
@@ -230,7 +254,7 @@ def format_table(analyses: List[FileAnalysis]) -> str:
     return "\n".join(output)
 
 
-def format_json(analyses: List[FileAnalysis]) -> str:
+def format_json(analyses: List[FileAnalysis], root_dir: Path) -> str:
     """Format results as JSON."""
     result = {
         "project_total": {
@@ -247,21 +271,20 @@ def format_json(analyses: List[FileAnalysis]) -> str:
     
     for analysis in analyses:
         if analysis.total_rules > 0:
-            dir_path = get_directory(analysis.file_path)
+            dir_path = get_relative_path(get_directory(analysis.file_path), root_dir)
             dir_stats[dir_path]["total"] += analysis.total_rules
             dir_stats[dir_path]["verified"] += analysis.verified_rules
             dir_stats[dir_path]["unverified"] += analysis.unverified_rules
     
     for dir_path, stats in sorted(dir_stats.items()):
         result["by_directory"][dir_path] = stats.copy()
-        if stats['total'] > 0:
-            result["by_directory"][dir_path]["verification_rate"] = 100 * stats['verified'] / stats['total']
     
     # By file
     for analysis in sorted(analyses, key=lambda x: x.file_path):
         if analysis.total_rules > 0:
+            rel_path = get_relative_path(analysis.file_path, root_dir)
             file_data = {
-                "file": analysis.file_path,
+                "file": rel_path,
                 "total_rules": analysis.total_rules,
                 "verified_rules": analysis.verified_rules,
                 "unverified_rules": analysis.unverified_rules,
@@ -324,7 +347,7 @@ def main():
             analyses.append(analysis)
     
     # Format and print results
-    output = format_summary(analyses, args.format)
+    output = format_summary(analyses, args.format, root_dir)
     print(output)
     
     return 0
