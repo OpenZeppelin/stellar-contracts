@@ -425,6 +425,8 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
 /// # Errors
 ///
 /// * [`AccessControlError::AdminNotSet`] - If no admin account is set.
+/// * [`AccessControlError::TransferInProgress`] - If there is a pending admin
+///   transfer.
 ///
 /// # Events
 ///
@@ -436,6 +438,11 @@ pub fn set_role_admin(e: &Env, role: &Symbol, admin_role: &Symbol) {
 /// * Authorization for the current admin is required.
 pub fn renounce_admin(e: &Env) {
     let admin = enforce_admin_auth(e);
+    let key = AccessControlStorageKey::PendingAdmin;
+
+    if e.storage().temporary().get::<_, Address>(&key).is_some() {
+        panic_with_error!(e, AccessControlError::TransferInProgress);
+    }
 
     e.storage().instance().remove(&AccessControlStorageKey::Admin);
 
