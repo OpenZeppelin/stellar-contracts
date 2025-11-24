@@ -26,7 +26,7 @@ pub fn assert_post_owner_is_set(e: Env) {
 // status: verified
 pub fn after_constructor_owner_is_set(e: Env) {
     let new_owner = nondet_address();
-    OwnableContract::__constructor(&e, new_owner);
+    OwnableContract::ownable_constructor(&e, new_owner);
     assert_post_owner_is_set(e);
 }
 
@@ -34,7 +34,7 @@ pub fn after_constructor_owner_is_set(e: Env) {
 // status: verified
 pub fn after_constructor_owner_is_set_sanity(e: Env) {
     let new_owner = nondet_address();
-    OwnableContract::__constructor(&e, new_owner);
+    OwnableContract::ownable_constructor(&e, new_owner);
     cvlr_satisfy!(true);
 }
 
@@ -131,7 +131,7 @@ pub fn assert_post_pending_owner_implies_owner(e: &Env) {
 // status: verified
 pub fn after_constructor_pending_owner_implies_owner(e: Env) {
     let new_owner = nondet_address();
-    OwnableContract::__constructor(&e, new_owner);
+    OwnableContract::ownable_constructor(&e, new_owner);
     assert_post_pending_owner_implies_owner(&e);
 }
 
@@ -139,7 +139,7 @@ pub fn after_constructor_pending_owner_implies_owner(e: Env) {
 // status: verified
 pub fn after_constructor_pending_owner_implies_owner_sanity(e: Env) {
     let new_owner = nondet_address();
-    OwnableContract::__constructor(&e, new_owner);
+    OwnableContract::ownable_constructor(&e, new_owner);
     cvlr_satisfy!(true);
 }
 

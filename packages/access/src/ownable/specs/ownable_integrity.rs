@@ -16,7 +16,7 @@ pub fn ownable_constructor_integrity(e: Env) {
     let new_owner = nondet_address();
     clog!(cvlr_soroban::Addr(&new_owner));
 
-    OwnableContract::__constructor(&e, new_owner.clone());
+    OwnableContract::ownable_constructor(&e, new_owner.clone());
     let owner_post = OwnableContract::get_owner(&e);
     
     if let Some(owner_post_internal) = owner_post.clone() {

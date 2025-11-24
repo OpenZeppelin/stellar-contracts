@@ -11,7 +11,7 @@ pub struct OwnableContract;
 
 #[contractimpl]
 impl OwnableContract {
-    pub fn __constructor(e: &Env, owner: Address) {
+    pub fn ownable_constructor(e: &Env, owner: Address) {
         set_owner(e, &owner);
     }
 

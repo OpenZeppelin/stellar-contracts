@@ -11,7 +11,7 @@ use crate::ownable::specs::ownable_contract::OwnableContract;
 #[rule]
 pub fn get_owner_sanity(e: Env) {
     let owner = nondet_address();
-    OwnableContract::__constructor(&e, owner);
+    OwnableContract::ownable_constructor(&e, owner);
     let _ =OwnableContract:: get_owner(&e);
     cvlr_satisfy!(true);
 }
@@ -19,14 +19,14 @@ pub fn get_owner_sanity(e: Env) {
 #[rule]
 pub fn set_owner_sanity(e: Env) {
     let owner = nondet_address();
-    OwnableContract::__constructor(&e, owner);
+    OwnableContract::ownable_constructor(&e, owner);
     cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn transfer_ownership_sanity(e: Env) {
     let owner = nondet_address();
-    OwnableContract::__constructor(&e, owner);
+    OwnableContract::ownable_constructor(&e, owner);
     let new_owner = nondet_address();
     let live_until_ledger = u32::nondet();
     OwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
@@ -36,7 +36,7 @@ pub fn transfer_ownership_sanity(e: Env) {
 #[rule]
 pub fn accept_ownership_sanity(e: Env) {
     let owner = nondet_address();
-    OwnableContract::__constructor(&e, owner);
+    OwnableContract::ownable_constructor(&e, owner);
     OwnableContract::accept_ownership(&e);
     cvlr_satisfy!(true);
 }
@@ -44,7 +44,7 @@ pub fn accept_ownership_sanity(e: Env) {
 #[rule]
 pub fn renounce_ownership_sanity(e: Env) {
     let owner = nondet_address();
-    OwnableContract::__constructor(&e, owner);
+    OwnableContract::ownable_constructor(&e, owner);
     OwnableContract::renounce_ownership(&e);
     cvlr_satisfy!(true);
 }
