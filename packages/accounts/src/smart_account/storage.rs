@@ -661,7 +661,6 @@ pub fn add_context_rule(
         PolicyClient::new(e, &policy).install(&param, &context_rule, &e.current_contract_address());
     }
 
-    // Emit event
     emit_context_rule_added(e, &context_rule);
 
     // Increment next id
@@ -716,7 +715,6 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: &String) -> ContextRule 
         valid_until: existing_rule.valid_until,
     };
 
-    // Emit event
     emit_context_rule_updated(e, id, &meta);
 
     context_rule
@@ -773,14 +771,13 @@ pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32
         valid_until,
     };
 
-    // Emit event
     emit_context_rule_updated(e, id, &meta);
 
     context_rule
 }
 
-/// Removes a context rule and uninstalls all its policies. Cleans up all
-/// associated storage entries.
+/// Removes a context rule and tries to uninstall all its policies. Cleans up
+/// all associated storage entries.
 ///
 /// # Arguments
 ///
@@ -806,7 +803,9 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 
     // Uninstall all policies
     for policy in context_rule.policies.iter() {
-        PolicyClient::new(e, &policy).uninstall(&context_rule, &e.current_contract_address());
+        // try_uninstall so that if the policy panics, complete the removal
+        let _ = PolicyClient::new(e, &policy)
+            .try_uninstall(&context_rule, &e.current_contract_address());
     }
 
     // Remove all storage entries for this context rule
@@ -836,7 +835,6 @@ pub fn remove_context_rule(e: &Env, id: u32) {
     // if count is set, it can be safely assumed it's greater than 0
     e.storage().instance().set(&SmartAccountStorageKey::Count, &(count - 1));
 
-    // Emit event
     emit_context_rule_removed(e, id);
 }
 
@@ -895,7 +893,6 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
 
     e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
-    // Emit event
     emit_signer_added(e, id, signer);
 }
 
@@ -946,7 +943,6 @@ pub fn remove_signer(e: &Env, id: u32, signer: &Signer) {
 
         e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
 
-        // Emit event
         emit_signer_removed(e, id, signer);
     } else {
         panic_with_error!(e, SmartAccountError::SignerNotFound)
@@ -1005,11 +1001,10 @@ pub fn add_policy(e: &Env, id: u32, policy: &Address, install_param: Val) {
 
     e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
 
-    // Emit event
     emit_policy_added(e, id, policy, install_param);
 }
 
-/// Removes a policy from an existing context rule and uninstalls it.
+/// Removes a policy from an existing context rule and tries to uninstall it.
 ///
 /// # Arguments
 ///
@@ -1045,15 +1040,13 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
         validate_signers_and_policies(e, &rule.signers, &policies);
 
         validate_and_set_fingerprint(e, &rule.context_type, &rule.signers, &policies);
-        // Remove the old fingerprint
         remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
 
-        // Uninstall the policy
-        PolicyClient::new(e, policy).uninstall(&rule, &e.current_contract_address());
+        // Try to uninstall the policy: if the policy panics, complete the removal
+        let _ = PolicyClient::new(e, policy).try_uninstall(&rule, &e.current_contract_address());
 
         e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
 
-        // Emit event
         emit_policy_removed(e, id, policy);
     } else {
         panic_with_error!(e, SmartAccountError::PolicyNotFound)
