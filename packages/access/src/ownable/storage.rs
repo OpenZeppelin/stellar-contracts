@@ -107,6 +107,8 @@ pub fn transfer_ownership(e: &Env, new_owner: &Address, live_until_ledger: u32) 
 ///
 /// * Authorization for the pending owner is required.
 pub fn accept_ownership(e: &Env) {
+    // let owner = OwnableStorageKey::Owner;
+    // let pending_owner = OwnableStorageKey::PendingOwner;
     let new_owner = accept_transfer(e, &OwnableStorageKey::Owner, &OwnableStorageKey::PendingOwner);
 
     #[cfg(not(feature = "certora"))]
@@ -137,9 +139,7 @@ pub fn accept_ownership(e: &Env) {
 /// * Authorization for the current owner is required.
 pub fn renounce_ownership(e: &Env) {
     let owner = enforce_owner_auth(e);
-    let key = OwnableStorageKey::PendingOwner;
-
-    if e.storage().temporary().get::<_, Address>(&key).is_some() {
+    if e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner).is_some() {
         panic_with_error!(e, OwnableError::TransferInProgress);
     }
 

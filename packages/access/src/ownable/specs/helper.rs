@@ -10,8 +10,7 @@ use crate::ownable::OwnableStorageKey;
 ///
 /// * `e` - Access to the Soroban environment.
 pub fn get_pending_owner(e: &Env) -> Option<Address> {
-    let key = OwnableStorageKey::PendingOwner;
-    let pending_owner = e.storage().temporary().get::<_, Address>(&key);
+    let pending_owner = e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner);
     if let Some(pending_owner_internal) = pending_owner.clone() {
         clog!(cvlr_soroban::Addr(&pending_owner_internal));
     }

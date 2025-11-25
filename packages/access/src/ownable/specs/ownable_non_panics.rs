@@ -102,10 +102,7 @@ pub fn accept_ownership_non_panic(e: Env) {
     e.storage().instance().set(&OwnableStorageKey::Owner, &address2);
 
     let pending_owner = get_pending_owner(&e);
-    cvlr_assume!(pending_owner.is_some());
-    if let Some(pending_owner_internal) = pending_owner.clone() {
-        cvlr_assume!(is_auth(pending_owner_internal));
-    }
+    cvlr_assume!(pending_owner.is_some() && is_auth(pending_owner.unwrap()));
     OwnableContract::accept_ownership(&e);
     cvlr_assert!(true);
 }

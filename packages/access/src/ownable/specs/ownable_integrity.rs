@@ -8,7 +8,6 @@ use soroban_sdk::{Env};
 
 use crate::ownable::{specs::{helper::get_pending_owner, ownable_contract::OwnableContract}, *};
 
-
 #[rule]
 // after the constructor the owner is set.
 // status: verified
