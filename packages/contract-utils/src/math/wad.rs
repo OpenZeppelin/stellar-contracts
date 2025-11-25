@@ -312,22 +312,34 @@ impl Wad {
 
     // ################## CHECKED ARITHMETIC ##################
 
-    /// Checked addition. Returns `None` on overflow.
+    /// Checked addition.
+    ///
+    /// Returns `None` on overflow.
+    ///
+    /// # Arguments
+    ///
+    /// * `rhs` - The value to add.
     pub fn checked_add(self, rhs: Wad) -> Option<Wad> {
         self.0.checked_add(rhs.0).map(Wad)
     }
 
-    /// Checked subtraction. Returns `None` on overflow.
+    /// Checked subtraction.
+    ///
+    /// Returns `None` on overflow.
+    ///
+    /// # Arguments
+    ///
+    /// * `rhs` - The value to subtract.
     pub fn checked_sub(self, rhs: Wad) -> Option<Wad> {
         self.0.checked_sub(rhs.0).map(Wad)
     }
 
-    /// Checked multiplication (Wad * Wad). Returns `None` on overflow.
+    /// Checked multiplication (Wad * Wad).
     ///
-    /// Handles phantom overflow by scaling to i256 when intermediate
-    /// multiplication overflows i128 but the final result fits.
-    ///
-    /// Result is truncated toward zero after division by WAD_SCALE.
+    /// Returns `None` on overflow. Handles phantom overflow by scaling to
+    /// `I256` when intermediate multiplication overflows `i128` but the final
+    /// result fits. Result is truncated toward zero after division by
+    /// `WAD_SCALE`.
     ///
     /// # Arguments
     ///
@@ -347,10 +359,14 @@ impl Wad {
         Some(Wad(result))
     }
 
-    /// Checked division (Wad / Wad). Returns `None` on overflow or division by
-    /// zero.
+    /// Checked division (Wad / Wad).
     ///
-    /// Result is truncated toward zero.
+    /// Returns `None` on overflow or division by zero. Result is truncated
+    /// toward zero.
+    ///
+    /// # Arguments
+    ///
+    /// * `rhs` - The divisor.
     pub fn checked_div(self, rhs: Wad) -> Option<Wad> {
         if rhs.0 == 0 {
             return None;
@@ -358,12 +374,24 @@ impl Wad {
         self.0.checked_mul(WAD_SCALE).map(|scaled| Wad(scaled / rhs.0))
     }
 
-    /// Checked multiplication by integer. Returns `None` on overflow.
+    /// Checked multiplication by integer.
+    ///
+    /// Returns `None` on overflow.
+    ///
+    /// # Arguments
+    ///
+    /// * `n` - The integer to multiply by.
     pub fn checked_mul_int(self, n: i128) -> Option<Wad> {
         self.0.checked_mul(n).map(Wad)
     }
 
-    /// Checked division by integer. Returns `None` on division by zero.
+    /// Checked division by integer.
+    ///
+    /// Returns `None` on division by zero.
+    ///
+    /// # Arguments
+    ///
+    /// * `n` - The integer to divide by.
     pub fn checked_div_int(self, n: i128) -> Option<Wad> {
         if n == 0 {
             return None;
@@ -419,22 +447,16 @@ impl Wad {
             .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
     }
 
-    /// Checked version of pow. Returns `Some(result)` on success.
+    /// Checked version of [`Wad::pow`].
     ///
-    /// This method handles "phantom overflow" transparently by scaling to i256
-    /// when intermediate multiplications overflow i128 but the final result
-    /// fits. It will panic on true overflow (when result exceeds i128 even
-    /// after scaling).
+    /// Returns `None` instead of panicking on overflow. Handles phantom
+    /// overflow transparently by scaling to `I256` when intermediate
+    /// multiplications overflow `i128` but the final result fits.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment for i256 operations.
     /// * `exponent` - The unsigned integer exponent.
-    ///
-    /// # Errors
-    ///
-    /// * [`SorobanFixedPointError::Overflow`] - When final result exceeds i128
-    ///   bounds (even after i256 scaling).
     ///
     /// # Examples
     ///
@@ -442,9 +464,14 @@ impl Wad {
     /// let e = Env::default();
     /// let small = Wad::from_integer(&e, 2);
     /// assert_eq!(small.checked_pow(&e, 10), Some(Wad::from_integer(&e, 1024)));
+    ///
+    /// let large = Wad::from_integer(&e, i128::MAX / WAD_SCALE);
+    /// assert_eq!(large.checked_pow(&e, 2), None); // Overflows
     /// ```
     ///
-    /// Phantom overflow is handled internally
+    /// # Notes
+    ///
+    /// Phantom overflow is handled internally.
     pub fn checked_pow(self, e: &Env, mut exponent: u32) -> Option<Self> {
         // Handle base cases
         if exponent == 0 {
