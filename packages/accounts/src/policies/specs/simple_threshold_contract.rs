@@ -8,6 +8,16 @@ use crate::policies::simple_threshold;
 #[contract]
 pub struct SimpleThresholdPolicy;
 
+impl SimpleThresholdPolicy {
+    pub fn get_threshold(e: &Env, context_rule_id: u32, smart_account: Address) -> u32 {
+        crate::policies::simple_threshold::get_threshold(e, context_rule_id, &smart_account)
+    }
+
+    pub fn set_threshold(e: &Env, threshold: u32, context_rule: ContextRule, smart_account: Address) {
+        crate::policies::simple_threshold::set_threshold(e, threshold, &context_rule, &smart_account)
+    }
+}
+
 #[contractimpl]
 impl Policy for SimpleThresholdPolicy {
     type AccountParams = SimpleThresholdAccountParams;
@@ -29,12 +39,3 @@ impl Policy for SimpleThresholdPolicy {
     }
 }
 
-impl SimpleThresholdPolicy {
-    pub fn get_threshold(e: &Env, context_rule_id: u32, smart_account: Address) -> u32 {
-        crate::policies::simple_threshold::get_threshold(e, context_rule_id, &smart_account)
-    }
-
-    pub fn set_threshold(e: &Env, threshold: u32, context_rule: ContextRule, smart_account: Address) {
-        crate::policies::simple_threshold::set_threshold(e, threshold, &context_rule, &smart_account)
-    }
-}
