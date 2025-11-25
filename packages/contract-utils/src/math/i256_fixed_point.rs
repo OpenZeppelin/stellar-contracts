@@ -26,7 +26,7 @@ SOFTWARE.
 
 use soroban_sdk::{panic_with_error, Env, I256};
 
-use crate::math::{soroban_fixed_point::SorobanFixedPoint, SorobanFixedPointError};
+use crate::math::{SorobanFixedPoint, SorobanFixedPointError};
 
 impl SorobanFixedPoint for I256 {
     fn fixed_mul_floor(&self, env: &Env, y: &I256, denominator: &I256) -> I256 {

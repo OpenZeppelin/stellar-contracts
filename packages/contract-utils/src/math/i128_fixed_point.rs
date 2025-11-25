@@ -26,7 +26,7 @@ SOFTWARE.
 
 use soroban_sdk::{panic_with_error, Env, I256};
 
-use crate::math::{soroban_fixed_point::SorobanFixedPoint, SorobanFixedPointError};
+use crate::math::{SorobanFixedPoint, SorobanFixedPointError};
 
 /// Performs floor(r / z)
 fn div_floor(r: i128, z: i128) -> Option<i128> {
@@ -70,7 +70,7 @@ impl SorobanFixedPoint for i128 {
     }
 }
 
-/// Performs floor(x * y / z)
+/// Performs floor(x * y / z), panics on overflow or division by zero
 fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
     match x.checked_mul(*y) {
         Some(r) => div_floor(r, *z)
@@ -114,13 +114,13 @@ fn checked_scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> Opti
         Some(r) => div_floor(r, *z),
         None => {
             // scale to i256 and retry
-            let res = crate::math::i256_fixed_point::mul_div_floor(
+            let res = crate::math::i256_fixed_point::checked_mul_div_floor(
                 env,
                 &I256::from_i128(env, *x),
                 &I256::from_i128(env, *y),
                 &I256::from_i128(env, *z),
             );
-            res.to_i128()
+            res.map(|r| r.to_i128())?
         }
     }
 }
@@ -131,13 +131,13 @@ fn checked_scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> Optio
         Some(r) => div_ceil(r, *z),
         None => {
             // scale to i256 and retry
-            let res = crate::math::i256_fixed_point::mul_div_ceil(
+            let res = crate::math::i256_fixed_point::checked_mul_div_ceil(
                 env,
                 &I256::from_i128(env, *x),
                 &I256::from_i128(env, *y),
                 &I256::from_i128(env, *z),
             );
-            res.to_i128()
+            res.map(|r| r.to_i128())?
         }
     }
 }

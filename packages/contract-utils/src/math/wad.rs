@@ -5,7 +5,7 @@ use core::{
 
 use soroban_sdk::{panic_with_error, Env};
 
-use crate::math::{soroban_fixed_point::SorobanFixedPoint, SorobanFixedPointError};
+use crate::math::{SorobanFixedPoint, SorobanFixedPointError};
 
 /// Fixed-point decimal number with 18 decimal places of precision.
 ///
@@ -442,8 +442,6 @@ impl Wad {
     /// let e = Env::default();
     /// let small = Wad::from_integer(&e, 2);
     /// assert_eq!(small.checked_pow(&e, 10), Some(Wad::from_integer(&e, 1024)));
-    ///
-    ///
     /// ```
     ///
     /// Phantom overflow is handled internally
