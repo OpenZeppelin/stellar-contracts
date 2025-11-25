@@ -23,7 +23,7 @@ pub fn fixed_mul_floor_integrity(e: &Env) {
     clog!(result);
     let expected_result = x * y / z;
     clog!(expected_result);
-    let max_rounding_error = 1;
+    let max_rounding_error: i128 = 1;
     clog!(max_rounding_error);
     let lower_bound = expected_result.checked_sub(max_rounding_error).unwrap();
     clog!(lower_bound);
