@@ -144,15 +144,15 @@ pub fn renounce_ownership_non_panic(e: Env) {
     // let pending_owner = e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner);
     // cvlr_assume!(pending_owner.is_none());
 
-    let none: Option<Address> = None::<Address>;
-    e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &none);
+    let key = OwnableStorageKey::PendingOwner;
+    e.storage().temporary().set(&key, &nondet_address());
+    e.storage().temporary().remove(&key);
 
-    let owner = OwnableContract::get_owner(&e);
-    cvlr_assume!(owner.is_some());
-    if let Some(owner_internal) = owner.clone() {
-        cvlr_assume!(is_auth(owner_internal));
-    }
-    
+    e.storage().instance().set(&OwnableStorageKey::Owner, &nondet_address());
+    let owner = OwnableContract::get_owner(&e).unwrap();
+
+    cvlr_assume!(is_auth(owner));
+
     OwnableContract::renounce_ownership(&e);
     cvlr_assert!(true);
 }
@@ -161,8 +161,10 @@ pub fn renounce_ownership_non_panic(e: Env) {
 // sanity
 // status: verified
 pub fn renounce_ownership_non_panic_sanity(e: Env) {
-    let none: Option<Address> = None::<Address>;
-    e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &none);
+    let key = OwnableStorageKey::PendingOwner;
+    e.storage().temporary().set(&key, &nondet_address());
+    e.storage().temporary().remove(&key);
+    
     let owner = OwnableContract::get_owner(&e);
     cvlr_assume!(owner.is_some());
     if let Some(owner_internal) = owner.clone() {

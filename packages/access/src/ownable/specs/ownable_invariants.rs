@@ -99,10 +99,13 @@ pub fn after_owner_restricted_function_owner_is_set_sanity(e: Env) {
 
 // helpers
 pub fn assume_pre_pending_owner_implies_owner(e: &Env) {
-    let pending_owner_pre = get_pending_owner(&e);
+    let pending_owner_pre = get_pending_owner(e);
+    if let Some(pend_pre) = pending_owner_pre.clone() {
+        clog!(cvlr_soroban::Addr(&pend_pre));
+    }
     let owner = OwnableContract::get_owner(&e);
-    if let Some(owner_internal) = owner.clone() {
-        clog!(cvlr_soroban::Addr(&owner_internal));
+    if let Some(owner_internal_pre) = owner.clone() {
+        clog!(cvlr_soroban::Addr(&owner_internal_pre));
     }
     if pending_owner_pre.is_some() {
         cvlr_assume!(owner.is_some());
@@ -111,9 +114,12 @@ pub fn assume_pre_pending_owner_implies_owner(e: &Env) {
 
 pub fn assert_post_pending_owner_implies_owner(e: &Env) {
     let pending_owner_post = get_pending_owner(&e);
+    if let Some(pend_post) = pending_owner_post.clone() {
+        clog!(cvlr_soroban::Addr(&pend_post));
+    }
     let owner = OwnableContract::get_owner(&e);
-    if let Some(owner_internal) = owner.clone() {
-        clog!(cvlr_soroban::Addr(&owner_internal));
+    if let Some(owner_internal_post) = owner.clone() {
+        clog!(cvlr_soroban::Addr(&owner_internal_post));
     }
     if pending_owner_post.is_some() {
         cvlr_assert!(owner.is_some());
