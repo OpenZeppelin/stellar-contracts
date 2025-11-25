@@ -36,6 +36,14 @@ impl SorobanFixedPoint for I256 {
     fn fixed_mul_ceil(&self, env: &Env, y: &I256, denominator: &I256) -> I256 {
         mul_div_ceil(env, self, y, denominator)
     }
+
+    fn checked_fixed_mul_floor(&self, env: &Env, y: &I256, denominator: &I256) -> Option<I256> {
+        checked_mul_div_floor(env, self, y, denominator)
+    }
+
+    fn checked_fixed_mul_ceil(&self, env: &Env, y: &I256, denominator: &I256) -> Option<I256> {
+        checked_mul_div_ceil(env, self, y, denominator)
+    }
 }
 
 /// Performs floor(x * y / z)
@@ -75,5 +83,45 @@ pub(crate) fn mul_div_ceil(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
         let remainder = r.rem_euclid(z);
         let one = I256::from_i32(env, 1);
         r.div(z).add(if remainder > zero { &one } else { &zero })
+    }
+}
+
+/// Checked version of floor(x * y / z)
+pub(crate) fn checked_mul_div_floor(env: &Env, x: &I256, y: &I256, z: &I256) -> Option<I256> {
+    let zero = I256::from_i32(env, 0);
+    let r = x.mul(y);
+
+    if z.clone() == zero {
+        return None;
+    }
+
+    if r < zero || (r > zero && z.clone() < zero) {
+        // ceil is taken by default for a negative result
+        let remainder = r.rem_euclid(z);
+        let one = I256::from_i32(env, 1);
+        Some(r.div(z).sub(if remainder > zero { &one } else { &zero }))
+    } else {
+        // floor is taken by default for a positive or zero result
+        Some(r.div(z))
+    }
+}
+
+/// Checked version of ceil(x * y / z)
+pub(crate) fn checked_mul_div_ceil(env: &Env, x: &I256, y: &I256, z: &I256) -> Option<I256> {
+    let zero = I256::from_i32(env, 0);
+    let r = x.mul(y);
+
+    if z.clone() == zero {
+        return None;
+    }
+
+    if z.clone() < zero || r <= zero {
+        // ceil is taken by default for a negative or zero result
+        Some(r.div(z))
+    } else {
+        // floor is taken by default for a positive result
+        let remainder = r.rem_euclid(z);
+        let one = I256::from_i32(env, 1);
+        Some(r.div(z).add(if remainder > zero { &one } else { &zero }))
     }
 }

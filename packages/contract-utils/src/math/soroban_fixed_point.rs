@@ -49,4 +49,16 @@ pub trait SorobanFixedPoint: Sized {
     /// This method will panic if the denominator is 0, a phantom overflow
     /// occurs, or the result does not fit in Self.
     fn fixed_mul_ceil(&self, env: &Env, y: &Self, denominator: &Self) -> Self;
+
+    /// Checked version of floor(x * y / denominator).
+    ///
+    /// Returns `None` if the denominator is 0, a phantom overflow occurs,
+    /// or the result does not fit in Self.
+    fn checked_fixed_mul_floor(&self, env: &Env, y: &Self, denominator: &Self) -> Option<Self>;
+
+    /// Checked version of ceil(x * y / denominator).
+    ///
+    /// Returns `None` if the denominator is 0, a phantom overflow occurs,
+    /// or the result does not fit in Self.
+    fn checked_fixed_mul_ceil(&self, env: &Env, y: &Self, denominator: &Self) -> Option<Self>;
 }
