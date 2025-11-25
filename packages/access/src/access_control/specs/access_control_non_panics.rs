@@ -140,7 +140,8 @@ pub fn grant_role_non_panic_sanity(e: Env) {
 // caller is admin or has admin_role
 // account has the role
 // role is not empty
-// status: 54 min timeout
+// status: verified 
+// when using -split false
 pub fn revoke_role_non_panic(e: Env) {
     let caller = nondet_address();
     let account = nondet_address();
