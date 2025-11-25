@@ -1,0 +1,1 @@
+// panics rules for all functions
