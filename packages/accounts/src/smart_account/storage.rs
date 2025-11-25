@@ -1204,7 +1204,7 @@ fn remove_fingerprint(
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `key` - The storage key to retrieve the value for.
-fn get_persistent_entry<T: TryFromVal<Env, Val>>(
+pub(crate) fn get_persistent_entry<T: TryFromVal<Env, Val>>(
     e: &Env,
     key: &SmartAccountStorageKey,
 ) -> Option<T> {

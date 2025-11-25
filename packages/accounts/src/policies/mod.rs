@@ -9,13 +9,13 @@ use soroban_sdk::{auth::Context, contractclient, Address, Env, FromVal, Val, Vec
 
 use crate::smart_account::{ContextRule, Signer};
 
+#[cfg(feature = "certora")]
+pub mod specs;
+
 pub mod simple_threshold;
 pub mod spending_limit;
 #[cfg(test)]
 mod test;
-
-#[cfg(feature = "certora")]
-pub mod specs;
 
 pub mod weighted_threshold;
 
