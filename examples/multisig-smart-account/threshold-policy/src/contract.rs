@@ -18,6 +18,15 @@ pub struct ThresholdPolicyContract;
 impl Policy for ThresholdPolicyContract {
     type AccountParams = simple_threshold::SimpleThresholdAccountParams;
 
+    /// Check if the threshold policy can be enforced.
+    ///
+    /// Verifies that the number of authenticated signers meets or exceeds
+    /// the configured threshold for this context rule.
+    ///
+    /// # Returns
+    ///
+    /// * `true` if the threshold is met
+    /// * `false` otherwise
     fn can_enforce(
         e: &Env,
         context: Context,
@@ -34,6 +43,10 @@ impl Policy for ThresholdPolicyContract {
         )
     }
 
+    /// Enforce the threshold policy.
+    ///
+    /// Records that authorization occurred and emits an event.
+    /// This is called after `can_enforce` returns true.
     fn enforce(
         e: &Env,
         context: Context,
@@ -50,6 +63,9 @@ impl Policy for ThresholdPolicyContract {
         )
     }
 
+    /// Install the threshold policy for a smart account.
+    ///
+    /// Stores the threshold configuration for the given context rule.
     fn install(
         e: &Env,
         install_params: Self::AccountParams,
@@ -59,6 +75,9 @@ impl Policy for ThresholdPolicyContract {
         simple_threshold::install(e, &install_params, &context_rule, &smart_account)
     }
 
+    /// Uninstall the threshold policy for a smart account.
+    ///
+    /// Removes the threshold configuration for the given context rule.
     fn uninstall(e: &Env, context_rule: ContextRule, smart_account: Address) {
         simple_threshold::uninstall(e, &context_rule, &smart_account)
     }
