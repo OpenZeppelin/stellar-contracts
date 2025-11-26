@@ -6,6 +6,7 @@ use cvlr::clog;
 
 use soroban_sdk::{Env, Address, Symbol};
 use crate::access_control::{AccessControl, specs::{access_control_contract::AccessControlContract, helper::{get_pending_admin, get_role_account}}};
+use crate::access_control::specs::constructor_helper::{before_constructor_no_has_role, before_constructor_no_role_accounts, before_constructor_no_role_count};
 
 // invariant: admin != None -> holds in all cases except for renounce_admin
 
@@ -363,23 +364,27 @@ pub fn assert_post_unique_indices_for_role(
 // didn't do sanity for these.
 
 #[rule]
-// status: violated - starting state for constructor is not all zeroes.
+// status: verified
 pub fn after_constructor_unique_indices_for_role(
     e: Env, account1: Address, account2: Address, role: Symbol
 ) {
-    let admin = nondet_address();
+    before_constructor_no_has_role(&e, account1.clone(), role.clone());
+    before_constructor_no_has_role(&e, account2.clone(), role.clone());
+    let admin: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&admin));
     AccessControlContract::access_control_constructor(&e, admin);
     assert_post_unique_indices_for_role(&e, account1.clone(), account2.clone(), role.clone());
 }
 
 #[rule]
-// status: violated - probably requires another invariant
+// status: verified
 pub fn after_grant_role_unique_indices_for_role(
     e: Env, account1: Address, account2: Address, role: Symbol
 ) {
     assume_pre_unique_indices_for_role(&e, account1.clone(), account2.clone(), role.clone());
-    let caller = nondet_address();
+    assume_pre_role_count_minus_one_geq_index(&e, account1.clone(), role.clone());
+    assume_pre_role_count_minus_one_geq_index(&e, account2.clone(), role.clone());
+    let caller: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&caller));
     let account = nondet_address();
     clog!(cvlr_soroban::Addr(&account));
@@ -389,22 +394,25 @@ pub fn after_grant_role_unique_indices_for_role(
 }
 
 #[rule]
-// status: violated - probably requires another invariant
+// status: verified
 pub fn after_revoke_role_unique_indices_for_role(
     e: Env, account1: Address, account2: Address, role: Symbol
 ) {
     assume_pre_unique_indices_for_role(&e, account1.clone(), account2.clone(), role.clone());
-    let caller = nondet_address();
+    let caller: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&caller));
     let account = nondet_address();
     clog!(cvlr_soroban::Addr(&account));
     let role_revoked = nondet_symbol();
+    assume_pre_unique_indices_for_role(&e, account1.clone(), account.clone(), role.clone());
+    assume_pre_unique_indices_for_role(&e, account2.clone(), account.clone(), role.clone());
+    assume_pre_role_count_minus_one_geq_index(&e, account.clone(), role.clone());
     AccessControlContract::revoke_role(&e, caller, account, role_revoked);
     assert_post_unique_indices_for_role(&e, account1.clone(), account2.clone(), role.clone());
 }
 
 #[rule]
-// status: violated - probably requires another invariant
+// status: verified
 pub fn after_renounce_role_unique_indices_for_role(
     e: Env, account1: Address, account2: Address, role: Symbol
 ) {
@@ -412,6 +420,9 @@ pub fn after_renounce_role_unique_indices_for_role(
     let caller = nondet_address();
     clog!(cvlr_soroban::Addr(&caller));
     let role_renounced = nondet_symbol();
+    assume_pre_unique_indices_for_role(&e, account1.clone(), caller.clone(), role.clone());
+    assume_pre_unique_indices_for_role(&e, account2.clone(), caller.clone(), role.clone());
+    assume_pre_role_count_minus_one_geq_index(&e, caller.clone(), role.clone());
     AccessControlContract::renounce_role(&e, caller, role_renounced);
     assert_post_unique_indices_for_role(&e, account1.clone(), account2.clone(), role.clone());
 }
@@ -492,10 +503,12 @@ pub fn assert_post_role_count_minus_one_geq_index(
 }
 
 #[rule]
-// status: violated - starting state for constructor is not all zeroes.
+// status: verified
 pub fn after_constructor_role_count_minus_one_geq_index(
     e: Env, account: Address, role: Symbol
 ) {
+    before_constructor_no_has_role(&e, account.clone(), role.clone());
+    before_constructor_no_role_count(&e, &role);
     let admin = nondet_address();
     clog!(cvlr_soroban::Addr(&admin));
     AccessControlContract::access_control_constructor(&e, admin);
@@ -518,7 +531,7 @@ pub fn after_grant_role_role_count_minus_one_geq_index(
 }
 
 #[rule]
-// status: violated - ?
+// status: violated - not sure
 pub fn after_revoke_role_role_count_minus_one_geq_index(
     e: Env, account: Address, role: Symbol
 ) {
@@ -534,7 +547,7 @@ pub fn after_revoke_role_role_count_minus_one_geq_index(
 }
 
 #[rule]
-// status: violated - requires another invariant
+// status: violated - not sure
 pub fn after_renounce_role_role_count_minus_one_geq_index(
     e: Env, account: Address, role: Symbol
 ) {
@@ -544,12 +557,13 @@ pub fn after_renounce_role_role_count_minus_one_geq_index(
     let role_renounced = nondet_symbol();
     assume_pre_role_count_minus_one_geq_index(&e, caller.clone(), role_renounced.clone()); // like requireInvariant in CVL
     assume_pre_unique_indices_for_role(&e, caller.clone(), account.clone(), role.clone());
+    assume_pre_has_role_index_implies_get_role_account(&e, caller.clone(), role.clone());
     AccessControlContract::renounce_role(&e, caller, role_renounced);
     assert_post_role_count_minus_one_geq_index(&e, account.clone(), role.clone());
 }
 
 #[rule]
-// status: verified - requires another invariant
+// status: verified
 pub fn after_transfer_admin_role_role_count_minus_one_geq_index(
     e: Env, account: Address, role: Symbol
 ) {
@@ -631,10 +645,12 @@ pub fn assert_post_has_role_index_implies_get_role_account(
 
 
 #[rule]
-// status: violated - starting state for constructor is not all zeroes.
+// status: verified
 pub fn after_constructor_has_role_index_implies_get_role_account(
     e: Env, account: Address, role: Symbol
 ) {
+    before_constructor_no_has_role(&e, account.clone(), role.clone());
+    before_constructor_no_role_accounts(&e, role.clone(), 0);
     let admin = nondet_address();
     clog!(cvlr_soroban::Addr(&admin));
     AccessControlContract::access_control_constructor(&e, admin);
