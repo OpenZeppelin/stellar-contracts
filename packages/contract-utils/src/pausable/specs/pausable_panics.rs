@@ -20,7 +20,7 @@ pub fn pause_panics_if_paused(e: Env) {
 
 #[rule]
 // unpause panics if the contract is not paused
-// status: violated - bitwise imprecision
+// status: verified with precise_bitwise_ops
 pub fn unpause_panics_if_not_paused(e: Env) {
     let paused_pre = PausableContract::paused(&e);
     cvlr_assume!(!paused_pre);
@@ -41,7 +41,7 @@ pub fn when_not_paused_panics_if_paused(e: Env) {
 
 #[rule]
 // when_paused_func panics if not paused
-// status: violated - bitwise imprecision
+// status: verified with precise_bitwise_ops
 pub fn when_paused_panics_if_not_paused(e: Env) {
     let paused_pre = PausableContract::paused(&e);
     cvlr_assume!(!paused_pre);

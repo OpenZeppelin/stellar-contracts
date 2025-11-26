@@ -7,29 +7,22 @@ use crate::pausable::specs::pausable_contract::PausableContract;
 use crate::pausable::Pausable;  
 use crate::pausable::{pause, paused};
 
-
 #[rule]
 // after call to pause the contract is paused
-// status: violated - why
+// status: verified
 pub fn pause_integrity(e: Env) {
-    let paused_pre = PausableContract::paused(&e);
-    clog!(paused_pre);
     let caller = nondet_address();
     PausableContract::pause(&e, caller);
     let paused_post = PausableContract::paused(&e);
-    clog!(paused_post);
     cvlr_assert!(paused_post);
 }
 
 #[rule]
 // after call to unpause the contract is not paused
-// status: violated - why
+// status: verified
 pub fn unpause_integrity(e: Env) {
-    let paused_pre = PausableContract::paused(&e);
-    clog!(paused_pre);
     let caller = nondet_address();
     PausableContract::unpause(&e, caller);
     let paused_post = PausableContract::paused(&e);
-    clog!(paused_post);
     cvlr_assert!(!paused_post);
 }

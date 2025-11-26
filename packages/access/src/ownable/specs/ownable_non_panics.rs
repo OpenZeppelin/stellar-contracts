@@ -130,20 +130,14 @@ pub fn accept_ownership_non_panic_sanity(e: Env) {
 // requires
 // storage setup
 // pending_owner is none
-// status: violated - the storage setup with none doesn't work - review
+// status: verified
 pub fn renounce_ownership_non_panic(e: Env) {
-    // // use cvlr_soroban::require_storage_tag;
     // // setup storage: needed for now. 
-    // let address = nondet_address();
-    // e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &address);
     // // WIP: will have this macro for setting storage up automatically.
     // // require_storage_tag(OwnableStorageKey::PendingOwner.into_val(&e), 77);
-    // let pending_owner = e.storage().temporary().get::<_, Address>(&OwnableStorageKey::PendingOwner);
-    // cvlr_assume!(pending_owner.is_none());
 
-    let key = OwnableStorageKey::PendingOwner;
-    e.storage().temporary().set(&key, &nondet_address());
-    e.storage().temporary().remove(&key);
+    e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &nondet_address());
+    e.storage().temporary().remove(&OwnableStorageKey::PendingOwner);
 
     e.storage().instance().set(&OwnableStorageKey::Owner, &nondet_address());
     let owner = OwnableContract::get_owner(&e).unwrap();
