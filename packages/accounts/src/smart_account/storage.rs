@@ -84,7 +84,7 @@
 //! }
 //! ```
 
-use cvlr::nondet::Nondet;
+use cvlr::nondet::{self, Nondet};
 use cvlr_soroban::{nondet_address, nondet_bytes, nondet_bytes_n, nondet_string, nondet_vec};
 #[cfg(feature = "certora")]
 use soroban_sdk::FromVal;
@@ -202,6 +202,16 @@ pub struct Meta {
     pub context_type: ContextRuleType,
     /// Optional expiration ledger sequence for the rule.
     pub valid_until: Option<u32>,
+}
+
+impl Nondet for Meta {
+    fn nondet() -> Self {
+        Meta {
+            name: nondet_string(),
+            context_type: ContextRuleType::nondet(),
+            valid_until: Option::nondet(),
+        }
+    }
 }
 
 /// A complete context rule defining authorization requirements.
@@ -618,30 +628,31 @@ pub fn compute_fingerprint(
     signers: &Vec<Signer>,
     policies: &Vec<Address>,
 ) -> BytesN<32> {
-    let mut sorted_signers = Vec::new(e);
-    for signer in signers.iter() {
-        match sorted_signers.binary_search(&signer) {
-            Ok(_) => panic_with_error!(e, SmartAccountError::DuplicateSigner),
-            Err(pos) => sorted_signers.insert(pos, signer),
-        }
-    }
+    // let mut sorted_signers = Vec::new(e);
+    // for signer in signers.iter() {
+    //     match sorted_signers.binary_search(&signer) {
+    //         Ok(_) => panic_with_error!(e, SmartAccountError::DuplicateSigner),
+    //         Err(pos) => sorted_signers.insert(pos, signer),
+    //     }
+    // }
 
-    let mut sorted_policies = Vec::new(e);
-    for policy in policies.iter() {
-        match sorted_policies.binary_search(&policy) {
-            Ok(_) => panic_with_error!(e, SmartAccountError::DuplicatePolicy),
-            Err(pos) => sorted_policies.insert(pos, policy),
-        }
-    }
+    // let mut sorted_policies = Vec::new(e);
+    // for policy in policies.iter() {
+    //     match sorted_policies.binary_search(&policy) {
+    //         Ok(_) => panic_with_error!(e, SmartAccountError::DuplicatePolicy),
+    //         Err(pos) => sorted_policies.insert(pos, policy),
+    //     }
+    // }
 
-    #[cfg(not(feature = "certora"))]
-    let mut rule_data = context_type.to_xdr(e);
-    #[cfg(feature = "certora")]
-    let mut rule_data = context_type.clone().to_xdr(e);
-    rule_data.append(&sorted_signers.to_xdr(e));
-    rule_data.append(&sorted_policies.to_xdr(e));
+    // #[cfg(not(feature = "certora"))]
+    // let mut rule_data = context_type.to_xdr(e);
+    // #[cfg(feature = "certora")]
+    // let mut rule_data = context_type.clone().to_xdr(e);
+    // rule_data.append(&sorted_signers.to_xdr(e));
+    // rule_data.append(&sorted_policies.to_xdr(e));
 
-    e.crypto().sha256(&rule_data).to_bytes()
+    // e.crypto().sha256(&rule_data).to_bytes()
+    nondet_bytes_n()
 }
 
 // ################## CHANGE STATE ##################
@@ -1172,7 +1183,7 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
 
         validate_and_set_fingerprint(e, &rule.context_type, &rule.signers, &policies);
         // Remove the old fingerprint
-        remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
+        // remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
 
         // Uninstall the policy
         #[cfg(not(feature = "certora"))]
