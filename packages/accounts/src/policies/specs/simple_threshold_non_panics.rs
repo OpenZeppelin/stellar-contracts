@@ -44,7 +44,7 @@ pub fn set_threshold_non_panic(e: Env) {
 #[rule]
 // requires
 // threshold exists 
-// status:
+// status: verified
 pub fn get_threshold_non_panic(e: Env) {
     let ctx_rule_id: u32 = u32::nondet();
     let account_id = nondet_address();
@@ -103,7 +103,7 @@ pub fn install_non_panic(e: Env) {
 #[rule]
 // requires
 // account_id auth
-// status:
+// status: verified
 pub fn uninstall_non_panic(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();

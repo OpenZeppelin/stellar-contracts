@@ -94,7 +94,7 @@ pub fn install_panics_if_unauth(e: Env) {
 
 #[rule]
 // install panics if ctx_rule.signers.len() = 0
-// status:
+// status: verifies but I am not sure it should
 pub fn install_panics_if_ctx_rule_signers_len_is_zero(e: Env) {
     let params: SimpleThresholdAccountParams = SimpleThresholdAccountParams::nondet();
     let ctx_rule: ContextRule = ContextRule::nondet();
