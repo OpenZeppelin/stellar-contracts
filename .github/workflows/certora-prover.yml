@@ -1,0 +1,48 @@
+name: Certora verification
+
+on: pull_request
+
+env:
+  CONFIGS: |
+    access_control_integrity.conf
+    access_control_invariants.conf
+    access_control_non_panics.conf
+    access_control_panics.conf
+    access_control_sanity.conf
+    ownable_integrity.conf
+    ownable_invariants.conf
+    ownable_non_panics.conf
+    ownable_panics.conf
+    ownable_sanity.conf
+  CLI_RELEASE: abakst/soroban-new-summaries
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      statuses: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install soroban
+        run: |
+          cargo update -p cvlr-soroban
+          rustup target add wasm32-unknown-unknown
+      - name: run configs
+        uses: Certora/certora-run-action@v2
+        with:
+          ecosystem: soroban
+          configurations: ${{ env.CONFIGS }}
+          job-name: "Verified Soroban Rules"
+          certora-key: ${{ secrets.CERTORAKEY }}
+          working-directory: packages/access/confs
+          cli-release: ${{ env.CLI_RELEASE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
