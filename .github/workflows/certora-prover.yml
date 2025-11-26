@@ -35,7 +35,7 @@ jobs:
           cargo update -p cvlr-soroban
           rustup target add wasm32-unknown-unknown
       - name: run configs
-        uses: Certora/certora-run-action@v2
+        uses: Certora/certora-run-action@9596198c77a3f33d22c59226ff7757185a504f8f
         with:
           ecosystem: soroban
           configurations: ${{ env.CONFIGS }}
