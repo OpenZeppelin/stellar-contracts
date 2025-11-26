@@ -14,7 +14,6 @@ env:
     ownable_non_panics.conf
     ownable_panics.conf
     ownable_sanity.conf
-  CLI_VERSION: abakst/soroban-new-summaries
 
 jobs:
   check:
@@ -43,7 +42,6 @@ jobs:
           job-name: "Verified Soroban Rules"
           certora-key: ${{ secrets.CERTORAKEY }}
           working-directory: packages/access/confs
-          cli-release: alpha
-          cli-version: ${{ env.CLI_VERSION }}
+          cli-release: stable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
