@@ -6,7 +6,7 @@ use cvlr_soroban_derive::rule;
 use cvlr::clog;
 
 use soroban_sdk::{Env};
-use crate::access_control::{AccessControl, specs::{access_control_contract::AccessControlContract, helper::get_pending_admin}};
+use crate::access_control::{AccessControl, ensure_role, specs::{access_control_contract::AccessControlContract, helper::get_pending_admin}};
 
 
 // package functions
@@ -322,9 +322,9 @@ pub fn admin_function_panics_if_admin_not_set(e: Env) {
 pub fn role1_func_panics_if_caller_does_not_have_role(e: Env) {
     let caller = nondet_address();
     let role1 = soroban_sdk::Symbol::new(&e, "role1");
-    let caller_has_role = AccessControlContract::has_role(&e, caller.clone(), role1.clone());
+    let caller_has_role = AccessControlContract::has_role(&e, caller.clone(), role1);
     cvlr_assume!(caller_has_role.is_none());
-    AccessControlContract::role1_func(&e, caller.clone());
+    AccessControlContract::role1_func(&e, caller);
     cvlr_assert!(false);
 }
 

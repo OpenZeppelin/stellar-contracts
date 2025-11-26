@@ -86,6 +86,8 @@
 
 use cvlr::nondet::Nondet;
 use cvlr_soroban::{nondet_address, nondet_bytes, nondet_bytes_n, nondet_string, nondet_vec};
+#[cfg(feature = "certora")]
+use soroban_sdk::FromVal;
 use soroban_sdk::{
     auth::{
         Context, ContractContext, ContractExecutable, CreateContractHostFnContext,
@@ -98,6 +100,16 @@ use soroban_sdk::{
     Address, Bytes, BytesN, Env, IntoVal, Map, String, TryFromVal, Val, Vec,
 };
 
+#[cfg(not(feature = "certora"))]
+use crate::smart_account::{
+    emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
+    emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
+};
+#[cfg(feature = "certora")]
+use crate::{
+    policies::Policy,
+    smart_account::specs::policy::{Params, PolicyContract},
+};
 use crate::{
     policies::{self, PolicyClient},
     smart_account::{
@@ -106,16 +118,6 @@ use crate::{
     },
     verifiers::VerifierClient,
 };
-
-#[cfg(not(feature = "certora"))]
-use crate::{
-    policies::PolicyClient,
-    smart_account::{
-        emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
-        emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
-    }
-};
-
 
 /// Storage keys for smart account data.
 #[contracttype]
@@ -185,7 +187,7 @@ impl Nondet for ContextRuleType {
             0 => ContextRuleType::Default,
             1 => ContextRuleType::CallContract(nondet_address()),
             2 => ContextRuleType::CreateContract(nondet_bytes_n()),
-            _ => panic!("unreachable")
+            _ => panic!("unreachable"),
         }
     }
 }
@@ -290,7 +292,7 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
         for id in ids.iter() {
             v.push_back(get_context_rule(e, id));
         }
-        return v
+        return v;
     }
 }
 
@@ -461,11 +463,22 @@ pub fn can_enforce_all_policies(
 ) -> bool {
     for policy in context_rule.policies.iter() {
         // policies are all or nothing
+        #[cfg(not(feature = "certora"))]
         if !PolicyClient::new(e, &policy).can_enforce(
             context,
             matched_signers,
             context_rule,
             &e.current_contract_address(),
+        ) {
+            return false;
+        }
+        #[cfg(feature = "certora")]
+        if PolicyContract::can_enforce(
+            e,
+            context.clone(),
+            matched_signers.clone(),
+            context_rule.clone(),
+            e.current_contract_address(),
         ) {
             return false;
         }
@@ -556,11 +569,20 @@ pub fn do_check_auth(
     for (rule, context, authenticated_signers) in validated_contexts.iter() {
         let ContextRule { policies, .. } = rule.clone();
         for policy in policies.iter() {
+            #[cfg(not(feature = "certora"))]
             PolicyClient::new(e, &policy).enforce(
                 &context,
                 &authenticated_signers,
                 &rule,
                 &e.current_contract_address(),
+            );
+            #[cfg(feature = "certora")]
+            PolicyContract::enforce(
+                e,
+                context.clone(),
+                authenticated_signers.clone(),
+                rule.clone(),
+                e.current_contract_address(),
             );
         }
     }
@@ -736,7 +758,15 @@ pub fn add_context_rule(
 
     // Install the policies
     for (policy, param) in policies.iter() {
+        #[cfg(not(feature = "certora"))]
         PolicyClient::new(e, &policy).install(&param, &context_rule, &e.current_contract_address());
+        #[cfg(feature = "certora")]
+        PolicyContract::install(
+            &e,
+            Params::from_val(e, &param),
+            context_rule.clone(),
+            e.current_contract_address(),
+        );
     }
 
     // Emit event
@@ -887,7 +917,10 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 
     // Uninstall all policies
     for policy in context_rule.policies.iter() {
+        #[cfg(not(feature = "certora"))]
         PolicyClient::new(e, &policy).uninstall(&context_rule, &e.current_contract_address());
+        #[cfg(feature = "certora")]
+        PolicyContract::uninstall(e, context_rule.clone(), e.current_contract_address());
     }
 
     // Remove all storage entries for this context rule
@@ -1076,7 +1109,15 @@ pub fn add_policy(e: &Env, id: u32, policy: &Address, install_param: Val) {
     }
 
     // Install the policy
+    #[cfg(not(feature = "certora"))]
     PolicyClient::new(e, policy).install(&install_param, &rule, &e.current_contract_address());
+    #[cfg(feature = "certora")]
+    PolicyContract::install(
+        e,
+        Params::from_val(e, &install_param),
+        rule.clone(),
+        e.current_contract_address(),
+    );
 
     policies.push_back(policy.clone());
 
@@ -1134,7 +1175,10 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
         remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
 
         // Uninstall the policy
+        #[cfg(not(feature = "certora"))]
         PolicyClient::new(e, policy).uninstall(&rule, &e.current_contract_address());
+        #[cfg(feature = "certora")]
+        PolicyContract::uninstall(e, rule, e.current_contract_address());
 
         e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
 

@@ -183,7 +183,7 @@ pub trait Policy {
 // with the public `Policy` trait above for their implementations.
 #[allow(unused)]
 #[contractclient(name = "PolicyClient")]
-trait PolicyClientInterface {
+pub trait PolicyClientInterface {
     fn can_enforce(
         e: &Env,
         context: Context,
