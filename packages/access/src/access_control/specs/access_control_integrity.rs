@@ -106,7 +106,7 @@ pub fn set_role_admin_integrity(e: Env) {
     let admin_role = nondet_symbol();
     AccessControlContract::set_role_admin(&e, role.clone(), admin_role.clone());
     let role_admin = AccessControlContract::get_role_admin(&e, role.clone());
-    cvlr_assert!(role_admin == Some(admin_role.clone()));
+    cvlr_assert!(role_admin.is_some() && role_admin.unwrap() == admin_role);
 }
 
 #[rule]
