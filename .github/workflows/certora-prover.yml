@@ -44,6 +44,6 @@ jobs:
           certora-key: ${{ secrets.CERTORAKEY }}
           working-directory: packages/access/confs
           cli-release: alpha
-          cli-version: ${{ CLI_VERSION }}
+          cli-version: ${{ env.CLI_VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
