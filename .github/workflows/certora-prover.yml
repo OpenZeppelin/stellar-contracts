@@ -30,6 +30,8 @@ jobs:
           submodules: recursive
       - name: Install rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install just
+        uses: extractions/setup-just@v3
       - name: Install soroban
         run: |
           cargo update -p cvlr-soroban
