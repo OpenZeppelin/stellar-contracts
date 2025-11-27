@@ -39,7 +39,7 @@ jobs:
           configurations: ${{ env.CONFIGS }}
           job-name: "Verified Soroban Rules"
           certora-key: ${{ secrets.CERTORAKEY }}
-          working-directory: packages/contract-utils/confs
+          working-directory: packages/smart-accounts/confs
           cli-release: stable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
