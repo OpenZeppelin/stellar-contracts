@@ -57,7 +57,7 @@ pub fn transfer_ownership_panics_if_live_until_ledger_0_and_pending_owner_none(e
 }
 
 #[rule]
-// trasfer_ownership panics if live_until_ledger = 0 and PendingOwner != new_owner
+// transfer_ownership panics if live_until_ledger = 0 and PendingOwner != new_owner
 // status: verified
 pub fn transfer_ownership_panics_if_live_until_ledger_0_and_diff_pending_owner(e: Env) {
     let new_owner = nondet_address();

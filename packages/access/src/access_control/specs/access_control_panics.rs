@@ -12,7 +12,7 @@ use crate::access_control::{AccessControl, ensure_role, specs::{access_control_c
 // package functions
 
 #[rule]
-// grant role panic if unautherized by caller
+// grant role panic if unauthorized by caller
 // status: verified
 pub fn grant_role_panics_if_caller_unauth(e: Env) {
     let caller = nondet_address();
@@ -44,7 +44,7 @@ pub fn grant_role_panics_if_caller_not_admin_nor_admin_role(e: Env) {
 }
 
 #[rule]
-// revoke_role panics if unautherized by caller
+// revoke_role panics if unauthorized by caller
 // status: verified
 pub fn revoke_role_panics_if_caller_unauth(e: Env) {
     let caller = nondet_address();
@@ -108,7 +108,7 @@ pub fn revoke_role_panics_if_role_is_empty(e: Env) {
 }
 
 #[rule]
-// renounce_role panics if unautherized by caller
+// renounce_role panics if unauthorized by caller
 // status: verified
 pub fn renounce_role_panics_if_caller_unauth(e: Env) {
     let caller = nondet_address();

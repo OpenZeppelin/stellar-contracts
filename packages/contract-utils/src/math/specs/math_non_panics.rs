@@ -16,7 +16,7 @@ use cvlr::clog;
 
 #[rule]
 // requires: z != 0
-// status: 
+// status: timeout -- do panics first.
 pub fn fixed_mul_floor_non_panic(e: &Env) {
     let x = i128::nondet();
     clog!(x);   

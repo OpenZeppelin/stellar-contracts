@@ -29,7 +29,7 @@ pub fn set_threshold_integrity(e: Env) {
 
 #[rule]
 // can_enforce returns the expected auth_signers.len() >= threshold_pre; 
-// not really an intgerity rule becasue this is a view function
+// not really an intgerity rule because this is a view function
 // status: verified
 pub fn can_enforce_threshold_integrity(e: Env, context: soroban_sdk::auth::Context) {
     let auth_signers: Vec<Signer> = nondet_vec();
@@ -41,7 +41,7 @@ pub fn can_enforce_threshold_integrity(e: Env, context: soroban_sdk::auth::Conte
     cvlr_assert!(can_enforce == expected_result);
 }
 
-// can't write an integrity rule for enforce becuase it panics if can_enforce returns false.
+// can't write an integrity rule for enforce because it panics if can_enforce returns false.
 
 #[rule]
 // after install the threshold is set to input

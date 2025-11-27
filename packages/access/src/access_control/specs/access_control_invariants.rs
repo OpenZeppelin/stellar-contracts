@@ -608,7 +608,7 @@ pub fn after_renounce_admin_role_count_minus_one_geq_index(
     assert_post_role_count_minus_one_geq_index(&e, account.clone(), role.clone());
 }
 
-// you would also want Exists(address). has_role(adress) = role_count - 1 but not supported.
+// you would also want Exists(address). has_role(address) = role_count - 1 but not supported.
 
 // invariant: if has_role(account,role) = index then get_account_role(role,index) = account
 
