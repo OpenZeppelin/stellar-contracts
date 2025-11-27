@@ -4,7 +4,7 @@ use cvlr_soroban_derive::rule;
 
 use soroban_sdk::{Env, Vec, contracttype};
 
-use crate::merkle_distributor::specs::simple_leaf::Leaf;
+use crate::merkle_distributor::specs::merkle_distributor_contract::Leaf;
 use crate::{crypto::sha256::Sha256, merkle_distributor::{IndexableLeaf, MerkleDistributor}};
 
 type Distributor = MerkleDistributor<Sha256>;
