@@ -4,17 +4,13 @@ on: pull_request
 
 env:
   CONFIGS: |
-    math_integrity.conf
-    math_non_panics.conf
-    math_panics.conf
-    math_sanity.conf
-    merkle_distributor_sanity.conf
-    merkle_distributor_integrity.conf
-    pausable_integrity.conf
-    pausable_non_panics.conf
-    pausable_panics.conf
-    pausable_sanity.conf
-
+    simple_threshold_integrity.conf
+    simple_threshold_invariants.conf
+    simple_threshold_non_panics.conf
+    simple_threshold_panics.conf
+    simple_threshold_contract_sanity.conf
+    weighted_threshold_sanity.conf
+    spending_limit_sanity.conf
 
 jobs:
   check:
