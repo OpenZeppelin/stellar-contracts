@@ -8,7 +8,7 @@ env:
     math_non_panics.conf
     math_panics.conf
     math_sanity.conf
-    merkle_distributor_sanity.conf
+    merkle_distributor_contract_sanity.conf
     merkle_distributor_integrity.conf
     pausable_integrity.conf
     pausable_non_panics.conf
