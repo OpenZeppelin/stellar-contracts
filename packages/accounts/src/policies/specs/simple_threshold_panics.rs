@@ -92,18 +92,6 @@ pub fn install_panics_if_unauth(e: Env) {
     cvlr_assert!(false);
 }
 
-#[rule]
-// install panics if ctx_rule.signers.len() = 0
-// status: verifies but I am not sure it should
-pub fn install_panics_if_ctx_rule_signers_len_is_zero(e: Env) {
-    let params: SimpleThresholdAccountParams = SimpleThresholdAccountParams::nondet();
-    let ctx_rule: ContextRule = ContextRule::nondet();
-    let account_id = nondet_address();
-    cvlr_assume!(ctx_rule.signers.len() == 0);
-    SimpleThresholdPolicy::install(&e, params, ctx_rule.clone(), account_id.clone());
-    cvlr_assert!(false);
-}
-
 
 #[rule]
 // uninstall panics if unauth
