@@ -2,6 +2,7 @@
 .certora_internal
 emv-*
 local.conf
+*.wat
 
 **/target/
 /.idea
