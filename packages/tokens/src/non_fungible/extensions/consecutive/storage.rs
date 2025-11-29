@@ -2,10 +2,13 @@ use core::mem;
 
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, String, TryFromVal, Val, Vec};
 
+#[cfg(not(feature = "certora"))]
 use crate::non_fungible::{
     burnable::emit_burn,
     emit_transfer,
-    extensions::consecutive::emit_consecutive_mint,
+};
+
+use crate::non_fungible::{
     sequential::{self as sequential},
     Base, ContractOverrides, NonFungibleTokenError, OWNERSHIP_EXTEND_AMOUNT,
     OWNERSHIP_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT,
@@ -211,7 +214,7 @@ impl Consecutive {
 
         Self::set_ownership_in_bucket(e, last_id);
         e.storage().persistent().set(&NFTConsecutiveStorageKey::Owner(last_id), &to);
-
+        #[cfg(not(feature = "certora"))]
         emit_consecutive_mint(e, to, first_id, last_id);
 
         // return the last minted id
@@ -243,6 +246,7 @@ impl Consecutive {
         from.require_auth();
 
         Consecutive::update(e, Some(from), None, token_id);
+        #[cfg(not(feature = "certora"))]
         emit_burn(e, from, token_id);
     }
 
@@ -276,6 +280,7 @@ impl Consecutive {
         Base::check_spender_approval(e, spender, from, token_id);
 
         Consecutive::update(e, Some(from), None, token_id);
+        #[cfg(not(feature = "certora"))]
         emit_burn(e, from, token_id);
     }
 
@@ -306,6 +311,7 @@ impl Consecutive {
         from.require_auth();
 
         Consecutive::update(e, Some(from), Some(to), token_id);
+        #[cfg(not(feature = "certora"))]
         emit_transfer(e, from, to, token_id);
     }
 
@@ -341,6 +347,7 @@ impl Consecutive {
         Base::check_spender_approval(e, spender, from, token_id);
 
         Consecutive::update(e, Some(from), Some(to), token_id);
+        #[cfg(not(feature = "certora"))]
         emit_transfer(e, from, to, token_id);
     }
 

@@ -75,11 +75,17 @@ use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, By
 
 use crate::rwa::{
     claim_issuer::{
-        emit_key_allowed, emit_key_removed, emit_revocation_event, emit_signatures_invalidated,
         ClaimIssuerError, SignatureVerifier, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
         KEYS_EXTEND_AMOUNT, KEYS_TTL_THRESHOLD, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
     },
     claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
+};
+
+#[cfg(not(feature = "certora"))]
+use crate::rwa::{
+    claim_issuer::{
+        emit_key_allowed, emit_key_removed, emit_revocation_event, emit_signatures_invalidated,
+    },
 };
 
 #[contracttype]
@@ -316,7 +322,17 @@ pub fn get_registries(e: &Env, signing_key: &SigningKey) -> Vec<Address> {
         .iter()
         .map(|(_, addr)| addr);
 
-    Vec::from_iter(e, iter)
+    #[cfg(not(feature = "certora"))]
+    return Vec::from_iter(e, iter);
+
+    #[cfg(feature = "certora")]
+    {
+        let mut v: Vec<Address> = Vec::new(e);
+        for addr in iter {
+            v.push_back(addr);
+        }
+        v
+    }
 }
 
 /// Checks if a public key and its scheme are allowed to sign claims for a
@@ -493,7 +509,7 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
     }
 
     e.storage().persistent().set(&pairs_storage_key, &pairs);
-
+    #[cfg(not(feature = "certora"))]
     emit_key_allowed(e, public_key, registry, scheme, claim_topic);
 }
 
@@ -565,7 +581,7 @@ pub fn remove_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, 
             e.storage().persistent().set(&topics_storage_key, &topic_keys);
         }
     }
-
+    #[cfg(not(feature = "certora"))]
     emit_key_removed(e, public_key, registry, scheme, claim_topic);
 }
 
@@ -642,6 +658,7 @@ pub fn invalidate_claim_signatures(e: &Env, identity: &Address, claim_topic: u32
     let nonce_key = ClaimIssuerStorageKey::ClaimNonce(identity.clone(), claim_topic);
     let mut nonce: u32 = e.storage().persistent().get(&nonce_key).unwrap_or(0);
 
+    #[cfg(not(feature = "certora"))]
     emit_signatures_invalidated(e, identity, claim_topic, nonce);
 
     nonce = nonce
@@ -688,6 +705,7 @@ pub fn set_claim_revoked(
 
     e.storage().persistent().set(&ClaimIssuerStorageKey::RevokedClaim(claim_digest), &revoked);
 
+    #[cfg(not(feature = "certora"))]
     emit_revocation_event(e, identity, claim_topic, claim_data, revoked);
 }
 

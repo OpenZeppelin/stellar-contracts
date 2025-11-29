@@ -2,13 +2,21 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 use crate::{
-    fungible::{emit_transfer, Base, ContractOverrides},
+    fungible::{Base, ContractOverrides},
     rwa::{
-        compliance::ComplianceClient, emit_address_frozen, emit_burn, emit_compliance_set,
-        emit_identity_verifier_set, emit_mint, emit_recovery_success,
-        emit_token_onchain_id_updated, emit_tokens_frozen, emit_tokens_unfrozen,
+        compliance::ComplianceClient,
         identity_verifier::IdentityVerifierClient, RWAError, FROZEN_EXTEND_AMOUNT,
         FROZEN_TTL_THRESHOLD,
+    },
+};
+
+#[cfg(not(feature = "certora"))]
+use crate::{
+    fungible::{emit_transfer,},
+    rwa::{
+        emit_address_frozen, emit_burn, emit_compliance_set,
+        emit_identity_verifier_set, emit_mint, emit_recovery_success,
+        emit_token_onchain_id_updated, emit_tokens_frozen, emit_tokens_unfrozen,
     },
 };
 
@@ -210,6 +218,7 @@ impl RWA {
             let new_frozen = current_frozen - tokens_to_unfreeze;
 
             e.storage().persistent().set(&RWAStorageKey::FrozenTokens(from.clone()), &new_frozen);
+            #[cfg(not(feature = "certora"))]
             emit_tokens_unfrozen(e, from, tokens_to_unfreeze);
         }
 
@@ -218,7 +227,7 @@ impl RWA {
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
         compliance_client.transferred(from, to, &amount, &e.current_contract_address());
-
+        #[cfg(not(feature = "certora"))]
         emit_transfer(e, from, to, amount);
     }
 
@@ -276,7 +285,7 @@ impl RWA {
         Base::update(e, None, Some(to), amount);
 
         compliance_client.created(to, &amount, &e.current_contract_address());
-
+        #[cfg(not(feature = "certora"))]
         emit_mint(e, to, amount);
     }
 
@@ -318,6 +327,7 @@ impl RWA {
             e.storage()
                 .persistent()
                 .set(&RWAStorageKey::FrozenTokens(user_address.clone()), &new_frozen);
+            #[cfg(not(feature = "certora"))]
             emit_tokens_unfrozen(e, user_address, tokens_to_unfreeze);
         }
 
@@ -326,7 +336,7 @@ impl RWA {
         let compliance_addr = Self::compliance(e);
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
         compliance_client.destroyed(user_address, &amount, &e.current_contract_address());
-
+        #[cfg(not(feature = "certora"))]
         emit_burn(e, user_address, amount);
     }
 
@@ -410,7 +420,7 @@ impl RWA {
         if is_address_frozen {
             Self::set_address_frozen(e, new_account, true);
         }
-
+        #[cfg(not(feature = "certora"))]
         emit_recovery_success(e, old_account, new_account);
 
         true
@@ -437,7 +447,7 @@ impl RWA {
     /// authorization logic.
     pub fn set_address_frozen(e: &Env, user_address: &Address, freeze: bool) {
         e.storage().persistent().set(&RWAStorageKey::AddressFrozen(user_address.clone()), &freeze);
-
+        #[cfg(not(feature = "certora"))]
         emit_address_frozen(e, user_address, freeze);
     }
 
@@ -481,6 +491,7 @@ impl RWA {
         e.storage()
             .persistent()
             .set(&RWAStorageKey::FrozenTokens(user_address.clone()), &new_frozen);
+        #[cfg(not(feature = "certora"))]
         emit_tokens_frozen(e, user_address, amount);
     }
 
@@ -522,6 +533,7 @@ impl RWA {
         e.storage()
             .persistent()
             .set(&RWAStorageKey::FrozenTokens(user_address.clone()), &new_frozen);
+        #[cfg(not(feature = "certora"))]
         emit_tokens_unfrozen(e, user_address, amount);
     }
 
@@ -545,7 +557,7 @@ impl RWA {
     /// authorization logic.
     pub fn set_onchain_id(e: &Env, onchain_id: &Address) {
         e.storage().instance().set(&RWAStorageKey::OnchainId, onchain_id);
-
+        #[cfg(not(feature = "certora"))]
         emit_token_onchain_id_updated(e, onchain_id);
     }
 
@@ -568,6 +580,7 @@ impl RWA {
     /// authorization logic.
     pub fn set_compliance(e: &Env, compliance: &Address) {
         e.storage().instance().set(&RWAStorageKey::Compliance, compliance);
+        #[cfg(not(feature = "certora"))]
         emit_compliance_set(e, compliance);
     }
 
@@ -590,6 +603,7 @@ impl RWA {
     /// authorization logic.
     pub fn set_identity_verifier(e: &Env, identity_verifier: &Address) {
         e.storage().instance().set(&RWAStorageKey::IdentityVerifier, identity_verifier);
+        #[cfg(not(feature = "certora"))]
         emit_identity_verifier_set(e, identity_verifier);
     }
 
@@ -649,7 +663,7 @@ impl RWA {
         Base::update(e, Some(from), Some(to), amount);
 
         compliance_client.transferred(from, to, &amount, &e.current_contract_address());
-
+        #[cfg(not(feature = "certora"))]
         emit_transfer(e, from, to, amount);
     }
 

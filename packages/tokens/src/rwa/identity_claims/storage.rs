@@ -28,8 +28,14 @@ use soroban_sdk::{
 };
 
 use super::{
-    emit_claim_event, ClaimEvent, ClaimsError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
+    ClaimEvent, ClaimsError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
 };
+
+#[cfg(not(feature = "certora"))]
+use super::{
+    emit_claim_event,
+};
+
 use crate::rwa::claim_issuer::ClaimIssuerClient;
 
 /// Represents a claim stored on-chain.
@@ -120,8 +126,10 @@ pub fn add_claim(
     // Emit appropriate event
     if is_new_claim {
         add_claim_to_topic_index(e, topic, &claim_id);
+        #[cfg(not(feature = "certora"))]
         emit_claim_event(e, ClaimEvent::Added, claim);
     } else {
+        #[cfg(not(feature = "certora"))]
         emit_claim_event(e, ClaimEvent::Changed, claim);
     }
 
@@ -206,7 +214,7 @@ pub fn remove_claim(e: &Env, claim_id: &BytesN<32>) {
     e.storage().persistent().remove(&claim_key);
 
     remove_claim_from_topic_index(e, claim.topic, claim_id);
-
+    #[cfg(not(feature = "certora"))]
     emit_claim_event(e, ClaimEvent::Removed, claim);
 }
 

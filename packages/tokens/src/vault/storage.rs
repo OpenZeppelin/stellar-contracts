@@ -3,7 +3,12 @@ use stellar_contract_utils::math::fixed_point::{muldiv, Rounding};
 
 use crate::{
     fungible::{Base, ContractOverrides},
-    vault::{emit_deposit, emit_withdraw, VaultTokenError, MAX_DECIMALS_OFFSET},
+    vault::{VaultTokenError, MAX_DECIMALS_OFFSET},
+};
+
+#[cfg(not(feature = "certora"))]
+use crate::{
+    vault::{emit_deposit, emit_withdraw,},
 };
 
 pub struct Vault;
@@ -743,7 +748,7 @@ impl Vault {
 
         if operator == from {
             // Direct transfer: `operator` is depositing their own assets
-            token_client.transfer(from, e.current_contract_address(), &assets);
+            token_client.transfer(from, &e.current_contract_address(), &assets);
         } else {
             // Allowance-based transfer: `operator` is depositing on behalf of `from`
             // This requires that `from` has approved `operator` on the underlying asset
@@ -751,6 +756,7 @@ impl Vault {
         }
 
         Base::mint(e, receiver, shares);
+        #[cfg(not(feature = "certora"))]
         emit_deposit(e, operator, from, receiver, assets, shares);
     }
 
@@ -798,6 +804,7 @@ impl Vault {
         // `safeTransfer` mechanism is not present in the base module, (will be provided
         // as an extension)
         token_client.transfer(&e.current_contract_address(), receiver, &assets);
+        #[cfg(not(feature = "certora"))]
         emit_withdraw(e, operator, receiver, owner, assets, shares);
     }
 

@@ -77,9 +77,18 @@ mod test;
 
 pub use extensions::{allowlist, blocklist, burnable, capped};
 pub use overrides::{Base, ContractOverrides};
-use soroban_sdk::{contracterror, contractevent, Address, Env, String};
+use soroban_sdk::{contracterror, Address, Env, String};
 pub use storage::{AllowanceData, AllowanceKey, StorageKey};
 pub use utils::{sac_admin_generic, sac_admin_wrapper};
+
+#[cfg(feature = "certora")]
+pub mod specs;
+
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
 
 /// Vanilla Fungible Token Trait
 ///
@@ -347,6 +356,7 @@ pub struct Transfer {
 /// * `from` - The address holding the tokens.
 /// * `to` - The address receiving the transferred tokens.
 /// * `amount` - The amount of tokens to be transferred.
+#[cfg(not(feature = "certora"))]
 pub fn emit_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
     Transfer { from: from.clone(), to: to.clone(), amount }.publish(e);
 }
@@ -372,6 +382,7 @@ pub struct Approve {
 /// * `spender` - The address authorized to spend the tokens.
 /// * `amount` - The amount of tokens made available to `spender`.
 /// * `live_until_ledger` - The ledger number at which the allowance expires.
+#[cfg(not(feature = "certora"))]
 pub fn emit_approve(
     e: &Env,
     owner: &Address,
@@ -399,6 +410,7 @@ pub struct Mint {
 /// * `e` - Access to Soroban environment.
 /// * `to` - The address receiving the new tokens.
 /// * `amount` - The amount of tokens to mint.
+#[cfg(not(feature = "certora"))]
 pub fn emit_mint(e: &Env, to: &Address, amount: i128) {
     Mint { to: to.clone(), amount }.publish(e);
 }

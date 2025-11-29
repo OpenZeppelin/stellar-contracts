@@ -1,7 +1,12 @@
 use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env, String, Symbol};
 
+#[cfg(not(feature = "certora"))]
 use crate::fungible::{
-    emit_approve, emit_mint, emit_transfer, Base, FungibleTokenError, BALANCE_EXTEND_AMOUNT,
+    emit_approve, emit_mint, emit_transfer,};
+
+
+use crate::fungible::{
+    Base, FungibleTokenError, BALANCE_EXTEND_AMOUNT,
     BALANCE_TTL_THRESHOLD,
 };
 
@@ -211,6 +216,7 @@ impl Base {
     ) {
         owner.require_auth();
         Base::set_allowance(e, owner, spender, amount, live_until_ledger);
+        #[cfg(not(feature = "certora"))]
         emit_approve(e, owner, spender, amount, live_until_ledger);
     }
 
@@ -348,6 +354,7 @@ impl Base {
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         from.require_auth();
         Base::update(e, Some(from), Some(to), amount);
+        #[cfg(not(feature = "certora"))]
         emit_transfer(e, from, to, amount);
     }
 
@@ -381,6 +388,7 @@ impl Base {
         spender.require_auth();
         Base::spend_allowance(e, from, spender, amount);
         Base::update(e, Some(from), Some(to), amount);
+        #[cfg(not(feature = "certora"))]
         emit_transfer(e, from, to, amount);
     }
 
@@ -476,6 +484,7 @@ impl Base {
     /// ```
     pub fn mint(e: &Env, to: &Address, amount: i128) {
         Base::update(e, None, Some(to), amount);
+        #[cfg(not(feature = "certora"))]
         emit_mint(e, to, amount);
     }
 

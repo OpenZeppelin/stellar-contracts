@@ -2,10 +2,17 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 
 use crate::rwa::{
     compliance::{
-        emit_module_added, emit_module_removed, ComplianceError, ComplianceHook,
+        ComplianceError, ComplianceHook,
         ComplianceModuleClient, COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
     },
     utils::token_binder::is_token_bound,
+};
+
+#[cfg(not(feature = "certora"))]
+use crate::rwa::{
+    compliance::{
+        emit_module_added, emit_module_removed,
+    }
 };
 
 /// Storage keys for the modular compliance contract.
@@ -115,6 +122,7 @@ pub fn add_module_to(e: &Env, hook: ComplianceHook, module: Address) {
     e.storage().persistent().set(&key, &modules);
 
     // Emit event
+    #[cfg(not(feature = "certora"))]
     emit_module_added(e, hook, module);
 }
 
@@ -163,6 +171,7 @@ pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
     e.storage().persistent().set(&key, &modules);
 
     // Emit event
+    #[cfg(not(feature = "certora"))]
     emit_module_removed(e, hook, module);
 }
 

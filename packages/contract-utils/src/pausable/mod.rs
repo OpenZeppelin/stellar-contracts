@@ -158,8 +158,9 @@ pub struct Paused {}
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
+#[cfg(not(feature = "certora"))]
 pub fn emit_paused(e: &Env) {
-    // Paused {}.publish(e);
+    Paused {}.publish(e);
 }
 
 /// Event emitted when the contract is unpaused.
@@ -172,6 +173,7 @@ pub struct Unpaused {}
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
+#[cfg(not(feature = "certora"))]
 pub fn emit_unpaused(e: &Env) {
-    // Unpaused {}.publish(e);
+    Unpaused {}.publish(e);
 }

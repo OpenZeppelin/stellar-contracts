@@ -1,7 +1,12 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
+#[cfg(not(feature = "certora"))]
 use crate::non_fungible::{
     royalties::{emit_set_default_royalty, emit_set_token_royalty},
+};
+
+
+use crate::non_fungible::{
     Base, NonFungibleTokenError, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
 };
 
@@ -56,7 +61,7 @@ impl Base {
         let key = NFTRoyaltiesStorageKey::DefaultRoyalty;
         let royalty_info = RoyaltyInfo { receiver: receiver.clone(), basis_points };
         e.storage().instance().set(&key, &royalty_info);
-
+        #[cfg(not(feature = "certora"))]
         emit_set_default_royalty(e, receiver, basis_points);
     }
 
@@ -101,7 +106,7 @@ impl Base {
         let key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
         let royalty_info = RoyaltyInfo { receiver: receiver.clone(), basis_points };
         e.storage().persistent().set(&key, &royalty_info);
-
+        #[cfg(not(feature = "certora"))]
         emit_set_token_royalty(e, receiver, token_id, basis_points);
     }
 
@@ -134,7 +139,7 @@ impl Base {
         // Remove the token royalty information
         let key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
         e.storage().persistent().remove(&key);
-
+        #[cfg(not(feature = "certora"))]
         super::emit_remove_token_royalty(e, token_id);
     }
 

@@ -72,10 +72,16 @@ mod utils;
 #[cfg(test)]
 mod test;
 
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
+
 pub use extensions::{burnable, consecutive, enumerable, royalties};
 pub use overrides::{Base, ContractOverrides};
 // ################## TRAIT ##################
-use soroban_sdk::{contracterror, contractevent, Address, Env, String};
+use soroban_sdk::{contracterror, Address, Env, String};
 pub use storage::{ApprovalData, NFTStorageKey};
 pub use utils::sequential;
 
@@ -420,6 +426,7 @@ pub struct Transfer {
 /// * `from` - The sender address.
 /// * `to` - The recipient address.
 /// * `token_id` - The token identifier.
+#[cfg(not(feature = "certora"))]
 pub fn emit_transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
     Transfer { from: from.clone(), to: to.clone(), token_id }.publish(e);
 }
@@ -446,6 +453,7 @@ pub struct Approve {
 /// * `approved` - The approved address.
 /// * `token_id` - The token identifier.
 /// * `live_until_ledger` - The ledger number until which the approval is valid.
+#[cfg(not(feature = "certora"))]
 pub fn emit_approve(
     e: &Env,
     approver: &Address,
@@ -476,6 +484,7 @@ pub struct ApproveForAll {
 /// * `owner` - The owner address.
 /// * `operator` - The operator address.
 /// * `live_until_ledger` - The ledger number until which the approval is valid.
+#[cfg(not(feature = "certora"))]
 pub fn emit_approve_for_all(e: &Env, owner: &Address, operator: &Address, live_until_ledger: u32) {
     ApproveForAll { owner: owner.clone(), operator: operator.clone(), live_until_ledger }
         .publish(e);
@@ -497,6 +506,7 @@ pub struct Mint {
 /// * `e` - The Soroban environment.
 /// * `to` - The recipient address.
 /// * `token_id` - The token identifier.
+#[cfg(not(feature = "certora"))]
 pub fn emit_mint(e: &Env, to: &Address, token_id: u32) {
     Mint { to: to.clone(), token_id }.publish(e);
 }

@@ -1,6 +1,12 @@
 use soroban_sdk::{
-    contractclient, contracterror, contractevent, contracttype, Address, Env, String, Vec,
+    contractclient, contracterror, contracttype, Address, Env, String, Vec,
 };
+
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
 
 use crate::rwa::utils::token_binder::TokenBinder;
 
@@ -236,6 +242,7 @@ pub struct ModuleAdded {
 /// * `e` - Access to the Soroban environment.
 /// * `hook` - The hook type the module is registered for.
 /// * `module` - The address of the module.
+#[cfg(not(feature = "certora"))]
 pub fn emit_module_added(e: &Env, hook: ComplianceHook, module: Address) {
     ModuleAdded { hook, module }.publish(e);
 }
@@ -257,6 +264,7 @@ pub struct ModuleRemoved {
 /// * `e` - Access to the Soroban environment.
 /// * `hook` - The hook type the module is registered for.
 /// * `module` - The address of the module.
+#[cfg(not(feature = "certora"))]
 pub fn emit_module_removed(e: &Env, hook: ComplianceHook, module: Address) {
     ModuleRemoved { hook, module }.publish(e);
 }

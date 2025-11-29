@@ -1952,6 +1952,10 @@ dependencies = [
 name = "stellar-tokens"
 version = "0.5.1"
 dependencies = [
+ "cvlr",
+ "cvlr-soroban",
+ "cvlr-soroban-derive",
+ "cvlr-soroban-macros",
  "ed25519-dalek",
  "k256",
  "p256",

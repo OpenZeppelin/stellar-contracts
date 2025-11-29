@@ -1,6 +1,9 @@
 use soroban_sdk::{Address, Env};
 
-use crate::non_fungible::{burnable::emit_burn, Base};
+#[cfg(not(feature = "certora"))]
+use crate::non_fungible::{burnable::emit_burn};
+
+use crate::non_fungible::{Base};
 
 impl Base {
     /// Destroys the token with `token_id` from `from`, ensuring ownership
@@ -27,6 +30,7 @@ impl Base {
     pub fn burn(e: &Env, from: &Address, token_id: u32) {
         from.require_auth();
         Base::update(e, Some(from), None, token_id);
+        #[cfg(not(feature = "certora"))]
         emit_burn(e, from, token_id);
     }
 
@@ -58,6 +62,7 @@ impl Base {
         spender.require_auth();
         Base::check_spender_approval(e, spender, from, token_id);
         Base::update(e, Some(from), None, token_id);
+        #[cfg(not(feature = "certora"))]
         emit_burn(e, from, token_id);
     }
 }

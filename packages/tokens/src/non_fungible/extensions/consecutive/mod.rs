@@ -62,7 +62,14 @@
 //!   in this extension must be used. Using other minting functions will break
 //!   the logic of tracking ownership.
 pub mod storage;
-use soroban_sdk::{contractevent, Address, Env};
+
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
+
+use soroban_sdk::{Address};
 pub use storage::Consecutive;
 
 use crate::non_fungible::NonFungibleToken;
@@ -100,6 +107,7 @@ pub struct ConsecutiveMint {
 /// * `to` - The recipient address.
 /// * `from_token_id` - The starting token identifier.
 /// * `to_token_id` - The ending token identifier.
+#[cfg(not(feature = "certora"))]
 pub fn emit_consecutive_mint(e: &Env, to: &Address, from_token_id: u32, to_token_id: u32) {
     ConsecutiveMint { to: to.clone(), from_token_id, to_token_id }.publish(e);
 }

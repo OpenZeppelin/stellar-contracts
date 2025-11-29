@@ -1,8 +1,13 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map, TryFromVal, Val, Vec};
 
 use crate::rwa::utils::token_binder::{
-    emit_token_bound, emit_token_unbound, TokenBinderError, BUCKET_SIZE, MAX_TOKENS,
+    TokenBinderError, BUCKET_SIZE, MAX_TOKENS,
     TOKEN_BINDER_EXTEND_AMOUNT, TOKEN_BINDER_TTL_THRESHOLD,
+};
+
+#[cfg(not(feature = "certora"))]
+use crate::rwa::utils::token_binder::{
+    emit_token_bound, emit_token_unbound,
 };
 
 /// Storage keys for the token binder system.
@@ -193,7 +198,7 @@ pub fn bind_token(e: &Env, token: &Address) {
 
     count += 1;
     e.storage().persistent().set(&TokenBinderStorageKey::TotalCount, &count);
-
+    #[cfg(not(feature = "certora"))]
     emit_token_bound(e, token);
 }
 
@@ -281,6 +286,7 @@ pub fn bind_tokens(e: &Env, tokens: &Vec<Address>) {
                 panic_with_error!(e, TokenBinderError::TokenAlreadyBound)
             }
             bucket.push_back(token.clone());
+            #[cfg(not(feature = "certora"))]
             emit_token_bound(e, &token);
             i += 1;
             count += 1;
@@ -355,7 +361,7 @@ pub fn unbind_token(e: &Env, token: &Address) {
 
     // Update total count
     e.storage().persistent().set(&TokenBinderStorageKey::TotalCount, &last_index);
-
+    #[cfg(not(feature = "certora"))]
     emit_token_unbound(e, token);
 }
 

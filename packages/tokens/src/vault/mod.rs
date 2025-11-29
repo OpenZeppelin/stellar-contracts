@@ -3,7 +3,13 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env};
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
+
+use soroban_sdk::{contracterror, Address, Env};
 pub use storage::Vault;
 
 use crate::fungible::FungibleToken;
@@ -410,6 +416,7 @@ pub struct Deposit {
 /// * `assets` - The amount of underlying assets being deposited into the vault.
 /// * `shares` - The amount of vault shares being minted in exchange for the
 ///   assets.
+#[cfg(not(feature = "certora"))]
 pub fn emit_deposit(
     e: &Env,
     operator: &Address,
@@ -455,6 +462,7 @@ pub struct Withdraw {
 /// * `assets` - The amount of underlying assets being withdrawn from the vault.
 /// * `shares` - The amount of vault shares being burned in exchange for the
 ///   assets.
+#[cfg(not(feature = "certora"))]
 pub fn emit_withdraw(
     e: &Env,
     operator: &Address,

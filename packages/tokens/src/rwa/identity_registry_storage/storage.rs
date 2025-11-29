@@ -125,9 +125,14 @@ use soroban_sdk::{
 };
 
 use crate::rwa::identity_registry_storage::{
-    emit_country_data_event, emit_identity_modified, emit_identity_recovered, emit_identity_stored,
-    emit_identity_unstored, CountryDataEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
+    CountryDataEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
     IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_ENTRIES,
+};
+
+#[cfg(not(feature = "certora"))]
+use crate::rwa::identity_registry_storage::{
+    emit_country_data_event, emit_identity_modified, emit_identity_recovered, emit_identity_stored,
+    emit_identity_unstored,
 };
 
 /// Represents the type of identity holder
@@ -361,7 +366,7 @@ pub fn add_identity(
         panic_with_error!(e, IRSError::IdentityOverwrite)
     }
     e.storage().persistent().set(&identity_key, identity);
-
+    #[cfg(not(feature = "certora"))]
     emit_identity_stored(e, account, identity);
 
     let profile = IdentityProfile { identity_type, countries: initial_countries.clone() };
@@ -369,6 +374,7 @@ pub fn add_identity(
     e.storage().persistent().set(&IRSStorageKey::IdentityProfile(account.clone()), &profile);
 
     for country_data in initial_countries.iter() {
+        #[cfg(not(feature = "certora"))]
         emit_country_data_event(e, CountryDataEvent::Added, account, &country_data);
     }
 }
@@ -411,7 +417,7 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
 
     e.storage().persistent().set(&key, new_identity);
-
+    #[cfg(not(feature = "certora"))]
     emit_identity_modified(e, &old_identity, new_identity);
 }
 
@@ -455,7 +461,7 @@ pub fn remove_identity(e: &Env, account: &Address) {
         .get(&identity_key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
     e.storage().persistent().remove(&identity_key);
-
+    #[cfg(not(feature = "certora"))]
     emit_identity_unstored(e, account, &identity);
 
     // Remove all associated identity profile
@@ -465,6 +471,7 @@ pub fn remove_identity(e: &Env, account: &Address) {
     e.storage().persistent().remove(&profile_key);
 
     for country_data in profile.countries {
+        #[cfg(not(feature = "certora"))]
         emit_country_data_event(e, CountryDataEvent::Removed, account, &country_data);
     }
 }
@@ -547,7 +554,7 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
 
     // Mark old account as recovered to new account
     e.storage().persistent().set(&IRSStorageKey::RecoveredTo(old_account.clone()), new_account);
-
+    #[cfg(not(feature = "certora"))]
     emit_identity_recovered(e, old_account, new_account);
 }
 
@@ -601,6 +608,7 @@ pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &
     e.storage().persistent().set(&key, &profile);
 
     for country_data in country_data_list.iter() {
+        #[cfg(not(feature = "certora"))]
         emit_country_data_event(e, CountryDataEvent::Added, account, &country_data);
     }
 }
@@ -643,7 +651,7 @@ pub fn modify_country_data(e: &Env, account: &Address, index: u32, country_data:
 
     let key = IRSStorageKey::IdentityProfile(account.clone());
     e.storage().persistent().set(&key, &profile);
-
+    #[cfg(not(feature = "certora"))]
     emit_country_data_event(e, CountryDataEvent::Modified, account, country_data);
 }
 
@@ -692,7 +700,7 @@ pub fn delete_country_data(e: &Env, account: &Address, index: u32) {
 
     let key = IRSStorageKey::IdentityProfile(account.clone());
     e.storage().persistent().set(&key, &profile);
-
+    #[cfg(not(feature = "certora"))]
     emit_country_data_event(e, CountryDataEvent::Removed, account, &country_data_to_remove);
 }
 

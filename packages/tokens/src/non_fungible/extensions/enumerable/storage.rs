@@ -1,7 +1,12 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
+#[cfg(not(feature = "certora"))]
 use crate::non_fungible::{
-    emit_mint, Base, ContractOverrides, NonFungibleTokenError, OWNER_EXTEND_AMOUNT,
+    emit_mint,
+};
+
+use crate::non_fungible::{
+    Base, ContractOverrides, NonFungibleTokenError, OWNER_EXTEND_AMOUNT,
     OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
 
@@ -199,6 +204,7 @@ impl Enumerable {
     /// implemented accordingly.
     pub fn non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
         Base::update(e, None, Some(to), token_id);
+        #[cfg(not(feature = "certora"))]
         emit_mint(e, to, token_id);
 
         Enumerable::add_to_enumerations(e, to, token_id);

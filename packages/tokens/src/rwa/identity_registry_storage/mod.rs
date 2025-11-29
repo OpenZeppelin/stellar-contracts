@@ -276,7 +276,13 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env, FromVal, Val, Vec};
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
+
+use soroban_sdk::{contracterror, Address, Env, FromVal, Val, Vec};
 pub use storage::{
     add_country_data_entries, add_identity, delete_country_data, get_country_data,
     get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
@@ -528,6 +534,7 @@ pub struct IdentityStored {
 /// * `e` - The Soroban environment.
 /// * `account` - The account address associated with the identity.
 /// * `identity` - The identity address that was stored.
+#[cfg(not(feature = "certora"))]
 pub fn emit_identity_stored(e: &Env, account: &Address, identity: &Address) {
     IdentityStored { account: account.clone(), identity: identity.clone() }.publish(e);
 }
@@ -549,6 +556,7 @@ pub struct IdentityUnstored {
 /// * `e` - The Soroban environment.
 /// * `account` - The account address that had its identity removed.
 /// * `identity` - The identity address that was removed.
+#[cfg(not(feature = "certora"))]
 pub fn emit_identity_unstored(e: &Env, account: &Address, identity: &Address) {
     IdentityUnstored { account: account.clone(), identity: identity.clone() }.publish(e);
 }
@@ -570,6 +578,7 @@ pub struct IdentityModified {
 /// * `e` - The Soroban environment.
 /// * `old_identity` - The previous identity address.
 /// * `new_identity` - The new identity address.
+#[cfg(not(feature = "certora"))]
 pub fn emit_identity_modified(e: &Env, old_identity: &Address, new_identity: &Address) {
     IdentityModified { old_identity: old_identity.clone(), new_identity: new_identity.clone() }
         .publish(e);
@@ -592,6 +601,7 @@ pub struct IdentityRecovered {
 /// * `e` - The Soroban environment.
 /// * `old_account` - The previous account address.
 /// * `new_account` - The new account address.
+#[cfg(not(feature = "certora"))]
 pub fn emit_identity_recovered(e: &Env, old_account: &Address, new_account: &Address) {
     IdentityRecovered { old_account: old_account.clone(), new_account: new_account.clone() }
         .publish(e);
@@ -633,6 +643,7 @@ pub struct CountryDataModified {
 /// * `event_type` - The type of country data event.
 /// * `account` - The account address associated with the country data.
 /// * `country_data` - The country data that was affected.
+#[cfg(not(feature = "certora"))]
 pub fn emit_country_data_event(
     e: &Env,
     event_type: CountryDataEvent,

@@ -54,7 +54,6 @@ mod test;
 #[cfg(feature = "certora")]
 pub mod specs;
 
-
 use core::marker::PhantomData;
 
 #[cfg(not(feature = "certora"))]

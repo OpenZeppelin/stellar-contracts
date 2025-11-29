@@ -3,7 +3,13 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractevent, Address, Env};
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
+
+use soroban_sdk::{Address, Env};
 
 use crate::fungible::FungibleToken;
 
@@ -87,6 +93,7 @@ pub struct Burn {
 /// * `e` - Access to Soroban environment.
 /// * `from` - The address holding the tokens.
 /// * `amount` - The amount of tokens to be burned.
+#[cfg(not(feature = "certora"))]
 pub fn emit_burn(e: &Env, from: &Address, amount: i128) {
     Burn { from: from.clone(), amount }.publish(e);
 }

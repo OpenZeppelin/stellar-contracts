@@ -13,6 +13,10 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+cvlr = { workspace = true, default-features = false }
+cvlr-soroban = { workspace = true }
+cvlr-soroban-macros = { workspace = true }
+cvlr-soroban-derive = { workspace = true }
 stellar-contract-utils = { workspace = true }
 
 [dev-dependencies]
@@ -22,3 +26,6 @@ soroban-test-helpers = { workspace = true }
 stellar-event-assertion = { workspace = true }
 k256 = { workspace = true, features = ["ecdsa"] }
 p256 = { workspace = true, features = ["ecdsa"] }
+
+[features]
+certora  = ["stellar-contract-utils/certora"]

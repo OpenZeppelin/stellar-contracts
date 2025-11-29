@@ -1,7 +1,11 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
+#[cfg(not(feature = "certora"))]
 use crate::fungible::{
     extensions::allowlist::{emit_user_allowed, emit_user_disallowed},
+};
+
+use crate::fungible::{
     overrides::{Base, ContractOverrides},
     FungibleTokenError, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
@@ -82,7 +86,7 @@ impl AllowList {
         // if the user is not allowed, allow them
         if !e.storage().persistent().has(&key) {
             e.storage().persistent().set(&key, &());
-
+            #[cfg(not(feature = "certora"))]
             emit_user_allowed(e, user);
         }
     }
@@ -115,7 +119,7 @@ impl AllowList {
         // if the user is currently allowed, disallow them
         if e.storage().persistent().has(&key) {
             e.storage().persistent().remove(&key);
-
+            #[cfg(not(feature = "certora"))]
             emit_user_disallowed(e, user);
         }
     }

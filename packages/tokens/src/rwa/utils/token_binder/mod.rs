@@ -3,7 +3,13 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractclient, contracterror, contractevent, Address, Env, Vec};
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::{contractevent};
+
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
+
+use soroban_sdk::{contractclient, contracterror, Address, Env, Vec};
 pub use storage::{
     bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound, linked_tokens,
     unbind_token,
@@ -125,6 +131,7 @@ pub struct TokenBound {
 ///
 /// * `e` - The Soroban environment
 /// * `token` - The token address that was bound
+#[cfg(not(feature = "certora"))]
 pub fn emit_token_bound(e: &Env, token: &Address) {
     TokenBound { token: token.clone() }.publish(e);
 }
@@ -143,6 +150,7 @@ pub struct TokenUnbound {
 ///
 /// * `e` - The Soroban environment
 /// * `token` - The token address that was unbound
+#[cfg(not(feature = "certora"))]
 fn emit_token_unbound(e: &Env, token: &Address) {
     TokenUnbound { token: token.clone() }.publish(e);
 }
