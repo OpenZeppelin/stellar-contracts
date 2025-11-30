@@ -26,7 +26,7 @@ impl WeightedThresholdPolicy {
     }
 }
 
-#[contractimpl]
+// #[contractimpl] -- doesn't compile with this because of duplicate names of contract functions in the same crate.
 impl Policy for WeightedThresholdPolicy {
     type AccountParams = WeightedThresholdAccountParams;
 

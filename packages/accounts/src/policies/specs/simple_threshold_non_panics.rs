@@ -71,7 +71,7 @@ pub fn can_enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
 #[rule]
 // requires
 // can_enforce returns true
-// status: violated - unreachable - unwrap_failed
+// status: violated - unreachable - unwrap_failed in nondet_bytes_n
 pub fn enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
     let authenticated_signers: Vec<Signer> = nondet_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
