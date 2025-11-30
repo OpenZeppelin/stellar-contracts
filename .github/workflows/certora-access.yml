@@ -7,6 +7,7 @@ env:
     access_control_integrity.conf
     access_control_invariants.conf
     access_control_non_panics.conf
+    access_control_revoke_role_non_panic.conf
     access_control_panics.conf
     access_control_sanity.conf
     ownable_integrity.conf
