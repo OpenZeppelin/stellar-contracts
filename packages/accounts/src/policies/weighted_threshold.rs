@@ -62,6 +62,7 @@
 //! ```
 
 use cvlr::nondet::*;
+use cvlr::clog;
 use cvlr_soroban::nondet_map;
 use soroban_sdk::{
     auth::Context, contracterror, contracttype, panic_with_error, Address, Env, Map,
@@ -163,6 +164,7 @@ pub fn get_threshold(e: &Env, context_rule_id: u32, smart_account: &Address) -> 
                 WEIGHTED_THRESHOLD_EXTEND_AMOUNT,
             );
         });
+    clog!(params.is_some());
 
     params
         .map(|p| p.threshold)
@@ -260,7 +262,7 @@ pub fn can_enforce(
 ) -> bool {
     let key = WeightedThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
     let params: Option<WeightedThresholdAccountParams> = e.storage().persistent().get(&key);
-
+    clog!(params.is_some());
     if let Some(params) = params {
         e.storage().persistent().extend_ttl(
             &key,
