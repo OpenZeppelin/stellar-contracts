@@ -2,8 +2,8 @@ use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
 use stellar_contract_utils::math::fixed_point::{muldiv, Rounding};
 
 use crate::{
-    fungible::{Base, ContractOverrides},
-    vault::{VaultTokenError, MAX_DECIMALS_OFFSET},
+    fungible::{Base, ContractOverrides, FungibleToken},
+    vault::{MAX_DECIMALS_OFFSET, VaultTokenError, specs::basic_token::{self, BasicToken}},
 };
 
 #[cfg(not(feature = "certora"))]
@@ -145,8 +145,12 @@ impl Vault {
     /// See the ERC-4626 Compliance Note in that function's documentation for
     /// details on the deviation from the standard.
     pub fn total_assets(e: &Env) -> i128 {
+        #[cfg(not(feature = "certora"))]
         let token_client = token::Client::new(e, &Self::query_asset(e));
-        token_client.balance(&e.current_contract_address())
+        #[cfg(not(feature = "certora"))]
+        return token_client.balance(&e.current_contract_address());
+        #[cfg(feature = "certora")]
+        BasicToken::balance(e, e.current_contract_address())
     }
 
     /// Converts an amount of underlying assets to the equivalent amount of
@@ -742,17 +746,23 @@ impl Vault {
     ) {
         // This function assumes prior authorization of the operator and validation of
         // amounts.
+        #[cfg(not(feature = "certora"))]
         let token_client = token::Client::new(e, &Self::query_asset(e));
         // `safeTransfer` mechanism is not present in the base module, (will be provided
         // as an extension)
-
         if operator == from {
             // Direct transfer: `operator` is depositing their own assets
+            #[cfg(not(feature = "certora"))]
             token_client.transfer(from, &e.current_contract_address(), &assets);
+            #[cfg(feature = "certora")]
+            BasicToken::transfer(e, from.clone(), e.current_contract_address(), assets);
         } else {
             // Allowance-based transfer: `operator` is depositing on behalf of `from`
             // This requires that `from` has approved `operator` on the underlying asset
+            #[cfg(not(feature = "certora"))]
             token_client.transfer_from(operator, from, &e.current_contract_address(), &assets);
+            #[cfg(feature = "certora")]
+            BasicToken::transfer_from(e, operator.clone(), from.clone(), e.current_contract_address(), assets);
         }
 
         Base::mint(e, receiver, shares);
@@ -800,10 +810,14 @@ impl Vault {
             Base::spend_allowance(e, owner, operator, shares);
         }
         Base::update(e, Some(owner), None, shares);
+        #[cfg(not(feature = "certora"))]
         let token_client = token::Client::new(e, &Self::query_asset(e));
         // `safeTransfer` mechanism is not present in the base module, (will be provided
         // as an extension)
+        #[cfg(not(feature = "certora"))]
         token_client.transfer(&e.current_contract_address(), receiver, &assets);
+        #[cfg(feature = "certora")]
+        BasicToken::transfer(e, e.current_contract_address(), receiver.clone(), assets);
         #[cfg(not(feature = "certora"))]
         emit_withdraw(e, operator, receiver, owner, assets, shares);
     }
@@ -842,7 +856,11 @@ impl Vault {
     ///
     /// * refer to [`Self::query_asset()`] errors.
     pub fn get_underlying_asset_decimals(e: &Env) -> u32 {
+        #[cfg(not(feature = "certora"))]
         let token_client = token::Client::new(e, &Self::query_asset(e));
-        token_client.decimals()
+         #[cfg(not(feature = "certora"))]
+        return token_client.decimals();
+        #[cfg(feature = "certora")]
+        BasicToken::decimals(e)
     }
 }

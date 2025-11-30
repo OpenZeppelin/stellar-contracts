@@ -3,6 +3,9 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
+#[cfg(feature = "certora")]
+pub mod specs;
+
 #[cfg(not(feature = "certora"))]
 use soroban_sdk::{contractevent};
 
