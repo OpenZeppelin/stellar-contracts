@@ -283,7 +283,7 @@ pub fn renounce_admin_panics_if_admin_not_set(e: Env) {
 
 #[rule]
 // renounce_admin panics if there is a pending adminship transfer.
-// status: violated - bug!
+// status: bug
 pub fn renounce_admin_panics_if_pending_adminship_transfer(e: Env) {
     let pending_admin = get_pending_admin(&e);
     cvlr_assume!(pending_admin.is_some());
