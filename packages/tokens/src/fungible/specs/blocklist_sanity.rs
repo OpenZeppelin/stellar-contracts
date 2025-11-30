@@ -9,20 +9,20 @@ use crate::fungible::{
 
 
 #[rule]
-pub fn block_list_total_supply(e: Env) {
+pub fn block_list_total_supply_sanity(e: Env) {
     let _ = FungibleBlockListContract::total_supply(&e);
     cvlr_satisfy!(true);
 }
 
 #[rule]
-pub fn block_list_balance(e: Env) {
+pub fn block_list_balance_sanity(e: Env) {
     let account = nondet_address();
     let _ = FungibleBlockListContract::balance(&e, account);
     cvlr_satisfy!(true);
 }
 
 #[rule]
-pub fn block_list_allowance(e: Env) {
+pub fn block_list_allowance_sanity(e: Env) {
     let owner = nondet_address();
     let spender = nondet_address();
     let _ = FungibleBlockListContract::allowance(&e, owner, spender);
@@ -30,7 +30,7 @@ pub fn block_list_allowance(e: Env) {
 }
 
 #[rule]
-pub fn block_list_transfer(e: Env) {
+pub fn block_list_transfer_sanity(e: Env) {
     let to = nondet_address();
     let from = nondet_address();
     let amount = nondet();
@@ -39,7 +39,7 @@ pub fn block_list_transfer(e: Env) {
 }
 
 #[rule]
-pub fn block_list_transfer_from(e: Env) {
+pub fn block_list_transfer_from_sanity(e: Env) {
     let spender = nondet_address();
     let to = nondet_address();
     let from = nondet_address();
@@ -49,7 +49,7 @@ pub fn block_list_transfer_from(e: Env) {
 }
 
 #[rule]
-pub fn block_list_approve(e: Env) {
+pub fn block_list_approve_sanity(e: Env) {
     let owner = nondet_address();
     let spender = nondet_address();
     let amount = nondet();
@@ -59,19 +59,19 @@ pub fn block_list_approve(e: Env) {
 }
 
 #[rule]
-pub fn block_list_decimals(e: Env) {
+pub fn block_list_decimals_sanity(e: Env) {
     FungibleBlockListContract::decimals(&e);
     cvlr_satisfy!(true);
 }
 
 #[rule]
-pub fn block_list_name(e: Env) {
+pub fn block_list_name_sanity(e: Env) {
     FungibleBlockListContract::name(&e);
     cvlr_satisfy!(true);
 }
 
 #[rule]
-pub fn block_list_symbol(e: Env) {
+pub fn block_list_symbol_sanity(e: Env) {
     FungibleBlockListContract::symbol(&e);
     cvlr_satisfy!(true);
 }

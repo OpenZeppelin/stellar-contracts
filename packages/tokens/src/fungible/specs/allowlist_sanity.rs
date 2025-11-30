@@ -11,14 +11,14 @@ use crate::fungible::{
 };
 
 #[rule]
-pub fn allow_list_constructor(e: Env) {
+pub fn allow_list_constructor_sanity(e: Env) {
     let cap = nondet();
     FungibleAllowListContract::__constructor(&e, cap);
     cvlr_satisfy!(true);
 }
 
 #[rule]
-pub fn allow_list_mint(e: Env) {
+pub fn allow_list_mint_sanity(e: Env) {
     let account = nondet_address();
     let amount = nondet();
     FungibleAllowListContract::mint(&e, account, amount);
@@ -26,20 +26,20 @@ pub fn allow_list_mint(e: Env) {
 }
 
 #[rule]
-pub fn allow_list_total_supply(e: Env) {
+pub fn allow_list_total_supply_sanity(e: Env) {
     let _ = FungibleAllowListContract::total_supply(&e);
     cvlr_satisfy!(true);
 }
 
 #[rule]
-pub fn allow_list_balance(e: Env) {
+pub fn allow_list_balance_sanity(e: Env) {
     let account = nondet_address();
     let _ = FungibleAllowListContract::balance(&e, account);
     cvlr_satisfy!(true);
 }
 
 #[rule]
-pub fn allow_list_allowance(e: Env) {
+pub fn allow_list_allowance_sanity(e: Env) {
     let owner = nondet_address();
     let spender = nondet_address();
     let _ = FungibleAllowListContract::allowance(&e, owner, spender);
@@ -47,7 +47,7 @@ pub fn allow_list_allowance(e: Env) {
 }
 
 #[rule]
-pub fn allow_list_transfer(e: Env) {
+pub fn allow_list_transfer_sanity(e: Env) {
     let to = nondet_address();
     let from = nondet_address();
     let amount = nondet();
@@ -56,7 +56,7 @@ pub fn allow_list_transfer(e: Env) {
 }
 
 #[rule]
-pub fn allow_list_transfer_from(e: Env) {
+pub fn allow_list_transfer_from_sanity(e: Env) {
     let spender = nondet_address();
     let to = nondet_address();
     let from = nondet_address();
@@ -66,7 +66,7 @@ pub fn allow_list_transfer_from(e: Env) {
 }
 
 #[rule]
-pub fn allow_list_approve(e: Env) {
+pub fn allow_list_approve_sanity(e: Env) {
     let owner = nondet_address();
     let spender = nondet_address();
     let amount = nondet();
@@ -76,19 +76,19 @@ pub fn allow_list_approve(e: Env) {
 }
 
 #[rule]
-pub fn allow_list_decimals(e: Env) {
+pub fn allow_list_decimals_sanity(e: Env) {
     FungibleAllowListContract::decimals(&e);
     cvlr_satisfy!(true);
 }
 
 #[rule]
-pub fn allow_list_name(e: Env) {
+pub fn allow_list_name_sanity(e: Env) {
     FungibleAllowListContract::name(&e);
     cvlr_satisfy!(true);
 }
 
 #[rule]
-pub fn allow_list_symbol(e: Env) {
+pub fn allow_list_symbol_sanity(e: Env) {
     FungibleAllowListContract::symbol(&e);
     cvlr_satisfy!(true);
 }
