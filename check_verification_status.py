@@ -21,6 +21,7 @@ class RuleInfo:
         self.status = status
         self.line_num = line_num
         self.is_verified = self._check_verified()
+        self.is_bug = self._check_if_bug()
     
     def _check_verified(self) -> bool:
         """Check if the rule is verified."""
@@ -30,6 +31,12 @@ class RuleInfo:
         # Check if status starts with "verified"
         return status_lower.startswith("verified")
 
+    def _check_if_bug(self) -> bool:
+        """Check if the rule is a bug."""
+        if self.status is None:
+            return False
+        status_lower = self.status.lower().strip()
+        return status_lower.startswith("bug")
 
 class FileAnalysis:
     """Analysis results for a single file."""
@@ -39,6 +46,7 @@ class FileAnalysis:
         self.total_rules = 0
         self.verified_rules = 0
         self.unverified_rules = 0
+        self.bug_rules = 0
     
     def add_rule(self, rule: RuleInfo):
         """Add a rule to this file's analysis."""
@@ -46,8 +54,10 @@ class FileAnalysis:
         self.total_rules += 1
         if rule.is_verified:
             self.verified_rules += 1
-        else:
+        elif not rule.is_bug:
             self.unverified_rules += 1
+        if rule.is_bug:
+            self.bug_rules += 1
 
 
 def find_spec_files(root_dir: Path) -> List[Path]:
@@ -198,7 +208,7 @@ def format_table(analyses: List[FileAnalysis], root_dir: Path) -> str:
     total_rules = sum(a.total_rules for a in analyses)
     total_verified = sum(a.verified_rules for a in analyses)
     total_unverified = sum(a.unverified_rules for a in analyses)
-    
+    total_bug = sum(a.bug_rules for a in analyses)
     output.append("=" * 40)
     output.append("Formal Verification Status Summary")
     output.append("=" * 40)
@@ -207,17 +217,18 @@ def format_table(analyses: List[FileAnalysis], root_dir: Path) -> str:
     output.append(f"  Total Rules: {total_rules}")
     output.append(f"  Verified: {total_verified}")
     output.append(f"  Unverified: {total_unverified}")
+    output.append(f"  Bug: {total_bug}")
     output.append("")
     
     # Group by directory
-    dir_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "verified": 0, "unverified": 0})
-    
+    dir_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "verified": 0, "unverified": 0, "bug": 0})
     for analysis in analyses:
         if analysis.total_rules > 0:
             dir_path = get_relative_path(get_directory(analysis.file_path), root_dir)
             dir_stats[dir_path]["total"] += analysis.total_rules
             dir_stats[dir_path]["verified"] += analysis.verified_rules
             dir_stats[dir_path]["unverified"] += analysis.unverified_rules
+            dir_stats[dir_path]["bug"] += analysis.bug_rules
     
     output.append("=" * 40)
     output.append("By Directory:")
@@ -227,7 +238,7 @@ def format_table(analyses: List[FileAnalysis], root_dir: Path) -> str:
     for dir_path in sorted(dir_stats.keys()):
         stats = dir_stats[dir_path]
         output.append(f"{dir_path}:")
-        output.append(f"  Total: {stats['total']}, Verified: {stats['verified']}, Unverified: {stats['unverified']}")
+        output.append(f"  Total: {stats['total']}, Verified: {stats['verified']}, Unverified: {stats['unverified']}, Bug: {stats['bug']}")
         output.append("")
     
     # By file
@@ -240,10 +251,10 @@ def format_table(analyses: List[FileAnalysis], root_dir: Path) -> str:
         if analysis.total_rules > 0:
             rel_path = get_relative_path(analysis.file_path, root_dir)
             output.append(f"{rel_path}:")
-            output.append(f"  Total: {analysis.total_rules}, Verified: {analysis.verified_rules}, Unverified: {analysis.unverified_rules}")
+            output.append(f"  Total: {analysis.total_rules}, Verified: {analysis.verified_rules}, Unverified: {analysis.unverified_rules}, Bug: {analysis.bug_rules}")
             
             # List unverified rules
-            unverified = [r for r in analysis.rules if not r.is_verified]
+            unverified = [r for r in analysis.rules if not r.is_verified and not r.is_bug]
             if unverified:
                 output.append("  Unverified Rules:")
                 for rule in unverified:
@@ -260,14 +271,15 @@ def format_json(analyses: List[FileAnalysis], root_dir: Path) -> str:
         "project_total": {
             "total_rules": sum(a.total_rules for a in analyses),
             "verified_rules": sum(a.verified_rules for a in analyses),
-            "unverified_rules": sum(a.unverified_rules for a in analyses)
+            "unverified_rules": sum(a.unverified_rules for a in analyses),
+            "bug_rules": sum(a.bug_rules for a in analyses)
         },
         "by_directory": {},
         "by_file": []
     }
     
     # Group by directory
-    dir_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "verified": 0, "unverified": 0})
+    dir_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "verified": 0, "unverified": 0, "bug": 0})
     
     for analysis in analyses:
         if analysis.total_rules > 0:
@@ -275,6 +287,7 @@ def format_json(analyses: List[FileAnalysis], root_dir: Path) -> str:
             dir_stats[dir_path]["total"] += analysis.total_rules
             dir_stats[dir_path]["verified"] += analysis.verified_rules
             dir_stats[dir_path]["unverified"] += analysis.unverified_rules
+            dir_stats[dir_path]["bug"] += analysis.bug_rules
     
     for dir_path, stats in sorted(dir_stats.items()):
         result["by_directory"][dir_path] = stats.copy()
@@ -288,6 +301,7 @@ def format_json(analyses: List[FileAnalysis], root_dir: Path) -> str:
                 "total_rules": analysis.total_rules,
                 "verified_rules": analysis.verified_rules,
                 "unverified_rules": analysis.unverified_rules,
+                "bug_rules": analysis.bug_rules,
                 "rules": []
             }
             
@@ -296,7 +310,8 @@ def format_json(analyses: List[FileAnalysis], root_dir: Path) -> str:
                     "name": rule.name,
                     "line": rule.line_num,
                     "status": rule.status,
-                    "verified": rule.is_verified
+                    "verified": rule.is_verified,
+                    "bug": rule.is_bug
                 })
             
             result["by_file"].append(file_data)
