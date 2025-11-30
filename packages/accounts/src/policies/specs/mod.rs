@@ -10,4 +10,7 @@ pub mod weighted_threshold_contract;
 pub mod weighted_threshold_contract_sanity;
 pub mod weighted_threshold_integrity;
 
-pub mod spending_limit_sanity;
+// pub mod spending_limit_sanity;
+pub mod spending_limit_contract;
+pub mod spending_limit_contract_sanity;
+pub mod spending_limit_integrity;
