@@ -8,8 +8,10 @@ env:
     simple_threshold_non_panics.conf
     simple_threshold_panics.conf
     simple_threshold_contract_sanity.conf
-    weighted_threshold_sanity.conf
-    spending_limit_sanity.conf
+    weighted_threshold_integrity.conf
+    weighted_threshold_contract_sanity.conf
+    spending_limit_integrity.conf
+    spending_limit_contract_sanity.conf
 
 jobs:
   check:
