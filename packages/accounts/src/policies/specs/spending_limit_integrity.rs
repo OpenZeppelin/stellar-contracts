@@ -1,18 +1,27 @@
-use core::task::Context;
+// use core::task::Context;
 
 use cvlr::{
     cvlr_assert,
     nondet::{self, Nondet},
     cvlr_satisfy,
+    cvlr_assume,
 };
+use cvlr::clog;
 use cvlr_soroban::{nondet_address, nondet_vec};
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Address, Env, Vec};
-
+use soroban_sdk::{Address, Env, IntoVal, Vec};
+use soroban_sdk::auth::{Context, ContractContext};
+use soroban_sdk::symbol_short;
 use crate::{
     policies::{Policy, spending_limit::{SpendingLimitAccountParams, SpendingLimitData, SpendingLimitStorageKey}, specs::spending_limit_contract::SpendingLimitPolicy},
     smart_account::{ContextRule, Signer},
 };
+
+// note we verify the rules in this file with:
+// "loop_iter": 1 or 2
+// "optimistic_loop": true
+// meaning we consider only runs where the loops are iterated at most 1/2 times.
+
 
 #[rule]
 // after set_spending_limit the spending_limit is set to the input
@@ -28,16 +37,44 @@ pub fn sl_set_spending_limit_integrity(e: Env) {
 }
 
 #[rule]
-// TODO
-// status: wip 
-pub fn sl_can_enforce_integrity(e: Env, context: soroban_sdk::auth::Context) {
+// status: violated - spurious.
+// trying to describe some path where can_enforce returns true.
+// should separate these out to a different file 
+// and describe all the different possible paths with loop_iter <= 2
+// and the trivial paths that return 0.
+// possibly we need an invariant that connects the different parameters of the spending limit
+pub fn no_previous_transfer_succeeds(e: Env, context: soroban_sdk::auth::Context) {
     let auth_signers: Vec<Signer> = nondet_vec();
+    cvlr_assume!(auth_signers.len() > 0);
     let ctx_rule: ContextRule = ContextRule::nondet();
+    let from = nondet_address();
+    clog!(cvlr_soroban::Addr(&from));
+    let to = nondet_address();
+    clog!(cvlr_soroban::Addr(&to));
+    let amount = i128::nondet();
+    clog!(amount);
+    let mut args = Vec::new(&e);
+    args.push_back(from.into_val(&e));
+    args.push_back(to.into_val(&e));
+    args.push_back(amount.into_val(&e));
+    let contract_context = Context::Contract(ContractContext{
+        fn_name: symbol_short!("transfer"),
+        args,
+        contract: nondet_address(),
+    });
     let account_id = nondet_address();
-    let result = SpendingLimitPolicy::can_enforce(&e, context, auth_signers, ctx_rule, account_id);
-    let expected_result = false;
-    cvlr_assert!(result == expected_result);
+    clog!(cvlr_soroban::Addr(&account_id));
+    let spending_limit_data = SpendingLimitPolicy::get_spending_limit_data(&e, ctx_rule.id, account_id.clone());
+    let spending_limit = spending_limit_data.spending_limit;
+    clog!(spending_limit);
+    let total_spent = spending_limit_data.cached_total_spent;
+    clog!(total_spent);
+    cvlr_assume!(total_spent == 0);
+    cvlr_assume!(amount <= spending_limit);
+    let result = SpendingLimitPolicy::can_enforce(&e, context, auth_signers.clone(), ctx_rule, account_id);
+    cvlr_assert!(result == true);
 }
+
 
 // can't write an integrity rule for enforce because it panics if can_enforce returns false.
 
