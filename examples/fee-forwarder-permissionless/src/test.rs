@@ -46,12 +46,10 @@ fn setup<'a>(
     e: &Env,
 ) -> (FeeForwarderClient<'a>, MockTokenClient<'a>, MockTargetClient<'a>, Address, Address, i128, i128)
 {
-    let admin = Address::generate(e);
     let user = Address::generate(e);
-    let manager = Address::generate(e);
     let relayer = Address::generate(e);
 
-    let fee_forwarder_id = e.register(FeeForwarder, (admin, manager, vec![e, relayer.clone()]));
+    let fee_forwarder_id = e.register(FeeForwarder, ());
     let token_id = e.register(MockToken, (user.clone(),));
     let target_id = e.register(MockTarget, ());
 
@@ -72,7 +70,7 @@ fn forward_basic() {
     let fn_args: Vec<Val> = vec![&e];
 
     let initial_user_balance = token.balance(&user);
-    let initial_contract_balance = token.balance(&fee_forwarder.address);
+    let initial_relayer_balance = token.balance(&relayer);
 
     e.mock_auths(&[
         // mock auth for user
@@ -146,7 +144,7 @@ fn forward_basic() {
     assert_eq!(res, String::from_str(&e, "hello"));
 
     assert_eq!(token.balance(&user), initial_user_balance - fee_amount);
-    assert_eq!(token.balance(&fee_forwarder.address), initial_contract_balance + fee_amount);
+    assert_eq!(token.balance(&relayer), initial_relayer_balance + fee_amount);
 }
 
 #[test]
@@ -159,7 +157,7 @@ fn forward_two_subinvokes() {
     let fn_args: Vec<Val> = vec![&e, user.into_val(&e)];
 
     let initial_user_balance = token.balance(&user);
-    let initial_contract_balance = token.balance(&fee_forwarder.address);
+    let initial_relayer_balance = token.balance(&relayer);
 
     e.mock_auths(&[
         // mock auth for user
@@ -241,5 +239,5 @@ fn forward_two_subinvokes() {
     assert_eq!(res, user);
 
     assert_eq!(token.balance(&user), initial_user_balance - fee_amount);
-    assert_eq!(token.balance(&fee_forwarder.address), initial_contract_balance + fee_amount);
+    assert_eq!(token.balance(&relayer), initial_relayer_balance + fee_amount);
 }

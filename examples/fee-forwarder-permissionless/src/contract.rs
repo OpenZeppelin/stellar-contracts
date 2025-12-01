@@ -67,32 +67,16 @@
 //! - Relayer can't change the target call parameters signed by user
 
 #![allow(clippy::too_many_arguments)]
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Val, Vec};
-use stellar_access::access_control::{grant_role_no_auth, set_admin, AccessControl};
-use stellar_fee_abstraction::{collect_fee_and_invoke, set_allowed_fee_token, sweep_token};
-use stellar_macros::{default_impl, only_role};
-
-const MANAGER_ROLE: Symbol = symbol_short!("manager");
-const EXECUTOR_ROLE: Symbol = symbol_short!("executor");
+use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
+use stellar_fee_abstraction::collect_fee_and_invoke;
 
 #[contract]
 pub struct FeeForwarder;
 
 #[contractimpl]
 impl FeeForwarder {
-    pub fn __constructor(e: &Env, admin: Address, manager: Address, executors: Vec<Address>) {
-        set_admin(e, &admin);
-
-        grant_role_no_auth(e, &manager, &MANAGER_ROLE, &admin);
-
-        for executor in executors.iter() {
-            grant_role_no_auth(e, &executor, &EXECUTOR_ROLE, &admin);
-        }
-    }
-
     /// This function can be invoked only with authorizatons from both sides:
     /// user and relayer.
-    #[only_role(relayer, "executor")]
     pub fn forward(
         e: &Env,
         fee_token: Address,
@@ -105,6 +89,8 @@ impl FeeForwarder {
         user: Address,
         relayer: Address,
     ) -> Val {
+        relayer.require_auth();
+
         collect_fee_and_invoke(
             e,
             &fee_token,
@@ -115,26 +101,7 @@ impl FeeForwarder {
             &target_fn,
             &target_args,
             &user,
-            &e.current_contract_address(), // current contract collects fees
+            &relayer, // relayer collects fees
         )
     }
-
-    #[only_role(operator, "manager")]
-    pub fn enable_fee_token(e: &Env, token: Address, operator: Address) {
-        set_allowed_fee_token(e, &token, true);
-    }
-
-    #[only_role(operator, "manager")]
-    pub fn disable_fee_token(e: &Env, token: Address, operator: Address) {
-        set_allowed_fee_token(e, &token, false);
-    }
-
-    #[only_role(operator, "manager")]
-    pub fn sweep_tokens(e: &Env, token: Address, recipient: Address, operator: Address) -> i128 {
-        sweep_token(e, &token, &recipient)
-    }
 }
-
-#[default_impl]
-#[contractimpl]
-impl AccessControl for FeeForwarder {}
