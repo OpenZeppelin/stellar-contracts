@@ -15,7 +15,18 @@ impl Verifier for Ed25519VerifierContract {
     type KeyData = BytesN<32>;
     type SigData = BytesN<64>;
 
-    /// Verify an Ed25519 signature against a message and public key
+    /// Verify an Ed25519 signature against a message and public key.
+    ///
+    /// # Arguments
+    ///
+    /// * `signature_payload` - The message hash that was signed
+    /// * `key_data` - The 32-byte Ed25519 public key
+    /// * `sig_data` - The 64-byte Ed25519 signature
+    ///
+    /// # Returns
+    ///
+    /// * `true` if the signature is valid
+    /// * `false` otherwise
     fn verify(
         e: &Env,
         signature_payload: Bytes,

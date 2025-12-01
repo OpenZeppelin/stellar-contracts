@@ -26,7 +26,7 @@ SOFTWARE.
 
 use soroban_sdk::{panic_with_error, Env, I256};
 
-use crate::math::soroban_fixed_point::{SorobanFixedPoint, SorobanFixedPointError};
+use crate::math::{soroban_fixed_point::SorobanFixedPoint, SorobanFixedPointError};
 
 impl SorobanFixedPoint for I256 {
     fn fixed_mul_floor(&self, env: &Env, y: &I256, denominator: &I256) -> I256 {
@@ -44,7 +44,7 @@ pub(crate) fn mul_div_floor(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
     let r = x.mul(y);
 
     if z.clone() == zero {
-        panic_with_error!(env, SorobanFixedPointError::ZeroDenominator);
+        panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
     }
 
     if r < zero || (r > zero && z.clone() < zero) {
@@ -64,7 +64,7 @@ pub(crate) fn mul_div_ceil(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
     let r = x.mul(y);
 
     if z.clone() == zero {
-        panic_with_error!(env, SorobanFixedPointError::ZeroDenominator);
+        panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
     }
 
     if z.clone() < zero || r <= zero {

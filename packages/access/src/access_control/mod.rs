@@ -345,6 +345,7 @@ pub enum AccessControlError {
     AdminAlreadySet = 2006,
     RoleNotHeld = 2007,
     RoleIsEmpty = 2008,
+    TransferInProgress = 2009,
 }
 
 // ################## CONSTANTS ##################
