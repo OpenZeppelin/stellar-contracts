@@ -1,5 +1,5 @@
 [package]
-name = "fee-forwarder-example"
+name = "fee-forwarder-permissioned-example"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -12,6 +12,7 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
+stellar-fee-abstraction = { workspace = true }
 stellar-access = { workspace = true }
 stellar-tokens = { workspace = true }
 stellar-macros = { workspace = true }

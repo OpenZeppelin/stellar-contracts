@@ -48,9 +48,10 @@ fn setup<'a>(
 {
     let admin = Address::generate(e);
     let user = Address::generate(e);
+    let manager = Address::generate(e);
     let relayer = Address::generate(e);
 
-    let fee_forwarder_id = e.register(FeeForwarder, (admin, vec![e, relayer.clone()]));
+    let fee_forwarder_id = e.register(FeeForwarder, (admin, manager, vec![e, relayer.clone()]));
     let token_id = e.register(MockToken, (user.clone(),));
     let target_id = e.register(MockTarget, ());
 
@@ -112,10 +113,13 @@ fn forward_basic() {
                 args: (
                     token.address.clone(),
                     fee_amount,
+                    max_fee_amount,
+                    current_ledger,
                     target.address.clone(),
                     &fn_name,
                     &fn_args,
                     user.clone(),
+                    relayer.clone(),
                 )
                     .into_val(&e),
                 sub_invokes: &[],
@@ -204,10 +208,13 @@ fn forward_two_subinvokes() {
                 args: (
                     token.address.clone(),
                     fee_amount,
+                    max_fee_amount,
+                    current_ledger,
                     target.address.clone(),
                     &fn_name,
                     &fn_args,
                     user.clone(),
+                    relayer.clone(),
                 )
                     .into_val(&e),
                 sub_invokes: &[],

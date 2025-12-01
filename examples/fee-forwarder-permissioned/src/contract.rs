@@ -32,14 +32,9 @@
 //! 3. **Relayer picks up transaction** (off-chain):
 //!    - Relayer calculates actual `fee_amount` based on current network
 //!      conditions
-//!    - Relayer verifies `fee_amount <= max_fee_amount`
 //!
 //! 4. **Relayer signs authorization** (second signature):
-//!    - Relayer authorizes the fee-forwarder contract with these parameters:
-//!      - `fee_token`: Same token as user specified
-//!      - `fee_amount`: Exact fee to charge (≤ max_fee_amount)
-//!      - `target_contract`, `target_fn`, `target_args`: Same as user specified
-//!      - `user`: The user's address
+//!    - Relayer authorizes the fee-forwarder contract
 //!    - Relayer must have `executor` role to call `forward()`
 //!
 //! 5. **Relayer submits transaction**:
@@ -61,10 +56,7 @@
 //! - `fee_token`, `max_fee_amount`, `expiration_ledger`
 //! - `target_contract`, `target_fn`, `target_args`
 //!
-//! **Relayer authorizes** (signs second, with exact fee):
-//! - `fee_token`, `fee_amount` (exact amount ≤ max)
-//! - `target_contract`, `target_fn`, `target_args`
-//! - `user` (whose transaction is being relayed)
+//! **Relayer authorizes** the whole invocation (signs second, with exact fee):
 //!
 //! ## Security Properties
 //!
@@ -75,13 +67,12 @@
 //! - Relayer can't change the target call parameters signed by user
 
 #![allow(clippy::too_many_arguments)]
-use soroban_sdk::{
-    contract, contractimpl, symbol_short, token::TokenClient, Address, Env, IntoVal, Symbol, Val,
-    Vec,
-};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Val, Vec};
 use stellar_access::access_control::{grant_role_no_auth, set_admin, AccessControl};
-use stellar_macros::{default_impl, has_role};
+use stellar_fee_abstraction::{collect_fee_and_invoke, set_allowed_fee_token, sweep_token};
+use stellar_macros::{default_impl, only_role};
 
+const MANAGER_ROLE: Symbol = symbol_short!("manager");
 const EXECUTOR_ROLE: Symbol = symbol_short!("executor");
 
 #[contract]
@@ -89,8 +80,10 @@ pub struct FeeForwarder;
 
 #[contractimpl]
 impl FeeForwarder {
-    pub fn __constructor(e: &Env, admin: Address, executors: Vec<Address>) {
+    pub fn __constructor(e: &Env, admin: Address, manager: Address, executors: Vec<Address>) {
         set_admin(e, &admin);
+
+        grant_role_no_auth(e, &manager, &MANAGER_ROLE, &admin);
 
         for executor in executors.iter() {
             grant_role_no_auth(e, &executor, &EXECUTOR_ROLE, &admin);
@@ -99,7 +92,7 @@ impl FeeForwarder {
 
     /// This function can be invoked only with authorizatons from both sides:
     /// user and relayer.
-    #[has_role(relayer, "executor")]
+    #[only_role(relayer, "executor")]
     pub fn forward(
         e: &Env,
         fee_token: Address,
@@ -112,58 +105,34 @@ impl FeeForwarder {
         user: Address,
         relayer: Address,
     ) -> Val {
-        // TODO: check max_fee_amount >= fee_amount
-        // TODO: check fee_token is allowed
-
-        // user and relayer authorize each the args that concern them, e.g. user is the
-        // 1st to sign the authorizatons, but at that moment they don't know the
-        // precise fee they will be charged and the address of the relayer who
-        // will sponsor the transaction.
-
-        let user_args_for_auth = (
-            fee_token.clone(),
+        collect_fee_and_invoke(
+            e,
+            &fee_token,
+            fee_amount,
             max_fee_amount,
             expiration_ledger,
-            target_contract.clone(),
-            target_fn.clone(),
-            target_args.clone(),
-        )
-            .into_val(e);
-        user.require_auth_for_args(user_args_for_auth);
-
-        let relayer_args_for_auth = (
-            fee_token.clone(),
-            fee_amount,
-            target_contract.clone(),
-            target_fn.clone(),
-            target_args.clone(),
-            user.clone(),
-        )
-            .into_val(e);
-        relayer.require_auth_for_args(relayer_args_for_auth);
-
-        let token_client = TokenClient::new(e, &fee_token);
-        // user signs an approval for `max_fee_amount` so that this contract can charge
-        // <= `max_fee_amount`
-        token_client.approve(
+            &target_contract,
+            &target_fn,
+            &target_args,
             &user,
             &e.current_contract_address(),
-            &max_fee_amount,
-            &expiration_ledger,
-        );
-
-        token_client.transfer_from(
-            &e.current_contract_address(),
-            &user,
-            &e.current_contract_address(),
-            &fee_amount,
-        );
-
-        e.invoke_contract::<Val>(&target_contract, &target_fn, target_args)
+        )
     }
 
-    // TODO: more functions to sweep tokens
-    // TODO: allow/disallow tokens
+    #[only_role(operator, "manager")]
+    pub fn enable_fee_token(e: &Env, token: Address, operator: Address) {
+        set_allowed_fee_token(e, &token, true);
+    }
+
+    #[only_role(operator, "manager")]
+    pub fn disable_fee_token(e: &Env, token: Address, operator: Address) {
+        set_allowed_fee_token(e, &token, false);
+    }
+
+    #[only_role(operator, "manager")]
+    pub fn sweep_tokens(e: &Env, token: Address, recipient: Address, operator: Address) -> i128 {
+        sweep_token(e, &token, &recipient)
+    }
 }
 
 #[default_impl]
