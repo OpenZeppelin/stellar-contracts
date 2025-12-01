@@ -329,9 +329,7 @@ impl Wad {
     /// result fits. Result is truncated toward zero after division by
     /// `WAD_SCALE`.
     pub fn checked_mul(self, e: &Env, rhs: Wad) -> Option<Wad> {
-        // Use fixed_mul_floor to handle phantom overflow transparently
-        let result = self.0.fixed_mul_floor(e, &rhs.0, &WAD_SCALE);
-        Some(Wad(result))
+        self.0.checked_fixed_mul_floor(e, &rhs.0, &WAD_SCALE).map(Wad)
     }
 
     /// Checked division (Wad / Wad). Returns `None` on overflow or division by

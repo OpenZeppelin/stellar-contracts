@@ -336,12 +336,12 @@ fn test_checked_mul_phantom_overflow_handled() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1500)")]
 fn test_checked_mul_true_overflow() {
     let e = Env::default();
     // True overflow: even with i256, result doesn't fit in i128
     let large = Wad::from_integer(&e, i128::MAX / WAD_SCALE);
-    let _ = large.checked_mul(&e, large);
+    let result = large.checked_mul(&e, large);
+    assert_eq!(result, None);
 }
 
 #[test]

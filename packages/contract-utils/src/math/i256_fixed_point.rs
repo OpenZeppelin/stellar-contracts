@@ -28,11 +28,11 @@ pub(crate) fn mul_div_floor(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
     let zero = I256::from_i32(env, 0);
     let r = x.mul(y);
 
-    if z.clone() == zero {
+    if *z == zero {
         panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
     }
 
-    if r < zero || (r > zero && z.clone() < zero) {
+    if r < zero || (r > zero && *z < zero) {
         // ceil is taken by default for a negative result
         let remainder = r.rem_euclid(z);
         let one = I256::from_i32(env, 1);
@@ -48,11 +48,11 @@ pub(crate) fn mul_div_ceil(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
     let zero = I256::from_i32(env, 0);
     let r = x.mul(y);
 
-    if z.clone() == zero {
+    if *z == zero {
         panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
     }
 
-    if z.clone() < zero || r <= zero {
+    if *z < zero || r <= zero {
         // ceil is taken by default for a negative or zero result
         r.div(z)
     } else {
@@ -68,11 +68,11 @@ pub(crate) fn checked_mul_div_floor(env: &Env, x: &I256, y: &I256, z: &I256) -> 
     let zero = I256::from_i32(env, 0);
     let r = x.mul(y);
 
-    if z.clone() == zero {
+    if *z == zero {
         return None;
     }
 
-    if r < zero || (r > zero && z.clone() < zero) {
+    if r < zero || (r > zero && *z < zero) {
         // ceil is taken by default for a negative result
         let remainder = r.rem_euclid(z);
         let one = I256::from_i32(env, 1);
@@ -88,11 +88,11 @@ pub(crate) fn checked_mul_div_ceil(env: &Env, x: &I256, y: &I256, z: &I256) -> O
     let zero = I256::from_i32(env, 0);
     let r = x.mul(y);
 
-    if z.clone() == zero {
+    if *z == zero {
         return None;
     }
 
-    if z.clone() < zero || r <= zero {
+    if *z < zero || r <= zero {
         // ceil is taken by default for a negative or zero result
         Some(r.div(z))
     } else {

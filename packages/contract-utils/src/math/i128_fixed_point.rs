@@ -66,7 +66,7 @@ fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
     }
 }
 
-/// Performs floor(x * y / z)
+/// Performs ceil(x * y / z)
 fn scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
     match x.checked_mul(*y) {
         Some(r) => div_ceil(r, *z)

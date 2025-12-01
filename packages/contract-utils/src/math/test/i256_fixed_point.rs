@@ -324,3 +324,18 @@ fn test_checked_fixed_mul_ceil_negative_rounds_up() {
 
     assert_eq!(result, Some(I256::from_i128(&env, -483_5313675)));
 }
+
+#[test]
+fn test_checked_mul_div_floor_negative_with_remainder() {
+    let env = Env::default();
+    // Choose r = x * y negative and not divisible by z
+    let x: I256 = I256::from_i128(&env, -7);
+    let y: I256 = I256::from_i128(&env, 10);
+    let z: I256 = I256::from_i128(&env, 3);
+
+    // r = -70, r / 3 = -23
+    // r < 0, remainder > 0 -> result = r.div(z) - 1 = -24
+    let result = crate::math::i256_fixed_point::checked_mul_div_floor(&env, &x, &y, &z).unwrap();
+
+    assert_eq!(result, I256::from_i128(&env, -24));
+}
