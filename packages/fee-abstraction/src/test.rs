@@ -7,6 +7,7 @@ use soroban_sdk::{
 use crate::{
     check_allowed_fee_token, emit_fee_collected, emit_forward_executed,
     is_fee_token_allowlist_enabled, set_allowed_fee_token, sweep_token, validate_fee_bounds,
+    FeeAbstractionStorageKey,
 };
 
 #[contract]
@@ -58,6 +59,48 @@ fn test_set_allowed_fee_token() {
 }
 
 #[test]
+fn test_swap_and_pop_removal_updates_mappings() {
+    let e = Env::default();
+    let contract_address = e.register(MockContract, ());
+    let token1 = Address::generate(&e);
+    let token2 = Address::generate(&e);
+    let token3 = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        // Allow three tokens -> indices 0,1,2
+        set_allowed_fee_token(&e, &token1, true);
+        set_allowed_fee_token(&e, &token2, true);
+        set_allowed_fee_token(&e, &token3, true);
+
+        // Remove the middle token (index 1). This should trigger swap-and-pop,
+        // moving token3 from index 2 to index 1 and updating its TokenIndex.
+        set_allowed_fee_token(&e, &token2, false);
+
+        // token3 is now at index 1
+        let i: u32 = e
+            .storage()
+            .persistent()
+            .get(&FeeAbstractionStorageKey::TokenIndex(token3.clone()))
+            .unwrap();
+        assert_eq!(i, 1);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #5001)")]
+fn test_allowing_already_allowed_token_panics() {
+    let e = Env::default();
+    let contract_address = e.register(MockContract, ());
+    let token = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        set_allowed_fee_token(&e, &token, true);
+        // Second allow should panic with FeeTokenAlreadyAllowed
+        set_allowed_fee_token(&e, &token, true);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #5000)")]
 fn test_disallowed_token_panics() {
     let e = Env::default();
@@ -65,7 +108,6 @@ fn test_disallowed_token_panics() {
     let token = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        // Allowlist enabled implicitly when at least one token is allowed.
         set_allowed_fee_token(&e, &Address::generate(&e), true);
         // Token not allowed, should panic
         check_allowed_fee_token(&e, &token);

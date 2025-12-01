@@ -201,7 +201,7 @@ pub fn set_allowed_fee_token(e: &Env, token: &Address, allowed: bool) {
         let remove_index = existing_index
             .unwrap_or_else(|| panic_with_error!(e, FeeAbstractionError::FeeTokenNotAllowed));
 
-        // Can't underflow, it would've been cought be the above panic_with_error
+        // Can't underflow, it would've been caught be the above panic_with_error
         let last_index = count - 1;
         let last_key = FeeAbstractionStorageKey::Token(last_index);
 
