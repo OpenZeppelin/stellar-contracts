@@ -5,7 +5,7 @@ use core::{
 
 use soroban_sdk::{panic_with_error, Env};
 
-use crate::math::SorobanFixedPointError;
+use crate::math::{SorobanFixedPoint, SorobanFixedPointError};
 
 /// Fixed-point decimal number with 18 decimal places of precision.
 ///
@@ -322,11 +322,14 @@ impl Wad {
         self.0.checked_sub(rhs.0).map(Wad)
     }
 
-    /// Checked multiplication (Wad * Wad). Returns `None` on overflow.
+    /// Checked multiplication (Wad * Wad).
     ///
-    /// Result is truncated toward zero after division by WAD_SCALE
-    pub fn checked_mul(self, rhs: Wad) -> Option<Wad> {
-        self.0.checked_mul(rhs.0).map(|product| Wad(product / WAD_SCALE))
+    /// Returns `None` on overflow. Handles phantom overflow by scaling to
+    /// `I256` when intermediate multiplication overflows `i128` but the final
+    /// result fits. Result is truncated toward zero after division by
+    /// `WAD_SCALE`.
+    pub fn checked_mul(self, e: &Env, rhs: Wad) -> Option<Wad> {
+        self.0.checked_fixed_mul_floor(e, &rhs.0, &WAD_SCALE).map(Wad)
     }
 
     /// Checked division (Wad / Wad). Returns `None` on overflow or division by
@@ -364,6 +367,123 @@ impl Wad {
     /// ```
     pub fn abs(self) -> Self {
         Wad(self.0.abs())
+    }
+
+    /// Raises Wad to an unsigned integer power using exponentiation by
+    /// squaring.
+    ///
+    /// This method is optimized for efficiency, computing the result in O(log
+    /// n) multiplications where n is the exponent. Each multiplication
+    /// maintains fixed-point precision by dividing by WAD_SCALE, with
+    /// truncation toward zero.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment for error handling.
+    /// * `exponent` - The unsigned integer exponent (0 to 2^32-1).
+    ///
+    /// # Errors
+    ///
+    /// * [`SorobanFixedPointError::Overflow`] - When intermediate or final
+    ///   result exceeds i128 bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Compound interest: (1.05)^10
+    /// let rate = Wad::from_ratio(&e, 105, 100);  // 1.05
+    /// let final_multiplier = rate.pow(&e, 10);
+    /// let final_amount = principal * final_multiplier;
+    ///
+    /// // Quadratic bonding curve: price = supply^2
+    /// let supply = Wad::from_integer(&e, 1000);
+    /// let price = supply.pow(&e, 2);
+    /// ```
+    pub fn pow(self, e: &Env, exponent: u32) -> Self {
+        self.checked_pow(e, exponent)
+            .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
+    }
+
+    /// Checked version of [`Wad::pow`].
+    ///
+    /// Returns `None` instead of panicking on overflow. Handles phantom
+    /// overflow transparently by scaling to `I256` when intermediate
+    /// multiplications overflow `i128` but the final result fits.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment for i256 operations.
+    /// * `exponent` - The unsigned integer exponent.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let e = Env::default();
+    /// let small = Wad::from_integer(&e, 2);
+    /// assert_eq!(small.checked_pow(&e, 10), Some(Wad::from_integer(&e, 1024)));
+    ///
+    /// let large = Wad::from_integer(&e, i128::MAX / WAD_SCALE);
+    /// assert_eq!(large.checked_pow(&e, 2), None); // Overflows
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// Phantom overflow is handled internally.
+    pub fn checked_pow(self, e: &Env, mut exponent: u32) -> Option<Self> {
+        // Handle base cases
+        if exponent == 0 {
+            return Some(Wad(WAD_SCALE)); // x^0 = 1
+        }
+
+        if exponent == 1 {
+            return Some(self);
+        }
+
+        if self.0 == 0 {
+            return Some(Wad::from_raw(0)); // 0^n = 0
+        }
+
+        if self.0 == WAD_SCALE {
+            return Some(self); // 1^n = 1
+        }
+
+        // Exponentiation by squaring - processes exponent bit-by-bit
+        let mut base = self;
+        let mut result = Wad(WAD_SCALE); // Start with 1 in WAD
+
+        // Example: x^10, where 10 in binary = 1010₂
+        //
+        // Binary:  1    0    1    0
+        //          ↓    ↓    ↓    ↓
+        // Powers:  x^8  x^4  x^2  x^1
+        //          │    │    │    │
+        // Bit=1?   Y    N    Y    N
+        //          │    │    │    │
+        // Action:  MUL  ---  MUL  ---  (only multiply result when bit=1)
+        //          SQR  SQR  SQR  ---  (always square base for next)
+        //
+        // Result: x^8 * x^2 = x^10
+        //
+        // Note: We use checked_fixed_mul_floor to handle phantom overflow
+        // (where intermediate multiplication overflows i128 but final result fits).
+        // This automatically scales to i256 when needed and returns None if the
+        // result doesn't fit in i128.
+        while exponent > 0 {
+            if exponent & 1 == 1 {
+                // result = result * base (in fixed-point)
+                let new_result = result.0.checked_fixed_mul_floor(e, &base.0, &WAD_SCALE)?;
+                result = Wad(new_result);
+            }
+
+            exponent >>= 1;
+            if exponent > 0 {
+                // base = base * base (in fixed-point)
+                let new_base = base.0.checked_fixed_mul_floor(e, &base.0, &WAD_SCALE)?;
+                base = Wad(new_base);
+            }
+        }
+
+        Some(result)
     }
 }
 
