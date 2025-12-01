@@ -1,5 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
-use stellar_contract_utils::math::fixed_point::{muldiv, Rounding};
+use stellar_contract_utils::math::{muldiv, Rounding};
 
 use crate::{
     fungible::{Base, ContractOverrides},
