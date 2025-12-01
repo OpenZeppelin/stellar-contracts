@@ -1,0 +1,18 @@
+[package]
+name = "stellar-fee-abstraction"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+publish = true
+description = "Fee abstraction utilities for Stellar contracts."
+
+[lib]
+crate-type = ["lib", "cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

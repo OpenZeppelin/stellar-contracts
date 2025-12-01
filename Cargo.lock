@@ -1817,6 +1817,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "stellar-fee-abstraction"
+version = "0.5.1"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "stellar-governance"
 version = "0.5.1"
 dependencies = [
