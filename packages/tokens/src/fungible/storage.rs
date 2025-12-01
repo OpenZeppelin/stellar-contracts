@@ -4,6 +4,7 @@ use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env, St
 use crate::fungible::{
     emit_approve, emit_mint, emit_transfer,};
 
+use cvlr::clog;
 
 use crate::fungible::{
     Base, FungibleTokenError, BALANCE_EXTEND_AMOUNT,
@@ -314,6 +315,9 @@ impl Base {
         }
 
         let allowance = Base::allowance_data(e, owner, spender);
+        clog!(allowance.amount);
+        clog!(amount);
+        // maybe this is a bug? because it doesn't consider live_until_ledger, should be allowance() instead?
 
         if allowance.amount < amount {
             panic_with_error!(e, FungibleTokenError::InsufficientAllowance);
