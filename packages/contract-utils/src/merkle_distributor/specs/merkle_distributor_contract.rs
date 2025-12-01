@@ -10,7 +10,7 @@ use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
 
 #[contracttype]
 #[derive(Clone)]
-pub(crate) struct Leaf {
+pub struct Leaf {
     pub index: u32
 }
 
