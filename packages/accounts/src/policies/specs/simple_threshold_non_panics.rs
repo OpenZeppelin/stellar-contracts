@@ -37,6 +37,8 @@ pub fn set_threshold_non_panic(e: Env) {
     cvlr_assume!(is_auth(account_id.clone()));
     storage_setup_threshold(e.clone(), ctx_rule.id, account_id.clone());
     cvlr_assume!(threshold != 0 && threshold <= ctx_rule.signers.len());
+    clog!(threshold);
+    clog!(ctx_rule.signers.len());
     SimpleThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
     cvlr_assert!(true);
 }

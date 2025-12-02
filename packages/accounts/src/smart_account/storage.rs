@@ -238,12 +238,38 @@ impl Nondet for ContextRule {
             id: u32::nondet(),
             context_type: ContextRuleType::nondet(),
             name: nondet_string(),
-            signers: nondet_vec(),
+            signers: nondet_signers_vec(),
             policies: nondet_vec(),
             valid_until: Option::<u32>::nondet(),
         }
     }
 }
+pub fn nondet_signers_vec() -> Vec<Signer>
+where
+    Signer: soroban_sdk::IntoVal<Env, soroban_sdk::Val>
+        + soroban_sdk::TryFromVal<Env, soroban_sdk::Val>,
+{
+    let env = Env::default();
+
+    // Choose an arbitrary length (but keep it bounded so verification doesn't explode).
+    // Adjust MAX as needed.
+    const MAX: u32 = 5;
+    let mut n: u32 = u32::nondet();
+    if n > MAX {
+        n = n % (MAX + 1);
+    }
+
+    let mut out: Vec<Signer> = Vec::new(&env);
+    let mut i = 0u32;
+    while i < n {
+        out.push_back(Signer::nondet());
+        i += 1;
+    }
+
+    out
+}
+
+
 
 // ################## QUERY STATE ##################
 
