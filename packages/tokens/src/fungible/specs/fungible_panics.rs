@@ -55,7 +55,7 @@ pub fn transfer_panics_if_amount_less_than_zero(e: Env) {
 
 #[rule]
 // transfer_from panics if spender does not auth
-// status: rerun
+// status: verified
 pub fn transfer_from_panics_if_spender_unauthorized(e: Env) {
     let to = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
@@ -91,7 +91,7 @@ pub fn transfer_from_panics_if_not_enough_balance(e: Env) {
 
 #[rule]
 // transfer_from panics if not enough allowance and spender != from
-// status: rerun
+// status: bug
 pub fn transfer_from_panics_if_not_enough_allowance(e: Env) {
     let to = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
@@ -162,7 +162,7 @@ pub fn approve_panics_if_amount_less_than_zero(e: Env) {
 
 #[rule]
 // approve panics if live_until_ledger > max_ledger
-// status: 
+// status: verified
 pub fn approve_panics_if_live_until_ledger_greater_than_max_ledger(e: Env) {
     let owner = nondet_address();
     clog!(cvlr_soroban::Addr(&owner));
@@ -179,7 +179,7 @@ pub fn approve_panics_if_live_until_ledger_greater_than_max_ledger(e: Env) {
 
 #[rule]
 // approve panics if live_until_ledger < current_ledger & amount > 0
-// status: 
+// status: verified
 pub fn approve_panics_if_live_until_ledger_less_than_current_ledger(e: Env) {
     let owner = nondet_address();
     clog!(cvlr_soroban::Addr(&owner));

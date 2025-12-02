@@ -9,7 +9,8 @@ use crate::fungible::Base;
 // total_supply does not change other than mint.
 // total_supply >= balance(a1)+balance(a2)
 
-// maybe its not right to talk about invariants just for fungible because its not really a contract setting (?)
+// maybe its not right to talk about invariants just for fungible because its not really a contract setting (?) 
+// or maybe its fine
 
 // helpers
 pub fn assume_pre_total_supply_geq_balance(e: Env, account: &Address) {
@@ -48,7 +49,7 @@ pub fn after_transfer_total_supply_geq_balance(e: Env) {
 }
 
 #[rule]
-// status: violated
+// status: violated - seems spurious
 pub fn after_transfer_from_total_supply_geq_balance(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));

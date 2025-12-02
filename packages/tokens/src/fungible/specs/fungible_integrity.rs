@@ -40,7 +40,7 @@ pub fn transfer_integrity(e: Env) {
 
 #[rule]
 // transfer_from changes balances and allowance accordingly 
-// status:
+// status: timeout
 pub fn transfer_from_integrity(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
@@ -84,7 +84,7 @@ pub fn transfer_from_integrity(e: Env) {
 
 #[rule]
 // approve changes allowance accordingly
-// status:
+// status: verified
 pub fn approve_integrity(e: Env) {
     // note - the allowance and approve are all in the same env.
     let owner = nondet_address();

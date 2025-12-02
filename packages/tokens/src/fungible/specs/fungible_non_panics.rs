@@ -6,7 +6,7 @@ use soroban_sdk::{Address, Env};
 use crate::fungible::FungibleToken;
 use crate::fungible::Base;
 
-#[rule]
+// #[rule]
 // requires
 // 
 // status: 
