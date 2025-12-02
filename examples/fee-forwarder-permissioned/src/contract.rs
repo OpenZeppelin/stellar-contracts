@@ -12,22 +12,23 @@
 //!      (e.g., USDC)
 //!    - User gets a quote from relayer: max fee amount and expiration ledger
 //!
-//! 2. **User signs authorization** (first signature):
+//! 2. **User signs authorizations** (first signature):
 //!    - User authorizes the fee-forwarder contract with these parameters:
 //!      - `fee_token`: Which token to use for payment
 //!      - `max_fee_amount`: Maximum fee they're willing to pay
 //!      - `expiration_ledger`: When the authorization expires
 //!      - `target_contract`, `target_fn`, `target_args`: The actual call to
 //!        make
-//!    - User MUST include at least one subinvocation:
-//!      - `fee_token.approve(fee_forwarder, max_fee_amount, expiration_ledger)`
-//!    - Depending on the target contract call, user may need to include a
-//!      second subinvocation:
-//!      - `target_contract.target_fn(target_args)` (if it requires some
-//!        authorization)
+//!      - If `target_contract.target_fn(target_args)` requires additional
+//!        authorization, user includes a subinvocation for it.
+//!    - User authorizes `fee_token.approve(fee_forwarder, max_fee_amount,
+//!      expiration_ledger)`
 //!
-//!    - **Note**: User does NOT sign the exact `fee_amount` or `relayer`
-//!      address yet (these are unknown at signing time)
+//!    **Note**:
+//!    - User does NOT sign the exact `fee_amount` or `relayer` address yet
+//!      (these are unknown at signing time)
+//!    - Pay attention to the composition of authorization entries (compare with
+//!      "examples/fee-forwarder-pemissionless")
 //!
 //! 3. **Relayer picks up transaction** (off-chain):
 //!    - Relayer calculates actual `fee_amount` based on current network
@@ -49,27 +50,11 @@
 //!    - Contract forwards call to `target_contract.target_fn(target_args)`
 //!    - If any step fails, entire transaction reverts (including token
 //!      transfer)
-//!
-//! ## Authorization Summary
-//!
-//! **User authorizes** (signs first, before knowing relayer or exact fee):
-//! - `fee_token`, `max_fee_amount`, `expiration_ledger`
-//! - `target_contract`, `target_fn`, `target_args`
-//!
-//! **Relayer authorizes** the whole invocation (signs second, with exact fee):
-//!
-//! ## Security Properties
-//!
-//! - User can't be charged more than `max_fee_amount`
-//! - User's authorization expires at `expiration_ledger`
-//! - Only whitelisted relayers (with `executor` role) can call `forward()`
-//! - Token transfer and target call are atomic (both succeed or both fail)
-//! - Relayer can't change the target call parameters signed by user
-
-#![allow(clippy::too_many_arguments)]
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Val, Vec};
 use stellar_access::access_control::{grant_role_no_auth, set_admin, AccessControl};
-use stellar_fee_abstraction::{collect_fee_and_invoke, set_allowed_fee_token, sweep_token};
+use stellar_fee_abstraction::{
+    auth_user_and_invoke, collect_fee_with_eager_approval, set_allowed_fee_token, sweep_token,
+};
 use stellar_macros::{default_impl, only_role};
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -105,17 +90,28 @@ impl FeeForwarder {
         user: Address,
         relayer: Address,
     ) -> Val {
-        collect_fee_and_invoke(
+        // Depending on whether we first collect fee and than invoke target,
+        // composing authorization entries might differ. Compare "test.rs" from this
+        // crate and from "examples/fee-forwarder-pemissionless".
+        collect_fee_with_eager_approval(
             e,
             &fee_token,
             fee_amount,
+            max_fee_amount,
+            expiration_ledger,
+            &user,
+            &e.current_contract_address(), // current contract collects fee
+        );
+
+        auth_user_and_invoke(
+            e,
+            &fee_token,
             max_fee_amount,
             expiration_ledger,
             &target_contract,
             &target_fn,
             &target_args,
             &user,
-            &e.current_contract_address(), // current contract collects fees
         )
     }
 

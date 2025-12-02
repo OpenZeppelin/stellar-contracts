@@ -26,8 +26,11 @@
 //!      - `target_contract.target_fn(target_args)` (if it requires some
 //!        authorization)
 //!
-//!    - **Note**: User does NOT sign the exact `fee_amount` or `relayer`
-//!      address yet (these are unknown at signing time)
+//!    **Note**:
+//!    - User does NOT sign the exact `fee_amount` or `relayer` address yet
+//!      (these are unknown at signing time)
+//!    - Pay attention to the composition of authorization entries (compare with
+//!      "examples/fee-forwarder-pemissioned")
 //!
 //! 3. **Relayer picks up transaction** (off-chain):
 //!    - Relayer calculates actual `fee_amount` based on current network
@@ -49,26 +52,8 @@
 //!    - Contract forwards call to `target_contract.target_fn(target_args)`
 //!    - If any step fails, entire transaction reverts (including token
 //!      transfer)
-//!
-//! ## Authorization Summary
-//!
-//! **User authorizes** (signs first, before knowing relayer or exact fee):
-//! - `fee_token`, `max_fee_amount`, `expiration_ledger`
-//! - `target_contract`, `target_fn`, `target_args`
-//!
-//! **Relayer authorizes** the whole invocation (signs second, with exact fee):
-//!
-//! ## Security Properties
-//!
-//! - User can't be charged more than `max_fee_amount`
-//! - User's authorization expires at `expiration_ledger`
-//! - Only whitelisted relayers (with `executor` role) can call `forward()`
-//! - Token transfer and target call are atomic (both succeed or both fail)
-//! - Relayer can't change the target call parameters signed by user
-
-#![allow(clippy::too_many_arguments)]
 use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
-use stellar_fee_abstraction::collect_fee_and_invoke;
+use stellar_fee_abstraction::{auth_user_and_invoke, collect_fee_with_lazy_approval};
 
 #[contract]
 pub struct FeeForwarder;
@@ -91,17 +76,30 @@ impl FeeForwarder {
     ) -> Val {
         relayer.require_auth();
 
-        collect_fee_and_invoke(
+        // Depending on whether we first invoke target and than collect fee,
+        // composing authorization entries might differ. Compare "test.rs" from this
+        // crate and from "examples/fee-forwarder-pemissioned".
+        let res = auth_user_and_invoke(
             e,
             &fee_token,
-            fee_amount,
             max_fee_amount,
             expiration_ledger,
             &target_contract,
             &target_fn,
             &target_args,
             &user,
-            &relayer, // relayer collects fees
-        )
+        );
+
+        collect_fee_with_lazy_approval(
+            e,
+            &fee_token,
+            fee_amount,
+            max_fee_amount,
+            expiration_ledger,
+            &user,
+            &relayer, // relayer collects fee
+        );
+
+        res
     }
 }

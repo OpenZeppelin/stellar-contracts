@@ -90,18 +90,17 @@ fn forward_basic() {
                     &fn_args,
                 )
                     .into_val(&e),
-                sub_invokes: &[MockAuthInvoke {
-                    contract: &token.address,
-                    fn_name: "approve",
-                    args: (
-                        user.clone(),
-                        fee_forwarder.address.clone(),
-                        max_fee_amount,
-                        current_ledger,
-                    )
-                        .into_val(&e),
-                    sub_invokes: &[],
-                }],
+                sub_invokes: &[],
+            },
+        },
+        MockAuth {
+            address: &user,
+            invoke: &MockAuthInvoke {
+                contract: &token.address,
+                fn_name: "approve",
+                args: (user.clone(), fee_forwarder.address.clone(), max_fee_amount, current_ledger)
+                    .into_val(&e),
+                sub_invokes: &[],
             },
         },
         MockAuth {
@@ -177,26 +176,22 @@ fn forward_two_subinvokes() {
                     &fn_args,
                 )
                     .into_val(&e),
-                sub_invokes: &[
-                    MockAuthInvoke {
-                        contract: &token.address,
-                        fn_name: "approve",
-                        args: (
-                            user.clone(),
-                            fee_forwarder.address.clone(),
-                            max_fee_amount,
-                            current_ledger,
-                        )
-                            .into_val(&e),
-                        sub_invokes: &[],
-                    },
-                    MockAuthInvoke {
-                        contract: &target.address,
-                        fn_name: "require_auth_test",
-                        args: (user.clone(),).into_val(&e),
-                        sub_invokes: &[],
-                    },
-                ],
+                sub_invokes: &[MockAuthInvoke {
+                    contract: &target.address,
+                    fn_name: "require_auth_test",
+                    args: (user.clone(),).into_val(&e),
+                    sub_invokes: &[],
+                }],
+            },
+        },
+        MockAuth {
+            address: &user,
+            invoke: &MockAuthInvoke {
+                contract: &token.address,
+                fn_name: "approve",
+                args: (user.clone(), fee_forwarder.address.clone(), max_fee_amount, current_ledger)
+                    .into_val(&e),
+                sub_invokes: &[],
             },
         },
         MockAuth {

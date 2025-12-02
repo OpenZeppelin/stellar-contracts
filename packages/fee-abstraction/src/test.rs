@@ -1,28 +1,229 @@
 use soroban_sdk::{
-    contract, contractimpl, symbol_short,
+    contract, contractimpl,
     testutils::{Address as _, Events},
-    Address, Env,
+    token::TokenClient,
+    vec, Address, Env, FromVal, String, Symbol, Val, Vec,
 };
+use stellar_macros::default_impl;
+use stellar_tokens::fungible::{Base, FungibleToken};
 
 use crate::{
-    check_allowed_fee_token, emit_fee_collected, emit_forward_executed,
-    is_fee_token_allowlist_enabled, set_allowed_fee_token, sweep_token, validate_fee_bounds,
-    FeeAbstractionStorageKey,
+    auth_user_and_invoke, check_allowed_fee_token, collect_fee_with_eager_approval,
+    collect_fee_with_lazy_approval, is_fee_token_allowlist_enabled, set_allowed_fee_token,
+    sweep_token, validate_fee_bounds, FeeAbstractionStorageKey,
 };
 
 #[contract]
 struct MockContract;
 
 #[contract]
+pub struct MockTarget;
+
+#[contractimpl]
+impl MockTarget {
+    pub fn greet(e: Env) -> String {
+        String::from_str(&e, "hello")
+    }
+}
+
+#[contract]
 struct MockToken;
 
 #[contractimpl]
 impl MockToken {
-    pub fn balance(e: Env, _id: Address) -> i128 {
-        e.storage().persistent().get(&symbol_short!("balance")).unwrap_or(1000)
+    pub fn __constructor(e: Env, user: Address) {
+        Base::mint(&e, &user, 1_000);
     }
+}
 
-    pub fn transfer(_e: Env, _from: Address, _to: Address, _amount: i128) {}
+#[default_impl]
+#[contractimpl]
+impl FungibleToken for MockToken {
+    type ContractType = Base;
+}
+
+#[test]
+fn test_collect_fee_with_eager_approval_overwrites_allowance() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+
+    let max_fee_amount = 50;
+
+    let token_client = TokenClient::new(&e, &token_address);
+    // approve initially > max_fee_amount, but it will be overwritten
+    token_client.approve(&user, &contract_address, &60, &100);
+
+    e.as_contract(&contract_address, || {
+        // approve 50, spend 20
+        collect_fee_with_eager_approval(
+            &e,
+            &token_address,
+            20,
+            max_fee_amount,
+            100,
+            &user,
+            &recipient,
+        );
+    });
+
+    let events = e.events().all();
+    // approval, trnasfer and collect fee
+    assert_eq!(events.len(), 3);
+
+    let allowance = token_client.allowance(&user, &contract_address);
+    assert_eq!(allowance, 30);
+
+    let balance = token_client.balance(&recipient);
+    assert_eq!(balance, 20);
+}
+
+#[test]
+fn test_collect_fee_with_lazy_approval_no_previous() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+
+    let max_fee_amount = 50;
+
+    let token_client = TokenClient::new(&e, &token_address);
+    // no previous approvals
+
+    e.as_contract(&contract_address, || {
+        // approve 50, spend 20
+        collect_fee_with_lazy_approval(
+            &e,
+            &token_address,
+            20,
+            max_fee_amount,
+            100,
+            &user,
+            &recipient,
+        );
+    });
+
+    let events = e.events().all();
+    // approval, trnasfer and collect fee
+    assert_eq!(events.len(), 3);
+
+    let allowance = token_client.allowance(&user, &contract_address);
+    assert_eq!(allowance, 30);
+
+    let balance = token_client.balance(&recipient);
+    assert_eq!(balance, 20);
+}
+
+#[test]
+fn test_collect_fee_with_lazy_approval_higher_previous() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+
+    let max_fee_amount = 50;
+
+    let token_client = TokenClient::new(&e, &token_address);
+    // approve initially > max_fee_amount
+    token_client.approve(&user, &contract_address, &60, &100);
+
+    e.as_contract(&contract_address, || {
+        // no approval, only spend 20
+        collect_fee_with_lazy_approval(
+            &e,
+            &token_address,
+            20,
+            max_fee_amount,
+            100,
+            &user,
+            &recipient,
+        );
+    });
+
+    let allowance = token_client.allowance(&user, &contract_address);
+    assert_eq!(allowance, 40);
+
+    let balance = token_client.balance(&recipient);
+    assert_eq!(balance, 20);
+}
+
+#[test]
+fn test_collect_fee_with_lazy_approval_lower_previous() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+
+    let max_fee_amount = 50;
+
+    let token_client = TokenClient::new(&e, &token_address);
+    // approve initially < max_fee_amount
+    token_client.approve(&user, &contract_address, &30, &100);
+
+    e.as_contract(&contract_address, || {
+        // approve 50 by overwriting the previous 30 and spend 20
+        collect_fee_with_lazy_approval(
+            &e,
+            &token_address,
+            20,
+            max_fee_amount,
+            100,
+            &user,
+            &recipient,
+        );
+    });
+
+    let allowance = token_client.allowance(&user, &contract_address);
+    assert_eq!(allowance, 30);
+
+    let balance = token_client.balance(&recipient);
+    assert_eq!(balance, 20);
+}
+
+#[test]
+fn test_auth_user_and_invoke() {
+    let e = Env::default();
+    e.mock_all_auths();
+
+    let token = Address::generate(&e);
+    let user = Address::generate(&e);
+
+    let contract_address = e.register(MockContract, ());
+
+    let current_ledger = e.ledger().sequence();
+    let target_contract = e.register(MockTarget, ());
+    let target_fn = Symbol::new(&e, "greet");
+    let target_args: Vec<Val> = vec![&e];
+
+    let greeting = e.as_contract(&contract_address, || {
+        auth_user_and_invoke(
+            &e,
+            &token,
+            50,
+            current_ledger + 10,
+            &target_contract,
+            &target_fn,
+            &target_args,
+            &user,
+        )
+    });
+    assert_eq!(String::from_val(&e, &greeting), String::from_str(&e, "hello"));
+
+    let events = e.events().all();
+    assert_eq!(events.len(), 1);
 }
 
 // ################## FEE TOKEN ALLOWLIST TESTS ##################
@@ -162,17 +363,26 @@ fn test_validate_fee_bounds_neg() {
 #[test]
 fn test_sweep_token_success() {
     let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
     let contract_address = e.register(MockContract, ());
-    let token_address = e.register(MockToken, ());
     let recipient = Address::generate(&e);
 
+    let token_address = e.register(MockToken, (contract_address.clone(),));
+    let token_client = TokenClient::new(&e, &token_address);
+
+    let balance = token_client.balance(&contract_address);
+
     e.as_contract(&contract_address, || {
-        let amount = sweep_token(&e, &token_address, &recipient);
-        assert_eq!(amount, 1000);
+        sweep_token(&e, &token_address, &recipient);
     });
 
+    // transfer + token swept
     let events = e.events().all();
-    assert_eq!(events.len(), 1);
+    assert_eq!(events.len(), 2);
+
+    assert_eq!(token_client.balance(&recipient), balance);
+    assert_eq!(token_client.balance(&contract_address), 0i128);
 }
 
 #[test]
@@ -180,49 +390,10 @@ fn test_sweep_token_success() {
 fn test_sweep_token_no_balance() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
+    let token_address = e.register(MockToken, (Address::generate(&e),));
     let recipient = Address::generate(&e);
-
-    let token_address = e.register(MockToken, ());
-    e.as_contract(&token_address, || {
-        e.storage().persistent().set(&symbol_short!("balance"), &0i128);
-    });
 
     e.as_contract(&contract_address, || {
         sweep_token(&e, &token_address, &recipient);
     });
-}
-
-// ################## EVENT EMISSION TESTS ##################
-
-#[test]
-fn test_emit_fee_collected() {
-    let e = Env::default();
-    let contract_address = e.register(MockContract, ());
-    let user = Address::generate(&e);
-    let collector = Address::generate(&e);
-    let token = Address::generate(&e);
-
-    e.as_contract(&contract_address, || {
-        emit_fee_collected(&e, &user, &collector, &token, 100);
-    });
-
-    let events = e.events().all();
-    assert_eq!(events.len(), 1);
-}
-
-#[test]
-fn test_emit_forward_executed() {
-    let e = Env::default();
-    let contract_address = e.register(MockContract, ());
-    let user = Address::generate(&e);
-    let target_contract = Address::generate(&e);
-    let target_fn = symbol_short!("test");
-    let target_args = soroban_sdk::vec![&e];
-
-    e.as_contract(&contract_address, || {
-        emit_forward_executed(&e, &user, &target_contract, &target_fn, &target_args);
-    });
-
-    let events = e.events().all();
-    assert_eq!(events.len(), 1);
 }

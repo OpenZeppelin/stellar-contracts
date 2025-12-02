@@ -1832,6 +1832,8 @@ name = "stellar-fee-abstraction"
 version = "0.5.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-macros",
+ "stellar-tokens",
 ]
 
 [[package]]

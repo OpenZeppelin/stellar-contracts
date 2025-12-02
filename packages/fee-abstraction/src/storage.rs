@@ -20,14 +20,17 @@ pub enum FeeAbstractionStorageKey {
     TokenIndex(Address),
 }
 
-/// Collect a fee from the user in a given token and invoke a target contract
-/// function.
+/// Authorize user-side parameters and invoke a target contract function.
+///
+/// This funciton does not collect fees, use [`collect_fee_with_lazy_approval`]
+/// or [`collect_fee_with_eager_approval`] for this purpose. Check examples in
+/// "examples/fee-forwarder-persmissioned" and
+/// "examples/fee-forwarder-persmissionless".
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `fee_token` - The token address to pay the fee with.
-/// * `fee_amount` - The actual fee amount to charge.
 /// * `max_fee_amount` - The maximum fee amount the user approved.
 /// * `expiration_ledger` - The ledger sequence at which the approval expires.
 /// * `target_contract` - The contract address to invoke after collecting the
@@ -35,19 +38,9 @@ pub enum FeeAbstractionStorageKey {
 /// * `target_fn` - The function to invoke on the target contract.
 /// * `target_args` - The arguments to pass to the target contract function.
 /// * `user` - The address of the user paying the fee and authorizing the call.
-/// * `fee_recipient` - The address that receives the collected fee.
-///
-/// # Errors
-///
-/// * [`FeeAbstractionError::InvalidFeeBounds`] - If `fee_amount >
-///   max_fee_amount`.
-/// * [`FeeAbstractionError::FeeTokenNotAllowed`] - If the fee token is not
-///   allowed when the allowlist is enabled.
 ///
 /// # Events
 ///
-/// * topics - `["FeeCollected", user: Address, recipient: Address]`
-/// * data - `[token: Address, amount: i128]`
 /// * topics - `["ForwardExecuted", user: Address, target_contract: Address]`
 /// * data - `[target_fn: Symbol, target_args: Vec<Val>]`
 ///
@@ -58,17 +51,15 @@ pub enum FeeAbstractionStorageKey {
 /// checks to validate the other parameters. Additionally, the invoker **MUST**
 /// ensure the call to the target contract is safe for them.
 #[allow(clippy::too_many_arguments)]
-pub fn collect_fee_and_invoke(
+pub fn auth_user_and_invoke(
     e: &Env,
     fee_token: &Address,
-    fee_amount: i128,
     max_fee_amount: i128,
     expiration_ledger: u32,
     target_contract: &Address,
     target_fn: &Symbol,
     target_args: &Vec<Val>,
     user: &Address,
-    fee_recipient: &Address,
 ) -> Val {
     let user_args_for_auth = (
         fee_token.clone(),
@@ -81,8 +72,6 @@ pub fn collect_fee_and_invoke(
         .into_val(e);
     user.require_auth_for_args(user_args_for_auth);
 
-    collect_fee(e, fee_token, fee_amount, max_fee_amount, expiration_ledger, user, fee_recipient);
-
     let res = e.invoke_contract::<Val>(target_contract, target_fn, target_args.clone());
 
     emit_forward_executed(e, user, target_contract, target_fn, target_args);
@@ -90,7 +79,12 @@ pub fn collect_fee_and_invoke(
     res
 }
 
-/// Collect a fee from the user in a given token.
+/// Collect a fee from the user in a given token, always setting allowance to
+/// the `max_fee_amount`.
+///
+/// Compared to [`collect_fee_with_lazy_approval`], this variant uses an *eager*
+/// approval strategy: it always approves `max_fee_amount` for this contract,
+/// overwriting any previous allowance.
 ///
 /// # Arguments
 ///
@@ -100,7 +94,7 @@ pub fn collect_fee_and_invoke(
 /// * `max_fee_amount` - The maximum fee amount the user approved.
 /// * `expiration_ledger` - The ledger sequence at which the approval expires.
 /// * `user` - The address of the user paying the fee.
-/// * `recipient` - The address that receives the collected fee.
+/// * `fee_recipient` - The address that receives the collected fee.
 ///
 /// # Events
 ///
@@ -109,35 +103,91 @@ pub fn collect_fee_and_invoke(
 ///
 /// # Errors
 ///
-/// * [`FeeAbstractionError::InvalidFeeBounds`] - If `fee_amount >
-///   max_fee_amount`.
+/// * [`FeeAbstractionError::InvalidFeeBounds`] - If amounts <= 0 or `fee_amount
+///   > max_fee_amount`.
 /// * [`FeeAbstractionError::FeeTokenNotAllowed`] - If the fee token is not
 ///   allowed when the allowlist is enabled.
-pub fn collect_fee(
+pub fn collect_fee_with_eager_approval(
     e: &Env,
     fee_token: &Address,
     fee_amount: i128,
     max_fee_amount: i128,
     expiration_ledger: u32,
     user: &Address,
-    recipient: &Address,
+    fee_recipient: &Address,
 ) {
     check_allowed_fee_token(e, fee_token);
 
-    // Checking explicitly the fee bounds instead of relying on validations in
-    // `approve` + `transfer_from`. There might be another approval from the `user`
-    // that will allow charging more than `max_fee_amount` intended for this
-    // invocation.
     validate_fee_bounds(e, fee_amount, max_fee_amount);
 
     let token_client = TokenClient::new(e, fee_token);
-    // User signs an approval for `max_fee_amount` so that this contract can charge
-    // up to that amount.
+    // User always approves `max_fee_amount` so that the contract can charge up to
+    // that amount, overwritting previous approvals.
     token_client.approve(user, &e.current_contract_address(), &max_fee_amount, &expiration_ledger);
 
-    token_client.transfer_from(&e.current_contract_address(), user, recipient, &fee_amount);
+    token_client.transfer_from(&e.current_contract_address(), user, fee_recipient, &fee_amount);
 
-    emit_fee_collected(e, user, recipient, fee_token, fee_amount);
+    emit_fee_collected(e, user, fee_recipient, fee_token, fee_amount);
+}
+
+/// Collect a fee from the user in a given token, overwritting allowance only
+/// when needed.
+///
+/// Compared to [`collect_fee_with_eager_approval`], this variant uses a *lazy*
+/// approval strategy: it approves `max_fee_amount` only if the allowance is
+/// below `max_fee_amount`.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `fee_token` - The token address to pay the fee with.
+/// * `fee_amount` - The actual fee amount to charge.
+/// * `max_fee_amount` - The maximum fee amount the user approved.
+/// * `expiration_ledger` - The ledger sequence at which the approval expires.
+/// * `user` - The address of the user paying the fee.
+/// * `fee_recipient` - The address that receives the collected fee.
+///
+/// # Events
+///
+/// * topics - `["FeeCollected", user: Address, recipient: Address]`
+/// * data - `[token: Address, amount: i128]`
+///
+/// # Errors
+///
+/// * [`FeeAbstractionError::InvalidFeeBounds`] - If amounts <= 0 or `fee_amount
+///   > max_fee_amount`.
+/// * [`FeeAbstractionError::FeeTokenNotAllowed`] - If the fee token is not
+///   allowed when the allowlist is enabled.
+pub fn collect_fee_with_lazy_approval(
+    e: &Env,
+    fee_token: &Address,
+    fee_amount: i128,
+    max_fee_amount: i128,
+    expiration_ledger: u32,
+    user: &Address,
+    fee_recipient: &Address,
+) {
+    check_allowed_fee_token(e, fee_token);
+
+    validate_fee_bounds(e, fee_amount, max_fee_amount);
+
+    let token_client = TokenClient::new(e, fee_token);
+    let allowance = token_client.allowance(user, &e.current_contract_address());
+
+    // User approves only if needed so that the contract can charge them up to
+    // `max_fee_amount`.
+    if allowance < max_fee_amount {
+        token_client.approve(
+            user,
+            &e.current_contract_address(),
+            &max_fee_amount,
+            &expiration_ledger,
+        );
+    }
+
+    token_client.transfer_from(&e.current_contract_address(), user, fee_recipient, &fee_amount);
+
+    emit_fee_collected(e, user, fee_recipient, fee_token, fee_amount);
 }
 
 // ################## FEE TOKEN ALLOWLIST ##################
