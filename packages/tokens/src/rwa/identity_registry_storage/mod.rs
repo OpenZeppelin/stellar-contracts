@@ -280,8 +280,8 @@ use soroban_sdk::{contracterror, contractevent, Address, Env, FromVal, Val, Vec}
 pub use storage::{
     add_country_data_entries, add_identity, delete_country_data, get_country_data,
     get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
-    modify_identity, recover_identity, remove_identity, stored_identity, CountryData,
-    CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
+    modify_identity, recover_identity, remove_identity, stored_identity, validate_country_data,
+    CountryData, CountryRelation, IdentityProfile, IdentityType, IndividualCountryRelation,
     OrganizationCountryRelation,
 };
 
@@ -491,6 +491,10 @@ pub enum IRSError {
     MaxCountryEntriesReached = 324,
     /// Account has been recovered and cannot be used.
     AccountRecovered = 325,
+    /// Metadata has too many entries (exceeds MAX_METADATA_ENTRIES).
+    MetadataTooManyEntries = 326,
+    /// Metadata string value is too long (exceeds MAX_METADATA_STRING_LEN).
+    MetadataStringTooLong = 327,
 }
 
 // ################## CONSTANTS ##################
@@ -502,6 +506,12 @@ pub const IDENTITY_TTL_THRESHOLD: u32 = IDENTITY_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 /// The maximum number of country data entries that can be associated with a
 /// single identity.
 pub const MAX_COUNTRY_ENTRIES: u32 = 15;
+
+/// The maximum number of metadata entries per CountryData.
+pub const MAX_METADATA_ENTRIES: u32 = 10;
+
+/// The maximum length of a metadata string value.
+pub const MAX_METADATA_STRING_LEN: u32 = 100;
 
 // ################## EVENTS ##################
 
@@ -640,14 +650,17 @@ pub fn emit_country_data_event(
     country_data: &CountryData,
 ) {
     match event_type {
-        CountryDataEvent::Added =>
+        CountryDataEvent::Added => {
             CountryDataAdded { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
-        CountryDataEvent::Removed =>
+                .publish(e)
+        }
+        CountryDataEvent::Removed => {
             CountryDataRemoved { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
-        CountryDataEvent::Modified =>
+                .publish(e)
+        }
+        CountryDataEvent::Modified => {
             CountryDataModified { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
+                .publish(e)
+        }
     }
 }

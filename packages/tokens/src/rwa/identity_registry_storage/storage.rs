@@ -127,7 +127,7 @@ use soroban_sdk::{
 use crate::rwa::identity_registry_storage::{
     emit_country_data_event, emit_identity_modified, emit_identity_recovered, emit_identity_stored,
     emit_identity_unstored, CountryDataEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
-    IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_ENTRIES,
+    IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_ENTRIES, MAX_METADATA_ENTRIES, MAX_METADATA_STRING_LEN,
 };
 
 /// Represents the type of identity holder
@@ -318,6 +318,10 @@ pub fn get_recovered_to(e: &Env, old_account: &Address) -> Option<Address> {
 /// * [`IRSError::EmptyCountryList`] - If `initial_countries` is empty.
 /// * [`IRSError::MaxCountryEntriesReached`] - If the number of
 ///   `initial_countries` exceeds `MAX_COUNTRY_ENTRIES`.
+/// * [`IRSError::MetadataTooManyEntries`] - If any country data has more than
+///   `MAX_METADATA_ENTRIES` metadata entries.
+/// * [`IRSError::MetadataStringTooLong`] - If any metadata string value exceeds
+///   `MAX_METADATA_STRING_LEN`.
 ///
 /// # Events
 ///
@@ -354,6 +358,10 @@ pub fn add_identity(
     }
     if initial_countries.len() > MAX_COUNTRY_ENTRIES {
         panic_with_error!(e, IRSError::MaxCountryEntriesReached);
+    }
+
+    for country_data in initial_countries.iter() {
+        validate_country_data(e, &country_data);
     }
 
     let identity_key = IRSStorageKey::Identity(account.clone());
@@ -566,6 +574,10 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
 /// * [`IRSError::EmptyCountryList`] - If `country_data_list` is empty.
 /// * [`IRSError::MaxCountryEntriesReached`] - If the number of country data
 ///   entries exceeds `MAX_COUNTRY_ENTRIES`.
+/// * [`IRSError::MetadataTooManyEntries`] - If any country data has more than
+///   `MAX_METADATA_ENTRIES` metadata entries.
+/// * [`IRSError::MetadataStringTooLong`] - If any metadata string value exceeds
+///   `MAX_METADATA_STRING_LEN`.
 ///
 /// # Events
 ///
@@ -586,6 +598,10 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
 pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &Vec<CountryData>) {
     if country_data_list.is_empty() {
         panic_with_error!(e, IRSError::EmptyCountryList)
+    }
+
+    for country_data in country_data_list.iter() {
+        validate_country_data(e, &country_data);
     }
 
     let mut profile: IdentityProfile =
@@ -617,6 +633,10 @@ pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &
 /// # Errors
 ///
 /// * [`IRSError::CountryDataNotFound`] - If the index is out of bounds.
+/// * [`IRSError::MetadataTooManyEntries`] - If the country data has more than
+///   `MAX_METADATA_ENTRIES` metadata entries.
+/// * [`IRSError::MetadataStringTooLong`] - If any metadata string value exceeds
+///   `MAX_METADATA_STRING_LEN`.
 ///
 /// # Events
 ///
@@ -634,6 +654,8 @@ pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &
 /// Using this function in public-facing methods may create significant security
 /// risks as it could allow unauthorized modifications.
 pub fn modify_country_data(e: &Env, account: &Address, index: u32, country_data: &CountryData) {
+    validate_country_data(e, country_data);
+
     let mut profile = get_identity_profile(e, account);
     if index >= profile.countries.len() {
         panic_with_error!(e, IRSError::CountryDataNotFound);
@@ -697,6 +719,33 @@ pub fn delete_country_data(e: &Env, account: &Address, index: u32) {
 }
 
 // ################## HELPERS ##################
+
+/// Validates a single country data entry to ensure metadata constraints are
+/// met.
+///
+/// # Arguments
+///
+/// * `e` - The Soroban environment.
+/// * `country_data` - The country data entry to validate.
+///
+/// # Errors
+///
+/// * [`IRSError::MetadataTooManyEntries`] - If metadata has more than
+///   `MAX_METADATA_ENTRIES` entries.
+/// * [`IRSError::MetadataStringTooLong`] - If any metadata string value exceeds
+///   `MAX_METADATA_STRING_LEN`.
+pub fn validate_country_data(e: &Env, country_data: &CountryData) {
+    if let Some(ref metadata) = country_data.metadata {
+        if metadata.len() > MAX_METADATA_ENTRIES {
+            panic_with_error!(e, IRSError::MetadataTooManyEntries);
+        }
+        for (_, value) in metadata.iter() {
+            if value.len() > MAX_METADATA_STRING_LEN {
+                panic_with_error!(e, IRSError::MetadataStringTooLong);
+            }
+        }
+    }
+}
 
 /// Helper function that tries to retrieve a persistent storage value and
 /// extend its TTL if the entry exists.
