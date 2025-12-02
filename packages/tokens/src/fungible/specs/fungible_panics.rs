@@ -104,7 +104,7 @@ pub fn transfer_from_panics_if_not_enough_allowance(e: Env) {
     let allowance = Base::allowance(&e, &from, &spender);
     clog!(allowance);
     cvlr_assume!(allowance < amount);
-    cvlr_assume!(spender != from);
+    // cvlr_assume!(spender != from); //review
     Base::transfer_from(&e, &spender, &from, &to, amount);
     cvlr_assert!(false);
 }
