@@ -4,15 +4,24 @@ Utilities for implementing fee abstraction, allowing users to pay transaction fe
 
 ## Features
 
+- Fee Collection Helpers (eager and lazy approval strategies)
+- Inoker Helper with user-side authorizations
 - Optional Fee Token Allowlist
 - Optional Token Sweeping
 - Validation Utilities
 
-### Events
-- `FeeCollected`: Emitted when a fee is collected
-- `ForwardExecuted`: Emitted when a call is forwarded
-- `TokensSwept`: Emitted when tokens are swept
+## Examples
 
-## Example
+- [fee-forwarder-permissioned](../../examples/fee-forwarder-permissioned)
 
-See the [fee-forwarder example](../../examples/fee-forwarder) for a complete implementation.
+  - Only trusted executors can call `forward`.
+  - The forwarder contract itself collects the fees, which can be swept later.
+
+- [fee-forwarder-permissionless](../../examples/fee-forwarder-permissionless)
+  - Anyone can call `forward`; there is no executor allowlist.
+  - The relayer (transaction submitter) receives the collected fee.
+
+Together, these examples show how to combine the auth helper
+(`auth_user_and_invoke`) with the fee collection helpers
+(`collect_fee_with_eager_approval` and `collect_fee_with_lazy_approval`) in
+both models.
