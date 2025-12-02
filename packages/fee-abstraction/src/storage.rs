@@ -22,7 +22,7 @@ pub enum FeeAbstractionStorageKey {
 
 /// Authorize user-side parameters and invoke a target contract function.
 ///
-/// This funciton does not collect fees, use [`collect_fee_with_lazy_approval`]
+/// This function does not collect fees, use [`collect_fee_with_lazy_approval`]
 /// or [`collect_fee_with_eager_approval`] for this purpose. Check examples in
 /// "examples/fee-forwarder-persmissioned" and
 /// "examples/fee-forwarder-persmissionless".
@@ -122,7 +122,7 @@ pub fn collect_fee_with_eager_approval(
 
     let token_client = TokenClient::new(e, fee_token);
     // User always approves `max_fee_amount` so that the contract can charge up to
-    // that amount, overwritting previous approvals.
+    // that amount, overwriting previous approvals.
     token_client.approve(user, &e.current_contract_address(), &max_fee_amount, &expiration_ledger);
 
     token_client.transfer_from(&e.current_contract_address(), user, fee_recipient, &fee_amount);
@@ -130,7 +130,7 @@ pub fn collect_fee_with_eager_approval(
     emit_fee_collected(e, user, fee_recipient, fee_token, fee_amount);
 }
 
-/// Collect a fee from the user in a given token, overwritting allowance only
+/// Collect a fee from the user in a given token, overwriting allowance only
 /// when needed.
 ///
 /// Compared to [`collect_fee_with_eager_approval`], this variant uses a *lazy*
