@@ -79,6 +79,7 @@ fn approve_with_event() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #115)")]
 fn approve_handles_expiry() {
     let e = Env::default();
     e.mock_all_auths();
@@ -90,8 +91,7 @@ fn approve_handles_expiry() {
         Base::approve(&e, &owner, &spender, 50, 2);
         e.ledger().set_sequence_number(3);
 
-        let expired_allowance = Base::allowance(&e, &owner, &spender);
-        assert_eq!(expired_allowance, 0);
+        let _ = Base::allowance(&e, &owner, &spender);
     });
 }
 
@@ -187,18 +187,11 @@ fn set_allowance_with_zero_amount() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let owner = Address::generate(&e);
-    let owner2 = Address::generate(&e);
     let spender = Address::generate(&e);
 
     e.as_contract(&address, || {
         Base::set_allowance(&e, &owner, &spender, 0, 5);
         let allowance_val = Base::allowance(&e, &owner, &spender);
-        assert_eq!(allowance_val, 0);
-
-        // should pass for a past ledger
-        e.ledger().set_sequence_number(10);
-        Base::set_allowance(&e, &owner2, &spender, 0, 5);
-        let allowance_val = Base::allowance(&e, &owner2, &spender);
         assert_eq!(allowance_val, 0);
     });
 }

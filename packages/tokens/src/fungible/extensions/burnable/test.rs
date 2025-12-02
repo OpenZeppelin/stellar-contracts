@@ -66,7 +66,7 @@ fn burn_with_insufficient_balance_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #101)")]
+#[should_panic(expected = "Error(Contract, #116)")]
 fn burn_with_no_allowance_panics() {
     let e = Env::default();
     e.mock_all_auths();

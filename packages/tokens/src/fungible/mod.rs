@@ -310,10 +310,14 @@ pub enum FungibleTokenError {
     SACMissingFnParam = 111,
     /// Indicates an invalid function parameter in the SAC contract context.
     SACInvalidFnParam = 112,
-    /// The user is not allowed to perform this operation
+    /// Indicates the user is not allowed to perform this operation.
     UserNotAllowed = 113,
-    /// The user is blocked and cannot perform this operation
+    /// Indicates the user is blocked and cannot perform this operation.
     UserBlocked = 114,
+    /// Indicates the allowance has expired.
+    ExpiredAllowance = 115,
+    /// Indicates the allowance does not exist.
+    AllowanceNotFound = 116,
 }
 
 // ################## CONSTANTS ##################

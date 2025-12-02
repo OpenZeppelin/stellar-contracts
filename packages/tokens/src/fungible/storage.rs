@@ -73,7 +73,6 @@ impl Base {
 
     /// Returns the amount of tokens a `spender` is allowed to spend on behalf
     /// of an `owner` and the ledger number at which this allowance expires.
-    /// Both values default to `0`.
     ///
     /// # Arguments
     ///
@@ -81,21 +80,30 @@ impl Base {
     /// * `owner` - The address holding the tokens.
     /// * `spender` - The address authorized to spend the tokens.
     ///
-    /// # Notes
+    /// # Errors
     ///
-    /// Attention is required when `live_until_ledger` is less than the current
-    /// ledger number, as this indicates the entry has expired. In such cases,
-    /// the allowance should be treated as `0`.
+    /// * [`FungibleTokenError::AllowanceNotFound`] - When trying to access a
+    ///   non-existent allowance.
+    /// * [`FungibleTokenError::ExpiredAllowance`] - When the allowance has
+    ///   expired.
     pub fn allowance_data(e: &Env, owner: &Address, spender: &Address) -> AllowanceData {
         let key = AllowanceKey { owner: owner.clone(), spender: spender.clone() };
-        e.storage()
+        let allowance_data = e
+            .storage()
             .temporary()
-            .get(&StorageKey::Allowance(key))
-            .unwrap_or(AllowanceData { amount: 0, live_until_ledger: 0 })
+            .get::<_, AllowanceData>(&StorageKey::Allowance(key))
+            .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::AllowanceNotFound));
+
+        let current_ledger = e.ledger().sequence();
+        if allowance_data.live_until_ledger < current_ledger {
+            panic_with_error!(e, FungibleTokenError::ExpiredAllowance);
+        }
+
+        allowance_data
     }
 
     /// Returns the amount of tokens a `spender` is allowed to spend on behalf
-    /// of an `owner`.
+    /// of an `owner` with expiry check.
     ///
     /// # Arguments
     ///
@@ -103,18 +111,11 @@ impl Base {
     /// * `owner` - The address holding the tokens.
     /// * `spender` - The address authorized to spend the tokens.
     ///
-    /// # Notes
+    /// # Errors
     ///
-    /// An allowance entry where `live_until_ledger` is less than the current
-    /// ledger number is treated as an allowance with amount `0`.
+    /// * refer to [`Base::allowance_data`] errors.
     pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
-        let allowance = Base::allowance_data(e, owner, spender);
-
-        if allowance.live_until_ledger < e.ledger().sequence() {
-            return 0;
-        }
-
-        allowance.amount
+        Base::allowance_data(e, owner, spender).amount
     }
 
     /// Returns the token metadata such as decimals, name and symbol.
@@ -261,7 +262,7 @@ impl Base {
         let current_ledger = e.ledger().sequence();
 
         if live_until_ledger > e.ledger().max_live_until_ledger()
-            || (amount > 0 && live_until_ledger < current_ledger)
+            || live_until_ledger < current_ledger
         {
             panic_with_error!(e, FungibleTokenError::InvalidLiveUntilLedger);
         }
@@ -272,14 +273,12 @@ impl Base {
 
         e.storage().temporary().set(&key, &allowance);
 
-        if amount > 0 {
-            // NOTE: cannot revert because of the check above;
-            // NOTE: 1 is not added to `live_for` as in the SAC implementation which
-            // is a bug tracked in https://github.com/stellar/rs-soroban-env/issues/1519
-            let live_for = live_until_ledger - current_ledger;
+        // NOTE: cannot revert because of the check above;
+        // NOTE: 1 is not added to `live_for` as in the SAC implementation which
+        // is a bug tracked in https://github.com/stellar/rs-soroban-env/issues/1519
+        let live_for = live_until_ledger - current_ledger;
 
-            e.storage().temporary().extend_ttl(&key, live_for, live_for);
-        }
+        e.storage().temporary().extend_ttl(&key, live_for, live_for);
     }
 
     /// Deducts the amount of tokens a `spender` is allowed to spend on behalf
@@ -315,15 +314,13 @@ impl Base {
             panic_with_error!(e, FungibleTokenError::InsufficientAllowance);
         }
 
-        if amount > 0 {
-            Base::set_allowance(
-                e,
-                owner,
-                spender,
-                allowance.amount - amount,
-                allowance.live_until_ledger,
-            );
-        }
+        Base::set_allowance(
+            e,
+            owner,
+            spender,
+            allowance.amount - amount,
+            allowance.live_until_ledger,
+        );
     }
 
     /// Transfers `amount` of tokens from `from` to `to`.
