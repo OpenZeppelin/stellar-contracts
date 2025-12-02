@@ -77,6 +77,40 @@ fn set_metadata_should_panic_when_base_uri_exceeds_max_length() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #213)")]
+fn set_metadata_should_panic_when_name_exceeds_max_length() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        // Create a name that exceeds MAX_NAME_LEN (40 characters)
+        let base_uri = String::from_str(&e, "https://example.com/");
+        let too_long_name = String::from_str(&e, &"a".repeat(41));
+        let symbol = String::from_str(&e, "TEST");
+
+        // This should panic with NameMaxLenExceeded error
+        Base::set_metadata(&e, base_uri, too_long_name, symbol);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #214)")]
+fn set_metadata_should_panic_when_symbol_exceeds_max_length() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        // Create a symbol that exceeds MAX_SYMBOL_LEN (10 characters)
+        let base_uri = String::from_str(&e, "https://example.com/");
+        let name = String::from_str(&e, "Test Collection");
+        let too_long_symbol = String::from_str(&e, &"a".repeat(11));
+
+        // This should panic with SymbolMaxLenExceeded error
+        Base::set_metadata(&e, base_uri, name, too_long_symbol);
+    });
+}
+
+#[test]
 fn approve_for_all_works() {
     let e = Env::default();
     e.mock_all_auths();

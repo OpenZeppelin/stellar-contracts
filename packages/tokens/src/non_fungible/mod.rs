@@ -380,6 +380,10 @@ pub enum NonFungibleTokenError {
     BaseUriMaxLenExceeded = 211,
     /// Indicates the royalty amount is higher than 10_000 (100%) basis points.
     InvalidRoyaltyAmount = 212,
+    /// Indicates the length of the name exceeds the maximum allowed.
+    NameMaxLenExceeded = 213,
+    /// Indicates the length of the symbol exceeds the maximum allowed.
+    SymbolMaxLenExceeded = 214,
 }
 
 // ################## CONSTANTS ##################
@@ -398,6 +402,10 @@ pub const TOKEN_TTL_THRESHOLD: u32 = TOKEN_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 pub const MAX_NUM_DIGITS: usize = 10;
 /// Max. allowed length for a base uri.
 pub const MAX_BASE_URI_LEN: usize = 200;
+/// Max. allowed length for a name.
+pub const MAX_NAME_LEN: usize = 40;
+/// Max. allowed length for a symbol.
+pub const MAX_SYMBOL_LEN: usize = 10;
 
 // ################## EVENTS ##################
 

@@ -3,7 +3,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use crate::non_fungible::{
     emit_approve, emit_approve_for_all, emit_mint, emit_transfer, sequential::increment_token_id,
     Base, NonFungibleTokenError, BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, MAX_BASE_URI_LEN,
-    MAX_NUM_DIGITS, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
+    MAX_NAME_LEN, MAX_NUM_DIGITS, MAX_SYMBOL_LEN, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
 };
 
 /// Storage container for the token for which an approval is granted
@@ -580,6 +580,14 @@ impl Base {
     pub fn set_metadata(e: &Env, base_uri: String, name: String, symbol: String) {
         if base_uri.len() as usize > MAX_BASE_URI_LEN {
             panic_with_error!(e, NonFungibleTokenError::BaseUriMaxLenExceeded)
+        }
+
+        if name.len() as usize > MAX_NAME_LEN {
+            panic_with_error!(e, NonFungibleTokenError::NameMaxLenExceeded)
+        }
+
+        if symbol.len() as usize > MAX_SYMBOL_LEN {
+            panic_with_error!(e, NonFungibleTokenError::SymbolMaxLenExceeded)
         }
 
         let metadata = Metadata { base_uri, name, symbol };
