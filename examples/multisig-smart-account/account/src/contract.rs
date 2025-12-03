@@ -12,9 +12,9 @@ use soroban_sdk::{
 };
 use stellar_accounts::smart_account::{
     add_context_rule, add_policy, add_signer, do_check_auth, get_context_rule, get_context_rules,
-    remove_context_rule, remove_policy, remove_signer, update_context_rule_name,
-    update_context_rule_valid_until, ContextRule, ContextRuleType, ExecutionEntryPoint, Signatures,
-    Signer, SmartAccount, SmartAccountError,
+    get_context_rules_count, remove_context_rule, remove_policy, remove_signer,
+    update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType,
+    ExecutionEntryPoint, Signatures, Signer, SmartAccount, SmartAccountError,
 };
 use stellar_contract_utils::upgradeable::UpgradeableInternal;
 use stellar_macros::Upgradeable;
@@ -87,6 +87,11 @@ impl SmartAccount for MultisigContract {
     /// Retrieve all context rules of a specific type.
     fn get_context_rules(e: &Env, context_rule_type: ContextRuleType) -> Vec<ContextRule> {
         get_context_rules(e, &context_rule_type)
+    }
+
+    /// Retrieve the numebr of all context rules, including the expired ones.
+    fn get_context_rules_count(e: &Env) -> u32 {
+        get_context_rules_count(e)
     }
 
     /// Add a new context rule to the smart account.

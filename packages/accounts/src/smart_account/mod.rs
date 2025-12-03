@@ -7,9 +7,9 @@ use soroban_sdk::{
 };
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, do_check_auth, get_context_rule,
-    get_context_rules, get_validated_context, remove_context_rule, remove_policy, remove_signer,
-    update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType, Meta,
-    Signatures, Signer,
+    get_context_rules, get_context_rules_count, get_validated_context, remove_context_rule,
+    remove_policy, remove_signer, update_context_rule_name, update_context_rule_valid_until,
+    ContextRule, ContextRuleType, Meta, Signatures, Signer,
 };
 
 /// Core trait for smart account functionality, extending Soroban's
@@ -54,6 +54,13 @@ pub trait SmartAccount: CustomAccountInterface {
     /// * `context_rule_type` - The type of context rules to retrieve (e.g.,
     ///   Default, CallContract).
     fn get_context_rules(e: &Env, context_rule_type: ContextRuleType) -> Vec<ContextRule>;
+
+    /// Retrieves the number of all context rules, including expired rules. Defaults to 0.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn get_context_rules_count(e: &Env) -> u32;
 
     /// Creates a new context rule with the specified configuration, returning
     /// the newly created `ContextRule` with a unique ID assigned. Installs
