@@ -89,7 +89,7 @@ impl SmartAccount for MultisigContract {
         get_context_rules(e, &context_rule_type)
     }
 
-    /// Retrieve the numebr of all context rules, including the expired ones.
+    /// Retrieve the number of all context rules, including the expired ones.
     fn get_context_rules_count(e: &Env) -> u32 {
         get_context_rules_count(e)
     }
