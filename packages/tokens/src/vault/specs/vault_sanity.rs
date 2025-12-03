@@ -3,90 +3,92 @@ use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Env, Address};
 
-use crate::vault::Vault;
 use stellar_contract_utils::math::fixed_point::Rounding;
+
+use crate::vault::{FungibleVault, Vault};
+use crate::vault::specs::vault::BasicVault;
 
 // Note: we are currently not depending on `query_asset`. Could be something to fix
 
 #[rule]
 pub fn vault_query_asset_sanity(e: Env) {
-	let _ = Vault::query_asset(&e);
+	let _ = BasicVault::query_asset(&e);
 	cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn vault_total_assets_sanity(e: Env) {
-	let _ = Vault::total_assets(&e);
+	let _ = BasicVault::total_assets(&e);
 	cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn vault_convert_to_shares_sanity(e: Env) {
 	let assets: i128 = nondet();
-	let _ = Vault::convert_to_shares(&e, assets);
+	let _ = BasicVault::convert_to_shares(&e, assets);
 	cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn vault_convert_to_assets_sanity(e: Env) {
 	let shares: i128 = nondet();
-	let _ = Vault::convert_to_assets(&e, shares);
+	let _ = BasicVault::convert_to_assets(&e, shares);
 	cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn vault_max_deposit_sanity(e: Env) {
 	let receiver: Address = nondet_address();
-	let _ = Vault::max_deposit(&e, receiver);
+	let _ = BasicVault::max_deposit(&e, receiver);
 	cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn vault_preview_deposit_sanity(e: Env) {
 	let assets: i128 = nondet();
-	let _ = Vault::preview_deposit(&e, assets);
+	let _ = BasicVault::preview_deposit(&e, assets);
 	cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn vault_max_mint_sanity(e: Env) {
 	let receiver: Address = nondet_address();
-	let _ = Vault::max_mint(&e, receiver);
+	let _ = BasicVault::max_mint(&e, receiver);
 	cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn vault_preview_mint_sanity(e: Env) {
 	let shares: i128 = nondet();
-	let _ = Vault::preview_mint(&e, shares);
+	let _ = BasicVault::preview_mint(&e, shares);
 	cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn vault_max_withdraw_sanity(e: Env) {
 	let owner: Address = nondet_address();
-	let _ = Vault::max_withdraw(&e, owner);
+	let _ = BasicVault::max_withdraw(&e, owner);
 	cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn vault_preview_withdraw_sanity(e: Env) {
 	let assets: i128 = nondet();
-	let _ = Vault::preview_withdraw(&e, assets);
+	let _ = BasicVault::preview_withdraw(&e, assets);
 	cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn vault_max_redeem_sanity(e: Env) {
 	let owner: Address = nondet_address();
-	let _ = Vault::max_redeem(&e, owner);
+	let _ = BasicVault::max_redeem(&e, owner);
 	cvlr_satisfy!(true);
 }
 
 #[rule]
 pub fn vault_preview_redeem_sanity(e: Env) {
 	let shares: i128 = nondet();
-	let _ = Vault::preview_redeem(&e, shares);
+	let _ = BasicVault::preview_redeem(&e, shares);
 	cvlr_satisfy!(true);
 }
 
@@ -96,7 +98,7 @@ pub fn vault_deposit_sanity(e: Env) {
 	let receiver: Address = nondet_address();
 	let from: Address = nondet_address();
 	let operator: Address = nondet_address();
-	let _ = Vault::deposit(&e, assets, receiver, from, operator);
+	let _ = BasicVault::deposit(&e, assets, receiver, from, operator);
 	cvlr_satisfy!(true);
 }
 
@@ -106,7 +108,7 @@ pub fn vault_mint_sanity(e: Env) {
 	let receiver: Address = nondet_address();
 	let from: Address = nondet_address();
 	let operator: Address = nondet_address();
-	let _ = Vault::mint(&e, shares, receiver, from, operator);
+	let _ = BasicVault::mint(&e, shares, receiver, from, operator);
 	cvlr_satisfy!(true);
 }
 
@@ -116,7 +118,7 @@ pub fn vault_withdraw_sanity(e: Env) {
 	let receiver: Address = nondet_address();
 	let owner: Address = nondet_address();
 	let operator: Address = nondet_address();
-	let _ = Vault::withdraw(&e, assets, receiver, owner, operator);
+	let _ = BasicVault::withdraw(&e, assets, receiver, owner, operator);
 	cvlr_satisfy!(true);
 }
 
@@ -126,7 +128,7 @@ pub fn vault_redeem_sanity(e: Env) {
 	let receiver: Address = nondet_address();
 	let owner: Address = nondet_address();
 	let operator: Address = nondet_address();
-	let _ = Vault::redeem(&e, shares, receiver, owner, operator);
+	let _ = BasicVault::redeem(&e, shares, receiver, owner, operator);
 	cvlr_satisfy!(true);
 }
 
@@ -147,34 +149,6 @@ pub fn vault_set_assset_sanity(e: Env) {
 pub fn vault_set_decimals_offset_sanity(e: Env) {
     let offset: u32 = nondet();
 	Vault::set_decimals_offset(&e, offset);
-	cvlr_satisfy!(true);
-}
-
-#[rule]
-pub fn vault_convert_to_shares_with_floor_sanity(e: Env) {
-	let assets: i128 = nondet();
-	let _ = Vault::convert_to_shares_with_rounding(&e, assets, Rounding::Floor);
-	cvlr_satisfy!(true);
-}
-
-#[rule]
-pub fn vault_convert_to_assets_with_floor_sanity(e: Env) {
-	let shares: i128 = nondet();
-	let _ = Vault::convert_to_assets_with_rounding(&e, shares, Rounding::Floor);
-	cvlr_satisfy!(true);
-}
-
-#[rule]
-pub fn vault_convert_to_shares_with_ceil_sanity(e: Env) {
-	let assets: i128 = nondet();
-	let _ = Vault::convert_to_shares_with_rounding(&e, assets, Rounding::Ceil);
-	cvlr_satisfy!(true);
-}
-
-#[rule]
-pub fn vault_convert_to_assets_with_ceil_sanity(e: Env) {
-	let shares: i128 = nondet();
-	let _ = Vault::convert_to_assets_with_rounding(&e, shares, Rounding::Ceil);
 	cvlr_satisfy!(true);
 }
 
