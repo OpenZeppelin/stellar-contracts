@@ -4,6 +4,25 @@
 //! the specified amount are blocked. It intersects transfer operations and
 //! enforces spending limits over a configurable rolling time window.
 //!
+//! ## Rolling window semantics
+//!
+//! The rolling window keeps only the last `period_ledgers` worth of ledger
+//! entries. Entries whose ledger sequence is **less than or equal to**
+//! `current_ledger - period_ledgers` are evicted before new transfers are
+//! evaluated, ensuring the cached totals match the live window.
+//!
+//! Example where `P` = `period_ledgers`, `C` = `current_ledger`:
+//!
+//! ```text
+//!   ...  C-P-2   C-P-1   C-P   C-P+1   ...   C-1   C
+//!         [evicted] [evicted]   |<------ kept ----->|
+//!                         ^ cutoff (exclusive window start)
+//!
+//!   ...    78      79      80      81   ...    99   100
+//!             [<=80 evicted]    |<------- kept ------>|
+//!                          ^ cutoff when `C = 100`, `P = 20`
+//! ```
+//!
 //! ## Example Usage
 //!
 //! ```rust,ignore
