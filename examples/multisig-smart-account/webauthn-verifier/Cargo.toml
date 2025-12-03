@@ -16,3 +16,5 @@ stellar-accounts = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+p256 = { workspace = true, features = ["ecdsa"] }
+hex-literal = { workspace = true }
