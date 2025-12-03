@@ -102,6 +102,8 @@ pub enum SpendingLimitError {
     NotAllowed = 3223,
     /// The spending history has reached maximum capacity.
     HistoryCapacityExceeded = 3224,
+    /// The context rule for the smart account has been already installed.
+    AlreadyInstalled = 3225,
 }
 
 /// Storage keys for spending limit policy data.
@@ -179,59 +181,57 @@ pub fn can_enforce(
     }
 
     let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id);
-    let spending_data: Option<SpendingLimitData> = e.storage().persistent().get(&key);
 
-    if let Some(data) = spending_data {
-        e.storage().persistent().extend_ttl(
-            &key,
-            SPENDING_LIMIT_TTL_THRESHOLD,
-            SPENDING_LIMIT_EXTEND_AMOUNT,
-        );
+    let Some(data): Option<SpendingLimitData> = e.storage().persistent().get(&key) else {
+        return false;
+    };
 
-        // Check if this is a contract call context
-        match context {
-            Context::Contract(ContractContext { fn_name, args, .. }) => {
-                // Only enforce on transfer functions
-                if fn_name == &symbol_short!("transfer") {
-                    // Try to extract the amount from the third argument (index 2)
-                    if let Some(amount_val) = args.get(2) {
-                        if let Ok(amount) = i128::try_from_val(e, &amount_val) {
-                            let current_ledger = e.ledger().sequence();
-                            let cutoff_ledger = current_ledger.saturating_sub(data.period_ledgers);
+    e.storage().persistent().extend_ttl(
+        &key,
+        SPENDING_LIMIT_TTL_THRESHOLD,
+        SPENDING_LIMIT_EXTEND_AMOUNT,
+    );
 
-                            // Calculate how much would be removed by cleanup
-                            let mut expired_total = 0i128;
-                            for (index, entry) in data.spending_history.iter().enumerate() {
-                                if entry.ledger_sequence <= cutoff_ledger {
-                                    expired_total += entry.amount;
-                                } else {
-                                    // Check if adding this transaction would exceed history
-                                    // capacity
-                                    let remaining_entries =
-                                        data.spending_history.len() - index as u32;
-                                    if remaining_entries >= MAX_HISTORY_ENTRIES {
-                                        return false;
-                                    }
-                                    break;
+    // Check if this is a contract call context
+    match context {
+        Context::Contract(ContractContext { fn_name, args, .. }) => {
+            // Only enforce on transfer functions
+            if fn_name == &symbol_short!("transfer") {
+                // Try to extract the amount from the third argument (index 2)
+                if let Some(amount_val) = args.get(2) {
+                    if let Ok(amount) = i128::try_from_val(e, &amount_val) {
+                        let current_ledger = e.ledger().sequence();
+                        let cutoff_ledger = current_ledger.saturating_sub(data.period_ledgers);
+
+                        // Calculate how much would be removed by cleanup
+                        let mut expired_total = 0i128;
+                        for (index, entry) in data.spending_history.iter().enumerate() {
+                            if entry.ledger_sequence <= cutoff_ledger {
+                                expired_total += entry.amount;
+                            } else {
+                                // Check if adding this transaction would exceed history
+                                // capacity
+                                let remaining_entries = data.spending_history.len() - index as u32;
+                                if remaining_entries >= MAX_HISTORY_ENTRIES {
+                                    return false;
                                 }
+                                break;
                             }
-
-                            let total_spent = data.cached_total_spent - expired_total;
-
-                            return total_spent + amount <= data.spending_limit;
                         }
+
+                        let total_spent = data.cached_total_spent - expired_total;
+
+                        return total_spent + amount <= data.spending_limit;
                     }
                 }
-                // For non-transfer contract calls, policy is not valid
-                false
             }
-            _ => {
-                // For non-contract call contexts, policy is not valid
-                false
-            }
+            // For non-transfer contract calls, policy is not valid
+            false
         }
-    } else {
-        false
+        _ => {
+            // For non-contract call contexts, policy is not valid
+            false
+        }
     }
 }
 
@@ -378,6 +378,8 @@ pub fn set_spending_limit(
 ///
 /// * [`SpendingLimitError::InvalidLimitOrPeriod`] - When spending_limit is not
 ///   positive or period_ledgers is zero.
+/// * [`SpendingLimitError::AlreadyInstalled`] - When policy was already
+///   installed for a given smart account and context rule.
 pub fn install(
     e: &Env,
     params: &SpendingLimitAccountParams,
@@ -390,6 +392,11 @@ pub fn install(
     if params.spending_limit <= 0 || params.period_ledgers == 0 {
         panic_with_error!(e, SpendingLimitError::InvalidLimitOrPeriod)
     }
+    let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id);
+
+    if e.storage().persistent().has(&key) {
+        panic_with_error!(e, SpendingLimitError::AlreadyInstalled)
+    }
 
     let data = SpendingLimitData {
         spending_limit: params.spending_limit,
@@ -398,10 +405,7 @@ pub fn install(
         cached_total_spent: 0,
     };
 
-    e.storage().persistent().set(
-        &SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id),
-        &data,
-    );
+    e.storage().persistent().set(&key, &data);
 }
 
 /// Uninstalls the spending limit policy from a smart account.

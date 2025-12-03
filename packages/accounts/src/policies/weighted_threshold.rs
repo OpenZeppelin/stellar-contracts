@@ -103,6 +103,8 @@ pub enum WeightedThresholdError {
     MathOverflow = 3212,
     /// The transaction is not allowed by this policy.
     NotAllowed = 3213,
+    /// The context rule for the smart account has been already installed.
+    AlreadyInstalled = 3214,
 }
 
 /// Storage keys for weighted threshold policy data.
@@ -436,6 +438,8 @@ pub fn set_signer_weight(
 ///   exceeds the total weight of all signers.
 /// * [`WeightedThresholdError::MathOverflow`] - When the total weight
 ///   calculation would overflow.
+/// * [`WeightedThresholdError::AlreadyInstalled`] - When policy was already
+///   installed for a given smart account and context rule.
 pub fn install(
     e: &Env,
     params: &WeightedThresholdAccountParams,
@@ -445,13 +449,18 @@ pub fn install(
     // Require authorization from the smart_account
     smart_account.require_auth();
 
+    let key = WeightedThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
+
+    if e.storage().persistent().has(&key) {
+        panic_with_error!(e, WeightedThresholdError::AlreadyInstalled)
+    }
+
     let total_weight = calculate_total_weight(e, &params.signer_weights);
 
     if params.threshold == 0 || params.threshold > total_weight {
         panic_with_error!(e, WeightedThresholdError::InvalidThreshold);
     }
 
-    let key = WeightedThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
     e.storage().persistent().set(&key, params);
 }
 

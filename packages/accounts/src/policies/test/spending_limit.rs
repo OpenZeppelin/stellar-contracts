@@ -80,6 +80,27 @@ fn install_success() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3225)")]
+fn install_already_installed_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    let context_rule = create_context_rule(&e);
+    let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+
+    e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #3222)")]
 fn install_invalid_spending_limit() {
     let e = Env::default();

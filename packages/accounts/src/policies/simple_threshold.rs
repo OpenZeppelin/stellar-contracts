@@ -83,6 +83,8 @@ pub enum SimpleThresholdError {
     InvalidThreshold = 3201,
     /// The transaction is not allowed by this policy.
     NotAllowed = 3202,
+    /// The context rule for the smart account has been already installed.
+    AlreadyInstalled = 3203,
 }
 
 /// Storage keys for simple threshold policy data.
@@ -259,6 +261,8 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
 ///
 /// * [`SimpleThresholdError::InvalidThreshold`] - When threshold is 0 or
 ///   exceeds the total number of signers in the context rule.
+/// * [`SimpleThresholdError::AlreadyInstalled`] - When policy was already
+///   installed for a given smart account and context rule.
 pub fn install(
     e: &Env,
     params: &SimpleThresholdAccountParams,
@@ -267,6 +271,13 @@ pub fn install(
 ) {
     // Require authorization from the smart_account
     smart_account.require_auth();
+
+    if e.storage()
+        .persistent()
+        .has(&SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id))
+    {
+        panic_with_error!(e, SimpleThresholdError::AlreadyInstalled)
+    }
 
     validate_and_set_threshold(e, params.threshold, context_rule, smart_account);
 }
