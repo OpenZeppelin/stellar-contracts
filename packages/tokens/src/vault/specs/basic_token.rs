@@ -2,11 +2,6 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 
 use crate::fungible::{Base, FungibleToken};
 
-
-// NOTE: This implements the `FungibleBurnable` trait on top of AllowList.
-// NOTE: This also uses the capped functionality to make sure they get verified.
-// Please change or split into separate files as needed.
-
 pub struct BasicToken<'a> {
     pub asset: &'a Address
 }
