@@ -183,7 +183,7 @@ pub fn can_enforce(
                             // Calculate how much would be removed by cleanup
                             let mut expired_total = 0i128;
                             for (index, entry) in data.spending_history.iter().enumerate() {
-                                if entry.ledger_sequence < cutoff_ledger {
+                                if entry.ledger_sequence <= cutoff_ledger {
                                     expired_total += entry.amount;
                                 } else {
                                     // Check if adding this transaction would exceed history
@@ -430,7 +430,7 @@ fn cleanup_old_entries(
     // We iterate from the front and remove old entries since they're at the
     // beginning
     while let Some(entry) = spending_history.get(0) {
-        if entry.ledger_sequence < cutoff_ledger {
+        if entry.ledger_sequence <= cutoff_ledger {
             removed_total += entry.amount;
             spending_history.pop_front();
         } else {
