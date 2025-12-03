@@ -55,7 +55,8 @@ pub trait SmartAccount: CustomAccountInterface {
     ///   Default, CallContract).
     fn get_context_rules(e: &Env, context_rule_type: ContextRuleType) -> Vec<ContextRule>;
 
-    /// Retrieves the number of all context rules, including expired rules. Defaults to 0.
+    /// Retrieves the number of all context rules, including expired rules.
+    /// Defaults to 0.
     ///
     /// # Arguments
     ///
