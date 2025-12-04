@@ -95,7 +95,7 @@ impl Base {
             .unwrap_or(AllowanceData { amount: 0, live_until_ledger: 0 });
 
         if allowance_data.live_until_ledger < e.ledger().sequence() {
-            AllowanceData { amount: 0, live_until_ledger: allowance_data.live_until_ledger }
+            AllowanceData { amount: 0, live_until_ledger: 0 }
         } else {
             allowance_data
         }
