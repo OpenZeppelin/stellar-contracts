@@ -76,8 +76,6 @@ impl Base {
     /// Both values default to `0`. If the allowance is expired, the amount is
     /// changed to `0`.
     ///
-
-    ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
@@ -86,8 +84,8 @@ impl Base {
     ///
     /// # Notes
     ///
-    /// For SAC compatibility, we do not return error for allowances that do not
-    /// exist, nor expired.
+    /// For SAC compatibility, we do not return an error for allowances that do not
+    /// exist or have expired.
     pub fn allowance_data(e: &Env, owner: &Address, spender: &Address) -> AllowanceData {
         let key = AllowanceKey { owner: owner.clone(), spender: spender.clone() };
         let allowance_data = e
