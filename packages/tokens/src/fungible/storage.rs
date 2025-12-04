@@ -73,8 +73,8 @@ impl Base {
 
     /// Returns the amount of tokens a `spender` is allowed to spend on behalf
     /// of an `owner` and the ledger number at which this allowance expires.
-    /// Both values default to `0`. If the allowance is expired, the amount is
-    /// changed to `0`.
+    /// Both values default to `0`. If the allowance is expired, the default values are
+    /// returned.
     ///
     /// # Arguments
     ///
