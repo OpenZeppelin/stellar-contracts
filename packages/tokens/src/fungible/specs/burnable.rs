@@ -27,7 +27,7 @@ pub fn burn_integrity(e: Env) {
 
 #[rule]
 // after burn_from the account's balance and total supply decrease by amount
-// status:
+// status: timeout (58min, 87%)
 pub fn burn_from_integrity(e: Env) {
     let account = nondet_address();
     let amount = nondet();
@@ -155,7 +155,7 @@ pub fn burn_from_panics_if_amount_less_than_zero(e: Env) {
 // from auth
 // from has enough balance
 // amount >= 0
-// status:
+// status: wip - waiting
 pub fn burn_non_panic(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -195,7 +195,7 @@ pub fn burn_non_panic_sanity(e: Env) {
 // from has enough balance
 // from has enough allowance
 // amount >= 0
-// status:
+// status: wip
 pub fn burn_from_non_panic(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
@@ -245,7 +245,7 @@ pub fn burn_from_non_panic_sanity(e: Env) {
 
 #[rule]
 // after burn total_supply >= balance for any account
-// status: 
+// status: unreachable violation - need invariant about sum of two balances. (maybe we can't prove all invariants?)
 pub fn after_burn_total_supply_geq_balance(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -261,7 +261,7 @@ pub fn after_burn_total_supply_geq_balance(e: Env) {
 
 #[rule]
 // after burn_from total_supply >= balance for any account
-// status: 
+// status: timeout (but violated - like above)
 pub fn after_burn_from_total_supply_geq_balance(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
