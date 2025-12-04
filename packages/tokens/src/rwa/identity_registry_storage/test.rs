@@ -6,10 +6,11 @@ use super::{
     storage::{
         add_country_data_entries, add_identity, delete_country_data, get_country_data,
         get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
-        modify_identity, recover_identity, remove_identity, stored_identity, CountryData,
-        CountryRelation, IdentityType, IndividualCountryRelation, OrganizationCountryRelation,
+        modify_identity, recover_identity, remove_identity, stored_identity, validate_country_data,
+        CountryData, CountryRelation, IdentityType, IndividualCountryRelation,
+        OrganizationCountryRelation,
     },
-    MAX_COUNTRY_ENTRIES,
+    MAX_COUNTRY_ENTRIES, MAX_METADATA_ENTRIES, MAX_METADATA_STRING_LEN,
 };
 
 #[contract]
@@ -959,5 +960,98 @@ fn recover_to_already_recovered_account_panics() {
         // Try to recover account3 to account1 (account1 was already recovered, should
         // panic)
         recover_identity(&e, &account3, &account1);
+    });
+}
+
+// ################## VALIDATE COUNTRY DATA TESTS ##################
+
+#[test]
+fn validate_country_data_with_no_metadata_succeeds() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: None,
+        };
+
+        // Should not panic
+        validate_country_data(&e, &country_data);
+
+        let mut metadata = Map::new(&e);
+        metadata.set(Symbol::new(&e, "key1"), String::from_str(&e, "value1"));
+        metadata.set(Symbol::new(&e, "key2"), String::from_str(&e, "value2"));
+
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: Some(metadata),
+        };
+
+        // Should not panic
+        validate_country_data(&e, &country_data);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #326)")]
+fn validate_country_data_panics_if_too_many_metadata_entries() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let mut metadata = Map::new(&e);
+        for i in 0..=MAX_METADATA_ENTRIES {
+            let key = Symbol::new(&e, &std::format!("key{}", i));
+            metadata.set(key, String::from_str(&e, "value"));
+        }
+
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: Some(metadata),
+        };
+
+        validate_country_data(&e, &country_data);
+    });
+}
+
+#[test]
+fn validate_country_data_with_max_string_length_succeeds() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let mut metadata = Map::new(&e);
+        let max_length_string: std::string::String = "a".repeat(MAX_METADATA_STRING_LEN as usize);
+        metadata.set(Symbol::new(&e, "key"), String::from_str(&e, &max_length_string));
+
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: Some(metadata),
+        };
+
+        // Should not panic
+        validate_country_data(&e, &country_data);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #327)")] // MetadataStringTooLong
+fn validate_country_data_panics_if_string_too_long() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        let mut metadata = Map::new(&e);
+        let too_long_string: std::string::String =
+            "a".repeat((MAX_METADATA_STRING_LEN + 1) as usize);
+        metadata.set(Symbol::new(&e, "key"), String::from_str(&e, &too_long_string));
+
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: Some(metadata),
+        };
+
+        validate_country_data(&e, &country_data);
     });
 }
