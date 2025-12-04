@@ -73,7 +73,8 @@ impl Base {
 
     /// Returns the amount of tokens a `spender` is allowed to spend on behalf
     /// of an `owner` and the ledger number at which this allowance expires.
-    /// Both values default to `0`.
+    /// Both values default to `0`. If the allowance is expired, or not found,
+    /// the default values are returned.
     ///
     /// # Arguments
     ///
@@ -83,15 +84,21 @@ impl Base {
     ///
     /// # Notes
     ///
-    /// Attention is required when `live_until_ledger` is less than the current
-    /// ledger number, as this indicates the entry has expired. In such cases,
-    /// the allowance should be treated as `0`.
+    /// For SAC compatibility, we do not return an error for allowances that do
+    /// not exist or have expired.
     pub fn allowance_data(e: &Env, owner: &Address, spender: &Address) -> AllowanceData {
         let key = AllowanceKey { owner: owner.clone(), spender: spender.clone() };
-        e.storage()
+        let allowance_data = e
+            .storage()
             .temporary()
             .get(&StorageKey::Allowance(key))
-            .unwrap_or(AllowanceData { amount: 0, live_until_ledger: 0 })
+            .unwrap_or(AllowanceData { amount: 0, live_until_ledger: 0 });
+
+        if allowance_data.live_until_ledger < e.ledger().sequence() {
+            AllowanceData { amount: 0, live_until_ledger: 0 }
+        } else {
+            allowance_data
+        }
     }
 
     /// Returns the amount of tokens a `spender` is allowed to spend on behalf
@@ -102,19 +109,8 @@ impl Base {
     /// * `e` - Access to Soroban environment.
     /// * `owner` - The address holding the tokens.
     /// * `spender` - The address authorized to spend the tokens.
-    ///
-    /// # Notes
-    ///
-    /// An allowance entry where `live_until_ledger` is less than the current
-    /// ledger number is treated as an allowance with amount `0`.
     pub fn allowance(e: &Env, owner: &Address, spender: &Address) -> i128 {
-        let allowance = Base::allowance_data(e, owner, spender);
-
-        if allowance.live_until_ledger < e.ledger().sequence() {
-            return 0;
-        }
-
-        allowance.amount
+        Base::allowance_data(e, owner, spender).amount
     }
 
     /// Returns the token metadata such as decimals, name and symbol.
