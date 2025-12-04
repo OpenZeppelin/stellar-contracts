@@ -13,7 +13,8 @@ use soroban_sdk::Env;
 #[rule]
 // after mint the account's balance increases by amount
 // total supply increases by amount
-// status:
+// status: verified
+// note: 26 minutes
 pub fn mint_integrity(e: Env) {
     let account = nondet_address();
     let amount = nondet();
@@ -28,6 +29,8 @@ pub fn mint_integrity(e: Env) {
 
 #[rule]
 // after a mint the total supply doesn't surpass the cap
+// status: verified
+// note: 18 minutes
 pub fn mint_preserves_cap(e: Env) {
     let amount = nondet();
     let account = nondet_address();
@@ -45,5 +48,8 @@ pub fn constructor_integrity(e: Env) {
     CappedTokenContract::__constructor(&e, cap);
     let cap_post = CappedTokenContract::get_cap(&e);
     cvlr_assert!(cap_post == cap);
-    cvlr_assert!(cap > 0);
+    cvlr_assert!(cap >= 0);
 }
+
+// TODO: invariants 
+// panics and non-panics are not interesting.

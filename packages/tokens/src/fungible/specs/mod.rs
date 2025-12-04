@@ -7,4 +7,5 @@ pub mod allowlist;
 pub mod blocklist;
 pub mod capped;
 pub mod capped_contract;
+pub mod burnable;
 // NOTE: may need to add rules for sac_admin related features.

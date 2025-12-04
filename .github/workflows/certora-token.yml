@@ -5,11 +5,18 @@ on: pull_request
 env:
   CONFIGS: |
     fungible_integrity.conf
+    fungible_invariants.conf
     fungible_non_panics.conf
     fungible_panics.conf
     fungible_sanity.conf
-    allowlist_sanity.conf
-    blocklist_sanity.conf
+    allowlist.conf
+    blocklist.conf
+    burnable.conf
+    burnable_nft_sanity.conf
+    capped.conf
+    consecutive_nft_sanity.conf
+    enumerable_nft_sanity.conf
+    royalties_nft_sanity.conf
     vault_sanity.conf
 
 jobs:
