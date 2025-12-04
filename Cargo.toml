@@ -5,6 +5,8 @@ members = [
     "examples/fungible-blocklist",
     "examples/fungible-capped",
     "examples/fungible-merkle-airdrop",
+    "examples/fee-forwarder-permissioned",
+    "examples/fee-forwarder-permissionless",
     "examples/fungible-pausable",
     "examples/fungible-vault",
     "examples/merkle-voting",
@@ -24,6 +26,7 @@ members = [
     "packages/accounts",
     "packages/access",
     "packages/contract-utils",
+    "packages/fee-abstraction",
     "packages/governance",
     "packages/macros",
     "packages/test-utils/*",
@@ -60,6 +63,7 @@ stellar-access = { path = "packages/access" }
 stellar-accounts = { path = "packages/accounts" }
 stellar-contract-utils = { path = "packages/contract-utils" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
+stellar-fee-abstraction = { path = "packages/fee-abstraction" }
 stellar-governance = { path = "packages/governance" }
 stellar-tokens = { path = "packages/tokens" }
 stellar-macros = { path = "packages/macros" }

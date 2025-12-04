@@ -560,6 +560,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
+name = "fee-forwarder-permissioned-example"
+version = "0.5.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-fee-abstraction",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "fee-forwarder-permissionless-example"
+version = "0.5.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-fee-abstraction",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "ff"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1803,6 +1824,15 @@ name = "stellar-event-assertion"
 version = "0.5.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "stellar-fee-abstraction"
+version = "0.5.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
