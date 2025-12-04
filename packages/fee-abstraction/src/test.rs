@@ -8,7 +8,7 @@ use stellar_macros::default_impl;
 use stellar_tokens::fungible::{Base, FungibleToken};
 
 use crate::{
-    auth_user_and_invoke, check_allowed_fee_token, collect_fee, is_fee_token_allowlist_enabled,
+    auth_user_and_invoke, collect_fee, is_allowed_fee_token, is_fee_token_allowlist_enabled,
     set_allowed_fee_token, sweep_token, validate_fee_bounds, FeeAbstractionApproval,
     FeeAbstractionStorageKey,
 };
@@ -43,7 +43,7 @@ impl FungibleToken for MockToken {
 }
 
 #[test]
-fn test_collect_fee_with_eager_approval_overwrites_allowance() {
+fn collect_fee_with_eager_approval_overwrites_allowance() {
     let e = Env::default();
     e.mock_all_auths_allowing_non_root_auth();
 
@@ -84,7 +84,7 @@ fn test_collect_fee_with_eager_approval_overwrites_allowance() {
 }
 
 #[test]
-fn test_collect_fee_with_lazy_approval_no_previous() {
+fn collect_fee_with_lazy_approval_no_previous() {
     let e = Env::default();
     e.mock_all_auths_allowing_non_root_auth();
 
@@ -124,7 +124,7 @@ fn test_collect_fee_with_lazy_approval_no_previous() {
 }
 
 #[test]
-fn test_collect_fee_with_lazy_approval_higher_previous() {
+fn collect_fee_with_lazy_approval_higher_previous() {
     let e = Env::default();
     e.mock_all_auths_allowing_non_root_auth();
 
@@ -161,7 +161,7 @@ fn test_collect_fee_with_lazy_approval_higher_previous() {
 }
 
 #[test]
-fn test_collect_fee_with_lazy_approval_lower_previous() {
+fn collect_fee_with_lazy_approval_lower_previous() {
     let e = Env::default();
     e.mock_all_auths_allowing_non_root_auth();
 
@@ -198,7 +198,7 @@ fn test_collect_fee_with_lazy_approval_lower_previous() {
 }
 
 #[test]
-fn test_auth_user_and_invoke() {
+fn auth_user_and_invoke_success() {
     let e = Env::default();
     e.mock_all_auths();
 
@@ -233,7 +233,7 @@ fn test_auth_user_and_invoke() {
 // ################## FEE TOKEN ALLOWLIST TESTS ##################
 
 #[test]
-fn test_allowlist_disabled_by_default() {
+fn allowlist_disabled_by_default() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
 
@@ -243,7 +243,7 @@ fn test_allowlist_disabled_by_default() {
 }
 
 #[test]
-fn test_set_allowed_fee_token() {
+fn set_allowed_fee_token_success() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
     let token = Address::generate(&e);
@@ -251,8 +251,8 @@ fn test_set_allowed_fee_token() {
     e.as_contract(&contract_address, || {
         set_allowed_fee_token(&e, &token, true);
 
-        // Should not panic
-        check_allowed_fee_token(&e, &token);
+        // Should be allowed
+        assert!(is_allowed_fee_token(&e, &token));
 
         // Disallow the token
         set_allowed_fee_token(&e, &token, false);
@@ -264,7 +264,7 @@ fn test_set_allowed_fee_token() {
 }
 
 #[test]
-fn test_swap_and_pop_removal_updates_mappings() {
+fn swap_and_pop_removal_updates_mappings() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
     let token1 = Address::generate(&e);
@@ -293,7 +293,7 @@ fn test_swap_and_pop_removal_updates_mappings() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #5001)")]
-fn test_allowing_already_allowed_token_panics() {
+fn allowing_already_allowed_token_panics() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
     let token = Address::generate(&e);
@@ -306,36 +306,57 @@ fn test_allowing_already_allowed_token_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5000)")]
-fn test_disallowed_token_panics() {
+fn not_allowed_token() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
     let token = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
         set_allowed_fee_token(&e, &Address::generate(&e), true);
-        // Token not allowed, should panic
-        check_allowed_fee_token(&e, &token);
+        // Token not allowed
+        assert!(!is_allowed_fee_token(&e, &token));
     });
 }
 
 #[test]
-fn test_allowlist_disabled_allows_all_tokens() {
+#[should_panic(expected = "Error(Contract, #5000)")]
+fn not_allowed_token_panics() {
+    let e = Env::default();
+    let contract_address = e.register(MockContract, ());
+    let token = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        set_allowed_fee_token(&e, &Address::generate(&e), true);
+        collect_fee(
+            &e,
+            &token,
+            20,
+            50,
+            100,
+            &Address::generate(&e),
+            &Address::generate(&e),
+            FeeAbstractionApproval::Eager,
+        );
+    });
+}
+
+#[test]
+fn allowlist_disabled_allows_all_tokens() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
     let token = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
         // Allowlist disabled when no tokens are allowed
-        // Should not panic even though token is not explicitly allowed
-        check_allowed_fee_token(&e, &token);
+        // Should return true even though token is not explicitly allowed
+        assert!(is_allowed_fee_token(&e, &token));
     });
 }
 
 // ################## VALIDATION TESTS ##################
 
 #[test]
-fn test_validate_fee_bounds_success() {
+fn validate_fee_bounds_success() {
     let e = Env::default();
     validate_fee_bounds(&e, 100, 100);
     validate_fee_bounds(&e, 50, 100);
@@ -343,21 +364,21 @@ fn test_validate_fee_bounds_success() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #5003)")]
-fn test_validate_fee_bounds_exceeds_max() {
+fn validate_fee_bounds_exceeds_max() {
     let e = Env::default();
     validate_fee_bounds(&e, 101, 100);
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #5003)")]
-fn test_validate_fee_bounds_zero() {
+fn validate_fee_bounds_zero() {
     let e = Env::default();
     validate_fee_bounds(&e, 0, 100);
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #5003)")]
-fn test_validate_fee_bounds_neg() {
+fn validate_fee_bounds_neg() {
     let e = Env::default();
     validate_fee_bounds(&e, 0, -1);
 }
@@ -365,7 +386,7 @@ fn test_validate_fee_bounds_neg() {
 // ################## TOKEN SWEEPING TESTS ##################
 
 #[test]
-fn test_sweep_token_success() {
+fn sweep_token_success() {
     let e = Env::default();
     e.mock_all_auths_allowing_non_root_auth();
 
@@ -391,7 +412,7 @@ fn test_sweep_token_success() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #5004)")]
-fn test_sweep_token_no_balance() {
+fn sweep_token_no_balance() {
     let e = Env::default();
     let contract_address = e.register(MockContract, ());
     let token_address = e.register(MockToken, (Address::generate(&e),));

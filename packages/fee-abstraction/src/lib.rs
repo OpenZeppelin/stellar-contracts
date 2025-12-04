@@ -36,7 +36,7 @@ pub const FEE_ABSTRACTION_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const FEE_ABSTRACTION_TTL_THRESHOLD: u32 = FEE_ABSTRACTION_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 pub use crate::storage::{
-    auth_user_and_invoke, check_allowed_fee_token, collect_fee, is_fee_token_allowlist_enabled,
+    auth_user_and_invoke, collect_fee, is_allowed_fee_token, is_fee_token_allowlist_enabled,
     set_allowed_fee_token, sweep_token, validate_fee_bounds, FeeAbstractionApproval,
     FeeAbstractionStorageKey,
 };

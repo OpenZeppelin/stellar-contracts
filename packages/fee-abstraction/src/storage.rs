@@ -112,7 +112,7 @@ pub fn auth_user_and_invoke(
 ///
 /// # Errors
 ///
-/// * refer to [`check_allowed_fee_token`] errors.
+/// * [`FeeAbstractionError::FeeTokenNotAllowed`] - If the token is not allowed.
 /// * refer to [`validate_fee_bounds`] errors.
 #[allow(clippy::too_many_arguments)]
 pub fn collect_fee(
@@ -125,7 +125,9 @@ pub fn collect_fee(
     fee_recipient: &Address,
     approval: FeeAbstractionApproval,
 ) {
-    check_allowed_fee_token(e, fee_token);
+    if !is_allowed_fee_token(e, fee_token) {
+        panic_with_error!(e, FeeAbstractionError::FeeTokenNotAllowed);
+    }
 
     validate_fee_bounds(e, fee_amount, max_fee_amount);
 
@@ -262,13 +264,9 @@ pub fn set_allowed_fee_token(e: &Env, token: &Address, allowed: bool) {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `token` - The token contract address to check.
-///
-/// # Errors
-///
-/// * [`FeeAbstractionError::FeeTokenNotAllowed`] - If the token is not allowed.
-pub fn check_allowed_fee_token(e: &Env, token: &Address) {
+pub fn is_allowed_fee_token(e: &Env, token: &Address) -> bool {
     if !is_fee_token_allowlist_enabled(e) {
-        return;
+        return true;
     }
 
     let token_index_key = FeeAbstractionStorageKey::TokenIndex(token.clone());
@@ -284,8 +282,9 @@ pub fn check_allowed_fee_token(e: &Env, token: &Address) {
             FEE_ABSTRACTION_TTL_THRESHOLD,
             FEE_ABSTRACTION_EXTEND_AMOUNT,
         );
+        true
     } else {
-        panic_with_error!(e, FeeAbstractionError::FeeTokenNotAllowed);
+        false
     }
 }
 
