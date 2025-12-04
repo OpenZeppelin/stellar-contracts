@@ -318,10 +318,7 @@ pub fn get_recovered_to(e: &Env, old_account: &Address) -> Option<Address> {
 /// * [`IRSError::EmptyCountryList`] - If `initial_countries` is empty.
 /// * [`IRSError::MaxCountryEntriesReached`] - If the number of
 ///   `initial_countries` exceeds `MAX_COUNTRY_ENTRIES`.
-/// * [`IRSError::MetadataTooManyEntries`] - If any country data has more than
-///   `MAX_METADATA_ENTRIES` metadata entries.
-/// * [`IRSError::MetadataStringTooLong`] - If any metadata string value exceeds
-///   `MAX_METADATA_STRING_LEN`.
+/// * refer to [`validate_country_data`] errors.
 ///
 /// # Events
 ///
@@ -574,10 +571,7 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
 /// * [`IRSError::EmptyCountryList`] - If `country_data_list` is empty.
 /// * [`IRSError::MaxCountryEntriesReached`] - If the number of country data
 ///   entries exceeds `MAX_COUNTRY_ENTRIES`.
-/// * [`IRSError::MetadataTooManyEntries`] - If any country data has more than
-///   `MAX_METADATA_ENTRIES` metadata entries.
-/// * [`IRSError::MetadataStringTooLong`] - If any metadata string value exceeds
-///   `MAX_METADATA_STRING_LEN`.
+/// * refer to [`validate_country_data`] errors.
 ///
 /// # Events
 ///
@@ -633,10 +627,7 @@ pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &
 /// # Errors
 ///
 /// * [`IRSError::CountryDataNotFound`] - If the index is out of bounds.
-/// * [`IRSError::MetadataTooManyEntries`] - If the country data has more than
-///   `MAX_METADATA_ENTRIES` metadata entries.
-/// * [`IRSError::MetadataStringTooLong`] - If any metadata string value exceeds
-///   `MAX_METADATA_STRING_LEN`.
+/// * refer to [`validate_country_data`] errors.
 ///
 /// # Events
 ///
