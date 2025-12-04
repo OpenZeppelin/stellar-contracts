@@ -53,7 +53,7 @@
 //!    - If any step fails, entire transaction reverts (including token
 //!      transfer)
 use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
-use stellar_fee_abstraction::{auth_user_and_invoke, collect_fee_with_lazy_approval};
+use stellar_fee_abstraction::{auth_user_and_invoke, collect_fee, FeeAbstractionApproval};
 
 #[contract]
 pub struct FeeForwarder;
@@ -90,7 +90,7 @@ impl FeeForwarder {
             &user,
         );
 
-        collect_fee_with_lazy_approval(
+        collect_fee(
             e,
             &fee_token,
             fee_amount,
@@ -98,6 +98,7 @@ impl FeeForwarder {
             expiration_ledger,
             &user,
             &relayer, // relayer collects fee
+            FeeAbstractionApproval::Lazy,
         );
 
         res

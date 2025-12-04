@@ -53,7 +53,7 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Val, Vec};
 use stellar_access::access_control::{grant_role_no_auth, set_admin, AccessControl};
 use stellar_fee_abstraction::{
-    auth_user_and_invoke, collect_fee_with_eager_approval, set_allowed_fee_token, sweep_token,
+    auth_user_and_invoke, collect_fee, set_allowed_fee_token, sweep_token, FeeAbstractionApproval,
 };
 use stellar_macros::{default_impl, only_role};
 
@@ -93,7 +93,7 @@ impl FeeForwarder {
         // Depending on whether we first collect fee and than invoke target,
         // composing authorization entries might differ. Compare "test.rs" from this
         // crate and from "examples/fee-forwarder-pemissionless".
-        collect_fee_with_eager_approval(
+        collect_fee(
             e,
             &fee_token,
             fee_amount,
@@ -101,6 +101,7 @@ impl FeeForwarder {
             expiration_ledger,
             &user,
             &e.current_contract_address(), // current contract collects fee
+            FeeAbstractionApproval::Eager,
         );
 
         auth_user_and_invoke(

@@ -8,9 +8,9 @@ use stellar_macros::default_impl;
 use stellar_tokens::fungible::{Base, FungibleToken};
 
 use crate::{
-    auth_user_and_invoke, check_allowed_fee_token, collect_fee_with_eager_approval,
-    collect_fee_with_lazy_approval, is_fee_token_allowlist_enabled, set_allowed_fee_token,
-    sweep_token, validate_fee_bounds, FeeAbstractionStorageKey,
+    auth_user_and_invoke, check_allowed_fee_token, collect_fee, is_fee_token_allowlist_enabled,
+    set_allowed_fee_token, sweep_token, validate_fee_bounds, FeeAbstractionApproval,
+    FeeAbstractionStorageKey,
 };
 
 #[contract]
@@ -60,7 +60,7 @@ fn test_collect_fee_with_eager_approval_overwrites_allowance() {
 
     e.as_contract(&contract_address, || {
         // approve 50, spend 20
-        collect_fee_with_eager_approval(
+        collect_fee(
             &e,
             &token_address,
             20,
@@ -68,6 +68,7 @@ fn test_collect_fee_with_eager_approval_overwrites_allowance() {
             100,
             &user,
             &recipient,
+            FeeAbstractionApproval::Eager,
         );
     });
 
@@ -99,7 +100,7 @@ fn test_collect_fee_with_lazy_approval_no_previous() {
 
     e.as_contract(&contract_address, || {
         // approve 50, spend 20
-        collect_fee_with_lazy_approval(
+        collect_fee(
             &e,
             &token_address,
             20,
@@ -107,6 +108,7 @@ fn test_collect_fee_with_lazy_approval_no_previous() {
             100,
             &user,
             &recipient,
+            FeeAbstractionApproval::Lazy,
         );
     });
 
@@ -139,7 +141,7 @@ fn test_collect_fee_with_lazy_approval_higher_previous() {
 
     e.as_contract(&contract_address, || {
         // no approval, only spend 20
-        collect_fee_with_lazy_approval(
+        collect_fee(
             &e,
             &token_address,
             20,
@@ -147,6 +149,7 @@ fn test_collect_fee_with_lazy_approval_higher_previous() {
             100,
             &user,
             &recipient,
+            FeeAbstractionApproval::Lazy,
         );
     });
 
@@ -175,7 +178,7 @@ fn test_collect_fee_with_lazy_approval_lower_previous() {
 
     e.as_contract(&contract_address, || {
         // approve 50 by overwriting the previous 30 and spend 20
-        collect_fee_with_lazy_approval(
+        collect_fee(
             &e,
             &token_address,
             20,
@@ -183,6 +186,7 @@ fn test_collect_fee_with_lazy_approval_lower_previous() {
             100,
             &user,
             &recipient,
+            FeeAbstractionApproval::Lazy,
         );
     });
 
