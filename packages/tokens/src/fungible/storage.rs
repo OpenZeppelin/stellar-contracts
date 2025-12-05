@@ -1,5 +1,5 @@
 use soroban_sdk::{
-    contracttype, panic_with_error, symbol_short, Address, Env, MuxedAddress, String, Symbol,
+    contracttype, log, panic_with_error, symbol_short, Address, Env, MuxedAddress, String, Symbol,
 };
 
 use crate::fungible::{
@@ -306,6 +306,7 @@ impl Base {
         }
 
         let allowance = Base::allowance_data(e, owner, spender);
+        log!(e, "allowance: {}", allowance.amount);
 
         if allowance.amount < amount {
             panic_with_error!(e, FungibleTokenError::InsufficientAllowance);

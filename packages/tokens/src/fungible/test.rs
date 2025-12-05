@@ -142,6 +142,33 @@ fn spend_allowance_invalid_amount_fails() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #101)")]
+fn spend_allowance_expired_ledger_fails_edge_case() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Base::approve(&e, &owner, &spender, 10, 1000);
+
+        let key = crate::fungible::StorageKey::Allowance(super::AllowanceKey {
+            owner: owner.clone(),
+            spender: spender.clone(),
+        });
+
+        // extend the TTL so the storage entry is not deleted
+        e.storage().temporary().extend_ttl(&key, 2000, 2000);
+        // expire the allowance
+        e.ledger().set_sequence_number(1001);
+
+        // should panic
+        Base::spend_allowance(&e, &owner, &spender, 10);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #102)")]
 fn set_allowance_with_expired_ledger_fails() {
     let e = Env::default();
