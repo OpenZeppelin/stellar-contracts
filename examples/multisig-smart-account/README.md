@@ -58,7 +58,7 @@ stellar contract deploy --alias webauthn_verifier \
 
 For this example, we assume the passkey verifier was deployed to:
 ```
-CC74I4FO7N2VY547Q7HA4QFIBZTYVG76DJH32ICBKI2FUPAS6J6MJE66
+CBEO6Q7UXBIQIHQR42RXETMYDKW7GABRX2O4UVW6O6YQOHROYWZJCOXZ
 ```
 
 ### Deploy Ed25519 Verifier
@@ -147,7 +147,7 @@ stellar contract deploy \
         },
         {
             "External": [
-                "CC74I4FO7N2VY547Q7HA4QFIBZTYVG76DJH32ICBKI2FUPAS6J6MJE66",
+                "CBEO6Q7UXBIQIHQR42RXETMYDKW7GABRX2O4UVW6O6YQOHROYWZJCOXZ",
                 "04beb2f6bb9f9b9406c46292957836aa6bddde48131ea0fabb33c0aa39f3c9a0641d2be6caf248c91de35f5113382a046e8fc946598d028d820b056d209019f47c2b817f01f993e42a5093d2694d88e9d849e3cd0b5ec7da7c5ce270882b92b134"
             ]
         }
