@@ -12,7 +12,10 @@
 //! ensure proper serialization and deserialization.
 //!
 //! The `key_data` parameter is expected to contain the 65-byte uncompressed
-//! secp256r1 public key followed by the credential ID bytes (if any).
+//! secp256r1 public key followed by the credential ID bytes (if any) that can
+//! be of a variable length. The public key is available on the client side only
+//! during the passkey generation and the credential ID is used to identify the
+//! passkey.
 use soroban_sdk::{contract, contractimpl, xdr::FromXdr, Bytes, BytesN, Env};
 use stellar_accounts::verifiers::{
     utils::extract_from_bytes,
