@@ -10,8 +10,15 @@
 //! structure containing authenticator data, client data JSON, and the signature
 //! itself. The `sig_data` parameter should be XDR-encoded `WebAuthnSigData` to
 //! ensure proper serialization and deserialization.
+//!
+//! The `key_data` parameter is expected to contain the 65-byte uncompressed
+//! secp256r1 public key followed by the credential ID bytes (if any) that can
+//! be of a variable length. The public key is available on the client side only
+//! during the passkey generation and the credential ID is used to identify the
+//! passkey.
 use soroban_sdk::{contract, contractimpl, xdr::FromXdr, Bytes, BytesN, Env};
 use stellar_accounts::verifiers::{
+    utils::extract_from_bytes,
     webauthn::{self, WebAuthnSigData},
     Verifier,
 };
@@ -21,7 +28,7 @@ pub struct WebauthnVerifierContract;
 
 #[contractimpl]
 impl Verifier for WebauthnVerifierContract {
-    type KeyData = BytesN<65>;
+    type KeyData = Bytes;
     type SigData = Bytes;
 
     /// Verify a WebAuthn signature against a message and public key.
@@ -29,7 +36,9 @@ impl Verifier for WebauthnVerifierContract {
     /// # Arguments
     ///
     /// * `signature_payload` - The message hash that was signed
-    /// * `key_data` - The 65-byte secp256r1 public key (uncompressed format)
+    /// * `key_data` - Bytes containing:
+    ///   - 65-byte secp256r1 public key (uncompressed format)
+    ///   - Variable length credential ID (used on the client side)
     /// * `sig_data` - XDR-encoded `WebAuthnSigData` structure containing:
     ///   - Authenticator data
     ///   - Client data JSON
@@ -39,9 +48,18 @@ impl Verifier for WebauthnVerifierContract {
     ///
     /// * `true` if the signature is valid
     /// * `false` otherwise
-    fn verify(e: &Env, signature_payload: Bytes, key_data: BytesN<65>, sig_data: Bytes) -> bool {
+    fn verify(
+        e: &Env,
+        signature_payload: Bytes,
+        key_data: Self::KeyData,
+        sig_data: Self::SigData,
+    ) -> bool {
         let sig_struct =
-            WebAuthnSigData::from_xdr(e, &sig_data).expect("WebAuthnSigData wrong format");
-        webauthn::verify(e, &signature_payload, &key_data, &sig_struct)
+            WebAuthnSigData::from_xdr(e, &sig_data).expect("WebAuthnSigData with correct format");
+
+        let pub_key: BytesN<65> =
+            extract_from_bytes(e, &key_data, 0..65).expect("65-byte public key to be extracted");
+
+        webauthn::verify(e, &signature_payload, &pub_key, &sig_struct)
     }
 }

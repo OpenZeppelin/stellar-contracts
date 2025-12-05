@@ -13,7 +13,7 @@ use soroban_sdk::{
 use crate::{
     policies::Policy,
     smart_account::{
-        get_context_rules, get_validated_context,
+        get_context_rules, get_context_rules_count, get_validated_context,
         storage::{
             add_context_rule, authenticate, can_enforce_all_policies, do_check_auth,
             get_authenticated_signers, get_context_rule, get_valid_context_rules,
@@ -1122,6 +1122,7 @@ fn get_context_rules_multiple_rules() {
         assert_eq!(rules.get(0).unwrap().id, rule1.id);
         assert_eq!(rules.get(1).unwrap().id, rule2.id);
         assert_eq!(rules.get(2).unwrap().id, rule3.id);
+        assert_eq!(get_context_rules_count(&e), 3);
     });
 }
 
@@ -1138,6 +1139,8 @@ fn get_context_rules_empty_result() {
 
         // Should return empty vector when no rules exist
         assert_eq!(rules.len(), 0);
+
+        assert_eq!(get_context_rules_count(&e), 0)
     });
 }
 

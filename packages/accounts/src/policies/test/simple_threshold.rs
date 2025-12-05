@@ -60,6 +60,28 @@ fn install_success() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3203)")]
+fn install_already_installed_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    let (_, _, _) = create_test_signers(&e);
+    let params = SimpleThresholdAccountParams { threshold: 2 };
+    let context_rule = create_test_context_rule(&e);
+
+    e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #3201)")]
 fn install_zero_threshold_fails() {
     let e = Env::default();

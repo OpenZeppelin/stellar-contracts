@@ -80,6 +80,27 @@ fn install_success() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3225)")]
+fn install_already_installed_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    let context_rule = create_context_rule(&e);
+    let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+
+    e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #3222)")]
 fn install_invalid_spending_limit() {
     let e = Env::default();
@@ -306,6 +327,10 @@ fn rolling_window_functionality() {
         enforce(&e, &context1, &context_rule.signers, &context_rule, &smart_account);
     });
 
+    e.ledger().with_mut(|li| {
+        li.sequence_number = 1010;
+    });
+
     // Second transaction: 300,000 (should succeed, total = 900,000)
     e.as_contract(&address, || {
         let context2 = create_transfer_context(&e, 300_000);
@@ -314,7 +339,7 @@ fn rolling_window_functionality() {
 
     // Move forward in time but within the rolling window
     e.ledger().with_mut(|li| {
-        li.sequence_number = 1050; // 50 ledgers later, still within 100 ledger
+        li.sequence_number = 1051; // 51 ledgers later, still within 100 ledger
                                    // window
     });
 
@@ -348,6 +373,54 @@ fn rolling_window_functionality() {
         // Verify the most recent transaction is the 900,000 one
         let last_entry = data.spending_history.get(data.spending_history.len() - 1).unwrap();
         assert_eq!(last_entry.amount, 900_000);
+    });
+}
+
+#[test]
+fn rolling_window_cutoff() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+
+    let start_ledger = 1000;
+    let period_ledgers = 100;
+
+    // Install policy
+    e.mock_all_auths();
+    e.ledger().with_mut(|li| {
+        li.sequence_number = start_ledger;
+    });
+
+    e.as_contract(&address, || {
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers };
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        let context1 = create_transfer_context(&e, 1_000_000);
+        enforce(&e, &context1, &context_rule.signers, &context_rule, &smart_account);
+    });
+
+    // Move forward `period_ledgers` - 1
+    e.ledger().with_mut(|li| {
+        li.sequence_number = start_ledger + period_ledgers - 1;
+    });
+
+    e.as_contract(&address, || {
+        let context2 = create_transfer_context(&e, 200_000);
+        // 200,000 (should return false)
+        assert!(!can_enforce(&e, &context2, &context_rule.signers, &context_rule, &smart_account));
+    });
+
+    e.ledger().with_mut(|li| {
+        li.sequence_number = start_ledger + period_ledgers;
+    });
+
+    e.as_contract(&address, || {
+        let context3 = create_transfer_context(&e, 200_000);
+        // 200,000 (should succeed)
+        enforce(&e, &context3, &context_rule.signers, &context_rule, &smart_account);
     });
 }
 

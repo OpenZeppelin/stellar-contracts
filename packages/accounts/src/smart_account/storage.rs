@@ -238,6 +238,16 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
     Vec::from_iter(e, ids.iter().map(|id| get_context_rule(e, id)))
 }
 
+/// Retrieves the number of all context rules, including expired ones. Defaults
+/// to 0.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+pub fn get_context_rules_count(e: &Env) -> u32 {
+    e.storage().instance().get(&SmartAccountStorageKey::Count).unwrap_or(0u32)
+}
+
 /// Retrieves all valid (non-expired) context rules for a specific context type,
 /// including default rules as fallback. Returns rules ordered with most
 /// recently added first for proper authorization precedence.
@@ -602,7 +612,7 @@ pub fn add_context_rule(
 ) -> ContextRule {
     let id = e.storage().instance().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
 
-    let count = e.storage().instance().get(&SmartAccountStorageKey::Count).unwrap_or(0u32);
+    let count = get_context_rules_count(e);
     if count >= MAX_CONTEXT_RULES {
         panic_with_error!(e, SmartAccountError::TooManyContextRules);
     }

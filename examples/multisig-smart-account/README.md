@@ -58,7 +58,7 @@ stellar contract deploy --alias webauthn_verifier \
 
 For this example, we assume the passkey verifier was deployed to:
 ```
-CDPMNLTCV44P3NIUNVPWL3SICZCHO7XBQ6CAKED4GQPGVG2RB7DMUIAX
+CBEO6Q7UXBIQIHQR42RXETMYDKW7GABRX2O4UVW6O6YQOHROYWZJCOXZ
 ```
 
 ### Deploy Ed25519 Verifier
@@ -110,14 +110,18 @@ The Ed25519 keys used in this example are:
 
 ### Passkey Public Key
 
-The generation of passkey public keys is more complex when using them in the WebAuthn protocol flow. For demonstration purposes, you can use a helper tool like [brozorec/smart-account-sign](https://github.com/brozorec/smart-account-sign) to assist with key generation.
+The generation of passkey public keys is more complex when using them in the WebAuthn protocol flow. Please, bear in mind that passkeys are bound to a particular domain so they can't be re-used across domains. For demonstration purposes, you can use a helper tool like [brozorec/smart-account-sign](https://github.com/brozorec/smart-account-sign) to assist with key generation.
 
 > **⚠️ Disclaimer:** The tool mentioned above is provided for demonstration purposes only. We do not vouch for its security or recommend it for production use. Always conduct your own security audit before using third-party tools in production environments.
 
-For this example, assume we've generated the following passkey public key:
+For this example, assume we've generated the following passkey public key and credential ID:
 ```
 04beb2f6bb9f9b9406c46292957836aa6bddde48131ea0fabb33c0aa39f3c9a0641d2be6caf248c91de35f5113382a046e8fc946598d028d820b056d209019f47c
+
+2b817f01f993e42a5093d2694d88e9d849e3cd0b5ec7da7c5ce270882b92b134
 ```
+
+Note that those values are concatenated in the example below.
 
 ## 5. Deploy the Multisig Smart Account
 
@@ -143,8 +147,8 @@ stellar contract deploy \
         },
         {
             "External": [
-                "CDPMNLTCV44P3NIUNVPWL3SICZCHO7XBQ6CAKED4GQPGVG2RB7DMUIAX",
-                "04beb2f6bb9f9b9406c46292957836aa6bddde48131ea0fabb33c0aa39f3c9a0641d2be6caf248c91de35f5113382a046e8fc946598d028d820b056d209019f47c"
+                "CBEO6Q7UXBIQIHQR42RXETMYDKW7GABRX2O4UVW6O6YQOHROYWZJCOXZ",
+                "04beb2f6bb9f9b9406c46292957836aa6bddde48131ea0fabb33c0aa39f3c9a0641d2be6caf248c91de35f5113382a046e8fc946598d028d820b056d209019f47c2b817f01f993e42a5093d2694d88e9d849e3cd0b5ec7da7c5ce270882b92b134"
             ]
         }
     ]' \
