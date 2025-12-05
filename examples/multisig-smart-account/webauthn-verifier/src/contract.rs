@@ -48,7 +48,12 @@ impl Verifier for WebauthnVerifierContract {
     ///
     /// * `true` if the signature is valid
     /// * `false` otherwise
-    fn verify(e: &Env, signature_payload: Bytes, key_data: Bytes, sig_data: Bytes) -> bool {
+    fn verify(
+        e: &Env,
+        signature_payload: Bytes,
+        key_data: Self::KeyData,
+        sig_data: Self::SigData,
+    ) -> bool {
         let sig_struct =
             WebAuthnSigData::from_xdr(e, &sig_data).expect("WebAuthnSigData with correct format");
 
