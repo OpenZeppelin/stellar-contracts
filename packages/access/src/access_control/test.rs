@@ -5,8 +5,8 @@ use stellar_event_assertion::EventAssertion;
 
 use crate::access_control::{
     accept_admin_transfer, add_to_role_enumeration, ensure_if_admin_or_admin_role, get_admin,
-    get_role_admin, get_role_member, get_role_member_count, grant_role, grant_role_no_auth,
-    has_role, remove_from_role_enumeration, remove_role_accounts_count_no_auth,
+    get_existing_roles, get_role_admin, get_role_member, get_role_member_count, grant_role,
+    grant_role_no_auth, has_role, remove_from_role_enumeration, remove_role_accounts_count_no_auth,
     remove_role_admin_no_auth, renounce_admin, renounce_role, revoke_role, set_admin,
     set_role_admin, set_role_admin_no_auth, transfer_admin_role,
 };
@@ -683,5 +683,207 @@ fn renounce_admin_fails_when_transfer_in_progress() {
         // Try to renounce admin while transfer is in progress
         // This should panic with TransferInProgress error
         renounce_admin(&e);
+    });
+}
+
+#[test]
+fn get_existing_roles_returns_empty_when_no_roles_exist() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let roles = get_existing_roles(&e);
+        assert_eq!(roles.len(), 0);
+    });
+}
+
+#[test]
+fn get_existing_roles_returns_roles_after_granting() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let user = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        set_admin(&e, &admin);
+
+        // Grant first role
+        grant_role(&e, &user, &USER_ROLE, &admin);
+
+        let roles = get_existing_roles(&e);
+        assert_eq!(roles.len(), 1);
+        assert_eq!(roles.get(0).unwrap(), USER_ROLE);
+    });
+}
+
+#[test]
+fn get_existing_roles_removes_role_when_last_account_removed() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let user = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        set_admin(&e, &admin);
+
+        // Grant role
+        grant_role(&e, &user, &USER_ROLE, &admin);
+
+        // Verify role exists
+        let roles_before = get_existing_roles(&e);
+        assert_eq!(roles_before.len(), 1);
+    });
+
+    e.as_contract(&address, || {
+        // Revoke role from last (and only) user
+        revoke_role(&e, &user, &USER_ROLE, &admin);
+
+        // Verify role is removed from existing roles
+        let roles_after = get_existing_roles(&e);
+        assert_eq!(roles_after.len(), 0);
+    });
+}
+
+#[test]
+fn get_existing_roles_keeps_role_when_some_accounts_remain() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        set_admin(&e, &admin);
+
+        // Grant role to two users
+        grant_role(&e, &user1, &USER_ROLE, &admin);
+    });
+
+    e.as_contract(&address, || {
+        grant_role(&e, &user2, &USER_ROLE, &admin);
+
+        // Verify role exists
+        let roles_before = get_existing_roles(&e);
+        assert_eq!(roles_before.len(), 1);
+    });
+
+    e.as_contract(&address, || {
+        // Revoke role from one user (but another still has it)
+        revoke_role(&e, &user1, &USER_ROLE, &admin);
+
+        // Verify role still exists
+        let roles_after = get_existing_roles(&e);
+        assert_eq!(roles_after.len(), 1);
+        assert_eq!(roles_after.get(0).unwrap(), USER_ROLE);
+    });
+}
+
+#[test]
+fn get_existing_roles_does_not_create_duplicates() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        set_admin(&e, &admin);
+
+        // Grant same role to multiple users
+        grant_role(&e, &user1, &USER_ROLE, &admin);
+    });
+
+    e.as_contract(&address, || {
+        grant_role(&e, &user2, &USER_ROLE, &admin);
+
+        // Should still only have one role in the list
+        let roles = get_existing_roles(&e);
+        assert_eq!(roles.len(), 1);
+        assert_eq!(roles.get(0).unwrap(), USER_ROLE);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2010)")]
+fn grant_role_fails_when_max_roles_exceeded() {
+    use crate::access_control::MAX_ROLES;
+
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let user = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        set_admin(&e, &admin);
+    });
+
+    // Create MAX_ROLES roles
+    for i in 0..MAX_ROLES {
+        e.as_contract(&address, || {
+            let role = Symbol::new(&e, &std::format!("role_{}", i));
+            grant_role(&e, &user, &role, &admin);
+        });
+    }
+
+    e.as_contract(&address, || {
+        // Verify we have MAX_ROLES
+        let roles = get_existing_roles(&e);
+        assert_eq!(roles.len(), MAX_ROLES);
+
+        // Try to create one more role - should panic
+        let overflow_role = Symbol::new(&e, "overflow_role");
+        grant_role(&e, &user, &overflow_role, &admin);
+    });
+}
+
+#[test]
+fn can_reuse_role_slot_after_removal() {
+    use crate::access_control::MAX_ROLES;
+
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let user = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        set_admin(&e, &admin);
+    });
+
+    // Create MAX_ROLES roles
+    for i in 0..MAX_ROLES {
+        e.as_contract(&address, || {
+            let role = Symbol::new(&e, &std::format!("role_{}", i));
+            grant_role(&e, &user, &role, &admin);
+        });
+    }
+    e.as_contract(&address, || {
+        // Verify we have MAX_ROLES
+        let roles_before = get_existing_roles(&e);
+        assert_eq!(roles_before.len(), MAX_ROLES);
+
+        // Remove one role
+        let first_role = Symbol::new(&e, "role_0");
+        revoke_role(&e, &user, &first_role, &admin);
+
+        // Verify we now have MAX_ROLES - 1
+        let roles_after_removal = get_existing_roles(&e);
+        assert_eq!(roles_after_removal.len(), MAX_ROLES - 1);
+    });
+
+    e.as_contract(&address, || {
+        // Now we should be able to add a new role
+        let new_role = Symbol::new(&e, "new_role");
+        grant_role(&e, &user, &new_role, &admin);
+
+        // Verify we're back to MAX_ROLES
+        let roles_final = get_existing_roles(&e);
+        assert_eq!(roles_final.len(), MAX_ROLES);
     });
 }
