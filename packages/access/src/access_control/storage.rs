@@ -116,6 +116,7 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 }
 
 /// Returns a vector containing all existing roles.
+/// Defaults to empty vector if no roles exist.
 ///
 /// # Arguments
 ///
@@ -126,7 +127,7 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 /// This function returns all roles that currently have at least one member.
 pub fn get_existing_roles(e: &Env) -> Vec<Symbol> {
     e.storage()
-        .instance()
+        .persistent()
         .get(&AccessControlStorageKey::ExistingRoles)
         .unwrap_or_else(|| Vec::new(e))
 }
@@ -674,12 +675,12 @@ pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
         let mut existing_roles = get_existing_roles(e);
 
         // Check if we've reached the maximum number of roles
-        if existing_roles.len() >= MAX_ROLES {
+        if existing_roles.len() = MAX_ROLES {
             panic_with_error!(e, AccessControlError::MaxRolesExceeded);
         }
 
         existing_roles.push_back(role.clone());
-        e.storage().instance().set(&AccessControlStorageKey::ExistingRoles, &existing_roles);
+        e.storage().persistent().set(&AccessControlStorageKey::ExistingRoles, &existing_roles);
     }
 
     // Add the account to the enumeration
@@ -769,7 +770,7 @@ pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
         // Find and remove the role
         if let Some(pos) = existing_roles.iter().position(|r| r == role.clone()) {
             existing_roles.remove(pos as u32);
-            e.storage().instance().set(&AccessControlStorageKey::ExistingRoles, &existing_roles);
+            e.storage().persistent().set(&AccessControlStorageKey::ExistingRoles, &existing_roles);
         }
     }
 }
