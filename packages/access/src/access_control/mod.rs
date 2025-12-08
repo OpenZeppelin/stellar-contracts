@@ -91,7 +91,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env, Symbol};
+use soroban_sdk::{contracterror, contractevent, Address, Env, Symbol, Vec};
 
 pub use crate::access_control::storage::{
     accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
@@ -114,6 +114,19 @@ pub trait AccessControl {
     /// * `account` - The account to check.
     /// * `role` - The role to check for.
     fn has_role(e: &Env, account: Address, role: Symbol) -> Option<u32>;
+
+    /// Returns a vector containing all existing roles.
+    /// Defaults to empty vector if no roles exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    ///
+    /// # Notes
+    ///
+    /// This function returns all roles that currently have at least one member.
+    /// The maximum number of roles is limited by [`MAX_ROLES`].
+    fn get_existing_roles(e: &Env) -> Vec<Symbol>;
 
     /// Returns the total number of accounts that have the specified role.
     /// If the role does not exist, returns 0.
