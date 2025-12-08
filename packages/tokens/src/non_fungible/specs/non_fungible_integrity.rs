@@ -148,7 +148,7 @@ pub fn nft_mint_integrity(e: Env) {
 #[rule]
 // after sequential mint the token owner is set to the to address
 // updates balances correctly
-// status: 
+// status: verified
 pub fn nft_sequential_mint_integrity(e: Env) {
     let to = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
