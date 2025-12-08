@@ -5,13 +5,13 @@ use cvlr::{
     nondet::{self, Nondet},
     cvlr_satisfy,
 };
-use cvlr_soroban::{nondet_address, nondet_vec};
+use cvlr_soroban::{nondet_address};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
     policies::{Policy, simple_threshold::SimpleThresholdAccountParams, specs::simple_threshold_contract::SimpleThresholdPolicy},
-    smart_account::{ContextRule, Signer},
+    smart_account::{ContextRule, Signer, specs::nondet::nondet_signers_vec},
 };
 
 #[rule]
@@ -24,7 +24,7 @@ pub fn get_simple_threshold_sanity(e: Env) {
 
 #[rule]
 pub fn can_enforce_simple_threshold_sanity(e: Env, context: soroban_sdk::auth::Context) {
-    let auth_signers: Vec<Signer> = nondet_vec();
+    let auth_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account: Address = nondet_address();
     let _ = SimpleThresholdPolicy::can_enforce(
@@ -39,7 +39,7 @@ pub fn can_enforce_simple_threshold_sanity(e: Env, context: soroban_sdk::auth::C
 
 #[rule]
 pub fn enforce_simple_threshold_sanity(e: Env, context: soroban_sdk::auth::Context) {
-    let auth_signers = nondet_vec();
+    let auth_signers = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account: Address = nondet_address();
     let _ = SimpleThresholdPolicy::enforce(

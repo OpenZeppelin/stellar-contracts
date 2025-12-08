@@ -24,6 +24,7 @@ impl CustomAccountInterface for SmartAccountContract {
         signatures: Signatures,
         auth_contexts: Vec<Context>,
     ) -> Result<(), Self::Error> {
+        // TODO: sanity will not work for this right now. DO NOT TRY.
         do_check_auth(&e, &signature_payload, &signatures, &auth_contexts)
     }
 }

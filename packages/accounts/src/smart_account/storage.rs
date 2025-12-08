@@ -83,9 +83,8 @@
 //!     policies: [threshold_policy, spending_limit_policy],
 //! }
 //! ```
-
 use cvlr::nondet::{self, Nondet};
-use cvlr_soroban::{nondet_address, nondet_bytes, nondet_bytes_n, nondet_string, nondet_vec};
+use cvlr_soroban::{nondet_address, nondet_bytes, nondet_bytes_n, nondet_string};
 #[cfg(feature = "certora")]
 use soroban_sdk::FromVal;
 use soroban_sdk::{
@@ -107,14 +106,13 @@ use crate::smart_account::{
 };
 #[cfg(feature = "certora")]
 use crate::{
-    policies::Policy,
-    smart_account::specs::policy::{Params, PolicyContract},
+    policies::{Policy, simple_threshold::SimpleThresholdAccountParams, spending_limit::SpendingLimitAccountParams},
+    smart_account::specs::policy::SimpleThresholdPolicyContract,
 };
 use crate::{
     policies::{self, PolicyClient},
     smart_account::{
-        SmartAccountError, MAX_CONTEXT_RULES, MAX_POLICIES, MAX_SIGNERS,
-        SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
+        MAX_CONTEXT_RULES, MAX_POLICIES, MAX_SIGNERS, SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD, SmartAccountError, specs::nondet::nondet_policy_vec
     },
     verifiers::VerifierClient,
 };
@@ -234,42 +232,17 @@ pub struct ContextRule {
 
 impl Nondet for ContextRule {
     fn nondet() -> Self {
+        use crate::smart_account::specs::nondet::nondet_signers_vec;
         ContextRule {
             id: u32::nondet(),
             context_type: ContextRuleType::nondet(),
             name: nondet_string(),
             signers: nondet_signers_vec(),
-            policies: nondet_vec(),
+            policies: nondet_policy_vec(),
             valid_until: Option::<u32>::nondet(),
         }
     }
 }
-pub fn nondet_signers_vec() -> Vec<Signer>
-where
-    Signer: soroban_sdk::IntoVal<Env, soroban_sdk::Val>
-        + soroban_sdk::TryFromVal<Env, soroban_sdk::Val>,
-{
-    let env = Env::default();
-
-    // Choose an arbitrary length (but keep it bounded so verification doesn't explode).
-    // Adjust MAX as needed.
-    const MAX: u32 = 5;
-    let mut n: u32 = u32::nondet();
-    if n > MAX {
-        n = n % (MAX + 1);
-    }
-
-    let mut out: Vec<Signer> = Vec::new(&env);
-    let mut i = 0u32;
-    while i < n {
-        out.push_back(Signer::nondet());
-        i += 1;
-    }
-
-    out
-}
-
-
 
 // ################## QUERY STATE ##################
 
@@ -302,7 +275,7 @@ pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
         name: meta.name,
         signers,
         policies,
-        valid_until: meta.valid_until,
+        valid_until: Option::nondet(),
     }
 }
 
@@ -509,7 +482,7 @@ pub fn can_enforce_all_policies(
             return false;
         }
         #[cfg(feature = "certora")]
-        if PolicyContract::can_enforce(
+        if SimpleThresholdPolicyContract::can_enforce(
             e,
             context.clone(),
             matched_signers.clone(),
@@ -613,7 +586,7 @@ pub fn do_check_auth(
                 &e.current_contract_address(),
             );
             #[cfg(feature = "certora")]
-            PolicyContract::enforce(
+            SimpleThresholdPolicyContract::enforce(
                 e,
                 context.clone(),
                 authenticated_signers.clone(),
@@ -648,36 +621,48 @@ pub fn do_check_auth(
 ///   during sorting.
 /// * [`SmartAccountError::DuplicatePolicy`] - When duplicate policies are found
 ///   during sorting.
+#[cfg(not(feature = "certora"))]
 pub fn compute_fingerprint(
     e: &Env,
     context_type: &ContextRuleType,
     signers: &Vec<Signer>,
     policies: &Vec<Address>,
 ) -> BytesN<32> {
-    // let mut sorted_signers = Vec::new(e);
-    // for signer in signers.iter() {
-    //     match sorted_signers.binary_search(&signer) {
-    //         Ok(_) => panic_with_error!(e, SmartAccountError::DuplicateSigner),
-    //         Err(pos) => sorted_signers.insert(pos, signer),
-    //     }
-    // }
+    let mut sorted_signers = Vec::new(e);
+    for signer in signers.iter() {
+        match sorted_signers.binary_search(&signer) {
+            Ok(_) => panic_with_error!(e, SmartAccountError::DuplicateSigner),
+            Err(pos) => sorted_signers.insert(pos, signer),
+        }
+    }
 
-    // let mut sorted_policies = Vec::new(e);
-    // for policy in policies.iter() {
-    //     match sorted_policies.binary_search(&policy) {
-    //         Ok(_) => panic_with_error!(e, SmartAccountError::DuplicatePolicy),
-    //         Err(pos) => sorted_policies.insert(pos, policy),
-    //     }
-    // }
+    let mut sorted_policies = Vec::new(e);
+    for policy in policies.iter() {
+        match sorted_policies.binary_search(&policy) {
+            Ok(_) => panic_with_error!(e, SmartAccountError::DuplicatePolicy),
+            Err(pos) => sorted_policies.insert(pos, policy),
+        }
+    }
 
-    // #[cfg(not(feature = "certora"))]
-    // let mut rule_data = context_type.to_xdr(e);
-    // #[cfg(feature = "certora")]
-    // let mut rule_data = context_type.clone().to_xdr(e);
-    // rule_data.append(&sorted_signers.to_xdr(e));
-    // rule_data.append(&sorted_policies.to_xdr(e));
+    #[cfg(not(feature = "certora"))]
+    let mut rule_data = context_type.to_xdr(e);
+    #[cfg(feature = "certora")]
+    let mut rule_data = context_type.clone().to_xdr(e);
+    rule_data.append(&sorted_signers.to_xdr(e));
+    rule_data.append(&sorted_policies.to_xdr(e));
 
-    // e.crypto().sha256(&rule_data).to_bytes()
+    e.crypto().sha256(&rule_data).to_bytes()
+}
+
+
+#[cfg(feature = "certora")]
+pub fn compute_fingerprint(
+    e: &Env,
+    context_type: &ContextRuleType,
+    signers: &Vec<Signer>,
+    policies: &Vec<Address>,
+) -> BytesN<32> {
+    // TODO: make a ghost map to track these.
     nondet_bytes_n()
 }
 
@@ -798,9 +783,9 @@ pub fn add_context_rule(
         #[cfg(not(feature = "certora"))]
         PolicyClient::new(e, &policy).install(&param, &context_rule, &e.current_contract_address());
         #[cfg(feature = "certora")]
-        PolicyContract::install(
+        SimpleThresholdPolicyContract::install(
             &e,
-            Params::from_val(e, &param),
+            SimpleThresholdAccountParams::from_val(e, &param),
             context_rule.clone(),
             e.current_contract_address(),
         );
@@ -957,7 +942,7 @@ pub fn remove_context_rule(e: &Env, id: u32) {
         #[cfg(not(feature = "certora"))]
         PolicyClient::new(e, &policy).uninstall(&context_rule, &e.current_contract_address());
         #[cfg(feature = "certora")]
-        PolicyContract::uninstall(e, context_rule.clone(), e.current_contract_address());
+        SimpleThresholdPolicyContract::uninstall(e, context_rule.clone(), e.current_contract_address());
     }
 
     // Remove all storage entries for this context rule
@@ -1149,9 +1134,9 @@ pub fn add_policy(e: &Env, id: u32, policy: &Address, install_param: Val) {
     #[cfg(not(feature = "certora"))]
     PolicyClient::new(e, policy).install(&install_param, &rule, &e.current_contract_address());
     #[cfg(feature = "certora")]
-    PolicyContract::install(
+    SimpleThresholdPolicyContract::install(
         e,
-        Params::from_val(e, &install_param),
+        SimpleThresholdAccountParams::from_val(e, &install_param),
         rule.clone(),
         e.current_contract_address(),
     );
@@ -1209,13 +1194,13 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
 
         validate_and_set_fingerprint(e, &rule.context_type, &rule.signers, &policies);
         // Remove the old fingerprint
-        // remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
+        remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
 
         // Uninstall the policy
         #[cfg(not(feature = "certora"))]
         PolicyClient::new(e, policy).uninstall(&rule, &e.current_contract_address());
         #[cfg(feature = "certora")]
-        PolicyContract::uninstall(e, rule, e.current_contract_address());
+        SimpleThresholdPolicyContract::uninstall(e, rule, e.current_contract_address());
 
         e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
 

@@ -1,14 +1,13 @@
 use cvlr::{cvlr_assert, nondet::*, cvlr_satisfy};
-use cvlr_soroban::{nondet_address, nondet_bytes, nondet_vec};
+use cvlr_soroban::{nondet_address, nondet_bytes};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::Env;
 
 use crate::{
     policies::spending_limit::{
-        can_enforce, enforce, get_spending_limit_data, install, set_spending_limit, uninstall,
-        SpendingLimitAccountParams,
+        SpendingLimitAccountParams, can_enforce, enforce, get_spending_limit_data, install, set_spending_limit, uninstall
     },
-    smart_account::ContextRule,
+    smart_account::{ContextRule, specs::nondet::nondet_signers_vec},
 };
 
 #[rule]
@@ -21,7 +20,7 @@ pub fn get_spending_limit_sanity(e: Env) {
 
 #[rule]
 pub fn can_enforce_spending_limit_sanity(e: Env, context: soroban_sdk::auth::Context) {
-    let auth_signers = nondet_vec();
+    let auth_signers = nondet_signers_vec();
     let ctx_rule = ContextRule::nondet();
     let account = nondet_address();
     let _ = can_enforce(&e, &context, &auth_signers, &ctx_rule, &account);
@@ -30,7 +29,7 @@ pub fn can_enforce_spending_limit_sanity(e: Env, context: soroban_sdk::auth::Con
 
 #[rule]
 pub fn enforce_spending_limit_sanity(e: Env, context: soroban_sdk::auth::Context) {
-    let auth_signers = nondet_vec();
+    let auth_signers = nondet_signers_vec();
     let ctx_rule = ContextRule::nondet();
     let account = nondet_address();
     let _ = enforce(&e, &context, &auth_signers, &ctx_rule, &account);

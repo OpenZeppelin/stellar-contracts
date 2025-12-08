@@ -5,13 +5,13 @@ use cvlr::{
     nondet::{self, Nondet},
     cvlr_satisfy,
 };
-use cvlr_soroban::{nondet_address, nondet_vec};
+use cvlr_soroban::{nondet_address};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
     policies::{Policy, simple_threshold::SimpleThresholdAccountParams, specs::simple_threshold_contract::SimpleThresholdPolicy},
-    smart_account::{ContextRule, Signer},
+    smart_account::{ContextRule, Signer, specs::nondet::nondet_signers_vec},
 };
 
 
@@ -32,7 +32,7 @@ pub fn st_set_threshold_integrity(e: Env) {
 // not really an intgerity rule because this is a view function
 // status: verified
 pub fn st_can_enforce_integrity(e: Env, context: soroban_sdk::auth::Context) {
-    let auth_signers: Vec<Signer> = nondet_vec();
+    let auth_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     let threshold_pre = SimpleThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());

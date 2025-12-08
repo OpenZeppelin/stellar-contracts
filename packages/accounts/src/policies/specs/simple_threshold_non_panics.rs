@@ -6,14 +6,14 @@ use cvlr::{
     nondet::{self, Nondet},
     cvlr_satisfy,
 };
-use cvlr_soroban::{nondet_address, nondet_vec, is_auth};
+use cvlr_soroban::{nondet_address, is_auth};
 use cvlr::clog;
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
     policies::{Policy, simple_threshold::SimpleThresholdAccountParams, specs::simple_threshold_contract::SimpleThresholdPolicy},
-    smart_account::{ContextRule, Signer},
+    smart_account::{ContextRule, Signer, specs::nondet::nondet_signers_vec},
 };
 
 fn storage_setup_threshold(e: Env, ctx_rule_id: u32, account_id: Address) {
@@ -62,7 +62,7 @@ pub fn get_threshold_non_panic(e: Env) {
 // requires nothing
 // status: violated - Expected sym to be a valid Val, in vec/vec_len
 pub fn can_enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
-    let authenticated_signers: Vec<Signer> = nondet_vec();
+    let authenticated_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     storage_setup_threshold(e.clone(), ctx_rule.id, account_id.clone());
@@ -75,7 +75,7 @@ pub fn can_enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
 // can_enforce returns true
 // status: violated - unreachable - unwrap_failed in nondet_bytes_n
 pub fn enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
-    let authenticated_signers: Vec<Signer> = nondet_vec();
+    let authenticated_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     storage_setup_threshold(e.clone(), ctx_rule.id, account_id.clone());

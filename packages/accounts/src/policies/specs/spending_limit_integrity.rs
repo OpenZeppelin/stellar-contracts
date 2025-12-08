@@ -7,14 +7,14 @@ use cvlr::{
     cvlr_assume,
 };
 use cvlr::clog;
-use cvlr_soroban::{nondet_address, nondet_vec};
+use cvlr_soroban::{nondet_address};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env, IntoVal, Vec};
 use soroban_sdk::auth::{Context, ContractContext};
 use soroban_sdk::symbol_short;
 use crate::{
-    policies::{Policy, spending_limit::{SpendingLimitAccountParams, SpendingLimitData, SpendingLimitStorageKey}, specs::spending_limit_contract::SpendingLimitPolicy},
-    smart_account::{ContextRule, Signer},
+    policies::{Policy, specs::spending_limit_contract::SpendingLimitPolicy, spending_limit::{SpendingLimitAccountParams, SpendingLimitData, SpendingLimitStorageKey}},
+    smart_account::{ContextRule, Signer, specs::nondet::nondet_signers_vec},
 };
 
 // note we verify the rules in this file with:
@@ -44,7 +44,7 @@ pub fn sl_set_spending_limit_integrity(e: Env) {
 // and the trivial paths that return 0.
 // possibly we need an invariant that connects the different parameters of the spending limit
 pub fn no_previous_transfer_succeeds(e: Env, context: soroban_sdk::auth::Context) {
-    let auth_signers: Vec<Signer> = nondet_vec();
+    let auth_signers: Vec<Signer> = nondet_signers_vec();
     cvlr_assume!(auth_signers.len() > 0);
     let ctx_rule: ContextRule = ContextRule::nondet();
     let from = nondet_address();

@@ -1,4 +1,4 @@
-mod storage;
+pub(crate) mod storage;
 #[cfg(test)]
 mod test;
 use soroban_sdk::{

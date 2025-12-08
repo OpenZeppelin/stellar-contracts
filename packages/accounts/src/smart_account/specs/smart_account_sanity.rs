@@ -1,12 +1,14 @@
-use cvlr::{cvlr_assert, cvlr_satisfy, nondet::*};
-use cvlr_soroban::{nondet_address, nondet_map, nondet_string, nondet_vec};
+
+use cvlr::{cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
+use cvlr_soroban::{nondet_address, nondet_map, nondet_string};
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{map, panic_with_error, vec, Env, Val};
+use soroban_sdk::{Env, String, Val, Vec, map, panic_with_error, vec};
 
 use crate::smart_account::{
-    specs::smart_account_contract::SmartAccountContract,
-    storage::{self, get_persistent_entry, SmartAccountStorageKey},
-    ContextRuleType, Meta, Signer, SmartAccount, SmartAccountError,
+    ContextRuleType, Meta, Signer, SmartAccount, SmartAccountError, specs::{
+        nondet::{nondet_policy_map, nondet_signers_vec},
+        smart_account_contract::SmartAccountContract,
+    }, storage::{self, SmartAccountStorageKey, get_persistent_entry}
 };
 
 #[rule]
@@ -28,12 +30,8 @@ pub fn add_context_rule_sanity(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
     let valid_until = Option::<u32>::nondet();
-    let signers = vec![&e, Signer::nondet(), Signer::nondet(), Signer::nondet()];
-    let policies = map![
-        &e,
-        (nondet_address(), Val::from_payload(u64::nondet())),
-        (nondet_address(), Val::from_payload(u64::nondet()))
-    ];
+    let signers = nondet_signers_vec();
+    let policies = nondet_policy_map();
     let _ =
         SmartAccountContract::add_context_rule(&e, ctx_typ, name, valid_until, signers, policies);
     cvlr_satisfy!(true);

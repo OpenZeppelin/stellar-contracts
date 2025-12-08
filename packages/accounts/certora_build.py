@@ -13,7 +13,7 @@ COMMAND = "just build"
 
 # JSON FIELDS
 PROJECT_DIR = (SCRIPT_DIR / "../").resolve()
-SOURCES = ["access/src/**/*.rs"]
+SOURCES = ["accounts/src/**/*.rs"]
 EXECUTABLES = "../target/wasm32-unknown-unknown/release/stellar_accounts.wasm"
 
 VERBOSE = False

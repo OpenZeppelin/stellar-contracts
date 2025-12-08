@@ -12,7 +12,7 @@ use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
     policies::{Policy, simple_threshold::SimpleThresholdAccountParams, specs::simple_threshold_contract::SimpleThresholdPolicy},
-    smart_account::{ContextRule, Signer},
+    smart_account::{ContextRule, Signer, specs::nondet::nondet_signers_vec},
 };
 
 #[rule]
@@ -58,7 +58,7 @@ pub fn get_threshold_panics_if_no_threshold(e: Env) {
 // enforce panics if can_enforce returns false
 // status: verified 
 pub fn enforce_panics_if_can_enforce_returns_false(e: Env, context: soroban_sdk::auth::Context) {
-    let authenticated_signers: Vec<Signer> = nondet_vec();
+    let authenticated_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     let can_enforce = SimpleThresholdPolicy::can_enforce(&e, context.clone(), authenticated_signers.clone(), ctx_rule.clone(), account_id.clone());
