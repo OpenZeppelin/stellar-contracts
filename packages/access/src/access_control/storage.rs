@@ -43,7 +43,6 @@ pub enum AccessControlStorageKey {
 pub fn has_role(e: &Env, account: &Address, role: &Symbol) -> Option<u32> {
     let key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
 
-    // extend ttl if `Some(index)`
     e.storage().persistent().get(&key).inspect(|_| {
         e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT)
     })
@@ -107,12 +106,10 @@ pub fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {
 /// * `role` - The role to query the admin role for.
 pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
-    if let Some(admin_role) = e.storage().persistent().get(&key) {
-        e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
-        Some(admin_role)
-    } else {
-        None
-    }
+
+    e.storage().persistent().get(&key).inspect(|_| {
+        e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT)
+    })
 }
 
 /// Returns a vector containing all existing roles.
@@ -126,10 +123,13 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 ///
 /// This function returns all roles that currently have at least one member.
 pub fn get_existing_roles(e: &Env) -> Vec<Symbol> {
-    e.storage()
-        .persistent()
-        .get(&AccessControlStorageKey::ExistingRoles)
-        .unwrap_or_else(|| Vec::new(e))
+    let key = AccessControlStorageKey::ExistingRoles;
+    if let Some(existing_role) = e.storage().persistent().get(&key) {
+        e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
+        existing_role
+    } else {
+        Vec::new(e)
+    }
 }
 
 // ################## CHANGE STATE ##################
@@ -675,7 +675,7 @@ pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
         let mut existing_roles = get_existing_roles(e);
 
         // Check if we've reached the maximum number of roles
-        if existing_roles.len() = MAX_ROLES {
+        if existing_roles.len() == MAX_ROLES {
             panic_with_error!(e, AccessControlError::MaxRolesExceeded);
         }
 
