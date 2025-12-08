@@ -52,7 +52,6 @@ pub fn transfer_ownership_integrity(e: Env) {
     }
     cvlr_assert!(owner_post == owner_pre);
     cvlr_assert!(pending_owner == Some(new_owner));
-    // TODO : assert about TTL.
 }
 
 
