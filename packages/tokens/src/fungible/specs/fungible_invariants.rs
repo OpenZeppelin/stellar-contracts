@@ -6,8 +6,8 @@ use soroban_sdk::{Address, Env};
 use crate::fungible::FungibleToken;
 use crate::fungible::Base;
 
-// total_supply does not change other than mint.
-// total_supply >= balance(a1)+balance(a2)
+// todo: total_supply does not change other than mint.
+// todo (?) total_supply >= balance(a1)+balance(a2)
 
 // maybe its not right to talk about invariants just for fungible because its not really a contract setting (?) 
 // or maybe its fine
