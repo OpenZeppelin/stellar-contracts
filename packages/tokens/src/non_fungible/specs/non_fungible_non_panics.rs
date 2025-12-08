@@ -60,7 +60,7 @@ pub fn reasonable_balance(e: Env, account: Address) {
 // - owner for token_id
 // - balance for from
 // - balance for to
-// status: 
+// status: verified
 pub fn nft_transfer_non_panic(e: Env) {
     let to: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
@@ -68,12 +68,12 @@ pub fn nft_transfer_non_panic(e: Env) {
     clog!(cvlr_soroban::Addr(&from));
     let token_id: u32 = nondet();
     clog!(token_id);
-    cvlr_assume!(is_auth(from.clone()));
     storage_setup_owner(e.clone(), token_id);
     storage_setup_balance(e.clone(), from.clone());
     storage_setup_balance(e.clone(), to.clone());
     let owner = Base::owner_of(&e, token_id);
     clog!(cvlr_soroban::Addr(&owner));
+    cvlr_assume!(is_auth(from.clone()));
     cvlr_assume!(owner == from);
     reasonable_balance(e.clone(), to.clone());
     assume_pre_owner_implies_balance(e.clone(), token_id); // invariant proved in non_fungible_invariants.rs
@@ -94,7 +94,7 @@ pub fn nft_transfer_non_panic(e: Env) {
 // - balance for to
 // - approval for token_id with spender
 // - approval for all for from and spender
-// status: 
+// status: verified
 pub fn nft_transfer_from_non_panic(e: Env) {
     let to: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
@@ -102,17 +102,17 @@ pub fn nft_transfer_from_non_panic(e: Env) {
     clog!(cvlr_soroban::Addr(&from));
     let token_id: u32 = nondet();
     clog!(token_id);
+    let spender = nondet_address();
+    clog!(cvlr_soroban::Addr(&spender));
     storage_setup_owner(e.clone(), token_id);
+    storage_setup_balance(e.clone(), from.clone());
+    storage_setup_balance(e.clone(), to.clone());
+    storage_setup_approved(e.clone(), token_id, spender.clone());
+    storage_setup_approved_for_all(e.clone(), from.clone(), spender.clone());
     let owner = Base::owner_of(&e, token_id);
     clog!(cvlr_soroban::Addr(&owner));
     cvlr_assume!(owner == from);
-    storage_setup_balance(e.clone(), from.clone());
-    storage_setup_balance(e.clone(), to.clone());
-    let spender = nondet_address();
-    clog!(cvlr_soroban::Addr(&spender));
     cvlr_assume!(is_auth(spender.clone()));
-    storage_setup_approved(e.clone(), token_id, spender.clone());
-    storage_setup_approved_for_all(e.clone(), from.clone(), spender.clone());
     cvlr_assume!(is_approved_for_token(&e, &from, &spender, token_id));
     reasonable_balance(e.clone(), to.clone());
     assume_pre_owner_implies_balance(e.clone(), token_id); // invariant proved in non_fungible_invariants.rs
@@ -127,7 +127,8 @@ pub fn nft_transfer_from_non_panic(e: Env) {
 // - live_until_ledger is 0 OR (live_until_ledger <= max_live_until_ledger AND live_until_ledger > current_ledger)
 // storage setup:
 // - owner for token_id
-// status: 
+// - approval_for_all for owner and approver
+// status: verified
 pub fn nft_approve_non_panic(e: Env) {
     let approver = nondet_address();
     clog!(cvlr_soroban::Addr(&approver));
@@ -137,18 +138,19 @@ pub fn nft_approve_non_panic(e: Env) {
     clog!(token_id);
     let live_until_ledger = u32::nondet();
     clog!(live_until_ledger);
+    storage_setup_owner(e.clone(), token_id);
+    let owner = Base::owner_of(&e, token_id);
     let current_ledger = e.ledger().sequence();
     let max_live_until_ledger = e.ledger().max_live_until_ledger();
     let ledger_leq_max = live_until_ledger <= max_live_until_ledger;
     let ledger_above_currnet = live_until_ledger > current_ledger;
     let live_until_ledger_is_zero = live_until_ledger == 0;
-    cvlr_assume!(live_until_ledger_is_zero || (ledger_leq_max && ledger_above_currnet));
     cvlr_assume!(is_auth(approver.clone()));
-    let owner = Base::owner_of(&e, token_id);
     let owner_is_approver = owner == approver;
+    storage_setup_approved_for_all(e.clone(), owner.clone(), approver.clone());
     let approver_is_approved_autherator = Base::is_approved_for_all(&e, &owner, &approver);
     cvlr_assume!(owner_is_approver || approver_is_approved_autherator);
-    storage_setup_owner(e.clone(), token_id);
+    cvlr_assume!(live_until_ledger_is_zero || (ledger_leq_max && ledger_above_currnet));
     Base::approve(&e, &approver, &approved, token_id, live_until_ledger);
     cvlr_assert!(true);
 }
@@ -157,7 +159,7 @@ pub fn nft_approve_non_panic(e: Env) {
 // requires:
 // - owner is authenticated
 // - live_until_ledger is 0 OR (live_until_ledger <= max_live_until_ledger AND live_until_ledger > current_ledger)
-// status:
+// status: verified
 pub fn nft_approve_for_all_non_panic(e: Env) {
     let owner = nondet_address();
     clog!(cvlr_soroban::Addr(&owner));
@@ -170,8 +172,8 @@ pub fn nft_approve_for_all_non_panic(e: Env) {
     let ledger_leq_max = live_until_ledger <= max_live_until_ledger;
     let ledger_above_currnet = live_until_ledger > current_ledger;
     let live_until_ledger_is_zero = live_until_ledger == 0;
-    cvlr_assume!(live_until_ledger_is_zero || (ledger_leq_max && ledger_above_currnet));
     cvlr_assume!(is_auth(owner.clone()));
+    cvlr_assume!(live_until_ledger_is_zero || (ledger_leq_max && ledger_above_currnet));
     Base::approve_for_all(&e, &owner, &operator, live_until_ledger);
     cvlr_assert!(true);
 }

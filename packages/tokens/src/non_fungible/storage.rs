@@ -4,6 +4,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use crate::non_fungible::{
     emit_approve, emit_approve_for_all, emit_mint, emit_transfer,
 };
+use cvlr::clog;
 
 use crate::non_fungible::{
     sequential::increment_token_id,
@@ -421,9 +422,12 @@ impl Base {
             if owner != *from_address {
                 panic_with_error!(e, NonFungibleTokenError::IncorrectOwner);
             }
-
+            clog!(cvlr_soroban::Addr(from_address));
+            clog!(token_id);
+            clog!(Self::balance(e, from_address));
             Base::decrease_balance(e, from_address, 1);
-
+            clog!(Self::balance(e, from_address));
+        
             // Clear any existing approval
             let approval_key = NFTStorageKey::Approval(token_id);
             e.storage().temporary().remove(&approval_key);
@@ -433,8 +437,11 @@ impl Base {
         }
 
         if let Some(to_address) = to {
+            clog!(cvlr_soroban::Addr(to_address));
+            clog!(token_id);
+            clog!(Self::balance(e, to_address));
             Base::increase_balance(e, to_address, 1);
-
+            clog!(Self::balance(e, to_address));
             // Set the new owner
             e.storage().persistent().set(&NFTStorageKey::Owner(token_id), to_address);
         } else {
