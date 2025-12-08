@@ -8,7 +8,7 @@ use crate::non_fungible::Base;
 use crate::non_fungible::specs::helper::{is_approved_for_token, is_owned};
 use cvlr_soroban::is_auth;
 
-// ################## INTEGRTIY RULES ##################
+// ################## INTEGRITY RULES ##################
 
 #[rule]
 // after burn the account's balance decreases by 1

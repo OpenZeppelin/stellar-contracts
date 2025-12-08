@@ -6,6 +6,7 @@ use cvlr::clog;
 
 use crate::non_fungible::Base;
 use crate::non_fungible::specs::helper::is_approved_for_token;
+use crate::non_fungible::sequential;
 
 #[rule]
 // after transfer the token owner is set to the to address
@@ -144,6 +145,26 @@ pub fn nft_mint_integrity(e: Env) {
     cvlr_assert!(balance_post == balance_pre + 1);
 }
 
+#[rule]
+// after sequential mint the token owner is set to the to address
+// updates balances correctly
+// status: 
+pub fn nft_sequential_mint_integrity(e: Env) {
+    let to = nondet_address();
+    clog!(cvlr_soroban::Addr(&to));
+    let current_token_id = sequential::next_token_id(&e);
+    clog!(current_token_id);
+    let balance_pre = Base::balance(&e, &to);
+    clog!(balance_pre);
+    Base::sequential_mint(&e, &to);
+    let owner_post = Base::owner_of(&e, current_token_id);
+    clog!(cvlr_soroban::Addr(&owner_post));
+    cvlr_assert!(owner_post == to);
+    let balance_post = Base::balance(&e, &to);
+    clog!(balance_post);
+    cvlr_assert!(balance_post == balance_pre + 1);
+}
+
 
 #[rule]
 // token_uri of two different tokens is different
@@ -159,4 +180,3 @@ pub fn nft_token_uri_injective(e: Env) {
     cvlr_assert!(uri1 != uri2);
 }
 
-// TODO: sequential_mint
