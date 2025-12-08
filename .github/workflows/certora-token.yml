@@ -18,6 +18,10 @@ env:
     enumerable_nft_sanity.conf
     royalties_nft_sanity.conf
     vault_sanity.conf
+    non_fungible_integrity.conf
+    non_fungible_invariants.conf
+    non_fungible_non_panics.conf
+    non_fungible_panics.conf
 
 jobs:
   check:

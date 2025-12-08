@@ -12,6 +12,7 @@ env:
     weighted_threshold_contract_sanity.conf
     spending_limit_integrity.conf
     spending_limit_contract_sanity.conf
+    smart_account_sanity.conf
 
 jobs:
   check:
