@@ -6,6 +6,7 @@ pub mod non_fungible_invariants;
 pub mod burnable;
 pub mod enumerable;
 pub mod royalties;
+pub mod consecutive;
 
 pub mod burnable_nft_contract;
 pub mod consecutive_nft_contract;

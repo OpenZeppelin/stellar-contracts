@@ -121,8 +121,6 @@ pub fn nft_approve_for_all_integrity(e: Env) {
     cvlr_assert!(is_approved_for_token_post);
 }
 
-// TODO: sequential mint here?
-
 #[rule]
 // after mint the token owner is set to the to address
 // updates balances correctly
