@@ -158,3 +158,5 @@ pub fn nft_token_uri_injective(e: Env) {
     let uri2 = Base::token_uri(&e, token_id2);
     cvlr_assert!(uri1 != uri2);
 }
+
+// TODO: sequential_mint

@@ -1,4 +1,4 @@
-mod storage;
+pub mod storage;
 use crate::non_fungible::NonFungibleToken;
 
 #[cfg(test)]

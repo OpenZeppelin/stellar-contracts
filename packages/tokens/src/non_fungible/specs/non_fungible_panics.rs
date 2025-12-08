@@ -111,7 +111,8 @@ pub fn nft_approve_panics_if_unauthorized(e: Env) {
 
 #[rule]
 // approve_panics if live_until_ledger > max_ledger
-// status: violated - bug?
+// status: bug
+// note: this is a low and also can be considered as a spurious violation (that is interesting to note)
 pub fn nft_approve_panics_if_live_until_ledger_greater_than_max_ledger(e: Env) {
     let owner = nondet_address();
     clog!(cvlr_soroban::Addr(&owner));
