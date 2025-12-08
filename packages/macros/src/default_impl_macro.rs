@@ -11,6 +11,11 @@ fn get_default_methods(trait_name: &str) -> Vec<syn::ImplItem> {
                 }
             },
             syn::parse_quote! {
+                fn get_existing_roles(e: &soroban_sdk::Env) -> soroban_sdk::Vec<soroban_sdk::Symbol> {
+                    stellar_access::access_control::get_existing_roles(e)
+                }
+            },
+            syn::parse_quote! {
                 fn get_role_member_count(e: &soroban_sdk::Env, role: soroban_sdk::Symbol) -> u32 {
                     stellar_access::access_control::get_role_member_count(e, &role)
                 }
