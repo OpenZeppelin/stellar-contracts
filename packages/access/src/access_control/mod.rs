@@ -95,11 +95,11 @@ use soroban_sdk::{contracterror, contractevent, Address, Env, Symbol};
 
 pub use crate::access_control::storage::{
     accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
-    ensure_if_admin_or_admin_role, ensure_role, get_admin, get_role_admin, get_role_member,
-    get_role_member_count, grant_role, grant_role_no_auth, has_role, remove_from_role_enumeration,
-    remove_role_accounts_count_no_auth, remove_role_admin_no_auth, renounce_admin, renounce_role,
-    revoke_role, revoke_role_no_auth, set_admin, set_role_admin, set_role_admin_no_auth,
-    transfer_admin_role, AccessControlStorageKey,
+    ensure_if_admin_or_admin_role, ensure_role, get_admin, get_existing_roles, get_role_admin,
+    get_role_member, get_role_member_count, grant_role, grant_role_no_auth, has_role,
+    remove_from_role_enumeration, remove_role_accounts_count_no_auth, remove_role_admin_no_auth,
+    renounce_admin, renounce_role, revoke_role, revoke_role_no_auth, set_admin, set_role_admin,
+    set_role_admin_no_auth, transfer_admin_role, AccessControlStorageKey,
 };
 
 pub trait AccessControl {
@@ -175,6 +175,8 @@ pub trait AccessControl {
     ///
     /// * [`AccessControlError::Unauthorized`] - If the caller does not have
     ///   enough privileges.
+    /// * [`AccessControlError::MaxRolesExceeded`] - If adding a new role would
+    ///   exceed the maximum allowed number of roles.
     ///
     /// # Events
     ///
@@ -346,6 +348,7 @@ pub enum AccessControlError {
     RoleNotHeld = 2007,
     RoleIsEmpty = 2008,
     TransferInProgress = 2009,
+    MaxRolesExceeded = 2010,
 }
 
 // ################## CONSTANTS ##################
@@ -353,6 +356,8 @@ pub enum AccessControlError {
 const DAY_IN_LEDGERS: u32 = 17280;
 pub const ROLE_EXTEND_AMOUNT: u32 = 90 * DAY_IN_LEDGERS;
 pub const ROLE_TTL_THRESHOLD: u32 = ROLE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+/// Maximum number of roles that can exist simultaneously.
+pub const MAX_ROLES: u32 = 256;
 
 // ################## EVENTS ##################
 

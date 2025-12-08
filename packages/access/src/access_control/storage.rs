@@ -1,10 +1,10 @@
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol, Vec};
 
 use crate::{
     access_control::{
         emit_admin_renounced, emit_admin_transfer_completed, emit_admin_transfer_initiated,
         emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControlError,
-        ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
+        MAX_ROLES, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
     },
     role_transfer::{accept_transfer, transfer_role},
 };
@@ -19,10 +19,11 @@ pub struct RoleAccountKey {
 /// Storage keys for the data associated with the access control
 #[contracttype]
 pub enum AccessControlStorageKey {
+    ExistingRoles,                // Vec<Symbol> of all existing roles
     RoleAccounts(RoleAccountKey), // (role, index) -> Address
     HasRole(Address, Symbol),     // (account, role) -> index
-    RoleAccountsCount(Symbol),    // role -> count
-    RoleAdmin(Symbol),            // role -> the admin role
+    RoleAccountsCount(Symbol),    // role -> count of accounts with the role
+    RoleAdmin(Symbol),            // role -> the admin of the role
     Admin,
     PendingAdmin,
 }
@@ -42,7 +43,6 @@ pub enum AccessControlStorageKey {
 pub fn has_role(e: &Env, account: &Address, role: &Symbol) -> Option<u32> {
     let key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
 
-    // extend ttl if `Some(index)`
     e.storage().persistent().get(&key).inspect(|_| {
         e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT)
     })
@@ -106,11 +106,29 @@ pub fn get_role_member(e: &Env, role: &Symbol, index: u32) -> Address {
 /// * `role` - The role to query the admin role for.
 pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
-    if let Some(admin_role) = e.storage().persistent().get(&key) {
+
+    e.storage().persistent().get(&key).inspect(|_| {
+        e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT)
+    })
+}
+
+/// Returns a vector containing all existing roles.
+/// Defaults to empty vector if no roles exist.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+///
+/// # Notes
+///
+/// This function returns all roles that currently have at least one member.
+pub fn get_existing_roles(e: &Env) -> Vec<Symbol> {
+    let key = AccessControlStorageKey::ExistingRoles;
+    if let Some(existing_roles) = e.storage().persistent().get(&key) {
         e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
-        Some(admin_role)
+        existing_roles
     } else {
-        None
+        Vec::new(e)
     }
 }
 
@@ -153,6 +171,7 @@ pub fn set_admin(e: &Env, admin: &Address) {
 /// # Errors
 ///
 /// * refer to [`ensure_if_admin_or_admin_role`] errors.
+/// * refer to [`grant_role_no_auth`] errors.
 ///
 /// # Events
 ///
@@ -179,6 +198,10 @@ pub fn grant_role(e: &Env, account: &Address, role: &Symbol, caller: &Address) {
 /// * `account` - The account to grant the role to.
 /// * `role` - The role to grant.
 /// * `caller` - The address of the caller.
+///
+/// # Errors
+///
+/// * refer to [`add_to_role_enumeration`] errors.
 ///
 /// # Events
 ///
@@ -637,10 +660,28 @@ pub fn enforce_admin_auth(e: &Env) -> Address {
 /// * `e` - Access to Soroban environment.
 /// * `account` - The account to add to the role.
 /// * `role` - The role to add the account to.
+///
+/// # Errors
+///
+/// * [`AccessControlError::MaxRolesExceeded`] - If adding a new role would
+///   exceed the maximum allowed number of roles.
 pub fn add_to_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
     // Get the current count of accounts with this role
     let count_key = AccessControlStorageKey::RoleAccountsCount(role.clone());
     let count = e.storage().persistent().get(&count_key).unwrap_or(0);
+
+    // If this is the first account with this role, add the role to ExistingRoles
+    if count == 0 {
+        let mut existing_roles = get_existing_roles(e);
+
+        // Check if we've reached the maximum number of roles
+        if existing_roles.len() == MAX_ROLES {
+            panic_with_error!(e, AccessControlError::MaxRolesExceeded);
+        }
+
+        existing_roles.push_back(role.clone());
+        e.storage().persistent().set(&AccessControlStorageKey::ExistingRoles, &existing_roles);
+    }
 
     // Add the account to the enumeration
     let new_key =
@@ -720,4 +761,16 @@ pub fn remove_from_role_enumeration(e: &Env, account: &Address, role: &Symbol) {
 
     // Update the count
     e.storage().persistent().set(&count_key, &last_index);
+
+    // If this was the last account with this role, remove the role from
+    // ExistingRoles
+    if last_index == 0 {
+        let mut existing_roles = get_existing_roles(e);
+
+        // Find and remove the role
+        if let Some(pos) = existing_roles.iter().position(|r| r == role.clone()) {
+            existing_roles.remove(pos as u32);
+            e.storage().persistent().set(&AccessControlStorageKey::ExistingRoles, &existing_roles);
+        }
+    }
 }
