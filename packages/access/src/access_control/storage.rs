@@ -124,9 +124,9 @@ pub fn get_role_admin(e: &Env, role: &Symbol) -> Option<Symbol> {
 /// This function returns all roles that currently have at least one member.
 pub fn get_existing_roles(e: &Env) -> Vec<Symbol> {
     let key = AccessControlStorageKey::ExistingRoles;
-    if let Some(existing_role) = e.storage().persistent().get(&key) {
+    if let Some(existing_roles) = e.storage().persistent().get(&key) {
         e.storage().persistent().extend_ttl(&key, ROLE_TTL_THRESHOLD, ROLE_EXTEND_AMOUNT);
-        existing_role
+        existing_roles
     } else {
         Vec::new(e)
     }
