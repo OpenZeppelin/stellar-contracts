@@ -104,17 +104,21 @@ use crate::smart_account::{
     emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
     emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
 };
-#[cfg(feature = "certora")]
-use crate::{
-    policies::{Policy, simple_threshold::SimpleThresholdAccountParams, spending_limit::SpendingLimitAccountParams},
-    smart_account::specs::policy::SimpleThresholdPolicyContract,
-};
 use crate::{
     policies::{self, PolicyClient},
     smart_account::{
-        MAX_CONTEXT_RULES, MAX_POLICIES, MAX_SIGNERS, SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD, SmartAccountError, specs::nondet::nondet_policy_vec
+        specs::nondet::nondet_policy_vec, SmartAccountError, MAX_CONTEXT_RULES, MAX_POLICIES,
+        MAX_SIGNERS, SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
     },
     verifiers::VerifierClient,
+};
+#[cfg(feature = "certora")]
+use crate::{
+    policies::{
+        simple_threshold::SimpleThresholdAccountParams, spending_limit::SpendingLimitAccountParams,
+        Policy,
+    },
+    smart_account::specs::policy::SimpleThresholdPolicyContract,
 };
 
 /// Storage keys for smart account data.
@@ -654,7 +658,6 @@ pub fn compute_fingerprint(
     e.crypto().sha256(&rule_data).to_bytes()
 }
 
-
 #[cfg(feature = "certora")]
 pub fn compute_fingerprint(
     e: &Env,
@@ -942,7 +945,11 @@ pub fn remove_context_rule(e: &Env, id: u32) {
         #[cfg(not(feature = "certora"))]
         PolicyClient::new(e, &policy).uninstall(&context_rule, &e.current_contract_address());
         #[cfg(feature = "certora")]
-        SimpleThresholdPolicyContract::uninstall(e, context_rule.clone(), e.current_contract_address());
+        SimpleThresholdPolicyContract::uninstall(
+            e,
+            context_rule.clone(),
+            e.current_contract_address(),
+        );
     }
 
     // Remove all storage entries for this context rule

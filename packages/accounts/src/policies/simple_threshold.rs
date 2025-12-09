@@ -46,15 +46,13 @@
 //! security degradation.**
 
 use cvlr::nondet::Nondet;
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
 use soroban_sdk::{
     auth::Context, contracterror, contracttype, panic_with_error, Address, Env, Vec,
 };
-
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
-#[cfg(feature = "certora")]
-use cvlr_soroban_derive::contractevent;
 
 use crate::smart_account::ContextRule;
 // re-export
@@ -81,9 +79,7 @@ pub struct SimpleThresholdAccountParams {
 
 impl Nondet for SimpleThresholdAccountParams {
     fn nondet() -> Self {
-        SimpleThresholdAccountParams {
-            threshold: u32::nondet(),
-        }
+        SimpleThresholdAccountParams { threshold: u32::nondet() }
     }
 }
 

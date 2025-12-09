@@ -1,6 +1,7 @@
+use cvlr::nondet::{self, Nondet};
 use cvlr_soroban::nondet_address;
 use soroban_sdk::{Address, Env, Map, Val, Vec};
-use cvlr::nondet::{self, Nondet};
+
 use crate::smart_account::Signer;
 
 pub fn nondet_signers_vec() -> Vec<Signer>
@@ -10,8 +11,8 @@ where
 {
     let env = Env::default();
 
-    // Choose an arbitrary length (but keep it bounded so verification doesn't explode).
-    // Adjust MAX as needed.
+    // Choose an arbitrary length (but keep it bounded so verification doesn't
+    // explode). Adjust MAX as needed.
     const MAX: u32 = 5;
     let mut n: u32 = u32::nondet();
     if n > MAX {
@@ -31,8 +32,8 @@ where
 pub fn nondet_policy_vec() -> Vec<Address> {
     let env = Env::default();
 
-    // Choose an arbitrary length (but keep it bounded so verification doesn't explode).
-    // Adjust MAX as needed.
+    // Choose an arbitrary length (but keep it bounded so verification doesn't
+    // explode). Adjust MAX as needed.
     const MAX: u32 = 5;
     let mut n: u32 = u32::nondet();
     if n > MAX {
@@ -52,8 +53,8 @@ pub fn nondet_policy_vec() -> Vec<Address> {
 pub fn nondet_policy_map() -> Map<Address, Val> {
     let env = Env::default();
 
-    // Choose an arbitrary length (but keep it bounded so verification doesn't explode).
-    // Adjust MAX as needed.
+    // Choose an arbitrary length (but keep it bounded so verification doesn't
+    // explode). Adjust MAX as needed.
     const MAX: u32 = 5;
     let mut n: u32 = u32::nondet();
     if n > MAX {

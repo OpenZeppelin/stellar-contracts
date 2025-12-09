@@ -14,17 +14,14 @@
 //! }
 //! ```
 use cvlr::nondet::Nondet;
+#[cfg(feature = "certora")]
+use cvlr_soroban_derive::contractevent;
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
 use soroban_sdk::{
     auth::{Context, ContractContext},
-    contracterror, contracttype, panic_with_error, symbol_short, Address, Env,
-    TryFromVal, Vec,
+    contracterror, contracttype, panic_with_error, symbol_short, Address, Env, TryFromVal, Vec,
 };
-
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
-#[cfg(feature = "certora")]
-use cvlr_soroban_derive::{contractevent};
 
 use crate::smart_account::{ContextRule, Signer};
 
@@ -53,10 +50,7 @@ pub struct SpendingLimitAccountParams {
 
 impl Nondet for SpendingLimitAccountParams {
     fn nondet() -> Self {
-        SpendingLimitAccountParams {
-            spending_limit: i128::nondet(),
-            period_ledgers: u32::nondet(),
-        }
+        SpendingLimitAccountParams { spending_limit: i128::nondet(), period_ledgers: u32::nondet() }
     }
 }
 

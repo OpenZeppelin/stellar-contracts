@@ -1,15 +1,17 @@
 use cvlr::{
-    cvlr_assert,
+    cvlr_assert, cvlr_satisfy,
     nondet::{self, Nondet},
-    cvlr_satisfy,
 };
-use cvlr_soroban::{nondet_address};
+use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
-    policies::{Policy, specs::weighted_threshold_contract::WeightedThresholdPolicy, weighted_threshold::WeightedThresholdAccountParams},
-    smart_account::{ContextRule, Signer, specs::nondet::nondet_signers_vec},
+    policies::{
+        specs::weighted_threshold_contract::WeightedThresholdPolicy,
+        weighted_threshold::WeightedThresholdAccountParams, Policy,
+    },
+    smart_account::{specs::nondet::nondet_signers_vec, ContextRule, Signer},
 };
 
 #[rule]
@@ -33,13 +35,7 @@ pub fn can_enforce_weighted_threshold_sanity(e: Env, context: soroban_sdk::auth:
     let auth_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account: Address = nondet_address();
-    let _ = WeightedThresholdPolicy::can_enforce(
-        &e,
-        context,
-        auth_signers,
-        ctx_rule,
-        account,
-    );
+    let _ = WeightedThresholdPolicy::can_enforce(&e, context, auth_signers, ctx_rule, account);
     cvlr_satisfy!(true);
 }
 
@@ -48,13 +44,7 @@ pub fn enforce_weighted_threshold_sanity(e: Env, context: soroban_sdk::auth::Con
     let auth_signers = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account: Address = nondet_address();
-    let _ = WeightedThresholdPolicy::enforce(
-        &e,
-        context,
-        auth_signers,
-        ctx_rule,
-        account,
-    );
+    let _ = WeightedThresholdPolicy::enforce(&e, context, auth_signers, ctx_rule, account);
     cvlr_satisfy!(true);
 }
 
@@ -93,4 +83,3 @@ pub fn uninstall_weighted_threshold_sanity(e: Env) {
     WeightedThresholdPolicy::uninstall(&e, ctx_rule, account_id);
     cvlr_satisfy!(true);
 }
-

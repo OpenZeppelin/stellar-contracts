@@ -61,19 +61,15 @@
 //! }
 //! ```
 
-use cvlr::nondet::*;
-use cvlr::clog;
+use cvlr::{clog, nondet::*};
 use cvlr_soroban::nondet_map;
-use soroban_sdk::{
-    auth::Context, contracterror, contracttype, panic_with_error, Address, Env, Map,
-    Vec,
-};
-
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
-use cvlr_soroban_derive::{contractevent};
+use cvlr_soroban_derive::contractevent;
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
+use soroban_sdk::{
+    auth::Context, contracterror, contracttype, panic_with_error, Address, Env, Map, Vec,
+};
 
 // re-export
 use crate::smart_account::{ContextRule, Signer};
@@ -101,12 +97,8 @@ pub struct WeightedThresholdAccountParams {
 
 impl Nondet for WeightedThresholdAccountParams {
     fn nondet() -> Self {
-        WeightedThresholdAccountParams {
-            signer_weights: nondet_map(),
-            threshold: nondet(),
-        }
+        WeightedThresholdAccountParams { signer_weights: nondet_map(), threshold: nondet() }
     }
-    
 }
 
 /// Error codes for weighted threshold policy operations.

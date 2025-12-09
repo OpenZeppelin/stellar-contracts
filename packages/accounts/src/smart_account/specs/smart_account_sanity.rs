@@ -1,14 +1,15 @@
-
 use cvlr::{cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::{nondet_address, nondet_map, nondet_string};
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, String, Val, Vec, map, panic_with_error, vec};
+use soroban_sdk::{map, panic_with_error, vec, Env, String, Val, Vec};
 
 use crate::smart_account::{
-    ContextRuleType, Meta, Signer, SmartAccount, SmartAccountError, specs::{
+    specs::{
         nondet::{nondet_policy_map, nondet_signers_vec},
         smart_account_contract::SmartAccountContract,
-    }, storage::{self, SmartAccountStorageKey, get_persistent_entry}
+    },
+    storage::{self, get_persistent_entry, SmartAccountStorageKey},
+    ContextRuleType, Meta, Signer, SmartAccount, SmartAccountError,
 };
 
 #[rule]

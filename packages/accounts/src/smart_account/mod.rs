@@ -1,17 +1,14 @@
 pub(crate) mod storage;
 #[cfg(test)]
 mod test;
-use soroban_sdk::{
-    auth::CustomAccountInterface, contractclient, contracterror, Address, Env, Map,
-    String, Symbol, Val, Vec,
-};
-
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
-use cvlr_soroban_derive::{contractevent};
-
+use cvlr_soroban_derive::contractevent;
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
+use soroban_sdk::{
+    auth::CustomAccountInterface, contractclient, contracterror, Address, Env, Map, String, Symbol,
+    Val, Vec,
+};
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, do_check_auth, get_context_rule,
     get_context_rules, get_validated_context, remove_context_rule, remove_policy, remove_signer,
@@ -19,10 +16,8 @@ pub use storage::{
     Signatures, Signer,
 };
 
-
 #[cfg(feature = "certora")]
 pub mod specs;
-
 
 /// Core trait for smart account functionality, extending Soroban's
 /// CustomAccountInterface with context rule management capabilities.
@@ -553,5 +548,3 @@ pub struct PolicyRemoved {
 pub fn emit_policy_removed(e: &Env, context_rule_id: u32, policy: &Address) {
     PolicyRemoved { context_rule_id, policy: policy.clone() }.publish(e);
 }
-
-
