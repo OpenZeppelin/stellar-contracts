@@ -138,7 +138,7 @@ pub fn vault_decimals_sanity(e: Env) {
 }
 
 #[rule]
-pub fn vault_set_assset_sanity(e: Env) {
+pub fn vault_set_asset_sanity(e: Env) {
     let asset = nondet_address();
     Vault::set_asset(&e, asset);
     cvlr_satisfy!(true);
