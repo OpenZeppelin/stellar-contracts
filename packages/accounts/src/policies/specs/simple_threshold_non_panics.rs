@@ -1,29 +1,34 @@
 use core::task::Context;
 
 use cvlr::{
-    cvlr_assert,
-    cvlr_assume,
+    clog, cvlr_assert, cvlr_assume, cvlr_satisfy,
     nondet::{self, Nondet},
-    cvlr_satisfy,
 };
-use cvlr_soroban::{nondet_address, is_auth};
-use cvlr::clog;
+use cvlr_soroban::{is_auth, nondet_address};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
-    policies::{Policy, simple_threshold::SimpleThresholdAccountParams, specs::simple_threshold_contract::SimpleThresholdPolicy},
-    smart_account::{ContextRule, Signer, specs::nondet::nondet_signers_vec},
+    policies::{
+        simple_threshold::{get_threshold, SimpleThresholdAccountParams},
+        specs::simple_threshold_contract::SimpleThresholdPolicy,
+        Policy,
+    },
+    smart_account::{specs::nondet::nondet_signers_vec, ContextRule, Signer},
 };
 
 fn storage_setup_threshold(e: Env, ctx_rule_id: u32, account_id: Address) {
     let threshold: u32 = u32::nondet();
-    let key = crate::policies::simple_threshold::SimpleThresholdStorageKey::AccountContext(account_id.clone(), ctx_rule_id);
+    let key = crate::policies::simple_threshold::SimpleThresholdStorageKey::AccountContext(
+        account_id.clone(),
+        ctx_rule_id,
+    );
     e.storage().persistent().set(&key, &threshold);
     clog!(threshold);
 }
 
-// These rules require the prover arg "prover_args": ["-trapAsAssert true"] to consider also panicking paths.
+// These rules require the prover arg "prover_args": ["-trapAsAssert true"] to
+// consider also panicking paths.
 
 #[rule]
 // requires
@@ -45,18 +50,21 @@ pub fn set_threshold_non_panic(e: Env) {
 
 #[rule]
 // requires
-// threshold exists 
+// threshold exists
 // status: verified
 pub fn get_threshold_non_panic(e: Env) {
     let ctx_rule_id: u32 = u32::nondet();
     let account_id = nondet_address();
     storage_setup_threshold(e.clone(), ctx_rule_id, account_id.clone());
-    let key = crate::policies::simple_threshold::SimpleThresholdStorageKey::AccountContext(account_id.clone(), ctx_rule_id);
+    let key = crate::policies::simple_threshold::SimpleThresholdStorageKey::AccountContext(
+        account_id.clone(),
+        ctx_rule_id,
+    );
     let threshold_opt: Option<u32> = e.storage().persistent().get(&key);
     cvlr_assume!(threshold_opt.is_some());
     SimpleThresholdPolicy::get_threshold(&e, ctx_rule_id, account_id);
     cvlr_assert!(true);
-} 
+}
 
 #[rule]
 // requires nothing
@@ -73,14 +81,24 @@ pub fn can_enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
 #[rule]
 // requires
 // can_enforce returns true
-// status: violated - unreachable - wip
-pub fn enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
+// status: verified
+pub fn enforce_non_panic(
+    e: Env,
+    context: soroban_sdk::auth::Context,
+    unused_context: soroban_sdk::auth::Context,
+) {
     let authenticated_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     storage_setup_threshold(e.clone(), ctx_rule.id, account_id.clone());
-    let can_enforce = SimpleThresholdPolicy::can_enforce(&e, context.clone(), authenticated_signers.clone(), ctx_rule.clone(), account_id.clone());
-    cvlr_assume!(can_enforce == true);
+    let can_enforce = SimpleThresholdPolicy::can_enforce(
+        &e,
+        unused_context,
+        authenticated_signers.clone(),
+        ctx_rule.clone(),
+        account_id.clone(),
+    );
+    cvlr_assume!(can_enforce && is_auth(account_id.clone()));
     SimpleThresholdPolicy::enforce(&e, context, authenticated_signers, ctx_rule, account_id);
     cvlr_assert!(true);
 }
