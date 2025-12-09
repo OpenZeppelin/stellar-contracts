@@ -1,14 +1,14 @@
-use cvlr::{cvlr_assert,cvlr_satisfy, nondet};
+use cvlr::{cvlr_assert, cvlr_satisfy, nondet};
 use cvlr_soroban::{nondet_address, nondet_bytes, nondet_bytes_n};
 use cvlr_soroban_derive::rule;
+use soroban_sdk::Env;
 
-use soroban_sdk::{Env};
+use crate::upgradeable::{
+    specs::upgradeable_migratable_contract::UpgradeableMigratableContract, *,
+};
 
-use crate::upgradeable::{specs::{upgradeable_migratable_contract::UpgradeableMigratableContract}, *};
-
-
-// contract does not make sense because there are no default implementations for the upgradeable trait functions
-
+// contract does not make sense because there are no default implementations for
+// the upgradeable trait functions
 
 #[rule]
 pub fn enable_migration_sanity(e: Env) {
@@ -28,13 +28,11 @@ pub fn complete_migration_sanity(e: Env) {
     cvlr_satisfy!(true);
 }
 
-
 #[rule]
 pub fn ensure_can_complete_migration_sanity(e: Env) {
     ensure_can_complete_migration(&e);
     cvlr_satisfy!(true);
 }
-
 
 // NOTE: should only run once relevant methods are implemented in the contract
 #[rule]

@@ -1,10 +1,8 @@
-use crate::ownable::{
-    set_owner, Ownable,
-};
 use soroban_sdk::{contract, contractimpl, Address, Env};
 use stellar_macros::{default_impl, only_owner};
 
 use crate as stellar_access;
+use crate::ownable::{set_owner, Ownable};
 
 #[contract]
 pub struct OwnableContract;
@@ -16,8 +14,7 @@ impl OwnableContract {
     }
 
     #[only_owner]
-    pub fn owner_restricted_function(e: &Env) {
-    }
+    pub fn owner_restricted_function(e: &Env) {}
 }
 
 #[contractimpl]

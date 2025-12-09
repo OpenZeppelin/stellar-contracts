@@ -1,13 +1,13 @@
-use cvlr::{cvlr_satisfy, nondet::*, cvlr_assert, cvlr_assume};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
-use cvlr::clog;
+use soroban_sdk::{Address, Env};
 
-use crate::non_fungible::Base;
-use crate::non_fungible::specs::helper::{is_approved_for_token, is_owned};
-use crate::non_fungible::extensions::royalties::storage::NFTRoyaltiesStorageKey;
-use crate::non_fungible::extensions::royalties::storage::RoyaltyInfo;
+use crate::non_fungible::{
+    extensions::royalties::storage::{NFTRoyaltiesStorageKey, RoyaltyInfo},
+    specs::helper::{is_approved_for_token, is_owned},
+    Base,
+};
 
 // helpers
 
@@ -103,8 +103,8 @@ pub fn royalty_info_token_royalty_is_some(e: Env) {
 }
 
 #[rule]
-// if there is no specific token royalty, but there is a default, the royalty is the default
-// status: verified
+// if there is no specific token royalty, but there is a default, the royalty is
+// the default status: verified
 pub fn royalty_info_token_royalty_is_none_and_default_is_some(e: Env) {
     let token_id = u32::nondet();
     clog!(token_id);
@@ -125,8 +125,8 @@ pub fn royalty_info_token_royalty_is_none_and_default_is_some(e: Env) {
 }
 
 #[rule]
-// if there is no specific token royalty, and no default, the royalty is 0 and receiver is the contract address
-// status: verified
+// if there is no specific token royalty, and no default, the royalty is 0 and
+// receiver is the contract address status: verified
 pub fn royalty_info_token_royalty_is_none_and_default_is_none(e: Env) {
     let token_id = u32::nondet();
     clog!(token_id);

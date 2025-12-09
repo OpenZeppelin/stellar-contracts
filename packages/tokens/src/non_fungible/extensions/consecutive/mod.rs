@@ -63,13 +63,11 @@
 //!   the logic of tracking ownership.
 pub mod storage;
 
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
-
-use soroban_sdk::{Address};
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
+use soroban_sdk::Address;
 pub use storage::Consecutive;
 
 use crate::non_fungible::NonFungibleToken;

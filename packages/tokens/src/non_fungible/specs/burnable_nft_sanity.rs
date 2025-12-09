@@ -1,10 +1,11 @@
 use cvlr::{cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
+use soroban_sdk::{Address, Env};
 
-use crate::non_fungible::specs::burnable_nft_contract::BurnableNft;
-use crate::non_fungible::{NonFungibleToken, burnable::NonFungibleBurnable};
+use crate::non_fungible::{
+    burnable::NonFungibleBurnable, specs::burnable_nft_contract::BurnableNft, NonFungibleToken,
+};
 
 #[rule]
 pub fn burnable_nft_balance_sanity(e: Env) {

@@ -1,13 +1,13 @@
-
-use cvlr::{cvlr_assert, cvlr_assume,cvlr_satisfy};
-use cvlr_soroban::{nondet_address, nondet_symbol, is_auth};
-use cvlr::nondet::Nondet;
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::Nondet};
+use cvlr_soroban::{is_auth, nondet_address, nondet_symbol};
 use cvlr_soroban_derive::rule;
-use cvlr::clog;
+use soroban_sdk::Env;
 
-use soroban_sdk::{Env};
-use crate::access_control::{AccessControl, ensure_role, specs::{access_control_contract::AccessControlContract, helper::get_pending_admin}};
-
+use crate::access_control::{
+    ensure_role,
+    specs::{access_control_contract::AccessControlContract, helper::get_pending_admin},
+    AccessControl,
+};
 
 // package functions
 
@@ -32,12 +32,13 @@ pub fn grant_role_panics_if_caller_not_admin_nor_admin_role(e: Env) {
     let role = nondet_symbol();
     let role_admin = AccessControlContract::get_role_admin(&e, role.clone());
     if let Some(role_admin_internal) = role_admin {
-        let caller_has_role_admin = AccessControlContract::has_role(&e, caller.clone(), role_admin_internal);
+        let caller_has_role_admin =
+            AccessControlContract::has_role(&e, caller.clone(), role_admin_internal);
         cvlr_assume!(caller_has_role_admin.is_none());
     }
     let admin = AccessControlContract::get_admin(&e);
     if let Some(admin_internal) = admin {
-        cvlr_assume!(caller.clone()!= admin_internal);
+        cvlr_assume!(caller.clone() != admin_internal);
     }
     AccessControlContract::grant_role(&e, caller.clone(), account, role.clone());
     cvlr_assert!(false);
@@ -66,19 +67,19 @@ pub fn revoke_role_panics_if_caller_not_admin_nor_admin_role(e: Env) {
     let role = nondet_symbol();
     let role_admin = AccessControlContract::get_role_admin(&e, role.clone());
     if let Some(role_admin_internal) = role_admin {
-        let caller_has_role_admin = AccessControlContract::has_role(&e, caller.clone(), role_admin_internal);
+        let caller_has_role_admin =
+            AccessControlContract::has_role(&e, caller.clone(), role_admin_internal);
         cvlr_assume!(caller_has_role_admin.is_none());
         clog!(caller_has_role_admin.unwrap());
     }
     let admin = AccessControlContract::get_admin(&e);
     if let Some(admin_internal) = admin {
-        cvlr_assume!(caller.clone()!= admin_internal);
+        cvlr_assume!(caller.clone() != admin_internal);
         clog!(cvlr_soroban::Addr(&admin_internal));
     }
     AccessControlContract::revoke_role(&e, caller.clone(), account, role.clone());
     cvlr_assert!(false);
 }
-
 
 #[rule]
 // revoke_role panics if account does not have the role
@@ -92,7 +93,6 @@ pub fn revoke_role_panics_if_account_does_not_have_role(e: Env) {
     AccessControlContract::revoke_role(&e, caller.clone(), account, role.clone());
     cvlr_assert!(false);
 }
-
 
 #[rule]
 // revoke_role panics if role is empty
@@ -125,7 +125,8 @@ pub fn renounce_role_panics_if_caller_does_not_have_role(e: Env) {
     let caller = nondet_address();
     clog!(cvlr_soroban::Addr(&caller));
     let role: soroban_sdk::Symbol = nondet_symbol();
-    let caller_has_role: Option<u32> = AccessControlContract::has_role(&e, caller.clone(), role.clone());
+    let caller_has_role: Option<u32> =
+        AccessControlContract::has_role(&e, caller.clone(), role.clone());
     cvlr_assume!(caller_has_role.is_none());
     AccessControlContract::renounce_role(&e, caller.clone(), role.clone());
     cvlr_assert!(false);
@@ -185,8 +186,8 @@ pub fn transfer_admin_role_panics_if_live_until_ledger_0_and_pending_admin_none(
 }
 
 #[rule]
-// transfer_admin_role panics if live_until_ledger = 0 and PendingAdmin != new_admin
-// status: verified
+// transfer_admin_role panics if live_until_ledger = 0 and PendingAdmin !=
+// new_admin status: verified
 pub fn transfer_admin_role_panics_if_live_until_ledger_0_and_diff_pending_admin(e: Env) {
     let new_admin = nondet_address();
     let live_until_ledger = 0;
@@ -204,7 +205,10 @@ pub fn transfer_admin_role_panics_if_live_until_ledger_0_and_diff_pending_admin(
 pub fn transfer_admin_role_panics_if_invalid_live_until_ledger(e: Env) {
     let new_admin = nondet_address();
     let live_until_ledger = u32::nondet();
-    cvlr_assume!(live_until_ledger < e.ledger().sequence() || live_until_ledger > e.ledger().max_live_until_ledger());
+    cvlr_assume!(
+        live_until_ledger < e.ledger().sequence()
+            || live_until_ledger > e.ledger().max_live_until_ledger()
+    );
     cvlr_assume!(live_until_ledger > 0);
     AccessControlContract::transfer_admin_role(&e, new_admin, live_until_ledger);
     cvlr_assert!(false);
@@ -258,7 +262,7 @@ pub fn set_role_admin_panics_if_admin_not_set(e: Env) {
     cvlr_assert!(false);
 }
 
-#[rule] 
+#[rule]
 // renounce_admin panics if not authorized by the admin.
 // status: verified
 pub fn renounce_admin_panics_if_unauth_by_admin(e: Env) {
@@ -316,7 +320,7 @@ pub fn admin_function_panics_if_admin_not_set(e: Env) {
     cvlr_assert!(false);
 }
 
-#[rule] 
+#[rule]
 // role1_func panics if caller doesn't have role
 // status: violated - symbol issue
 pub fn role1_func_panics_if_caller_does_not_have_role(e: Env) {

@@ -3,12 +3,10 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
-
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
 use soroban_sdk::{Address, Env};
 pub use storage::AllowList;
 

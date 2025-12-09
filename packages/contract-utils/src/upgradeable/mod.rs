@@ -72,7 +72,6 @@
 //! you can also find a helper `Upgrader` contract that performs upgrade+migrate
 //! in a single transaction.
 
-
 mod storage;
 
 #[cfg(test)]

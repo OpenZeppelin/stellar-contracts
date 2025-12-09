@@ -1,15 +1,19 @@
-
-use cvlr::{cvlr_assert, cvlr_assume,cvlr_satisfy};
-use cvlr_soroban::{nondet_address, nondet_symbol, is_auth};
-use cvlr::nondet::{Nondet, nondet};
+use cvlr::{
+    clog, cvlr_assert, cvlr_assume, cvlr_satisfy,
+    nondet::{nondet, Nondet},
+};
+use cvlr_soroban::{is_auth, nondet_address, nondet_symbol};
 use cvlr_soroban_derive::rule;
-use cvlr::clog;
+use soroban_sdk::{Address, Env, Symbol};
 
-use crate::access_control::storage::{AccessControlStorageKey, RoleAccountKey};
-use soroban_sdk::{Env, Address, Symbol};
-use crate::access_control::{AccessControl, specs::{access_control_contract::AccessControlContract, helper::get_pending_admin}};
+use crate::access_control::{
+    specs::{access_control_contract::AccessControlContract, helper::get_pending_admin},
+    storage::{AccessControlStorageKey, RoleAccountKey},
+    AccessControl,
+};
 
-// These rules require the prover arg "prover_args": ["-trapAsAssert true"] to consider also panicking paths.
+// These rules require the prover arg "prover_args": ["-trapAsAssert true"] to
+// consider also panicking paths.
 
 // storage setup
 
@@ -34,27 +38,29 @@ pub fn storage_setup_pending_admin_none(e: Env) {
 pub fn storage_setup_role_admin(e: Env, role: Symbol) {
     let role_admin_key: AccessControlStorageKey = AccessControlStorageKey::RoleAdmin(role.clone());
     let symbol = nondet_symbol();
-    e.storage().persistent().set(&role_admin_key, &symbol);   
+    e.storage().persistent().set(&role_admin_key, &symbol);
 }
 
 pub fn storage_setup_role_counts(e: Env, role: Symbol) {
-    let role_accounts_count_key: AccessControlStorageKey = AccessControlStorageKey::RoleAccountsCount(role.clone());
-    let nondet_count : u32 = nondet();
-    e.storage().persistent().set(&role_accounts_count_key, &nondet_count); 
+    let role_accounts_count_key: AccessControlStorageKey =
+        AccessControlStorageKey::RoleAccountsCount(role.clone());
+    let nondet_count: u32 = nondet();
+    e.storage().persistent().set(&role_accounts_count_key, &nondet_count);
 }
 
 pub fn storage_setup_account_has_role(e: Env, account: Address, role: Symbol) {
     let has_role_key = AccessControlStorageKey::HasRole(account.clone(), role.clone());
-    let nondet_index_account : u32 = nondet();
-    e.storage().persistent().set(&has_role_key, &nondet_index_account); 
+    let nondet_index_account: u32 = nondet();
+    e.storage().persistent().set(&has_role_key, &nondet_index_account);
 }
 
 pub fn storage_setup_caller_has_role_admin(e: Env, caller: Address, role: Symbol) {
     let role_admin = AccessControlContract::get_role_admin(&e, role.clone());
     if let Some(role_admin_internal) = role_admin {
-        let caller_has_role_admin_key = AccessControlStorageKey::HasRole(caller.clone(), role_admin_internal.clone());
-        let nondet_index : u32 = nondet();
-        e.storage().persistent().set(&caller_has_role_admin_key, &nondet_index);    
+        let caller_has_role_admin_key =
+            AccessControlStorageKey::HasRole(caller.clone(), role_admin_internal.clone());
+        let nondet_index: u32 = nondet();
+        e.storage().persistent().set(&caller_has_role_admin_key, &nondet_index);
     }
 }
 
@@ -96,7 +102,8 @@ pub fn grant_role_non_panic(e: Env) {
     let mut caller_has_role_admin = false;
     let role_admin = AccessControlContract::get_role_admin(&e, role.clone());
     if let Some(role_admin_internal) = role_admin {
-        caller_has_role_admin = AccessControlContract::has_role(&e, caller.clone(), role_admin_internal).is_some();
+        caller_has_role_admin =
+            AccessControlContract::has_role(&e, caller.clone(), role_admin_internal).is_some();
     }
     cvlr_assume!(caller_equals_admin || caller_has_role_admin);
     AccessControlContract::grant_role(&e, caller, account, role);
@@ -126,7 +133,8 @@ pub fn grant_role_non_panic_sanity(e: Env) {
     let mut caller_has_role_admin = false;
     let role_admin = AccessControlContract::get_role_admin(&e, role.clone());
     if let Some(role_admin_internal) = role_admin {
-        caller_has_role_admin = AccessControlContract::has_role(&e, caller.clone(), role_admin_internal).is_some();
+        caller_has_role_admin =
+            AccessControlContract::has_role(&e, caller.clone(), role_admin_internal).is_some();
     }
     cvlr_assume!(caller_equals_admin || caller_has_role_admin);
     AccessControlContract::grant_role(&e, caller, account, role);
@@ -140,7 +148,7 @@ pub fn grant_role_non_panic_sanity(e: Env) {
 // caller is admin or has admin_role
 // account has the role
 // role is not empty
-// status: verified 
+// status: verified
 // when using -split false
 pub fn revoke_role_non_panic(e: Env) {
     let caller = nondet_address();
@@ -153,7 +161,7 @@ pub fn revoke_role_non_panic(e: Env) {
     storage_setup_account_has_role(e.clone(), account.clone(), role.clone());
     storage_setup_caller_has_role_admin(e.clone(), caller.clone(), role.clone());
     storage_setup_last_account(e.clone(), role.clone());
-    
+
     cvlr_assume!(is_auth(caller.clone()));
     let admin = AccessControlContract::get_admin(&e);
     let mut caller_equals_admin = false;
@@ -163,7 +171,8 @@ pub fn revoke_role_non_panic(e: Env) {
     let mut caller_has_role_admin = false;
     let role_admin = AccessControlContract::get_role_admin(&e, role.clone());
     if let Some(role_admin_internal) = role_admin {
-        caller_has_role_admin = AccessControlContract::has_role(&e, caller.clone(), role_admin_internal).is_some();
+        caller_has_role_admin =
+            AccessControlContract::has_role(&e, caller.clone(), role_admin_internal).is_some();
     }
     cvlr_assume!(caller_equals_admin || caller_has_role_admin);
     let account_has_role = AccessControlContract::has_role(&e, account.clone(), role.clone());
@@ -198,7 +207,8 @@ pub fn revoke_role_non_panic_sanity(e: Env) {
     let mut caller_has_role_admin = false;
     let role_admin = AccessControlContract::get_role_admin(&e, role.clone());
     if let Some(role_admin_internal) = role_admin {
-        caller_has_role_admin = AccessControlContract::has_role(&e, caller.clone(), role_admin_internal).is_some();
+        caller_has_role_admin =
+            AccessControlContract::has_role(&e, caller.clone(), role_admin_internal).is_some();
     }
     cvlr_assume!(caller_equals_admin || caller_has_role_admin);
     let account_has_role = AccessControlContract::has_role(&e, account.clone(), role.clone());
@@ -216,7 +226,7 @@ pub fn revoke_role_non_panic_sanity(e: Env) {
 // caller has the role
 // role is not empty
 // status: verified
-pub fn renounce_role_non_panic(e: Env) { 
+pub fn renounce_role_non_panic(e: Env) {
     let caller = nondet_address();
     let role = nondet_symbol();
 
@@ -236,14 +246,14 @@ pub fn renounce_role_non_panic(e: Env) {
 #[rule]
 // sanity
 // status: verified
-pub fn renounce_role_non_panic_sanity(e: Env) { 
+pub fn renounce_role_non_panic_sanity(e: Env) {
     let caller = nondet_address();
     let role = nondet_symbol();
 
     storage_setup_role_counts(e.clone(), role.clone());
     storage_setup_account_has_role(e.clone(), caller.clone(), role.clone());
     storage_setup_last_account(e.clone(), role.clone());
-    
+
     cvlr_assume!(is_auth(caller.clone()));
     let caller_has_role = AccessControlContract::has_role(&e, caller.clone(), role.clone());
     cvlr_assume!(caller_has_role.is_some());
@@ -281,8 +291,7 @@ pub fn transfer_admin_role_non_panic(e: Env) {
 
     if live_until_ledger == 0 {
         cvlr_assume!(pending_admin.is_some());
-    }
-    else {
+    } else {
         cvlr_assume!(live_until_ledger >= e.ledger().sequence());
         cvlr_assume!(live_until_ledger <= e.ledger().max_live_until_ledger());
     }
@@ -314,8 +323,7 @@ pub fn transfer_admin_role_non_panic_sanity(e: Env) {
 
     if live_until_ledger == 0 {
         cvlr_assume!(pending_admin.is_some());
-    }
-    else {
+    } else {
         cvlr_assume!(live_until_ledger >= e.ledger().sequence());
         cvlr_assume!(live_until_ledger <= e.ledger().max_live_until_ledger());
     }
@@ -331,10 +339,9 @@ pub fn transfer_admin_role_non_panic_sanity(e: Env) {
 // pending admin auth
 // status: verified
 pub fn accept_admin_transfer_non_panic(e: Env) {
-
     storage_setup_pending_admin(e.clone());
     storage_setup_admin(e.clone());
-        
+
     let pending_admin = get_pending_admin(&e);
     cvlr_assume!(pending_admin.is_some());
     if let Some(pending_admin_internal) = pending_admin.clone() {
@@ -350,7 +357,7 @@ pub fn accept_admin_transfer_non_panic(e: Env) {
 pub fn accept_admin_transfer_non_panic_sanity(e: Env) {
     storage_setup_pending_admin(e.clone());
     storage_setup_admin(e.clone());
-        
+
     let pending_admin = get_pending_admin(&e);
     cvlr_assume!(pending_admin.is_some());
     if let Some(pending_admin_internal) = pending_admin.clone() {

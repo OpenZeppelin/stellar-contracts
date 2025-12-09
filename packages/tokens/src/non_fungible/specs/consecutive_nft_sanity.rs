@@ -1,10 +1,12 @@
 use cvlr::{cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
+use soroban_sdk::{Address, Env};
 
-use crate::non_fungible::specs::consecutive_nft_contract::ConsecutiveNft;
-use crate::non_fungible::{NonFungibleToken, burnable::NonFungibleBurnable, consecutive::NonFungibleConsecutive};
+use crate::non_fungible::{
+    burnable::NonFungibleBurnable, consecutive::NonFungibleConsecutive,
+    specs::consecutive_nft_contract::ConsecutiveNft, NonFungibleToken,
+};
 
 #[rule]
 pub fn consecutive_nft_balance_sanity(e: Env) {

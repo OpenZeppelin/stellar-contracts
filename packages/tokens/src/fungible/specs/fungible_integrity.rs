@@ -1,10 +1,9 @@
-use cvlr::{cvlr_assert, cvlr_satisfy, nondet::*};
+use cvlr::{clog, cvlr_assert, cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
-use cvlr::clog;
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env};
-use crate::fungible::FungibleToken;
-use crate::fungible::Base;
+
+use crate::fungible::{Base, FungibleToken};
 
 #[rule]
 // transfer changes balances accordingly
@@ -14,7 +13,7 @@ pub fn transfer_integrity(e: Env) {
     clog!(cvlr_soroban::Addr(&to));
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     let balance_from_pre = Base::balance(&e, &from);
     clog!(balance_from_pre);
@@ -39,7 +38,7 @@ pub fn transfer_integrity(e: Env) {
 }
 
 #[rule]
-// transfer_from changes balances and allowance accordingly 
+// transfer_from changes balances and allowance accordingly
 // status: timeout
 pub fn transfer_from_integrity(e: Env) {
     let spender = nondet_address();
@@ -48,7 +47,7 @@ pub fn transfer_from_integrity(e: Env) {
     clog!(cvlr_soroban::Addr(&from));
     let to = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     let balance_from_pre = Base::balance(&e, &from);
     clog!(balance_from_pre);
@@ -58,7 +57,7 @@ pub fn transfer_from_integrity(e: Env) {
     clog!(allowance_pre);
     let total_supply_pre = Base::total_supply(&e);
     clog!(total_supply_pre);
-    Base::transfer_from(&e, &spender, &from, &to, amount); 
+    Base::transfer_from(&e, &spender, &from, &to, amount);
     let balance_from_post = Base::balance(&e, &from);
     clog!(balance_from_post);
     let balance_to_post = Base::balance(&e, &to);
@@ -91,9 +90,9 @@ pub fn approve_integrity(e: Env) {
     clog!(cvlr_soroban::Addr(&owner));
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
-    let live_until_ledger:u32 = nondet();
+    let live_until_ledger: u32 = nondet();
     clog!(live_until_ledger);
     let allowance_pre = Base::allowance(&e, &owner, &spender);
     clog!(allowance_pre);

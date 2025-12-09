@@ -1,17 +1,17 @@
-use cvlr::{cvlr_assert,cvlr_assume,cvlr_satisfy};use cvlr_soroban_derive::rule;
-use cvlr::nondet::Nondet;
-use cvlr::clog;
-use soroban_sdk::{Env};
-use crate::math::i128_fixed_point::*;
-use crate::math::fixed_point::Rounding;
-use crate::math::soroban_fixed_point::SorobanFixedPoint;
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::Nondet};
+use cvlr_soroban_derive::rule;
+use soroban_sdk::Env;
+
+use crate::math::{
+    fixed_point::Rounding, i128_fixed_point::*, soroban_fixed_point::SorobanFixedPoint,
+};
 
 // todo: handle the muldiv function directly, need support for nondet_rounding.
 
 #[rule]
 // result is at most expected
 // status: first assert verified, second violated spurious
-// 
+//
 pub fn fixed_mul_floor_integrity(e: &Env) {
     let x = i128::nondet();
     clog!(x);

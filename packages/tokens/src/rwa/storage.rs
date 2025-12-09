@@ -1,22 +1,20 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
+#[cfg(not(feature = "certora"))]
+use crate::{
+    fungible::emit_transfer,
+    rwa::{
+        emit_address_frozen, emit_burn, emit_compliance_set, emit_identity_verifier_set, emit_mint,
+        emit_recovery_success, emit_token_onchain_id_updated, emit_tokens_frozen,
+        emit_tokens_unfrozen,
+    },
+};
 use crate::{
     fungible::{Base, ContractOverrides},
     rwa::{
-        compliance::ComplianceClient,
-        identity_verifier::IdentityVerifierClient, RWAError, FROZEN_EXTEND_AMOUNT,
-        FROZEN_TTL_THRESHOLD,
-    },
-};
-
-#[cfg(not(feature = "certora"))]
-use crate::{
-    fungible::{emit_transfer,},
-    rwa::{
-        emit_address_frozen, emit_burn, emit_compliance_set,
-        emit_identity_verifier_set, emit_mint, emit_recovery_success,
-        emit_token_onchain_id_updated, emit_tokens_frozen, emit_tokens_unfrozen,
+        compliance::ComplianceClient, identity_verifier::IdentityVerifierClient, RWAError,
+        FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
 };
 

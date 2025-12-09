@@ -1,15 +1,15 @@
-use cvlr::{cvlr_assert, cvlr_assume,cvlr_satisfy};
-use cvlr_soroban::{nondet_address, is_auth};
+use cvlr::{cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::Nondet};
+use cvlr_soroban::{is_auth, nondet_address};
 use cvlr_soroban_derive::rule;
-use cvlr::nondet::Nondet;
-
 use soroban_sdk::{Address, Env};
 
-use crate::ownable::specs::ownable_contract::OwnableContract;
-use crate::ownable::*;
-use crate::{ownable::{OwnableStorageKey, specs::helper::get_pending_owner}};
+use crate::ownable::{
+    specs::{helper::get_pending_owner, ownable_contract::OwnableContract},
+    OwnableStorageKey, *,
+};
 
-// These rules require the prover arg "prover_args": ["-trapAsAssert true"] to consider also panicking paths.
+// These rules require the prover arg "prover_args": ["-trapAsAssert true"] to
+// consider also panicking paths.
 
 #[rule]
 // requires
@@ -25,7 +25,7 @@ pub fn transfer_ownership_non_panic(e: Env) {
 
     let address2 = nondet_address();
     e.storage().instance().set(&OwnableStorageKey::Owner, &address2);
-    
+
     let new_owner = nondet_address().clone();
     let live_until_ledger = u32::nondet();
 
@@ -42,8 +42,7 @@ pub fn transfer_ownership_non_panic(e: Env) {
 
     if live_until_ledger == 0 {
         cvlr_assume!(pending_owner.is_some());
-    }
-    else {
+    } else {
         cvlr_assume!(live_until_ledger >= e.ledger().sequence());
         cvlr_assume!(live_until_ledger <= e.ledger().max_live_until_ledger());
     }
@@ -61,7 +60,7 @@ pub fn transfer_ownership_non_panic_sanity(e: Env) {
 
     let address2 = nondet_address();
     e.storage().instance().set(&OwnableStorageKey::Owner, &address2);
-    
+
     let new_owner = nondet_address().clone();
     let live_until_ledger = u32::nondet();
 
@@ -78,8 +77,7 @@ pub fn transfer_ownership_non_panic_sanity(e: Env) {
 
     if live_until_ledger == 0 {
         cvlr_assume!(pending_owner.is_some());
-    }
-    else {
+    } else {
         cvlr_assume!(live_until_ledger >= e.ledger().sequence());
         cvlr_assume!(live_until_ledger <= e.ledger().max_live_until_ledger());
     }
@@ -132,7 +130,7 @@ pub fn accept_ownership_non_panic_sanity(e: Env) {
 // pending_owner is none
 // status: verified
 pub fn renounce_ownership_non_panic(e: Env) {
-    // // setup storage: needed for now. 
+    // // setup storage: needed for now.
     // // WIP: will have this macro for setting storage up automatically.
     // // require_storage_tag(OwnableStorageKey::PendingOwner.into_val(&e), 77);
 
@@ -155,7 +153,7 @@ pub fn renounce_ownership_non_panic_sanity(e: Env) {
     let key = OwnableStorageKey::PendingOwner;
     e.storage().temporary().set(&key, &nondet_address());
     e.storage().temporary().remove(&key);
-    
+
     let owner = OwnableContract::get_owner(&e);
     cvlr_assume!(owner.is_some());
     if let Some(owner_internal) = owner.clone() {

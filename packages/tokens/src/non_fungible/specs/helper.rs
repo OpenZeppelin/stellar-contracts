@@ -1,7 +1,7 @@
-use soroban_sdk::{Env, Address};
-use crate::non_fungible::Base;  
 use cvlr::clog;
-use crate::non_fungible::storage::NFTStorageKey;
+use soroban_sdk::{Address, Env};
+
+use crate::non_fungible::{storage::NFTStorageKey, Base};
 
 pub fn is_approved_for_token(e: &Env, owner: &Address, operator: &Address, token_id: u32) -> bool {
     let get_approved_result = Base::get_approved(e, token_id);

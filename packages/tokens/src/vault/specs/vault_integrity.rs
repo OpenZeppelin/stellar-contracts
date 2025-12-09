@@ -1,14 +1,16 @@
 use cvlr::{cvlr_assert, cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
-
+use soroban_sdk::{Address, Env};
 use stellar_contract_utils::math::fixed_point::Rounding;
 
-use crate::vault::{FungibleVault, Vault};
-use crate::vault::specs::vault::BasicVault;
-use crate::vault::specs::basic_token::BasicToken;
-use crate::fungible::FungibleToken;
+use crate::{
+    fungible::FungibleToken,
+    vault::{
+        specs::{basic_token::BasicToken, vault::BasicVault},
+        FungibleVault, Vault,
+    },
+};
 
 #[rule]
 // deposit changes balances of BasicToken and BasicVault correctly.

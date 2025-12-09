@@ -1,9 +1,11 @@
 use cvlr::cvlr_assume;
-use soroban_sdk::{Env, Address, Symbol};
+use soroban_sdk::{Address, Env, Symbol};
 
-use crate::access_control::{AccessControl, specs::access_control_contract::AccessControlContract};
-
-use crate::access_control::storage::{AccessControlStorageKey, RoleAccountKey};
+use crate::access_control::{
+    specs::access_control_contract::AccessControlContract,
+    storage::{AccessControlStorageKey, RoleAccountKey},
+    AccessControl,
+};
 
 pub fn before_constructor_no_admin(e: &Env) {
     let key = AccessControlStorageKey::Admin;
@@ -36,11 +38,7 @@ pub fn before_constructor_no_has_role(e: &Env, account: Address, role: Symbol) {
 }
 
 pub fn before_constructor_no_role_accounts(e: &Env, role: Symbol, index: u32) {
-    let key = AccessControlStorageKey::RoleAccounts(RoleAccountKey {
-        role,
-        index,
-    });
+    let key = AccessControlStorageKey::RoleAccounts(RoleAccountKey { role, index });
     let account = e.storage().persistent().get::<_, Address>(&key);
     cvlr_assume!(account.is_none());
 }
-

@@ -1,23 +1,21 @@
-use cvlr::{cvlr_assert, cvlr_assume,cvlr_satisfy};
-use cvlr_soroban::{nondet_address,is_auth};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::Nondet};
+use cvlr_soroban::{is_auth, nondet_address};
 use cvlr_soroban_derive::rule;
-use cvlr::nondet::Nondet;
-use cvlr::clog;
+use soroban_sdk::{Address, Env};
 
-use soroban_sdk::{Env, Address};
+use crate::ownable::{
+    specs::{helper::get_pending_owner, ownable_contract::OwnableContract},
+    *,
+};
 
-use crate::ownable::specs::ownable_contract::OwnableContract;
-use crate::ownable::*;
-
-use crate::ownable::specs::helper::get_pending_owner;
-
-// panic rules should all "pass" to be considered verified, even though they assert false.
+// panic rules should all "pass" to be considered verified, even though they
+// assert false.
 
 // package functions
 
 #[rule]
 // transfer_ownership panics if the not authorized by the owner.
-// status: verified  
+// status: verified
 pub fn transfer_ownership_panics_if_unauth_by_owner(e: Env) {
     let new_owner = nondet_address();
     clog!(cvlr_soroban::Addr(&new_owner));
@@ -57,8 +55,8 @@ pub fn transfer_ownership_panics_if_live_until_ledger_0_and_pending_owner_none(e
 }
 
 #[rule]
-// transfer_ownership panics if live_until_ledger = 0 and PendingOwner != new_owner
-// status: verified
+// transfer_ownership panics if live_until_ledger = 0 and PendingOwner !=
+// new_owner status: verified
 pub fn transfer_ownership_panics_if_live_until_ledger_0_and_diff_pending_owner(e: Env) {
     let new_owner = nondet_address();
     let live_until_ledger = 0;
@@ -76,7 +74,10 @@ pub fn transfer_ownership_panics_if_live_until_ledger_0_and_diff_pending_owner(e
 pub fn transfer_ownership_panics_if_invalid_live_until_ledger(e: Env) {
     let new_owner = nondet_address();
     let live_until_ledger = u32::nondet();
-    cvlr_assume!(live_until_ledger < e.ledger().sequence() || live_until_ledger > e.ledger().max_live_until_ledger());
+    cvlr_assume!(
+        live_until_ledger < e.ledger().sequence()
+            || live_until_ledger > e.ledger().max_live_until_ledger()
+    );
     cvlr_assume!(live_until_ledger > 0);
     OwnableContract::transfer_ownership(&e, new_owner, live_until_ledger);
     cvlr_assert!(false);
@@ -104,7 +105,7 @@ pub fn accept_ownership_panics_if_pending_owner_not_set(e: Env) {
     cvlr_assert!(false);
 }
 
-#[rule] 
+#[rule]
 // renounce_ownership panics if not authorized by the owner.
 // status: verified
 pub fn renounce_ownership_panics_if_unauth_by_owner(e: Env) {
@@ -140,7 +141,7 @@ pub fn renounce_ownership_panics_if_pending_ownership_transfer(e: Env) {
 // harness functions
 
 #[rule]
-// owner_restricted_function panics if not authorized by owner. 
+// owner_restricted_function panics if not authorized by owner.
 // status: verified
 pub fn owner_restricted_function_panics_if_unauth_by_owner(e: Env) {
     let owner = OwnableContract::get_owner(&e);
@@ -153,7 +154,7 @@ pub fn owner_restricted_function_panics_if_unauth_by_owner(e: Env) {
 }
 
 #[rule]
-// owner_restricted_function panics if the owner is not set. 
+// owner_restricted_function panics if the owner is not set.
 // status: verified
 pub fn owner_restricted_function_panics_if_owner_not_set(e: Env) {
     let owner = OwnableContract::get_owner(&e);

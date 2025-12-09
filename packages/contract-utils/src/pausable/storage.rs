@@ -1,9 +1,8 @@
 use soroban_sdk::{contracttype, panic_with_error, Env};
 
-use crate::pausable::{PausableError};
-
+use crate::pausable::PausableError;
 #[cfg(not(feature = "certora"))]
-use crate::pausable::{emit_paused, emit_unpaused,};
+use crate::pausable::{emit_paused, emit_unpaused};
 
 /// Storage key for the pausable state
 #[contracttype]

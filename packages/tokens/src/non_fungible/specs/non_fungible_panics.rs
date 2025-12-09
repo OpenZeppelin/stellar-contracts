@@ -1,10 +1,9 @@
-use cvlr::{cvlr_satisfy, nondet::*, cvlr_assert, cvlr_assume};
-use cvlr_soroban::{nondet_address, is_auth};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
+use cvlr_soroban::{is_auth, nondet_address};
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
-use cvlr::clog;
-use crate::non_fungible::Base;
-use crate::non_fungible::specs::helper::is_approved_for_token;
+use soroban_sdk::{Address, Env};
+
+use crate::non_fungible::{specs::helper::is_approved_for_token, Base};
 
 #[rule]
 // transfer_panics if not auth by from
@@ -37,7 +36,6 @@ pub fn nft_transfer_panics_if_not_owner(e: Env) {
     Base::transfer(&e, &from, &to, token_id);
     cvlr_assert!(false);
 }
-
 
 #[rule]
 // transfer_from_panics if spender does not auth
@@ -112,7 +110,8 @@ pub fn nft_approve_panics_if_unauthorized(e: Env) {
 #[rule]
 // approve_panics if live_until_ledger > max_ledger
 // status: bug
-// note: this is a low and also can be considered as a spurious violation (that is interesting to note)
+// note: this is a low and also can be considered as a spurious violation (that
+// is interesting to note)
 pub fn nft_approve_panics_if_live_until_ledger_greater_than_max_ledger(e: Env) {
     let owner = nondet_address();
     clog!(cvlr_soroban::Addr(&owner));
@@ -147,6 +146,3 @@ pub fn nft_approve_panics_if_live_until_ledger_less_than_current_ledger(e: Env) 
     Base::approve(&e, &owner, &spender, token_id, live_until_ledger);
     cvlr_assert!(false);
 }
-
-
-

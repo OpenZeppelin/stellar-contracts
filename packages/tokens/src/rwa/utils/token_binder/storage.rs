@@ -1,13 +1,10 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map, TryFromVal, Val, Vec};
 
-use crate::rwa::utils::token_binder::{
-    TokenBinderError, BUCKET_SIZE, MAX_TOKENS,
-    TOKEN_BINDER_EXTEND_AMOUNT, TOKEN_BINDER_TTL_THRESHOLD,
-};
-
 #[cfg(not(feature = "certora"))]
+use crate::rwa::utils::token_binder::{emit_token_bound, emit_token_unbound};
 use crate::rwa::utils::token_binder::{
-    emit_token_bound, emit_token_unbound,
+    TokenBinderError, BUCKET_SIZE, MAX_TOKENS, TOKEN_BINDER_EXTEND_AMOUNT,
+    TOKEN_BINDER_TTL_THRESHOLD,
 };
 
 /// Storage keys for the token binder system.

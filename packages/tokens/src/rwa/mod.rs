@@ -104,12 +104,10 @@ pub mod utils;
 #[cfg(test)]
 mod test;
 
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
-
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
 use soroban_sdk::{contracterror, Address, Env, String};
 use stellar_contract_utils::pausable::Pausable;
 pub use storage::{RWAStorageKey, RWA};

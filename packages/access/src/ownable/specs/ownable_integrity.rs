@@ -1,12 +1,12 @@
-use cvlr::{cvlr_assert, cvlr_assume,cvlr_satisfy};
-use cvlr_soroban::{nondet_address};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::Nondet};
+use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use cvlr::clog;
-use cvlr::nondet::Nondet;
+use soroban_sdk::Env;
 
-use soroban_sdk::{Env};
-
-use crate::ownable::{specs::{helper::get_pending_owner, ownable_contract::OwnableContract}, *};
+use crate::ownable::{
+    specs::{helper::get_pending_owner, ownable_contract::OwnableContract},
+    *,
+};
 
 #[rule]
 // after the constructor the owner is set.
@@ -17,7 +17,7 @@ pub fn ownable_constructor_integrity(e: Env) {
 
     OwnableContract::ownable_constructor(&e, new_owner.clone());
     let owner_post = OwnableContract::get_owner(&e);
-    
+
     if let Some(owner_post_internal) = owner_post.clone() {
         clog!(cvlr_soroban::Addr(&owner_post_internal));
     }
@@ -41,7 +41,7 @@ pub fn transfer_ownership_integrity(e: Env) {
         clog!(cvlr_soroban::Addr(&owner_pre_internal));
     }
     OwnableContract::transfer_ownership(&e, new_owner.clone(), live_until_ledger);
-    
+
     let pending_owner = get_pending_owner(&e);
     if let Some(pending_owner_internal) = pending_owner.clone() {
         clog!(cvlr_soroban::Addr(&pending_owner_internal));
@@ -53,7 +53,6 @@ pub fn transfer_ownership_integrity(e: Env) {
     cvlr_assert!(owner_post == owner_pre);
     cvlr_assert!(pending_owner == Some(new_owner));
 }
-
 
 #[rule]
 // transfer_ownership with a live ledger 0 removes the pending owner.
@@ -73,10 +72,9 @@ pub fn remove_transfer_ownership_integrity(e: Env) {
 }
 
 #[rule]
-// accept_ownership sets the owner to the pending owner and removes the pending owner.
-// status: verified
+// accept_ownership sets the owner to the pending owner and removes the pending
+// owner. status: verified
 pub fn accept_ownership_integrity(e: Env) {
-
     let pending_owner_pre = get_pending_owner(&e);
     if let Some(pending_owner_internal) = pending_owner_pre.clone() {
         clog!(cvlr_soroban::Addr(&pending_owner_internal));
@@ -103,7 +101,6 @@ pub fn accept_ownership_integrity(e: Env) {
 // renounce_ownership removes the owner.
 // status: verified
 pub fn renounce_ownership_integrity(e: Env) {
-
     OwnableContract::renounce_ownership(&e);
 
     let owner = OwnableContract::get_owner(&e);

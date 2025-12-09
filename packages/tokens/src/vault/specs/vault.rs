@@ -1,5 +1,9 @@
-use crate::{fungible::{ContractOverrides, FungibleToken}, vault::{FungibleVault, Vault}};
 use soroban_sdk::{Address, Env};
+
+use crate::{
+    fungible::{ContractOverrides, FungibleToken},
+    vault::{FungibleVault, Vault},
+};
 pub struct BasicVault;
 
 impl FungibleToken for BasicVault {
@@ -54,7 +58,7 @@ impl FungibleVault for BasicVault {
     }
 
     fn convert_to_shares(e: &Env, assets: i128) -> i128 {
-       Vault::convert_to_shares(e, assets)
+        Vault::convert_to_shares(e, assets)
     }
 
     fn convert_to_assets(e: &Env, shares: i128) -> i128 {

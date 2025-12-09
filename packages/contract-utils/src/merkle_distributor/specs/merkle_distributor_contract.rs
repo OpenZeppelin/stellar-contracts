@@ -1,24 +1,22 @@
 use cvlr::nondet::Nondet;
-use soroban_sdk::contracttype;
-use soroban_sdk::symbol_short;
-use soroban_sdk::Symbol;
+use soroban_sdk::{
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol, Vec,
+};
 
-use crate::crypto::sha256::Sha256;
-use crate::merkle_distributor::IndexableLeaf;
-use crate::merkle_distributor::MerkleDistributor;
-use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
+use crate::{
+    crypto::sha256::Sha256,
+    merkle_distributor::{IndexableLeaf, MerkleDistributor},
+};
 
 #[contracttype]
 #[derive(Clone)]
 pub struct Leaf {
-    pub index: u32
+    pub index: u32,
 }
 
 impl Nondet for Leaf {
     fn nondet() -> Self {
-        Leaf {
-            index: u32::nondet(),
-        }
+        Leaf { index: u32::nondet() }
     }
 }
 
@@ -26,10 +24,9 @@ impl IndexableLeaf for Leaf {
     fn index(&self) -> u32 {
         self.index
     }
-}   
+}
 
 type MerkleDistributorSha256 = MerkleDistributor<Sha256>;
-
 
 pub const OWNER: Symbol = symbol_short!("OWNER");
 

@@ -1,12 +1,12 @@
-use cvlr::{cvlr_assert, cvlr_assume,cvlr_satisfy};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::Nondet};
 use cvlr_soroban::{nondet_address, nondet_symbol};
-use cvlr::nondet::Nondet;
 use cvlr_soroban_derive::rule;
-use cvlr::clog;
+use soroban_sdk::Env;
 
-use soroban_sdk::{Env};
-use crate::access_control::{AccessControl, specs::{access_control_contract::AccessControlContract, helper::get_pending_admin}};
-
+use crate::access_control::{
+    specs::{access_control_contract::AccessControlContract, helper::get_pending_admin},
+    AccessControl,
+};
 
 #[rule]
 // after call to constructor the admin is set
@@ -58,8 +58,8 @@ pub fn renounce_role_integrity(e: Env) {
 }
 
 #[rule]
-// after call to transfer_admin_role with live_until_ledger > current_ledger the pending admin is set to the new admin
-// status: verified
+// after call to transfer_admin_role with live_until_ledger > current_ledger the
+// pending admin is set to the new admin status: verified
 pub fn transfer_admin_role_integrity(e: Env) {
     let new_admin = nondet_address();
     let live_until_ledger = u32::nondet();
@@ -71,8 +71,8 @@ pub fn transfer_admin_role_integrity(e: Env) {
 }
 
 #[rule]
-// after call to accept_admin_transfer with live_until_ledger = 0 the pending admin is none
-// status: verified
+// after call to accept_admin_transfer with live_until_ledger = 0 the pending
+// admin is none status: verified
 pub fn remove_transfer_admin_role_integrity(e: Env) {
     let new_admin = nondet_address();
     let live_until_ledger = 0;
@@ -82,7 +82,8 @@ pub fn remove_transfer_admin_role_integrity(e: Env) {
 }
 
 #[rule]
-// after call to accept_admin_transfer the admin is set to the previous pending admin, which is not none, and the pending admin is set to none
+// after call to accept_admin_transfer the admin is set to the previous pending
+// admin, which is not none, and the pending admin is set to none
 // status: verified
 pub fn accept_admin_transfer_integrity(e: Env) {
     let pending_admin_pre = get_pending_admin(&e);
@@ -94,19 +95,22 @@ pub fn accept_admin_transfer_integrity(e: Env) {
     }
     cvlr_assert!(admin == pending_admin_pre);
     cvlr_assert!(!admin.is_none());
-    let pending_admin_post   = get_pending_admin(&e);
+    let pending_admin_post = get_pending_admin(&e);
     cvlr_assert!(pending_admin_post.is_none());
 }
 
 #[rule]
-// after call to set_role_admin the role admin of the given role is the given admin_role
-// status: verified
+// after call to set_role_admin the role admin of the given role is the given
+// admin_role status: verified
 pub fn set_role_admin_integrity(e: Env) {
     let role = nondet_symbol();
     let admin_role = nondet_symbol();
     AccessControlContract::set_role_admin(&e, role.clone(), admin_role.clone());
     let role_admin = AccessControlContract::get_role_admin(&e, role.clone());
-    cvlr_assert!(role_admin.is_some() && role_admin.unwrap().to_val().get_payload() == admin_role.to_val().get_payload());
+    cvlr_assert!(
+        role_admin.is_some()
+            && role_admin.unwrap().to_val().get_payload() == admin_role.to_val().get_payload()
+    );
 }
 
 #[rule]

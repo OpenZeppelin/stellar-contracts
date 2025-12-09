@@ -1,11 +1,9 @@
-use cvlr::{cvlr_satisfy, nondet::*, cvlr_assert, cvlr_assume};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
-use cvlr::clog;
+use soroban_sdk::{Address, Env};
 
-use crate::non_fungible::Base;
-use crate::non_fungible::storage::NFTStorageKey;
+use crate::non_fungible::{storage::NFTStorageKey, Base};
 
 // invariant: token_owner -> balance >= 1 (can't do iff)
 
@@ -15,7 +13,7 @@ pub fn assume_pre_token_owner_exists(e: Env, token_id: u32) {
     clog!(token_id);
     let key = NFTStorageKey::Owner(token_id);
     let owner = e.storage().persistent().get::<_, Address>(&key);
-    cvlr_assume!(owner.is_some()); 
+    cvlr_assume!(owner.is_some());
     if let Some(owner) = owner {
         clog!(cvlr_soroban::Addr(&owner));
     }
@@ -25,7 +23,7 @@ pub fn assert_post_token_owner_exists(e: Env, token_id: u32) {
     clog!(token_id);
     let key = NFTStorageKey::Owner(token_id);
     let owner = e.storage().persistent().get::<_, Address>(&key);
-    cvlr_assert!(owner.is_some()); 
+    cvlr_assert!(owner.is_some());
     if let Some(owner) = owner {
         clog!(cvlr_soroban::Addr(&owner));
     }
@@ -132,7 +130,8 @@ pub fn assert_post_owner_implies_balance(e: Env, token_id: u32) {
 }
 
 #[rule]
-// status: spurious violation - prover doens't understand the relation between balance before and after
+// status: spurious violation - prover doesn't understand the relation between
+// balance before and after
 pub fn after_transfer_owner_implies_balance(e: Env) {
     let to = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
@@ -148,7 +147,8 @@ pub fn after_transfer_owner_implies_balance(e: Env) {
 }
 
 #[rule]
-// status: spurious violation - prover doens't understand the relation between balance before and after
+// status: spurious violation - prover doesn't understand the relation between
+// balance before and after
 pub fn after_transfer_from_owner_implies_balance(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));

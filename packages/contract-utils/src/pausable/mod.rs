@@ -55,13 +55,11 @@ mod test;
 #[cfg(feature = "certora")]
 pub mod specs;
 
-use soroban_sdk::{contracterror, Address, Env};
-
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
+use soroban_sdk::{contracterror, Address, Env};
 
 pub use crate::pausable::storage::{pause, paused, unpause, when_not_paused, when_paused};
 

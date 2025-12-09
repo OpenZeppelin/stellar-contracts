@@ -1,28 +1,32 @@
-use soroban_sdk::{Address, Env, xdr::Enum};
+use soroban_sdk::{xdr::Enum, Address, Env};
 
-use crate::{non_fungible::Base, non_fungible::{ContractOverrides, NonFungibleToken, burnable::NonFungibleBurnable, enumerable::{Enumerable, NonFungibleEnumerable}}};
+use crate::non_fungible::{
+    burnable::NonFungibleBurnable,
+    enumerable::{Enumerable, NonFungibleEnumerable},
+    Base, ContractOverrides, NonFungibleToken,
+};
 
 pub struct EnumerableNft;
 
 impl NonFungibleToken for EnumerableNft {
     type ContractType = Enumerable;
-    
+
     fn balance(e: &Env, account: Address) -> u32 {
         Enumerable::balance(e, &account)
     }
-    
+
     fn owner_of(e: &Env, token_id: u32) -> Address {
         Enumerable::owner_of(e, token_id)
     }
-    
+
     fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {
         Enumerable::transfer(e, &from, &to, token_id);
     }
-    
+
     fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, token_id: u32) {
         Enumerable::transfer_from(e, &spender, &from, &to, token_id);
     }
-    
+
     fn approve(
         e: &Env,
         approver: Address,
@@ -32,27 +36,27 @@ impl NonFungibleToken for EnumerableNft {
     ) {
         Enumerable::approve(e, &approver, &approved, token_id, live_until_ledger);
     }
-    
+
     fn approve_for_all(e: &Env, owner: Address, operator: Address, live_until_ledger: u32) {
         Enumerable::approve_for_all(e, &owner, &operator, live_until_ledger);
     }
-    
+
     fn get_approved(e: &Env, token_id: u32) -> Option<Address> {
         Enumerable::get_approved(e, token_id)
     }
-    
+
     fn is_approved_for_all(e: &Env, owner: Address, operator: Address) -> bool {
         Enumerable::is_approved_for_all(e, &owner, &operator)
     }
-    
+
     fn name(e: &Env) -> soroban_sdk::String {
         Enumerable::name(e)
     }
-    
+
     fn symbol(e: &Env) -> soroban_sdk::String {
         Enumerable::symbol(e)
     }
-    
+
     fn token_uri(e: &Env, token_id: u32) -> soroban_sdk::String {
         Enumerable::token_uri(e, token_id)
     }
@@ -82,7 +86,8 @@ impl NonFungibleEnumerable for EnumerableNft {
     }
 }
 
-// TODO: Just a basic calls to `sequential_mint` and `non_sequential_mint`. May need additional setup depending on rule.
+// TODO: Just a basic calls to `sequential_mint` and `non_sequential_mint`. May
+// need additional setup depending on rule.
 impl EnumerableNft {
     pub fn seq_mint(e: &Env, to: Address) -> u32 {
         Enumerable::sequential_mint(e, &to)

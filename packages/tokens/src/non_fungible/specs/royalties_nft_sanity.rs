@@ -1,10 +1,11 @@
 use cvlr::{cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
+use soroban_sdk::{Address, Env};
 
-use crate::non_fungible::specs::royalties_nft_contract::RoyaltiesNft;
-use crate::non_fungible::{NonFungibleToken, royalties::NonFungibleRoyalties};
+use crate::non_fungible::{
+    royalties::NonFungibleRoyalties, specs::royalties_nft_contract::RoyaltiesNft, NonFungibleToken,
+};
 
 #[rule]
 pub fn royalties_nft_balance_sanity(e: Env) {

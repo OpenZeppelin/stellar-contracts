@@ -27,15 +27,9 @@ use soroban_sdk::{
     contracttype, panic_with_error, vec, xdr::ToXdr, Address, Bytes, BytesN, Env, String, Vec,
 };
 
-use super::{
-    ClaimEvent, ClaimsError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
-};
-
 #[cfg(not(feature = "certora"))]
-use super::{
-    emit_claim_event,
-};
-
+use super::emit_claim_event;
+use super::{ClaimEvent, ClaimsError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD};
 use crate::rwa::claim_issuer::ClaimIssuerClient;
 
 /// Represents a claim stored on-chain.

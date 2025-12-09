@@ -1,10 +1,10 @@
-use cvlr::{cvlr_assert,cvlr_satisfy};use cvlr_soroban_derive::rule;
-use cvlr::nondet::Nondet;
+use cvlr::{cvlr_assert, cvlr_satisfy, nondet::Nondet};
+use cvlr_soroban_derive::rule;
+use soroban_sdk::Env;
 
-use soroban_sdk::{Env};
-use crate::math::i128_fixed_point::*;
-use crate::math::fixed_point::Rounding;
-use crate::math::soroban_fixed_point::SorobanFixedPoint;
+use crate::math::{
+    fixed_point::Rounding, i128_fixed_point::*, soroban_fixed_point::SorobanFixedPoint,
+};
 // TODO: need 256 support
 
 #[rule]

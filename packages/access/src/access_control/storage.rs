@@ -1,17 +1,12 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Symbol};
 
 #[cfg(not(feature = "certora"))]
-use crate::{
-    access_control::{
-        emit_admin_renounced, emit_admin_transfer_completed, emit_admin_transfer_initiated,
-        emit_role_admin_changed, emit_role_granted, emit_role_revoked,
-    }
+use crate::access_control::{
+    emit_admin_renounced, emit_admin_transfer_completed, emit_admin_transfer_initiated,
+    emit_role_admin_changed, emit_role_granted, emit_role_revoked,
 };
-
 use crate::{
-    access_control::{
-       AccessControlError, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
-    },
+    access_control::{AccessControlError, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD},
     role_transfer::{accept_transfer, transfer_role},
 };
 

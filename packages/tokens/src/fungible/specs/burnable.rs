@@ -1,17 +1,23 @@
-use cvlr::{cvlr_assert, cvlr_satisfy, cvlr_assume, nondet::*};
-use cvlr_soroban::{nondet_address, is_auth};
-use cvlr::clog;
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
+use cvlr_soroban::{is_auth, nondet_address};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env};
-use crate::fungible::Base;
-use crate::fungible::specs::fungible_invariants::{assume_pre_total_supply_geq_balance, assert_post_total_supply_geq_balance};
-use crate::fungible::specs::fungible_non_panics::{storage_setup_balance, storage_setup_allowance};
+
+use crate::fungible::{
+    specs::{
+        fungible_invariants::{
+            assert_post_total_supply_geq_balance, assume_pre_total_supply_geq_balance,
+        },
+        fungible_non_panics::{storage_setup_allowance, storage_setup_balance},
+    },
+    Base,
+};
 
 // ################## INTEGRITY RULES ##################
 
 #[rule]
 // after burn the account's balance and total supply decrease by amount
-// status: verified 
+// status: verified
 // note: 20 minutes
 pub fn burn_integrity(e: Env) {
     let account = nondet_address();
@@ -258,7 +264,7 @@ pub fn assume_pre_total_supply_geq_two_balances(e: Env, account1: &Address, acco
 
 #[rule]
 // after burn total_supply >= balance for any account
-// status: 
+// status:
 pub fn after_burn_total_supply_geq_balance(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));

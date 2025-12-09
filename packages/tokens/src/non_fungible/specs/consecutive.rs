@@ -1,17 +1,16 @@
-use cvlr::{cvlr_satisfy, nondet::*, cvlr_assert, cvlr_assume};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
-use cvlr::clog;
+use soroban_sdk::{Address, Env};
 
-use crate::non_fungible::extensions::consecutive::Consecutive;
-use crate::non_fungible::sequential;
-use crate::non_fungible::overrides::ContractOverrides;
-use crate::non_fungible::specs::helper::is_approved_for_token;
+use crate::non_fungible::{
+    extensions::consecutive::Consecutive, overrides::ContractOverrides, sequential,
+    specs::helper::is_approved_for_token,
+};
 
 // ################## INTEGRITY RULES ##################
 
-// same integrity rules from non_fungible_integrity.rs 
+// same integrity rules from non_fungible_integrity.rs
 // but the underlying functions are different.
 // the code is very challenging for the prover
 // need to think how we can simplify
@@ -80,8 +79,8 @@ pub fn nft_consecutive_transfer_from_integrity(e: Env) {
     let balance_to_post = Consecutive::balance(&e, &to);
     clog!(balance_to_post);
     if to != from {
-    cvlr_assert!(balance_from_post == balance_from_pre - 1);
-    cvlr_assert!(balance_to_post == balance_to_pre + 1);
+        cvlr_assert!(balance_from_post == balance_from_pre - 1);
+        cvlr_assert!(balance_to_post == balance_to_pre + 1);
     } else {
         cvlr_assert!(balance_to_post == balance_to_pre);
         cvlr_assert!(balance_from_post == balance_from_pre);
@@ -92,7 +91,7 @@ pub fn nft_consecutive_transfer_from_integrity(e: Env) {
 
 #[rule]
 // after approve the token owner is approved
-// status: verified 
+// status: verified
 // note: ±30 min and sanity unclear.
 pub fn nft_consecutive_approve_integrity(e: Env) {
     let approver = nondet_address();

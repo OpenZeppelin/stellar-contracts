@@ -1,15 +1,9 @@
+use cvlr::clog;
 use soroban_sdk::{contracttype, panic_with_error, symbol_short, Address, Env, String, Symbol};
 
 #[cfg(not(feature = "certora"))]
-use crate::fungible::{
-    emit_approve, emit_mint, emit_transfer,};
-
-use cvlr::clog;
-
-use crate::fungible::{
-    Base, FungibleTokenError, BALANCE_EXTEND_AMOUNT,
-    BALANCE_TTL_THRESHOLD,
-};
+use crate::fungible::{emit_approve, emit_mint, emit_transfer};
+use crate::fungible::{Base, FungibleTokenError, BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD};
 
 /// Storage key that maps to [`Metadata`]
 pub const METADATA_KEY: Symbol = symbol_short!("METADATA");
@@ -317,7 +311,8 @@ impl Base {
         let allowance = Base::allowance_data(e, owner, spender);
         clog!(allowance.amount);
         clog!(amount);
-        // maybe this is a bug? because it doesn't consider live_until_ledger, should be allowance() instead?
+        // maybe this is a bug? because it doesn't consider live_until_ledger, should be
+        // allowance() instead?
 
         if allowance.amount < amount {
             panic_with_error!(e, FungibleTokenError::InsufficientAllowance);

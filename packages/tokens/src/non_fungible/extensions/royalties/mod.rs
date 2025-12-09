@@ -4,12 +4,10 @@ use crate::non_fungible::NonFungibleToken;
 #[cfg(test)]
 mod test;
 
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
-
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
 use soroban_sdk::{Address, Env};
 
 /// Royalties Trait for Non-Fungible Token (ERC2981)

@@ -2,8 +2,8 @@ use cvlr::{cvlr_assert, cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env};
-use crate::fungible::FungibleToken;
-use crate::fungible::Base;
+
+use crate::fungible::{Base, FungibleToken};
 
 #[rule]
 pub fn total_supply_sanity(e: Env) {
@@ -72,4 +72,3 @@ pub fn symbol_sanity(e: Env) {
     Base::symbol(&e);
     cvlr_satisfy!(true);
 }
-

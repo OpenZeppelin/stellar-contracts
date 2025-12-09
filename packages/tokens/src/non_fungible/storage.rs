@@ -1,15 +1,12 @@
+use cvlr::clog;
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 
 #[cfg(not(feature = "certora"))]
+use crate::non_fungible::{emit_approve, emit_approve_for_all, emit_mint, emit_transfer};
 use crate::non_fungible::{
-    emit_approve, emit_approve_for_all, emit_mint, emit_transfer,
-};
-use cvlr::clog;
-
-use crate::non_fungible::{
-    sequential::increment_token_id,
-    Base, NonFungibleTokenError, BALANCE_EXTEND_AMOUNT, BALANCE_TTL_THRESHOLD, MAX_BASE_URI_LEN,
-    MAX_NUM_DIGITS, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
+    sequential::increment_token_id, Base, NonFungibleTokenError, BALANCE_EXTEND_AMOUNT,
+    BALANCE_TTL_THRESHOLD, MAX_BASE_URI_LEN, MAX_NUM_DIGITS, OWNER_EXTEND_AMOUNT,
+    OWNER_TTL_THRESHOLD,
 };
 
 /// Storage container for the token for which an approval is granted
@@ -427,7 +424,7 @@ impl Base {
             clog!(Self::balance(e, from_address));
             Base::decrease_balance(e, from_address, 1);
             clog!(Self::balance(e, from_address));
-        
+
             // Clear any existing approval
             let approval_key = NFTStorageKey::Approval(token_id);
             e.storage().temporary().remove(&approval_key);

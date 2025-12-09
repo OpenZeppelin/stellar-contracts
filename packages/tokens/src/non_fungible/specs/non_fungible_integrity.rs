@@ -1,12 +1,9 @@
-use cvlr::{cvlr_satisfy, nondet::*, cvlr_assert, cvlr_assume};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
-use cvlr::clog;
+use soroban_sdk::{Address, Env};
 
-use crate::non_fungible::Base;
-use crate::non_fungible::specs::helper::is_approved_for_token;
-use crate::non_fungible::sequential;
+use crate::non_fungible::{sequential, specs::helper::is_approved_for_token, Base};
 
 #[rule]
 // after transfer the token owner is set to the to address
@@ -71,8 +68,8 @@ pub fn nft_transfer_from_integrity(e: Env) {
     let balance_to_post = Base::balance(&e, &to);
     clog!(balance_to_post);
     if to != from {
-    cvlr_assert!(balance_from_post == balance_from_pre - 1);
-    cvlr_assert!(balance_to_post == balance_to_pre + 1);
+        cvlr_assert!(balance_from_post == balance_from_pre - 1);
+        cvlr_assert!(balance_to_post == balance_to_pre + 1);
     } else {
         cvlr_assert!(balance_to_post == balance_to_pre);
         cvlr_assert!(balance_from_post == balance_from_pre);
@@ -112,7 +109,7 @@ pub fn nft_approve_for_all_integrity(e: Env) {
     clog!(cvlr_soroban::Addr(&operator));
     let live_until_ledger = u32::nondet();
     clog!(live_until_ledger);
-    let token_id = u32::nondet(); // some token 
+    let token_id = u32::nondet(); // some token
     clog!(token_id);
     cvlr_assume!(live_until_ledger > 0);
     Base::approve_for_all(&e, &owner, &operator, live_until_ledger);
@@ -163,7 +160,6 @@ pub fn nft_sequential_mint_integrity(e: Env) {
     cvlr_assert!(balance_post == balance_pre + 1);
 }
 
-
 #[rule]
 // token_uri of two different tokens is different
 // status: tool issue
@@ -177,4 +173,3 @@ pub fn nft_token_uri_injective(e: Env) {
     let uri2 = Base::token_uri(&e, token_id2);
     cvlr_assert!(uri1 != uri2);
 }
-

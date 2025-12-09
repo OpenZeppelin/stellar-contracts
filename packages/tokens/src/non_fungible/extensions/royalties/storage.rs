@@ -1,14 +1,8 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 #[cfg(not(feature = "certora"))]
-use crate::non_fungible::{
-    royalties::{emit_set_default_royalty, emit_set_token_royalty},
-};
-
-
-use crate::non_fungible::{
-    Base, NonFungibleTokenError, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD,
-};
+use crate::non_fungible::royalties::{emit_set_default_royalty, emit_set_token_royalty};
+use crate::non_fungible::{Base, NonFungibleTokenError, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD};
 
 /// Storage container for royalty information
 #[contracttype]

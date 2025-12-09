@@ -1,16 +1,15 @@
-use cvlr::{cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
-use cvlr::clog;
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env};
-use crate::fungible::FungibleToken;
-use crate::fungible::Base;
+
+use crate::fungible::{Base, FungibleToken};
 
 // todo: total_supply does not change other than mint.
 // todo (?) total_supply >= balance(a1)+balance(a2)
 
-// maybe its not right to talk about invariants just for fungible because its not really a contract setting (?) 
-// or maybe its fine
+// maybe its not right to talk about invariants just for fungible because its
+// not really a contract setting (?) or maybe its fine
 
 // helpers
 pub fn assume_pre_total_supply_geq_balance(e: Env, account: &Address) {
@@ -25,14 +24,14 @@ pub fn assume_pre_total_supply_geq_balance(e: Env, account: &Address) {
 pub fn assert_post_total_supply_geq_balance(e: Env, account: &Address) {
     clog!(cvlr_soroban::Addr(account));
     let total_supply = Base::total_supply(&e);
-    clog!(total_supply);    
+    clog!(total_supply);
     let balance = Base::balance(&e, account);
     clog!(balance);
     cvlr_assert!(total_supply >= balance);
 }
 
 #[rule]
-// status: violated - spurious 
+// status: violated - spurious
 // https://prover.certora.com/output/5771024/7ac81c9f026e44b1a29a116052a06333/
 // actually this cannot verify
 pub fn after_transfer_total_supply_geq_balance(e: Env) {

@@ -1,13 +1,14 @@
-use cvlr::{cvlr_satisfy, nondet::*, cvlr_assert, cvlr_assume};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
-use cvlr::clog;
-use crate::non_fungible::Base;
-use crate::non_fungible::enumerable::Enumerable;
-use crate::non_fungible::extensions::enumerable::storage::{NFTEnumerableStorageKey, OwnerTokensKey};
-use crate::non_fungible::{OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD};
-use crate::non_fungible::overrides::ContractOverrides;
+use soroban_sdk::{Address, Env};
+
+use crate::non_fungible::{
+    enumerable::Enumerable,
+    extensions::enumerable::storage::{NFTEnumerableStorageKey, OwnerTokensKey},
+    overrides::ContractOverrides,
+    Base, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
+};
 
 // helpers
 
@@ -15,8 +16,7 @@ use crate::non_fungible::overrides::ContractOverrides;
 /// owner's local list, or `None` if not found. This is a non-panicking
 /// version of [`Enumerable::get_owner_token_id`].
 pub fn try_get_owner_token_id(e: &Env, owner: &Address, index: u32) -> Option<u32> {
-    let key =
-        NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index });
+    let key = NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey { owner: owner.clone(), index });
     let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
         return None;
     };
@@ -40,11 +40,12 @@ pub fn try_get_token_id(e: &Env, index: u32) -> Option<u32> {
 // ################## INVARIANTS ##################
 
 // invariant: index < balance <-> get_owner_token_id != none
-// invariants should be checked for transfer, transfer_from, mint, sequential_mint, burn and burn_from (approves are trivial)
+// invariants should be checked for transfer, transfer_from, mint,
+// sequential_mint, burn and burn_from (approves are trivial)
 
 // invariant: total_supply >= balance()
 
-// helpers 
+// helpers
 
 pub fn assume_pre_total_supply_geq_balance(e: Env, account: &Address) {
     clog!(cvlr_soroban::Addr(account));
@@ -276,4 +277,3 @@ pub fn after_nft_burn_from_valid_index(e: Env) {
     Enumerable::burn_from(&e, &spender, &from, token_id);
     assert_post_valid_index(e, index);
 }
-

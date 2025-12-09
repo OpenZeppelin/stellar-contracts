@@ -1,11 +1,9 @@
-
-use cvlr::{cvlr_assert,cvlr_satisfy};use cvlr_soroban::{nondet_address, nondet_symbol};
+use cvlr::{cvlr_assert, cvlr_satisfy, nondet::Nondet};
+use cvlr_soroban::{nondet_address, nondet_symbol};
 use cvlr_soroban_derive::rule;
-use cvlr::nondet::Nondet;
+use soroban_sdk::Env;
 
-use soroban_sdk::{Env};
-
-use crate::access_control::{AccessControl, specs::access_control_contract::AccessControlContract};
+use crate::access_control::{specs::access_control_contract::AccessControlContract, AccessControl};
 
 #[rule]
 pub fn has_role_sanity(e: Env) {
@@ -81,7 +79,6 @@ pub fn revoke_role_sanity(e: Env) {
     AccessControlContract::revoke_role(&e, caller, account, role);
     cvlr_satisfy!(true);
 }
-
 
 #[rule]
 pub fn renounce_role_sanity(e: Env) {

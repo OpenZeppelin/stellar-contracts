@@ -94,13 +94,11 @@ mod test;
 #[cfg(feature = "certora")]
 pub mod specs;
 
-use soroban_sdk::{contracterror, Address, Env, Symbol};
-
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
+use soroban_sdk::{contracterror, Address, Env, Symbol};
 
 pub use crate::access_control::storage::{
     accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
@@ -110,7 +108,6 @@ pub use crate::access_control::storage::{
     revoke_role, revoke_role_no_auth, set_admin, set_role_admin, set_role_admin_no_auth,
     transfer_admin_role, AccessControlStorageKey,
 };
-
 
 pub trait AccessControl {
     /// Returns `Some(index)` if the account has the specified role,

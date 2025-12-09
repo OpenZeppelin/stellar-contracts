@@ -84,11 +84,10 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 #[cfg(feature = "certora")]
 pub mod specs;
 
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
 
 /// Vanilla Fungible Token Trait
 ///

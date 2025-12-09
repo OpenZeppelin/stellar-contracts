@@ -1,14 +1,14 @@
 use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
 use stellar_contract_utils::math::fixed_point::{muldiv, Rounding};
 
+#[cfg(not(feature = "certora"))]
+use crate::vault::{emit_deposit, emit_withdraw};
 use crate::{
     fungible::{Base, ContractOverrides, FungibleToken},
-    vault::{MAX_DECIMALS_OFFSET, VaultTokenError, specs::basic_token::{self, BasicToken}},
-};
-
-#[cfg(not(feature = "certora"))]
-use crate::{
-    vault::{emit_deposit, emit_withdraw,},
+    vault::{
+        specs::basic_token::{self, BasicToken},
+        VaultTokenError, MAX_DECIMALS_OFFSET,
+    },
 };
 
 pub struct Vault;
@@ -762,7 +762,13 @@ impl Vault {
             #[cfg(not(feature = "certora"))]
             token_client.transfer_from(operator, from, &e.current_contract_address(), &assets);
             #[cfg(feature = "certora")]
-            BasicToken::transfer_from(e, operator.clone(), from.clone(), e.current_contract_address(), assets);
+            BasicToken::transfer_from(
+                e,
+                operator.clone(),
+                from.clone(),
+                e.current_contract_address(),
+                assets,
+            );
         }
 
         Base::mint(e, receiver, shares);
@@ -858,7 +864,7 @@ impl Vault {
     pub fn get_underlying_asset_decimals(e: &Env) -> u32 {
         #[cfg(not(feature = "certora"))]
         let token_client = token::Client::new(e, &Self::query_asset(e));
-         #[cfg(not(feature = "certora"))]
+        #[cfg(not(feature = "certora"))]
         return token_client.decimals();
         #[cfg(feature = "certora")]
         BasicToken::decimals(e)

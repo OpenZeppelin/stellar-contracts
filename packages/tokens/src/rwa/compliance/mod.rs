@@ -1,12 +1,8 @@
-use soroban_sdk::{
-    contractclient, contracterror, contracttype, Address, Env, String, Vec,
-};
-
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
+use soroban_sdk::{contractclient, contracterror, contracttype, Address, Env, String, Vec};
 
 use crate::rwa::utils::token_binder::TokenBinder;
 

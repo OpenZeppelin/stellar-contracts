@@ -1,13 +1,12 @@
 use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, BytesN, Env, Vec};
 
 #[cfg(not(feature = "certora"))]
-use crate::{merkle_distributor::{emit_set_claimed, emit_set_root}};
-
+use crate::merkle_distributor::{emit_set_claimed, emit_set_root};
 use crate::{
     crypto::{hasher::Hasher, merkle::Verifier},
     merkle_distributor::{
-        IndexableLeaf, MerkleDistributor, MerkleDistributorError,
-        MERKLE_CLAIMED_EXTEND_AMOUNT, MERKLE_CLAIMED_TTL_THRESHOLD,
+        IndexableLeaf, MerkleDistributor, MerkleDistributorError, MERKLE_CLAIMED_EXTEND_AMOUNT,
+        MERKLE_CLAIMED_TTL_THRESHOLD,
     },
 };
 

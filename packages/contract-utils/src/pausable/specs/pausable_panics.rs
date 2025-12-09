@@ -1,11 +1,9 @@
-use cvlr::{cvlr_assert,cvlr_assume,cvlr_satisfy};
+use cvlr::{cvlr_assert, cvlr_assume, cvlr_satisfy};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
 use soroban_sdk::Env;
-use crate::pausable::specs::pausable_contract::PausableContract;
-use crate::pausable::Pausable;  
-use crate::pausable::{pause, paused};
 
+use crate::pausable::{pause, paused, specs::pausable_contract::PausableContract, Pausable};
 
 #[rule]
 // pause panics if the contract is already paused

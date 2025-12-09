@@ -1,12 +1,12 @@
+pub mod burnable;
+pub mod consecutive;
+pub mod enumerable;
 pub mod helper;
 pub mod non_fungible_integrity;
-pub mod non_fungible_panics;
-pub mod non_fungible_non_panics;
 pub mod non_fungible_invariants;
-pub mod burnable;
-pub mod enumerable;
+pub mod non_fungible_non_panics;
+pub mod non_fungible_panics;
 pub mod royalties;
-pub mod consecutive;
 
 pub mod burnable_nft_contract;
 pub mod consecutive_nft_contract;

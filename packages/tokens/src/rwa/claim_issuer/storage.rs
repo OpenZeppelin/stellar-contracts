@@ -73,19 +73,16 @@ use core::ops::RangeBounds;
 
 use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, Vec};
 
+#[cfg(not(feature = "certora"))]
+use crate::rwa::claim_issuer::{
+    emit_key_allowed, emit_key_removed, emit_revocation_event, emit_signatures_invalidated,
+};
 use crate::rwa::{
     claim_issuer::{
         ClaimIssuerError, SignatureVerifier, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
         KEYS_EXTEND_AMOUNT, KEYS_TTL_THRESHOLD, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
     },
     claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
-};
-
-#[cfg(not(feature = "certora"))]
-use crate::rwa::{
-    claim_issuer::{
-        emit_key_allowed, emit_key_removed, emit_revocation_event, emit_signatures_invalidated,
-    },
 };
 
 #[contracttype]

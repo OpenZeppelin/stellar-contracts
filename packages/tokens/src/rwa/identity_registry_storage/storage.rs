@@ -124,15 +124,13 @@ use soroban_sdk::{
     contracttype, panic_with_error, Address, Env, Map, String, Symbol, TryFromVal, Val, Vec,
 };
 
-use crate::rwa::identity_registry_storage::{
-    CountryDataEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
-    IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_ENTRIES,
-};
-
 #[cfg(not(feature = "certora"))]
 use crate::rwa::identity_registry_storage::{
     emit_country_data_event, emit_identity_modified, emit_identity_recovered, emit_identity_stored,
     emit_identity_unstored,
+};
+use crate::rwa::identity_registry_storage::{
+    CountryDataEvent, IRSError, IDENTITY_EXTEND_AMOUNT, IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_ENTRIES,
 };
 
 /// Represents the type of identity holder

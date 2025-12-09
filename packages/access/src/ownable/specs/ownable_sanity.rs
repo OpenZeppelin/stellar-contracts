@@ -1,18 +1,15 @@
-use cvlr::{cvlr_assert,cvlr_satisfy};use cvlr_soroban::{nondet_address};
+use cvlr::{cvlr_assert, cvlr_satisfy, nondet::Nondet};
+use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use cvlr::nondet::Nondet;
+use soroban_sdk::Env;
 
-use soroban_sdk::{Env};
-
-use crate::ownable::*;
-
-use crate::ownable::specs::ownable_contract::OwnableContract;
+use crate::ownable::{specs::ownable_contract::OwnableContract, *};
 
 #[rule]
 pub fn get_owner_sanity(e: Env) {
     let owner = nondet_address();
     OwnableContract::ownable_constructor(&e, owner);
-    let _ =OwnableContract:: get_owner(&e);
+    let _ = OwnableContract::get_owner(&e);
     cvlr_satisfy!(true);
 }
 

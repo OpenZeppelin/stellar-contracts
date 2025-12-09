@@ -143,12 +143,10 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
-
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
 use soroban_sdk::{contractclient, contracterror, Address, Bytes, Env};
 pub use storage::{
     allow_key, build_claim_identifier, decode_claim_data_expiration, encode_claim_data_expiration,

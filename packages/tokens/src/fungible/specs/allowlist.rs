@@ -1,11 +1,9 @@
-use cvlr::{cvlr_assert, cvlr_satisfy, cvlr_assume, nondet::*};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
-use cvlr::clog;
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env};
-use crate::fungible::FungibleToken;
-use crate::fungible::Base;
-use crate::fungible::allowlist::AllowList;
+
+use crate::fungible::{allowlist::AllowList, Base, FungibleToken};
 
 // ################## INTEGRITY RULES ##################
 
@@ -39,12 +37,12 @@ pub fn transfer_panics_if_from_not_allowed(e: Env) {
     clog!(cvlr_soroban::Addr(&to));
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(!AllowList::allowed(&e, &from));
     AllowList::transfer(&e, &from, &to, amount);
     cvlr_assert!(false);
-}   
+}
 
 #[rule]
 // transfer panics if to is not allowed
@@ -54,7 +52,7 @@ pub fn transfer_panics_if_to_not_allowed(e: Env) {
     clog!(cvlr_soroban::Addr(&to));
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(!AllowList::allowed(&e, &to));
     AllowList::transfer(&e, &from, &to, amount);
@@ -71,7 +69,7 @@ pub fn transfer_from_panics_if_from_not_allowed(e: Env) {
     clog!(cvlr_soroban::Addr(&spender));
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(!AllowList::allowed(&e, &from));
     AllowList::transfer_from(&e, &spender, &from, &to, amount);
@@ -88,7 +86,7 @@ pub fn transfer_from_panics_if_to_not_allowed(e: Env) {
     clog!(cvlr_soroban::Addr(&spender));
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(!AllowList::allowed(&e, &to));
     AllowList::transfer_from(&e, &spender, &from, &to, amount);
@@ -105,7 +103,7 @@ pub fn approve_panics_if_owner_not_allowed(e: Env) {
     clog!(cvlr_soroban::Addr(&owner));
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     let live_until_ledger = u32::nondet();
     clog!(live_until_ledger);
@@ -120,7 +118,7 @@ pub fn approve_panics_if_owner_not_allowed(e: Env) {
 pub fn burn_panics_if_from_not_allowed(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(!AllowList::allowed(&e, &from));
     AllowList::burn(&e, &from, amount);
@@ -135,10 +133,9 @@ pub fn burn_from_panics_if_from_not_allowed(e: Env) {
     clog!(cvlr_soroban::Addr(&spender));
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(!AllowList::allowed(&e, &from));
     AllowList::burn_from(&e, &spender, &from, amount);
     cvlr_assert!(false);
 }
-

@@ -1,10 +1,12 @@
 use cvlr::{cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
+use soroban_sdk::{Address, Env};
 
-use crate::non_fungible::specs::enumerable_nft_contract::EnumerableNft;
-use crate::non_fungible::{NonFungibleToken, burnable::NonFungibleBurnable, enumerable::NonFungibleEnumerable};
+use crate::non_fungible::{
+    burnable::NonFungibleBurnable, enumerable::NonFungibleEnumerable,
+    specs::enumerable_nft_contract::EnumerableNft, NonFungibleToken,
+};
 
 #[rule]
 pub fn enumerable_nft_balance_sanity(e: Env) {

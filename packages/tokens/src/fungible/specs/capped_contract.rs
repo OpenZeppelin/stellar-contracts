@@ -1,6 +1,9 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 
-use crate::fungible::{extensions::capped::{check_cap, query_cap, set_cap}, Base, FungibleToken};
+use crate::fungible::{
+    extensions::capped::{check_cap, query_cap, set_cap},
+    Base, FungibleToken,
+};
 
 #[contract]
 pub struct CappedTokenContract;

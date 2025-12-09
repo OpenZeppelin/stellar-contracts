@@ -1,12 +1,12 @@
-use cvlr::{cvlr_assert, cvlr_assume,cvlr_satisfy};
-use cvlr_soroban::{nondet_address};
-use cvlr::nondet::Nondet;
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::Nondet};
+use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
+use soroban_sdk::Env;
 
-
-use soroban_sdk::{Env};
-use cvlr::clog;
-use crate::ownable::{specs::{helper::get_pending_owner, ownable_contract::OwnableContract}, *};
+use crate::ownable::{
+    specs::{helper::get_pending_owner, ownable_contract::OwnableContract},
+    *,
+};
 
 // invariant: owner != None -> holds in all cases except for renounce_ownership
 
@@ -142,7 +142,6 @@ pub fn after_constructor_pending_owner_implies_owner_sanity(e: Env) {
     OwnableContract::ownable_constructor(&e, new_owner);
     cvlr_satisfy!(true);
 }
-
 
 /////////
 #[rule]

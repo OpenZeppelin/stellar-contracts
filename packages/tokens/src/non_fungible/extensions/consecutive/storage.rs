@@ -3,11 +3,7 @@ use core::mem;
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, String, TryFromVal, Val, Vec};
 
 #[cfg(not(feature = "certora"))]
-use crate::non_fungible::{
-    burnable::emit_burn,
-    emit_transfer,
-};
-
+use crate::non_fungible::{burnable::emit_burn, emit_transfer};
 use crate::non_fungible::{
     sequential::{self as sequential},
     Base, ContractOverrides, NonFungibleTokenError, OWNERSHIP_EXTEND_AMOUNT,

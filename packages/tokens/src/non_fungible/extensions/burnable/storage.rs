@@ -1,9 +1,8 @@
 use soroban_sdk::{Address, Env};
 
 #[cfg(not(feature = "certora"))]
-use crate::non_fungible::{burnable::emit_burn};
-
-use crate::non_fungible::{Base};
+use crate::non_fungible::burnable::emit_burn;
+use crate::non_fungible::Base;
 
 impl Base {
     /// Destroys the token with `token_id` from `from`, ensuring ownership

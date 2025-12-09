@@ -75,14 +75,12 @@ mod test;
 #[cfg(feature = "certora")]
 pub mod specs;
 
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
-
 pub use extensions::{burnable, consecutive, enumerable, royalties};
 pub use overrides::{Base, ContractOverrides};
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
 // ################## TRAIT ##################
 use soroban_sdk::{contracterror, Address, Env, String};
 pub use storage::{ApprovalData, NFTStorageKey};

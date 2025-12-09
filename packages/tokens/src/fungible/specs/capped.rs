@@ -2,13 +2,12 @@
 // need to implement a mint function for this.
 // and constructor.
 
-use crate::fungible::specs::capped_contract::CappedTokenContract;
-use crate::fungible::FungibleToken;
-
 use cvlr::{cvlr_assert, cvlr_satisfy, nondet::*};
 use cvlr_soroban::nondet_address;
 use cvlr_soroban_derive::rule;
 use soroban_sdk::Env;
+
+use crate::fungible::{specs::capped_contract::CappedTokenContract, FungibleToken};
 
 #[rule]
 // after mint the account's balance increases by amount
@@ -51,5 +50,5 @@ pub fn constructor_integrity(e: Env) {
     cvlr_assert!(cap >= 0);
 }
 
-// TODO: invariants 
+// TODO: invariants
 // panics and non-panics are not interesting.

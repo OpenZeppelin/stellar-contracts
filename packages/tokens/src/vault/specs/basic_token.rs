@@ -3,11 +3,11 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use crate::fungible::{Base, FungibleToken};
 
 pub struct BasicToken<'a> {
-    pub asset: &'a Address
+    pub asset: &'a Address,
 }
 
 impl<'a> BasicToken<'a> {
-    pub fn __constructor (e: &Env, addr: &'a Address) -> BasicToken<'a> {
+    pub fn __constructor(e: &Env, addr: &'a Address) -> BasicToken<'a> {
         return BasicToken { asset: addr };
     }
 }

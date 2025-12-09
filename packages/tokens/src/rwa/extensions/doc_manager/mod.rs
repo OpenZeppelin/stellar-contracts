@@ -29,12 +29,10 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
-
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
 use soroban_sdk::{contracterror, Address, BytesN, Env, String, Vec};
 pub use storage::{
     get_document, get_document_by_index, get_document_count, get_documents, remove_document,

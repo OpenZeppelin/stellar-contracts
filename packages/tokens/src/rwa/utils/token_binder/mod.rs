@@ -3,12 +3,10 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
-
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
 use soroban_sdk::{contractclient, contracterror, Address, Env, Vec};
 pub use storage::{
     bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound, linked_tokens,

@@ -1,12 +1,12 @@
-use cvlr::{cvlr_satisfy, nondet::*, cvlr_assert, cvlr_assume};
-use cvlr_soroban::nondet_address;
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
+use cvlr_soroban::{is_auth, nondet_address};
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address};
-use cvlr::clog;
+use soroban_sdk::{Address, Env};
 
-use crate::non_fungible::Base;
-use crate::non_fungible::specs::helper::{is_approved_for_token, is_owned};
-use cvlr_soroban::is_auth;
+use crate::non_fungible::{
+    specs::helper::{is_approved_for_token, is_owned},
+    Base,
+};
 
 // ################## INTEGRITY RULES ##################
 
@@ -148,7 +148,7 @@ pub fn nft_burn_from_panics_if_not_owned(e: Env) {
 
 #[rule]
 // burn_from panics if not approved
-// status: verified 
+// status: verified
 pub fn nft_burn_from_panics_if_not_approved(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));

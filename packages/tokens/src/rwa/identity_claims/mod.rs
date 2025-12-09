@@ -2,15 +2,11 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
-
-use soroban_sdk::{
-    contractclient, contracterror, Address, Bytes, BytesN, Env, String, Vec,
-};
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
+use soroban_sdk::{contractclient, contracterror, Address, Bytes, BytesN, Env, String, Vec};
 pub use storage::{
     add_claim, generate_claim_id, get_claim, get_claim_ids_by_topic, remove_claim, Claim,
 };

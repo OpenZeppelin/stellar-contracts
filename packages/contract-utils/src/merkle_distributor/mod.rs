@@ -56,12 +56,10 @@ pub mod specs;
 
 use core::marker::PhantomData;
 
-#[cfg(not(feature = "certora"))]
-use soroban_sdk::{contractevent};
-
 #[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
-
+#[cfg(not(feature = "certora"))]
+use soroban_sdk::contractevent;
 use soroban_sdk::{contracterror, Bytes, Env, Val};
 
 use crate::crypto::hasher::Hasher;

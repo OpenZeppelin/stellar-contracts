@@ -1,9 +1,8 @@
 use soroban_sdk::{Address, Env};
 
+use crate::fungible::Base;
 #[cfg(not(feature = "certora"))]
 use crate::fungible::{extensions::burnable::emit_burn, Base};
-
-use crate::fungible::{Base};
 
 impl Base {
     /// Destroys `amount` of tokens from `from`. Updates the total

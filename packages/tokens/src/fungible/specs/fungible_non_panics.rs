@@ -1,23 +1,27 @@
-use cvlr::{cvlr_assert, cvlr_satisfy, cvlr_assume, nondet::*};
-use cvlr_soroban::{nondet_address, is_auth};
-use cvlr::clog;
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
+use cvlr_soroban::{is_auth, nondet_address};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env};
-use crate::fungible::FungibleToken;
-use crate::fungible::Base;
-use crate::fungible::storage::{StorageKey, AllowanceKey, AllowanceData};
-// These rules require the prover arg "prover_args": ["-trapAsAssert true"] to consider also panicking paths.
+
+use crate::fungible::{
+    storage::{AllowanceData, AllowanceKey, StorageKey},
+    Base, FungibleToken,
+};
+// These rules require the prover arg "prover_args": ["-trapAsAssert true"] to
+// consider also panicking paths.
 
 pub fn storage_setup_balance(e: Env, account: Address) {
-    let balance:i128 = nondet();
+    let balance: i128 = nondet();
     e.storage().persistent().set(&StorageKey::Balance(account), &balance);
 }
 
 pub fn storage_setup_allowance(e: Env, owner: Address, spender: Address) {
-    let amount:i128 = nondet();
-    let live_until_ledger:u32 = nondet();
+    let amount: i128 = nondet();
+    let live_until_ledger: u32 = nondet();
     let allowance = AllowanceData { amount, live_until_ledger };
-    e.storage().temporary().set(&StorageKey::Allowance(AllowanceKey { owner, spender }), &allowance);
+    e.storage()
+        .temporary()
+        .set(&StorageKey::Allowance(AllowanceKey { owner, spender }), &allowance);
 }
 
 #[rule]
@@ -31,7 +35,7 @@ pub fn transfer_non_panic(e: Env) {
     clog!(cvlr_soroban::Addr(&to));
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(is_auth(from.clone()));
     storage_setup_balance(e.clone(), from.clone());
@@ -51,7 +55,7 @@ pub fn transfer_non_panic_sanity(e: Env) {
     clog!(cvlr_soroban::Addr(&to));
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(is_auth(from.clone()));
     storage_setup_balance(e.clone(), from.clone());
@@ -77,7 +81,7 @@ pub fn transfer_from_non_panic(e: Env) {
     clog!(cvlr_soroban::Addr(&from));
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(is_auth(spender.clone()));
     storage_setup_balance(e.clone(), from.clone());
@@ -103,7 +107,7 @@ pub fn transfer_from_non_panic_sanity(e: Env) {
     clog!(cvlr_soroban::Addr(&from));
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(is_auth(spender.clone()));
     storage_setup_balance(e.clone(), from.clone());
@@ -130,7 +134,7 @@ pub fn approve_non_panic(e: Env) {
     clog!(cvlr_soroban::Addr(&owner));
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     let live_until_ledger = nondet();
     clog!(live_until_ledger);
@@ -147,7 +151,6 @@ pub fn approve_non_panic(e: Env) {
     cvlr_assert!(true);
 }
 
-
 #[rule]
 // sanity
 // status: verified
@@ -156,7 +159,7 @@ pub fn approve_non_panic_sanity(e: Env) {
     clog!(cvlr_soroban::Addr(&owner));
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
-    let amount:i128 = nondet();
+    let amount: i128 = nondet();
     clog!(amount);
     let live_until_ledger = nondet();
     clog!(live_until_ledger);

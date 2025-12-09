@@ -1,15 +1,12 @@
 use soroban_sdk::{contractclient, contracttype, panic_with_error, Address, Env};
 
+#[cfg(not(feature = "certora"))]
+use crate::rwa::emit_claim_topics_and_issuers_set;
 use crate::rwa::{
     claim_issuer::ClaimIssuerClient,
     claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
     identity_claims::{generate_claim_id, Claim, IdentityClaimsClient},
     RWAError,
-};
-
-#[cfg(not(feature = "certora"))]
-use crate::rwa::{
-    emit_claim_topics_and_issuers_set,
 };
 
 /// Storage keys for the data associated with `RWA` token
