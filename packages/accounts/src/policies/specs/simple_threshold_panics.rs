@@ -72,7 +72,7 @@ pub fn enforce_panics_if_can_enforce_returns_false(e: Env, context: soroban_sdk:
         ctx_rule.clone(),
         account_id.clone(),
     );
-    cvlr_assume!(can_enforce == false);
+    cvlr_assume!(!can_enforce);
     SimpleThresholdPolicy::enforce(&e, context, authenticated_signers, ctx_rule, account_id);
     cvlr_assert!(false);
 }

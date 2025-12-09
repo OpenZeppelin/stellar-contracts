@@ -38,7 +38,7 @@ pub fn enforce_simple_threshold_sanity(e: Env, context: soroban_sdk::auth::Conte
     let auth_signers = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account: Address = nondet_address();
-    let _ = SimpleThresholdPolicy::enforce(&e, context, auth_signers, ctx_rule, account);
+    SimpleThresholdPolicy::enforce(&e, context, auth_signers, ctx_rule, account);
     cvlr_satisfy!(true);
 }
 

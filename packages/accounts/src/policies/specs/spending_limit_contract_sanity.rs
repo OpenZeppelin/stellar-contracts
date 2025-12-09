@@ -36,7 +36,7 @@ pub fn enforce_spending_limit_sanity(e: Env, context: soroban_sdk::auth::Context
     let auth_signers = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account: Address = nondet_address();
-    let _ = SpendingLimitPolicy::enforce(&e, context, auth_signers, ctx_rule, account);
+    SpendingLimitPolicy::enforce(&e, context, auth_signers, ctx_rule, account);
     cvlr_satisfy!(true);
 }
 

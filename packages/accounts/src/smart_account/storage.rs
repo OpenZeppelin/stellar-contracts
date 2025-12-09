@@ -305,7 +305,7 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
         for id in ids.iter() {
             v.push_back(get_context_rule(e, id));
         }
-        return v;
+        v
     }
 }
 
@@ -787,7 +787,7 @@ pub fn add_context_rule(
         PolicyClient::new(e, &policy).install(&param, &context_rule, &e.current_contract_address());
         #[cfg(feature = "certora")]
         SimpleThresholdPolicyContract::install(
-            &e,
+            e,
             SimpleThresholdAccountParams::from_val(e, &param),
             context_rule.clone(),
             e.current_contract_address(),

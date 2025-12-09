@@ -81,7 +81,7 @@ pub fn can_enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
 #[rule]
 // requires
 // can_enforce returns true
-// status: verified
+// status: verified using `unsed_context`
 pub fn enforce_non_panic(
     e: Env,
     context: soroban_sdk::auth::Context,

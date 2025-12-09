@@ -83,7 +83,7 @@ pub fn no_previous_transfer_succeeds(e: Env, context: soroban_sdk::auth::Context
     cvlr_assume!(amount <= spending_limit);
     let result =
         SpendingLimitPolicy::can_enforce(&e, context, auth_signers.clone(), ctx_rule, account_id);
-    cvlr_assert!(result == true);
+    cvlr_assert!(result);
 }
 
 // can't write an integrity rule for enforce because it panics if can_enforce

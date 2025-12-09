@@ -16,7 +16,7 @@ where
     const MAX: u32 = 5;
     let mut n: u32 = u32::nondet();
     if n > MAX {
-        n = n % (MAX + 1);
+        n %= MAX + 1;
     }
 
     let mut out: Vec<Signer> = Vec::new(&env);
@@ -37,7 +37,7 @@ pub fn nondet_policy_vec() -> Vec<Address> {
     const MAX: u32 = 5;
     let mut n: u32 = u32::nondet();
     if n > MAX {
-        n = n % (MAX + 1);
+        n %= MAX + 1;
     }
 
     let mut out: Vec<Address> = Vec::new(&env);
@@ -58,7 +58,7 @@ pub fn nondet_policy_map() -> Map<Address, Val> {
     const MAX: u32 = 5;
     let mut n: u32 = u32::nondet();
     if n > MAX {
-        n = n % (MAX + 1);
+        n %= MAX + 1;
     }
 
     let mut out: Map<Address, Val> = Map::new(&env);
