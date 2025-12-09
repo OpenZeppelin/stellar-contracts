@@ -29,7 +29,7 @@ fn storage_setup_threshold(e: Env, ctx_rule_id: u32, account_id: Address) {
 // requires
 // valid threshold
 // account_id auth
-// status: violated - Expected sym to be a valid Val, in vec/vec_len
+// status: verified
 pub fn set_threshold_non_panic(e: Env) {
     let threshold: u32 = u32::nondet();
     let ctx_rule: ContextRule = ContextRule::nondet();
@@ -60,7 +60,7 @@ pub fn get_threshold_non_panic(e: Env) {
 
 #[rule]
 // requires nothing
-// status: violated - Expected sym to be a valid Val, in vec/vec_len
+// status: verified
 pub fn can_enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
     let authenticated_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
@@ -73,7 +73,7 @@ pub fn can_enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
 #[rule]
 // requires
 // can_enforce returns true
-// status: violated - unreachable - unwrap_failed in nondet_bytes_n
+// status: violated - unreachable - wip
 pub fn enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
     let authenticated_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
@@ -89,7 +89,7 @@ pub fn enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
 // requires
 // account_id auth
 // valid threshold
-// status: violated - Expected sym to be a valid Val, in vec/vec_len
+// status: verified
 pub fn install_non_panic(e: Env) {
     let params: SimpleThresholdAccountParams = SimpleThresholdAccountParams::nondet();
     let ctx_rule: ContextRule = ContextRule::nondet();

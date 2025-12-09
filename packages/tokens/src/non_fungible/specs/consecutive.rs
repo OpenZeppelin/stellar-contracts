@@ -130,7 +130,6 @@ pub fn nft_batch_mint_integrity(e: Env) {
     Consecutive::batch_mint(&e, &to, amount);
     let balance_post = Consecutive::balance(&e, &to);
     clog!(balance_post);
-    clog!(balance_post == balance_pre + amount);
     cvlr_assert!(balance_post == balance_pre + amount);
     let owner_of_current_token_id = Consecutive::owner_of(&e, current_token_id);
     clog!(cvlr_soroban::Addr(&owner_of_current_token_id));
