@@ -115,10 +115,9 @@ use crate::{
 #[cfg(feature = "certora")]
 use crate::{
     policies::{
-        simple_threshold::SimpleThresholdAccountParams, spending_limit::SpendingLimitAccountParams,
-        Policy,
+        Policy, simple_threshold::SimpleThresholdAccountParams, spending_limit::SpendingLimitAccountParams
     },
-    smart_account::specs::policy::SimpleThresholdPolicyContract,
+    smart_account::specs::{policy::SimpleThresholdPolicyContract, verifer::SimpleVerifier}, verifiers::Verifier,
 };
 
 /// Storage keys for smart account data.
@@ -443,11 +442,16 @@ pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signers: &Map<Signer,
         match signer {
             Signer::External(verifier, key_data) => {
                 let sig_payload = Bytes::from_array(e, &signature_payload.to_bytes().to_array());
+                #[cfg(not(feature = "certora"))]
                 if !VerifierClient::new(e, &verifier).verify(
                     &sig_payload,
                     &key_data.into_val(e),
                     &sig_data.into_val(e),
                 ) {
+                    panic_with_error!(e, SmartAccountError::ExternalVerificationFailed)
+                }
+                #[cfg(feature = "certora")]
+                if !SimpleVerifier::verify(e, sig_payload, key_data.try_into().expect("bytes must have length 32"), sig_data.try_into().expect("bytes must have length 64")) {
                     panic_with_error!(e, SmartAccountError::ExternalVerificationFailed)
                 }
             }
