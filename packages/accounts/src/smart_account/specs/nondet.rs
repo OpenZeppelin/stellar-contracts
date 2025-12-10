@@ -1,5 +1,7 @@
 use cvlr::nondet::{self, Nondet};
-use cvlr_soroban::{nondet_address, nondet_bytes, nondet_bytes_n, nondet_string, nondet_symbol, nondet_vec};
+use cvlr_soroban::{
+    nondet_address, nondet_bytes, nondet_bytes_n, nondet_string, nondet_symbol, nondet_vec,
+};
 use soroban_sdk::{
     auth::{
         Context, ContractContext, ContractExecutable, CreateContractHostFnContext,

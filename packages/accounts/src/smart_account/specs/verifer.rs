@@ -11,7 +11,12 @@ impl Verifier for SimpleVerifier {
     type SigData = BytesN<64>;
 
     // NOTE: maybe needs a fancier implementation
-    fn verify(e: &soroban_sdk::Env, hash: soroban_sdk::Bytes, key_data: Self::KeyData, sig_data: Self::SigData) -> bool {
+    fn verify(
+        e: &soroban_sdk::Env,
+        hash: soroban_sdk::Bytes,
+        key_data: Self::KeyData,
+        sig_data: Self::SigData,
+    ) -> bool {
         true
     }
 }

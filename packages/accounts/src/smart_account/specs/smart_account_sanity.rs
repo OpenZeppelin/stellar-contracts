@@ -4,10 +4,16 @@ use cvlr_soroban_derive::rule;
 use soroban_sdk::{map, panic_with_error, vec, Env, String, Val, Vec};
 
 use crate::smart_account::{
-    ContextRuleType, Meta, Signer, SmartAccount, SmartAccountError, authenticate, do_check_auth, get_validated_context, specs::{
-        nondet::{nondet_context, nondet_context_vec, nondet_hash_32, nondet_policy_map, nondet_signatures_map, nondet_signers_vec},
+    authenticate, do_check_auth, get_validated_context,
+    specs::{
+        nondet::{
+            nondet_context, nondet_context_vec, nondet_hash_32, nondet_policy_map,
+            nondet_signatures_map, nondet_signers_vec,
+        },
         smart_account_contract::SmartAccountContract,
-    }, storage::{self, SmartAccountStorageKey, get_persistent_entry}
+    },
+    storage::{self, get_persistent_entry, SmartAccountStorageKey},
+    ContextRuleType, Meta, Signer, SmartAccount, SmartAccountError,
 };
 
 #[rule]
