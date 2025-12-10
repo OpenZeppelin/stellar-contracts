@@ -108,6 +108,3 @@ pub fn remove_policy_integrity(e: Env) {
     let policies_contains_policy = policies_post.contains(&policy);
     cvlr_assert!(!policies_contains_policy);
 }
-
-// other functions in storage, that are not exposed by the trait:
-// that are called by do_check_auth

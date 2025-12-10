@@ -497,13 +497,22 @@ pub fn can_enforce_all_policies(
             return false;
         }
         #[cfg(feature = "certora")]
-        if SimpleThresholdPolicyContract::can_enforce(
+        // this allows us to have only one policy
+        // that is the simplethresholdpolicy.
+        // i would rather have two policies
+        // and have them be nondet.
+        if !SimpleThresholdPolicyContract::can_enforce(
             e,
             context.clone(),
             matched_signers.clone(),
             context_rule.clone(),
             e.current_contract_address(),
         ) {
+            let threshold = SimpleThresholdPolicyContract::get_threshold(e, context_rule.id, e.current_contract_address());
+            use cvlr::clog;
+            clog!(threshold);
+            clog!(matched_signers.len());
+            clog!(matched_signers.len() >= threshold);
             return false;
         }
     }
@@ -592,6 +601,7 @@ pub fn do_check_auth(
     // effects if any.
     for (rule, context, authenticated_signers) in validated_contexts.iter() {
         let ContextRule { policies, .. } = rule.clone();
+        // when we get to here the rule was already verified to enforce should not panic.
         for policy in policies.iter() {
             #[cfg(not(feature = "certora"))]
             PolicyClient::new(e, &policy).enforce(
