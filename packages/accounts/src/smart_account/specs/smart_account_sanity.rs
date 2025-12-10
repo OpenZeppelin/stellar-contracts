@@ -98,7 +98,6 @@ pub fn remove_policy_sanity(e: Env) {
     cvlr_satisfy!(true);
 }
 
-// status: potentially timeout
 #[rule]
 pub fn do_check_auth_sanity(e: Env) {
     let signature_payload = nondet_hash_32();
