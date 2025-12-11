@@ -190,7 +190,7 @@ impl Nondet for ContextRuleType {
             0 => ContextRuleType::Default,
             1 => ContextRuleType::CallContract(nondet_address()),
             2 => ContextRuleType::CreateContract(nondet_bytes_n()),
-            _ => panic!("unreachable"),
+            _ => panic!("unreachable % 3 can only give 0, 1, 2"),
         }
     }
 }
@@ -280,7 +280,7 @@ pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
         name: meta.name,
         signers,
         policies,
-        valid_until: Option::nondet(),
+        valid_until: meta.valid_until,
     }
 }
 
@@ -860,6 +860,7 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: &String) -> ContextRule 
         context_type: existing_rule.context_type.clone(),
         valid_until: existing_rule.valid_until,
     };
+
     e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
 
     let context_rule = ContextRule {
@@ -918,6 +919,7 @@ pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32
         context_type: existing_rule.context_type.clone(),
         valid_until,
     };
+
     e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
 
     let context_rule = ContextRule {

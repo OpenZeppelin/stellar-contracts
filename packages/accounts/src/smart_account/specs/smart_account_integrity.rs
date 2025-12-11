@@ -24,20 +24,13 @@ use crate::smart_account::storage::{
 
 #[rule]
 // after update_context_rule_valid_until the rule's valid until changes.
-// status: verified for loop_iter = 1,2, violated for loop_iter = 3
-// what loop??
+// status: verified
+// needs loop_iter = 3 for init loop in try_from_val for Meta.
 pub fn update_context_rule_valid_until_integrity(e: Env) {
     let id: u32 = nondet();
-    clog!(id);
     let valid_until = Option::<u32>::nondet();
-    clog!(valid_until);
-    let ctx_rule_pre = get_context_rule(&e, id);
-    let valid_until_pre = ctx_rule_pre.valid_until;
-    clog!(valid_until_pre);
-    update_context_rule_valid_until(&e, id, valid_until);
-    let ctx_rule_post = get_context_rule(&e, id);
+    let ctx_rule_post = update_context_rule_valid_until(&e, id, valid_until);
     let valid_until_post = ctx_rule_post.valid_until;
-    clog!(valid_until_post);
     cvlr_assert!(valid_until_post == valid_until);
 }
 

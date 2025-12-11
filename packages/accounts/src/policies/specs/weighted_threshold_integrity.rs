@@ -18,7 +18,7 @@ use crate::{
 #[rule]
 // can_enforce returns the expected result: total_weight >= threshold_pre where
 // total_weight is the sum of the weights of the authenticated signers
-// status: verified
+// status: verified: https://prover.certora.com/output/33158/3278037fac7949f481dd6dfa49e52a53
 pub fn wt_can_enforce_integrity(e: Env) {
     let context: soroban_sdk::auth::Context = nondet_context();
     let auth_signers: Vec<Signer> = nondet_signers_vec();
