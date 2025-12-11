@@ -104,7 +104,8 @@ pub fn royalty_info_token_royalty_is_some(e: Env) {
 
 #[rule]
 // if there is no specific token royalty, but there is a default, the royalty is
-// the default status: verified
+// the default 
+// status: verified
 pub fn royalty_info_token_royalty_is_none_and_default_is_some(e: Env) {
     let token_id = u32::nondet();
     clog!(token_id);
@@ -126,7 +127,8 @@ pub fn royalty_info_token_royalty_is_none_and_default_is_some(e: Env) {
 
 #[rule]
 // if there is no specific token royalty, and no default, the royalty is 0 and
-// receiver is the contract address status: verified
+// receiver is the contract address 
+// status: verified
 pub fn royalty_info_token_royalty_is_none_and_default_is_none(e: Env) {
     let token_id = u32::nondet();
     clog!(token_id);

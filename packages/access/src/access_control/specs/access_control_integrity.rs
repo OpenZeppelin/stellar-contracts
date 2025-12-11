@@ -59,7 +59,8 @@ pub fn renounce_role_integrity(e: Env) {
 
 #[rule]
 // after call to transfer_admin_role with live_until_ledger > current_ledger the
-// pending admin is set to the new admin status: verified
+// pending admin is set to the new admin 
+// status: verified
 pub fn transfer_admin_role_integrity(e: Env) {
     let new_admin = nondet_address();
     let live_until_ledger = u32::nondet();
@@ -72,7 +73,8 @@ pub fn transfer_admin_role_integrity(e: Env) {
 
 #[rule]
 // after call to accept_admin_transfer with live_until_ledger = 0 the pending
-// admin is none status: verified
+// admin is none 
+// status: verified
 pub fn remove_transfer_admin_role_integrity(e: Env) {
     let new_admin = nondet_address();
     let live_until_ledger = 0;
@@ -101,7 +103,8 @@ pub fn accept_admin_transfer_integrity(e: Env) {
 
 #[rule]
 // after call to set_role_admin the role admin of the given role is the given
-// admin_role status: verified
+// admin_role 
+// status: verified
 pub fn set_role_admin_integrity(e: Env) {
     let role = nondet_symbol();
     let admin_role = nondet_symbol();

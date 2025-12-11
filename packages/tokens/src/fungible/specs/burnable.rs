@@ -264,7 +264,7 @@ pub fn assume_pre_total_supply_geq_two_balances(e: Env, account1: &Address, acco
 
 #[rule]
 // after burn total_supply >= balance for any account
-// status:
+// status: bad rule
 pub fn after_burn_total_supply_geq_balance(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -281,7 +281,7 @@ pub fn after_burn_total_supply_geq_balance(e: Env) {
 
 #[rule]
 // after burn_from total_supply >= balance for any account
-// status:
+// status: bad rule
 pub fn after_burn_from_total_supply_geq_balance(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));

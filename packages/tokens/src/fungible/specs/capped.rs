@@ -41,7 +41,7 @@ pub fn mint_preserves_cap(e: Env) {
 
 #[rule]
 // after constructor the cap is set
-// status:
+// status: wip
 pub fn constructor_integrity(e: Env) {
     let cap = nondet();
     CappedTokenContract::__constructor(&e, cap);

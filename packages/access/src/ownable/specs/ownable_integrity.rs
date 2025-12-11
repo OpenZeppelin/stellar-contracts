@@ -73,7 +73,8 @@ pub fn remove_transfer_ownership_integrity(e: Env) {
 
 #[rule]
 // accept_ownership sets the owner to the pending owner and removes the pending
-// owner. status: verified
+// owner. 
+// status: verified
 pub fn accept_ownership_integrity(e: Env) {
     let pending_owner_pre = get_pending_owner(&e);
     if let Some(pending_owner_internal) = pending_owner_pre.clone() {

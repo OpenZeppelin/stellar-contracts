@@ -187,7 +187,8 @@ pub fn transfer_admin_role_panics_if_live_until_ledger_0_and_pending_admin_none(
 
 #[rule]
 // transfer_admin_role panics if live_until_ledger = 0 and PendingAdmin !=
-// new_admin status: verified
+// new_admin 
+// status: verified
 pub fn transfer_admin_role_panics_if_live_until_ledger_0_and_diff_pending_admin(e: Env) {
     let new_admin = nondet_address();
     let live_until_ledger = 0;
