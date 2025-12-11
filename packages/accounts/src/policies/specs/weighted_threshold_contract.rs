@@ -50,6 +50,13 @@ impl WeightedThresholdPolicy {
             &smart_account,
         )
     }
+
+    pub fn calculate_total_weight(
+        e: &Env,
+        signer_weights: Map<Signer, u32>,
+    ) -> u32 {
+        crate::policies::weighted_threshold::calculate_total_weight(e, &signer_weights)
+    }
 }
 
 // #[contractimpl] -- doesn't compile with this because of duplicate names of

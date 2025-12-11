@@ -405,17 +405,22 @@ pub fn set_signer_weight(
 ) {
     // Require authorization from the smart_account
     smart_account.require_auth();
-
+    clog!(cvlr_soroban::Addr(&smart_account));
+    clog!(context_rule.id);
     let key = WeightedThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
     let mut params: WeightedThresholdAccountParams =
         e.storage().persistent().get(&key).unwrap_or_else(|| {
             panic_with_error!(e, WeightedThresholdError::SmartAccountNotInstalled)
         });
-
+    clog!(weight);
+    clog!(params.signer_weights.get(signer.clone()));
     params.signer_weights.set(signer.clone(), weight);
 
     // Check if threshold is still reachable with updated signer weights
     let total_weight = calculate_total_weight(e, &params.signer_weights);
+    clog!(params.signer_weights.get(signer.clone()));
+    clog!(total_weight);
+    clog!(params.threshold);
 
     if params.threshold > total_weight {
         panic_with_error!(e, WeightedThresholdError::InvalidThreshold);
@@ -495,12 +500,15 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
 ///
 /// * [`WeightedThresholdError::MathOverflow`] - When the total weight
 ///   calculation would overflow.
-fn calculate_total_weight(e: &Env, signer_weights: &Map<Signer, u32>) -> u32 {
+pub fn calculate_total_weight(e: &Env, signer_weights: &Map<Signer, u32>) -> u32 {
     let mut total_weight: u32 = 0;
     for weight in signer_weights.values() {
+        clog!(total_weight);
+        clog!(weight);
         total_weight = total_weight
             .checked_add(weight)
             .unwrap_or_else(|| panic_with_error!(e, WeightedThresholdError::MathOverflow));
     }
+    clog!(total_weight);
     total_weight
 }

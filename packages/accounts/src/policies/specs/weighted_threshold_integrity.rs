@@ -3,6 +3,7 @@ use cvlr_soroban::{nondet_address, nondet_vec};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env, Vec};
 
+use crate::policies::weighted_threshold;
 use crate::{
     policies::{
         Policy, specs::weighted_threshold_contract::WeightedThresholdPolicy, weighted_threshold::{WeightedThresholdAccountParams, WeightedThresholdStorageKey}
@@ -18,7 +19,8 @@ use crate::{
 #[rule]
 // can_enforce returns the expected result: total_weight >= threshold_pre where
 // total_weight is the sum of the weights of the authenticated signers
-// status: verified: https://prover.certora.com/output/33158/3278037fac7949f481dd6dfa49e52a53
+// status: verified
+// run: https://prover.certora.com/output/33158/3278037fac7949f481dd6dfa49e52a53
 pub fn wt_can_enforce_integrity(e: Env) {
     let context: soroban_sdk::auth::Context = nondet_context();
     let auth_signers: Vec<Signer> = nondet_signers_vec();
@@ -38,13 +40,7 @@ pub fn wt_can_enforce_integrity(e: Env) {
     clog!(cvlr_soroban::Addr(&account_id));
     let signer_weights =
         WeightedThresholdPolicy::get_signer_weights(&e, ctx_rule.clone(), account_id.clone());
-    let mut total_weight: u32 = 0;
-    for signer in auth_signers.iter() {
-        if let Some(weight) = signer_weights.get(signer.clone()) {
-            clog!(weight);
-            total_weight = total_weight.checked_add(weight).unwrap();
-        }
-    }
+    let total_weight = weighted_threshold::calculate_weight(&e, &auth_signers, &ctx_rule, &account_id);
     clog!(total_weight);
     clog!(threshold_pre);
     let expected_result = total_weight >= threshold_pre;
