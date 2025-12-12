@@ -33,29 +33,25 @@ pub fn burn_integrity(e: Env) {
 
 #[rule]
 // after burn_from the total supply decrease by amount
-// status: verified: https://prover.certora.com/output/33158/ef281b2292ce4bcf8b830ebc5ef32f4f
+// status: verified https://prover.certora.com/output/33158/93794c587a8d4f29baa47bb358edf9d9
 pub fn burn_from_integrity_1(e: Env) {
     let account = nondet_address();
     let amount = nondet();
-    let balance_pre = Base::balance(&e, &account);
     let total_supply_pre = Base::total_supply(&e);
     Base::burn_from(&e, &account, &account, amount);
-    let balance_post = Base::balance(&e, &account);
     let total_supply_post = Base::total_supply(&e);
     cvlr_assert!(total_supply_post == total_supply_pre - amount);
 }
 
 #[rule]
 // after burn_from the account's balance decrease by amount
-// status: https://prover.certora.com/output/33158/2e9929d3bd104fa8b17ec8dbb5d7ee27
+// status: verified https://prover.certora.com/output/33158/93794c587a8d4f29baa47bb358edf9d9
 pub fn burn_from_integrity_2(e: Env) {
     let account = nondet_address();
     let amount = nondet();
     let balance_pre = Base::balance(&e, &account);
-    let total_supply_pre = Base::total_supply(&e);
     Base::burn_from(&e, &account, &account, amount);
     let balance_post = Base::balance(&e, &account);
-    let total_supply_post = Base::total_supply(&e);
     cvlr_assert!(balance_post == balance_pre - amount);
 }
 

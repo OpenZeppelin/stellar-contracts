@@ -115,7 +115,6 @@ pub fn authenticate_sanity(e: Env) {
     cvlr_satisfy!(true);
 }
 
-// status: potentially timeout
 #[rule]
 pub fn get_validated_context_sanity(e: Env) {
     let context = nondet_context();

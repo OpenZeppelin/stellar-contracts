@@ -309,8 +309,7 @@ impl Base {
         }
 
         let allowance = Base::allowance_data(e, owner, spender);
-        clog!(allowance.amount);
-        clog!(amount);
+
         // maybe this is a bug? because it doesn't consider live_until_ledger, should be
         // allowance() instead?
 
