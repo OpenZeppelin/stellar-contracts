@@ -71,7 +71,8 @@ pub fn nft_consecutive_transfer_integrity_3(e: Env) {
 
 #[rule]
 // updates balances correctly
-// status: timeout
+// status: verified https://prover.certora.com/output/33158/176c79a419624672a0fadb5d4023106a
+// sanity: https://prover.certora.com/output/33158/733987d707ac43fea16f3d8b4f0f972c
 pub fn nft_consecutive_transfer_from_integrity_1(e: Env) {
     let spender = nondet_address();
     let from = nondet_address();
@@ -93,7 +94,8 @@ pub fn nft_consecutive_transfer_from_integrity_1(e: Env) {
 
 #[rule]
 // updates balances correctly
-// status: timeout
+// status: verified https://prover.certora.com/output/33158/fecc4e01acdc4ef69510a81fa7f9d748
+// sanity: https://prover.certora.com/output/33158/cc5dabd82a5a44e08463900b8a83bf09
 pub fn nft_consecutive_transfer_from_integrity_2(e: Env) {
     let spender = nondet_address();
     let from = nondet_address();
@@ -133,7 +135,8 @@ pub fn nft_consecutive_transfer_from_integrity_3(e: Env) {
 
 #[rule]
 // after transfer_from the token owner is to
-// status: timeout.
+// status: verified https://prover.certora.com/output/33158/be586547df9a40fa92ee93dd56dee3ea
+// sanity: https://prover.certora.com/output/33158/186bf39e78554aa1bea92331cc3bf1fc
 // Note: previously this was doing `let owner_post = Consecutive::owner_of(&e, token_id);`
 // which may not be necessary for finding the owner based on the change to owner in `update`.
 pub fn nft_consecutive_transfer_from_integrity_4(e: Env) {

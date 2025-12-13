@@ -264,7 +264,7 @@ pub fn after_nft_burn_valid_index(e: Env) {
 }
 
 #[rule]
-// status: timeout
+// status: violation https://prover.certora.com/output/33158/842685020d6b433197bb4efdb12558c6
 pub fn after_nft_burn_from_valid_index(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
