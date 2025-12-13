@@ -33,7 +33,8 @@ pub fn burn_integrity(e: Env) {
 
 #[rule]
 // after burn_from the total supply decrease by amount
-// status: verified https://prover.certora.com/output/33158/93794c587a8d4f29baa47bb358edf9d9
+// status: verified
+// note: 21 min
 pub fn burn_from_integrity_1(e: Env) {
     let account = nondet_address();
     let amount = nondet();
@@ -45,7 +46,8 @@ pub fn burn_from_integrity_1(e: Env) {
 
 #[rule]
 // after burn_from the account's balance decrease by amount
-// status: verified https://prover.certora.com/output/33158/93794c587a8d4f29baa47bb358edf9d9
+// status: verified
+// note: 15 min
 pub fn burn_from_integrity_2(e: Env) {
     let account = nondet_address();
     let amount = nondet();
@@ -170,7 +172,7 @@ pub fn burn_from_panics_if_amount_less_than_zero(e: Env) {
 // from auth
 // from has enough balance
 // amount >= 0
-// status: wip - waiting
+// status: wip
 pub fn burn_non_panic(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -188,7 +190,7 @@ pub fn burn_non_panic(e: Env) {
 
 #[rule]
 // sanity
-// status:
+// status: wip
 pub fn burn_non_panic_sanity(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -234,7 +236,7 @@ pub fn burn_from_non_panic(e: Env) {
 
 #[rule]
 // sanity
-// status:
+// status: wip
 pub fn burn_from_non_panic_sanity(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));

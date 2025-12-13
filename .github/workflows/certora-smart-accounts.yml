@@ -4,15 +4,23 @@ on: pull_request
 
 env:
   CONFIGS: |
+    do_check_auth.conf
     simple_threshold_integrity.conf
+    simple_threshold_invariants.conf
     simple_threshold_non_panics.conf
     simple_threshold_panics.conf
+    simple_threshold_sanity.conf
     simple_threshold_contract_sanity.conf
-    weighted_threshold_integrity.conf
-    weighted_threshold_contract_sanity.conf
-    spending_limit_integrity.conf
-    spending_limit_contract_sanity.conf
+    smart_account_integrity.conf
     smart_account_sanity.conf
+    spending_limit_integrity.conf
+    spending_limit_sanity.conf
+    spending_limit_contract_sanity.conf
+    weighted_threshold_integrity.conf
+    weighted_threshold_invariants.conf
+    weighted_threshold_panics.conf
+    weighted_threshold_sanity.conf
+    weighted_threshold_contract_sanity.conf
 
 jobs:
   check:

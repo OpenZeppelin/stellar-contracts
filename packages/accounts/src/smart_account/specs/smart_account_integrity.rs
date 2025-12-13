@@ -78,23 +78,24 @@ pub fn remove_signer_integrity(e: Env) {
 #[rule]
 // after add_policy the policy is added.
 // status: wip
+// 
 pub fn add_policy_integrity(e: Env) {
     let id: u32 = nondet();
     let policy = nondet_address();
     let ctx_rule_pre = get_context_rule(&e, id);
     let policies_pre = ctx_rule_pre.policies;
     let policies_pre_len: u32 = policies_pre.len();
-    cvlr_assume!(policies_pre_len == 0);
+    // cvlr_assume!(policies_pre_len == 0);
     let install_param = Val::from_payload(u64::nondet());
     add_policy(&e, id, &policy, install_param);
     let ctx_rule_post = get_context_rule(&e, id);
     let policies_post = ctx_rule_post.policies;
     let policies_post_len: u32 = policies_post.len();
-    cvlr_assert!(policies_post_len == 1);
+    // cvlr_assert!(policies_post_len == 1);
     let last_policy = policies_post.get(policies_post_len - 1).unwrap();
-    cvlr_assert!(last_policy == policy);
-    // let policies_contains_policy = policies_post.contains(&policy);
-    // cvlr_assert!(policies_contains_policy);
+    cvlr_assert!(last_policy == policy); // verified
+    let policies_contains_policy = policies_post.contains(&policy);
+    cvlr_assert!(policies_contains_policy); // not verified
 }
 
 #[rule]

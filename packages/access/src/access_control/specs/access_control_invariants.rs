@@ -712,7 +712,8 @@ pub fn after_grant_role_has_role_index_implies_get_role_account(
 }
 
 #[rule]
-// status: verified in 9 minutes
+// status: verified
+// note: 9 min
 pub fn after_revoke_role_has_role_index_implies_get_role_account(
     e: Env,
     account: Address,

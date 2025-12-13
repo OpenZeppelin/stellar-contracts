@@ -12,16 +12,18 @@ env:
     allowlist.conf
     blocklist.conf
     burnable.conf
-    burnable_nft_sanity.conf
     capped.conf
-    consecutive_nft_sanity.conf
-    enumerable_nft_sanity.conf
-    royalties_nft_sanity.conf
-    vault_sanity.conf
+    consecutive.conf
+    enumerable.conf
+    non_fungible_burnable.conf
     non_fungible_integrity.conf
     non_fungible_invariants.conf
     non_fungible_non_panics.conf
     non_fungible_panics.conf
+    royalties.conf
+    vault_conversions.conf
+    vault_integrity.conf
+    vault_sanity.conf
 
 jobs:
   check:

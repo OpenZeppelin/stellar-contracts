@@ -39,7 +39,7 @@ pub fn transfer_integrity(e: Env) {
 
 #[rule]
 // transfer_from changes total supply accordingly
-// status: verified https://prover.certora.com/output/33158/4631143c82f34fa58591b8f12c1411d3
+// status: verified
 pub fn transfer_from_integrity_1(e: Env) {
     let spender = nondet_address();
     let from = nondet_address();
@@ -53,8 +53,8 @@ pub fn transfer_from_integrity_1(e: Env) {
 }
 
 #[rule]
-// transfer_from changes balances and allowance accordingly
-// status: verified https://prover.certora.com/output/33158/4f0610d39049484db39a3d270a5038c2
+// transfer_from changes balances from accordingly
+// status: verified
 pub fn transfer_from_integrity_2(e: Env) {
     let spender = nondet_address();
     let from = nondet_address();
@@ -73,8 +73,8 @@ pub fn transfer_from_integrity_2(e: Env) {
 }
 
 #[rule]
-// transfer_from changes balances and allowance accordingly
-// status: verified https://prover.certora.com/output/33158/4661dcb42134455ab9c1e47d9a7887c9
+// transfer_from changes balances to accordingly
+// status: verified
 pub fn transfer_from_integrity_3(e: Env) {
     let spender = nondet_address();
     let from = nondet_address();
@@ -93,10 +93,10 @@ pub fn transfer_from_integrity_3(e: Env) {
 }
 
 #[rule]
-// transfer_from changes balances and allowance accordingly
+// transfer_from changes allowance accordingly
 // status: violation: https://prover.certora.com/output/33158/0180ad7c7e534d6cbc950a393201775c
 // not sure if this is even true because `allowance` has an additional check that `allowance_data` does not.
-// see changes made below.
+// see changes made below. WIP
 pub fn transfer_from_integrity_4(e: Env) {
     let spender = nondet_address();
     let from = nondet_address();

@@ -56,6 +56,7 @@ pub fn nft_consecutive_transfer_integrity_2(e: Env) {
 #[rule]
 // after transfer the token owner is set to the to address
 // status: https://prover.certora.com/output/33158/08b3797b32494c0291626077382c405d
+// RAZ: pretty sure we need to revert it back! i think its pointless like this.
 // Note: previously this was doing `let owner_post = Consecutive::owner_of(&e, token_id);`
 // which may not be necessary for finding the owner based on the change to owner in `update`.
 pub fn nft_consecutive_transfer_integrity_3(e: Env) {
@@ -139,6 +140,7 @@ pub fn nft_consecutive_transfer_from_integrity_3(e: Env) {
 // sanity: https://prover.certora.com/output/33158/186bf39e78554aa1bea92331cc3bf1fc
 // Note: previously this was doing `let owner_post = Consecutive::owner_of(&e, token_id);`
 // which may not be necessary for finding the owner based on the change to owner in `update`.
+// WIP - review
 pub fn nft_consecutive_transfer_from_integrity_4(e: Env) {
     let spender = nondet_address();
     let from = nondet_address();
