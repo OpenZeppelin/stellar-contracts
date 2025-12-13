@@ -94,7 +94,7 @@ pub fn transfer_from_integrity_3(e: Env) {
 
 #[rule]
 // transfer_from changes balances and allowance accordingly
-// status: violated: https://prover.certora.com/output/33158/0180ad7c7e534d6cbc950a393201775c
+// status: violation: https://prover.certora.com/output/33158/0180ad7c7e534d6cbc950a393201775c
 // not sure if this is even true because `allowance` has an additional check that `allowance_data` does not.
 // see changes made below.
 pub fn transfer_from_integrity_4(e: Env) {

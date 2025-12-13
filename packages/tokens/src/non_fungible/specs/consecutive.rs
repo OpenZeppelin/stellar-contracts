@@ -4,8 +4,7 @@ use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env};
 
 use crate::non_fungible::{
-    extensions::consecutive::Consecutive, overrides::ContractOverrides, sequential,
-    specs::helper::is_approved_for_token,
+    consecutive::storage::NFTConsecutiveStorageKey, extensions::consecutive::Consecutive, overrides::ContractOverrides, sequential, specs::helper::is_approved_for_token
 };
 
 // ################## INTEGRITY RULES ##################
@@ -17,76 +16,136 @@ use crate::non_fungible::{
 // perhaps we can only analyze the internal functions such as update.
 
 #[rule]
-// after transfer the token owner is set to the to address
 // updates balances correctly
-// status: timeout
-pub fn nft_consecutive_transfer_integrity(e: Env) {
+// status: verified https://prover.certora.com/output/33158/cbbe33a98d264b0fbd4ac7ec19cffd9b
+pub fn nft_consecutive_transfer_integrity_1(e: Env) {
     let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
     let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
     let token_id = u32::nondet();
-    clog!(token_id);
-    let owner_pre = Consecutive::owner_of(&e, token_id);
-    clog!(cvlr_soroban::Addr(&owner_pre));
+
     let balance_from_pre = Consecutive::balance(&e, &from);
-    clog!(balance_from_pre);
-    let balance_to_pre = Consecutive::balance(&e, &to);
-    clog!(balance_to_pre);
     Consecutive::transfer(&e, &from, &to, token_id);
-    let owner_post = Consecutive::owner_of(&e, token_id);
-    clog!(cvlr_soroban::Addr(&owner_post));
-    cvlr_assert!(owner_post == to);
     let balance_from_post = Consecutive::balance(&e, &from);
-    clog!(balance_from_post);
-    let balance_to_post = Consecutive::balance(&e, &to);
-    clog!(balance_to_post);
+
     if to != from {
         cvlr_assert!(balance_from_post == balance_from_pre - 1);
-        cvlr_assert!(balance_to_post == balance_to_pre + 1);
     } else {
-        cvlr_assert!(balance_to_post == balance_to_pre);
         cvlr_assert!(balance_from_post == balance_from_pre);
     }
 }
 
 #[rule]
-// after transfer_from the token owner is to
 // updates balances correctly
-// removes approval
-// status: timeout
-pub fn nft_consecutive_transfer_from_integrity(e: Env) {
-    let spender = nondet_address();
-    clog!(cvlr_soroban::Addr(&spender));
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
+// status: verified https://prover.certora.com/output/33158/cbbe33a98d264b0fbd4ac7ec19cffd9b
+pub fn nft_consecutive_transfer_integrity_2(e: Env) {
     let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
+    let from = nondet_address();
     let token_id = u32::nondet();
-    clog!(token_id);
-    let owner_pre = Consecutive::owner_of(&e, token_id);
-    clog!(cvlr_soroban::Addr(&owner_pre));
-    let balance_from_pre = Consecutive::balance(&e, &from);
-    clog!(balance_from_pre);
+
     let balance_to_pre = Consecutive::balance(&e, &to);
-    clog!(balance_to_pre);
-    Consecutive::transfer_from(&e, &spender, &from, &to, token_id);
-    let owner_post = Consecutive::owner_of(&e, token_id);
-    clog!(cvlr_soroban::Addr(&owner_post));
-    cvlr_assert!(owner_post == to);
-    let balance_from_post = Consecutive::balance(&e, &from);
-    clog!(balance_from_post);
+    Consecutive::transfer(&e, &from, &to, token_id);
     let balance_to_post = Consecutive::balance(&e, &to);
-    clog!(balance_to_post);
+
     if to != from {
-        cvlr_assert!(balance_from_post == balance_from_pre - 1);
         cvlr_assert!(balance_to_post == balance_to_pre + 1);
     } else {
         cvlr_assert!(balance_to_post == balance_to_pre);
+    }
+}
+
+#[rule]
+// after transfer the token owner is set to the to address
+// status: https://prover.certora.com/output/33158/08b3797b32494c0291626077382c405d
+// Note: previously this was doing `let owner_post = Consecutive::owner_of(&e, token_id);`
+// which may not be necessary for finding the owner based on the change to owner in `update`.
+pub fn nft_consecutive_transfer_integrity_3(e: Env) {
+    let to = nondet_address();
+    let from = nondet_address();
+    let token_id = u32::nondet();
+
+    Consecutive::transfer(&e, &from, &to, token_id);
+    let owner_post: Option<Address> = e.storage().persistent().get(&NFTConsecutiveStorageKey::Owner(token_id));
+    cvlr_assert!(owner_post.is_some() && owner_post.unwrap() == to);
+}
+
+
+#[rule]
+// updates balances correctly
+// status: timeout
+pub fn nft_consecutive_transfer_from_integrity_1(e: Env) {
+    let spender = nondet_address();
+    let from = nondet_address();
+    let to = nondet_address();
+    let token_id = u32::nondet();
+
+    let balance_from_pre = Consecutive::balance(&e, &from);
+
+    Consecutive::transfer_from(&e, &spender, &from, &to, token_id);
+
+    let balance_from_post = Consecutive::balance(&e, &from);
+
+    if to != from {
+        cvlr_assert!(balance_from_post == balance_from_pre - 1);
+    } else {
         cvlr_assert!(balance_from_post == balance_from_pre);
     }
+}
+
+#[rule]
+// updates balances correctly
+// status: timeout
+pub fn nft_consecutive_transfer_from_integrity_2(e: Env) {
+    let spender = nondet_address();
+    let from = nondet_address();
+    let to = nondet_address();
+    let token_id = u32::nondet();
+
+    let balance_to_pre = Consecutive::balance(&e, &to);
+
+    Consecutive::transfer_from(&e, &spender, &from, &to, token_id);
+
+    let balance_to_post = Consecutive::balance(&e, &to);
+
+    if to != from {
+        cvlr_assert!(balance_to_post == balance_to_pre + 1);
+    } else {
+        cvlr_assert!(balance_to_post == balance_to_pre);
+    }
+}
+
+#[rule]
+// removes approval
+// status: verified https://prover.certora.com/output/33158/0cc2e71922e94a90987fa09bd5afa9b0
+// sanity: https://prover.certora.com/output/33158/f8c67f75d3f44d199703beea9db8bbff
+pub fn nft_consecutive_transfer_from_integrity_3(e: Env) {
+    let spender = nondet_address();
+    let from = nondet_address();
+    let to = nondet_address();
+    let token_id = u32::nondet();
+
+    let balance_to_pre = Consecutive::balance(&e, &to);
+
+    Consecutive::transfer_from(&e, &spender, &from, &to, token_id);
+
     let approval_post = Consecutive::get_approved(&e, token_id);
     cvlr_assert!(approval_post.is_none());
+}
+
+#[rule]
+// after transfer_from the token owner is to
+// status: timeout.
+// Note: previously this was doing `let owner_post = Consecutive::owner_of(&e, token_id);`
+// which may not be necessary for finding the owner based on the change to owner in `update`.
+pub fn nft_consecutive_transfer_from_integrity_4(e: Env) {
+    let spender = nondet_address();
+    let from = nondet_address();
+    let to = nondet_address();
+    let token_id = u32::nondet();
+
+    Consecutive::transfer_from(&e, &spender, &from, &to, token_id);
+
+    let owner_post: Option<Address> = e.storage().persistent().get(&NFTConsecutiveStorageKey::Owner(token_id));
+    cvlr_assert!(owner_post.is_some() && owner_post.unwrap() == to);
 }
 
 #[rule]
