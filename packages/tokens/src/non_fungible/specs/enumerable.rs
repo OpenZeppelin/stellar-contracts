@@ -40,126 +40,12 @@ pub fn try_get_token_id(e: &Env, index: u32) -> Option<u32> {
 // ################## INVARIANTS ##################
 
 // invariant: index < balance <-> get_owner_token_id != none
+
 // invariants should be checked for transfer, transfer_from, mint,
 // sequential_mint, burn and burn_from (approves are trivial)
 
 // invariant: total_supply >= balance()
-
-// helpers
-
-pub fn assume_pre_total_supply_geq_balance(e: Env, account: &Address) {
-    clog!(cvlr_soroban::Addr(account));
-    let total_supply = Enumerable::total_supply(&e);
-    clog!(total_supply);
-    let balance = Enumerable::balance(&e, account);
-    clog!(balance);
-    cvlr_assume!(total_supply >= balance);
-}
-
-pub fn assert_post_total_supply_geq_balance(e: Env, account: &Address) {
-    clog!(cvlr_soroban::Addr(account));
-    let total_supply = Enumerable::total_supply(&e);
-    clog!(total_supply);
-    let balance = Enumerable::balance(&e, account);
-    clog!(balance);
-    cvlr_assert!(total_supply >= balance);
-}
-
-#[rule]
-// status: violation - bad rule
-// https://prover.certora.com/output/5771024/c6c53c3cbf134b41a6dccc5a68a30cff/
-pub fn after_nft_transfer_total_supply_geq_balance(e: Env) {
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let token_id = u32::nondet();
-    clog!(token_id);
-    let account = nondet_address();
-    clog!(cvlr_soroban::Addr(&account));
-    assume_pre_total_supply_geq_balance(e.clone(), &account);
-    assume_pre_total_supply_geq_balance(e.clone(), &from);
-    Enumerable::transfer(&e, &from, &to, token_id);
-    assert_post_total_supply_geq_balance(e, &account);
-}
-
-#[rule]
-// status: violation bad rule
-pub fn after_nft_transfer_from_total_supply_geq_balance(e: Env) {
-    let spender = nondet_address();
-    clog!(cvlr_soroban::Addr(&spender));
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let token_id = u32::nondet();
-    clog!(token_id);
-    let account = nondet_address();
-    clog!(cvlr_soroban::Addr(&account));
-    assume_pre_total_supply_geq_balance(e.clone(), &account);
-    assume_pre_total_supply_geq_balance(e.clone(), &from);
-    Enumerable::transfer_from(&e, &spender, &from, &to, token_id);
-    assert_post_total_supply_geq_balance(e, &account);
-}
-
-#[rule]
-// status: verified
-pub fn after_nft_non_sequential_mint_total_supply_geq_balance(e: Env) {
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let token_id = u32::nondet();
-    clog!(token_id);
-    let account = nondet_address();
-    clog!(cvlr_soroban::Addr(&account));
-    assume_pre_total_supply_geq_balance(e.clone(), &account);
-    Enumerable::non_sequential_mint(&e, &to, token_id);
-    assert_post_total_supply_geq_balance(e, &account);
-}
-
-#[rule]
-// status: verified
-pub fn after_nft_sequential_mint_total_supply_geq_balance(e: Env) {
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let account = nondet_address();
-    clog!(cvlr_soroban::Addr(&account));
-    assume_pre_total_supply_geq_balance(e.clone(), &account);
-    Enumerable::sequential_mint(&e, &to);
-    assert_post_total_supply_geq_balance(e, &account);
-}
-
-#[rule]
-// status: violation - same problem from fungible. bad rule
-// https://prover.certora.com/output/33158/b15351401b0e464795731ba47f482125
-pub fn after_nft_burn_total_supply_geq_balance(e: Env) {
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let token_id = u32::nondet();
-    clog!(token_id);
-    let account = nondet_address();
-    clog!(cvlr_soroban::Addr(&account));
-    assume_pre_total_supply_geq_balance(e.clone(), &account);
-    Enumerable::burn(&e, &from, token_id);
-    assert_post_total_supply_geq_balance(e, &account);
-}
-
-#[rule]
-// status: violation https://prover.certora.com/output/33158/6ec050fb37a14a48980ecd71a718df04
-// - expected violation, as in burn bad rule
-pub fn after_nft_burn_from_total_supply_geq_balance(e: Env) {
-    let spender = nondet_address();
-    clog!(cvlr_soroban::Addr(&spender));
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let token_id = u32::nondet();
-    clog!(token_id);
-    let account = nondet_address();
-    clog!(cvlr_soroban::Addr(&account));
-    assume_pre_total_supply_geq_balance(e.clone(), &account);
-    assume_pre_total_supply_geq_balance(e.clone(), &from);
-    Enumerable::burn_from(&e, &spender, &from, token_id);
-    assert_post_total_supply_geq_balance(e, &account);
-}
+// can't prove without ghosts and hooks
 
 // invariant: index < total_supply <-> get_token_id != none
 

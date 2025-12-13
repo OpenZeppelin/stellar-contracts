@@ -5,9 +5,6 @@ use soroban_sdk::{Address, Env};
 
 use crate::fungible::{
     specs::{
-        fungible_invariants::{
-            assert_post_total_supply_geq_balance, assume_pre_total_supply_geq_balance,
-        },
         fungible_non_panics::{storage_setup_allowance, storage_setup_balance},
     },
     Base,
@@ -260,51 +257,4 @@ pub fn burn_from_non_panic_sanity(e: Env) {
 
 // ################## INVARIANT RULES ##################
 
-// we can't prove this without ghosts and hooks.
-pub fn assume_pre_total_supply_geq_two_balances(e: Env, account1: &Address, account2: &Address) {
-    clog!(cvlr_soroban::Addr(account1));
-    clog!(cvlr_soroban::Addr(account2));
-    let total_supply = Base::total_supply(&e);
-    clog!(total_supply);
-    let balance1 = Base::balance(&e, account1);
-    clog!(balance1);
-    let balance2 = Base::balance(&e, account2);
-    clog!(balance2);
-    cvlr_assume!(total_supply >= balance1 + balance2);
-}
-
-#[rule]
-// after burn total_supply >= balance for any account
-// status: bad rule
-pub fn after_burn_total_supply_geq_balance(e: Env) {
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let amount = nondet();
-    clog!(amount);
-    let account = nondet_address();
-    clog!(cvlr_soroban::Addr(&account));
-    assume_pre_total_supply_geq_balance(e.clone(), &account);
-    assume_pre_total_supply_geq_balance(e.clone(), &from);
-    assume_pre_total_supply_geq_two_balances(e.clone(), &account, &from);
-    Base::burn(&e, &from, amount);
-    assert_post_total_supply_geq_balance(e, &account);
-}
-
-#[rule]
-// after burn_from total_supply >= balance for any account
-// status: bad rule
-pub fn after_burn_from_total_supply_geq_balance(e: Env) {
-    let spender = nondet_address();
-    clog!(cvlr_soroban::Addr(&spender));
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let amount = nondet();
-    clog!(amount);
-    let account = nondet_address();
-    clog!(cvlr_soroban::Addr(&account));
-    assume_pre_total_supply_geq_balance(e.clone(), &account);
-    assume_pre_total_supply_geq_balance(e.clone(), &from);
-    assume_pre_total_supply_geq_two_balances(e.clone(), &account, &from);
-    Base::burn_from(&e, &spender, &from, amount);
-    assert_post_total_supply_geq_balance(e, &account);
-}
+// again, we would like to show total_supply >= balance, but that requires ghosts and hooks.
