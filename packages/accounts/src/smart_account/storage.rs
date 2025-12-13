@@ -118,7 +118,7 @@ use crate::{
         simple_threshold::SimpleThresholdAccountParams, spending_limit::SpendingLimitAccountParams,
         Policy,
     },
-    smart_account::specs::{policy::SimpleThresholdPolicyContract, verifer::SimpleVerifier},
+    smart_account::specs::{policy::SimpleThresholdPolicyContract, verifier::SimpleVerifier},
     verifiers::Verifier,
 };
 

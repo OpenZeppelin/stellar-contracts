@@ -4,7 +4,7 @@ use crate::verifiers::Verifier;
 
 pub struct SimpleVerifier;
 
-// Taken from the documentation in `verifers/mod.rs`
+// Taken from the documentation in `verifiers/mod.rs`
 
 impl Verifier for SimpleVerifier {
     type KeyData = BytesN<32>;
