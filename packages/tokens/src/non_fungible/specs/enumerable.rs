@@ -66,7 +66,7 @@ pub fn assert_post_total_supply_geq_balance(e: Env, account: &Address) {
 }
 
 #[rule]
-// status: violation - why
+// status: violation - bad rule
 // https://prover.certora.com/output/5771024/c6c53c3cbf134b41a6dccc5a68a30cff/
 pub fn after_nft_transfer_total_supply_geq_balance(e: Env) {
     let to = nondet_address();
@@ -84,7 +84,7 @@ pub fn after_nft_transfer_total_supply_geq_balance(e: Env) {
 }
 
 #[rule]
-// status: violation https://prover.certora.com/output/33158/ff62c09005e2484dbcd11347f59e1ce5
+// status: violation bad rule
 pub fn after_nft_transfer_from_total_supply_geq_balance(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
@@ -129,7 +129,7 @@ pub fn after_nft_sequential_mint_total_supply_geq_balance(e: Env) {
 }
 
 #[rule]
-// status: violation - same problem from fungible.
+// status: violation - same problem from fungible. bad rule
 // https://prover.certora.com/output/33158/b15351401b0e464795731ba47f482125
 pub fn after_nft_burn_total_supply_geq_balance(e: Env) {
     let from = nondet_address();
@@ -145,7 +145,7 @@ pub fn after_nft_burn_total_supply_geq_balance(e: Env) {
 
 #[rule]
 // status: violation https://prover.certora.com/output/33158/6ec050fb37a14a48980ecd71a718df04
-// - expected violation, as in burn
+// - expected violation, as in burn bad rule
 pub fn after_nft_burn_from_total_supply_geq_balance(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
@@ -250,7 +250,8 @@ pub fn after_nft_sequential_mint_valid_index(e: Env) {
 }
 
 #[rule]
-// status: violation https://prover.certora.com/output/33158/75d3df1bfcce4f8d8c89280e4a10d046
+// status: violation - investigate
+// https://prover.certora.com/output/33158/75d3df1bfcce4f8d8c89280e4a10d046
 pub fn after_nft_burn_valid_index(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -264,7 +265,8 @@ pub fn after_nft_burn_valid_index(e: Env) {
 }
 
 #[rule]
-// status: violation https://prover.certora.com/output/33158/842685020d6b433197bb4efdb12558c6
+// status: violation
+// investigate https://prover.certora.com/output/33158/842685020d6b433197bb4efdb12558c6
 pub fn after_nft_burn_from_valid_index(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
