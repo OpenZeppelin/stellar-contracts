@@ -12,7 +12,7 @@ use crate::{
 };
 
 #[rule]
-// status: violated - spurious
+// status: violation - spurious
 pub fn merkle_distributor_constructor_integrity(e: Env) {
     let root_hash = nondet_bytes_n();
     let owner = nondet_address();
@@ -23,7 +23,7 @@ pub fn merkle_distributor_constructor_integrity(e: Env) {
 }
 
 #[rule]
-// status: violated - spurious
+// status: violation - spurious
 pub fn set_claimed_integrity(e: Env) {
     let index: u32 = nondet();
     clog!(index);
@@ -34,7 +34,7 @@ pub fn set_claimed_integrity(e: Env) {
 }
 
 #[rule]
-// status: violated - spurious
+// status: violation - spurious
 pub fn claim_integrity(e: Env) {
     let leaf = Leaf::nondet();
     let proof = nondet_vec();

@@ -29,7 +29,7 @@ pub fn storage_setup_allowance(e: Env, owner: Address, spender: Address) {
 // from auth
 // from has enough balance
 // amount >= 0
-// status: violated - problem with storage and nondet?
+// status: violation - problem with storage and nondet?
 pub fn transfer_non_panic(e: Env) {
     let to: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
@@ -73,7 +73,7 @@ pub fn transfer_non_panic_sanity(e: Env) {
 // from has enough allowance
 // spender has enough allowance
 // amount >= 0
-// status: violated - problem with storage and nondet?
+// status: violation - problem with storage and nondet?
 pub fn transfer_from_non_panic(e: Env) {
     let to: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&to));

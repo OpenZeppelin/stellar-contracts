@@ -323,7 +323,7 @@ pub fn admin_function_panics_if_admin_not_set(e: Env) {
 
 #[rule]
 // role1_func panics if caller doesn't have role
-// status: violated - symbol issue
+// status: violation - symbol issue
 pub fn role1_func_panics_if_caller_does_not_have_role(e: Env) {
     let caller = nondet_address();
     let role1 = soroban_sdk::Symbol::new(&e, "role1");
@@ -335,7 +335,7 @@ pub fn role1_func_panics_if_caller_does_not_have_role(e: Env) {
 
 #[rule]
 // role1_auth_func panics if caller doesn't have role
-// status: violated - symbol issue
+// status: violation - symbol issue
 pub fn role1_auth_func_panics_if_caller_does_not_have_role(e: Env) {
     let caller = nondet_address();
     let role1 = soroban_sdk::Symbol::new(&e, "role1");
@@ -357,7 +357,7 @@ pub fn role1_auth_func_panics_if_caller_does_not_authorize(e: Env) {
 
 #[rule]
 // role1_or_role2_func panics if caller doesn't have role
-// status: violated - symbol issue
+// status: violation - symbol issue
 pub fn role1_or_role2_func_panics_if_caller_does_not_have_role(e: Env) {
     let caller = nondet_address();
     let role1 = soroban_sdk::Symbol::new(&e, "role1");
@@ -371,7 +371,7 @@ pub fn role1_or_role2_func_panics_if_caller_does_not_have_role(e: Env) {
 
 #[rule]
 // role1_or_role2_auth_func panics if caller doesn't have role
-// status: violated - symbol issue
+// status: violation - symbol issue
 pub fn role1_or_role2_auth_func_panics_if_caller_does_not_have_role(e: Env) {
     let caller = nondet_address();
     let role1 = soroban_sdk::Symbol::new(&e, "role1");
@@ -395,7 +395,7 @@ pub fn role1_or_role2_auth_func_panics_if_caller_does_not_authorize(e: Env) {
 
 #[rule]
 // role1_and_role2_func panics if caller1 doesn't have role
-// status: violated - symbol issue
+// status: violation - symbol issue
 pub fn role1_and_role2_func_panics_if_caller1_does_not_have_role(e: Env) {
     let caller1 = nondet_address();
     let caller2 = nondet_address();
@@ -408,7 +408,7 @@ pub fn role1_and_role2_func_panics_if_caller1_does_not_have_role(e: Env) {
 
 #[rule]
 // role1_and_role2_func panics if caller2 doesn't have role
-// status: violated - symbol issue
+// status: violation - symbol issue
 pub fn role1_and_role2_func_panics_if_caller2_does_not_have_role(e: Env) {
     let caller1 = nondet_address();
     let caller2 = nondet_address();

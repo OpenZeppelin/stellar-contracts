@@ -35,7 +35,7 @@ pub fn fixed_mul_ceil_panics_if_zero_denominator(e: &Env) {
 
 #[rule]
 // fixed_mul_floor panics if the result overflows
-// status: violated - spurious?
+// status: violation - spurious?
 pub fn fixed_mul_floor_panics_if_result_overflows(e: &Env) {
     let x = i128::nondet();
     clog!(x);
@@ -55,7 +55,7 @@ pub fn fixed_mul_floor_panics_if_result_overflows(e: &Env) {
 
 #[rule]
 // fixed_mul_ceil panics if the result overflows
-// status: violated - spurious?
+// status: violation - spurious?
 pub fn fixed_mul_ceil_panics_if_result_overflows(e: &Env) {
     let x = i128::nondet();
     clog!(x);

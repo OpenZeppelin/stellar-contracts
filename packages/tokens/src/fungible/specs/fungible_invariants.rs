@@ -31,7 +31,7 @@ pub fn assert_post_total_supply_geq_balance(e: Env, account: &Address) {
 }
 
 #[rule]
-// status: violated - spurious
+// status: violation - spurious
 // https://prover.certora.com/output/5771024/7ac81c9f026e44b1a29a116052a06333/
 // actually this cannot verify
 pub fn after_transfer_total_supply_geq_balance(e: Env) {
@@ -49,7 +49,7 @@ pub fn after_transfer_total_supply_geq_balance(e: Env) {
 }
 
 #[rule]
-// status: violated - seems spurious
+// status: violation - seems spurious
 pub fn after_transfer_from_total_supply_geq_balance(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));

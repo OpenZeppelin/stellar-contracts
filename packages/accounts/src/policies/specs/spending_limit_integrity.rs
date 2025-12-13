@@ -45,7 +45,7 @@ pub fn sl_set_spending_limit_integrity(e: Env) {
 }
 
 #[rule]
-// status: violated - spurious.
+// status: violation - spurious.
 // trying to describe some path where can_enforce returns true.
 // should separate these out to a different file
 // and describe all the different possible paths with loop_iter <= 2

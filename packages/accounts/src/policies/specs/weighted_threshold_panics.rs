@@ -71,7 +71,7 @@ pub fn wt_set_threshold_panics_if_not_installed(e: Env) {
 
 #[rule]
 // set_signer_weight_panics if threshold > total_weight after update
-// status: spurious violation? unclear?
+// status: violation spurious? unclear?
 pub fn wt_set_signer_weight_panics_if_threshold_exceeds_total_weight(e: Env) {
     let signer: Signer = Signer::nondet();
     let weight: u32 = u32::nondet();
