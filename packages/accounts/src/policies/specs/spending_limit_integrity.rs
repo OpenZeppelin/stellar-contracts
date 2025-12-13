@@ -54,7 +54,7 @@ pub fn sl_set_spending_limit_integrity(e: Env) {
 // spending limit
 pub fn no_previous_transfer_succeeds(e: Env, context: soroban_sdk::auth::Context) {
     let auth_signers: Vec<Signer> = nondet_signers_vec();
-    cvlr_assume!(auth_signers.len() > 0);
+    cvlr_assume!(!auth_signers.is_empty());
     let ctx_rule: ContextRule = ContextRule::nondet();
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));

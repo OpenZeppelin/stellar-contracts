@@ -96,7 +96,7 @@ pub fn after_enforce_threshold_non_zero(e: Env, context: soroban_sdk::auth::Cont
 pub fn assume_pre_threshold_less_than_signers(e: Env, ctx_rule: ContextRule, account_id: Address) {
     let threshold: u32 = SimpleThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
     let signers: Vec<Signer> = ctx_rule.signers;
-    let signers_length: u32 = signers.len() as u32;
+    let signers_length: u32 = signers.len();
     clog!(threshold);
     clog!(signers_length);
     cvlr_assume!(threshold <= signers_length);
@@ -105,7 +105,7 @@ pub fn assume_pre_threshold_less_than_signers(e: Env, ctx_rule: ContextRule, acc
 pub fn assert_post_threshold_less_than_signers(e: Env, ctx_rule: ContextRule, account_id: Address) {
     let threshold: u32 = SimpleThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
     let signers: Vec<Signer> = ctx_rule.signers;
-    let signers_length: u32 = signers.len() as u32;
+    let signers_length: u32 = signers.len();
     clog!(threshold);
     clog!(signers_length);
     cvlr_assert!(threshold <= signers_length);
@@ -128,7 +128,7 @@ pub fn after_install_threshold_leq_signers_length(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     let threshold: u32 = u32::nondet();
-    let params: SimpleThresholdAccountParams = SimpleThresholdAccountParams { threshold: threshold };
+    let params: SimpleThresholdAccountParams = SimpleThresholdAccountParams { threshold };
     SimpleThresholdPolicy::install(&e, params, ctx_rule.clone(), account_id.clone());
     assert_post_threshold_less_than_signers(e.clone(), ctx_rule.clone(), account_id.clone());
 }

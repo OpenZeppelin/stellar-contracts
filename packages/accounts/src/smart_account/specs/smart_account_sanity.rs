@@ -111,7 +111,7 @@ pub fn do_check_auth_sanity(e: Env) {
 pub fn authenticate_sanity(e: Env) {
     let signature_payload = nondet_hash_32();
     let signatures = nondet_signatures_map();
-    let _ = authenticate(&e, &signature_payload, &signatures.0);
+    authenticate(&e, &signature_payload, &signatures.0);
     cvlr_satisfy!(true);
 }
 

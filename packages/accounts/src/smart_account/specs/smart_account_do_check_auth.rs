@@ -31,11 +31,11 @@ pub fn can_enforce_all_policies_matches_can_enforce(e: Env) {
     clog!(policies.len());
     cvlr_assume!(policies.len()==1); // just one policy -- anyway its the threshold contract
 
-    let threshold = SimpleThresholdPolicyContract::get_threshold(&e, ctx_rule.id, (&e).current_contract_address());
+    let threshold = SimpleThresholdPolicyContract::get_threshold(&e, ctx_rule.id, e.current_contract_address());
     clog!(threshold);
     // cvlr_assume!(threshold > 0);
 
-    let can_enforce = SimpleThresholdPolicyContract::can_enforce(&e, context.clone(), matched_signers.clone(), ctx_rule.clone(), (&e).current_contract_address());
+    let can_enforce = SimpleThresholdPolicyContract::can_enforce(&e, context.clone(), matched_signers.clone(), ctx_rule.clone(), e.current_contract_address());
     clog!(can_enforce);
     
     let can_enforce_all_policies = can_enforce_all_policies(
