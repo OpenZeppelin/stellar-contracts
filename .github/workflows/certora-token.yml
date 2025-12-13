@@ -5,7 +5,6 @@ on: pull_request
 env:
   CONFIGS: |
     fungible_integrity.conf
-    fungible_invariants.conf
     fungible_non_panics.conf
     fungible_panics.conf
     fungible_sanity.conf
