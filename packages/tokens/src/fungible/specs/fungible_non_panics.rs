@@ -39,6 +39,7 @@ pub fn transfer_non_panic(e: Env) {
     clog!(amount);
     cvlr_assume!(is_auth(from.clone()));
     storage_setup_balance(e.clone(), from.clone());
+    storage_setup_balance(e.clone(), to.clone());
     let from_balance = Base::balance(&e, &from);
     clog!(from_balance);
     cvlr_assume!(from_balance >= amount);
@@ -173,5 +174,96 @@ pub fn approve_non_panic_sanity(e: Env) {
     cvlr_assume!(!ledger_more_than_max);
     cvlr_assume!(!(non_zero_amount && ledger_less_than_current));
     Base::approve(&e, &owner, &spender, amount, live_until_ledger);
+    cvlr_satisfy!(true);
+}
+
+#[rule]
+// requires
+// from auth
+// from has enough balance
+// amount >= 0
+// status: wip
+pub fn burn_non_panic(e: Env) {
+    let from = nondet_address();
+    clog!(cvlr_soroban::Addr(&from));
+    let amount: i128 = nondet();
+    clog!(amount);
+    cvlr_assume!(is_auth(from.clone()));
+    storage_setup_balance(e.clone(), from.clone());
+    let from_balance = Base::balance(&e, &from);
+    clog!(from_balance);
+    cvlr_assume!(from_balance >= amount);
+    cvlr_assume!(amount >= 0);
+    Base::burn(&e, &from, amount);
+    cvlr_assert!(true);
+}
+
+#[rule]
+// sanity
+// status: wip
+pub fn burn_non_panic_sanity(e: Env) {
+    let from = nondet_address();
+    clog!(cvlr_soroban::Addr(&from));
+    let amount: i128 = nondet();
+    clog!(amount);
+    cvlr_assume!(is_auth(from.clone()));
+    storage_setup_balance(e.clone(), from.clone());
+    let from_balance = Base::balance(&e, &from);
+    clog!(from_balance);
+    cvlr_assume!(from_balance >= amount);
+    cvlr_assume!(amount >= 0);
+    Base::burn(&e, &from, amount);
+    cvlr_satisfy!(true);
+}
+
+#[rule]
+// requires
+// spender auth
+// from has enough balance
+// from has enough allowance
+// amount >= 0
+// status: wip
+pub fn burn_from_non_panic(e: Env) {
+    let spender = nondet_address();
+    clog!(cvlr_soroban::Addr(&spender));
+    let from = nondet_address();
+    clog!(cvlr_soroban::Addr(&from));
+    let amount: i128 = nondet();
+    clog!(amount);
+    cvlr_assume!(is_auth(spender.clone()));
+    storage_setup_balance(e.clone(), from.clone());
+    let balance_from = Base::balance(&e, &from);
+    clog!(balance_from);
+    cvlr_assume!(balance_from >= amount);
+    storage_setup_allowance(e.clone(), from.clone(), spender.clone());
+    let allowance_spender = Base::allowance(&e, &from, &spender);
+    clog!(allowance_spender);
+    cvlr_assume!(allowance_spender >= amount);
+    cvlr_assume!(amount >= 0);
+    Base::burn_from(&e, &spender, &from, amount);
+    cvlr_assert!(true);
+}
+
+#[rule]
+// sanity
+// status: wip
+pub fn burn_from_non_panic_sanity(e: Env) {
+    let spender = nondet_address();
+    clog!(cvlr_soroban::Addr(&spender));
+    let from = nondet_address();
+    clog!(cvlr_soroban::Addr(&from));
+    let amount: i128 = nondet();
+    clog!(amount);
+    cvlr_assume!(is_auth(spender.clone()));
+    storage_setup_balance(e.clone(), from.clone());
+    let balance_from = Base::balance(&e, &from);
+    clog!(balance_from);
+    cvlr_assume!(balance_from >= amount);
+    storage_setup_allowance(e.clone(), from.clone(), spender.clone());
+    let allowance_spender = Base::allowance(&e, &from, &spender);
+    clog!(allowance_spender);
+    cvlr_assume!(allowance_spender >= amount);
+    cvlr_assume!(amount >= 0);
+    Base::burn_from(&e, &spender, &from, amount);
     cvlr_satisfy!(true);
 }

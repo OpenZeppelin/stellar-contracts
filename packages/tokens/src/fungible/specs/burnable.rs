@@ -2,13 +2,7 @@ use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::{is_auth, nondet_address};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env};
-
-use crate::fungible::{
-    specs::{
-        fungible_non_panics::{storage_setup_allowance, storage_setup_balance},
-    },
-    Base,
-};
+use crate::fungible::{Base};
 
 // ################## INTEGRITY RULES ##################
 
@@ -162,98 +156,7 @@ pub fn burn_from_panics_if_amount_less_than_zero(e: Env) {
     cvlr_assert!(false);
 }
 
-// ################## NON-PANIC RULES ##################
-
-#[rule]
-// requires
-// from auth
-// from has enough balance
-// amount >= 0
-// status: wip
-pub fn burn_non_panic(e: Env) {
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let amount: i128 = nondet();
-    clog!(amount);
-    cvlr_assume!(is_auth(from.clone()));
-    storage_setup_balance(e.clone(), from.clone());
-    let from_balance = Base::balance(&e, &from);
-    clog!(from_balance);
-    cvlr_assume!(from_balance >= amount);
-    cvlr_assume!(amount >= 0);
-    Base::burn(&e, &from, amount);
-    cvlr_assert!(true);
-}
-
-#[rule]
-// sanity
-// status: wip
-pub fn burn_non_panic_sanity(e: Env) {
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let amount: i128 = nondet();
-    clog!(amount);
-    cvlr_assume!(is_auth(from.clone()));
-    storage_setup_balance(e.clone(), from.clone());
-    let from_balance = Base::balance(&e, &from);
-    clog!(from_balance);
-    cvlr_assume!(from_balance >= amount);
-    cvlr_assume!(amount >= 0);
-    Base::burn(&e, &from, amount);
-    cvlr_satisfy!(true);
-}
-
-#[rule]
-// requires
-// spender auth
-// from has enough balance
-// from has enough allowance
-// amount >= 0
-// status: wip
-pub fn burn_from_non_panic(e: Env) {
-    let spender = nondet_address();
-    clog!(cvlr_soroban::Addr(&spender));
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let amount: i128 = nondet();
-    clog!(amount);
-    cvlr_assume!(is_auth(spender.clone()));
-    storage_setup_balance(e.clone(), from.clone());
-    let balance_from = Base::balance(&e, &from);
-    clog!(balance_from);
-    cvlr_assume!(balance_from >= amount);
-    storage_setup_allowance(e.clone(), from.clone(), spender.clone());
-    let allowance_spender = Base::allowance(&e, &from, &spender);
-    clog!(allowance_spender);
-    cvlr_assume!(allowance_spender >= amount);
-    cvlr_assume!(amount >= 0);
-    Base::burn_from(&e, &spender, &from, amount);
-    cvlr_assert!(true);
-}
-
-#[rule]
-// sanity
-// status: wip
-pub fn burn_from_non_panic_sanity(e: Env) {
-    let spender = nondet_address();
-    clog!(cvlr_soroban::Addr(&spender));
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let amount: i128 = nondet();
-    clog!(amount);
-    cvlr_assume!(is_auth(spender.clone()));
-    storage_setup_balance(e.clone(), from.clone());
-    let balance_from = Base::balance(&e, &from);
-    clog!(balance_from);
-    cvlr_assume!(balance_from >= amount);
-    storage_setup_allowance(e.clone(), from.clone(), spender.clone());
-    let allowance_spender = Base::allowance(&e, &from, &spender);
-    clog!(allowance_spender);
-    cvlr_assume!(allowance_spender >= amount);
-    cvlr_assume!(amount >= 0);
-    Base::burn_from(&e, &spender, &from, amount);
-    cvlr_satisfy!(true);
-}
+// non-panic rules are in fungible_non_panics.rs
 
 // ################## INVARIANT RULES ##################
 
