@@ -29,7 +29,7 @@ pub fn storage_setup_allowance(e: Env, owner: Address, spender: Address) {
 // from auth
 // from has enough balance
 // amount >= 0
-// status: violation - problem with storage and nondet?
+// status: violation - spurious - Expected sym to be a valid Val, in ledger/put_contract_data
 pub fn transfer_non_panic(e: Env) {
     let to: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
@@ -74,7 +74,7 @@ pub fn transfer_non_panic_sanity(e: Env) {
 // from has enough allowance
 // spender has enough allowance
 // amount >= 0
-// status: violation - problem with storage and nondet?
+// status: violation - spurious - Expected sym to be a valid Val, in ledger/put_contract_data
 pub fn transfer_from_non_panic(e: Env) {
     let to: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
@@ -182,7 +182,7 @@ pub fn approve_non_panic_sanity(e: Env) {
 // from auth
 // from has enough balance
 // amount >= 0
-// status: wip
+// status: violation - spurious - Expected sym to be a valid Val, in ledger/put_contract_data
 pub fn burn_non_panic(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -200,7 +200,7 @@ pub fn burn_non_panic(e: Env) {
 
 #[rule]
 // sanity
-// status: wip
+// status: 
 pub fn burn_non_panic_sanity(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -222,7 +222,7 @@ pub fn burn_non_panic_sanity(e: Env) {
 // from has enough balance
 // from has enough allowance
 // amount >= 0
-// status: wip
+// status: violation - spurious - Expected sym to be a valid Val, in ledger/put_contract_data
 pub fn burn_from_non_panic(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
@@ -246,7 +246,7 @@ pub fn burn_from_non_panic(e: Env) {
 
 #[rule]
 // sanity
-// status: wip
+// status: 
 pub fn burn_from_non_panic_sanity(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
