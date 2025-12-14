@@ -12,15 +12,42 @@ use crate::smart_account::{
 };
 use crate::smart_account::storage::{
     SmartAccountStorageKey, ContextRule,
-    remove_context_rule, get_context_rule, update_context_rule_valid_until, 
-    add_signer, remove_signer, add_policy, remove_policy, get_persistent_entry
+    remove_context_rule, get_context_rule, update_context_rule_valid_until, update_context_rule_name, add_context_rule,
+    add_signer, remove_signer, add_policy, remove_policy, get_persistent_entry,
 };
+use crate::smart_account::specs::helper::{get_count, get_next_id, get_ids_of_rule_type};
 
 // functions from the trait:
 
-// add_context_rule - hard - failing sanity in 15m
+#[rule]
+// after add_context_rule the rule_count increases by 1
+// status: timeout
+pub fn add_context_rule_integrity_1(e: Env) {
+    let ctx_typ = ContextRuleType::nondet();
+    let name = nondet_string();
+    let valid_until = Option::<u32>::nondet();
+    let signers = nondet_signers_vec();
+    let policies = nondet_policy_map();
+    let count_pre = get_count(e.clone());
+    add_context_rule(&e, &ctx_typ, &name, valid_until, &signers, &policies);
+    let count_post = get_count(e.clone());
+    cvlr_assert!(count_post == count_pre + 1);
+}
 
-// todo: update_context_rule_name - string equality is hard prob.
+// todo: more
+
+#[rule]
+// after update_context_rule_name the name changes
+// status: 
+pub fn update_context_rule_name_integrity(e: Env) {
+    let id = nondet();
+    let name = nondet_string();
+    let ctx_rule_pre = get_context_rule(&e, id);
+    update_context_rule_name(&e, id, &name);
+    let ctx_rule_post = get_context_rule(&e, id);
+    let name_post = ctx_rule_post.name;
+    cvlr_assert!(name_post == name);
+}
 
 #[rule]
 // after update_context_rule_valid_until the rule's valid until changes.
@@ -37,16 +64,18 @@ pub fn update_context_rule_valid_until_integrity(e: Env) {
 #[rule]
 // remove context_rule updates the rule count correctly.
 // status: verified
-// note: 42 minutes
-pub fn remove_context_rule_integrity(e: Env) {
+// note: 80 minutes!
+pub fn remove_context_rule_integrity_1(e: Env) {
     let id: u32 = nondet();
     clog!(id);
     let ctx_rule_pre = get_context_rule(&e, id);
-    let rule_count_pre = e.storage().instance().get(&SmartAccountStorageKey::Count).unwrap_or(0u32);
+    let rule_count_pre = get_count(e.clone());
     remove_context_rule(&e, id);
-    let rule_count_post = e.storage().instance().get(&SmartAccountStorageKey::Count).unwrap_or(0u32);
+    let rule_count_post = get_count(e.clone());
     cvlr_assert!(rule_count_post == rule_count_pre - 1);
 }
+
+// todo: more
 
 #[rule]
 // after add_signer the signer is added.
@@ -78,7 +107,6 @@ pub fn remove_signer_integrity(e: Env) {
 #[rule]
 // after add_policy the policy is added.
 // status: wip
-// 
 pub fn add_policy_integrity(e: Env) {
     let id: u32 = nondet();
     let policy = nondet_address();

@@ -49,8 +49,12 @@ pub fn can_enforce_all_policies_matches_can_enforce(e: Env) {
 
 // other functions in storage, that are not exposed by the trait:
 // the other entry point is do_check_auth
+// which itself is too complex.
+// mainly it calls:
 // do_check_auth -> authenticate
 // do_check_auth -> get_validated_context -> can_enforce_all_policies
+// do_check_auth -> enforce
+
 
 // get_validated_context
 // if there exists a context rule that has can_enforce_all_policies return true we return true
@@ -63,3 +67,6 @@ pub fn can_enforce_all_policies_matches_can_enforce(e: Env) {
 // and have two such policies
 // then the rule would refer to them. 
 // generically you would want say two ctx rules each with 2 policies
+
+// authenticate:
+// enforce if some signature is not verified.

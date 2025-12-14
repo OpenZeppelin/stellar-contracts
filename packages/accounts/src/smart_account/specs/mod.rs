@@ -5,3 +5,4 @@ pub mod smart_account_integrity;
 pub mod smart_account_do_check_auth;
 pub mod policy;
 pub mod verifier;
+pub mod helper;
