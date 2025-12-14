@@ -13,7 +13,6 @@ use crate::fungible::{specs::capped_contract::CappedTokenContract, FungibleToken
 // after mint the account's balance increases by amount
 // total supply increases by amount
 // status: verified
-// note: 26 minutes
 pub fn mint_integrity(e: Env) {
     let account = nondet_address();
     let amount = nondet();
@@ -41,7 +40,7 @@ pub fn mint_preserves_cap(e: Env) {
 
 #[rule]
 // after constructor the cap is set
-// status: wip
+// status: verified
 pub fn constructor_integrity(e: Env) {
     let cap = nondet();
     CappedTokenContract::__constructor(&e, cap);
@@ -49,6 +48,3 @@ pub fn constructor_integrity(e: Env) {
     cvlr_assert!(cap_post == cap);
     cvlr_assert!(cap >= 0);
 }
-
-// TODO: invariants
-// panics and non-panics are not interesting.
