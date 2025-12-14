@@ -16,8 +16,8 @@ use crate::non_fungible::{
 // perhaps we can only analyze the internal functions such as update.
 
 #[rule]
-// updates balances correctly
-// status: verified https://prover.certora.com/output/33158/cbbe33a98d264b0fbd4ac7ec19cffd9b
+// updates balance from correctly
+// status: verified
 pub fn nft_consecutive_transfer_integrity_1(e: Env) {
     let to = nondet_address();
     let from = nondet_address();
@@ -35,8 +35,8 @@ pub fn nft_consecutive_transfer_integrity_1(e: Env) {
 }
 
 #[rule]
-// updates balances correctly
-// status: verified https://prover.certora.com/output/33158/cbbe33a98d264b0fbd4ac7ec19cffd9b
+// updates balances to correctly
+// status: verified
 pub fn nft_consecutive_transfer_integrity_2(e: Env) {
     let to = nondet_address();
     let from = nondet_address();
@@ -55,11 +55,23 @@ pub fn nft_consecutive_transfer_integrity_2(e: Env) {
 
 #[rule]
 // after transfer the token owner is set to the to address
-// status: https://prover.certora.com/output/33158/08b3797b32494c0291626077382c405d
-// RAZ: pretty sure we need to revert it back! i think its pointless like this.
-// Note: previously this was doing `let owner_post = Consecutive::owner_of(&e, token_id);`
-// which may not be necessary for finding the owner based on the change to owner in `update`.
+// status: verified
 pub fn nft_consecutive_transfer_integrity_3(e: Env) {
+    let to = nondet_address();
+    let from = nondet_address();
+    let token_id = u32::nondet();
+
+    Consecutive::transfer(&e, &from, &to, token_id);
+
+    let owner_post = Consecutive::owner_of(&e, token_id);
+    cvlr_assert!(owner_post == to);
+}
+
+// #[rule]
+// simplies the above by getting from storage instead of using owner_of function - unclear if this is a good approx.
+// status: verified
+// https://prover.certora.com/output/33158/08b3797b32494c0291626077382c405d
+pub fn nft_consecutive_transfer_integrity_3_siplfied(e: Env) {
     let to = nondet_address();
     let from = nondet_address();
     let token_id = u32::nondet();
