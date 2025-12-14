@@ -87,7 +87,7 @@ impl Enumerable {
     /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
     ///   ID is not found in the global enumeration.
     pub fn get_token_id(e: &Env, index: u32) -> u32 {
-        let key = NFTEnumerableStorageKey::GlobalTokens(index);
+        let key: NFTEnumerableStorageKey = NFTEnumerableStorageKey::GlobalTokens(index);
         let Some(token_id) = e.storage().persistent().get::<_, u32>(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
         };
@@ -200,6 +200,7 @@ impl Enumerable {
     /// strategy for generating `token_id`s varies by project and must be
     /// implemented accordingly.
     pub fn non_sequential_mint(e: &Env, to: &Address, token_id: u32) {
+        clog!(token_id);
         Base::update(e, None, Some(to), token_id);
         #[cfg(not(feature = "certora"))]
         emit_mint(e, to, token_id);
@@ -397,8 +398,11 @@ impl Enumerable {
     /// * refer to [`Enumerable::add_to_owner_enumeration`] errors.
     /// * refer to [`Enumerable::increment_total_supply`] errors.
     pub fn add_to_enumerations(e: &Env, owner: &Address, token_id: u32) {
+        clog!(token_id);
+        clog!(cvlr_soroban::Addr(owner));
         Enumerable::add_to_owner_enumeration(e, owner, token_id);
         let total_supply = Enumerable::increment_total_supply(e);
+        clog!(total_supply);
         Enumerable::add_to_global_enumeration(e, token_id, total_supply);
     }
 
@@ -527,6 +531,8 @@ impl Enumerable {
     /// * `token_id` - The token ID to add.
     /// * `total_supply` - The current total supply, acts as the index.
     pub fn add_to_global_enumeration(e: &Env, token_id: u32, total_supply: u32) {
+        clog!(token_id);
+        clog!(total_supply);
         e.storage()
             .persistent()
             .set(&NFTEnumerableStorageKey::GlobalTokens(total_supply), &token_id);
@@ -555,6 +561,7 @@ impl Enumerable {
         let Some(to_be_removed_index) = e.storage().persistent().get::<_, u32>(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
         };
+        clog!(to_be_removed_index);
         e.storage().persistent().extend_ttl(&key, TOKEN_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT);
 
         // unlike `remove_from_owner_enumeration`, we perform the swap without

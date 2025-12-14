@@ -25,5 +25,8 @@ pub fn is_approved_for_token(e: &Env, owner: &Address, operator: &Address, token
 pub fn is_owned(e: &Env, token_id: u32) -> bool {
     let key = NFTStorageKey::Owner(token_id);
     let owner = e.storage().persistent().get::<_, Address>(&key);
+    if let Some(owner_internal) = owner.clone() {
+        clog!(cvlr_soroban::Addr(&owner_internal));
+    }
     return owner.is_some();
 }

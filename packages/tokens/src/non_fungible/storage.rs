@@ -670,6 +670,7 @@ impl Base {
     /// the `token_id` is unique and not already in use.
     pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
         let token_id = increment_token_id(e, 1);
+        clog!(token_id);
         Base::update(e, None, Some(to), token_id);
         #[cfg(not(feature = "certora"))]
         emit_mint(e, to, token_id);
