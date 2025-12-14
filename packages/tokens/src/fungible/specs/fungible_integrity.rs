@@ -96,7 +96,8 @@ pub fn transfer_from_integrity_3(e: Env) {
 // transfer_from changes allowance accordingly
 // status: violation: https://prover.certora.com/output/33158/0180ad7c7e534d6cbc950a393201775c
 // not sure if this is even true because `allowance` has an additional check that `allowance_data` does not.
-// see changes made below. WIP
+// see changes made below.
+// Raz: to me this looks spurious.
 pub fn transfer_from_integrity_4(e: Env) {
     let spender = nondet_address();
     let from = nondet_address();
