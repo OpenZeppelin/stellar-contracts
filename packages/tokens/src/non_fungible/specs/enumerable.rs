@@ -49,6 +49,11 @@ pub fn try_get_token_id(e: &Env, index: u32) -> Option<u32> {
 
 // invariant: index < total_supply <-> get_token_id != none
 
+// TODO: supporting invariant about consistency of two mappings.
+// index -> token
+// token -> index
+// then you need the same for balances
+
 // helpers
 
 pub fn assume_pre_valid_index(e: Env, index: u32) {
@@ -56,8 +61,11 @@ pub fn assume_pre_valid_index(e: Env, index: u32) {
     let total_supply = Enumerable::total_supply(&e);
     clog!(total_supply);
     let index_less_than_total_supply = index < total_supply;
+    clog!(index_less_than_total_supply);
     let token_id = try_get_token_id(&e, index);
+    clog!(token_id);
     let token_id_not_none = token_id.is_some();
+    clog!(token_id_not_none);
     cvlr_assume!(index_less_than_total_supply == token_id_not_none);
 }
 
@@ -66,8 +74,11 @@ pub fn assert_post_valid_index(e: Env, index: u32) {
     let total_supply = Enumerable::total_supply(&e);
     clog!(total_supply);
     let index_less_than_total_supply = index < total_supply;
+    clog!(index_less_than_total_supply);
     let token_id = try_get_token_id(&e, index);
+    clog!(token_id);
     let token_id_not_none = token_id.is_some();
+    clog!(token_id_not_none);
     cvlr_assert!(index_less_than_total_supply == token_id_not_none);
 }
 
@@ -136,8 +147,8 @@ pub fn after_nft_sequential_mint_valid_index(e: Env) {
 }
 
 #[rule]
-// status: violation - investigate
-// https://prover.certora.com/output/33158/75d3df1bfcce4f8d8c89280e4a10d046
+// status: violation - missing invariant
+// https://prover.certora.com/output/5771024/752d106807eb450385e8fb72bb6d4d82/
 pub fn after_nft_burn_valid_index(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -151,8 +162,8 @@ pub fn after_nft_burn_valid_index(e: Env) {
 }
 
 #[rule]
-// status: violation
-// investigate https://prover.certora.com/output/33158/842685020d6b433197bb4efdb12558c6
+// status: violation - missing invariant
+// https://prover.certora.com/output/33158/842685020d6b433197bb4efdb12558c6
 pub fn after_nft_burn_from_valid_index(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));

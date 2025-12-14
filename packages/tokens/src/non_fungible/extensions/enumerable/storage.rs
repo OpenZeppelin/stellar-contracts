@@ -1,5 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
-
+use cvlr::clog;
 #[cfg(not(feature = "certora"))]
 use crate::non_fungible::emit_mint;
 use crate::non_fungible::{
@@ -235,6 +235,8 @@ impl Enumerable {
     /// * global_tokens enumeration
     pub fn burn(e: &Env, from: &Address, token_id: u32) {
         Base::burn(e, from, token_id);
+        clog!(token_id);
+        clog!(cvlr_soroban::Addr(from));
 
         Enumerable::remove_from_enumerations(e, from, token_id);
     }
@@ -473,6 +475,8 @@ impl Enumerable {
     /// This function is expected to be called after the balance of the owner
     /// is already manipulated (mint, transfer, etc.)
     pub fn remove_from_owner_enumeration(e: &Env, owner: &Address, to_be_removed_id: u32) {
+        clog!(to_be_removed_id);
+        clog!(cvlr_soroban::Addr(owner));
         let key = NFTEnumerableStorageKey::OwnerTokensIndex(to_be_removed_id);
         let Some(to_be_removed_index) = e.storage().persistent().get(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInOwnerList);
@@ -482,13 +486,14 @@ impl Enumerable {
         // owner's balance is already decremented by 1, so it will be the index of the
         // last token in the enumeration list.
         let last_token_index = Base::balance(e, owner);
-
+        clog!(last_token_index);
         // Update the `OwnerTokens`.
         if to_be_removed_index != last_token_index {
             // Before swap: [A, B, C, D]  (burning `B`, which is at index 1)
             // After swap:  [A, D, C, D]  (`D` moves to index 1, note that `B` isn't moved)
             // After deletion: [A, D, C]  (last item is deleted, effectively removing `B`)
             let last_token_id = Enumerable::get_owner_token_id(e, owner, last_token_index);
+            clog!(last_token_id);
             e.storage().persistent().set(
                 &NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey {
                     owner: owner.clone(),
@@ -496,14 +501,14 @@ impl Enumerable {
                 }),
                 &last_token_id,
             );
-
+            clog!(to_be_removed_index);
             // Update the moved token's index.
             e.storage().persistent().set(
                 &NFTEnumerableStorageKey::OwnerTokensIndex(last_token_id),
                 &to_be_removed_index,
             );
         }
-
+        
         // Delete the last token from owner's local list.
         e.storage().persistent().remove(&NFTEnumerableStorageKey::OwnerTokens(OwnerTokensKey {
             owner: owner.clone(),
@@ -544,6 +549,8 @@ impl Enumerable {
     /// * [`NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
     ///   ID is not found in the global enumeration.
     pub fn remove_from_global_enumeration(e: &Env, to_be_removed_id: u32, last_token_index: u32) {
+        clog!(to_be_removed_id);
+        clog!(last_token_index);
         let key = NFTEnumerableStorageKey::GlobalTokensIndex(to_be_removed_id);
         let Some(to_be_removed_index) = e.storage().persistent().get::<_, u32>(&key) else {
             panic_with_error!(e, NonFungibleTokenError::TokenNotFoundInGlobalList);
@@ -558,6 +565,7 @@ impl Enumerable {
         // After swap:  [A, D, C, D]  (`D` moves to index 1, note that `B` isn't moved)
         // After deletion: [A, D, C]  (last item is deleted, effectively removing `B`)
         let last_token_id = Enumerable::get_token_id(e, last_token_index);
+        clog!(last_token_id);
         e.storage()
             .persistent()
             .set(&NFTEnumerableStorageKey::GlobalTokens(to_be_removed_index), &last_token_id);
