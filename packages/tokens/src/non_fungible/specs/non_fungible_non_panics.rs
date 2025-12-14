@@ -5,7 +5,7 @@ use soroban_sdk::{Address, Env};
 
 use crate::non_fungible::{
     specs::{
-        helper::is_approved_for_token, non_fungible_invariants::assume_pre_owner_implies_balance,
+        helper::is_approved_for_token,
     },
     storage::{ApprovalData, NFTStorageKey},
     Base,
@@ -81,7 +81,7 @@ pub fn nft_transfer_non_panic(e: Env) {
     cvlr_assume!(is_auth(from.clone()));
     cvlr_assume!(owner == from);
     reasonable_balance(e.clone(), to.clone());
-    assume_pre_owner_implies_balance(e.clone(), token_id); // invariant proved in non_fungible_invariants.rs
+    cvlr_assume!(Base::balance(&e, &from) > 0); // owner -> balance (invariant)
     Base::transfer(&e, &from, &to, token_id);
     cvlr_assert!(true);
 }
@@ -121,7 +121,7 @@ pub fn nft_transfer_from_non_panic(e: Env) {
     cvlr_assume!(is_auth(spender.clone()));
     cvlr_assume!(is_approved_for_token(&e, &from, &spender, token_id));
     reasonable_balance(e.clone(), to.clone());
-    assume_pre_owner_implies_balance(e.clone(), token_id); // invariant proved in non_fungible_invariants.rs
+    cvlr_assume!(Base::balance(&e, &from) > 0); // owner -> balance (invariant)
     Base::transfer_from(&e, &spender, &from, &to, token_id);
     cvlr_assert!(true);
 }
