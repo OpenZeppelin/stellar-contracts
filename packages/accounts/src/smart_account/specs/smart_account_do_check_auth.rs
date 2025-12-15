@@ -9,7 +9,8 @@ use crate::smart_account::{
     ContextRuleType, Meta, Signer, SmartAccount, SmartAccountError, specs::{
         nondet::{nondet_policy_map, nondet_signers_vec, nondet_context},
         smart_account_contract::SmartAccountContract,
-        policy::{SimpleThresholdPolicyContract},
+        policy1::{Policy1},
+        policy2::{Policy2},
     }, 
 };
 use crate::smart_account::storage::{
@@ -20,8 +21,9 @@ use crate::policies::Policy;
 #[rule]
 // can_enforce_all_policies returns the conjunction of can_enforce of each individual policy
 // currently the rule is written with the SimpleThresholdPolicyContract
-// status: verified
-// for 1 policy.
+// status: wip
+// for 2 policies.
+// rule doesn't work currently - need to check the two policies in policies, not Policy1,Policy2.
 pub fn can_enforce_all_policies_matches_can_enforce(e: Env) {
     let ctx_rule = ContextRule::nondet();
     let context = nondet_context();
@@ -29,14 +31,18 @@ pub fn can_enforce_all_policies_matches_can_enforce(e: Env) {
     clog!(matched_signers.len());
     let policies = ctx_rule.policies.clone();
     clog!(policies.len());
-    cvlr_assume!(policies.len()==1); // just one policy -- anyway its the threshold contract
+    cvlr_assume!(policies.len()<=2); // at most two policies
 
-    let threshold = SimpleThresholdPolicyContract::get_threshold(&e, ctx_rule.id, e.current_contract_address());
-    clog!(threshold);
-    // cvlr_assume!(threshold > 0);
-
-    let can_enforce = SimpleThresholdPolicyContract::can_enforce(&e, context.clone(), matched_signers.clone(), ctx_rule.clone(), e.current_contract_address());
-    clog!(can_enforce);
+    let threshold1 = Policy1::get_threshold(&e, ctx_rule.id, e.current_contract_address());
+    clog!(threshold1);
+    let threshold2 = Policy2::get_threshold(&e, ctx_rule.id, e.current_contract_address());
+    clog!(threshold2);
+    let can_enforce1 = Policy1::can_enforce(&e, context.clone(), matched_signers.clone(), ctx_rule.clone(), e.current_contract_address());
+    clog!(can_enforce1);
+    let can_enforce2 = Policy2::can_enforce(&e, context.clone(), matched_signers.clone(), ctx_rule.clone(), e.current_contract_address());
+    clog!(can_enforce2);
+    let can_enforce_both = can_enforce1 && can_enforce2;
+    clog!(can_enforce_both);
     
     let can_enforce_all_policies = can_enforce_all_policies(
         &e, 
@@ -44,7 +50,8 @@ pub fn can_enforce_all_policies_matches_can_enforce(e: Env) {
         &ctx_rule, 
         &matched_signers);
     clog!(can_enforce_all_policies);
-    cvlr_assert!(can_enforce_all_policies == can_enforce);
+    
+    cvlr_assert!(can_enforce_all_policies == can_enforce_both);
 }
 
 // other functions in storage, that are not exposed by the trait:
