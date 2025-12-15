@@ -1,10 +1,10 @@
 mod storage;
-use crate::non_fungible::NonFungibleToken;
+use crate::non_fungible::{overrides::BurnableOverrides, NonFungibleToken};
 
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractevent, Address, Env};
+use soroban_sdk::{contractevent, contracttrait, Address, Env};
 
 /// Burnable Trait for Non-Fungible Token
 ///
@@ -56,7 +56,8 @@ use soroban_sdk::{contractevent, Address, Env};
 ///     /* and the macro will generate all the missing default implementations for you */
 /// }
 /// ```
-pub trait NonFungibleBurnable: NonFungibleToken {
+#[contracttrait]
+pub trait NonFungibleBurnable: NonFungibleToken<ContractType: BurnableOverrides> {
     /// Destroys the token with `token_id` from `from`.
     ///
     /// # Arguments
@@ -76,7 +77,9 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: u32]`
-    fn burn(e: &Env, from: Address, token_id: u32);
+    fn burn(e: &Env, from: Address, token_id: u32) {
+        Self::ContractType::burn(e, &from, token_id);
+    }
 
     /// Destroys the token with `token_id` from `from`, by using `spender`s
     /// approval.
@@ -102,7 +105,9 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: u32]`
-    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32);
+    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32) {
+        Self::ContractType::burn_from(e, &spender, &from, token_id);
+    }
 }
 
 // ################## EVENTS ##################

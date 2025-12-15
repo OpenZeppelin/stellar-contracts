@@ -1,5 +1,6 @@
 use soroban_sdk::{
-    contract, contractimpl, contracttype, testutils::Address as _, Address, Env, String, Symbol,
+    contract, contractimpl, contracttype, testutils::Address as _, Address, Env, MuxedAddress,
+    String, Symbol,
 };
 use stellar_access::access_control::{set_admin, AccessControl};
 use stellar_macros::{default_impl, has_role};
@@ -26,8 +27,7 @@ impl ExampleContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl FungibleToken for ExampleContract {
     type ContractType = Base;
 }

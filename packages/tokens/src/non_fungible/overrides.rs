@@ -132,3 +132,20 @@ pub struct Base;
 
 // No override required for the `Base` contract type.
 impl ContractOverrides for Base {}
+
+/// Burnable functionality
+///
+/// Trait for overriding `burn` and `burn_from` functions.
+/// The behavior of `burn` and `burn_from` changes across implementations,
+/// i.e. enumerable, consecutive, hence the need for an abstraction
+pub trait BurnableOverrides {
+    fn burn(e: &Env, from: &Address, token_id: u32) {
+        Base::burn(e, from, token_id);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+        Base::burn_from(e, spender, from, token_id);
+    }
+}
+
+impl BurnableOverrides for Base {}

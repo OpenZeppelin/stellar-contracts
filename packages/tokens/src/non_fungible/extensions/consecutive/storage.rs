@@ -6,6 +6,7 @@ use crate::non_fungible::{
     burnable::emit_burn,
     emit_transfer,
     extensions::consecutive::emit_consecutive_mint,
+    overrides::BurnableOverrides,
     sequential::{self as sequential},
     Base, ContractOverrides, NonFungibleTokenError, OWNERSHIP_EXTEND_AMOUNT,
     OWNERSHIP_TTL_THRESHOLD, OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT,
@@ -39,6 +40,16 @@ impl ContractOverrides for Consecutive {
         live_until_ledger: u32,
     ) {
         Consecutive::approve(e, approver, approved, token_id, live_until_ledger);
+    }
+}
+
+impl BurnableOverrides for Consecutive {
+    fn burn(e: &Env, from: &Address, token_id: u32) {
+        Consecutive::burn(e, from, token_id);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+        Consecutive::burn_from(e, spender, from, token_id);
     }
 }
 

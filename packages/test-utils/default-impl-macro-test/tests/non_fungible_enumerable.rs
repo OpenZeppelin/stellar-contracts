@@ -1,5 +1,4 @@
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
-use stellar_macros::default_impl;
 use stellar_tokens::non_fungible::{
     enumerable::{Enumerable, NonFungibleEnumerable},
     Base, NonFungibleToken,
@@ -19,14 +18,12 @@ impl ExampleContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Enumerable;
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl NonFungibleEnumerable for ExampleContract {}
 
 fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {

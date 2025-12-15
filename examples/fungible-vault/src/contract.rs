@@ -1,7 +1,6 @@
 //! Tokenized Vault Example Contract.
 
-use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_macros::default_impl;
+use soroban_sdk::{contract, contractimpl, Address, Env, MuxedAddress, String};
 use stellar_tokens::{
     fungible::{Base, FungibleToken},
     vault::{FungibleVault, Vault},
@@ -28,8 +27,7 @@ impl ExampleContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl FungibleToken for ExampleContract {
     type ContractType = Vault;
 

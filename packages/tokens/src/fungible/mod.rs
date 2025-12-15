@@ -161,7 +161,9 @@ pub trait FungibleToken {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn total_supply(e: &Env) -> i128;
+    fn total_supply(e: &Env) -> i128 {
+        Self::ContractType::total_supply(e)
+    }
 
     /// Returns the amount of tokens held by `account`.
     ///
@@ -169,7 +171,9 @@ pub trait FungibleToken {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address for which the balance is being queried.
-    fn balance(e: &Env, account: Address) -> i128;
+    fn balance(e: &Env, account: Address) -> i128 {
+        Self::ContractType::balance(e, &account)
+    }
 
     /// Returns the amount of tokens a `spender` is allowed to spend on behalf
     /// of an `owner`.
@@ -179,7 +183,10 @@ pub trait FungibleToken {
     /// * `e` - Access to Soroban environment.
     /// * `owner` - The address holding the tokens.
     /// * `spender` - The address authorized to spend the tokens.
-    fn allowance(e: &Env, owner: Address, spender: Address) -> i128;
+
+    fn allowance(e: &Env, owner: Address, spender: Address) -> i128 {
+        Self::ContractType::allowance(e, &owner, &spender)
+    }
 
     /// Transfers `amount` of tokens from `from` to `to`.
     ///
@@ -200,7 +207,9 @@ pub trait FungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[to_muxed_id: Option<u64>, amount: i128]`
-    fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128);
+    fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
+        Self::ContractType::transfer(e, &from, &to, amount);
+    }
 
     /// Transfers `amount` of tokens from `from` to `to` using the
     /// allowance mechanism. `amount` is then deducted from `spender`
@@ -227,7 +236,9 @@ pub trait FungibleToken {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128);
+    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128) {
+        Self::ContractType::transfer_from(e, &spender, &from, &to, amount);
+    }
 
     /// Sets the amount of tokens a `spender` is allowed to spend on behalf of
     /// an `owner`. Overrides any existing allowance set between `spender` and
@@ -253,28 +264,36 @@ pub trait FungibleToken {
     ///
     /// * topics - `["approve", from: Address, spender: Address]`
     /// * data - `[amount: i128, live_until_ledger: u32]`
-    fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32);
+    fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32) {
+        Self::ContractType::approve(e, &owner, &spender, amount, live_until_ledger);
+    }
 
     /// Returns the number of decimals used to represent amounts of this token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    fn decimals(e: &Env) -> u32;
+    fn decimals(e: &Env) -> u32 {
+        Self::ContractType::decimals(e)
+    }
 
     /// Returns the name for this token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    fn name(e: &Env) -> String;
+    fn name(e: &Env) -> String {
+        Self::ContractType::name(e)
+    }
 
     /// Returns the symbol for this token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    fn symbol(e: &Env) -> String;
+    fn symbol(e: &Env) -> String {
+        Self::ContractType::symbol(e)
+    }
 }
 
 // ################## ERRORS ##################

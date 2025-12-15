@@ -1,5 +1,6 @@
-use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
-use stellar_macros::default_impl;
+use soroban_sdk::{
+    contract, contractimpl, testutils::Address as _, Address, Env, MuxedAddress, String,
+};
 use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, FungibleToken};
 
 #[contract]
@@ -16,14 +17,12 @@ impl ExampleContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl FungibleToken for ExampleContract {
     type ContractType = Base;
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl FungibleBurnable for ExampleContract {}
 
 fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {

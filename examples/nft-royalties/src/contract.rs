@@ -55,8 +55,7 @@ impl ExampleContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Base;
 }

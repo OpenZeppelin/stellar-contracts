@@ -8,7 +8,6 @@
 //! control to sensitive operations is not taken into consideration!
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
-use stellar_macros::default_impl;
 use stellar_tokens::non_fungible::{burnable::NonFungibleBurnable, Base, NonFungibleToken};
 
 #[contract]
@@ -25,14 +24,12 @@ impl ExampleContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Base;
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl NonFungibleBurnable for ExampleContract {}
 
 fn create_client<'a>(e: &Env) -> ExampleContractClient<'a> {
