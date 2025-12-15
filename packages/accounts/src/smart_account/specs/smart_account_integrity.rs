@@ -34,7 +34,12 @@ pub fn add_context_rule_integrity_1(e: Env) {
     cvlr_assert!(count_post == count_pre + 1);
 }
 
-// todo: more
+// todo: 
+// id increases by 1
+// the new rule id appears in the context rule list for context type
+// the policies are set as policies(id)
+// the signers are set as signers(id)
+// the metadata is set as meta(id)
 
 #[rule]
 // after update_context_rule_name the name changes
@@ -48,6 +53,13 @@ pub fn update_context_rule_name_integrity(e: Env) {
     let name_post = ctx_rule_post.name;
     cvlr_assert!(name_post == name);
 }
+
+// todo:
+// the id is decreased by 1
+// the rule is removed from the context rule list for context type
+// policies?
+// signers?
+// metadata?
 
 #[rule]
 // after update_context_rule_valid_until the rule's valid until changes.
