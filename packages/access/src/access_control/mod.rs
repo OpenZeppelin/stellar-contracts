@@ -91,7 +91,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env, Symbol, Vec};
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, Symbol, Vec};
 
 pub use crate::access_control::storage::{
     accept_admin_transfer, add_to_role_enumeration, enforce_admin_auth,
@@ -102,6 +102,7 @@ pub use crate::access_control::storage::{
     set_role_admin_no_auth, transfer_admin_role, AccessControlStorageKey,
 };
 
+#[contracttrait]
 pub trait AccessControl {
     /// Returns `Some(index)` if the account has the specified role,
     /// where `index` is the position of the account for that role,
@@ -113,7 +114,9 @@ pub trait AccessControl {
     /// * `e` - Access to Soroban environment.
     /// * `account` - The account to check.
     /// * `role` - The role to check for.
-    fn has_role(e: &Env, account: Address, role: Symbol) -> Option<u32>;
+    fn has_role(e: &Env, account: Address, role: Symbol) -> Option<u32> {
+        has_role(e, &account, &role)
+    }
 
     /// Returns a vector containing all existing roles.
     /// Defaults to empty vector if no roles exist.
@@ -126,7 +129,9 @@ pub trait AccessControl {
     ///
     /// This function returns all roles that currently have at least one member.
     /// The maximum number of roles is limited by [`MAX_ROLES`].
-    fn get_existing_roles(e: &Env) -> Vec<Symbol>;
+    fn get_existing_roles(e: &Env) -> Vec<Symbol> {
+        get_existing_roles(e)
+    }
 
     /// Returns the total number of accounts that have the specified role.
     /// If the role does not exist, returns 0.
@@ -135,7 +140,9 @@ pub trait AccessControl {
     ///
     /// * `e` - Access to Soroban environment.
     /// * `role` - The role to get the count for.
-    fn get_role_member_count(e: &Env, role: Symbol) -> u32;
+    fn get_role_member_count(e: &Env, role: Symbol) -> u32 {
+        get_role_member_count(e, &role)
+    }
 
     /// Returns the account at the specified index for a given role.
     ///
@@ -156,7 +163,9 @@ pub trait AccessControl {
     ///
     /// * [`AccessControlError::IndexOutOfBounds`] - If the index is out of
     ///   bounds for the role's member list.
-    fn get_role_member(e: &Env, role: Symbol, index: u32) -> Address;
+    fn get_role_member(e: &Env, role: Symbol, index: u32) -> Address {
+        get_role_member(e, &role, index)
+    }
 
     /// Returns the admin role for a specific role.
     /// If no admin role is explicitly set, returns `None`.
@@ -165,14 +174,18 @@ pub trait AccessControl {
     ///
     /// * `e` - Access to Soroban environment.
     /// * `role` - The role to query the admin role for.
-    fn get_role_admin(e: &Env, role: Symbol) -> Option<Symbol>;
+    fn get_role_admin(e: &Env, role: Symbol) -> Option<Symbol> {
+        get_role_admin(e, &role)
+    }
 
     /// Returns the admin account.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    fn get_admin(e: &Env) -> Option<Address>;
+    fn get_admin(e: &Env) -> Option<Address> {
+        get_admin(e)
+    }
 
     /// Grants a role to an account.
     ///
@@ -195,7 +208,9 @@ pub trait AccessControl {
     ///
     /// * topics - `["role_granted", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
-    fn grant_role(e: &Env, account: Address, role: Symbol, caller: Address);
+    fn grant_role(e: &Env, account: Address, role: Symbol, caller: Address) {
+        grant_role(e, &account, &role, &caller);
+    }
 
     /// Revokes a role from an account.
     /// To revoke your own role, please use [`AccessControl::renounce_role()`]
@@ -221,7 +236,9 @@ pub trait AccessControl {
     ///
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
-    fn revoke_role(e: &Env, account: Address, role: Symbol, caller: Address);
+    fn revoke_role(e: &Env, account: Address, role: Symbol, caller: Address) {
+        revoke_role(e, &account, &role, &caller);
+    }
 
     /// Allows an account to renounce a role assigned to itself.
     /// Users can only renounce roles for their own account.
@@ -243,7 +260,9 @@ pub trait AccessControl {
     ///
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
-    fn renounce_role(e: &Env, role: Symbol, caller: Address);
+    fn renounce_role(e: &Env, role: Symbol, caller: Address) {
+        renounce_role(e, &role, &caller);
+    }
 
     /// Initiates the admin role transfer.
     /// Admin privileges for the current admin are not revoked until the
@@ -279,7 +298,9 @@ pub trait AccessControl {
     /// # Notes
     ///
     /// * Authorization for the current admin is required.
-    fn transfer_admin_role(e: &Env, new_admin: Address, live_until_ledger: u32);
+    fn accept_admin_transfer(e: &Env) {
+        accept_admin_transfer(e);
+    }
 
     /// Completes the 2-step admin transfer.
     ///
@@ -297,7 +318,9 @@ pub trait AccessControl {
     /// * [`crate::role_transfer::RoleTransferError::NoPendingTransfer`] - If
     ///   there is no pending transfer to accept.
     /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
-    fn accept_admin_transfer(e: &Env);
+    fn transfer_admin_role(e: &Env, new_admin: Address, live_until_ledger: u32) {
+        transfer_admin_role(e, &new_admin, live_until_ledger);
+    }
 
     /// Sets `admin_role` as the admin role of `role`.
     ///
@@ -319,7 +342,9 @@ pub trait AccessControl {
     /// # Notes
     ///
     /// * Authorization for the current admin is required.
-    fn set_role_admin(e: &Env, role: Symbol, admin_role: Symbol);
+    fn set_role_admin(e: &Env, role: Symbol, admin_role: Symbol) {
+        set_role_admin(e, &role, &admin_role);
+    }
 
     /// Allows the current admin to renounce their role, making the contract
     /// permanently admin-less. This is useful for decentralization purposes
@@ -342,7 +367,9 @@ pub trait AccessControl {
     /// # Notes
     ///
     /// * Authorization for the current admin is required.
-    fn renounce_admin(e: &Env);
+    fn renounce_admin(e: &Env) {
+        renounce_admin(e);
+    }
 }
 
 // ################## ERRORS ##################

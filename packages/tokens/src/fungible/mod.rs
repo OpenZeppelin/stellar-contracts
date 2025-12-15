@@ -183,7 +183,6 @@ pub trait FungibleToken {
     /// * `e` - Access to Soroban environment.
     /// * `owner` - The address holding the tokens.
     /// * `spender` - The address authorized to spend the tokens.
-
     fn allowance(e: &Env, owner: Address, spender: Address) -> i128 {
         Self::ContractType::allowance(e, &owner, &spender)
     }

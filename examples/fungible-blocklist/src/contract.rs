@@ -7,9 +7,10 @@
 
 use soroban_sdk::{
     contract, contracterror, contractimpl, symbol_short, Address, Env, MuxedAddress, String,
+    Symbol, Vec,
 };
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::{default_impl, only_role};
+use stellar_macros::only_role;
 use stellar_tokens::fungible::{
     blocklist::{BlockList, FungibleBlockList},
     Base, FungibleToken,
@@ -70,6 +71,5 @@ impl FungibleBlockList for ExampleContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl AccessControl for ExampleContract {}

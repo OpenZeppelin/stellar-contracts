@@ -38,6 +38,5 @@ impl FungibleToken for ExampleContract {
     type ContractType = RWA;
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl AccessControl for ExampleContract {}
