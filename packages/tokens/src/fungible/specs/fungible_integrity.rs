@@ -94,37 +94,29 @@ pub fn transfer_from_integrity_3(e: Env) {
 
 #[rule]
 // transfer_from changes allowance accordingly
-// status: violation - spurious
-// https://prover.certora.com/output/33158/0180ad7c7e534d6cbc950a393201775c
-// Chandra: not sure if this is even true because `allowance` has an additional check that `allowance_data` does not.
-// see changes made below.
-// Raz: to me this looks spurious.
+// status: bug 
+// same bug in transfer_from as observed in transfer_from_panics_if_not_enough_allowance
+// as we saw if allowance.amount = amount and live_until_ledger < current_ledger
+// you can still transfer_from then:
+// allowance_pre = 0 (because allowance expired)
+// allowance_post = 0 
+// but no panic
+// amount > 0 => violation.
 pub fn transfer_from_integrity_4(e: Env) {
     let spender = nondet_address();
     let from = nondet_address();
     let to = nondet_address();
     let amount: i128 = nondet();
-    
+    clog!(cvlr_soroban::Addr(&spender));
+    clog!(cvlr_soroban::Addr(&from));
+    clog!(cvlr_soroban::Addr(&to));
+    clog!(amount);
     let allowance_pre = Base::allowance(&e, &from, &spender);
+    clog!(allowance_pre);
     Base::transfer_from(&e, &spender, &from, &to, amount);
     let allowance_post = Base::allowance(&e, &from, &spender);
-    // let allowance_pre = Base::allowance_data(&e, &from, &spender).amount;
-    // clog!(allowance_pre);
-
-    // let allowance = Base::allowance_data(&e, &from, &spender);
-    // let allowance_post = allowance.amount;
-    // let until = allowance.live_until_ledger;
-    // let rhs = e.ledger().sequence();
-    // clog!(allowance_post);
-    // clog!(until);
-    // clog!(rhs);
-
-    // cvlr_assume!(amount > 0);
-    if spender != from {
-        cvlr_assert!(allowance_post == allowance_pre - amount);
-    } else {
-        cvlr_assert!(allowance_post == allowance_pre);
-    }
+    clog!(allowance_post);
+    cvlr_assert!(allowance_post == allowance_pre - amount); // allowance to yourself is treated the same way.
 }
 
 #[rule]
