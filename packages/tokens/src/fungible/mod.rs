@@ -77,7 +77,9 @@ mod test;
 
 pub use extensions::{allowlist, blocklist, burnable, capped};
 pub use overrides::{Base, ContractOverrides};
-use soroban_sdk::{contracterror, contractevent, Address, Env, MuxedAddress, String};
+use soroban_sdk::{
+    contracterror, contractevent, contracttrait, Address, Env, MuxedAddress, String,
+};
 pub use storage::{AllowanceData, AllowanceKey, StorageKey};
 pub use utils::{sac_admin_generic, sac_admin_wrapper};
 
@@ -145,6 +147,7 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// [`FungibleToken::transfer`] is implemented for the `Allowlist` contract
 /// type, you can find it using
 /// [`crate::fungible::allowlist::AllowList::transfer`].
+#[contracttrait]
 pub trait FungibleToken {
     /// Helper type that allows us to override some of the functionality of the
     /// base trait based on the extensions implemented. You should use

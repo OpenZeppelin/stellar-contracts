@@ -28,43 +28,7 @@ impl ExampleContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl FungibleToken for ExampleContract {
     type ContractType = Base;
-
-    fn total_supply(e: &Env) -> i128 {
-        Self::ContractType::total_supply(e)
-    }
-
-    fn balance(e: &Env, account: Address) -> i128 {
-        Self::ContractType::balance(e, &account)
-    }
-
-    fn allowance(e: &Env, owner: Address, spender: Address) -> i128 {
-        Self::ContractType::allowance(e, &owner, &spender)
-    }
-
-    fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
-        Self::ContractType::transfer(e, &from, &to, amount);
-    }
-
-    fn transfer_from(e: &Env, spender: Address, from: Address, to: Address, amount: i128) {
-        Self::ContractType::transfer_from(e, &spender, &from, &to, amount);
-    }
-
-    fn approve(e: &Env, owner: Address, spender: Address, amount: i128, live_until_ledger: u32) {
-        Self::ContractType::approve(e, &owner, &spender, amount, live_until_ledger);
-    }
-
-    fn decimals(e: &Env) -> u32 {
-        Self::ContractType::decimals(e)
-    }
-
-    fn name(e: &Env) -> String {
-        Self::ContractType::name(e)
-    }
-
-    fn symbol(e: &Env) -> String {
-        Self::ContractType::symbol(e)
-    }
 }
