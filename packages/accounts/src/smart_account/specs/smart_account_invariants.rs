@@ -14,3 +14,4 @@ use crate::smart_account::{
 // invariant: 
 // any ctx rule has at least one signer or a policy.
 // validate_signers_and_policies should always not panic.
+// Context rules and fingerprints are in a one-to-one correspondence.

@@ -4,5 +4,8 @@ pub mod smart_account_contract;
 pub mod smart_account_integrity;
 pub mod smart_account_do_check_auth;
 pub mod policy;
+pub mod policy1;
+pub mod policy2;
 pub mod verifier;
 pub mod helper;
+pub mod ghosts;
