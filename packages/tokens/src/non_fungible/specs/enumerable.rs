@@ -485,7 +485,8 @@ pub fn after_nft_sequential_mint_token_id_iff_owned(e: Env) {
 }
 
 #[rule]
-// status:
+// status: weird spurious violation
+// https://prover.certora.com/output/5771024/eab33adc17bd4ba9995c469b7e878776/
 pub fn after_nft_burn_token_id_iff_owned(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
