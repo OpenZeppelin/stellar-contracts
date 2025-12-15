@@ -93,27 +93,6 @@ pub use utils::sequential;
 /// sequential minting, and [`crate::non_fungible::Base::mint`] for
 /// non-sequential minting strategies.
 ///
-/// # Notes
-///
-/// `#[contractimpl]` macro requires even the default implementations to be
-/// present under its scope. To not confuse the developers, we did not provide
-/// the default implementations here, but we are providing a macro to generate
-/// the default implementations for you.
-///
-/// When implementing [`NonFungibleToken`] trait for your Smart Contract,
-/// you can follow the below example:
-///
-/// ```ignore
-/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
-/// #[contractimpl]
-/// impl NonFungibleToken for MyContract {
-///     ContractType = {Your Contract Type Here};
-///
-///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
-///     /* and the macro will generate all the missing default implementations for you */
-/// }
-/// ```
-///
 /// This trait is implemented for the following Contract Types:
 /// * [`crate::non_fungible::Base`] (covering the vanilla case, and compatible
 ///   with [`crate::non_fungible::extensions::burnable::NonFungibleBurnable`])

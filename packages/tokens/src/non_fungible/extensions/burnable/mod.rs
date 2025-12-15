@@ -37,25 +37,6 @@ use soroban_sdk::{contractevent, contracttrait, Address, Env};
 ///     }
 /// }
 /// ```
-///
-/// # Notes
-///
-/// `#[contractimpl]` macro requires even the default implementations to be
-/// present under its scope. To not confuse the developers, we did not provide
-/// the default implementations here, but we are providing a macro to generate
-/// the default implementations for you.
-///
-/// When implementing [`NonFungibleBurnable`] trait for your Smart Contract,
-/// you can follow the below example:
-///
-/// ```ignore
-/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
-/// #[contractimpl]
-/// impl NonFungibleBurnable for MyContract {
-///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
-///     /* and the macro will generate all the missing default implementations for you */
-/// }
-/// ```
 #[contracttrait]
 pub trait NonFungibleBurnable: NonFungibleToken<ContractType: BurnableOverrides> {
     /// Destroys the token with `token_id` from `from`.

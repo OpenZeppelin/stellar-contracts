@@ -6,20 +6,18 @@ Macros for Stellar contracts.
 
 ### Default Implementation
 
-The `#[default_impl]` macro generates missing default implementations for traits provided by the Stellar library.
+The `#[contractimpl(contracttrait = true)]` macro generates missing default implementations for traits provided by this library.
 
 #### Usage Examples
 
 ```rust
 use soroban_sdk::{contract, contractimpl, Address, Env};
 use stellar_tokens::fungible::{Base, FungibleToken};
-use stellar_macros::default_impl;
 
 #[contract]
 pub struct MyContract;
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl FungibleToken for MyContract {
     type ContractType = Base;
 

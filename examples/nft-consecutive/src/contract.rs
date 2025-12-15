@@ -34,9 +34,10 @@ impl ExampleContract {
 }
 
 // You don't have to provide the implementations for all the methods,
-// `#[default_impl]` macro does this for you. This example showcases
-// what is happening under the hood when you use `#[default_impl]` macro.
-#[contractimpl]
+// `#[contractimpl(contracttrait = true)]` macro does this for you. This example
+// showcases what is happening under the hood when you use
+// `#[contractimpl(contracttrait = true)]` macro.
+#[contractimpl(contracttrait = true)]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Consecutive;
 
@@ -93,6 +94,10 @@ impl NonFungibleToken for ExampleContract {
 
 impl NonFungibleConsecutive for ExampleContract {}
 
+// You don't have to provide the implementations for all the methods,
+// `#[contractimpl(contracttrait = true)]` macro does this for you. This example
+// showcases what is happening under the hood when you use
+// `#[contractimpl(contracttrait = true)]` macro.
 #[contractimpl]
 impl NonFungibleBurnable for ExampleContract {
     fn burn(e: &Env, from: Address, token_id: u32) {

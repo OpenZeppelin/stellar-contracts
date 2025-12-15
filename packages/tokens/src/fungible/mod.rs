@@ -102,27 +102,6 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// We do provide a function [`crate::fungible::Base::mint`] for minting to
 /// cover the general use case.
 ///
-/// # Notes
-///
-/// `#[contractimpl]` macro requires even the default implementations to be
-/// present under its scope. To not confuse the developers, we did not provide
-/// the default implementations here, but we are providing a macro to generate
-/// them.
-///
-/// When implementing [`crate::non_fungible::NonFungibleToken`] trait for your
-/// Smart Contract, you can follow the below example:
-///
-/// ```ignore
-/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
-/// #[contractimpl]
-/// impl FungibleToken for MyContract {
-///     ContractType = {Your Contract Type Here};
-///
-///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
-///     /* and the macro will generate all the missing default implementations for you */
-/// }
-/// ```
-///
 /// This trait is implemented for the following Contract Types:
 /// * [`crate::fungible::Base`] (covering the vanilla case, and compatible with
 ///   [`crate::fungible::burnable::FungibleBurnable`]) trait

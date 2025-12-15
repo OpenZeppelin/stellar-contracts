@@ -40,25 +40,6 @@ use crate::non_fungible::NonFungibleToken;
 /// 2. Enumerability can also be offloaded to off-chain services. This extension
 ///    exists for the use-cases where the enumeration is required as an on-chain
 ///    operation.
-///
-/// # Notes
-///
-/// `#[contractimpl]` macro requires even the default implementations to be
-/// present under its scope. To not confuse the developers, we did not provide
-/// the default implementations here, but we are providing a macro to generate
-/// the default implementations for you.
-///
-/// When implementing [`NonFungibleEnumerable`] trait for your Smart Contract,
-/// you can follow the below example:
-///
-/// ```ignore
-/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
-/// #[contractimpl]
-/// impl NonFungibleEnumerable for MyContract {
-///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
-///     /* and the macro will generate all the missing default implementations for you */
-/// }
-/// ```
 #[contracttrait]
 pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// Returns the total amount of tokens stored by the contract.

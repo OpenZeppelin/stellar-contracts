@@ -191,8 +191,7 @@ Extending the `instance` storage entries is the responsibility of the contract d
 #[contract]
 pub struct MyToken;
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl FungibleToken for MyToken {
     ContractType = Base;
     // Custom overrides here (optional)
@@ -202,14 +201,12 @@ impl FungibleToken for MyToken {
 ### 2. Extension Composition Pattern
 
 ```rust
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl FungibleBurnable for MyToken {
     // Burning functionality
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait = true)]
 impl Pausable for MyToken {
     // Pausable functionality
 }
@@ -218,7 +215,7 @@ impl Pausable for MyToken {
 ### 3. Macros As Helpers
 
 The library provides macros to either:
-- reduce boilerplate (i.e. `#[default_impl]`)
+- reduce boilerplate (i.e. `#[derive(Upgradeable)]`)
 - improve clarity of the code by annotating the function instead of having the business logic inside the function as a regular code to improve the DevX (i.e. `#[only_owner]`, `#[when_not_paused]`)
 
 #### Principles for Introducing New Macros
