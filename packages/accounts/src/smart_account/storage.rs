@@ -376,10 +376,6 @@ pub fn get_authenticated_signers(
     authenticated
 }
 
-// add_context_rule(rule_1,context_1)
-// let rules = get_context_rules(context_1)
-// assert rules.contains(rule_1)
-
 
 /// Validates a context against all applicable rules and returns the matching
 /// rule with authenticated signers. Returns a tuple of the matched context
@@ -480,14 +476,6 @@ pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signers: &Map<Signer,
     }
 }
 
-#[cfg(feature = "certora")]
-mod ghost_vars {
-    use super::Address;
-    use crate::smart_account::specs::ghosts::GhostVar;
-    
-    pub(super) static mut POLICY1_ADDRESS: GhostVar<Address> = GhostVar::UnInit;
-    pub(super) static mut POLICY2_ADDRESS: GhostVar<Address> = GhostVar::UnInit;
-}
 /// Checks if all policies in a rule can be enforced with the provided signers.
 /// Returns `true` only if all policies can be satisfied, `false` otherwise.
 ///
@@ -515,35 +503,10 @@ pub fn can_enforce_all_policies(
             return false;
         }
         #[cfg(feature = "certora")]
+        use crate::smart_account::specs::helper::can_enforce_dispatch;
         {
-            unsafe {
-                let policy1_addr = ghost_vars::POLICY1_ADDRESS.get();
-                let policy2_addr = ghost_vars::POLICY2_ADDRESS.get();
-                if policy == policy1_addr {
-                    let can_enforce = Policy1::can_enforce(
-                        e,
-                        context.clone(),
-                        matched_signers.clone(),
-                        context_rule.clone(),
-                        e.current_contract_address(),
-                    );
-                    if !can_enforce {
-                        return false;
-                    }
-                } else if policy == policy2_addr {
-                    let can_enforce = Policy2::can_enforce(
-                        e,
-                        context.clone(),
-                        matched_signers.clone(),
-                        context_rule.clone(),
-                        e.current_contract_address(),
-                    );
-                    if !can_enforce {
-                        return false;
-                    }
-                } else {
-                    panic!("Policy not found");
-                }
+            if !can_enforce_dispatch(e, context, matched_signers, context_rule, &e.current_contract_address(), policy) {
+                return false;
             }
         }
     }

@@ -11,6 +11,7 @@ use crate::smart_account::{
         smart_account_contract::SmartAccountContract,
         policy1::{Policy1},
         policy2::{Policy2},
+        helper::can_enforce_dispatch,
     }, 
 };
 use crate::smart_account::storage::{
@@ -33,17 +34,12 @@ pub fn can_enforce_all_policies_matches_can_enforce(e: Env) {
     clog!(policies.len());
     cvlr_assume!(policies.len()<=2); // at most two policies
 
-    let threshold1 = Policy1::get_threshold(&e, ctx_rule.id, e.current_contract_address());
-    clog!(threshold1);
-    let threshold2 = Policy2::get_threshold(&e, ctx_rule.id, e.current_contract_address());
-    clog!(threshold2);
-    let can_enforce1 = Policy1::can_enforce(&e, context.clone(), matched_signers.clone(), ctx_rule.clone(), e.current_contract_address());
-    clog!(can_enforce1);
-    let can_enforce2 = Policy2::can_enforce(&e, context.clone(), matched_signers.clone(), ctx_rule.clone(), e.current_contract_address());
-    clog!(can_enforce2);
-    let can_enforce_both = can_enforce1 && can_enforce2;
-    clog!(can_enforce_both);
-    
+    let first_policy = policies.get(0).unwrap();
+    let second_policy = policies.get(1).unwrap();
+    let can_enforce_first = can_enforce_dispatch(&e, &context, &matched_signers, &ctx_rule, &e.current_contract_address(), first_policy);
+    let can_enforce_second = can_enforce_dispatch(&e, &context, &matched_signers, &ctx_rule, &e.current_contract_address(), second_policy);
+    let can_enforce_both = can_enforce_first && can_enforce_second;
+
     let can_enforce_all_policies = can_enforce_all_policies(
         &e, 
         &context, 
