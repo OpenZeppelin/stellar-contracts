@@ -105,6 +105,9 @@ pub mod utils;
 mod test;
 
 #[cfg(feature = "certora")]
+pub mod specs;
+
+#[cfg(feature = "certora")]
 use cvlr_soroban_derive::contractevent;
 #[cfg(not(feature = "certora"))]
 use soroban_sdk::contractevent;
