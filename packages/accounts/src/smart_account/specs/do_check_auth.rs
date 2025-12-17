@@ -104,3 +104,6 @@ pub fn can_enforce_all_policies_matches_can_enforce(e: Env) {
 // if there exists a context rule that has can_enforce_all_policies return true we return true
 // so context rules are disjunctive over rules and conjunctive over policies
 // note as well that if no valid context it panics instead of returning false.
+
+// todo: enforce loop?
+// todo: do_check_auth?

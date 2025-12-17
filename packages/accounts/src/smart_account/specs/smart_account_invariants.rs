@@ -4,8 +4,8 @@ use cvlr_soroban::{nondet_address, nondet_string};
 use soroban_sdk::{Env, String, Val, Vec};
 
 use crate::smart_account::{
-    ContextRuleType, Signer, specs::{
-        helper::validate_signers_and_policies_non_panicking,
+    ContextRuleType, MAX_CONTEXT_RULES, Signer, specs::{
+        helper::{get_count, validate_signers_and_policies_non_panicking},
         nondet::{nondet_policy_map, nondet_signers_vec},
     }, storage::{
         add_context_rule, add_policy, add_signer, get_context_rule, remove_context_rule, 
@@ -15,8 +15,9 @@ use crate::smart_account::{
 };
 
 // todo invariants:
-// no duplicate rules
-// number of rules is bounded 
+// no duplicate policies
+// no duplicate signers
+// follows from compute_fingerprint mechanism (see panic conditions there)s
 
 // invariant: 
 // any ctx rule has at least one signer or a policy <->
@@ -57,7 +58,8 @@ pub fn after_add_signer_valid_signers_and_policies(e: Env) {
     let signer = Signer::nondet();
     let rule_pre = get_context_rule(&e, id);
     assume_pre_valid_signers_and_policies(e.clone(), rule_pre.clone());
-    add_signer(&e, id, &signer);
+    let id_add_signer = nondet();
+    add_signer(&e, id_add_signer, &signer);
     let rule_post = get_context_rule(&e, id);
     assert_post_valid_signers_and_policies(e.clone(), rule_post);
 }
@@ -69,7 +71,8 @@ pub fn after_remove_signer_valid_signers_and_policies(e: Env) {
     let signer = Signer::nondet();
     let rule_pre = get_context_rule(&e, id);
     assume_pre_valid_signers_and_policies(e.clone(), rule_pre.clone());
-    remove_signer(&e, id, &signer);
+    let id_remove_signer = nondet();
+    remove_signer(&e, id_remove_signer, &signer);
     let rule_post = get_context_rule(&e, id);
     assert_post_valid_signers_and_policies(e.clone(), rule_post);
 }
@@ -82,7 +85,8 @@ pub fn after_add_policy_valid_signers_and_policies(e: Env) {
     let install_param = Val::from_payload(u64::nondet());
     let rule_pre = get_context_rule(&e, id);
     assume_pre_valid_signers_and_policies(e.clone(), rule_pre.clone());
-    add_policy(&e, id, &policy, install_param);
+    let id_add_policy = nondet();
+    add_policy(&e, id_add_policy, &policy, install_param);
     let rule_post = get_context_rule(&e, id);
     assert_post_valid_signers_and_policies(e.clone(), rule_post);
 }
@@ -94,7 +98,8 @@ pub fn after_remove_policy_valid_signers_and_policies(e: Env) {
     let policy = nondet_address();
     let rule_pre = get_context_rule(&e, id);
     assume_pre_valid_signers_and_policies(e.clone(), rule_pre.clone());
-    remove_policy(&e, id, &policy);
+    let id_remove_policy = nondet();
+    remove_policy(&e, id_remove_policy, &policy);
     let rule_post = get_context_rule(&e, id);
     assert_post_valid_signers_and_policies(e.clone(), rule_post);
 }
@@ -106,7 +111,8 @@ pub fn after_update_context_rule_name_valid_signers_and_policies(e: Env) {
     let name = nondet_string();
     let rule_pre = get_context_rule(&e, id);
     assume_pre_valid_signers_and_policies(e.clone(), rule_pre.clone());
-    let rule_post = update_context_rule_name(&e, id, &name);
+    let id_update_context_rule_name = nondet();
+    let rule_post = update_context_rule_name(&e, id_update_context_rule_name, &name);
     assert_post_valid_signers_and_policies(e.clone(), rule_post);
 }
 
@@ -117,6 +123,106 @@ pub fn after_update_context_rule_valid_until_valid_signers_and_policies(e: Env) 
     let valid_until = Option::<u32>::nondet();
     let rule_pre = get_context_rule(&e, id);
     assume_pre_valid_signers_and_policies(e.clone(), rule_pre.clone());
-    let rule_post = update_context_rule_valid_until(&e, id, valid_until);
+    let id_update_context_rule_valid_until = nondet();
+    let rule_post = update_context_rule_valid_until(&e, id_update_context_rule_valid_until, valid_until);
     assert_post_valid_signers_and_policies(e.clone(), rule_post);
+}
+
+// invariant: number of rules is at most 15
+
+// helpers
+
+pub fn assume_pre_number_of_rules_at_most_max(e: Env) {
+    let count = get_count(e);
+    let max = MAX_CONTEXT_RULES;
+    cvlr_assume!(count <= max);
+}
+
+pub fn assert_post_number_of_rules_at_most_max(e: Env) {
+    let count = get_count(e);
+    let max = MAX_CONTEXT_RULES;
+    cvlr_assert!(count <= max);
+}
+
+#[rule]
+// status: 
+pub fn after_add_context_rule_number_of_rules_at_most_max(e: Env) {
+    let ctx_typ = ContextRuleType::nondet();
+    let name = nondet_string();
+    let valid_until = Option::<u32>::nondet();
+    let signers = nondet_signers_vec();
+    let policies = nondet_policy_map();
+    assume_pre_number_of_rules_at_most_max(e.clone());
+    add_context_rule(&e, &ctx_typ, &name, valid_until, &signers, &policies);
+    assert_post_number_of_rules_at_most_max(e.clone());
+}
+
+#[rule]
+// status: 
+pub fn after_update_context_rule_name_number_of_rules_at_most_max(e: Env) {
+    let id: u32 = nondet();
+    let name = nondet_string();
+    assume_pre_number_of_rules_at_most_max(e.clone());
+    update_context_rule_name(&e, id, &name);
+    assert_post_number_of_rules_at_most_max(e.clone());
+}
+
+#[rule]
+// status: 
+pub fn after_update_context_rule_valid_until_number_of_rules_at_most_max(e: Env) {
+    let id: u32 = nondet();
+    let valid_until = Option::<u32>::nondet();
+    assume_pre_number_of_rules_at_most_max(e.clone());
+    update_context_rule_valid_until(&e, id, valid_until);
+    assert_post_number_of_rules_at_most_max(e.clone());
+}
+
+#[rule]
+// status: 
+pub fn after_remove_context_rule_number_of_rules_at_most_max(e: Env) {
+    let id: u32 = nondet();
+    assume_pre_number_of_rules_at_most_max(e.clone());
+    remove_context_rule(&e, id);
+    assert_post_number_of_rules_at_most_max(e.clone());
+}
+
+#[rule]
+// status: 
+pub fn after_add_signer_number_of_rules_at_most_max(e: Env) {
+    let id: u32 = nondet();
+    let signer = Signer::nondet();
+    assume_pre_number_of_rules_at_most_max(e.clone());
+    add_signer(&e, id, &signer);
+    assert_post_number_of_rules_at_most_max(e.clone());
+}
+
+#[rule]
+// status: 
+pub fn after_remove_signer_number_of_rules_at_most_max(e: Env) {
+    let id: u32 = nondet();
+    let signer = Signer::nondet();
+    assume_pre_number_of_rules_at_most_max(e.clone());
+    remove_signer(&e, id, &signer);
+    assert_post_number_of_rules_at_most_max(e.clone());
+}
+
+#[rule]
+// status: 
+pub fn after_add_policy_number_of_rules_at_most_max(e: Env) {
+    let id: u32 = nondet();
+    let policy = nondet_address();
+    let install_param = Val::from_payload(u64::nondet());
+    assume_pre_number_of_rules_at_most_max(e.clone());
+    add_policy(&e, id, &policy, install_param);
+    assert_post_number_of_rules_at_most_max(e.clone());
+}
+
+#[rule]
+// status: 
+pub fn after_remove_policy_number_of_rules_at_most_max(e: Env) {
+    let id: u32 = nondet();
+    let policy = nondet_address();
+    assume_pre_number_of_rules_at_most_max(e.clone());
+    remove_policy(&e, id, &policy);
+    assert_post_number_of_rules_at_most_max(e.clone());
 }

@@ -674,6 +674,9 @@ pub fn compute_fingerprint(
     e.crypto().sha256(&rule_data).to_bytes()
 }
 
+use crate::smart_account::specs::ghosts::GhostMap;
+pub static mut FINGERPRINT_MAP: GhostMap<(ContextRuleType, Vec<Signer>, Vec<Address>), BytesN<32>> = GhostMap::UnInit;
+
 #[cfg(feature = "certora")]
 pub fn compute_fingerprint(
     e: &Env,
@@ -681,8 +684,11 @@ pub fn compute_fingerprint(
     signers: &Vec<Signer>,
     policies: &Vec<Address>,
 ) -> BytesN<32> {
-    // TODO: make a ghost map to track these.
-    nondet_bytes_n()
+    // how do we assume injectivity of the ghost mapping
+    let input = (context_type.clone(), signers.clone(), policies.clone());
+    unsafe {
+        FINGERPRINT_MAP.get(&input)
+    }
 }
 
 // ################## CHANGE STATE ##################
