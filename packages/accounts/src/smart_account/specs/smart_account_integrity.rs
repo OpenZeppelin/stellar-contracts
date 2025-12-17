@@ -1,23 +1,24 @@
-use cvlr::clog;
-use cvlr::{cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
+use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::{nondet_address, nondet_map, nondet_string};
 use cvlr_soroban_derive::rule;
-use soroban_sdk::{Env, Address, String, Val, Vec, map, panic_with_error, vec};
+use soroban_sdk::{map, panic_with_error, vec, Address, Env, String, Val, Vec};
 
 use crate::smart_account::{
-    ContextRuleType, Meta, Signer, SmartAccount, SmartAccountError, specs::{
+    specs::{
+        helper::{
+            get_count, get_ids_of_rule_type, get_meta_of_id, get_next_id, get_policies_of_id,
+            get_signers_of_id,
+        },
         nondet::{nondet_policy_map, nondet_signers_vec},
         smart_account_contract::SmartAccountContract,
-    }, 
-};
-use crate::smart_account::storage::{
-    SmartAccountStorageKey, ContextRule,
-    remove_context_rule, get_context_rule, update_context_rule_valid_until, update_context_rule_name, add_context_rule,
-    add_signer, remove_signer, add_policy, remove_policy, get_persistent_entry,
-    get_valid_context_rules,
-};
-use crate::smart_account::specs::helper::{
-    get_count, get_next_id, get_ids_of_rule_type, get_policies_of_id, get_signers_of_id, get_meta_of_id,
+    },
+    storage::{
+        add_context_rule, add_policy, add_signer, get_context_rule, get_persistent_entry,
+        get_valid_context_rules, remove_context_rule, remove_policy, remove_signer,
+        update_context_rule_name, update_context_rule_valid_until, ContextRule,
+        SmartAccountStorageKey,
+    },
+    ContextRuleType, Meta, Signer, SmartAccount, SmartAccountError,
 };
 
 // functions from the trait:
@@ -39,7 +40,7 @@ pub fn add_context_rule_integrity_1(e: Env) {
 
 #[rule]
 // after add_context_rule the id increases by 1
-// status: 
+// status:
 pub fn add_context_rule_integrity_2(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -61,16 +62,16 @@ pub fn add_context_rule_integrity_3(e: Env) {
     let signers = nondet_signers_vec();
     let policies = nondet_policy_map();
     let id = get_next_id(e.clone());
-    let rule =add_context_rule(&e, &ctx_typ, &name, valid_until, &signers, &policies);
+    let rule = add_context_rule(&e, &ctx_typ, &name, valid_until, &signers, &policies);
     let rule_id = rule.id;
     let ids = get_ids_of_rule_type(e.clone(), ctx_typ);
     cvlr_assert!(ids.contains(&rule_id));
 }
 
 #[rule]
-// after add_context_rule the rule appears 
+// after add_context_rule the rule appears
 // in get_valid_context_rules (in first index)
-// most important! 
+// most important!
 pub fn add_context_rule_integrity_4(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -83,8 +84,7 @@ pub fn add_context_rule_integrity_4(e: Env) {
     // cvlr_assert!(rules.contains(&rule));
 }
 
-
-// todo: 
+// todo:
 #[rule]
 // the policies are set as policies(id)
 pub fn add_context_rule_integrity_5(e: Env) {
@@ -189,7 +189,7 @@ pub fn add_context_rule_integrity_12(e: Env) {
     let rule = add_context_rule(&e, &ctx_typ, &name, valid_until, &signers, &policies);
     let rule_id = rule.id;
     let id_meta = get_meta_of_id(e.clone(), rule_id);
-    let expected_meta = Meta{name: name, context_type: ctx_typ, valid_until: valid_until};
+    let expected_meta = Meta { name, context_type: ctx_typ, valid_until };
     cvlr_assert!(id_meta == expected_meta);
 }
 
@@ -260,29 +260,45 @@ pub fn remove_context_rule_integrity_3(e: Env) {
 
 #[rule]
 // after add_signer the signer is added.
-// status: violation - spurious - vector modeling
+// status: verified
+#[rule]
 pub fn add_signer_integrity(e: Env) {
     let id: u32 = nondet();
-    clog!(id);
     let signer = Signer::nondet();
+    let meta = Meta::nondet();
+
+    // important: setup storage to be consistent
+    e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
+    e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &Vec::<Signer>::new(&e));
+    e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &Vec::<Address>::new(&e));
+
     add_signer(&e, id, &signer);
+
     let ctx_rule_post = get_context_rule(&e, id);
-    let signers_post = ctx_rule_post.signers;
-    let signers_contains_signer = signers_post.contains(&signer);
-    cvlr_assert!(signers_contains_signer);
+    cvlr_assert!(ctx_rule_post.signers.contains(&signer));
 }
 
 #[rule]
 // after remove_signer the signer is removed
-// status: violation - spurious - vector modeling
+// status: verified
+#[rule]
 pub fn remove_signer_integrity(e: Env) {
     let id: u32 = nondet();
     let signer = Signer::nondet();
+
+    let meta = Meta::nondet();
+    e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
+
+    // add a single signer because `remove_signer` assumes no duplicates and
+    // `add_signer` does not allow duplicates.
+    let mut signers = Vec::new(&e);
+    signers.push_back(signer.clone());
+    e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
+
     remove_signer(&e, id, &signer);
+
     let ctx_rule_post = get_context_rule(&e, id);
-    let signers_post = ctx_rule_post.signers;
-    let signers_contains_signer = signers_post.contains(&signer);
-    cvlr_assert!(!signers_contains_signer);
+    cvlr_assert!(!ctx_rule_post.signers.contains(&signer));
 }
 
 #[rule]
