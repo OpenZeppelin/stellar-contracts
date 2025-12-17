@@ -122,7 +122,6 @@ use crate::{
         policy1::Policy1,
         policy2::Policy2,
         policy::SimpleThresholdPolicyContract,
-        verifier::SimpleVerifier,
     },
     verifiers::Verifier,
 };
@@ -459,11 +458,13 @@ pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signers: &Map<Signer,
                     panic_with_error!(e, SmartAccountError::ExternalVerificationFailed)
                 }
                 #[cfg(feature = "certora")]
-                if !SimpleVerifier::verify(
-                    e,
+                use crate::smart_account::specs::dispatcher::verify_dispatch;
+                if !verify_dispatch(
+                    e, 
                     sig_payload,
-                    key_data.try_into().expect("bytes must have length 32"),
+                    key_data.try_into().expect("bytes must have length 32"), 
                     sig_data.try_into().expect("bytes must have length 64"),
+                    verifier.clone()
                 ) {
                     panic_with_error!(e, SmartAccountError::ExternalVerificationFailed)
                 }
@@ -503,7 +504,7 @@ pub fn can_enforce_all_policies(
             return false;
         }
         #[cfg(feature = "certora")]
-        use crate::smart_account::specs::helper::can_enforce_dispatch;
+        use crate::smart_account::specs::dispatcher::can_enforce_dispatch;
         {
             if !can_enforce_dispatch(e, context, matched_signers, context_rule, &e.current_contract_address(), policy) {
                 return false;

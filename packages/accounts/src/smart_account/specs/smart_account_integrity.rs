@@ -72,6 +72,7 @@ pub fn add_context_rule_integrity_3(e: Env) {
 // after add_context_rule the rule appears
 // in get_valid_context_rules (in first index)
 // most important!
+// status: verified - very unclear (without SMT?)
 pub fn add_context_rule_integrity_4(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -126,6 +127,7 @@ pub fn add_context_rule_integrity_7(e: Env) {
 
 #[rule]
 // after add_context_rule the valid until is set as valid until
+// status: verified - very unclear (without SMT?)
 pub fn add_context_rule_integrity_8(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -260,7 +262,7 @@ pub fn remove_context_rule_integrity_3(e: Env) {
 
 #[rule]
 // after add_signer the signer is added.
-// status: verified
+// status: verified - review 
 #[rule]
 pub fn add_signer_integrity(e: Env) {
     let id: u32 = nondet();
@@ -271,7 +273,8 @@ pub fn add_signer_integrity(e: Env) {
     e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
     e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &Vec::<Signer>::new(&e));
     e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &Vec::<Address>::new(&e));
-
+    // raz: doesn't make sense to me
+    
     add_signer(&e, id, &signer);
 
     let ctx_rule_post = get_context_rule(&e, id);
@@ -280,7 +283,7 @@ pub fn add_signer_integrity(e: Env) {
 
 #[rule]
 // after remove_signer the signer is removed
-// status: verified
+// status: verified - review
 #[rule]
 pub fn remove_signer_integrity(e: Env) {
     let id: u32 = nondet();
@@ -294,6 +297,7 @@ pub fn remove_signer_integrity(e: Env) {
     let mut signers = Vec::new(&e);
     signers.push_back(signer.clone());
     e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
+    // raz: doesn't make sense to me
 
     remove_signer(&e, id, &signer);
 

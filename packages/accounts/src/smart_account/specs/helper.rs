@@ -29,35 +29,30 @@ pub fn get_meta_of_id(e: Env, id: u32) -> Meta {
     e.storage().persistent().get::<_, Meta>(&SmartAccountStorageKey::Meta(id)).unwrap_or_else(|| panic!())
 }
 
-// manual dispatching between different policies
+// 
 
-mod ghost_vars {
-    use super::Address;
-    use crate::smart_account::specs::ghosts::GhostVar;
-    
-    pub(super) static mut POLICY1_ADDRESS: GhostVar<Address> = GhostVar::UnInit;
-    pub(super) static mut POLICY2_ADDRESS: GhostVar<Address> = GhostVar::UnInit;
-}
+use crate::smart_account::MAX_SIGNERS;
+use crate::smart_account::MAX_POLICIES;
 
-pub fn can_enforce_dispatch(
+// a version of the validate_signers_and_policies function that
+// returns false instead of panicking and returns true otherwise.
+pub fn validate_signers_and_policies_non_panicking(
     e: &Env,
-    context: &Context,
-    matched_signers: &Vec<Signer>,
-    context_rule: &ContextRule,
-    smart_account: &Address,
-    policy_addr: Address,
+    signers: &Vec<Signer>,
+    policies: &Vec<Address>,
 ) -> bool {
-    unsafe {
-        let policy1_addr = ghost_vars::POLICY1_ADDRESS.get();
-        let policy2_addr = ghost_vars::POLICY2_ADDRESS.get();
-        if policy_addr == policy1_addr {
-            return Policy1::can_enforce(e, context.clone(), matched_signers.clone(), context_rule.clone(), smart_account.clone());
-        } 
-        else if policy_addr == policy2_addr {
-            return Policy2::can_enforce(e, context.clone(), matched_signers.clone(), context_rule.clone(), smart_account.clone());
-        }
-        else {
-            panic!("Policy not found");
-        }
+    if signers.len() > MAX_SIGNERS {
+        return false
     }
+
+    if policies.len() > MAX_POLICIES {
+        return false;
+    }
+
+    // Check minimum requirements - must have at least one signer or one policy
+    if signers.is_empty() && policies.is_empty() {
+        return false;
+    }
+
+    true
 }
