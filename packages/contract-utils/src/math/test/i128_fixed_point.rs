@@ -258,3 +258,55 @@ fn test_checked_fixed_mul_ceil_overflow() {
 
     assert_eq!(result, None);
 }
+
+#[test]
+fn test_div_floor_both_negative() {
+    let env = Env::default();
+    let x: i128 = 1;
+    let y: i128 = -5;
+    let z: i128 = -2;
+
+    // r = -5, r / -2 = floor(2.5) = 2
+    let result = x.fixed_mul_floor(&env, &y, &z);
+
+    assert_eq!(result, 2);
+}
+
+#[test]
+fn test_div_floor_r_negative_z_positive() {
+    let env = Env::default();
+    let x: i128 = 1;
+    let y: i128 = -5;
+    let z: i128 = 2;
+
+    // r = -5, r / 2 = floor(-2.5) = -3
+    let result = x.fixed_mul_floor(&env, &y, &z);
+
+    assert_eq!(result, -3);
+}
+
+#[test]
+fn test_div_ceil_both_negative() {
+    let env = Env::default();
+    let x: i128 = 1;
+    let y: i128 = -5;
+    let z: i128 = -2;
+
+    // r = -5, r / -2 = ceil(2.5) = 3
+    let result = x.fixed_mul_ceil(&env, &y, &z);
+
+    assert_eq!(result, 3);
+}
+
+#[test]
+fn test_div_ceil_r_negative_z_positive() {
+    let env = Env::default();
+    let x: i128 = 1;
+    let y: i128 = -5;
+    let z: i128 = 2;
+
+    // r = -5, r / 2 = ceil(-2.5) = -2
+    let result = x.fixed_mul_ceil(&env, &y, &z);
+
+    assert_eq!(result, -2);
+}

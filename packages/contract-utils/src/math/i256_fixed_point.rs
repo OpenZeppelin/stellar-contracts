@@ -25,42 +25,14 @@ impl SorobanFixedPoint for I256 {
 
 /// Performs floor(x * y / z)
 pub(crate) fn mul_div_floor(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
-    let zero = I256::from_i32(env, 0);
-    let r = x.mul(y);
-
-    if *z == zero {
-        panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
-    }
-
-    if r < zero || (r > zero && *z < zero) {
-        // ceil is taken by default for a negative result
-        let remainder = r.rem_euclid(z);
-        let one = I256::from_i32(env, 1);
-        r.div(z).sub(if remainder > zero { &one } else { &zero })
-    } else {
-        // floor is taken by default for a positive or zero result
-        r.div(z)
-    }
+    checked_mul_div_floor(env, x, y, z)
+        .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::DivisionByZero))
 }
 
 /// Performs ceil(x * y / z)
 pub(crate) fn mul_div_ceil(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
-    let zero = I256::from_i32(env, 0);
-    let r = x.mul(y);
-
-    if *z == zero {
-        panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
-    }
-
-    if *z < zero || r <= zero {
-        // ceil is taken by default for a negative or zero result
-        r.div(z)
-    } else {
-        // floor is taken by default for a positive result
-        let remainder = r.rem_euclid(z);
-        let one = I256::from_i32(env, 1);
-        r.div(z).add(if remainder > zero { &one } else { &zero })
-    }
+    checked_mul_div_ceil(env, x, y, z)
+        .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::DivisionByZero))
 }
 
 /// Checked version of floor(x * y / z)
@@ -72,7 +44,7 @@ pub(crate) fn checked_mul_div_floor(env: &Env, x: &I256, y: &I256, z: &I256) -> 
         return None;
     }
 
-    if r < zero || (r > zero && *z < zero) {
+    if (r < zero && *z > zero) || (r > zero && *z < zero) {
         // ceil is taken by default for a negative result
         let remainder = r.rem_euclid(z);
         let one = I256::from_i32(env, 1);
@@ -92,7 +64,7 @@ pub(crate) fn checked_mul_div_ceil(env: &Env, x: &I256, y: &I256, z: &I256) -> O
         return None;
     }
 
-    if *z < zero || r <= zero {
+    if (r <= zero && *z > zero) || (r >= zero && *z < zero) {
         // ceil is taken by default for a negative or zero result
         Some(r.div(z))
     } else {

@@ -339,3 +339,157 @@ fn test_checked_mul_div_floor_negative_with_remainder() {
 
     assert_eq!(result, I256::from_i128(&env, -24));
 }
+
+#[test]
+fn test_mul_div_floor_both_negative() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 1);
+    let y: I256 = I256::from_i128(&env, -5);
+    let z: I256 = I256::from_i128(&env, -2);
+
+    // r = -5, r / -2 = 2
+    let result = crate::math::i256_fixed_point::mul_div_floor(&env, &x, &y, &z);
+
+    assert_eq!(result, I256::from_i128(&env, 2));
+}
+
+#[test]
+fn test_mul_div_floor_both_positive() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 1);
+    let y: I256 = I256::from_i128(&env, 5);
+    let z: I256 = I256::from_i128(&env, 2);
+
+    // r = 5, r / 2 = 2
+    let result = crate::math::i256_fixed_point::mul_div_floor(&env, &x, &y, &z);
+
+    assert_eq!(result, I256::from_i128(&env, 2));
+}
+
+#[test]
+fn test_mul_div_floor_r_positive_z_negative() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 1);
+    let y: I256 = I256::from_i128(&env, 5);
+    let z: I256 = I256::from_i128(&env, -2);
+
+    // r = 5, r / -2 = -2 (truncated), floor(-2.5) = -3
+    let result = crate::math::i256_fixed_point::mul_div_floor(&env, &x, &y, &z);
+
+    assert_eq!(result, I256::from_i128(&env, -3));
+}
+
+#[test]
+fn test_mul_div_floor_r_negative_z_positive() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 1);
+    let y: I256 = I256::from_i128(&env, -5);
+    let z: I256 = I256::from_i128(&env, 2);
+
+    // r = -5, r / 2 = -2 (truncated), floor(-2.5) = -3
+    let result = crate::math::i256_fixed_point::mul_div_floor(&env, &x, &y, &z);
+
+    assert_eq!(result, I256::from_i128(&env, -3));
+}
+
+#[test]
+fn test_mul_div_floor_r_zero() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 0);
+    let y: I256 = I256::from_i128(&env, 5);
+    let z: I256 = I256::from_i128(&env, 2);
+
+    // r = 0, 0 / 2 = 0
+    let result = crate::math::i256_fixed_point::mul_div_floor(&env, &x, &y, &z);
+
+    assert_eq!(result, I256::from_i128(&env, 0));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1501)")]
+fn test_mul_div_floor_z_zero() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 1);
+    let y: I256 = I256::from_i128(&env, 5);
+    let z: I256 = I256::from_i128(&env, 0);
+
+    crate::math::i256_fixed_point::mul_div_floor(&env, &x, &y, &z);
+}
+
+// ################## mul_div_ceil TESTS ##################
+
+#[test]
+fn test_mul_div_ceil_both_positive() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 1);
+    let y: I256 = I256::from_i128(&env, 5);
+    let z: I256 = I256::from_i128(&env, 2);
+
+    // r = 5, r / 2 = 2 (truncated), ceil(2.5) = 3
+    let result = crate::math::i256_fixed_point::mul_div_ceil(&env, &x, &y, &z);
+
+    assert_eq!(result, I256::from_i128(&env, 3));
+}
+
+#[test]
+fn test_mul_div_ceil_both_negative() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 1);
+    let y: I256 = I256::from_i128(&env, -5);
+    let z: I256 = I256::from_i128(&env, -2);
+
+    // r = -5, r / -2 = 2 (truncated), ceil(2.5) = 3
+    let result = crate::math::i256_fixed_point::mul_div_ceil(&env, &x, &y, &z);
+
+    assert_eq!(result, I256::from_i128(&env, 3));
+}
+
+#[test]
+fn test_mul_div_ceil_r_positive_z_negative() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 1);
+    let y: I256 = I256::from_i128(&env, 5);
+    let z: I256 = I256::from_i128(&env, -2);
+
+    // r = 5, r / -2 = -2 (truncated), ceil(-2.5) = -2
+    let result = crate::math::i256_fixed_point::mul_div_ceil(&env, &x, &y, &z);
+
+    assert_eq!(result, I256::from_i128(&env, -2));
+}
+
+#[test]
+fn test_mul_div_ceil_r_negative_z_positive() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 1);
+    let y: I256 = I256::from_i128(&env, -5);
+    let z: I256 = I256::from_i128(&env, 2);
+
+    // r = -5, r / 2 = -2 (truncated), ceil(-2.5) = -2
+    let result = crate::math::i256_fixed_point::mul_div_ceil(&env, &x, &y, &z);
+
+    assert_eq!(result, I256::from_i128(&env, -2));
+}
+
+#[test]
+fn test_mul_div_ceil_r_zero() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 0);
+    let y: I256 = I256::from_i128(&env, 5);
+    let z: I256 = I256::from_i128(&env, 2);
+
+    // r = 0, 0 / 2 = 0
+    let result = crate::math::i256_fixed_point::mul_div_ceil(&env, &x, &y, &z);
+
+    assert_eq!(result, I256::from_i128(&env, 0));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1501)")]
+fn test_mul_div_ceil_z_zero() {
+    let env = Env::default();
+    let x: I256 = I256::from_i128(&env, 1);
+    let y: I256 = I256::from_i128(&env, 5);
+    let z: I256 = I256::from_i128(&env, 0);
+
+    crate::math::i256_fixed_point::mul_div_ceil(&env, &x, &y, &z);
+}
