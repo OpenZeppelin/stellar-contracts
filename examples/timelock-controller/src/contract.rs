@@ -429,5 +429,5 @@ impl TimelockController {
 }
 
 // Implement AccessControl trait to expose role management functions
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl AccessControl for TimelockController {}

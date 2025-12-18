@@ -28,10 +28,10 @@ impl ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Base;
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl NonFungibleBurnable for ExampleContract {}

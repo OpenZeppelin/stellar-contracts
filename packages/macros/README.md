@@ -6,7 +6,7 @@ Macros for Stellar contracts.
 
 ### Default Implementation
 
-The `#[contractimpl(contracttrait = true)]` macro generates missing default implementations for traits provided by this library.
+The `#[contractimpl(contracttrait)]` macro generates missing default implementations for traits provided by this library.
 
 #### Usage Examples
 
@@ -17,7 +17,7 @@ use stellar_tokens::fungible::{Base, FungibleToken};
 #[contract]
 pub struct MyContract;
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleToken for MyContract {
     type ContractType = Base;
 

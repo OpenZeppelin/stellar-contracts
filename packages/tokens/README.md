@@ -49,12 +49,12 @@ impl MyContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleToken for MyContract {
     type ContractType = Base;
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleBurnable for MyContract {}
 ```
 
@@ -107,12 +107,12 @@ impl MyNFTContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl NonFungibleToken for MyNFTContract {
     type ContractType = Base;
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl NonFungibleBurnable for MyNFTContract {}
 ```
 

@@ -36,5 +36,5 @@ impl ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl Ownable for ExampleContract {}

@@ -28,7 +28,7 @@ impl ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
     type ContractType = Base;
 }

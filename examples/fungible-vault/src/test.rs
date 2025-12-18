@@ -26,7 +26,7 @@ impl MockAssetContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleToken for MockAssetContract {
     type ContractType = stellar_tokens::fungible::Base;
 }

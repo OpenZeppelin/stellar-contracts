@@ -132,5 +132,5 @@ impl FeeForwarder {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl AccessControl for FeeForwarder {}

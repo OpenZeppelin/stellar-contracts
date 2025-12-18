@@ -27,7 +27,7 @@ impl ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
     type ContractType = Vault;
 
@@ -38,7 +38,7 @@ impl FungibleToken for ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleVault for ExampleContract {
     fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128 {
         Vault::deposit(e, assets, receiver, from, operator)

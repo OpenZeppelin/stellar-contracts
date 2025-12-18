@@ -53,7 +53,7 @@ impl MyContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl AccessControl for MyContract {}
 ```
 
@@ -108,7 +108,7 @@ impl MyContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl Ownable for MyContract {}
 ```
 

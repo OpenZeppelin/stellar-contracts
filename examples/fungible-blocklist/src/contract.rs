@@ -49,7 +49,7 @@ impl ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
     type ContractType = BlockList;
 }
@@ -71,5 +71,5 @@ impl FungibleBlockList for ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl AccessControl for ExampleContract {}

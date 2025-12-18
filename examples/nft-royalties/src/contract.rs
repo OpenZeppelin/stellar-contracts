@@ -55,7 +55,7 @@ impl ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Base;
 }
@@ -88,5 +88,5 @@ impl NonFungibleRoyalties for ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl AccessControl for ExampleContract {}

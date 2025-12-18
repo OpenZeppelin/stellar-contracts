@@ -41,5 +41,5 @@ impl SACAdminWrapper for ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl AccessControl for ExampleContract {}

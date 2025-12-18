@@ -44,7 +44,7 @@ impl ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
     type ContractType = AllowList;
 }
@@ -65,8 +65,8 @@ impl FungibleAllowList for ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl AccessControl for ExampleContract {}
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleBurnable for ExampleContract {}

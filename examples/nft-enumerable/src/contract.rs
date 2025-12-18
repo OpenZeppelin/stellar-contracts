@@ -34,13 +34,13 @@ impl ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl NonFungibleToken for ExampleContract {
     type ContractType = Enumerable;
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl NonFungibleEnumerable for ExampleContract {}
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl NonFungibleBurnable for ExampleContract {}

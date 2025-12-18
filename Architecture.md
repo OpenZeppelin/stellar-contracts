@@ -191,7 +191,7 @@ Extending the `instance` storage entries is the responsibility of the contract d
 #[contract]
 pub struct MyToken;
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleToken for MyToken {
     ContractType = Base;
     // Custom overrides here (optional)
@@ -201,12 +201,12 @@ impl FungibleToken for MyToken {
 ### 2. Extension Composition Pattern
 
 ```rust
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleBurnable for MyToken {
     // Burning functionality
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl Pausable for MyToken {
     // Pausable functionality
 }

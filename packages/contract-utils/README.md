@@ -42,7 +42,7 @@ impl MyContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl Pausable for MyContract {
     #[only_owner]
     pub fn pause(e: &Env) {
@@ -55,7 +55,7 @@ impl Pausable for MyContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl Ownable for MyContract {}
 ```
 
@@ -98,7 +98,7 @@ impl UpgradeableInternal for ExampleContract {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl Ownable for ExampleContract {}
 ```
 

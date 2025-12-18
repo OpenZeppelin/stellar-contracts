@@ -20,7 +20,7 @@ impl MockToken {
     }
 }
 
-#[contractimpl(contracttrait = true)]
+#[contractimpl(contracttrait)]
 impl FungibleToken for MockToken {
     type ContractType = Base;
 }
