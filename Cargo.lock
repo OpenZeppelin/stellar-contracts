@@ -1670,8 +1670,8 @@ dependencies = [
 
 [[package]]
 name = "soroban-ledger-snapshot"
-version = "23.2.1"
-source = "git+https://github.com/stellar/rs-soroban-sdk?branch=i1451#9b48fb73eba4853635a205b051074c32bd2469a7"
+version = "23.3.0"
+source = "git+https://github.com/stellar/rs-soroban-sdk?branch=i1451#05a66469f103a3938e629b31a481ddf1a0d8ac8c"
 dependencies = [
  "serde",
  "serde_json",
@@ -1683,8 +1683,8 @@ dependencies = [
 
 [[package]]
 name = "soroban-sdk"
-version = "23.2.1"
-source = "git+https://github.com/stellar/rs-soroban-sdk?branch=i1451#9b48fb73eba4853635a205b051074c32bd2469a7"
+version = "23.3.0"
+source = "git+https://github.com/stellar/rs-soroban-sdk?branch=i1451#05a66469f103a3938e629b31a481ddf1a0d8ac8c"
 dependencies = [
  "arbitrary",
  "bytes-lit",
@@ -1701,12 +1701,13 @@ dependencies = [
  "soroban-ledger-snapshot",
  "soroban-sdk-macros",
  "stellar-strkey",
+ "visibility",
 ]
 
 [[package]]
 name = "soroban-sdk-macros"
-version = "23.2.1"
-source = "git+https://github.com/stellar/rs-soroban-sdk?branch=i1451#9b48fb73eba4853635a205b051074c32bd2469a7"
+version = "23.3.0"
+source = "git+https://github.com/stellar/rs-soroban-sdk?branch=i1451#05a66469f103a3938e629b31a481ddf1a0d8ac8c"
 dependencies = [
  "darling",
  "heck",
@@ -1724,8 +1725,8 @@ dependencies = [
 
 [[package]]
 name = "soroban-spec"
-version = "23.2.1"
-source = "git+https://github.com/stellar/rs-soroban-sdk?branch=i1451#9b48fb73eba4853635a205b051074c32bd2469a7"
+version = "23.3.0"
+source = "git+https://github.com/stellar/rs-soroban-sdk?branch=i1451#05a66469f103a3938e629b31a481ddf1a0d8ac8c"
 dependencies = [
  "base64",
  "stellar-xdr",
@@ -1735,8 +1736,8 @@ dependencies = [
 
 [[package]]
 name = "soroban-spec-rust"
-version = "23.2.1"
-source = "git+https://github.com/stellar/rs-soroban-sdk?branch=i1451#9b48fb73eba4853635a205b051074c32bd2469a7"
+version = "23.3.0"
+source = "git+https://github.com/stellar/rs-soroban-sdk?branch=i1451#05a66469f103a3938e629b31a481ddf1a0d8ac8c"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -2059,6 +2060,17 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "visibility"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d674d135b4a8c1d7e813e2f8d1c9a58308aee4a680323066025e53132218bd91"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.106",
+]
 
 [[package]]
 name = "wait-timeout"
