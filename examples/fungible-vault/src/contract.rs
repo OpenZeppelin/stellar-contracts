@@ -93,12 +93,10 @@ impl FungibleVault for ExampleContract {
     }
 
     fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128 {
-        operator.require_auth();
         Vault::deposit(e, assets, receiver, from, operator)
     }
 
     fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128 {
-        operator.require_auth();
         Vault::mint(e, shares, receiver, from, operator)
     }
 
@@ -109,12 +107,10 @@ impl FungibleVault for ExampleContract {
         owner: Address,
         operator: Address,
     ) -> i128 {
-        operator.require_auth();
         Vault::withdraw(e, assets, receiver, owner, operator)
     }
 
     fn redeem(e: &Env, shares: i128, receiver: Address, owner: Address, operator: Address) -> i128 {
-        operator.require_auth();
         Vault::redeem(e, shares, receiver, owner, operator)
     }
 }
