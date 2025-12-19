@@ -267,13 +267,16 @@ fn withdraw_functionality() {
     // Create contracts
     let asset_address = create_asset_contract(&e, initial_supply, &admin);
     let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
+    let mut shares_minted = 0;
 
     e.mock_all_auths();
 
     e.as_contract(&vault_address, || {
-        let shares_minted =
+        shares_minted =
             Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
+    });
 
+    e.as_contract(&vault_address, || {
         // Withdraw assets
         let shares_burned =
             Vault::withdraw(&e, withdraw_amount, user.clone(), user.clone(), user.clone());
@@ -296,13 +299,16 @@ fn redeem_functionality() {
     // Create contracts
     let asset_address = create_asset_contract(&e, initial_supply, &admin);
     let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
+    let mut shares_minted = 0;
 
     e.mock_all_auths();
 
     e.as_contract(&vault_address, || {
-        let shares_minted =
+        shares_minted =
             Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
+    });
 
+    e.as_contract(&vault_address, || {
         // Redeem half the shares
         let shares_to_redeem = shares_minted / 2;
         let assets_received =
@@ -372,7 +378,9 @@ fn withdraw_exceeds_max() {
 
     e.as_contract(&vault_address, || {
         Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
+    });
 
+    e.as_contract(&vault_address, || {
         // Try to withdraw more than max
         let max_withdraw = Vault::max_withdraw(&e, user.clone());
         Vault::withdraw(&e, max_withdraw + 1, user.clone(), user.clone(), user.clone());
@@ -398,10 +406,13 @@ fn redeem_exceeds_max() {
     // Setup: deposit assets first
     let asset_client = MockAssetContractClient::new(&e, &asset_address);
     asset_client.transfer(&admin, &vault_address, &deposit_amount);
+    let mut shares = 0;
 
     e.as_contract(&vault_address, || {
-        let shares = Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
+        shares = Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
+    });
 
+    e.as_contract(&vault_address, || {
         // Try to redeem more shares than user has
         Vault::redeem(&e, shares + 1, user.clone(), user.clone(), user.clone());
     });

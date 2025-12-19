@@ -341,12 +341,16 @@ impl Vault {
         from: Address,
         operator: Address,
     ) -> i128 {
+        operator.require_auth();
+
         let max_assets = Self::max_deposit(e, receiver.clone());
         if assets > max_assets {
             panic_with_error!(e, VaultTokenError::VaultExceededMaxDeposit);
         }
         let shares: i128 = Self::preview_deposit(e, assets);
         Self::deposit_internal(e, &receiver, assets, shares, &from, &operator);
+        emit_deposit(e, &operator, &from, &receiver, assets, shares);
+
         shares
     }
 
@@ -389,12 +393,16 @@ impl Vault {
         from: Address,
         operator: Address,
     ) -> i128 {
+        operator.require_auth();
+
         let max_shares = Self::max_mint(e, receiver.clone());
         if shares > max_shares {
             panic_with_error!(e, VaultTokenError::VaultExceededMaxMint);
         }
         let assets: i128 = Self::preview_mint(e, shares);
         Self::deposit_internal(e, &receiver, assets, shares, &from, &operator);
+        emit_deposit(e, &operator, &from, &receiver, assets, shares);
+
         assets
     }
 
@@ -436,12 +444,16 @@ impl Vault {
         owner: Address,
         operator: Address,
     ) -> i128 {
+        operator.require_auth();
+
         let max_assets = Self::max_withdraw(e, owner.clone());
         if assets > max_assets {
             panic_with_error!(e, VaultTokenError::VaultExceededMaxWithdraw);
         }
         let shares: i128 = Self::preview_withdraw(e, assets);
         Self::withdraw_internal(e, &receiver, &owner, assets, shares, &operator);
+        emit_withdraw(e, &operator, &receiver, &owner, assets, shares);
+
         shares
     }
 
@@ -483,12 +495,16 @@ impl Vault {
         owner: Address,
         operator: Address,
     ) -> i128 {
+        operator.require_auth();
+
         let max_shares = Self::max_redeem(e, owner.clone());
         if shares > max_shares {
             panic_with_error!(e, VaultTokenError::VaultExceededMaxRedeem);
         }
         let assets = Self::preview_redeem(e, shares);
         Self::withdraw_internal(e, &receiver, &owner, assets, shares, &operator);
+        emit_withdraw(e, &operator, &receiver, &owner, assets, shares);
+
         assets
     }
 
@@ -751,7 +767,6 @@ impl Vault {
         }
 
         Base::mint(e, receiver, shares);
-        emit_deposit(e, operator, from, receiver, assets, shares);
     }
 
     /// Internal withdraw/redeem workflow without authorization checks.
@@ -798,7 +813,6 @@ impl Vault {
         // `safeTransfer` mechanism is not present in the base module, (will be provided
         // as an extension)
         token_client.transfer(&e.current_contract_address(), receiver, &assets);
-        emit_withdraw(e, operator, receiver, owner, assets, shares);
     }
 
     /// Returns the virtual decimals offset for the vault (defaults to 0 if not
