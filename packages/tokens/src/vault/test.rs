@@ -267,13 +267,11 @@ fn withdraw_functionality() {
     // Create contracts
     let asset_address = create_asset_contract(&e, initial_supply, &admin);
     let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
-    let mut shares_minted = 0;
 
     e.mock_all_auths();
 
-    e.as_contract(&vault_address, || {
-        shares_minted =
-            Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
+    let shares_minted = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone())
     });
 
     e.as_contract(&vault_address, || {
@@ -299,13 +297,11 @@ fn redeem_functionality() {
     // Create contracts
     let asset_address = create_asset_contract(&e, initial_supply, &admin);
     let vault_address = create_vault_contract(&e, &asset_address, decimals_offset);
-    let mut shares_minted = 0;
 
     e.mock_all_auths();
 
-    e.as_contract(&vault_address, || {
-        shares_minted =
-            Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
+    let shares_minted = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone())
     });
 
     e.as_contract(&vault_address, || {
@@ -406,10 +402,9 @@ fn redeem_exceeds_max() {
     // Setup: deposit assets first
     let asset_client = MockAssetContractClient::new(&e, &asset_address);
     asset_client.transfer(&admin, &vault_address, &deposit_amount);
-    let mut shares = 0;
 
-    e.as_contract(&vault_address, || {
-        shares = Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone());
+    let shares = e.as_contract(&vault_address, || {
+        Vault::deposit(&e, deposit_amount, user.clone(), user.clone(), user.clone())
     });
 
     e.as_contract(&vault_address, || {

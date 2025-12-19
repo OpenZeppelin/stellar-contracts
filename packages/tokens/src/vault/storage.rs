@@ -326,14 +326,9 @@ impl Vault {
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// It is the responsibility of the implementer to establish appropriate
-    /// access controls to ensure that only authorized accounts can execute
-    /// deposit operations. Consider combining with the Ownable or Access
-    /// Control pattern, or using `operator.require_auth()`.
+    /// Authorization from `operator` is required.
     pub fn deposit(
         e: &Env,
         assets: i128,
@@ -378,14 +373,9 @@ impl Vault {
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// It is the responsibility of the implementer to establish appropriate
-    /// access controls to ensure that only authorized accounts can execute
-    /// mint operations. Consider combining with the Ownable or Access
-    /// Control pattern, or using `operator.require_auth()`.
+    /// Authorization from `operator` is required.
     pub fn mint(
         e: &Env,
         shares: i128,
@@ -429,14 +419,9 @@ impl Vault {
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// It is the responsibility of the implementer to establish appropriate
-    /// access controls to ensure that only authorized accounts can execute
-    /// withdrawal operations. Consider combining with the Ownable or Access
-    /// Control pattern, or using `operator.require_auth()`.
+    /// Authorization from `operator` is required.
     pub fn withdraw(
         e: &Env,
         assets: i128,
@@ -480,14 +465,9 @@ impl Vault {
     ///   Address]`
     /// * data - `[assets: i128, shares: i128]`
     ///
-    /// # Security Warning
+    /// # Notes
     ///
-    /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-    ///
-    /// It is the responsibility of the implementer to establish appropriate
-    /// access controls to ensure that only authorized accounts can execute
-    /// redemption operations. Consider combining with the Ownable or Access
-    /// Control pattern, or using `operator.require_auth()`.
+    /// Authorization from `operator` is required.
     pub fn redeem(
         e: &Env,
         shares: i128,
@@ -766,7 +746,7 @@ impl Vault {
             token_client.transfer_from(operator, from, &e.current_contract_address(), &assets);
         }
 
-        Base::mint(e, receiver, shares);
+        Base::update(e, None, Some(receiver), shares);
     }
 
     /// Internal withdraw/redeem workflow without authorization checks.
