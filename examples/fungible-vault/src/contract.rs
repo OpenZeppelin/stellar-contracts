@@ -39,26 +39,4 @@ impl FungibleToken for ExampleContract {
 }
 
 #[contractimpl(contracttrait)]
-impl FungibleVault for ExampleContract {
-    fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128 {
-        Vault::deposit(e, assets, receiver, from, operator)
-    }
-
-    fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128 {
-        Vault::mint(e, shares, receiver, from, operator)
-    }
-
-    fn withdraw(
-        e: &Env,
-        assets: i128,
-        receiver: Address,
-        owner: Address,
-        operator: Address,
-    ) -> i128 {
-        Vault::withdraw(e, assets, receiver, owner, operator)
-    }
-
-    fn redeem(e: &Env, shares: i128, receiver: Address, owner: Address, operator: Address) -> i128 {
-        Vault::redeem(e, shares, receiver, owner, operator)
-    }
-}
+impl FungibleVault for ExampleContract {}
