@@ -37,3 +37,17 @@ fn burn_works() {
     client.burn(&owner, &0);
     assert_eq!(client.balance(&owner), 0);
 }
+
+#[test]
+fn burn_from_works() {
+    let e = Env::default();
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let client = create_client(&e, &owner);
+
+    e.mock_all_auths();
+    client.mint(&owner);
+    client.approve(&owner, &spender, &0, &1000);
+    client.burn_from(&spender, &owner, &0);
+    assert_eq!(client.balance(&owner), 0);
+}
