@@ -29,6 +29,13 @@ use crate::fungible::FungibleToken;
 /// However, this parameter is omitted from the module functions, defined in
 /// "storage.rs", because the authorizations are to be handled in the access
 /// control helpers or directly implemented.
+///
+/// There is no default implementation for this trait on purpose.
+///
+/// Because, there are no default implementation to enforce how the
+/// authorization should be configured. Not providing a default implementation
+/// for this trait is a reminder for the implementor to provide the
+/// authorization logic for this trait.
 pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     /// Returns the blocked status of an account.
     ///
