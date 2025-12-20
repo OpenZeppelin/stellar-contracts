@@ -153,7 +153,7 @@ pub fn assert_post_number_of_rules_at_most_max(e: Env) {
 }
 
 #[rule]
-// status: 
+// status: verified
 pub fn after_add_context_rule_number_of_rules_at_most_max(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -166,7 +166,7 @@ pub fn after_add_context_rule_number_of_rules_at_most_max(e: Env) {
 }
 
 #[rule]
-// status: 
+// status: verified
 pub fn after_update_context_rule_name_number_of_rules_at_most_max(e: Env) {
     let id: u32 = nondet();
     let name = nondet_string();
@@ -176,7 +176,7 @@ pub fn after_update_context_rule_name_number_of_rules_at_most_max(e: Env) {
 }
 
 #[rule]
-// status: 
+// status: verified
 pub fn after_update_context_rule_valid_until_number_of_rules_at_most_max(e: Env) {
     let id: u32 = nondet();
     let valid_until = Option::<u32>::nondet();
@@ -186,7 +186,7 @@ pub fn after_update_context_rule_valid_until_number_of_rules_at_most_max(e: Env)
 }
 
 #[rule]
-// status: 
+// status: verified
 pub fn after_remove_context_rule_number_of_rules_at_most_max(e: Env) {
     let id: u32 = nondet();
     assume_pre_number_of_rules_at_most_max(e.clone());
@@ -195,7 +195,7 @@ pub fn after_remove_context_rule_number_of_rules_at_most_max(e: Env) {
 }
 
 #[rule]
-// status: 
+// status: verified
 pub fn after_add_signer_number_of_rules_at_most_max(e: Env) {
     let id: u32 = nondet();
     let signer = Signer::nondet();
@@ -205,7 +205,7 @@ pub fn after_add_signer_number_of_rules_at_most_max(e: Env) {
 }
 
 #[rule]
-// status: 
+// status: verified
 pub fn after_remove_signer_number_of_rules_at_most_max(e: Env) {
     let id: u32 = nondet();
     let signer = Signer::nondet();
@@ -215,7 +215,7 @@ pub fn after_remove_signer_number_of_rules_at_most_max(e: Env) {
 }
 
 #[rule]
-// status: 
+// status: verified
 pub fn after_add_policy_number_of_rules_at_most_max(e: Env) {
     let id: u32 = nondet();
     let policy = nondet_address();
@@ -226,7 +226,7 @@ pub fn after_add_policy_number_of_rules_at_most_max(e: Env) {
 }
 
 #[rule]
-// status: 
+// status: verified
 pub fn after_remove_policy_number_of_rules_at_most_max(e: Env) {
     let id: u32 = nondet();
     let policy = nondet_address();
@@ -234,6 +234,9 @@ pub fn after_remove_policy_number_of_rules_at_most_max(e: Env) {
     remove_policy(&e, id, &policy);
     assert_post_number_of_rules_at_most_max(e.clone());
 }
+
+// invariant: no duplicate policies
+// waiting for better summary of compute fingerprint
 
 // helpers
 
@@ -283,7 +286,7 @@ pub fn after_update_context_rule_name_no_duplicate_policies(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_update_context_rule_valid_until_no_duplicate_policies(e: Env) {
     let id: u32 = nondet();
     let valid_until = Option::<u32>::nondet();
@@ -308,7 +311,7 @@ pub fn after_remove_context_rule_no_duplicate_policies(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_add_signer_no_duplicate_policies(e: Env) {
     let id: u32 = nondet();
     let signer = Signer::nondet();
@@ -357,6 +360,9 @@ pub fn after_remove_policy_no_duplicate_policies(e: Env) {
     remove_policy(&e, id_remove_policy, &policy);
     assert_post_no_duplicate_policies(e.clone(), id, index1, index2);
 }
+
+// invariant: no duplicate signers
+// waiting for better summary of compute fingerprint
 
 // helpers
 

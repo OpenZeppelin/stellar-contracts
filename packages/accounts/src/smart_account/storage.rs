@@ -650,7 +650,7 @@ pub fn compute_fingerprint(
 ) -> BytesN<32> {
     let mut sorted_signers = Vec::new(e);
     for signer in signers.iter() {
-        match sorted_signers.binary_search(&signer) {
+        match sorted_signers.binary_search(&signer) { // summary: contains instead of binary_search?
             Ok(_) => panic_with_error!(e, SmartAccountError::DuplicateSigner),
             Err(pos) => sorted_signers.insert(pos, signer),
         }

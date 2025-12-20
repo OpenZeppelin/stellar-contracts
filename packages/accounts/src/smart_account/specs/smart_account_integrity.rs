@@ -281,6 +281,11 @@ pub fn add_signer_integrity(e: Env) {
     cvlr_assert!(ctx_rule_post.signers.contains(&signer));
 }
 
+// storage.set(var_key, nondet())
+// let var1 = storage.get(var_key) // nondet? --> and set to whatever you get
+// let var2 = storage.get(var_key) // nondet? // get what you set 
+// cvlr_assert!(var1=var2) // should verify?
+
 #[rule]
 // after remove_signer the signer is removed
 // status: verified - review
