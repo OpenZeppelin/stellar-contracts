@@ -12,10 +12,16 @@ use crate::{
     },
 };
 
+// integrity rules for all functions of the vault.
+
+// set assets sets the asset adress in storage
+
+// set_decimals_offset sets the decimals offset in storage
+
 #[rule]
-// deposit changes balances of AssetToken and BasicVault correctly.
+// deposit changes decreases the asset balance by assets
 // status: timeout
-pub fn deposit_integrity(e: Env) {
+pub fn deposit_integrity_1(e: Env) {
     let assets: i128 = nondet();
     let receiver: Address = nondet_address();
     let from: Address = nondet_address();
@@ -30,3 +36,14 @@ pub fn deposit_integrity(e: Env) {
     // cvlr_assert!(shares_receiver_post == shares_receiver_pre + shares);
     // cvlr_assert!(assets_from_post == assets_from_pre - assets);
 }
+
+// deposit increases the shares balance by shares (output)
+
+// deposit increases total_assets by assets
+
+// deposit increases total_supply by shares
+
+// similar rules for withdraw, mint, redeem
+
+// if these don't work we will write them in terms of the internal functions
+// deposit_internal and withdraw_internal

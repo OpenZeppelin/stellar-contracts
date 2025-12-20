@@ -1,5 +1,7 @@
 pub mod asset_token;
-pub mod conversions;
+pub mod vault_conversions;
 pub mod vault;
 pub mod vault_integrity;
 pub mod vault_sanity;
+pub mod vault_solvency;
+pub mod vault_panics;
