@@ -94,17 +94,5 @@ impl NonFungibleToken for ExampleContract {
 
 impl NonFungibleConsecutive for ExampleContract {}
 
-// You don't have to provide the implementations for all the methods,
-// `#[contractimpl(contracttrait)]` macro does this for you. This example
-// showcases what is happening under the hood when you use
-// `#[contractimpl(contracttrait)]` macro.
-#[contractimpl]
-impl NonFungibleBurnable for ExampleContract {
-    fn burn(e: &Env, from: Address, token_id: u32) {
-        Self::ContractType::burn(e, &from, token_id);
-    }
-
-    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32) {
-        Self::ContractType::burn_from(e, &spender, &from, token_id);
-    }
-}
+#[contractimpl(contracttrait)]
+impl NonFungibleBurnable for ExampleContract {}
