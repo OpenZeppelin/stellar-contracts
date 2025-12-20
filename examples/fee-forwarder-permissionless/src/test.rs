@@ -3,9 +3,8 @@ extern crate std;
 use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, MockAuth, MockAuthInvoke},
-    vec, Address, Env, IntoVal, String, Symbol, TryIntoVal, Val, Vec,
+    vec, Address, Env, IntoVal, MuxedAddress, String, Symbol, TryIntoVal, Val, Vec,
 };
-use stellar_macros::default_impl;
 use stellar_tokens::fungible::{Base, FungibleToken};
 
 use crate::contract::{FeeForwarder, FeeForwarderClient};
@@ -21,8 +20,7 @@ impl MockToken {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl FungibleToken for MockToken {
     type ContractType = Base;
 }

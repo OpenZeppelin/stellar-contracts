@@ -5,7 +5,7 @@
 
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
 use stellar_access::ownable::{set_owner, Ownable};
-use stellar_macros::{default_impl, only_owner};
+use stellar_macros::only_owner;
 
 #[contracttype]
 pub enum DataKey {
@@ -36,6 +36,5 @@ impl ExampleContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl Ownable for ExampleContract {}

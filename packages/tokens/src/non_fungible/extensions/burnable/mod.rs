@@ -1,10 +1,10 @@
 mod storage;
-use crate::non_fungible::NonFungibleToken;
+use crate::non_fungible::{overrides::BurnableOverrides, NonFungibleToken};
 
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractevent, Address, Env};
+use soroban_sdk::{contractevent, contracttrait, Address, Env};
 
 /// Burnable Trait for Non-Fungible Token
 ///
@@ -37,26 +37,8 @@ use soroban_sdk::{contractevent, Address, Env};
 ///     }
 /// }
 /// ```
-///
-/// # Notes
-///
-/// `#[contractimpl]` macro requires even the default implementations to be
-/// present under its scope. To not confuse the developers, we did not provide
-/// the default implementations here, but we are providing a macro to generate
-/// the default implementations for you.
-///
-/// When implementing [`NonFungibleBurnable`] trait for your Smart Contract,
-/// you can follow the below example:
-///
-/// ```ignore
-/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
-/// #[contractimpl]
-/// impl NonFungibleBurnable for MyContract {
-///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
-///     /* and the macro will generate all the missing default implementations for you */
-/// }
-/// ```
-pub trait NonFungibleBurnable: NonFungibleToken {
+#[contracttrait]
+pub trait NonFungibleBurnable: NonFungibleToken<ContractType: BurnableOverrides> {
     /// Destroys the token with `token_id` from `from`.
     ///
     /// # Arguments
@@ -76,7 +58,9 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: u32]`
-    fn burn(e: &Env, from: Address, token_id: u32);
+    fn burn(e: &Env, from: Address, token_id: u32) {
+        Self::ContractType::burn(e, &from, token_id);
+    }
 
     /// Destroys the token with `token_id` from `from`, by using `spender`s
     /// approval.
@@ -102,7 +86,9 @@ pub trait NonFungibleBurnable: NonFungibleToken {
     ///
     /// * topics - `["burn", from: Address]`
     /// * data - `[token_id: u32]`
-    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32);
+    fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32) {
+        Self::ContractType::burn_from(e, &spender, &from, token_id);
+    }
 }
 
 // ################## EVENTS ##################

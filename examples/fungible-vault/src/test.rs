@@ -2,8 +2,9 @@
 
 extern crate std;
 
-use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env, String};
-use stellar_macros::default_impl;
+use soroban_sdk::{
+    contract, contractimpl, testutils::Address as _, Address, Env, MuxedAddress, String,
+};
 use stellar_tokens::fungible::{Base, FungibleToken};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
@@ -25,8 +26,7 @@ impl MockAssetContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl FungibleToken for MockAssetContract {
     type ContractType = stellar_tokens::fungible::Base;
 }

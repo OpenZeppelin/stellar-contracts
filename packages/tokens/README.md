@@ -14,7 +14,7 @@ The `fungible` module provides functionalities for fungible tokens: balance mana
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, ContractOverrides, FungibleToken};
 use stellar_access::ownable::{self as ownable, Ownable};
-use stellar_macros::{default_impl, only_owner};
+use stellar_macros::{only_owner};
 
 #[contract]
 pub struct MyContract;
@@ -49,14 +49,12 @@ impl MyContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl FungibleToken for MyContract {
     type ContractType = Base;
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl FungibleBurnable for MyContract {}
 ```
 
@@ -81,7 +79,6 @@ The `non_fungible` module implements non-fungible token functionality:
 
 ```rust
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_macros::default_impl;
 use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
     Base, ContractOverrides, NonFungibleToken,
@@ -110,14 +107,12 @@ impl MyNFTContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl NonFungibleToken for MyNFTContract {
     type ContractType = Base;
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl NonFungibleBurnable for MyNFTContract {}
 ```
 

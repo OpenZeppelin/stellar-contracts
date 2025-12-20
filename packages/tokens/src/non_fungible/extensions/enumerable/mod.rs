@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{contracttrait, Address, Env};
 pub use storage::Enumerable;
 
 use crate::non_fungible::NonFungibleToken;
@@ -40,32 +40,16 @@ use crate::non_fungible::NonFungibleToken;
 /// 2. Enumerability can also be offloaded to off-chain services. This extension
 ///    exists for the use-cases where the enumeration is required as an on-chain
 ///    operation.
-///
-/// # Notes
-///
-/// `#[contractimpl]` macro requires even the default implementations to be
-/// present under its scope. To not confuse the developers, we did not provide
-/// the default implementations here, but we are providing a macro to generate
-/// the default implementations for you.
-///
-/// When implementing [`NonFungibleEnumerable`] trait for your Smart Contract,
-/// you can follow the below example:
-///
-/// ```ignore
-/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
-/// #[contractimpl]
-/// impl NonFungibleEnumerable for MyContract {
-///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
-///     /* and the macro will generate all the missing default implementations for you */
-/// }
-/// ```
+#[contracttrait]
 pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     /// Returns the total amount of tokens stored by the contract.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn total_supply(e: &Env) -> u32;
+    fn total_supply(e: &Env) -> u32 {
+        Enumerable::total_supply(e)
+    }
 
     /// Returns the `token_id` owned by `owner` at a given `index` in the
     /// owner's local list. Use along with
@@ -82,7 +66,9 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     ///
     /// * [`crate::non_fungible::NonFungibleTokenError::TokenNotFoundInOwnerList`] - When the token
     ///   ID is not found in the owner's enumeration.
-    fn get_owner_token_id(e: &Env, owner: Address, index: u32) -> u32;
+    fn get_owner_token_id(e: &Env, owner: Address, index: u32) -> u32 {
+        Enumerable::get_owner_token_id(e, &owner, index)
+    }
 
     /// Returns the `token_id` at a given `index` in the global token list.
     /// Use along with [`NonFungibleEnumerable::total_supply`] to enumerate
@@ -104,5 +90,7 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
     ///
     /// * [`crate::non_fungible::NonFungibleTokenError::TokenNotFoundInGlobalList`] - When the token
     ///   ID is not found in the global enumeration.
-    fn get_token_id(e: &Env, index: u32) -> u32;
+    fn get_token_id(e: &Env, index: u32) -> u32 {
+        Enumerable::get_token_id(e, index)
+    }
 }

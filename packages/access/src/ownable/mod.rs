@@ -35,7 +35,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env};
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env};
 
 pub use crate::ownable::storage::{
     accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
@@ -46,6 +46,7 @@ pub use crate::ownable::storage::{
 ///
 /// Provides functions to query ownership, initiate a transfer, or renounce
 /// ownership.
+#[contracttrait]
 pub trait Ownable {
     /// Returns `Some(Address)` if ownership is set, or `None` if ownership has
     /// been renounced.
@@ -53,7 +54,9 @@ pub trait Ownable {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn get_owner(e: &Env) -> Option<Address>;
+    fn get_owner(e: &Env) -> Option<Address> {
+        get_owner(e)
+    }
 
     /// Initiates a 2-step ownership transfer to a new address.
     ///
@@ -81,7 +84,9 @@ pub trait Ownable {
     /// # Notes
     ///
     /// * Authorization for the current owner is required.
-    fn transfer_ownership(e: &Env, new_owner: Address, live_until_ledger: u32);
+    fn transfer_ownership(e: &Env, new_owner: Address, live_until_ledger: u32) {
+        transfer_ownership(e, &new_owner, live_until_ledger);
+    }
 
     /// Accepts a pending ownership transfer.
     ///
@@ -98,7 +103,9 @@ pub trait Ownable {
     ///
     /// * topics - `["ownership_transfer_completed"]`
     /// * data - `[new_owner: Address]`
-    fn accept_ownership(e: &Env);
+    fn accept_ownership(e: &Env) {
+        accept_ownership(e);
+    }
 
     /// Renounces ownership of the contract.
     ///
@@ -118,7 +125,9 @@ pub trait Ownable {
     /// # Notes
     ///
     /// * Authorization for the current owner is required.
-    fn renounce_ownership(e: &Env);
+    fn renounce_ownership(e: &Env) {
+        renounce_ownership(e);
+    }
 }
 
 // ################## ERRORS ##################

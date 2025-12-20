@@ -32,20 +32,12 @@ use soroban_sdk::{contractevent, Address, Env};
 /// Non-Fungible and Fungible tokens, we are using `i128` instead of `u128` for
 /// the `sale_price`, due to SEP-41.
 ///
-/// `#[contractimpl]` macro requires even the default implementations to be
-/// present under its scope. To avoid confusion, we do not provide the default
-/// implementations here, but we are providing a macro that generates them.
+/// There is no default implementation for this trait on purpose.
 ///
-/// ## Example
-///
-/// ```ignore
-/// #[default_impl] // **IMPORTANT**: place this above `#[contractimpl]`
-/// #[contractimpl]
-/// impl NonFungibleRoyalties for MyContract {
-///     /* your overrides here (you don't have to put anything here if you don't want to override anything) */
-///     /* and the macro will generate all the missing default implementations for you */
-/// }
-/// ```
+/// Because, there are no default implementation to enforce how the
+/// authorization should be configured. Not providing a default implementation
+/// for this trait is a reminder for the implementor to provide the
+/// authorization logic for this trait.
 pub trait NonFungibleRoyalties: NonFungibleToken {
     /// Sets the global default royalty information for the entire collection.
     /// This will be used for all tokens that don't have specific royalty

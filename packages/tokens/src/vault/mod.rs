@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env};
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env};
 pub use storage::Vault;
 
 use crate::fungible::FungibleToken;
@@ -39,6 +39,7 @@ use crate::fungible::FungibleToken;
 /// This implementation follows the ERC-4626 standard for tokenized vaults,
 /// providing familiar interfaces for Ethereum developers while leveraging
 /// Stellar's unique capabilities.
+#[contracttrait]
 pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// Returns the address of the underlying asset that the vault manages.
     ///
@@ -50,7 +51,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// * [`crate::vault::VaultTokenError::VaultAssetAddressNotSet`] - When the
     ///   vault's underlying asset address has not been initialized.
-    fn query_asset(e: &Env) -> Address;
+    fn query_asset(e: &Env) -> Address {
+        Self::ContractType::query_asset(e)
+    }
 
     /// Returns the total amount of underlying assets held by the vault.
     ///
@@ -65,7 +68,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// * [`crate::vault::VaultTokenError::VaultAssetAddressNotSet`] - When the
     ///   vault's underlying asset address has not been initialized.
-    fn total_assets(e: &Env) -> i128;
+    fn total_assets(e: &Env) -> i128 {
+        Self::ContractType::total_assets(e)
+    }
 
     /// Converts an amount of underlying assets to the equivalent amount of
     /// vault shares (rounded down).
@@ -81,7 +86,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///   assets < 0.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
     ///   operations result in overflow.
-    fn convert_to_shares(e: &Env, assets: i128) -> i128;
+    fn convert_to_shares(e: &Env, assets: i128) -> i128 {
+        Self::ContractType::convert_to_shares(e, assets)
+    }
 
     /// Converts an amount of vault shares to the equivalent amount of
     /// underlying assets (rounded down).
@@ -97,7 +104,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///   shares < 0.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
     ///   operations result in overflow.
-    fn convert_to_assets(e: &Env, shares: i128) -> i128;
+    fn convert_to_assets(e: &Env, shares: i128) -> i128 {
+        Self::ContractType::convert_to_assets(e, shares)
+    }
 
     /// Returns the maximum amount of underlying assets that can be deposited
     /// for the given receiver address (currently `i128::MAX`).
@@ -106,7 +115,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
-    fn max_deposit(e: &Env, receiver: Address) -> i128;
+    fn max_deposit(e: &Env, receiver: Address) -> i128 {
+        Self::ContractType::max_deposit(e, receiver)
+    }
 
     /// Simulates and returns the amount of vault shares that would be minted
     /// for a given deposit of underlying assets (rounded down).
@@ -122,7 +133,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///   assets < 0.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
     ///   operations result in overflow.
-    fn preview_deposit(e: &Env, assets: i128) -> i128;
+    fn preview_deposit(e: &Env, assets: i128) -> i128 {
+        Self::ContractType::preview_deposit(e, assets)
+    }
 
     /// Deposits underlying assets into the vault and mints vault shares
     /// to the receiver, returning the amount of vault shares minted.
@@ -156,7 +169,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
     ///
     /// Authorization for the operator must be handled at a higher level.
-    fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128;
+    fn deposit(e: &Env, assets: i128, receiver: Address, from: Address, operator: Address) -> i128 {
+        Self::ContractType::deposit(e, assets, receiver, from, operator)
+    }
 
     /// Returns the maximum amount of vault shares that can be minted
     /// for the given receiver address (currently `i128::MAX`).
@@ -165,7 +180,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `receiver` - The address that would receive the vault shares.
-    fn max_mint(e: &Env, receiver: Address) -> i128;
+    fn max_mint(e: &Env, receiver: Address) -> i128 {
+        Self::ContractType::max_mint(e, receiver)
+    }
 
     /// Simulates and returns the amount of underlying assets required to mint
     /// a given amount of vault shares (rounded up).
@@ -181,7 +198,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///   shares < 0.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
     ///   operations result in overflow.
-    fn preview_mint(e: &Env, shares: i128) -> i128;
+    fn preview_mint(e: &Env, shares: i128) -> i128 {
+        Self::ContractType::preview_mint(e, shares)
+    }
 
     /// Mints a specific amount of vault shares to the receiver by depositing
     /// the required amount of underlying assets, returning the amount of assets
@@ -216,7 +235,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
     ///
     /// Authorization for the operator must be handled at a higher level.
-    fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128;
+    fn mint(e: &Env, shares: i128, receiver: Address, from: Address, operator: Address) -> i128 {
+        Self::ContractType::mint(e, shares, receiver, from, operator)
+    }
 
     /// Returns the maximum amount of underlying assets that can be
     /// withdrawn by the given owner, limited by their vault share balance.
@@ -232,7 +253,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///   shares < 0.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
     ///   operations result in overflow.
-    fn max_withdraw(e: &Env, owner: Address) -> i128;
+    fn max_withdraw(e: &Env, owner: Address) -> i128 {
+        Self::ContractType::max_withdraw(e, owner)
+    }
 
     /// Simulates and returns the amount of vault shares that would be burned
     /// to withdraw a given amount of underlying assets (rounded up).
@@ -248,7 +271,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///   assets < 0.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
     ///   operations result in overflow.
-    fn preview_withdraw(e: &Env, assets: i128) -> i128;
+    fn preview_withdraw(e: &Env, assets: i128) -> i128 {
+        Self::ContractType::preview_withdraw(e, assets)
+    }
 
     /// Withdraws a specific amount of underlying assets from the vault
     /// by burning the required amount of vault shares from the owner,
@@ -285,7 +310,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
         receiver: Address,
         owner: Address,
         operator: Address,
-    ) -> i128;
+    ) -> i128 {
+        Self::ContractType::withdraw(e, assets, receiver, owner, operator)
+    }
 
     /// Returns the maximum amount of vault shares that can be redeemed
     /// by the given owner (equal to their vault share balance).
@@ -294,7 +321,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `owner` - The address that owns the vault shares.
-    fn max_redeem(e: &Env, owner: Address) -> i128;
+    fn max_redeem(e: &Env, owner: Address) -> i128 {
+        Self::ContractType::max_redeem(e, owner)
+    }
 
     /// Simulates and returns the amount of underlying assets that would be
     /// received for redeeming a given amount of vault shares (rounded down).
@@ -310,7 +339,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     ///   shares < 0.
     /// * [`crate::vault::VaultTokenError::MathOverflow`] - When mathematical
     ///   operations result in overflow.
-    fn preview_redeem(e: &Env, shares: i128) -> i128;
+    fn preview_redeem(e: &Env, shares: i128) -> i128 {
+        Self::ContractType::preview_redeem(e, shares)
+    }
 
     /// Redeems a specific amount of vault shares for underlying assets,
     /// returning the amount of underlying assets received.
@@ -344,7 +375,9 @@ pub trait FungibleVault: FungibleToken<ContractType = Vault> {
     /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
     ///
     /// Authorization for the operator must be handled at a higher level.
-    fn redeem(e: &Env, shares: i128, receiver: Address, owner: Address, operator: Address) -> i128;
+    fn redeem(e: &Env, shares: i128, receiver: Address, owner: Address, operator: Address) -> i128 {
+        Self::ContractType::redeem(e, shares, receiver, owner, operator)
+    }
 }
 
 // ################## ERRORS ##################

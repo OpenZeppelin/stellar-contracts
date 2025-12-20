@@ -25,7 +25,6 @@ The `access_control` module provides comprehensive role-based access control fun
 ```rust
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env};
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::default_impl;
 
 #[contract]
 pub struct MyContract;
@@ -54,8 +53,7 @@ impl MyContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl AccessControl for MyContract {}
 ```
 
@@ -88,7 +86,6 @@ The `ownable` module implements a simple ownership pattern:
 ```rust
 use soroban_sdk::{contract, contractimpl, Address, Env};
 use stellar_access::ownable::{self as ownable, Ownable};
-use stellar_macros::default_impl;
 
 #[contract]
 pub struct MyContract;
@@ -111,8 +108,7 @@ impl MyContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl Ownable for MyContract {}
 ```
 

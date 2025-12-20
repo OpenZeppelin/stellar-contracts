@@ -119,7 +119,7 @@ use stellar_governance::timelock::{
     schedule_operation, set_execute_operation, set_min_delay as timelock_set_min_delay, Operation,
     OperationState, TimelockError,
 };
-use stellar_macros::{default_impl, only_admin, only_role};
+use stellar_macros::{only_admin, only_role};
 
 // Role constants
 const PROPOSER_ROLE: Symbol = symbol_short!("proposer");
@@ -429,6 +429,5 @@ impl TimelockController {
 }
 
 // Implement AccessControl trait to expose role management functions
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl AccessControl for TimelockController {}

@@ -2,9 +2,8 @@ use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, Events},
     token::TokenClient,
-    vec, Address, Env, FromVal, String, Symbol, Val, Vec,
+    vec, Address, Env, FromVal, MuxedAddress, String, Symbol, Val, Vec,
 };
-use stellar_macros::default_impl;
 use stellar_tokens::fungible::{Base, FungibleToken};
 
 use crate::{
@@ -36,8 +35,7 @@ impl MockToken {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl FungibleToken for MockToken {
     type ContractType = Base;
 }

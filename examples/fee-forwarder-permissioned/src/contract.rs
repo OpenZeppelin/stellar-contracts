@@ -55,7 +55,7 @@ use stellar_access::access_control::{grant_role_no_auth, set_admin, AccessContro
 use stellar_fee_abstraction::{
     auth_user_and_invoke, collect_fee, set_allowed_fee_token, sweep_token, FeeAbstractionApproval,
 };
-use stellar_macros::{default_impl, only_role};
+use stellar_macros::only_role;
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
 const EXECUTOR_ROLE: Symbol = symbol_short!("executor");
@@ -132,6 +132,5 @@ impl FeeForwarder {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl AccessControl for FeeForwarder {}

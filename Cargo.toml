@@ -45,7 +45,7 @@ categories = ["no-std", "wasm"]
 version = "0.5.1"
 
 [workspace.dependencies]
-soroban-sdk = "23.0.2"
+soroban-sdk = "23.4.0"
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"

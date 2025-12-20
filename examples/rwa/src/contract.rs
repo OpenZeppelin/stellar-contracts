@@ -2,7 +2,6 @@
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String};
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::default_impl;
 use stellar_tokens::{
     fungible::{Base, FungibleToken},
     rwa::RWA,
@@ -33,12 +32,10 @@ impl ExampleContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl FungibleToken for ExampleContract {
     type ContractType = RWA;
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl AccessControl for ExampleContract {}

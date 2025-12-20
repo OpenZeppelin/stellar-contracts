@@ -43,6 +43,7 @@
 mod i128_fixed_point;
 mod i256_fixed_point;
 pub mod wad;
+pub use i128_fixed_point::{checked_muldiv, muldiv};
 
 #[cfg(test)]
 mod test;
@@ -129,61 +130,4 @@ pub enum Rounding {
     Floor,
     /// Round toward positive infinity (up)
     Ceil,
-}
-
-/// Calculates `x * y / denominator` with full precision.
-///
-/// Performs multiplication and division with phantom overflow handling,
-/// following the specified rounding direction.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `x` - The first operand.
-/// * `y` - The second operand.
-/// * `denominator` - The divisor.
-/// * `rounding` - The rounding direction to use.
-///
-/// # Errors
-///
-/// * [`SorobanFixedPointError::DivisionByZero`] - When `denominator` is zero.
-/// * [`SorobanFixedPointError::Overflow`] - When the result overflows `i128`.
-///
-/// # Notes
-///
-/// Automatically handles phantom overflow by scaling to `I256` when necessary.
-pub fn muldiv(e: &Env, x: i128, y: i128, denominator: i128, rounding: Rounding) -> i128 {
-    match rounding {
-        Rounding::Floor => x.fixed_mul_floor(e, &y, &denominator),
-        Rounding::Ceil => x.fixed_mul_ceil(e, &y, &denominator),
-    }
-}
-
-/// Checked version of [`muldiv`].
-///
-/// Calculates `x * y / denominator` with full precision, returning `None`
-/// instead of panicking on error.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `x` - The first operand.
-/// * `y` - The second operand.
-/// * `denominator` - The divisor.
-/// * `rounding` - The rounding direction to use.
-///
-/// # Notes
-///
-/// Automatically handles phantom overflow by scaling to `I256` when necessary.
-pub fn checked_muldiv(
-    e: &Env,
-    x: i128,
-    y: i128,
-    denominator: i128,
-    rounding: Rounding,
-) -> Option<i128> {
-    match rounding {
-        Rounding::Floor => x.checked_fixed_mul_floor(e, &y, &denominator),
-        Rounding::Ceil => x.checked_fixed_mul_ceil(e, &y, &denominator),
-    }
 }

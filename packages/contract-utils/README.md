@@ -14,7 +14,7 @@ The `pausable` module provides functionality to pause and unpause contract opera
 use soroban_sdk::{contract, contractimpl, Address, Env};
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_access::ownable::{self as ownable, Ownable};
-use stellar_macros::{default_impl, only_owner, when_not_paused, when_paused};
+use stellar_macros::{only_owner, when_not_paused, when_paused};
 
 #[contract]
 pub struct MyContract;
@@ -42,8 +42,7 @@ impl MyContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl Pausable for MyContract {
     #[only_owner]
     pub fn pause(e: &Env) {
@@ -56,8 +55,7 @@ impl Pausable for MyContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl Ownable for MyContract {}
 ```
 
@@ -75,7 +73,7 @@ use soroban_sdk::{
 };
 use stellar_access::ownable::{self as ownable, Ownable};
 use stellar_contract_utils::upgradeable::UpgradeableInternal;
-use stellar_macros::{default_impl, only_owner, Upgradeable};
+use stellar_macros::{only_owner, Upgradeable};
 
 #[derive(Upgradeable)]
 #[contract]
@@ -100,8 +98,7 @@ impl UpgradeableInternal for ExampleContract {
     }
 }
 
-#[default_impl]
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl Ownable for ExampleContract {}
 ```
 

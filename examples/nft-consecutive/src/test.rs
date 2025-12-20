@@ -53,3 +53,34 @@ fn consecutive_burn_works() {
     client.burn(&owner, &0);
     assert_eq!(client.balance(&owner), 99);
 }
+
+#[test]
+fn consecutive_burn_override_works() {
+    let e = Env::default();
+    let owner = Address::generate(&e);
+    let client = create_client(&e, &owner);
+    e.mock_all_auths();
+    client.batch_mint(&owner, &100);
+    assert_eq!(client.owner_of(&50), owner);
+    client.burn(&owner, &50);
+    assert_eq!(client.balance(&owner), 99);
+    // Verify ownership is preserved for adjacent tokens
+    assert_eq!(client.owner_of(&49), owner);
+    assert_eq!(client.owner_of(&51), owner);
+}
+
+#[test]
+fn consecutive_burn_from_override_works() {
+    let e = Env::default();
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let client = create_client(&e, &owner);
+    e.mock_all_auths();
+    client.batch_mint(&owner, &100);
+    client.approve(&owner, &spender, &50, &1000);
+    client.burn_from(&spender, &owner, &50);
+    assert_eq!(client.balance(&owner), 99);
+    // Verify ownership is preserved for adjacent tokens
+    assert_eq!(client.owner_of(&49), owner);
+    assert_eq!(client.owner_of(&51), owner);
+}

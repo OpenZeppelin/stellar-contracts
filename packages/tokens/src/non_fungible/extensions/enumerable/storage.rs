@@ -1,8 +1,8 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::non_fungible::{
-    emit_mint, Base, ContractOverrides, NonFungibleTokenError, OWNER_EXTEND_AMOUNT,
-    OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
+    emit_mint, overrides::BurnableOverrides, Base, ContractOverrides, NonFungibleTokenError,
+    OWNER_EXTEND_AMOUNT, OWNER_TTL_THRESHOLD, TOKEN_EXTEND_AMOUNT, TOKEN_TTL_THRESHOLD,
 };
 
 pub struct Enumerable;
@@ -14,6 +14,16 @@ impl ContractOverrides for Enumerable {
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
         Enumerable::transfer_from(e, spender, from, to, token_id);
+    }
+}
+
+impl BurnableOverrides for Enumerable {
+    fn burn(e: &Env, from: &Address, token_id: u32) {
+        Enumerable::burn(e, from, token_id);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, token_id: u32) {
+        Enumerable::burn_from(e, spender, from, token_id);
     }
 }
 
