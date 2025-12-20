@@ -2,17 +2,17 @@ use soroban_sdk::{contract, contractimpl, Address, Env, String};
 
 use crate::fungible::{Base, FungibleToken};
 
-pub struct BasicToken<'a> {
+pub struct AssetToken<'a> {
     pub asset: &'a Address,
 }
 
-impl<'a> BasicToken<'a> {
-    pub fn __constructor(e: &Env, addr: &'a Address) -> BasicToken<'a> {
-        return BasicToken { asset: addr };
+impl<'a> AssetToken<'a> {
+    pub fn __constructor(e: &Env, addr: &'a Address) -> AssetToken<'a> {
+        return AssetToken { asset: addr };
     }
 }
 
-impl<'a> FungibleToken for BasicToken<'a> {
+impl<'a> FungibleToken for AssetToken<'a> {
     type ContractType = Base;
 
     fn total_supply(e: &Env) -> i128 {

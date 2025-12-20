@@ -1,4 +1,4 @@
-pub mod basic_token;
+pub mod asset_token;
 pub mod conversions;
 pub mod vault;
 pub mod vault_integrity;

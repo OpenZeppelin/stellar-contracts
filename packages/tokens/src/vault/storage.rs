@@ -6,7 +6,7 @@ use crate::vault::{emit_deposit, emit_withdraw};
 use crate::{
     fungible::{Base, ContractOverrides, FungibleToken},
     vault::{
-        specs::basic_token::{self, BasicToken},
+        specs::asset_token::{self, AssetToken},
         VaultTokenError, MAX_DECIMALS_OFFSET,
     },
 };
@@ -150,7 +150,7 @@ impl Vault {
         #[cfg(not(feature = "certora"))]
         return token_client.balance(&e.current_contract_address());
         #[cfg(feature = "certora")]
-        BasicToken::balance(e, e.current_contract_address())
+        AssetToken::balance(e, e.current_contract_address())
     }
 
     /// Converts an amount of underlying assets to the equivalent amount of
@@ -755,14 +755,14 @@ impl Vault {
             #[cfg(not(feature = "certora"))]
             token_client.transfer(from, &e.current_contract_address(), &assets);
             #[cfg(feature = "certora")]
-            BasicToken::transfer(e, from.clone(), e.current_contract_address(), assets);
+            AssetToken::transfer(e, from.clone(), e.current_contract_address(), assets);
         } else {
             // Allowance-based transfer: `operator` is depositing on behalf of `from`
             // This requires that `from` has approved `operator` on the underlying asset
             #[cfg(not(feature = "certora"))]
             token_client.transfer_from(operator, from, &e.current_contract_address(), &assets);
             #[cfg(feature = "certora")]
-            BasicToken::transfer_from(
+            AssetToken::transfer_from(
                 e,
                 operator.clone(),
                 from.clone(),
@@ -823,7 +823,7 @@ impl Vault {
         #[cfg(not(feature = "certora"))]
         token_client.transfer(&e.current_contract_address(), receiver, &assets);
         #[cfg(feature = "certora")]
-        BasicToken::transfer(e, e.current_contract_address(), receiver.clone(), assets);
+        AssetToken::transfer(e, e.current_contract_address(), receiver.clone(), assets);
         #[cfg(not(feature = "certora"))]
         emit_withdraw(e, operator, receiver, owner, assets, shares);
     }
@@ -867,6 +867,6 @@ impl Vault {
         #[cfg(not(feature = "certora"))]
         return token_client.decimals();
         #[cfg(feature = "certora")]
-        BasicToken::decimals(e)
+        AssetToken::decimals(e)
     }
 }

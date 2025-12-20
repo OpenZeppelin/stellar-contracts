@@ -7,7 +7,7 @@ use stellar_contract_utils::math::fixed_point::Rounding;
 use crate::{
     fungible::FungibleToken,
     vault::{
-        specs::{basic_token::BasicToken, vault::BasicVault},
+        specs::{asset_token::AssetToken, vault::BasicVault},
         FungibleVault, Vault,
     },
 };
