@@ -67,6 +67,8 @@ pub fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
     match x.checked_mul(*y) {
         Some(r) => div_floor(r, *z)
             .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ZeroDenominator)),
+        
+        #[cfg(not(feature = "certora"))]
         None => {
             // scale to i256 and retry
             let res = crate::math::i256_fixed_point::mul_div_floor(
@@ -78,6 +80,10 @@ pub fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
             res.to_i128()
                 .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ResultOverflow))
         }
+        #[cfg(feature = "certora")]
+        None => {
+            panic_with_error!(env, SorobanFixedPointError::ResultOverflow)
+        }
     }
 }
 
@@ -86,6 +92,7 @@ pub fn scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
     match x.checked_mul(*y) {
         Some(r) => div_ceil(r, *z)
             .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ZeroDenominator)),
+        #[cfg(not(feature = "certora"))]
         None => {
             // scale to i256 and retry
             let res = crate::math::i256_fixed_point::mul_div_ceil(
@@ -96,6 +103,10 @@ pub fn scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
             );
             res.to_i128()
                 .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::ResultOverflow))
+        }
+        #[cfg(feature = "certora")]
+        None => {
+            panic_with_error!(env, SorobanFixedPointError::ResultOverflow)
         }
     }
 }
