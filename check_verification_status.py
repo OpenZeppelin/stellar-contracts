@@ -4,6 +4,48 @@ Script to analyze formal verification status across the project.
 
 Scans all files in /specs directories, counts #[rule] functions,
 and checks their //status comments to identify unverified rules.
+
+USAGE:
+    python3 check_verification_status.py [OPTIONS]
+
+OPTIONS:
+    --format {table,json}
+        Output format: 'table' (human-readable) or 'json' (machine-readable)
+        Default: table
+
+    --verbosity {repo,directory,file}
+        Level of detail to show:
+        - 'repo': Show only project-wide totals
+        - 'directory': Show totals + breakdown by directory
+        - 'file': Show full details (totals + directories + files + unverified rules)
+        Default: file
+
+    --path PATH
+        Filter results to a specific directory or file.
+        Can be relative to root directory or absolute path.
+        Examples:
+        - --path packages/tokens/src/vault/specs
+        - --path packages/tokens/src/vault/specs/vault_solvency.rs
+        Default: Show all spec files
+
+    --root ROOT_DIR
+        Root directory to search (default: current directory)
+
+EXAMPLES:
+    # Show full details for entire project
+    python3 check_verification_status.py
+
+    # Show only summary totals
+    python3 check_verification_status.py --verbosity repo
+
+    # Show directory breakdown for tokens package
+    python3 check_verification_status.py --path packages/tokens --verbosity directory
+
+    # Show full details for a specific file
+    python3 check_verification_status.py --path packages/tokens/src/vault/specs/vault_solvency.rs
+
+    # Get JSON output for a specific directory
+    python3 check_verification_status.py --path packages/tokens/src/vault/specs --format json --verbosity directory
 """
 
 import os
@@ -190,17 +232,57 @@ def get_relative_path(file_path: str, root_dir: Path) -> str:
         return file_path
 
 
-def format_summary(analyses: List[FileAnalysis], output_format: str = "table", root_dir: Path = None) -> str:
+def filter_analyses_by_path(analyses: List[FileAnalysis], filter_path: Path, root_dir: Path) -> List[FileAnalysis]:
+    """
+    Filter analyses to only include those matching the given path.
+    If path is a directory, includes all files in that directory.
+    If path is a file, includes only that file.
+    """
+    if not filter_path.exists():
+        return []
+    
+    filter_path = filter_path.resolve()
+    root_dir = root_dir.resolve()
+    
+    # Try to make filter_path relative to root_dir
+    try:
+        relative_filter = filter_path.relative_to(root_dir)
+    except ValueError:
+        # If not relative, use absolute path
+        relative_filter = filter_path
+    
+    filtered = []
+    for analysis in analyses:
+        analysis_path = Path(analysis.file_path).resolve()
+        
+        # Check if analysis path matches filter path
+        if filter_path.is_file():
+            # Exact file match
+            if analysis_path == filter_path:
+                filtered.append(analysis)
+        else:
+            # Directory match - check if analysis is in or under the directory
+            try:
+                analysis_path.relative_to(filter_path)
+                filtered.append(analysis)
+            except ValueError:
+                # Not in this directory
+                pass
+    
+    return filtered
+
+
+def format_summary(analyses: List[FileAnalysis], output_format: str = "table", root_dir: Path = None, verbosity: str = "file") -> str:
     """Format the analysis results."""
     if root_dir is None:
         root_dir = Path.cwd()
     if output_format == "json":
-        return format_json(analyses, root_dir)
+        return format_json(analyses, root_dir, verbosity)
     else:
-        return format_table(analyses, root_dir)
+        return format_table(analyses, root_dir, verbosity)
 
 
-def format_table(analyses: List[FileAnalysis], root_dir: Path) -> str:
+def format_table(analyses: List[FileAnalysis], root_dir: Path, verbosity: str = "file") -> str:
     """Format results as a table."""
     output = []
     
@@ -209,112 +291,124 @@ def format_table(analyses: List[FileAnalysis], root_dir: Path) -> str:
     total_verified = sum(a.verified_rules for a in analyses)
     total_unverified = sum(a.unverified_rules for a in analyses)
     total_bug = sum(a.bug_rules for a in analyses)
+    
     output.append("=" * 40)
     output.append("Formal Verification Status Summary")
     output.append("=" * 40)
     output.append("")
-    output.append(f"Project Total:")
-    output.append(f"  Total Rules: {total_rules}")
-    output.append(f"  Verified: {total_verified}")
-    output.append(f"  Unverified: {total_unverified}")
-    output.append(f"  Bug: {total_bug}")
-    output.append("")
     
-    # Group by directory
-    dir_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "verified": 0, "unverified": 0, "bug": 0})
-    for analysis in analyses:
-        if analysis.total_rules > 0:
-            dir_path = get_relative_path(get_directory(analysis.file_path), root_dir)
-            dir_stats[dir_path]["total"] += analysis.total_rules
-            dir_stats[dir_path]["verified"] += analysis.verified_rules
-            dir_stats[dir_path]["unverified"] += analysis.unverified_rules
-            dir_stats[dir_path]["bug"] += analysis.bug_rules
-    
-    output.append("=" * 40)
-    output.append("By Directory:")
-    output.append("=" * 40)
-    output.append("")
-    
-    for dir_path in sorted(dir_stats.keys()):
-        stats = dir_stats[dir_path]
-        output.append(f"{dir_path}:")
-        output.append(f"  Total: {stats['total']}, Verified: {stats['verified']}, Unverified: {stats['unverified']}, Bug: {stats['bug']}")
+    # Always show repo-level summary
+    if verbosity in ["repo", "directory", "file"]:
+        output.append(f"Total:")
+        output.append(f"  Total Rules: {total_rules}")
+        output.append(f"  Verified: {total_verified}")
+        output.append(f"  Unverified: {total_unverified}")
+        output.append(f"  Bug: {total_bug}")
         output.append("")
     
-    # By file
-    output.append("=" * 40)
-    output.append("By File:")
-    output.append("=" * 40)
-    output.append("")
-    
-    for analysis in sorted(analyses, key=lambda x: x.file_path):
-        if analysis.total_rules > 0:
-            rel_path = get_relative_path(analysis.file_path, root_dir)
-            output.append(f"{rel_path}:")
-            output.append(f"  Total: {analysis.total_rules}, Verified: {analysis.verified_rules}, Unverified: {analysis.unverified_rules}, Bug: {analysis.bug_rules}")
-            
-            # List unverified rules
-            unverified = [r for r in analysis.rules if not r.is_verified and not r.is_bug]
-            if unverified:
-                output.append("  Unverified Rules:")
-                for rule in unverified:
-                    status_str = rule.status if rule.status else "no status"
-                    output.append(f"    - {rule.name} (line {rule.line_num}): {status_str}")
+    # Show directory-level if verbosity is directory or file
+    if verbosity in ["directory", "file"]:
+        # Group by directory
+        dir_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "verified": 0, "unverified": 0, "bug": 0})
+        for analysis in analyses:
+            if analysis.total_rules > 0:
+                dir_path = get_relative_path(get_directory(analysis.file_path), root_dir)
+                dir_stats[dir_path]["total"] += analysis.total_rules
+                dir_stats[dir_path]["verified"] += analysis.verified_rules
+                dir_stats[dir_path]["unverified"] += analysis.unverified_rules
+                dir_stats[dir_path]["bug"] += analysis.bug_rules
+        
+        output.append("=" * 40)
+        output.append("By Directory:")
+        output.append("=" * 40)
+        output.append("")
+        
+        for dir_path in sorted(dir_stats.keys()):
+            stats = dir_stats[dir_path]
+            output.append(f"{dir_path}:")
+            output.append(f"  Total: {stats['total']}, Verified: {stats['verified']}, Unverified: {stats['unverified']}, Bug: {stats['bug']}")
             output.append("")
+    
+    # Show file-level if verbosity is file
+    if verbosity == "file":
+        output.append("=" * 40)
+        output.append("By File:")
+        output.append("=" * 40)
+        output.append("")
+        
+        for analysis in sorted(analyses, key=lambda x: x.file_path):
+            if analysis.total_rules > 0:
+                rel_path = get_relative_path(analysis.file_path, root_dir)
+                output.append(f"{rel_path}:")
+                output.append(f"  Total: {analysis.total_rules}, Verified: {analysis.verified_rules}, Unverified: {analysis.unverified_rules}, Bug: {analysis.bug_rules}")
+                
+                # List unverified rules
+                unverified = [r for r in analysis.rules if not r.is_verified and not r.is_bug]
+                if unverified:
+                    output.append("  Unverified Rules:")
+                    for rule in unverified:
+                        status_str = rule.status if rule.status else "no status"
+                        output.append(f"    - {rule.name} (line {rule.line_num}): {status_str}")
+                output.append("")
     
     return "\n".join(output)
 
 
-def format_json(analyses: List[FileAnalysis], root_dir: Path) -> str:
+def format_json(analyses: List[FileAnalysis], root_dir: Path, verbosity: str = "file") -> str:
     """Format results as JSON."""
-    result = {
-        "project_total": {
+    result = {}
+    
+    # Always include repo-level summary
+    if verbosity in ["repo", "directory", "file"]:
+        result["total"] = {
             "total_rules": sum(a.total_rules for a in analyses),
             "verified_rules": sum(a.verified_rules for a in analyses),
             "unverified_rules": sum(a.unverified_rules for a in analyses),
             "bug_rules": sum(a.bug_rules for a in analyses)
-        },
-        "by_directory": {},
-        "by_file": []
-    }
+        }
     
-    # Group by directory
-    dir_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "verified": 0, "unverified": 0, "bug": 0})
+    # Include directory-level if verbosity is directory or file
+    if verbosity in ["directory", "file"]:
+        result["by_directory"] = {}
+        # Group by directory
+        dir_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"total": 0, "verified": 0, "unverified": 0, "bug": 0})
+        
+        for analysis in analyses:
+            if analysis.total_rules > 0:
+                dir_path = get_relative_path(get_directory(analysis.file_path), root_dir)
+                dir_stats[dir_path]["total"] += analysis.total_rules
+                dir_stats[dir_path]["verified"] += analysis.verified_rules
+                dir_stats[dir_path]["unverified"] += analysis.unverified_rules
+                dir_stats[dir_path]["bug"] += analysis.bug_rules
+        
+        for dir_path, stats in sorted(dir_stats.items()):
+            result["by_directory"][dir_path] = stats.copy()
     
-    for analysis in analyses:
-        if analysis.total_rules > 0:
-            dir_path = get_relative_path(get_directory(analysis.file_path), root_dir)
-            dir_stats[dir_path]["total"] += analysis.total_rules
-            dir_stats[dir_path]["verified"] += analysis.verified_rules
-            dir_stats[dir_path]["unverified"] += analysis.unverified_rules
-            dir_stats[dir_path]["bug"] += analysis.bug_rules
-    
-    for dir_path, stats in sorted(dir_stats.items()):
-        result["by_directory"][dir_path] = stats.copy()
-    
-    # By file
-    for analysis in sorted(analyses, key=lambda x: x.file_path):
-        if analysis.total_rules > 0:
-            rel_path = get_relative_path(analysis.file_path, root_dir)
-            file_data = {
-                "file": rel_path,
-                "total_rules": analysis.total_rules,
-                "verified_rules": analysis.verified_rules,
-                "unverified_rules": analysis.unverified_rules,
-                "bug_rules": analysis.bug_rules,
-                "rules": []
-            }
-            
-            for rule in analysis.rules:
-                file_data["rules"].append({
-                    "name": rule.name,
-                    "line": rule.line_num,
-                    "status": rule.status,
-                    "verified": rule.is_verified,
-                    "bug": rule.is_bug
-                })
-            
-            result["by_file"].append(file_data)
+    # Include file-level if verbosity is file
+    if verbosity == "file":
+        result["by_file"] = []
+        for analysis in sorted(analyses, key=lambda x: x.file_path):
+            if analysis.total_rules > 0:
+                rel_path = get_relative_path(analysis.file_path, root_dir)
+                file_data = {
+                    "file": rel_path,
+                    "total_rules": analysis.total_rules,
+                    "verified_rules": analysis.verified_rules,
+                    "unverified_rules": analysis.unverified_rules,
+                    "bug_rules": analysis.bug_rules,
+                    "rules": []
+                }
+                
+                for rule in analysis.rules:
+                    file_data["rules"].append({
+                        "name": rule.name,
+                        "line": rule.line_num,
+                        "status": rule.status,
+                        "verified": rule.is_verified,
+                        "bug": rule.is_bug
+                    })
+                
+                result["by_file"].append(file_data)
     
     return json.dumps(result, indent=2)
 
@@ -337,6 +431,18 @@ def main():
         type=str,
         default=".",
         help="Root directory to search (default: current directory)"
+    )
+    parser.add_argument(
+        "--verbosity",
+        choices=["repo", "directory", "file"],
+        default="file",
+        help="Verbosity level: 'repo' (summary only), 'directory' (summary + directory breakdown), 'file' (full details) (default: file)"
+    )
+    parser.add_argument(
+        "--path",
+        type=str,
+        default=None,
+        help="Filter results to a specific directory or file path (relative to root or absolute)"
     )
     
     args = parser.parse_args()
@@ -361,8 +467,27 @@ def main():
         if analysis.total_rules > 0:
             analyses.append(analysis)
     
+    # Filter by path if provided
+    if args.path:
+        filter_path = Path(args.path)
+        if not filter_path.is_absolute():
+            # Try relative to root_dir first, then current directory
+            filter_path = root_dir / filter_path
+            if not filter_path.exists():
+                filter_path = Path(args.path).resolve()
+        
+        if not filter_path.exists():
+            print(f"Error: Path does not exist: {args.path}", file=os.sys.stderr)
+            return 1
+        
+        analyses = filter_analyses_by_path(analyses, filter_path, root_dir)
+        
+        if not analyses:
+            print(f"No spec files found matching path: {args.path}", file=os.sys.stderr)
+            return 1
+    
     # Format and print results
-    output = format_summary(analyses, args.format, root_dir)
+    output = format_summary(analyses, args.format, root_dir, args.verbosity)
     print(output)
     
     return 0
