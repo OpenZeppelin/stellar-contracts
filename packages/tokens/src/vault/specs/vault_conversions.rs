@@ -12,11 +12,23 @@ use crate::{
         FungibleVault, Vault,
     },
 };
+use super::vault_invariants::safe_assumptions;
+
+pub fn useful_clogs(e: &Env) {
+    let total_assets = BasicVault::total_assets(e);
+    clog!(total_assets);
+    let total_supply = BasicVault::total_supply(e);
+    clog!(total_supply);
+    let decimals_offset = Vault::get_decimals_offset(e);
+    clog!(decimals_offset);
+}
 
 #[rule]
 // convert to shares returns 0 if and only if input is 0
 // status: 
 pub fn convert_to_shares_zero_to_zero(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
     let assets: i128 = nondet();
     clog!(assets);
     let shares = BasicVault::convert_to_shares(&e, assets);
@@ -32,6 +44,8 @@ pub fn convert_to_shares_zero_to_zero(e: Env) {
 // convert to assets returns 0 if and only if input is 0
 // status: 
 pub fn convert_to_assets_zero_to_zero(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
     let shares: i128 = 0;
     clog!(shares);
     let assets = BasicVault::convert_to_assets(&e, shares);
@@ -47,6 +61,8 @@ pub fn convert_to_assets_zero_to_zero(e: Env) {
 // convert to shares monotonicty
 // status: 
 pub fn convert_to_shares_monotonicity(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
     let assets1: i128 = nondet();
     let assets2: i128 = nondet();
     clog!(assets1);
@@ -63,6 +79,8 @@ pub fn convert_to_shares_monotonicity(e: Env) {
 // convert to assets monotonicity
 // status: 
 pub fn convert_to_assets_monotonicity(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
     let shares1: i128 = nondet();
     let shares2: i128 = nondet();
     clog!(shares1);
@@ -79,6 +97,8 @@ pub fn convert_to_assets_monotonicity(e: Env) {
 // convert to shares weak additivity
 // status: 
 pub fn convert_to_shares_weak_additivity(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
     let assets1: i128 = nondet();
     let assets2: i128 = nondet();
     let assets_sum = assets1 + assets2;
@@ -98,6 +118,8 @@ pub fn convert_to_shares_weak_additivity(e: Env) {
 // convert to assets weak additivity
 // status: 
 pub fn convert_to_assets_weak_additivity(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
     let shares1: i128 = nondet();
     let shares2: i128 = nondet();
     let shares_sum = shares1 + shares2;
@@ -117,6 +139,8 @@ pub fn convert_to_assets_weak_additivity(e: Env) {
 // convert to shares weak inverse
 // status: 
 pub fn convert_to_shares_weak_inverse(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
     let assets: i128 = nondet();
     clog!(assets);
     let shares_from_assets = BasicVault::convert_to_shares(&e, assets);
@@ -130,6 +154,8 @@ pub fn convert_to_shares_weak_inverse(e: Env) {
 // convert to assets weak inverse
 // status: 
 pub fn convert_to_assets_weak_inverse(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
     let shares: i128 = nondet();
     clog!(shares);
     let assets_from_shares = BasicVault::convert_to_assets(&e, shares);
@@ -139,4 +165,167 @@ pub fn convert_to_assets_weak_inverse(e: Env) {
     cvlr_assert!(shares_from_assets_from_shares <= shares);
 }
 
-// todo: deposit withdraw mint redeem match the conversion functions
+// always less shares than assets - important for solvency
+ 
+#[rule]
+// convert to shares produces a number of shares smaller than the assets 
+// status:
+pub fn conert_to_shares_leq_assets(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
+    let assets: i128 = nondet();
+    clog!(assets);
+    let shares = BasicVault::convert_to_shares(&e, assets);
+    clog!(shares);
+    cvlr_assert!(shares <= assets);
+}
+
+#[rule]
+// convert to assets produces a number of assets greater than the shares
+// status:
+pub fn convert_to_assets_leq_shares(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
+    let shares: i128 = nondet();
+    clog!(shares);
+    let assets = BasicVault::convert_to_assets(&e, shares);
+    clog!(assets);
+    cvlr_assert!(assets >= shares);
+}
+
+#[rule]
+// preview_deposit matches convert to shares
+pub fn preview_deposit_matches_convert_to_shares(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
+    let assets: i128 = nondet();
+    clog!(assets);
+    let shares = BasicVault::convert_to_shares(&e, assets);
+    clog!(shares);
+    let preview_deposit = BasicVault::preview_deposit(&e, assets);
+    clog!(preview_deposit);
+    cvlr_assert!(preview_deposit == shares);
+}
+
+#[rule]
+// preview_mint matches convert to assets
+pub fn preview_mint_matches_convert_to_assets(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
+    let shares: i128 = nondet();
+    clog!(shares);
+    let assets = BasicVault::convert_to_assets(&e, shares);
+    clog!(assets);
+    let preview_mint = BasicVault::preview_mint(&e, shares);
+    clog!(preview_mint);
+    cvlr_assert!(preview_mint == assets);
+}
+
+#[rule]
+// preview_withdraw matches convert to shares
+pub fn preview_withdraw_matches_convert_to_shares(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
+    let assets: i128 = nondet();
+    clog!(assets);
+    let shares = BasicVault::convert_to_shares(&e, assets);
+    clog!(shares);
+    let preview_withdraw = BasicVault::preview_withdraw(&e, assets);
+    clog!(preview_withdraw);
+    cvlr_assert!(preview_withdraw == shares);
+}
+
+#[rule]
+// preview_redeem matches convert to assets
+pub fn preview_redeem_matches_convert_to_assets(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
+    let shares: i128 = nondet();
+    clog!(shares);
+    let assets = BasicVault::convert_to_assets(&e, shares);
+    clog!(assets);
+    let preview_redeem = BasicVault::preview_redeem(&e, shares);
+    clog!(preview_redeem);
+    cvlr_assert!(preview_redeem == assets);
+}
+
+#[rule]
+// deposit matches preview_deposit
+pub fn deposit_matches_preview_deposit(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
+    let assets: i128 = nondet();
+    clog!(assets);
+    let preview_deposit = BasicVault::preview_deposit(&e, assets);
+    clog!(preview_deposit);
+    let receiver: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&receiver));
+    let from: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&from));
+    let operator: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&operator));
+    let shares = BasicVault::deposit(&e, assets, receiver, from, operator);
+    clog!(shares);
+    cvlr_assert!(shares == preview_deposit);
+}
+
+#[rule]
+// withdraw matches preview_withdraw
+pub fn withdraw_matches_preview_withdraw(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
+    let assets: i128 = nondet();
+    clog!(assets);
+    let preview_withdraw = BasicVault::preview_withdraw(&e, assets);
+    clog!(preview_withdraw);
+    let receiver: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&receiver));
+    let owner: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&owner));
+    let operator: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&operator));
+    let shares = BasicVault::withdraw(&e, assets, receiver, owner, operator);
+    clog!(shares);
+    cvlr_assert!(shares == preview_withdraw);
+}
+
+#[rule]
+// mint matches preview_mint
+pub fn mint_matches_preview_mint(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
+    let shares: i128 = nondet();
+    clog!(shares);
+    let preview_mint = BasicVault::preview_mint(&e, shares);
+    clog!(preview_mint);
+    let receiver: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&receiver));
+    let from: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&from));
+    let operator: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&operator));
+    let assets = BasicVault::mint(&e, shares, receiver, from, operator);
+    clog!(assets);
+    cvlr_assert!(assets == preview_mint);
+}
+
+#[rule]
+// redeem matches preview_redeem
+pub fn redeem_matches_preview_redeem(e: Env) {
+    safe_assumptions(&e);
+    useful_clogs(&e);
+    let shares: i128 = nondet();
+    clog!(shares);
+    let preview_redeem = BasicVault::preview_redeem(&e, shares);
+    clog!(preview_redeem);
+    let receiver: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&receiver));
+    let owner: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&owner));
+    let operator: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&operator));
+    let assets = BasicVault::redeem(&e, shares, receiver, owner, operator);
+    clog!(assets);
+    cvlr_assert!(assets == preview_redeem);
+}
+
