@@ -18,7 +18,7 @@ use super::vault_invariants::safe_assumptions;
 
 #[rule]
 // set assets sets the asset adress in storage
-// status:
+// status: verified
 pub fn set_asset_integrity(e: Env) {
     let new_asset_address: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&new_asset_address.clone()));
@@ -30,7 +30,7 @@ pub fn set_asset_integrity(e: Env) {
 
 #[rule]
 // set_decimals_offset sets the decimals offset in storage
-// status:
+// status: verified
 pub fn set_decimals_offset_integrity(e: Env) {
     let new_decimals_offset: u32 = nondet();
     clog!(new_decimals_offset);
@@ -139,7 +139,8 @@ pub fn deposit_integrity_4(e: Env) {
 
 #[rule]
 // deposit_internal decreases the asset balance of from by assets
-// status:
+// status: violated - ?
+// https://prover.certora.com/output/5771024/e8f44da0afee4942a34883390d752df4/
 pub fn deposit_internal_integrity_1(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();
@@ -163,7 +164,7 @@ pub fn deposit_internal_integrity_1(e: Env) {
 
 #[rule]
 // deposit_internal increases the shares balance of receiver by shares
-// status:
+// status: bad rule - ignoring self-transfer
 pub fn deposit_internal_integrity_2(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();
@@ -211,7 +212,7 @@ pub fn deposit_internal_integrity_3(e: Env) {
 
 #[rule]
 // deposit_internal increases total_supply by shares
-// status:
+// status: bad rule - ignores self transfer
 pub fn deposit_internal_integrity_4(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();

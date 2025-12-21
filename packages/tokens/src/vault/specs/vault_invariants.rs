@@ -34,7 +34,7 @@ pub fn assert_post_total_supply_geq_zero(e: &Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_transfer_total_supply_geq_zero(e: Env) {
     assume_pre_total_supply_geq_zero(&e);
     let from = nondet_address();
@@ -48,7 +48,7 @@ pub fn after_transfer_total_supply_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_transfer_from_total_supply_geq_zero(e: Env) {
     assume_pre_total_supply_geq_zero(&e);
     let spender = nondet_address();
@@ -64,7 +64,7 @@ pub fn after_transfer_from_total_supply_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_approve_total_supply_geq_zero(e: Env) {
     assume_pre_total_supply_geq_zero(&e);
     let owner = nondet_address();
@@ -145,7 +145,7 @@ pub fn after_redeem_total_supply_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_set_asset_total_supply_geq_zero(e: Env) {
     assume_pre_total_supply_geq_zero(&e);
     let asset: Address = nondet_address();
@@ -155,7 +155,7 @@ pub fn after_set_asset_total_supply_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_set_decimals_offset_total_supply_geq_zero(e: Env) {
     assume_pre_total_supply_geq_zero(&e);
     let offset: u32 = nondet();
@@ -165,7 +165,7 @@ pub fn after_set_decimals_offset_total_supply_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_token_transfer_total_supply_geq_zero(e: Env) {
     assume_pre_total_supply_geq_zero(&e);
     let from: Address = nondet_address();
@@ -179,7 +179,7 @@ pub fn after_token_transfer_total_supply_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_token_transfer_from_total_supply_geq_zero(e: Env) {
     assume_pre_total_supply_geq_zero(&e);
     let spender: Address = nondet_address();
@@ -195,7 +195,7 @@ pub fn after_token_transfer_from_total_supply_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_token_approve_total_supply_geq_zero(e: Env) {
     assume_pre_total_supply_geq_zero(&e);
     let owner: Address = nondet_address();
@@ -226,7 +226,7 @@ pub fn assert_post_total_assets_geq_zero(e: &Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_transfer_total_assets_geq_zero(e: Env) {
     assume_pre_total_assets_geq_zero(&e);
     let from = nondet_address();
@@ -240,7 +240,7 @@ pub fn after_transfer_total_assets_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_transfer_from_total_assets_geq_zero(e: Env) {
     assume_pre_total_assets_geq_zero(&e);
     let spender = nondet_address();
@@ -256,7 +256,7 @@ pub fn after_transfer_from_total_assets_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_approve_total_assets_geq_zero(e: Env) {
     assume_pre_total_assets_geq_zero(&e);
     let owner = nondet_address();
@@ -337,7 +337,7 @@ pub fn after_redeem_total_assets_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_set_asset_total_assets_geq_zero(e: Env) {
     assume_pre_total_assets_geq_zero(&e);
     let asset: Address = nondet_address();
@@ -347,7 +347,7 @@ pub fn after_set_asset_total_assets_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_set_decimals_offset_total_assets_geq_zero(e: Env) {
     assume_pre_total_assets_geq_zero(&e);
     let offset: u32 = nondet();
@@ -357,7 +357,7 @@ pub fn after_set_decimals_offset_total_assets_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_token_transfer_total_assets_geq_zero(e: Env) {
     assume_pre_total_assets_geq_zero(&e);
     let from: Address = nondet_address();
@@ -371,7 +371,7 @@ pub fn after_token_transfer_total_assets_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_token_transfer_from_total_assets_geq_zero(e: Env) {
     assume_pre_total_assets_geq_zero(&e);
     let spender: Address = nondet_address();
@@ -387,7 +387,7 @@ pub fn after_token_transfer_from_total_assets_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_token_approve_total_assets_geq_zero(e: Env) {
     assume_pre_total_assets_geq_zero(&e);
     let owner: Address = nondet_address();

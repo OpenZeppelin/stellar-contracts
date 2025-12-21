@@ -25,7 +25,7 @@ pub fn useful_clogs(e: &Env) {
 
 #[rule]
 // convert to shares returns 0 if and only if input is 0
-// status: 
+// status: violation - only one direction is true.
 pub fn convert_to_shares_zero_to_zero(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -42,7 +42,7 @@ pub fn convert_to_shares_zero_to_zero(e: Env) {
 
 #[rule]
 // convert to assets returns 0 if and only if input is 0
-// status: 
+// status: verified
 pub fn convert_to_assets_zero_to_zero(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -169,7 +169,7 @@ pub fn convert_to_assets_weak_inverse(e: Env) {
  
 #[rule]
 // convert to shares produces a number of shares smaller than the assets 
-// status:
+// status: violation - spurious - requires solvency assumption
 pub fn conert_to_shares_leq_assets(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);

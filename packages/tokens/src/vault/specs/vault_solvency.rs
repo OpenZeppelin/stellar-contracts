@@ -40,7 +40,8 @@ pub fn assert_post_total_assets_geq_total_supply(e: &Env) {
 }
 
 #[rule]
-// status:
+// status: violation - spurious - my suspicion is that this is a case where the Vault and Asset have the same address.
+// although need to understand how this is modeled in the prover.
 pub fn after_transfer_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
@@ -72,7 +73,7 @@ pub fn after_transfer_from_total_assets_geq_total_supply(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_approve_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
@@ -106,7 +107,7 @@ pub fn after_deposit_total_assets_geq_total_supply(e: Env) {
 }
 
 #[rule]
-// status:
+// status: 
 pub fn after_mint_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
@@ -157,7 +158,7 @@ pub fn after_redeem_total_assets_geq_total_supply(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_set_asset_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
@@ -168,8 +169,7 @@ pub fn after_set_asset_total_assets_geq_total_supply(e: Env) {
 }
 
 #[rule]
-// status:
-// maybe this doesn't work? because it breaks the math?
+// status: verified
 pub fn after_set_decimals_offset_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
@@ -182,7 +182,7 @@ pub fn after_set_decimals_offset_total_assets_geq_total_supply(e: Env) {
 // we can check also for the operations on the underlying token, so long as the current contract doesn't send tokens.
 
 #[rule]
-// status:
+// status: verified
 pub fn after_token_transfer_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
@@ -200,7 +200,7 @@ pub fn after_token_transfer_total_assets_geq_total_supply(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_token_transfer_from_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
@@ -220,7 +220,7 @@ pub fn after_token_transfer_from_total_assets_geq_total_supply(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified
 pub fn after_token_approve_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
