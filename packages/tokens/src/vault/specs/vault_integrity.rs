@@ -164,7 +164,7 @@ pub fn deposit_internal_integrity_1(e: Env) {
 
 #[rule]
 // deposit_internal increases the shares balance of receiver by shares
-// status: bad rule - ignoring self-transfer
+// status: spurious violation - maybe if token and vault are same address
 pub fn deposit_internal_integrity_2(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();
@@ -188,7 +188,9 @@ pub fn deposit_internal_integrity_2(e: Env) {
 
 #[rule]
 // deposit_internal increases total_assets by assets
-// status:
+// status: verified
+// with disable_split:
+// https://prover.certora.com/output/5771024/faeda71b5e70472eb4ad1bc8be561e99/
 pub fn deposit_internal_integrity_3(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();
@@ -212,7 +214,7 @@ pub fn deposit_internal_integrity_3(e: Env) {
 
 #[rule]
 // deposit_internal increases total_supply by shares
-// status: bad rule - ignores self transfer
+// status: spurious violation - maybe if token and vault are same address
 pub fn deposit_internal_integrity_4(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();

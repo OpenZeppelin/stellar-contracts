@@ -272,7 +272,9 @@ pub fn after_approve_total_assets_geq_zero(e: Env) {
 }
 
 #[rule]
-// status:
+// status: verified 
+// with disable_split:
+// https://prover.certora.com/output/5771024/e3a269ef5d2547dfbadfdfadad55f238/
 pub fn after_deposit_total_assets_geq_zero(e: Env) {
     assume_pre_total_assets_geq_zero(&e);
     let assets: i128 = nondet();
