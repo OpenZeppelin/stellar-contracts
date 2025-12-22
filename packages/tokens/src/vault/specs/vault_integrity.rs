@@ -140,6 +140,7 @@ pub fn deposit_integrity_4(e: Env) {
 #[rule]
 // deposit_internal decreases the asset balance of from by assets
 // status: violated - ?
+// maybe underflow can happen in the internal? review
 // https://prover.certora.com/output/5771024/e8f44da0afee4942a34883390d752df4/
 pub fn deposit_internal_integrity_1(e: Env) {
     safe_assumptions(&e);
@@ -164,7 +165,8 @@ pub fn deposit_internal_integrity_1(e: Env) {
 
 #[rule]
 // deposit_internal increases the shares balance of receiver by shares
-// status: spurious violation - maybe if token and vault are same address
+// status: violated - prob. same as above.
+// https://prover.certora.com/output/5771024/e8f44da0afee4942a34883390d752df4/
 pub fn deposit_internal_integrity_2(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();
@@ -189,7 +191,7 @@ pub fn deposit_internal_integrity_2(e: Env) {
 #[rule]
 // deposit_internal increases total_assets by assets
 // status: verified
-// with disable_split:
+// in a rerun with disable_split (59min)
 // https://prover.certora.com/output/5771024/faeda71b5e70472eb4ad1bc8be561e99/
 pub fn deposit_internal_integrity_3(e: Env) {
     safe_assumptions(&e);
@@ -214,7 +216,7 @@ pub fn deposit_internal_integrity_3(e: Env) {
 
 #[rule]
 // deposit_internal increases total_supply by shares
-// status: spurious violation - maybe if token and vault are same address
+// status: timeout
 pub fn deposit_internal_integrity_4(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();

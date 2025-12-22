@@ -24,8 +24,8 @@ pub fn useful_clogs(e: &Env) {
 }
 
 #[rule]
-// convert to shares returns 0 if and only if input is 0
-// status: violation - only one direction is true.
+// convert to shares of 0 assets gives 0 shares.
+// status: wip
 pub fn convert_to_shares_zero_to_zero(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -37,7 +37,9 @@ pub fn convert_to_shares_zero_to_zero(e: Env) {
     clog!(assets_are_zero);
     let shares_are_zero = shares == 0;
     clog!(shares_are_zero);
-    cvlr_assert!(assets_are_zero == shares_are_zero);
+    if assets_are_zero {
+        cvlr_assert!(shares_are_zero);
+    }
 }
 
 #[rule]
@@ -59,7 +61,7 @@ pub fn convert_to_assets_zero_to_zero(e: Env) {
 
 #[rule]
 // convert to shares monotonicty
-// status: 
+// status: timeout
 pub fn convert_to_shares_monotonicity(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -77,7 +79,7 @@ pub fn convert_to_shares_monotonicity(e: Env) {
 
 #[rule]
 // convert to assets monotonicity
-// status: 
+// status: timeout
 pub fn convert_to_assets_monotonicity(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -95,7 +97,7 @@ pub fn convert_to_assets_monotonicity(e: Env) {
 
 #[rule]
 // convert to shares weak additivity
-// status: 
+// status: timeout
 pub fn convert_to_shares_weak_additivity(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -116,7 +118,7 @@ pub fn convert_to_shares_weak_additivity(e: Env) {
 
 #[rule]
 // convert to assets weak additivity
-// status: 
+// status: timeout
 pub fn convert_to_assets_weak_additivity(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -137,7 +139,7 @@ pub fn convert_to_assets_weak_additivity(e: Env) {
 
 #[rule]
 // convert to shares weak inverse
-// status: 
+// status: timeout
 pub fn convert_to_shares_weak_inverse(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -152,7 +154,7 @@ pub fn convert_to_shares_weak_inverse(e: Env) {
 
 #[rule]
 // convert to assets weak inverse
-// status: 
+// status: timeout
 pub fn convert_to_assets_weak_inverse(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -182,7 +184,7 @@ pub fn conert_to_shares_leq_assets(e: Env) {
 
 #[rule]
 // convert to assets produces a number of assets greater than the shares
-// status:
+// status: timeout
 pub fn convert_to_assets_leq_shares(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -195,6 +197,7 @@ pub fn convert_to_assets_leq_shares(e: Env) {
 
 #[rule]
 // preview_deposit matches convert to shares
+// status: timeout
 pub fn preview_deposit_matches_convert_to_shares(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -209,6 +212,7 @@ pub fn preview_deposit_matches_convert_to_shares(e: Env) {
 
 #[rule]
 // preview_mint matches convert to assets
+// status: timeout
 pub fn preview_mint_matches_convert_to_assets(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -223,6 +227,7 @@ pub fn preview_mint_matches_convert_to_assets(e: Env) {
 
 #[rule]
 // preview_withdraw matches convert to shares
+// status: timeout
 pub fn preview_withdraw_matches_convert_to_shares(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -237,6 +242,7 @@ pub fn preview_withdraw_matches_convert_to_shares(e: Env) {
 
 #[rule]
 // preview_redeem matches convert to assets
+// status: timeout
 pub fn preview_redeem_matches_convert_to_assets(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -251,6 +257,7 @@ pub fn preview_redeem_matches_convert_to_assets(e: Env) {
 
 #[rule]
 // deposit matches preview_deposit
+// status: timeout
 pub fn deposit_matches_preview_deposit(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -271,6 +278,7 @@ pub fn deposit_matches_preview_deposit(e: Env) {
 
 #[rule]
 // withdraw matches preview_withdraw
+// status: timeout
 pub fn withdraw_matches_preview_withdraw(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -291,6 +299,7 @@ pub fn withdraw_matches_preview_withdraw(e: Env) {
 
 #[rule]
 // mint matches preview_mint
+// status: timeout
 pub fn mint_matches_preview_mint(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -311,6 +320,7 @@ pub fn mint_matches_preview_mint(e: Env) {
 
 #[rule]
 // redeem matches preview_redeem
+// status: timeout
 pub fn redeem_matches_preview_redeem(e: Env) {
     safe_assumptions(&e);
     useful_clogs(&e);
@@ -328,4 +338,3 @@ pub fn redeem_matches_preview_redeem(e: Env) {
     clog!(assets);
     cvlr_assert!(assets == preview_redeem);
 }
-

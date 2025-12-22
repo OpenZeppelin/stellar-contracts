@@ -56,7 +56,7 @@ pub fn after_transfer_total_assets_geq_total_supply(e: Env) {
 }
 
 #[rule]
-// status:
+// status: timeout
 pub fn after_transfer_from_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
@@ -90,7 +90,7 @@ pub fn after_approve_total_assets_geq_total_supply(e: Env) {
 }
 
 #[rule]
-// status:
+// status: timeout
 pub fn after_deposit_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
@@ -107,7 +107,7 @@ pub fn after_deposit_total_assets_geq_total_supply(e: Env) {
 }
 
 #[rule]
-// status: 
+// status: timeout
 pub fn after_mint_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
@@ -124,7 +124,7 @@ pub fn after_mint_total_assets_geq_total_supply(e: Env) {
 }
 
 #[rule]
-// status:
+// status: timeout
 pub fn after_withdraw_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
@@ -141,7 +141,7 @@ pub fn after_withdraw_total_assets_geq_total_supply(e: Env) {
 }
 
 #[rule]
-// status:
+// status: timeout
 pub fn after_redeem_total_assets_geq_total_supply(e: Env) {
     safe_assumptions(&e);
     assume_pre_total_assets_geq_total_supply(&e);
