@@ -1,6 +1,8 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
+#[cfg(feature = "certora")]
+use crate::rwa::{compliance::Compliance, identity_verifier::IdentityVerifier, specs::{compliance::ComplianceContract, identity_verifier::IdentityVerifierContract}};
 #[cfg(not(feature = "certora"))]
 use crate::{
     fungible::emit_transfer,
@@ -223,8 +225,12 @@ impl RWA {
         Base::update(e, Some(from), Some(to), amount);
 
         let compliance_addr = Self::compliance(e);
+        #[cfg(not(feature = "certora"))]
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
+        #[cfg(not(feature = "certora"))]
         compliance_client.transferred(from, to, &amount, &e.current_contract_address());
+        #[cfg(feature = "certora")]
+        ComplianceContract::transferred(e, from.clone(), to.clone(), amount, e.current_contract_address());
         #[cfg(not(feature = "certora"))]
         emit_transfer(e, from, to, amount);
     }
@@ -267,14 +273,24 @@ impl RWA {
     /// ```
     pub fn mint(e: &Env, to: &Address, amount: i128) {
         let identity_verifier_addr = Self::identity_verifier(e);
+        #[cfg(not(feature = "certora"))]
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
+        #[cfg(not(feature = "certora"))]
         identity_verifier_client.verify_identity(to);
 
+        #[cfg(feature = "certora")]
+        IdentityVerifierContract::verify_identity(e, to);
+
         let compliance_addr = Self::compliance(e);
+        #[cfg(not(feature = "certora"))]
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
 
+        #[cfg(not(feature = "certora"))]
         let can_create: bool =
             compliance_client.can_create(to, &amount, &e.current_contract_address());
+        #[cfg(feature = "certora")]
+        let can_create: bool =
+            ComplianceContract::can_create(e, to.clone(), amount, e.current_contract_address());
 
         if !can_create {
             panic_with_error!(e, RWAError::MintNotCompliant);
@@ -282,7 +298,10 @@ impl RWA {
 
         Base::update(e, None, Some(to), amount);
 
+        #[cfg(not(feature = "certora"))]
         compliance_client.created(to, &amount, &e.current_contract_address());
+        #[cfg(feature = "certora")]
+        ComplianceContract::created(e, to.clone(), amount, e.current_contract_address());
         #[cfg(not(feature = "certora"))]
         emit_mint(e, to, amount);
     }
@@ -332,8 +351,12 @@ impl RWA {
         Base::update(e, Some(user_address), None, amount);
 
         let compliance_addr = Self::compliance(e);
+        #[cfg(not(feature = "certora"))]
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
+        #[cfg(not(feature = "certora"))]
         compliance_client.destroyed(user_address, &amount, &e.current_contract_address());
+        #[cfg(feature = "certora")]
+        ComplianceContract::destroyed(e, user_address.clone(), amount, e.current_contract_address());
         #[cfg(not(feature = "certora"))]
         emit_burn(e, user_address, amount);
     }
@@ -382,12 +405,21 @@ impl RWA {
     pub fn recover_balance(e: &Env, old_account: &Address, new_account: &Address) -> bool {
         // Verify identity for the new account
         let identity_verifier_addr = Self::identity_verifier(e);
+        #[cfg(not(feature = "certora"))]
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
+        #[cfg(not(feature = "certora"))]
         identity_verifier_client.verify_identity(new_account);
+        #[cfg(feature = "certora")]
+        IdentityVerifierContract::verify_identity(e, new_account);
 
         // Verify that the new account is the recovery target for the old account
+        #[cfg(not(feature = "certora"))]
         let recovery_target = identity_verifier_client
             .recovery_target(old_account)
+            .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityMismatch));
+
+        #[cfg(feature = "certora")]
+        let recovery_target = IdentityVerifierContract::recovery_target(e, old_account)
             .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityMismatch));
 
         if recovery_target != *new_account {
@@ -644,15 +676,28 @@ impl RWA {
         }
 
         let identity_verifier_addr = Self::identity_verifier(e);
+        #[cfg(not(feature = "certora"))]
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
+        #[cfg(not(feature = "certora"))]
         identity_verifier_client.verify_identity(from);
+        #[cfg(not(feature = "certora"))]
         identity_verifier_client.verify_identity(to);
+        #[cfg(feature = "certora")]
+        {
+            IdentityVerifierContract::verify_identity(e, from);
+            IdentityVerifierContract::verify_identity(e, to);
+        }
+
 
         // Validate compliance rules for the transfer
         let compliance_addr = Self::compliance(e);
+        #[cfg(not(feature = "certora"))]
         let compliance_client = ComplianceClient::new(e, &compliance_addr);
+        #[cfg(not(feature = "certora"))]
         let can_transfer: bool =
             compliance_client.can_transfer(from, to, &amount, &e.current_contract_address());
+        #[cfg(feature = "certora")]
+        let can_transfer: bool = ComplianceContract::can_transfer(e, from.clone(), to.clone(), amount, e.current_contract_address());
 
         if !can_transfer {
             panic_with_error!(e, RWAError::TransferNotCompliant);
@@ -660,7 +705,11 @@ impl RWA {
 
         Base::update(e, Some(from), Some(to), amount);
 
+        #[cfg(not(feature = "certora"))]
         compliance_client.transferred(from, to, &amount, &e.current_contract_address());
+        #[cfg(feature = "certora")]
+        ComplianceContract::transferred(e, from.clone(), to.clone(), amount, e.current_contract_address());
+        
         #[cfg(not(feature = "certora"))]
         emit_transfer(e, from, to, amount);
     }

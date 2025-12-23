@@ -1,4 +1,8 @@
+#[cfg(not(feature = "certora"))]
 mod storage;
+
+#[cfg(feature = "certora")]
+pub mod storage;
 #[cfg(test)]
 mod test;
 

@@ -271,7 +271,11 @@
 //! - Non-sensitive jurisdictional data
 //! - Public compliance frameworks where transparency is required
 //! - Testing and development environments
+#[cfg(not(feature = "certora"))]
 mod storage;
+
+#[cfg(feature = "certora")]
+pub mod storage;
 
 #[cfg(test)]
 mod test;

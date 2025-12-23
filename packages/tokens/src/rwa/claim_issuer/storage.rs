@@ -77,6 +77,10 @@ use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, By
 use crate::rwa::claim_issuer::{
     emit_key_allowed, emit_key_removed, emit_revocation_event, emit_signatures_invalidated,
 };
+#[cfg(feature = "certora")]
+use crate::rwa::claim_topics_and_issuers::ClaimTopicsAndIssuers;
+#[cfg(feature = "certora")]
+use crate::rwa::specs::claim_topics_and_issuers::ClaimTopicsAndIssuersContract;
 use crate::rwa::{
     claim_issuer::{
         ClaimIssuerError, SignatureVerifier, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
@@ -421,9 +425,12 @@ pub fn is_key_allowed_for_registry(
 /// * `registry` - The registry address to check against.
 /// * `claim_topic` - The claim topic to check authorization for.
 pub fn is_authorized_for(e: &Env, registry: &Address, claim_topic: u32) -> bool {
+    #[cfg(not(feature = "certora"))]
     let registry_client = ClaimTopicsAndIssuersClient::new(e, registry);
-
-    registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic)
+    #[cfg(not(feature = "certora"))]
+    return registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic);
+    #[cfg(feature = "certora")]
+    ClaimTopicsAndIssuersContract::has_claim_topic(e, e.current_contract_address(), claim_topic)
 }
 
 /// Allows a public key to sign claims for specific topic and
@@ -466,10 +473,16 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
         panic_with_error!(e, ClaimIssuerError::KeyIsEmpty)
     }
 
+    #[cfg(not(feature = "certora"))]
     let registry_client = ClaimTopicsAndIssuersClient::new(e, registry);
 
     // Check claim issuer can sign claim about a specific topic
+    #[cfg(not(feature = "certora"))]
     if !registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic) {
+        panic_with_error!(e, ClaimIssuerError::NotAllowed)
+    }
+    #[cfg(feature = "certora")]
+    if !ClaimTopicsAndIssuersContract::has_claim_topic(e, e.current_contract_address(), claim_topic) {
         panic_with_error!(e, ClaimIssuerError::NotAllowed)
     }
 

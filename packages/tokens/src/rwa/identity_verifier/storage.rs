@@ -2,11 +2,10 @@ use soroban_sdk::{contractclient, contracttype, panic_with_error, Address, Env};
 
 #[cfg(not(feature = "certora"))]
 use crate::rwa::emit_claim_topics_and_issuers_set;
+#[cfg(feature = "certora")]
+use crate::rwa::{claim_issuer::ClaimIssuer, claim_topics_and_issuers::ClaimTopicsAndIssuers, specs::{claim_issuer::{ClaimIssuerContract, try_is_claim_valid}, claim_topics_and_issuers::ClaimTopicsAndIssuersContract, identity_registry_storage::IdentityRegistryStorageContract}};
 use crate::rwa::{
-    claim_issuer::ClaimIssuerClient,
-    claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
-    identity_claims::{generate_claim_id, Claim, IdentityClaimsClient},
-    RWAError,
+    RWAError, claim_issuer::ClaimIssuerClient, claim_topics_and_issuers::ClaimTopicsAndIssuersClient, identity_claims::{Claim, IdentityClaims, IdentityClaimsClient, generate_claim_id}, specs::identity_claims::IdentityClaimsContract
 };
 
 /// Storage keys for the data associated with `RWA` token
@@ -80,15 +79,23 @@ pub fn identity_registry_storage(e: &Env) -> Address {
 ///   account cannot be verified.
 pub fn verify_identity(e: &Env, account: &Address) {
     let irs_addr = identity_registry_storage(e);
+    #[cfg(not(feature = "certora"))]
     let irs_client = IdentityRegistryStorageClient::new(e, &irs_addr);
 
+    #[cfg(not(feature = "certora"))]
     let identity_addr = irs_client.stored_identity(account);
+    #[cfg(feature = "certora")]
+    let identity_addr = <IdentityRegistryStorageContract as crate::rwa::identity_registry_storage::IdentityRegistryStorage>::stored_identity(e, account.clone());
+    #[cfg(not(feature = "certora"))]
     let identity_client = IdentityClaimsClient::new(e, &identity_addr);
 
     let cti_addr = claim_topics_and_issuers(e);
+    #[cfg(not(feature = "certora"))]
     let cti_client = ClaimTopicsAndIssuersClient::new(e, &cti_addr);
-
+    #[cfg(not(feature = "certora"))]
     let topics_and_issuers = cti_client.get_claim_topics_and_issuers();
+    #[cfg(feature = "certora")]
+    let topics_and_issuers = ClaimTopicsAndIssuersContract::get_claim_topics_and_issuers(e);
 
     for (claim_topic, issuers) in topics_and_issuers.iter() {
         let issuers_with_claim_ids = issuers.iter().enumerate().map(|(i, issuer)| {
@@ -98,13 +105,18 @@ pub fn verify_identity(e: &Env, account: &Address) {
                 i as u32 == issuers.len() - 1,
             )
         });
+        #[cfg(not(feature = "certora"))]
         let account_claim_ids = identity_client.get_claim_ids_by_topic(&claim_topic);
+        #[cfg(feature = "certora")]
+        let account_claim_ids = IdentityClaimsContract::get_claim_ids_by_topic(e, claim_topic);
 
         for (issuer, claim_id, is_last) in issuers_with_claim_ids {
             if account_claim_ids.contains(&claim_id) {
                 // Here, we can assume claim exists so no need to use `try_get_claim()`.
+                #[cfg(not(feature = "certora"))]
                 let claim: Claim = identity_client.get_claim(&claim_id);
-
+                #[cfg(feature = "certora")]
+                let claim: Claim = IdentityClaimsContract::get_claim(e, claim_id);
                 if validate_claim(e, &claim, claim_topic, &issuer, &identity_addr) {
                     break;
                 } else if is_last {
@@ -138,12 +150,22 @@ pub fn validate_claim(
     identity_addr: &Address,
 ) -> bool {
     if claim.topic == claim_topic && claim.issuer == *issuer {
+        #[cfg(not(feature = "certora"))]
         let validation = ClaimIssuerClient::new(e, issuer).try_is_claim_valid(
             identity_addr,
             &claim_topic,
             &claim.scheme,
             &claim.signature,
             &claim.data,
+        );
+        #[cfg(feature = "certora")]
+        let validation = try_is_claim_valid(
+            e,
+            identity_addr.clone(),
+            claim_topic,
+            claim.scheme,
+            claim.signature.clone(),
+            claim.data.clone(),
         );
         matches!(validation, Ok(Ok(_)))
     } else {
@@ -161,9 +183,12 @@ pub fn validate_claim(
 /// * `old_account` - The address of the old account.
 pub fn recovery_target(e: &Env, old_account: &Address) -> Option<Address> {
     let irs_addr = identity_registry_storage(e);
+    #[cfg(not(feature = "certora"))]
     let irs_client = IdentityRegistryStorageClient::new(e, &irs_addr);
-
-    irs_client.get_recovered_to(old_account)
+    #[cfg(not(feature = "certora"))]
+    return irs_client.get_recovered_to(old_account);
+    #[cfg(feature = "certora")]
+    <IdentityRegistryStorageContract as crate::rwa::identity_registry_storage::IdentityRegistryStorage>::get_recovered_to(e, old_account.clone())
 }
 
 /// Sets the claim topics and issuers contract of the token.
