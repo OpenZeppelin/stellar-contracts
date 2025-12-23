@@ -159,7 +159,8 @@ pub fn after_redeem_solvency(e: Env) {
 // we can check also for the operations on the underlying token, so long as the current contract doesn't send tokens.
 
 #[rule]
-// status: violation - spurious
+// status: violation - underflow - investigate
+// but also spurious because shares and assets are the same.
 // https://prover.certora.com/output/5771024/27efa3519e8f4a66a957fee0f9ed792d/
 pub fn after_token_transfer_solvency(e: Env) {
     safe_assumptions(&e);
