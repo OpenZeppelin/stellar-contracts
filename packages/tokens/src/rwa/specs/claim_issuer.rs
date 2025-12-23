@@ -17,6 +17,7 @@ impl ClaimIssuer for ClaimIssuerContract {
     }
 }
 
+// this is a workaround to make this function available.
 pub fn try_is_claim_valid(
     e: &Env,
     identity: Address,
