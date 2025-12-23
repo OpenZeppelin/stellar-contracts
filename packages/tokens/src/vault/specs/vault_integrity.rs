@@ -139,8 +139,7 @@ pub fn deposit_integrity_4(e: Env) {
 
 #[rule]
 // deposit_internal decreases the asset balance of from by assets
-// status: violated - ?
-// maybe underflow can happen in the internal? review
+// status: spurious violation - vault and token have same balance storage
 // https://prover.certora.com/output/5771024/e8f44da0afee4942a34883390d752df4/
 pub fn deposit_internal_integrity_1(e: Env) {
     safe_assumptions(&e);
@@ -165,7 +164,7 @@ pub fn deposit_internal_integrity_1(e: Env) {
 
 #[rule]
 // deposit_internal increases the shares balance of receiver by shares
-// status: violated - prob. same as above.
+// status: spurious violation - vault and token have same balance storage
 // https://prover.certora.com/output/5771024/e8f44da0afee4942a34883390d752df4/
 pub fn deposit_internal_integrity_2(e: Env) {
     safe_assumptions(&e);

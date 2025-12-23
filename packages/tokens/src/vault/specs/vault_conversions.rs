@@ -13,6 +13,7 @@ use crate::{
     },
 };
 use super::vault_invariants::safe_assumptions;
+use super::vault_solvency::assume_pre_solvency;
 
 pub fn useful_clogs(e: &Env) {
     let total_assets = BasicVault::total_assets(e);
@@ -28,7 +29,6 @@ pub fn useful_clogs(e: &Env) {
 // status: wip
 pub fn convert_to_shares_zero_to_zero(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let assets: i128 = nondet();
     clog!(assets);
     let shares = BasicVault::convert_to_shares(&e, assets);
@@ -47,7 +47,6 @@ pub fn convert_to_shares_zero_to_zero(e: Env) {
 // status: verified
 pub fn convert_to_assets_zero_to_zero(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let shares: i128 = 0;
     clog!(shares);
     let assets = BasicVault::convert_to_assets(&e, shares);
@@ -64,7 +63,6 @@ pub fn convert_to_assets_zero_to_zero(e: Env) {
 // status: timeout
 pub fn convert_to_shares_monotonicity(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let assets1: i128 = nondet();
     let assets2: i128 = nondet();
     clog!(assets1);
@@ -82,7 +80,6 @@ pub fn convert_to_shares_monotonicity(e: Env) {
 // status: timeout
 pub fn convert_to_assets_monotonicity(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let shares1: i128 = nondet();
     let shares2: i128 = nondet();
     clog!(shares1);
@@ -100,7 +97,6 @@ pub fn convert_to_assets_monotonicity(e: Env) {
 // status: timeout
 pub fn convert_to_shares_weak_additivity(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let assets1: i128 = nondet();
     let assets2: i128 = nondet();
     let assets_sum = assets1 + assets2;
@@ -121,7 +117,6 @@ pub fn convert_to_shares_weak_additivity(e: Env) {
 // status: timeout
 pub fn convert_to_assets_weak_additivity(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let shares1: i128 = nondet();
     let shares2: i128 = nondet();
     let shares_sum = shares1 + shares2;
@@ -142,7 +137,6 @@ pub fn convert_to_assets_weak_additivity(e: Env) {
 // status: timeout
 pub fn convert_to_shares_weak_inverse(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let assets: i128 = nondet();
     clog!(assets);
     let shares_from_assets = BasicVault::convert_to_shares(&e, assets);
@@ -157,7 +151,6 @@ pub fn convert_to_shares_weak_inverse(e: Env) {
 // status: timeout
 pub fn convert_to_assets_weak_inverse(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let shares: i128 = nondet();
     clog!(shares);
     let assets_from_shares = BasicVault::convert_to_assets(&e, shares);
@@ -166,41 +159,12 @@ pub fn convert_to_assets_weak_inverse(e: Env) {
     clog!(shares_from_assets_from_shares);
     cvlr_assert!(shares_from_assets_from_shares <= shares);
 }
-
-// always less shares than assets - important for solvency
  
-#[rule]
-// convert to shares produces a number of shares smaller than the assets 
-// status: violation - spurious - requires solvency assumption
-pub fn conert_to_shares_leq_assets(e: Env) {
-    safe_assumptions(&e);
-    useful_clogs(&e);
-    let assets: i128 = nondet();
-    clog!(assets);
-    let shares = BasicVault::convert_to_shares(&e, assets);
-    clog!(shares);
-    cvlr_assert!(shares <= assets);
-}
-
-#[rule]
-// convert to assets produces a number of assets greater than the shares
-// status: timeout
-pub fn convert_to_assets_leq_shares(e: Env) {
-    safe_assumptions(&e);
-    useful_clogs(&e);
-    let shares: i128 = nondet();
-    clog!(shares);
-    let assets = BasicVault::convert_to_assets(&e, shares);
-    clog!(assets);
-    cvlr_assert!(assets >= shares);
-}
-
 #[rule]
 // preview_deposit matches convert to shares
 // status: timeout
 pub fn preview_deposit_matches_convert_to_shares(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let assets: i128 = nondet();
     clog!(assets);
     let shares = BasicVault::convert_to_shares(&e, assets);
@@ -215,7 +179,6 @@ pub fn preview_deposit_matches_convert_to_shares(e: Env) {
 // status: timeout
 pub fn preview_mint_matches_convert_to_assets(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let shares: i128 = nondet();
     clog!(shares);
     let assets = BasicVault::convert_to_assets(&e, shares);
@@ -230,7 +193,6 @@ pub fn preview_mint_matches_convert_to_assets(e: Env) {
 // status: timeout
 pub fn preview_withdraw_matches_convert_to_shares(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let assets: i128 = nondet();
     clog!(assets);
     let shares = BasicVault::convert_to_shares(&e, assets);
@@ -245,7 +207,6 @@ pub fn preview_withdraw_matches_convert_to_shares(e: Env) {
 // status: timeout
 pub fn preview_redeem_matches_convert_to_assets(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let shares: i128 = nondet();
     clog!(shares);
     let assets = BasicVault::convert_to_assets(&e, shares);
@@ -260,7 +221,6 @@ pub fn preview_redeem_matches_convert_to_assets(e: Env) {
 // status: timeout
 pub fn deposit_matches_preview_deposit(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let assets: i128 = nondet();
     clog!(assets);
     let preview_deposit = BasicVault::preview_deposit(&e, assets);
@@ -281,7 +241,6 @@ pub fn deposit_matches_preview_deposit(e: Env) {
 // status: timeout
 pub fn withdraw_matches_preview_withdraw(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let assets: i128 = nondet();
     clog!(assets);
     let preview_withdraw = BasicVault::preview_withdraw(&e, assets);
@@ -302,7 +261,6 @@ pub fn withdraw_matches_preview_withdraw(e: Env) {
 // status: timeout
 pub fn mint_matches_preview_mint(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let shares: i128 = nondet();
     clog!(shares);
     let preview_mint = BasicVault::preview_mint(&e, shares);
@@ -323,7 +281,6 @@ pub fn mint_matches_preview_mint(e: Env) {
 // status: timeout
 pub fn redeem_matches_preview_redeem(e: Env) {
     safe_assumptions(&e);
-    useful_clogs(&e);
     let shares: i128 = nondet();
     clog!(shares);
     let preview_redeem = BasicVault::preview_redeem(&e, shares);
