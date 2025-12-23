@@ -14,7 +14,6 @@ impl IdentityVerifier for IdentityVerifierContract {
     }
 
     fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: Address, operator: Address) {
-        operator.require_auth(); // check if this is needed? Based on docs, it might be.
         storage::set_claim_topics_and_issuers(e, &claim_topics_and_issuers);
     }
 

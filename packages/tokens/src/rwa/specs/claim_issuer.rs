@@ -13,7 +13,7 @@ impl ClaimIssuer for ClaimIssuerContract {
         sig_data: Bytes,
         claim_data: Bytes,
     ) {
-        // TODO: Implement something here?
+        // TODO: Implement something here, not sure what would be appropriate.
     }
 }
 

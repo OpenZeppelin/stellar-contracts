@@ -8,12 +8,10 @@ pub struct ClaimTopicsAndIssuersContract;
 
 impl ClaimTopicsAndIssuers for ClaimTopicsAndIssuersContract {
     fn add_claim_topic(e: &Env, claim_topic: u32, operator: Address) {
-        operator.require_auth();
         storage::add_claim_topic(e, claim_topic);
     }
 
     fn remove_claim_topic(e: &Env, claim_topic: u32, operator: Address) {
-        operator.require_auth();
         storage::remove_claim_topic(e, claim_topic);
     }
 
@@ -22,12 +20,10 @@ impl ClaimTopicsAndIssuers for ClaimTopicsAndIssuersContract {
     }
 
     fn add_trusted_issuer(e: &Env, trusted_issuer: Address, claim_topics: Vec<u32>, operator: Address) {
-        operator.require_auth();
         storage::add_trusted_issuer(e, &trusted_issuer, &claim_topics);
     }
 
     fn remove_trusted_issuer(e: &Env, trusted_issuer: Address, operator: Address) {
-        operator.require_auth();
         storage::remove_trusted_issuer(e, &trusted_issuer);
     }
 
@@ -37,7 +33,6 @@ impl ClaimTopicsAndIssuers for ClaimTopicsAndIssuersContract {
         claim_topics: Vec<u32>,
         operator: Address,
     ) {
-        operator.require_auth();
         storage::update_issuer_claim_topics(e, &trusted_issuer, &claim_topics);
     }
 

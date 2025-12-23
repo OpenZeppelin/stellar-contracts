@@ -13,24 +13,20 @@ impl TokenBinder for ComplianceContract {
     }
 
     fn bind_token(e: &Env, token: Address, operator: Address) {
-        operator.require_auth(); // check if this is needed
         bind_token(e, &token);
     }
 
     fn unbind_token(e: &Env, token: Address, operator: Address) {
-        operator.require_auth();
         unbind_token(e, &token);
     }
 }
 
 impl Compliance for ComplianceContract {
     fn add_module_to(e: &Env, hook: ComplianceHook, module: Address, operator: Address) {
-        operator.require_auth(); // check if this is needed
         storage::add_module_to(e, hook, module);
     }
 
     fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address, operator: Address) {
-        operator.require_auth(); // check if this is needed
         storage::remove_module_from(e, hook, module);
     }
 
