@@ -141,6 +141,10 @@ pub fn deposit_integrity_4(e: Env) {
 // deposit_internal decreases the asset balance of from by assets
 // status: spurious violation - vault and token have same balance storage
 // https://prover.certora.com/output/5771024/e8f44da0afee4942a34883390d752df4/
+// verified after munge to the name of balances,
+// in a rerun with disable_split
+// 50 minutes
+// https://prover.certora.com/output/5771024/2b4d1a4cdc554b5caee76f9faa592096/?
 pub fn deposit_internal_integrity_1(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();

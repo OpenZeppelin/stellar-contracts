@@ -7,3 +7,4 @@ pub mod vault_solvency;
 pub mod vault_panics;
 pub mod vault_invariants;
 pub mod helper;
+pub mod fungible_munged;
