@@ -40,7 +40,7 @@
 //! to accounts with `minter_admin` role to grant/revoke the `minter` role
 //! to other accounts.
 //!
-//! One can create as many roles as they want, and create a chain of command
+//! One can create up to 256 roles simultaneously, and create a chain of command
 //! structure if they want to go with this approach.
 //!
 //! If you need even more granular control over which roles can do what, you can
