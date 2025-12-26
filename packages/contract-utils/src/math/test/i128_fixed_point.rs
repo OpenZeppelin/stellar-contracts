@@ -18,6 +18,19 @@ fn test_fixed_mul_floor_zero_denominator() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #1500)")]
+fn test_fixed_mul_floor_overflow_on_division() {
+    let env = Env::default();
+    // i128::MIN / -1 overflows because -i128::MIN can't be represented
+    // This should panic with Overflow (#1500), not DivisionByZero (#1501)
+    let x: i128 = i128::MIN;
+    let y: i128 = 1;
+    let denominator: i128 = -1;
+
+    x.fixed_mul_floor(&env, &y, &denominator);
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #1501)")]
 fn test_fixed_mul_ceil_zero_denominator() {
     let env = Env::default();
