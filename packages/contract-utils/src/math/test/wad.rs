@@ -151,6 +151,28 @@ fn test_from_ratio_overflow() {
 }
 
 #[test]
+fn test_from_ratio_phantom_overflow_handled() {
+    let e = Env::default();
+    // Large numerator that would overflow i128 when multiplied by WAD_SCALE
+    // but the final result after division fits in i128
+    // 10^20 * WAD_SCALE / 10^20 = WAD_SCALE (1 WAD)
+    let large = 100_000_000_000_000_000_000_i128; // 10^20
+    let wad = Wad::from_ratio(&e, large, large);
+    assert_eq!(wad, Wad::from_integer(&e, 1));
+}
+
+#[test]
+fn test_from_ratio_large_values_phantom_overflow() {
+    let e = Env::default();
+    // Test: 5 trillion / 2.5 trillion = 2
+    // 5 * 10^12 * WAD_SCALE would overflow i128, but result (2 WAD) fits
+    let num = 5_000_000_000_000_i128; // 5 trillion
+    let den = 2_500_000_000_000_i128; // 2.5 trillion
+    let wad = Wad::from_ratio(&e, num, den);
+    assert_eq!(wad, Wad::from_integer(&e, 2));
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #1501)")]
 fn test_from_ratio_division_by_zero() {
     let e = Env::default();
@@ -228,7 +250,7 @@ fn test_checked_div_by_zero() {
     let e = Env::default();
     let a = Wad::from_integer(&e, 1);
     let b = Wad::from_raw(0);
-    let result = a.checked_div(b);
+    let result = a.checked_div(&e, b);
     assert_eq!(result, None);
 }
 
@@ -349,16 +371,43 @@ fn test_checked_div_success() {
     let e = Env::default();
     let a = Wad::from_integer(&e, 6);
     let b = Wad::from_integer(&e, 2);
-    let result = a.checked_div(b);
+    let result = a.checked_div(&e, b);
     assert_eq!(result, Some(Wad::from_integer(&e, 3)));
 }
 
 #[test]
 fn test_checked_div_overflow() {
+    let e = Env::default();
     let a = Wad::from_raw(i128::MAX);
     let b = Wad::from_raw(1);
-    let result = a.checked_div(b); // MAX * WAD_SCALE will overflow
+    let result = a.checked_div(&e, b); // MAX * WAD_SCALE will overflow even with I256
     assert_eq!(result, None);
+}
+
+#[test]
+fn test_checked_div_phantom_overflow_handled() {
+    let e = Env::default();
+    // 5000 WAD / 5000 WAD = 1 WAD
+    // The intermediate calculation (5000 * WAD_SCALE * WAD_SCALE) would overflow
+    // i128 but the final result (1 WAD) fits, so phantom overflow should be
+    // handled
+    let a = Wad::from_integer(&e, 5_000);
+    let b = Wad::from_integer(&e, 5_000);
+    let result = a.checked_div(&e, b);
+    assert_eq!(result, Some(Wad::from_integer(&e, 1)));
+}
+
+#[test]
+fn test_checked_div_large_values_phantom_overflow() {
+    let e = Env::default();
+    // Test with even larger values that would definitely overflow i128
+    // but produce a valid result after division
+    let large_value = 1_000_000_000_000_i128; // 1 trillion
+    let a = Wad::from_integer(&e, large_value);
+    let b = Wad::from_integer(&e, large_value);
+    let result = a.checked_div(&e, b);
+    // 1 trillion / 1 trillion = 1
+    assert_eq!(result, Some(Wad::from_integer(&e, 1)));
 }
 
 #[test]
