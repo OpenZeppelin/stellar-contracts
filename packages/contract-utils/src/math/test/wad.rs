@@ -155,8 +155,9 @@ fn test_from_ratio_phantom_overflow_handled() {
     let e = Env::default();
     // Large numerator that would overflow i128 when multiplied by WAD_SCALE
     // but the final result after division fits in i128
-    // 10^20 * WAD_SCALE / 10^20 = WAD_SCALE (1 WAD)
-    let large = 100_000_000_000_000_000_000_i128; // 10^20
+    // 10^21 * WAD_SCALE (10^18) = 10^39 which overflows i128 (max ~1.7*10^38)
+    // but 10^21 / 10^21 = 1, so final result (1 WAD) fits
+    let large = 1_000_000_000_000_000_000_000_i128; // 10^21
     let wad = Wad::from_ratio(&e, large, large);
     assert_eq!(wad, Wad::from_integer(&e, 1));
 }
@@ -164,10 +165,10 @@ fn test_from_ratio_phantom_overflow_handled() {
 #[test]
 fn test_from_ratio_large_values_phantom_overflow() {
     let e = Env::default();
-    // Test: 5 trillion / 2.5 trillion = 2
-    // 5 * 10^12 * WAD_SCALE would overflow i128, but result (2 WAD) fits
-    let num = 5_000_000_000_000_i128; // 5 trillion
-    let den = 2_500_000_000_000_i128; // 2.5 trillion
+    // 10^22 * WAD_SCALE (10^18) = 10^40 which overflows i128
+    // but 10^22 / (5 * 10^21) = 2, so final result (2 WAD) fits
+    let num = 10_000_000_000_000_000_000_000_i128; // 10^22
+    let den = 5_000_000_000_000_000_000_000_i128; // 5 * 10^21
     let wad = Wad::from_ratio(&e, num, den);
     assert_eq!(wad, Wad::from_integer(&e, 2));
 }
