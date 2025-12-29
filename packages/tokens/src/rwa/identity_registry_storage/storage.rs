@@ -259,6 +259,7 @@ pub fn get_identity_profile(e: &Env, account: &Address) -> IdentityProfile {
 /// # Errors
 ///
 /// * [`IRSError::CountryDataNotFound`] - If the index is out of bounds.
+/// * refer to [`get_identity_profile`] errors.
 pub fn get_country_data(e: &Env, account: &Address, index: u32) -> CountryData {
     let profile = get_identity_profile(e, account);
     profile
