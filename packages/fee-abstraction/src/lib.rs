@@ -6,16 +6,23 @@
 //!
 //! # Core Features
 //!
+//! - **High-level helpers**: wrappers that combine target invocation
+//!   (forwarding) and fee collection in the desired order.
 //! - **Fee Token Allowlist**: Optional allowlist for accepted fee tokens
 //! - **Token Sweeping**: Optional functions to collect accumulated fees
 //! - **Fee Validation**: Utilities for validating fee amounts
 //!
 //! # Usage
 //!
-//! This module provides storage functions and event helpers that can be
-//! integrated into a fee forwarder contract. The contract is responsible for:
-//! - Authorization checks (who can manage fee tokens, sweep funds)
-//! - Implementing the actual forwarding logic
+//! Prefer the high-level wrappers for integrating fee abstraction:
+//! - [`invoke_then_collect_fee`]: invoke target first, then collect fee (see
+//!   `examples/fee-forwarder-permissionless` for authorization-tree
+//!   implications)
+//! - [`collect_fee_then_invoke`]: collect fee first, then invoke target (see
+//!   `examples/fee-forwarder-permissioned` for authorization-tree implications)
+//!
+//! Lower-level helpers ([`auth_user_and_invoke`], [`collect_fee`]) are also
+//! exposed for custom composition.
 #![no_std]
 
 mod storage;
@@ -36,9 +43,9 @@ pub const FEE_ABSTRACTION_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const FEE_ABSTRACTION_TTL_THRESHOLD: u32 = FEE_ABSTRACTION_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 pub use crate::storage::{
-    auth_user_and_invoke, collect_fee, is_allowed_fee_token, is_fee_token_allowlist_enabled,
-    set_allowed_fee_token, sweep_token, validate_fee_bounds, FeeAbstractionApproval,
-    FeeAbstractionStorageKey,
+    auth_user_and_invoke, collect_fee, collect_fee_then_invoke, invoke_then_collect_fee,
+    is_allowed_fee_token, is_fee_token_allowlist_enabled, set_allowed_fee_token, sweep_token,
+    validate_fee_bounds, FeeAbstractionApproval, FeeAbstractionStorageKey,
 };
 
 // ################## ERRORS ##################

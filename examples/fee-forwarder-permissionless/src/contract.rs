@@ -53,7 +53,7 @@
 //!    - If any step fails, entire transaction reverts (including token
 //!      transfer)
 use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
-use stellar_fee_abstraction::{auth_user_and_invoke, collect_fee, FeeAbstractionApproval};
+use stellar_fee_abstraction::{invoke_then_collect_fee, FeeAbstractionApproval};
 
 #[contract]
 pub struct FeeForwarder;
@@ -78,29 +78,19 @@ impl FeeForwarder {
 
         // Depending on whether we first invoke target and than collect fee,
         // composing authorization entries might differ. Compare "test.rs" from this
-        // crate and from "examples/fee-forwarder-pemissioned".
-        let res = auth_user_and_invoke(
+        // crate with "examples/fee-forwarder-pemissioned".
+        invoke_then_collect_fee(
             e,
             &fee_token,
+            fee_amount,
             max_fee_amount,
             expiration_ledger,
             &target_contract,
             &target_fn,
             &target_args,
             &user,
-        );
-
-        collect_fee(
-            e,
-            &fee_token,
-            fee_amount,
-            max_fee_amount,
-            expiration_ledger,
-            &user,
             &relayer, // relayer collects fee
             FeeAbstractionApproval::Lazy,
-        );
-
-        res
+        )
     }
 }
