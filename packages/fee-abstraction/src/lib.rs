@@ -11,15 +11,28 @@
 //! - **Fee Token Allowlist**: Optional allowlist for accepted fee tokens
 //! - **Token Sweeping**: Optional functions to collect accumulated fees
 //! - **Fee Validation**: Utilities for validating fee amounts
+//! - **Approval strategies**: utilities for collecting fee from users support
+//!   two approval semantics:
+//!   - [`FeeAbstractionApproval::Eager`]: always approve `max_fee_amount`
+//!     (overwriting any existing allowance)
+//!   - [`FeeAbstractionApproval::Lazy`]: only approve if the current allowance
+//!     is less than `max_fee_amount`
 //!
 //! # Usage
 //!
-//! Prefer the high-level wrappers for integrating fee abstraction:
-//! - [`invoke_then_collect_fee`]: invoke target first, then collect fee (see
-//!   `examples/fee-forwarder-permissionless` for authorization-tree
+//! This module provides storage functions and event helpers that can be
+//! integrated into a fee forwarding contract. The implementing contract is
+//! responsible for the authorization checks and who can manage fee tokens or
+//! sweep collected fees.
+//!
+//! Prefer one of the high-level wrappers for integrating fee abstraction
+//! (they are alternatives):
+//! - [`invoke_then_collect_fee`]: invoke target first (forward), then collect
+//!   fee (see `examples/fee-forwarder-permissionless` for authorization-tree
 //!   implications)
-//! - [`collect_fee_then_invoke`]: collect fee first, then invoke target (see
-//!   `examples/fee-forwarder-permissioned` for authorization-tree implications)
+//! - [`collect_fee_then_invoke`]: collect fee first, then invoke target
+//!   (forward) (see `examples/fee-forwarder-permissioned` for
+//!   authorization-tree implications)
 //!
 //! Lower-level helpers ([`auth_user_and_invoke`], [`collect_fee`]) are also
 //! exposed for custom composition.
