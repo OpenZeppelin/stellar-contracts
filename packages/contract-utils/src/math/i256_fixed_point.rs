@@ -25,14 +25,22 @@ impl SorobanFixedPoint for I256 {
 
 /// Performs floor(x * y / z)
 pub(crate) fn mul_div_floor(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
+    let zero = I256::from_i32(env, 0);
+    if *z == zero {
+        panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
+    }
     checked_mul_div_floor(env, x, y, z)
-        .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::DivisionByZero))
+        .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::Overflow))
 }
 
 /// Performs ceil(x * y / z)
 pub(crate) fn mul_div_ceil(env: &Env, x: &I256, y: &I256, z: &I256) -> I256 {
+    let zero = I256::from_i32(env, 0);
+    if *z == zero {
+        panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
+    }
     checked_mul_div_ceil(env, x, y, z)
-        .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::DivisionByZero))
+        .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::Overflow))
 }
 
 /// Checked version of floor(x * y / z)

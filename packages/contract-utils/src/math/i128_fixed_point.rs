@@ -106,9 +106,14 @@ impl SorobanFixedPoint for i128 {
 
 /// Performs floor(x * y / z), panics on overflow or division by zero
 fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
+    if *z == 0 {
+        panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
+    }
     match x.checked_mul(*y) {
+        // *z == 0 check is already done above, so the only possible error is overflow,
+        // where r = i128::MIN and z = -1
         Some(r) => div_floor(r, *z)
-            .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::DivisionByZero)),
+            .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::Overflow)),
         None => {
             // scale to i256 and retry
             let res = crate::math::i256_fixed_point::mul_div_floor(
@@ -125,9 +130,14 @@ fn scaled_mul_div_floor(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
 
 /// Performs ceil(x * y / z)
 fn scaled_mul_div_ceil(x: &i128, env: &Env, y: &i128, z: &i128) -> i128 {
+    if *z == 0 {
+        panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
+    }
     match x.checked_mul(*y) {
+        // *z == 0 check is already done above, so the only possible error is overflow,
+        // where r = i128::MIN and z = -1
         Some(r) => div_ceil(r, *z)
-            .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::DivisionByZero)),
+            .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::Overflow)),
         None => {
             // scale to i256 and retry
             let res = crate::math::i256_fixed_point::mul_div_ceil(
