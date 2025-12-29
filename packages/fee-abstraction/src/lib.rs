@@ -58,6 +58,8 @@ pub enum FeeAbstractionError {
     InvalidFeeBounds = 5003,
     /// No tokens available to sweep
     NoTokensToSweep = 5004,
+    /// Fee recipient is invalid
+    InvalidFeeRecipient = 5005,
 }
 
 // ################## EVENTS ##################
