@@ -197,7 +197,7 @@ fn collect_fee_with_lazy_approval_lower_previous() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #5005)")]
-fn collect_fee_panics_invalid_fee_recipient() {
+fn collect_fee_panics_invalid_user() {
     let e = Env::default();
 
     let contract_address = e.register(MockContract, ());
