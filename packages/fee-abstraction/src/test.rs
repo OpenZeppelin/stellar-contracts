@@ -203,9 +203,19 @@ fn collect_fee_panics_invalid_fee_recipient() {
     let contract_address = e.register(MockContract, ());
     let user = Address::generate(&e);
     let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        collect_fee(&e, &token_address, 20, 50, 100, &user, &user, FeeAbstractionApproval::Lazy);
+        collect_fee(
+            &e,
+            &token_address,
+            20,
+            50,
+            100,
+            &contract_address,
+            &recipient,
+            FeeAbstractionApproval::Lazy,
+        );
     });
 }
 

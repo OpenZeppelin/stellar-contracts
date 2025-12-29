@@ -113,8 +113,7 @@ pub fn auth_user_and_invoke(
 /// # Errors
 ///
 /// * [`FeeAbstractionError::FeeTokenNotAllowed`] - If the token is not allowed.
-/// * [`FeeAbstractionError::InvalidFeeRecipient`] - If fee recipient is same as
-///   user.
+/// * [`FeeAbstractionError::InvalidUser`] - If user is current contract.
 /// * refer to [`validate_fee_bounds`] errors.
 #[allow(clippy::too_many_arguments)]
 pub fn collect_fee(
@@ -131,8 +130,8 @@ pub fn collect_fee(
         panic_with_error!(e, FeeAbstractionError::FeeTokenNotAllowed);
     }
 
-    if fee_recipient == user {
-        panic_with_error!(e, FeeAbstractionError::InvalidFeeRecipient)
+    if e.current_contract_address() == *user {
+        panic_with_error!(e, FeeAbstractionError::InvalidUser)
     }
 
     validate_fee_bounds(e, fee_amount, max_fee_amount);
