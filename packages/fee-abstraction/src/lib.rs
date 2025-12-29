@@ -58,6 +58,8 @@ pub enum FeeAbstractionError {
     InvalidFeeBounds = 5003,
     /// No tokens available to sweep
     NoTokensToSweep = 5004,
+    /// User address is current contract
+    InvalidUser = 5005,
 }
 
 // ################## EVENTS ##################

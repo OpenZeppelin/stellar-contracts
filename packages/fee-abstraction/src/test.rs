@@ -196,6 +196,30 @@ fn collect_fee_with_lazy_approval_lower_previous() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #5005)")]
+fn collect_fee_panics_invalid_fee_recipient() {
+    let e = Env::default();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        collect_fee(
+            &e,
+            &token_address,
+            20,
+            50,
+            100,
+            &contract_address,
+            &recipient,
+            FeeAbstractionApproval::Lazy,
+        );
+    });
+}
+
+#[test]
 fn auth_user_and_invoke_success() {
     let e = Env::default();
     e.mock_all_auths();
