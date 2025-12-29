@@ -38,7 +38,7 @@ pub fn transfer_integrity(e: Env) {
 }
 
 #[rule]
-// transfer_from changes total supply accordingly
+// transfer_from does not change total supply
 // status: verified
 pub fn transfer_from_integrity_1(e: Env) {
     let spender = nondet_address();
@@ -53,7 +53,7 @@ pub fn transfer_from_integrity_1(e: Env) {
 }
 
 #[rule]
-// transfer_from changes balances from accordingly
+// transfer_from changes the balance of from accordingly
 // status: verified
 pub fn transfer_from_integrity_2(e: Env) {
     let spender = nondet_address();
@@ -73,7 +73,7 @@ pub fn transfer_from_integrity_2(e: Env) {
 }
 
 #[rule]
-// transfer_from changes balances to accordingly
+// transfer_from changes the balance of to accordingly
 // status: verified
 pub fn transfer_from_integrity_3(e: Env) {
     let spender = nondet_address();

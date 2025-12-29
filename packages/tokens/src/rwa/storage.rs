@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 #[cfg(feature = "certora")]
-use crate::rwa::{compliance::Compliance, identity_verifier::IdentityVerifier, specs::{compliance::ComplianceContract, identity_verifier::IdentityVerifierContract}};
+use crate::rwa::{compliance::Compliance, identity_verifier::IdentityVerifier, specs::{compliance_trivial::ComplianceTrivial, identity_verifier_trivial::IdentityVerifierTrivial}};
 #[cfg(not(feature = "certora"))]
 use crate::{
     fungible::emit_transfer,
@@ -230,7 +230,7 @@ impl RWA {
         #[cfg(not(feature = "certora"))]
         compliance_client.transferred(from, to, &amount, &e.current_contract_address());
         #[cfg(feature = "certora")]
-        ComplianceContract::transferred(e, from.clone(), to.clone(), amount, e.current_contract_address());
+        ComplianceTrivial::transferred(e, from.clone(), to.clone(), amount, e.current_contract_address());
         #[cfg(not(feature = "certora"))]
         emit_transfer(e, from, to, amount);
     }
@@ -279,7 +279,7 @@ impl RWA {
         identity_verifier_client.verify_identity(to);
 
         #[cfg(feature = "certora")]
-        IdentityVerifierContract::verify_identity(e, to);
+        IdentityVerifierTrivial::verify_identity(e, to);
 
         let compliance_addr = Self::compliance(e);
         #[cfg(not(feature = "certora"))]
@@ -290,7 +290,7 @@ impl RWA {
             compliance_client.can_create(to, &amount, &e.current_contract_address());
         #[cfg(feature = "certora")]
         let can_create: bool =
-            ComplianceContract::can_create(e, to.clone(), amount, e.current_contract_address());
+            ComplianceTrivial::can_create(e, to.clone(), amount, e.current_contract_address());
 
         if !can_create {
             panic_with_error!(e, RWAError::MintNotCompliant);
@@ -301,7 +301,7 @@ impl RWA {
         #[cfg(not(feature = "certora"))]
         compliance_client.created(to, &amount, &e.current_contract_address());
         #[cfg(feature = "certora")]
-        ComplianceContract::created(e, to.clone(), amount, e.current_contract_address());
+        ComplianceTrivial::created(e, to.clone(), amount, e.current_contract_address());
         #[cfg(not(feature = "certora"))]
         emit_mint(e, to, amount);
     }
@@ -356,7 +356,7 @@ impl RWA {
         #[cfg(not(feature = "certora"))]
         compliance_client.destroyed(user_address, &amount, &e.current_contract_address());
         #[cfg(feature = "certora")]
-        ComplianceContract::destroyed(e, user_address.clone(), amount, e.current_contract_address());
+        ComplianceTrivial::destroyed(e, user_address.clone(), amount, e.current_contract_address());
         #[cfg(not(feature = "certora"))]
         emit_burn(e, user_address, amount);
     }
@@ -410,7 +410,7 @@ impl RWA {
         #[cfg(not(feature = "certora"))]
         identity_verifier_client.verify_identity(new_account);
         #[cfg(feature = "certora")]
-        IdentityVerifierContract::verify_identity(e, new_account);
+        IdentityVerifierTrivial::verify_identity(e, new_account);
 
         // Verify that the new account is the recovery target for the old account
         #[cfg(not(feature = "certora"))]
@@ -419,7 +419,7 @@ impl RWA {
             .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityMismatch));
 
         #[cfg(feature = "certora")]
-        let recovery_target = IdentityVerifierContract::recovery_target(e, old_account)
+        let recovery_target = IdentityVerifierTrivial::recovery_target(e, old_account)
             .unwrap_or_else(|| panic_with_error!(e, RWAError::IdentityMismatch));
 
         if recovery_target != *new_account {
@@ -684,8 +684,8 @@ impl RWA {
         identity_verifier_client.verify_identity(to);
         #[cfg(feature = "certora")]
         {
-            IdentityVerifierContract::verify_identity(e, from);
-            IdentityVerifierContract::verify_identity(e, to);
+            IdentityVerifierTrivial::verify_identity(e, from);
+            IdentityVerifierTrivial::verify_identity(e, to);
         }
 
 
@@ -697,7 +697,7 @@ impl RWA {
         let can_transfer: bool =
             compliance_client.can_transfer(from, to, &amount, &e.current_contract_address());
         #[cfg(feature = "certora")]
-        let can_transfer: bool = ComplianceContract::can_transfer(e, from.clone(), to.clone(), amount, e.current_contract_address());
+        let can_transfer: bool = ComplianceTrivial::can_transfer(e, from.clone(), to.clone(), amount, e.current_contract_address());
 
         if !can_transfer {
             panic_with_error!(e, RWAError::TransferNotCompliant);
@@ -708,7 +708,7 @@ impl RWA {
         #[cfg(not(feature = "certora"))]
         compliance_client.transferred(from, to, &amount, &e.current_contract_address());
         #[cfg(feature = "certora")]
-        ComplianceContract::transferred(e, from.clone(), to.clone(), amount, e.current_contract_address());
+        ComplianceTrivial::transferred(e, from.clone(), to.clone(), amount, e.current_contract_address());
         
         #[cfg(not(feature = "certora"))]
         emit_transfer(e, from, to, amount);

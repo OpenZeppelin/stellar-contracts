@@ -2,6 +2,8 @@ use cvlr::nondet::*;
 use cvlr_soroban::{nondet_address, nondet_bytes_n};
 use soroban_sdk::{Address, BytesN, String, Vec};
 
+// DUPLICATE CODE
+
 // Helper trait to exclude BytesN<32> from the generic implementation
 // This trait is implemented for all types that can use the generic Nondet implementation
 pub(crate) trait CanUseGenericNondet {}
@@ -75,9 +77,13 @@ where
     }
 
     #[inline(never)]
-    pub fn get(&self, k: &K) -> V {
+    pub fn get(&mut self, k: &K) -> V {
         match self {
-            Self::UnInit => V::nondet(),
+            Self::UnInit => {
+                let new_v = V::nondet();
+                *self = Self::Init { k: k.clone(), v: new_v.clone() };
+                new_v
+            }, // notice this is stronger than what we had before - if the ghost is unset we set it and not just return nondet 
             Self::Init { k: my_k, v: my_v } => {
                 if k == my_k {
                     my_v.clone()
@@ -87,39 +93,60 @@ where
             }
         }
     }
+
+    #[inline(never)]
+    pub fn is_uninit(&self) -> bool {
+        matches!(self, Self::UnInit)
+    }
+
+    #[inline(never)]
+    pub fn is_init(&self) -> bool {
+        matches!(self, Self::Init { .. })
+    }
 }
 
 // Implementation for BytesN<32> using nondet_bytes_n()
 // Note: We only implement for BytesN<32> here. If you need GhostMap for other BytesN sizes,
 // add separate impl blocks for each size to avoid overlapping impl conflicts.
-impl <K: Clone + Eq> GhostMap<K, BytesN<32>> {
-    #[inline(never)]
-    pub fn init(&mut self, k: &K, v: BytesN<32>) {
-        *self = Self::Init { k: k.clone(), v: v.clone() };
-    }
+// impl <K: Clone + Eq> GhostMap<K, BytesN<32>> {
+//     #[inline(never)]
+//     pub fn init(&mut self, k: &K, v: BytesN<32>) {
+//         *self = Self::Init { k: k.clone(), v: v.clone() };
+//     }
 
-    #[inline(never)]
-    pub fn set(&mut self, k: &K, v: BytesN<32>) {
-        match self {
-            Self::Init { k: my_k, v: my_v} =>
-                if k == my_k {
-                    *my_v = v
-                }
-            _ => {}
-        }
-    }
+//     #[inline(never)]
+//     pub fn set(&mut self, k: &K, v: BytesN<32>) {
+//         match self {
+//             Self::Init { k: my_k, v: my_v} =>
+//                 if k == my_k {
+//                     *my_v = v
+//                 }
+//             _ => {}
+//         }
+//     }
 
-    #[inline(never)]
-    pub fn get(&self, k: &K) -> BytesN<32> {
-        match self {
-            Self::UnInit => nondet_bytes_n(),
-            Self::Init { k: my_k, v: my_v } => {
-                if k == my_k {
-                    my_v.clone()
-                } else {
-                    nondet_bytes_n()
-                }
-            }
-        }
-    }
-}
+//     #[inline(never)]
+//     pub fn get(&self, k: &K) -> BytesN<32> {
+//         match self {
+//             Self::UnInit => nondet_bytes_n(),
+//             Self::Init { k: my_k, v: my_v } => {
+//                 if k == my_k {
+//                     my_v.clone()
+//                 } else {
+//                     nondet_bytes_n()
+//                 }
+//             }
+//         }
+//     }
+
+//     #[inline(never)]
+//     pub fn is_uninit(&self) -> bool {
+//         matches!(self, Self::UnInit)
+//     }
+
+//     #[inline(never)]
+//     pub fn is_init(&self) -> bool {
+//         matches!(self, Self::Init { .. })
+//     }
+// }
+
