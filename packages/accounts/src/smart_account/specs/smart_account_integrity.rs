@@ -270,9 +270,11 @@ pub fn add_signer_integrity(e: Env) {
     let meta = Meta::nondet();
 
     // important: setup storage to be consistent
-    e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
-    e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &Vec::<Signer>::new(&e));
-    e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &Vec::<Address>::new(&e));
+    // e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
+    // let signers = nondet_signers_vec();
+    let signers: Vec<Signer> = Vec::new(&e);
+    e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
+    // e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &Vec::<Address>::new(&e));
     // raz: doesn't make sense to me
     
     add_signer(&e, id, &signer);

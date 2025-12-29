@@ -96,7 +96,7 @@ pub fn rwa_mint_panics_if_identity_verification_fails(e: Env) {
     assume_verify_identity_result_map_is_uninit();
     let verify_identity_result = IdentityVerifierTrivial::verify_identity_non_panicking(&e, &to);
     clog!(verify_identity_result);
-    clog_verify_identity_result_map();
+    clog_verify_identity_result_map(); // gives uinit = true
     cvlr_assume!(!verify_identity_result);
     RWA::mint(&e, &to, amount);
     cvlr_assert!(false);

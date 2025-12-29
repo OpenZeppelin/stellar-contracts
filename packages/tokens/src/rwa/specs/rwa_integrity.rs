@@ -381,4 +381,137 @@ pub fn rwa_approve_integrity(e: Env) {
     cvlr_assert!(allowance_post == amount);
 }
 
-// todo: rules about recover_balance - function that is not exposed in the trait.
+#[rule]
+// output of recover_balance equals balance > 0
+// status:
+pub fn rwa_recover_balance_integrity_1(e: Env) {
+    let old_account = nondet_address();
+    clog!(cvlr_soroban::Addr(&old_account));
+    let new_account = nondet_address();
+    clog!(cvlr_soroban::Addr(&new_account));
+    let balance_old_account_pre = RWA::balance(&e, &old_account);
+    clog!(balance_old_account_pre);
+    let balance_was_non_zero = balance_old_account_pre > 0;
+    clog!(balance_was_non_zero);
+    let balance_new_account_pre = RWA::balance(&e, &new_account);
+    clog!(balance_new_account_pre);
+    let output = RWA::recover_balance(&e, &old_account, &new_account);
+    let balance_new_account_post = RWA::balance(&e, &new_account);
+    clog!(balance_new_account_post);
+    let balance_old_account_post = RWA::balance(&e, &old_account);
+    clog!(balance_old_account_post);
+    clog!(output);
+    cvlr_assert!(output == balance_was_non_zero);
+}
+
+#[rule]
+// after recover_balance the old account has no balance
+// status:
+pub fn rwa_recover_balance_integrity_2(e: Env) {
+    let old_account = nondet_address();
+    clog!(cvlr_soroban::Addr(&old_account));
+    let new_account = nondet_address();
+    clog!(cvlr_soroban::Addr(&new_account));
+    let balance_old_account_pre = RWA::balance(&e, &old_account);
+    clog!(balance_old_account_pre);
+    let balance_new_account_pre = RWA::balance(&e, &new_account);
+    clog!(balance_new_account_pre);
+    let output = RWA::recover_balance(&e, &old_account, &new_account);
+    clog!(output);
+    let balance_new_account_post = RWA::balance(&e, &new_account);
+    clog!(balance_new_account_post);
+    let balance_old_account_post = RWA::balance(&e, &old_account);
+    clog!(balance_old_account_post);
+    if output {
+        if new_account != old_account {
+            cvlr_assert!(balance_old_account_post == 0);
+        } else {
+            cvlr_assert!(balance_old_account_post == balance_old_account_pre);
+        }
+    } else {
+        cvlr_assert!(balance_old_account_post == balance_old_account_pre);
+    }
+}
+
+#[rule]
+// after recover_balance the new account has the balance of the old account
+// status:
+pub fn rwa_recover_balance_integrity_3(e: Env) {
+    let old_account = nondet_address();
+    clog!(cvlr_soroban::Addr(&old_account));
+    let new_account = nondet_address();
+    clog!(cvlr_soroban::Addr(&new_account));
+    let balance_old_account_pre = RWA::balance(&e, &old_account);
+    clog!(balance_old_account_pre);
+    let balance_new_account_pre = RWA::balance(&e, &new_account);
+    clog!(balance_new_account_pre);
+    let output = RWA::recover_balance(&e, &old_account, &new_account);
+    clog!(output);
+    let balance_new_account_post = RWA::balance(&e, &new_account);
+    clog!(balance_new_account_post);
+    let balance_old_account_post = RWA::balance(&e, &old_account);
+    clog!(balance_old_account_post);
+    if output {
+        cvlr_assert!(balance_new_account_post == balance_old_account_pre);
+    } else {
+        cvlr_assert!(balance_new_account_post == balance_new_account_pre);
+    }
+}
+
+
+#[rule]
+// after recover_balance the new account has the frozen tokens of the old account
+// status:
+pub fn rwa_recover_balance_integrity_4(e: Env) {
+    let old_account = nondet_address();
+    clog!(cvlr_soroban::Addr(&old_account));
+    let new_account = nondet_address();
+    clog!(cvlr_soroban::Addr(&new_account));
+    let old_account_frozen_tokens_pre = RWA::get_frozen_tokens(&e, &old_account);
+    clog!(old_account_frozen_tokens_pre);
+    let new_account_frozen_tokens_pre = RWA::get_frozen_tokens(&e, &new_account);
+    clog!(new_account_frozen_tokens_pre);
+    cvlr_assume!(old_account_frozen_tokens_pre >= 0);
+    let output = RWA::recover_balance(&e, &old_account, &new_account);
+    clog!(output);
+    let new_account_frozen_tokens_post = RWA::get_frozen_tokens(&e, &new_account);
+    clog!(new_account_frozen_tokens_post);
+    let old_account_frozen_tokens_post = RWA::get_frozen_tokens(&e, &old_account);
+    clog!(old_account_frozen_tokens_post);
+    if output {
+        cvlr_assert!(new_account_frozen_tokens_post == old_account_frozen_tokens_pre);
+    } else {
+        cvlr_assert!(new_account_frozen_tokens_post == new_account_frozen_tokens_pre);
+        cvlr_assert!(old_account_frozen_tokens_post == old_account_frozen_tokens_pre);
+    }
+}
+
+#[rule]
+// after recover_balance the new account has the frozen status of the old account
+// status:
+pub fn rwa_recover_balance_integrity_5(e: Env) {
+    let old_account = nondet_address();
+    clog!(cvlr_soroban::Addr(&old_account));
+    let new_account = nondet_address();
+    clog!(cvlr_soroban::Addr(&new_account));
+    let old_account_frozen_status_pre = RWA::is_frozen(&e, &old_account);
+    clog!(old_account_frozen_status_pre);
+    let new_account_frozen_status_pre = RWA::is_frozen(&e, &new_account);
+    clog!(new_account_frozen_status_pre);
+    let output = RWA::recover_balance(&e, &old_account, &new_account);
+    clog!(output);
+    let new_account_frozen_status_post = RWA::is_frozen(&e, &new_account);
+    clog!(new_account_frozen_status_post);
+    let old_account_frozen_status_post = RWA::is_frozen(&e, &old_account);
+    clog!(old_account_frozen_status_post);
+    if output {
+        if old_account_frozen_status_pre {
+            cvlr_assert!(new_account_frozen_status_post);
+        } else {
+            cvlr_assert!(new_account_frozen_status_post == new_account_frozen_status_pre);
+        }
+    } else {
+        cvlr_assert!(new_account_frozen_status_post == new_account_frozen_status_pre);
+        cvlr_assert!(old_account_frozen_status_post == old_account_frozen_status_pre);
+    }
+}
