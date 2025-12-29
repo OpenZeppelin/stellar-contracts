@@ -142,10 +142,9 @@ impl Wad {
         if den == 0 {
             panic_with_error!(e, SorobanFixedPointError::DivisionByZero)
         }
-        let scaled = num
-            .checked_mul(WAD_SCALE)
-            .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow));
-        Wad(scaled / den)
+        num.checked_fixed_mul_floor(e, &WAD_SCALE, &den)
+            .map(Wad)
+            .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
     }
 
     /// Creates a Wad from a token amount with specified decimals.
@@ -336,11 +335,11 @@ impl Wad {
     /// zero.
     ///
     /// Result is truncated toward zero.
-    pub fn checked_div(self, rhs: Wad) -> Option<Wad> {
+    pub fn checked_div(self, e: &Env, rhs: Wad) -> Option<Wad> {
         if rhs.0 == 0 {
             return None;
         }
-        self.0.checked_mul(WAD_SCALE).map(|scaled| Wad(scaled / rhs.0))
+        self.0.checked_fixed_mul_floor(e, &WAD_SCALE, &rhs.0).map(Wad)
     }
 
     /// Checked multiplication by integer. Returns `None` on overflow.
