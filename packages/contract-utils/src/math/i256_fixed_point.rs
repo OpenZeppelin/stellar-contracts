@@ -30,7 +30,7 @@ use crate::math::{Rounding, SorobanFixedPointError, SorobanMulDiv};
 /// # Notes
 ///
 /// Automatically handles phantom overflow by scaling to `I256` when necessary.
-pub fn muldiv_i256(e: &Env, x: I256, y: I256, denominator: I256, rounding: Rounding) -> I256 {
+pub fn mul_div_i256(e: &Env, x: I256, y: I256, denominator: I256, rounding: Rounding) -> I256 {
     match rounding {
         Rounding::Floor => x.mul_div_floor(e, &y, &denominator),
         Rounding::Ceil => x.mul_div_ceil(e, &y, &denominator),
@@ -54,7 +54,7 @@ pub fn muldiv_i256(e: &Env, x: I256, y: I256, denominator: I256, rounding: Round
 /// # Notes
 ///
 /// Automatically handles phantom overflow by scaling to `I256` when necessary.
-pub fn checked_muldiv_i256(
+pub fn checked_mul_div_i256(
     e: &Env,
     x: I256,
     y: I256,

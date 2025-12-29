@@ -5,7 +5,7 @@ extern crate std;
 use soroban_sdk::Env;
 
 use crate::math::{
-    i128_fixed_point::{checked_muldiv_i128, muldiv_i128},
+    i128_fixed_point::{checked_mul_div_i128, mul_div_i128},
     Rounding, SorobanMulDiv,
 };
 
@@ -66,6 +66,42 @@ fn test_mul_div_ceil_result_overflow() {
     let denominator: i128 = 1;
 
     x.mul_div_ceil(&env, &y, &denominator);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1501)")]
+fn test_mul_div_zero_denominator() {
+    let env = Env::default();
+    let x: i128 = 100;
+    let y: i128 = 50;
+    let denominator: i128 = 0;
+
+    x.mul_div(&env, &y, &denominator);
+}
+
+#[test]
+fn test_mul_div_phantom_overflow_scales() {
+    let env = Env::default();
+    // Values that overflow i128 when multiplied but fit after division
+    let x: i128 = 170_141_183_460_469_231_731;
+    let y: i128 = 10i128.pow(27);
+    let denominator: i128 = 10i128.pow(27);
+
+    let result = x.mul_div(&env, &y, &denominator);
+
+    assert_eq!(result, 170_141_183_460_469_231_731);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1500)")]
+fn test_mul_div_result_overflow() {
+    let env = Env::default();
+    // This will overflow i128 even after scaling to I256
+    let x: i128 = i128::MAX;
+    let y: i128 = i128::MAX;
+    let denominator: i128 = 1;
+
+    x.mul_div(&env, &y, &denominator);
 }
 
 #[test]
@@ -420,7 +456,7 @@ fn test_muldiv_floor_rounds_down() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = muldiv_i128(&env, x, y, denominator, Rounding::Floor);
+    let result = mul_div_i128(&env, x, y, denominator, Rounding::Floor);
 
     assert_eq!(result, 483_5313675);
 }
@@ -432,7 +468,7 @@ fn test_muldiv_ceil_rounds_up() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = muldiv_i128(&env, x, y, denominator, Rounding::Ceil);
+    let result = mul_div_i128(&env, x, y, denominator, Rounding::Ceil);
 
     assert_eq!(result, 483_5313676);
 }
@@ -444,7 +480,7 @@ fn test_muldiv_truncate() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = muldiv_i128(&env, x, y, denominator, Rounding::Truncate);
+    let result = mul_div_i128(&env, x, y, denominator, Rounding::Truncate);
 
     assert_eq!(result, 483_5313675);
 }
@@ -458,7 +494,7 @@ fn test_checked_muldiv_floor_success() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = checked_muldiv_i128(&env, x, y, denominator, Rounding::Floor);
+    let result = checked_mul_div_i128(&env, x, y, denominator, Rounding::Floor);
 
     assert_eq!(result, Some(483_5313675));
 }
@@ -470,7 +506,7 @@ fn test_checked_muldiv_ceil_success() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = checked_muldiv_i128(&env, x, y, denominator, Rounding::Ceil);
+    let result = checked_mul_div_i128(&env, x, y, denominator, Rounding::Ceil);
 
     assert_eq!(result, Some(483_5313676));
 }
@@ -482,7 +518,7 @@ fn test_checked_muldiv_truncate_success() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = checked_muldiv_i128(&env, x, y, denominator, Rounding::Truncate);
+    let result = checked_mul_div_i128(&env, x, y, denominator, Rounding::Truncate);
 
     assert_eq!(result, Some(483_5313675));
 }

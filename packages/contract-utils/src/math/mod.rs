@@ -43,8 +43,8 @@
 mod i128_fixed_point;
 mod i256_fixed_point;
 pub mod wad;
-pub use i128_fixed_point::{checked_muldiv_i128, muldiv_i128};
-pub use i256_fixed_point::{checked_muldiv_i256, muldiv_i256};
+pub use i128_fixed_point::{checked_mul_div_i128, mul_div_i128};
+pub use i256_fixed_point::{checked_mul_div_i256, mul_div_i256};
 
 #[cfg(test)]
 mod test;
