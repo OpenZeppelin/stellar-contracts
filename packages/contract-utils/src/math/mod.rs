@@ -72,7 +72,7 @@ pub trait SorobanMulDiv: Sized {
     ///   zero.
     /// * [`SorobanFixedPointError::Overflow`] - When a phantom overflow occurs
     ///   or the result does not fit in `Self`.
-    fn mul_div_floor(&self, env: &Env, y: &Self, denominator: &Self) -> Self;
+    fn mul_div_floor(&self, e: &Env, y: &Self, denominator: &Self) -> Self;
 
     /// Calculates ceil(x * y / denominator).
     ///
@@ -88,7 +88,7 @@ pub trait SorobanMulDiv: Sized {
     ///   zero.
     /// * [`SorobanFixedPointError::Overflow`] - When a phantom overflow occurs
     ///   or the result does not fit in `Self`.
-    fn mul_div_ceil(&self, env: &Env, y: &Self, denominator: &Self) -> Self;
+    fn mul_div_ceil(&self, e: &Env, y: &Self, denominator: &Self) -> Self;
 
     /// Calculates (x * y / denominator).
     ///
@@ -104,7 +104,7 @@ pub trait SorobanMulDiv: Sized {
     ///   zero.
     /// * [`SorobanFixedPointError::Overflow`] - When a phantom overflow occurs
     ///   or the result does not fit in `Self`.
-    fn mul_div(&self, env: &Env, y: &Self, denominator: &Self) -> Self;
+    fn mul_div(&self, e: &Env, y: &Self, denominator: &Self) -> Self;
 
     /// Checked version of floor(x * y / denominator).
     ///
@@ -115,7 +115,7 @@ pub trait SorobanMulDiv: Sized {
     /// * `env` - Access to the Soroban environment.
     /// * `y` - The multiplicand.
     /// * `denominator` - The divisor.
-    fn checked_mul_div_floor(&self, env: &Env, y: &Self, denominator: &Self) -> Option<Self>;
+    fn checked_mul_div_floor(&self, e: &Env, y: &Self, denominator: &Self) -> Option<Self>;
 
     /// Checked version of ceil(x * y / denominator).
     ///
@@ -126,7 +126,7 @@ pub trait SorobanMulDiv: Sized {
     /// * `env` - Access to the Soroban environment.
     /// * `y` - The multiplicand.
     /// * `denominator` - The divisor.
-    fn checked_mul_div_ceil(&self, env: &Env, y: &Self, denominator: &Self) -> Option<Self>;
+    fn checked_mul_div_ceil(&self, e: &Env, y: &Self, denominator: &Self) -> Option<Self>;
 
     /// Checked version of (x * y / denominator).
     ///
@@ -137,7 +137,7 @@ pub trait SorobanMulDiv: Sized {
     /// * `env` - Access to the Soroban environment.
     /// * `y` - The multiplicand.
     /// * `denominator` - The divisor.
-    fn checked_mul_div(&self, env: &Env, y: &Self, denominator: &Self) -> Option<Self>;
+    fn checked_mul_div(&self, e: &Env, y: &Self, denominator: &Self) -> Option<Self>;
 }
 
 // ################## ERRORS ##################

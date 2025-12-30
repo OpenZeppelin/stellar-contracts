@@ -76,28 +76,28 @@ impl SorobanMulDiv for i128 {
     ///
     /// # Errors
     ///
-    /// Returns [`SorobanFixedPointError::DivisionByZero`] if denominator is
-    /// zero. Returns [`SorobanFixedPointError::Overflow`] if the result
-    /// overflows.
-    fn mul_div_floor(&self, env: &Env, y: &i128, denominator: &i128) -> i128 {
+    /// * [`SorobanFixedPointError::DivisionByZero`] - when `denominator` is
+    ///   zero.
+    /// * [`SorobanFixedPointError::Overflow`] - when the result overflows.
+    fn mul_div_floor(&self, e: &Env, y: &i128, denominator: &i128) -> i128 {
         if *denominator == 0 {
-            panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
+            panic_with_error!(e, SorobanFixedPointError::DivisionByZero);
         }
         match self.checked_mul(*y) {
             // *z == 0 check is already done above, so the only possible error is overflow,
             // where r = i128::MIN and z = -1
             Some(r) => div_floor(r, *denominator)
-                .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::Overflow)),
+                .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow)),
             None => {
                 // scale to i256 and retry
-                let x_i256 = &I256::from_i128(env, *self);
-                let y_i256 = &I256::from_i128(env, *y);
-                let z_i256 = &I256::from_i128(env, *denominator);
+                let x_i256 = &I256::from_i128(e, *self);
+                let y_i256 = &I256::from_i128(e, *y);
+                let z_i256 = &I256::from_i128(e, *denominator);
 
-                let res = x_i256.mul_div_floor(env, y_i256, z_i256);
+                let res = x_i256.mul_div_floor(e, y_i256, z_i256);
 
                 res.to_i128()
-                    .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::Overflow))
+                    .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
             }
         }
     }
@@ -113,28 +113,28 @@ impl SorobanMulDiv for i128 {
     ///
     /// # Errors
     ///
-    /// Returns [`SorobanFixedPointError::DivisionByZero`] if denominator is
-    /// zero. Returns [`SorobanFixedPointError::Overflow`] if the result
-    /// overflows.
-    fn mul_div_ceil(&self, env: &Env, y: &i128, denominator: &i128) -> i128 {
+    /// * [`SorobanFixedPointError::DivisionByZero`] - when `denominator` is
+    ///   zero.
+    /// * [`SorobanFixedPointError::Overflow`] - when the result overflows.
+    fn mul_div_ceil(&self, e: &Env, y: &i128, denominator: &i128) -> i128 {
         if *denominator == 0 {
-            panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
+            panic_with_error!(e, SorobanFixedPointError::DivisionByZero);
         }
         match self.checked_mul(*y) {
             // *z == 0 check is already done above, so the only possible error is overflow,
             // where r = i128::MIN and z = -1
             Some(r) => div_ceil(r, *denominator)
-                .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::Overflow)),
+                .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow)),
             None => {
                 // scale to i256 and retry
-                let x_i256 = &I256::from_i128(env, *self);
-                let y_i256 = &I256::from_i128(env, *y);
-                let z_i256 = &I256::from_i128(env, *denominator);
+                let x_i256 = &I256::from_i128(e, *self);
+                let y_i256 = &I256::from_i128(e, *y);
+                let z_i256 = &I256::from_i128(e, *denominator);
 
-                let res = x_i256.mul_div_ceil(env, y_i256, z_i256);
+                let res = x_i256.mul_div_ceil(e, y_i256, z_i256);
 
                 res.to_i128()
-                    .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::Overflow))
+                    .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
             }
         }
     }
@@ -150,25 +150,25 @@ impl SorobanMulDiv for i128 {
     ///
     /// # Errors
     ///
-    /// Returns [`SorobanFixedPointError::DivisionByZero`] if denominator is
-    /// zero. Returns [`SorobanFixedPointError::Overflow`] if the result
-    /// overflows.
-    fn mul_div(&self, env: &Env, y: &i128, denominator: &i128) -> i128 {
+    /// * [`SorobanFixedPointError::DivisionByZero`] - when `denominator` is
+    ///   zero.
+    /// * [`SorobanFixedPointError::Overflow`] - when the result overflows.
+    fn mul_div(&self, e: &Env, y: &i128, denominator: &i128) -> i128 {
         if *denominator == 0 {
-            panic_with_error!(env, SorobanFixedPointError::DivisionByZero);
+            panic_with_error!(e, SorobanFixedPointError::DivisionByZero);
         }
         match self.checked_mul(*y) {
             Some(r) => r / *denominator,
             None => {
                 // scale to i256 and retry
-                let x_i256 = &I256::from_i128(env, *self);
-                let y_i256 = &I256::from_i128(env, *y);
-                let z_i256 = &I256::from_i128(env, *denominator);
+                let x_i256 = &I256::from_i128(e, *self);
+                let y_i256 = &I256::from_i128(e, *y);
+                let z_i256 = &I256::from_i128(e, *denominator);
 
-                let res = x_i256.mul_div(env, y_i256, z_i256);
+                let res = x_i256.mul_div(e, y_i256, z_i256);
 
                 res.to_i128()
-                    .unwrap_or_else(|| panic_with_error!(env, SorobanFixedPointError::Overflow))
+                    .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
             }
         }
     }
@@ -182,16 +182,16 @@ impl SorobanMulDiv for i128 {
     /// * `env` - Access to the Soroban environment.
     /// * `y` - The multiplicand.
     /// * `denominator` - The divisor.
-    fn checked_mul_div_floor(&self, env: &Env, y: &i128, denominator: &i128) -> Option<i128> {
+    fn checked_mul_div_floor(&self, e: &Env, y: &i128, denominator: &i128) -> Option<i128> {
         match self.checked_mul(*y) {
             Some(r) => div_floor(r, *denominator),
             None => {
                 // scale to i256 and retry
-                let x_i256 = &I256::from_i128(env, *self);
-                let y_i256 = &I256::from_i128(env, *y);
-                let z_i256 = &I256::from_i128(env, *denominator);
+                let x_i256 = &I256::from_i128(e, *self);
+                let y_i256 = &I256::from_i128(e, *y);
+                let z_i256 = &I256::from_i128(e, *denominator);
 
-                let res = x_i256.checked_mul_div_floor(env, y_i256, z_i256);
+                let res = x_i256.checked_mul_div_floor(e, y_i256, z_i256);
 
                 res.map(|r| r.to_i128())?
             }
@@ -207,16 +207,16 @@ impl SorobanMulDiv for i128 {
     /// * `env` - Access to the Soroban environment.
     /// * `y` - The multiplicand.
     /// * `denominator` - The divisor.
-    fn checked_mul_div_ceil(&self, env: &Env, y: &i128, denominator: &i128) -> Option<i128> {
+    fn checked_mul_div_ceil(&self, e: &Env, y: &i128, denominator: &i128) -> Option<i128> {
         match self.checked_mul(*y) {
             Some(r) => div_ceil(r, *denominator),
             None => {
                 // scale to i256 and retry
-                let x_i256 = &I256::from_i128(env, *self);
-                let y_i256 = &I256::from_i128(env, *y);
-                let z_i256 = &I256::from_i128(env, *denominator);
+                let x_i256 = &I256::from_i128(e, *self);
+                let y_i256 = &I256::from_i128(e, *y);
+                let z_i256 = &I256::from_i128(e, *denominator);
 
-                let res = x_i256.checked_mul_div_ceil(env, y_i256, z_i256);
+                let res = x_i256.checked_mul_div_ceil(e, y_i256, z_i256);
 
                 res.map(|r| r.to_i128())?
             }
@@ -232,16 +232,16 @@ impl SorobanMulDiv for i128 {
     /// * `env` - Access to the Soroban environment.
     /// * `y` - The multiplicand.
     /// * `denominator` - The divisor.
-    fn checked_mul_div(&self, env: &Env, y: &i128, denominator: &i128) -> Option<i128> {
+    fn checked_mul_div(&self, e: &Env, y: &i128, denominator: &i128) -> Option<i128> {
         match self.checked_mul(*y) {
             Some(r) => r.checked_div(*denominator),
             None => {
                 // scale to i256 and retry
-                let x_i256 = &I256::from_i128(env, *self);
-                let y_i256 = &I256::from_i128(env, *y);
-                let z_i256 = &I256::from_i128(env, *denominator);
+                let x_i256 = &I256::from_i128(e, *self);
+                let y_i256 = &I256::from_i128(e, *y);
+                let z_i256 = &I256::from_i128(e, *denominator);
 
-                let res = x_i256.checked_mul_div(env, y_i256, z_i256);
+                let res = x_i256.checked_mul_div(e, y_i256, z_i256);
 
                 res.map(|r| r.to_i128())?
             }

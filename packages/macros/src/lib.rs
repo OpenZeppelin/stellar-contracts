@@ -229,7 +229,7 @@ pub fn only_owner(attrs: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// ```ignore
 /// #[when_not_paused]
-/// pub fn my_function(env: &Env) {
+/// pub fn my_function(e: &Env) {
 ///     // This code will only execute if the contract is not paused
 /// }
 /// ```
@@ -258,7 +258,7 @@ pub fn when_not_paused(attrs: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```ignore
 /// #[when_paused]
-/// pub fn my_function(env: &Env) {
+/// pub fn my_function(e: &Env) {
 ///     // This code will only execute if the contract is paused
 /// }
 /// ```
