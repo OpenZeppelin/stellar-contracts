@@ -1,5 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
-use stellar_contract_utils::math::{muldiv, Rounding};
+use stellar_contract_utils::math::{mul_div_i128, Rounding};
 
 use crate::{
     fungible::{Base, ContractOverrides},
@@ -645,7 +645,7 @@ impl Vault {
             .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
         // (assets × (totalSupply + 10^offset)) / (totalAssets + 1)
-        muldiv(e, x, y, denominator, rounding)
+        mul_div_i128(e, x, y, denominator, rounding)
     }
 
     /// Internal conversion function from shares to assets with support for
@@ -693,7 +693,7 @@ impl Vault {
             .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
         // (shares × (totalAssets + 1)) / (totalSupply + 10^offset)
-        muldiv(e, x, y, denominator, rounding)
+        mul_div_i128(e, x, y, denominator, rounding)
     }
 
     /// Internal deposit/mint workflow without authorization checks.
