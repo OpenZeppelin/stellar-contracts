@@ -611,7 +611,22 @@ impl RWA {
     /// Please refer to [`Base::update`] for the inline documentation.
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         from.require_auth();
+        Self::transfer_no_auth(e, from, to, amount);
+    }
 
+    /// This is a wrapper around [`Base::update()`] to enable
+    /// the compatibility across [`crate::fungible::FungibleToken`]
+    /// with [`crate::rwa::RWAToken`]
+    ///
+    /// Please refer to [`Base::update`] and [`Self::transfer`] for the inline
+    /// documentation.
+    pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        spender.require_auth();
+        Base::spend_allowance(e, from, spender, amount);
+        Self::transfer_no_auth(e, from, to, amount);
+    }
+
+    pub fn transfer_no_auth(e: &Env, from: &Address, to: &Address, amount: i128) {
         // Check if contract is paused
         if paused(e) {
             panic_with_error!(e, PausableError::EnforcedPause);
@@ -651,16 +666,5 @@ impl RWA {
         compliance_client.transferred(from, to, &amount, &e.current_contract_address());
 
         emit_transfer(e, from, to, None, amount);
-    }
-
-    /// This is a wrapper around [`Base::update()`] to enable
-    /// the compatibility across [`crate::fungible::FungibleToken`]
-    /// with [`crate::rwa::RWAToken`]
-    ///
-    /// Please refer to [`Base::update`] and [`Self::transfer`] for the inline
-    /// documentation.
-    pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
-        Base::spend_allowance(e, from, spender, amount);
-        Self::transfer(e, from, to, amount);
     }
 }
