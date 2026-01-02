@@ -6,8 +6,7 @@
 //!
 //! # Core Features
 //!
-//! - **High-level helpers**: wrappers that combine target invocation
-//!   (forwarding) and fee collection in the desired order.
+//! - **Target invocation and fee collection** helper
 //! - **Fee Token Allowlist**: Optional allowlist for accepted fee tokens
 //! - **Token Sweeping**: Optional functions to collect accumulated fees
 //! - **Fee Validation**: Utilities for validating fee amounts
@@ -24,18 +23,6 @@
 //! integrated into a fee forwarding contract. The implementing contract is
 //! responsible for the authorization checks and who can manage fee tokens or
 //! sweep collected fees.
-//!
-//! Prefer one of the high-level wrappers for integrating fee abstraction
-//! (they are alternatives):
-//! - [`invoke_then_collect_fee`]: invoke target first (forward), then collect
-//!   fee (see `examples/fee-forwarder-permissionless` for authorization-tree
-//!   implications)
-//! - [`collect_fee_then_invoke`]: collect fee first, then invoke target
-//!   (forward) (see `examples/fee-forwarder-permissioned` for
-//!   authorization-tree implications)
-//!
-//! Lower-level helpers ([`auth_user_and_invoke`], [`collect_fee`]) are also
-//! exposed for custom composition.
 #![no_std]
 
 mod storage;
@@ -56,9 +43,9 @@ pub const FEE_ABSTRACTION_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const FEE_ABSTRACTION_TTL_THRESHOLD: u32 = FEE_ABSTRACTION_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 pub use crate::storage::{
-    auth_user_and_invoke, collect_fee, collect_fee_then_invoke, invoke_then_collect_fee,
-    is_allowed_fee_token, is_fee_token_allowlist_enabled, set_allowed_fee_token, sweep_token,
-    validate_fee_bounds, FeeAbstractionApproval, FeeAbstractionStorageKey,
+    collect_fee, collect_fee_and_invoke, is_allowed_fee_token, is_fee_token_allowlist_enabled,
+    set_allowed_fee_token, sweep_token, validate_expiration_ledger, validate_fee_bounds,
+    FeeAbstractionApproval, FeeAbstractionStorageKey,
 };
 
 // ################## ERRORS ##################
@@ -80,6 +67,8 @@ pub enum FeeAbstractionError {
     NoTokensToSweep = 5004,
     /// User address is current contract
     InvalidUser = 5005,
+    /// Expiration ledger is passed
+    InvalidExpirationLedger = 5006,
 }
 
 // ################## EVENTS ##################

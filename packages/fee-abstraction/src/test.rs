@@ -1,15 +1,15 @@
 use soroban_sdk::{
     contract, contractimpl,
-    testutils::{Address as _, Events},
+    testutils::{Address as _, Events, Ledger},
     token::TokenClient,
     vec, Address, Env, FromVal, MuxedAddress, String, Symbol, Val, Vec,
 };
 use stellar_tokens::fungible::{Base, FungibleToken};
 
 use crate::{
-    auth_user_and_invoke, collect_fee, is_allowed_fee_token, is_fee_token_allowlist_enabled,
-    set_allowed_fee_token, sweep_token, validate_fee_bounds, FeeAbstractionApproval,
-    FeeAbstractionStorageKey,
+    collect_fee, collect_fee_and_invoke, is_allowed_fee_token, is_fee_token_allowlist_enabled,
+    set_allowed_fee_token, sweep_token, validate_expiration_ledger, validate_fee_bounds,
+    FeeAbstractionApproval, FeeAbstractionStorageKey,
 };
 
 #[contract]
@@ -196,6 +196,39 @@ fn collect_fee_with_lazy_approval_lower_previous() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #5006)")]
+fn collect_fee_with_lazy_approval_expired_ledger_panics() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+
+    let max_fee_amount = 50;
+
+    let token_client = TokenClient::new(&e, &token_address);
+    // approve enough (100 > max_fee_amount) till ledger 200
+    token_client.approve(&user, &contract_address, &100, &200);
+
+    e.ledger().set_sequence_number(101);
+
+    e.as_contract(&contract_address, || {
+        collect_fee(
+            &e,
+            &token_address,
+            20,
+            max_fee_amount,
+            100, // expiration_ledger < 101
+            &user,
+            &recipient,
+            FeeAbstractionApproval::Lazy,
+        );
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #5005)")]
 fn collect_fee_panics_invalid_user() {
     let e = Env::default();
@@ -220,12 +253,13 @@ fn collect_fee_panics_invalid_user() {
 }
 
 #[test]
-fn auth_user_and_invoke_success() {
+fn collect_fee_and_invoke_success() {
     let e = Env::default();
     e.mock_all_auths();
 
-    let token = Address::generate(&e);
     let user = Address::generate(&e);
+    let token = e.register(MockToken, (user.clone(),));
+    let fee_recipient = Address::generate(&e);
 
     let contract_address = e.register(MockContract, ());
 
@@ -235,21 +269,24 @@ fn auth_user_and_invoke_success() {
     let target_args: Vec<Val> = vec![&e];
 
     let greeting = e.as_contract(&contract_address, || {
-        auth_user_and_invoke(
+        collect_fee_and_invoke(
             &e,
             &token,
+            20,
             50,
             current_ledger + 10,
             &target_contract,
             &target_fn,
             &target_args,
             &user,
+            &fee_recipient,
+            FeeAbstractionApproval::Lazy,
         )
     });
     assert_eq!(String::from_val(&e, &greeting), String::from_str(&e, "hello"));
 
     let events = e.events().all();
-    assert_eq!(events.len(), 1);
+    assert_eq!(events.len(), 4);
 }
 
 // ################## FEE TOKEN ALLOWLIST TESTS ##################
@@ -403,6 +440,14 @@ fn validate_fee_bounds_zero() {
 fn validate_fee_bounds_neg() {
     let e = Env::default();
     validate_fee_bounds(&e, 0, -1);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #5006)")]
+fn validate_expiration_ledger_past() {
+    let e = Env::default();
+    e.ledger().set_sequence_number(10);
+    validate_expiration_ledger(&e, 9);
 }
 
 // ################## TOKEN SWEEPING TESTS ##################

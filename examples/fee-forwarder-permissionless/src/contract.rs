@@ -29,8 +29,6 @@
 //!    **Note**:
 //!    - User does NOT sign the exact `fee_amount` or `relayer` address yet
 //!      (these are unknown at signing time)
-//!    - Pay attention to the composition of authorization entries (compare with
-//!      "examples/fee-forwarder-pemissioned")
 //!
 //! 3. **Relayer picks up transaction** (off-chain):
 //!    - Relayer calculates actual `fee_amount` based on current network
@@ -53,7 +51,7 @@
 //!    - If any step fails, entire transaction reverts (including token
 //!      transfer)
 use soroban_sdk::{contract, contractimpl, Address, Env, Symbol, Val, Vec};
-use stellar_fee_abstraction::{invoke_then_collect_fee, FeeAbstractionApproval};
+use stellar_fee_abstraction::{collect_fee_and_invoke, FeeAbstractionApproval};
 
 #[contract]
 pub struct FeeForwarder;
@@ -76,10 +74,7 @@ impl FeeForwarder {
     ) -> Val {
         relayer.require_auth();
 
-        // Depending on whether we first invoke target and than collect fee,
-        // composing authorization entries might differ. Compare "test.rs" from this
-        // crate with "examples/fee-forwarder-pemissioned".
-        invoke_then_collect_fee(
+        collect_fee_and_invoke(
             e,
             &fee_token,
             fee_amount,
@@ -90,7 +85,7 @@ impl FeeForwarder {
             &target_args,
             &user,
             &relayer, // relayer collects fee
-            FeeAbstractionApproval::Lazy,
+            FeeAbstractionApproval::Eager,
         )
     }
 }

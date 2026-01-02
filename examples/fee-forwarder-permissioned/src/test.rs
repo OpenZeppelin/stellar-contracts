@@ -72,26 +72,8 @@ fn forward_basic() {
     let initial_user_balance = token.balance(&user);
     let initial_contract_balance = token.balance(&fee_forwarder.address);
 
-    e.mock_auths(&[
-        // mock auth for user
-        MockAuth {
-            address: &user,
-            invoke: &MockAuthInvoke {
-                contract: &fee_forwarder.address,
-                fn_name: "forward",
-                args: (
-                    token.address.clone(),
-                    max_fee_amount,
-                    current_ledger,
-                    target.address.clone(),
-                    &fn_name,
-                    &fn_args,
-                )
-                    .into_val(&e),
-                sub_invokes: &[],
-            },
-        },
-        MockAuth {
+    token
+        .mock_auths(&[MockAuth {
             address: &user,
             invoke: &MockAuthInvoke {
                 contract: &token.address,
@@ -100,32 +82,52 @@ fn forward_basic() {
                     .into_val(&e),
                 sub_invokes: &[],
             },
-        },
-        MockAuth {
-            // mock auth for relayer
-            address: &relayer,
-            invoke: &MockAuthInvoke {
-                contract: &fee_forwarder.address,
-                fn_name: "forward",
-                args: (
-                    token.address.clone(),
-                    fee_amount,
-                    max_fee_amount,
-                    current_ledger,
-                    target.address.clone(),
-                    &fn_name,
-                    &fn_args,
-                    user.clone(),
-                    relayer.clone(),
-                )
-                    .into_val(&e),
-                sub_invokes: &[],
-            },
-        },
-    ]);
+        }])
+        .approve(&user, &fee_forwarder.address, &max_fee_amount, &current_ledger);
 
     // `greet` should return "hello"
     let res: String = fee_forwarder
+        .mock_auths(&[
+            // mock auth for user
+            MockAuth {
+                address: &user,
+                invoke: &MockAuthInvoke {
+                    contract: &fee_forwarder.address,
+                    fn_name: "forward",
+                    args: (
+                        token.address.clone(),
+                        max_fee_amount,
+                        current_ledger,
+                        target.address.clone(),
+                        &fn_name,
+                        &fn_args,
+                    )
+                        .into_val(&e),
+                    sub_invokes: &[],
+                },
+            },
+            MockAuth {
+                // mock auth for relayer
+                address: &relayer,
+                invoke: &MockAuthInvoke {
+                    contract: &fee_forwarder.address,
+                    fn_name: "forward",
+                    args: (
+                        token.address.clone(),
+                        fee_amount,
+                        max_fee_amount,
+                        current_ledger,
+                        target.address.clone(),
+                        &fn_name,
+                        &fn_args,
+                        user.clone(),
+                        relayer.clone(),
+                    )
+                        .into_val(&e),
+                    sub_invokes: &[],
+                },
+            },
+        ])
         .forward(
             &token.address,
             &fee_amount,
@@ -142,6 +144,7 @@ fn forward_basic() {
 
     assert_eq!(res, String::from_str(&e, "hello"));
 
+    assert_eq!(token.allowance(&user, &fee_forwarder.address), max_fee_amount - fee_amount);
     assert_eq!(token.balance(&user), initial_user_balance - fee_amount);
     assert_eq!(token.balance(&fee_forwarder.address), initial_contract_balance + fee_amount);
 }
@@ -158,31 +161,8 @@ fn forward_two_subinvokes() {
     let initial_user_balance = token.balance(&user);
     let initial_contract_balance = token.balance(&fee_forwarder.address);
 
-    e.mock_auths(&[
-        // mock auth for user
-        MockAuth {
-            address: &user,
-            invoke: &MockAuthInvoke {
-                contract: &fee_forwarder.address,
-                fn_name: "forward",
-                args: (
-                    token.address.clone(),
-                    max_fee_amount,
-                    current_ledger,
-                    target.address.clone(),
-                    &fn_name,
-                    &fn_args,
-                )
-                    .into_val(&e),
-                sub_invokes: &[MockAuthInvoke {
-                    contract: &target.address,
-                    fn_name: "require_auth_test",
-                    args: (user.clone(),).into_val(&e),
-                    sub_invokes: &[],
-                }],
-            },
-        },
-        MockAuth {
+    token
+        .mock_auths(&[MockAuth {
             address: &user,
             invoke: &MockAuthInvoke {
                 contract: &token.address,
@@ -191,32 +171,57 @@ fn forward_two_subinvokes() {
                     .into_val(&e),
                 sub_invokes: &[],
             },
-        },
-        MockAuth {
-            // mock auth for relayer
-            address: &relayer,
-            invoke: &MockAuthInvoke {
-                contract: &fee_forwarder.address,
-                fn_name: "forward",
-                args: (
-                    token.address.clone(),
-                    fee_amount,
-                    max_fee_amount,
-                    current_ledger,
-                    target.address.clone(),
-                    &fn_name,
-                    &fn_args,
-                    user.clone(),
-                    relayer.clone(),
-                )
-                    .into_val(&e),
-                sub_invokes: &[],
-            },
-        },
-    ]);
+        }])
+        .approve(&user, &fee_forwarder.address, &max_fee_amount, &current_ledger);
 
     // `require_auth_test` should return user address
     let res: Address = fee_forwarder
+        .mock_auths(&[
+            // mock auth for user
+            MockAuth {
+                address: &user,
+                invoke: &MockAuthInvoke {
+                    contract: &fee_forwarder.address,
+                    fn_name: "forward",
+                    args: (
+                        token.address.clone(),
+                        max_fee_amount,
+                        current_ledger,
+                        target.address.clone(),
+                        &fn_name,
+                        &fn_args,
+                    )
+                        .into_val(&e),
+                    sub_invokes: &[MockAuthInvoke {
+                        contract: &target.address,
+                        fn_name: "require_auth_test",
+                        args: (user.clone(),).into_val(&e),
+                        sub_invokes: &[],
+                    }],
+                },
+            },
+            MockAuth {
+                // mock auth for relayer
+                address: &relayer,
+                invoke: &MockAuthInvoke {
+                    contract: &fee_forwarder.address,
+                    fn_name: "forward",
+                    args: (
+                        token.address.clone(),
+                        fee_amount,
+                        max_fee_amount,
+                        current_ledger,
+                        target.address.clone(),
+                        &fn_name,
+                        &fn_args,
+                        user.clone(),
+                        relayer.clone(),
+                    )
+                        .into_val(&e),
+                    sub_invokes: &[],
+                },
+            },
+        ])
         .forward(
             &token.address,
             &fee_amount,
