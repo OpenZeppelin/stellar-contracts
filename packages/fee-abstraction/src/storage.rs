@@ -32,98 +32,11 @@ pub enum FeeAbstractionApproval {
 
 // ################## INVOKE TARGET (FORWARD) AND COLLECT FEE ##################
 
-/// Invoke the target contract first (forward) and then collect the fee. This
-/// function is a high-level wrapper and an alternative to
-/// [`collect_fee_then_invoke`].
+///  Collect the fee and invoke the target contract (forward).
 ///
-/// The order of target invocation and fee collection affects how the user
-/// authorization tree must be constructed. With this helper, user's
-/// authorization typically needs to include the token approval as a
-/// sub-invocation, alongside the target call if required (compare
-/// to [`collect_fee_then_invoke`]), as demonstrated in
-/// `examples/fee-forwarder-permissionless`.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `fee_token` - The token address to pay the fee with.
-/// * `fee_amount` - The actual fee amount to charge.
-/// * `max_fee_amount` - The maximum fee amount the user approved.
-/// * `expiration_ledger` - The ledger sequence at which the approval expires.
-/// * `target_contract` - The contract address to invoke.
-/// * `target_fn` - The function to invoke on the target contract.
-/// * `target_args` - The arguments to pass to the target contract function.
-/// * `user` - The address of the user authorizing the call and paying the fee.
-/// * `fee_recipient` - The address that receives the collected fee.
-/// * `approval` - The approval strategy to use (`Lazy` or `Eager`).
-///
-/// # Events
-///
-/// * topics - `["ForwardExecuted", user: Address, target_contract: Address]`
-/// * data - `[target_fn: Symbol, target_args: Vec<Val>]`
-///
-/// * topics - `["FeeCollected", user: Address, recipient: Address]`
-/// * data - `[token: Address, amount: i128]`
-///
-/// # Errors
-///
-/// * refer to [`collect_fee`] errors.
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function performs authorization checks **only** on the
-/// user's input. The contract using this function should perform further
-/// checks and authorization verifications. Additionally, the invoker **MUST**
-/// ensure the call to the target contract is safe for them. In the most cases,
-/// the latter is to be done off-chain by simulating the outcome of the
-/// transaction.
-#[allow(clippy::too_many_arguments)]
-pub fn invoke_then_collect_fee(
-    e: &Env,
-    fee_token: &Address,
-    fee_amount: i128,
-    max_fee_amount: i128,
-    expiration_ledger: u32,
-    target_contract: &Address,
-    target_fn: &Symbol,
-    target_args: &Vec<Val>,
-    user: &Address,
-    fee_recipient: &Address,
-    approval: FeeAbstractionApproval,
-) -> Val {
-    let res = auth_user_and_invoke(
-        e,
-        fee_token,
-        max_fee_amount,
-        expiration_ledger,
-        target_contract,
-        target_fn,
-        target_args,
-        user,
-    );
-
-    collect_fee(
-        e,
-        fee_token,
-        fee_amount,
-        max_fee_amount,
-        expiration_ledger,
-        user,
-        fee_recipient,
-        approval,
-    );
-
-    res
-}
-
-/// Collect the fee first and then invoke the target contract (forward). This
-/// function is a high-level wrapper and an alternative to
-/// [`invoke_then_collect_fee`].
-///
-/// The order of target invocation and fee collection affects how the user
-/// authorization tree must be constructed. With this helper, the user typically
-/// needs to provide a separate authorization for the token approval (compare to
-/// [`invoke_then_collect_fee`]), as demonstrated in
+/// User's authorization needs to include the token approval as a
+/// sub-invocation, alongside the target call if required, as demonstrated in
+/// `examples/fee-forwarder-permissionless` and
 /// `examples/fee-forwarder-permissioned`.
 ///
 /// # Arguments
@@ -142,11 +55,11 @@ pub fn invoke_then_collect_fee(
 ///
 /// # Events
 ///
-/// * topics - `["FeeCollected", user: Address, recipient: Address]`
-/// * data - `[token: Address, amount: i128]`
-///
 /// * topics - `["ForwardExecuted", user: Address, target_contract: Address]`
 /// * data - `[target_fn: Symbol, target_args: Vec<Val>]`
+///
+/// * topics - `["FeeCollected", user: Address, recipient: Address]`
+/// * data - `[token: Address, amount: i128]`
 ///
 /// # Errors
 ///
@@ -161,7 +74,7 @@ pub fn invoke_then_collect_fee(
 /// the latter is to be done off-chain by simulating the outcome of the
 /// transaction.
 #[allow(clippy::too_many_arguments)]
-pub fn collect_fee_then_invoke(
+pub fn collect_fee_and_invoke(
     e: &Env,
     fee_token: &Address,
     fee_amount: i128,
@@ -174,73 +87,6 @@ pub fn collect_fee_then_invoke(
     fee_recipient: &Address,
     approval: FeeAbstractionApproval,
 ) -> Val {
-    collect_fee(
-        e,
-        fee_token,
-        fee_amount,
-        max_fee_amount,
-        expiration_ledger,
-        user,
-        fee_recipient,
-        approval,
-    );
-
-    auth_user_and_invoke(
-        e,
-        fee_token,
-        max_fee_amount,
-        expiration_ledger,
-        target_contract,
-        target_fn,
-        target_args,
-        user,
-    )
-}
-
-/// Low-level helper to authorize user-side parameters and invoke a target
-/// contract function.
-///
-/// This function does not collect fees. Use [`collect_fee`] with the desired
-/// [`FeeAbstractionApproval`] strategy for that. Prefer the high-level wrappers
-/// [`invoke_then_collect_fee`] and [`collect_fee_then_invoke`] unless you need
-/// custom composition.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `fee_token` - The token address to pay the fee with.
-/// * `max_fee_amount` - The maximum fee amount the user approved.
-/// * `expiration_ledger` - The ledger sequence at which the approval expires.
-/// * `target_contract` - The contract address to invoke after collecting the
-///   fee.
-/// * `target_fn` - The function to invoke on the target contract.
-/// * `target_args` - The arguments to pass to the target contract function.
-/// * `user` - The address of the user paying the fee and authorizing the call.
-///
-/// # Events
-///
-/// * topics - `["ForwardExecuted", user: Address, target_contract: Address]`
-/// * data - `[target_fn: Symbol, target_args: Vec<Val>]`
-///
-/// # Security Warning
-///
-/// **IMPORTANT**: This function performs authorization checks **only** on the
-/// user's input. The contract using this function should perform further
-/// checks and authorization verifications. Additionally, the invoker **MUST**
-/// ensure the call to the target contract is safe for them. In the most cases,
-/// the latter is to be done off-chain by simulating the outcome of the
-/// transaction.
-#[allow(clippy::too_many_arguments)]
-pub fn auth_user_and_invoke(
-    e: &Env,
-    fee_token: &Address,
-    max_fee_amount: i128,
-    expiration_ledger: u32,
-    target_contract: &Address,
-    target_fn: &Symbol,
-    target_args: &Vec<Val>,
-    user: &Address,
-) -> Val {
     let user_args_for_auth = (
         fee_token.clone(),
         max_fee_amount,
@@ -252,6 +98,17 @@ pub fn auth_user_and_invoke(
         .into_val(e);
     user.require_auth_for_args(user_args_for_auth);
 
+    collect_fee(
+        e,
+        fee_token,
+        fee_amount,
+        max_fee_amount,
+        expiration_ledger,
+        user,
+        fee_recipient,
+        approval,
+    );
+
     let res = e.invoke_contract::<Val>(target_contract, target_fn, target_args.clone());
 
     emit_forward_executed(e, user, target_contract, target_fn, target_args);
@@ -259,16 +116,12 @@ pub fn auth_user_and_invoke(
     res
 }
 
-/// Low-level helper to collect a fee from the user in a given token.
+/// Low-level helper to collect a fee from the user in a given token by checking
+/// whether the token is allowed when allow list is enabled.
 ///
 /// It can be used with either eager or lazy approval semantics. `Eager` always
 /// approves `max_fee_amount` (overwriting any existing allowance); `Lazy` only
 /// approves if the current allowance is less than `max_fee_amount`.
-///
-/// This function is meant to be composed with [`auth_user_and_invoke`]. The
-/// order of composition affects the required user authorization tree. Prefer
-/// the high-level wrappers [`invoke_then_collect_fee`] and
-/// [`collect_fee_then_invoke`] unless you need custom composition.
 ///
 /// # Arguments
 ///
@@ -296,6 +149,10 @@ pub fn auth_user_and_invoke(
 ///
 /// **IMPORTANT**: This function does not perform authorization checks.
 /// The caller must ensure proper authorization before calling this function.
+/// Additionally, this function does NOT relate to a specific target invocation
+/// and should NOT be used in isolation, e.g. making the target contract
+/// invocation and the fee collection in different transactions. It is strongly
+/// recommended that the fee collection and the target invocation be atomic.
 #[allow(clippy::too_many_arguments)]
 pub fn collect_fee(
     e: &Env,

@@ -21,14 +21,13 @@
 //!        make
 //!      - If `target_contract.target_fn(target_args)` requires additional
 //!        authorization, user includes a subinvocation for it.
-//!    - User authorizes `fee_token.approve(fee_forwarder, max_fee_amount,
-//!      expiration_ledger)`
+//!      - If an approval is needed, user authorizes
+//!        `fee_token.approve(fee_forwarder, max_fee_amount,
+//!      expiration_ledger)` as a subinvocation.
 //!
 //!    **Note**:
 //!    - User does NOT sign the exact `fee_amount` or `relayer` address yet
 //!      (these are unknown at signing time)
-//!    - Pay attention to the composition of authorization entries (compare with
-//!      "examples/fee-forwarder-pemissionless")
 //!
 //! 3. **Relayer picks up transaction** (off-chain):
 //!    - Relayer calculates actual `fee_amount` based on current network
@@ -53,7 +52,7 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Val, Vec};
 use stellar_access::access_control::{grant_role_no_auth, set_admin, AccessControl};
 use stellar_fee_abstraction::{
-    collect_fee_then_invoke, set_allowed_fee_token, sweep_token, FeeAbstractionApproval,
+    collect_fee_and_invoke, set_allowed_fee_token, sweep_token, FeeAbstractionApproval,
 };
 use stellar_macros::only_role;
 
@@ -90,10 +89,7 @@ impl FeeForwarder {
         user: Address,
         relayer: Address,
     ) -> Val {
-        // Depending on whether we first collect fee and than invoke target,
-        // composing authorization entries might differ. Compare "test.rs" from this
-        // crate with "examples/fee-forwarder-pemissionless".
-        collect_fee_then_invoke(
+        collect_fee_and_invoke(
             e,
             &fee_token,
             fee_amount,
@@ -104,7 +100,7 @@ impl FeeForwarder {
             &target_args,
             &user,
             &e.current_contract_address(), // current contract collects fee
-            FeeAbstractionApproval::Eager,
+            FeeAbstractionApproval::Lazy,
         )
     }
 

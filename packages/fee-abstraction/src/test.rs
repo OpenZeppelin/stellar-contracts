@@ -7,7 +7,7 @@ use soroban_sdk::{
 use stellar_tokens::fungible::{Base, FungibleToken};
 
 use crate::{
-    auth_user_and_invoke, collect_fee, is_allowed_fee_token, is_fee_token_allowlist_enabled,
+    collect_fee, collect_fee_and_invoke, is_allowed_fee_token, is_fee_token_allowlist_enabled,
     set_allowed_fee_token, sweep_token, validate_fee_bounds, FeeAbstractionApproval,
     FeeAbstractionStorageKey,
 };
@@ -220,12 +220,13 @@ fn collect_fee_panics_invalid_user() {
 }
 
 #[test]
-fn auth_user_and_invoke_success() {
+fn collect_fee_and_invoke_success() {
     let e = Env::default();
     e.mock_all_auths();
 
-    let token = Address::generate(&e);
     let user = Address::generate(&e);
+    let token = e.register(MockToken, (user.clone(),));
+    let fee_recipient = Address::generate(&e);
 
     let contract_address = e.register(MockContract, ());
 
@@ -235,21 +236,24 @@ fn auth_user_and_invoke_success() {
     let target_args: Vec<Val> = vec![&e];
 
     let greeting = e.as_contract(&contract_address, || {
-        auth_user_and_invoke(
+        collect_fee_and_invoke(
             &e,
             &token,
+            20,
             50,
             current_ledger + 10,
             &target_contract,
             &target_fn,
             &target_args,
             &user,
+            &fee_recipient,
+            FeeAbstractionApproval::Lazy,
         )
     });
     assert_eq!(String::from_val(&e, &greeting), String::from_str(&e, "hello"));
 
     let events = e.events().all();
-    assert_eq!(events.len(), 1);
+    assert_eq!(events.len(), 4);
 }
 
 // ################## FEE TOKEN ALLOWLIST TESTS ##################
