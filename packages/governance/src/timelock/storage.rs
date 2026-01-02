@@ -116,11 +116,15 @@ pub enum OperationResult {
 ///
 /// # Returns
 ///
-/// An `OperationResult` containing the converted value.
+/// An `OperationResult` containing the converted value. If the value cannot
+/// be converted to any supported type, returns `OperationResult::Void`.
 ///
-/// # Panics
+/// # Note
 ///
-/// Panics if the `Val` cannot be converted to any of the supported types.
+/// The function attempts type conversions in a specific order. For 32-byte
+/// values, it cannot distinguish between U256 and I256 without additional
+/// context, so all 32-byte values are treated as U256. Contract developers
+/// should use more specific return types when possible.
 fn val_to_operation_result(e: &Env, val: Val) -> OperationResult {
     use soroban_sdk::TryFromVal;
 
@@ -157,10 +161,11 @@ fn val_to_operation_result(e: &Env, val: Val) -> OperationResult {
     }
     if let Ok(v) = Bytes::try_from_val(e, &val) {
         // Check if it's a 32-byte value (could be U256 or I256)
+        // Note: We cannot distinguish U256 from I256 without additional context
+        // from the contract. Both are represented as 32-byte values in Soroban.
+        // We default to treating them as U256.
         if v.len() == 32 {
             if let Ok(bytes_n) = BytesN::<32>::try_from_val(e, &val) {
-                // For now, treat 32-byte values as U256
-                // In practice, distinguishing U256 from I256 requires additional context
                 return OperationResult::U256(bytes_n);
             }
         }
