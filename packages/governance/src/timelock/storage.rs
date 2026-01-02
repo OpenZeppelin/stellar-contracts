@@ -1,5 +1,6 @@
 use soroban_sdk::{
-    contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, Symbol, Val, Vec,
+    contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, Map, String, Symbol,
+    Val, Vec,
 };
 
 use crate::timelock::{
@@ -56,6 +57,124 @@ pub enum TimelockStorageKey {
     /// [`OperationState::Ready`] state (Note: value is 0 for
     /// [`OperationState::Unset`], 1 for [`OperationState:Done`]).
     Timestamp(BytesN<32>),
+}
+
+/// Represents a return value from an executed operation.
+///
+/// This enum wraps all possible Soroban value types that can be returned
+/// from contract function invocations. It provides a concrete type that
+/// can be properly serialized and displayed by CLI tools.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum OperationResult {
+    /// Boolean value
+    Bool(bool),
+    /// Void/unit type (no return value)
+    Void,
+    /// 32-bit unsigned integer
+    U32(u32),
+    /// 32-bit signed integer
+    I32(i32),
+    /// 64-bit unsigned integer
+    U64(u64),
+    /// 64-bit signed integer
+    I64(i64),
+    /// 128-bit unsigned integer
+    U128(u128),
+    /// 128-bit signed integer
+    I128(i128),
+    /// 256-bit unsigned integer (as bytes)
+    U256(BytesN<32>),
+    /// 256-bit signed integer (as bytes)
+    I256(BytesN<32>),
+    /// Arbitrary bytes
+    Bytes(Bytes),
+    /// String value
+    String(String),
+    /// Symbol value
+    Symbol(Symbol),
+    /// Vector of values
+    Vec(Vec<Val>),
+    /// Map of key-value pairs
+    Map(Map<Val, Val>),
+    /// Contract or account address
+    Address(Address),
+}
+
+// ################## QUERY STATE ##################
+
+/// Converts a `Val` to an `OperationResult`.
+///
+/// This function attempts to convert a raw `Val` into a concrete
+/// `OperationResult` type by checking its underlying type and performing
+/// the appropriate conversion.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `val` - The raw value to convert.
+///
+/// # Returns
+///
+/// An `OperationResult` containing the converted value.
+///
+/// # Panics
+///
+/// Panics if the `Val` cannot be converted to any of the supported types.
+fn val_to_operation_result(e: &Env, val: Val) -> OperationResult {
+    use soroban_sdk::TryFromVal;
+
+    // Try each type in order of likelihood/simplicity
+    if let Ok(v) = bool::try_from_val(e, &val) {
+        return OperationResult::Bool(v);
+    }
+    if let Ok(v) = u32::try_from_val(e, &val) {
+        return OperationResult::U32(v);
+    }
+    if let Ok(v) = i32::try_from_val(e, &val) {
+        return OperationResult::I32(v);
+    }
+    if let Ok(v) = u64::try_from_val(e, &val) {
+        return OperationResult::U64(v);
+    }
+    if let Ok(v) = i64::try_from_val(e, &val) {
+        return OperationResult::I64(v);
+    }
+    if let Ok(v) = u128::try_from_val(e, &val) {
+        return OperationResult::U128(v);
+    }
+    if let Ok(v) = i128::try_from_val(e, &val) {
+        return OperationResult::I128(v);
+    }
+    if let Ok(v) = Address::try_from_val(e, &val) {
+        return OperationResult::Address(v);
+    }
+    if let Ok(v) = Symbol::try_from_val(e, &val) {
+        return OperationResult::Symbol(v);
+    }
+    if let Ok(v) = String::try_from_val(e, &val) {
+        return OperationResult::String(v);
+    }
+    if let Ok(v) = Bytes::try_from_val(e, &val) {
+        // Check if it's a 32-byte value (could be U256 or I256)
+        if v.len() == 32 {
+            if let Ok(bytes_n) = BytesN::<32>::try_from_val(e, &val) {
+                // For now, treat 32-byte values as U256
+                // In practice, distinguishing U256 from I256 requires additional context
+                return OperationResult::U256(bytes_n);
+            }
+        }
+        return OperationResult::Bytes(v);
+    }
+    if let Ok(v) = Vec::<Val>::try_from_val(e, &val) {
+        return OperationResult::Vec(v);
+    }
+    if let Ok(v) = Map::<Val, Val>::try_from_val(e, &val) {
+        return OperationResult::Map(v);
+    }
+
+    // If nothing matched, it's likely void
+    OperationResult::Void
 }
 
 // ################## QUERY STATE ##################
@@ -269,7 +388,7 @@ pub fn schedule_operation(e: &Env, operation: &Operation, delay: u32) -> BytesN<
 ///
 /// # Returns
 ///
-/// The return value from the invoked contract function.
+/// The return value from the invoked contract function as an `OperationResult`.
 ///
 /// # Errors
 ///
@@ -288,10 +407,12 @@ pub fn schedule_operation(e: &Env, operation: &Operation, delay: u32) -> BytesN<
 ///
 /// **IMPORTANT**: This function does not perform authorization checks.
 /// The caller must ensure proper authorization before calling this function.
-pub fn execute_operation(e: &Env, operation: &Operation) -> Val {
+pub fn execute_operation(e: &Env, operation: &Operation) -> OperationResult {
     set_execute_operation(e, operation);
 
-    e.invoke_contract::<Val>(&operation.target, &operation.function, operation.args.clone())
+    let result =
+        e.invoke_contract::<Val>(&operation.target, &operation.function, operation.args.clone());
+    val_to_operation_result(e, result)
 }
 
 /// Validates and marks an operation as executed without invoking the target.

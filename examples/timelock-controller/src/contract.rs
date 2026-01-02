@@ -117,7 +117,7 @@ use stellar_governance::timelock::{
     get_operation_state, get_timestamp, hash_operation as timelock_hash_operation,
     is_operation_done, is_operation_pending, is_operation_ready, operation_exists,
     schedule_operation, set_execute_operation, set_min_delay as timelock_set_min_delay, Operation,
-    OperationState, TimelockError,
+    OperationResult, OperationState, TimelockError,
 };
 use stellar_macros::{only_admin, only_role};
 
@@ -333,7 +333,7 @@ impl TimelockController {
         predecessor: BytesN<32>,
         salt: BytesN<32>,
         executor: Option<Address>,
-    ) -> Val {
+    ) -> OperationResult {
         if get_role_member_count(e, &EXECUTOR_ROLE) != 0 {
             let executor = executor.expect("to be present");
             ensure_role(e, &EXECUTOR_ROLE, &executor);
