@@ -128,6 +128,11 @@ pub enum OperationResult {
 fn val_to_operation_result(e: &Env, val: Val) -> OperationResult {
     use soroban_sdk::TryFromVal;
 
+    // Note: Val is a tagged union that preserves type information.
+    // TryFromVal will only succeed if the Val's type tag matches the target type.
+    // For example, a U32Val will successfully convert to u32 but fail for i32.
+    // The conversion order here doesn't affect correctness, only performance.
+
     // Try each type in order of likelihood/simplicity
     if let Ok(v) = bool::try_from_val(e, &val) {
         return OperationResult::Bool(v);
@@ -165,6 +170,7 @@ fn val_to_operation_result(e: &Env, val: Val) -> OperationResult {
         // from the contract. Both are represented as 32-byte values in Soroban.
         // We default to treating them as U256.
         if v.len() == 32 {
+            // Convert to BytesN<32> directly from the Val to preserve type info
             if let Ok(bytes_n) = BytesN::<32>::try_from_val(e, &val) {
                 return OperationResult::U256(bytes_n);
             }
