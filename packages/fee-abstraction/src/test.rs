@@ -1,6 +1,6 @@
 use soroban_sdk::{
     contract, contractimpl,
-    testutils::{Address as _, Events},
+    testutils::{Address as _, Events, Ledger},
     token::TokenClient,
     vec, Address, Env, FromVal, MuxedAddress, String, Symbol, Val, Vec,
 };
@@ -8,8 +8,8 @@ use stellar_tokens::fungible::{Base, FungibleToken};
 
 use crate::{
     collect_fee, collect_fee_and_invoke, is_allowed_fee_token, is_fee_token_allowlist_enabled,
-    set_allowed_fee_token, sweep_token, validate_fee_bounds, FeeAbstractionApproval,
-    FeeAbstractionStorageKey,
+    set_allowed_fee_token, sweep_token, validate_expiration_ledger, validate_fee_bounds,
+    FeeAbstractionApproval, FeeAbstractionStorageKey,
 };
 
 #[contract]
@@ -193,6 +193,39 @@ fn collect_fee_with_lazy_approval_lower_previous() {
 
     let balance = token_client.balance(&recipient);
     assert_eq!(balance, 20);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #5006)")]
+fn collect_fee_with_lazy_approval_expired_ledger_panics() {
+    let e = Env::default();
+    e.mock_all_auths_allowing_non_root_auth();
+
+    let contract_address = e.register(MockContract, ());
+    let user = Address::generate(&e);
+    let token_address = e.register(MockToken, (user.clone(),));
+    let recipient = Address::generate(&e);
+
+    let max_fee_amount = 50;
+
+    let token_client = TokenClient::new(&e, &token_address);
+    // approve enough (100 > max_fee_amount) till ledger 200
+    token_client.approve(&user, &contract_address, &100, &200);
+
+    e.ledger().set_sequence_number(101);
+
+    e.as_contract(&contract_address, || {
+        collect_fee(
+            &e,
+            &token_address,
+            20,
+            max_fee_amount,
+            100, // expiration_ledger < 101
+            &user,
+            &recipient,
+            FeeAbstractionApproval::Lazy,
+        );
+    });
 }
 
 #[test]
@@ -407,6 +440,14 @@ fn validate_fee_bounds_zero() {
 fn validate_fee_bounds_neg() {
     let e = Env::default();
     validate_fee_bounds(&e, 0, -1);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #5006)")]
+fn validate_expiration_ledger_past() {
+    let e = Env::default();
+    e.ledger().set_sequence_number(10);
+    validate_expiration_ledger(&e, 9);
 }
 
 // ################## TOKEN SWEEPING TESTS ##################

@@ -194,6 +194,10 @@ pub fn collect_fee(
                     &max_fee_amount,
                     &expiration_ledger,
                 );
+            } else {
+                // assuming that in the other cases the expiration ledger is validated in
+                // `token.approve()`
+                validate_expiration_ledger(e, expiration_ledger);
             }
         }
     }
@@ -394,5 +398,22 @@ pub fn sweep_token(e: &Env, token: &Address, recipient: &Address) -> i128 {
 pub fn validate_fee_bounds(e: &Env, fee_amount: i128, max_fee_amount: i128) {
     if fee_amount <= 0 || fee_amount > max_fee_amount {
         panic_with_error!(e, FeeAbstractionError::InvalidFeeBounds);
+    }
+}
+
+/// Validate the ledger is in the future.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `expiration_ledger` - The ledger number to validate.
+///
+/// # Errors
+///
+/// * [`FeeAbstractionError::InvalidExpirationLedger`] - If `expiration_ledger`
+///   is in the past.
+pub fn validate_expiration_ledger(e: &Env, expiration_ledger: u32) {
+    if expiration_ledger < e.ledger().sequence() {
+        panic_with_error!(e, FeeAbstractionError::InvalidExpirationLedger)
     }
 }
