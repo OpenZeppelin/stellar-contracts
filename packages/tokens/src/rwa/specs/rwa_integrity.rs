@@ -11,7 +11,7 @@ use crate::fungible::FungibleToken;
 
 #[rule]
 // forced_transfer changes balance of from appropriately
-// status: timeout
+// status: verified https://prover.certora.com/output/33158/82f91444a64247649c1ea229fc9eb2c3
 pub fn rwa_forced_transfer_integrity_1(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -34,7 +34,7 @@ pub fn rwa_forced_transfer_integrity_1(e: Env) {
 
 #[rule]
 // forced_transfer changes balance of to appropriately
-// status: timeout
+// status: verified https://prover.certora.com/output/33158/e2033d4a0977480c9ed77f796bc441a9
 pub fn rwa_forced_transfer_integrity_2(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -77,7 +77,7 @@ pub fn rwa_forced_transfer_integrity_3(e: Env) {
 
 #[rule]
 // mint increases balance of to appropriately
-// status: timeout
+// status: verified https://prover.certora.com/output/33158/824613f78bed403fafa3cc198244524b
 pub fn rwa_mint_integrity_1(e: Env) {
     let to = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
@@ -93,7 +93,7 @@ pub fn rwa_mint_integrity_1(e: Env) {
 
 #[rule]
 // mint increases total supply by amount
-// status: timeout
+// status: https://prover.certora.com/output/33158/311d6caa88244ce49a62e39308d278f4
 pub fn rwa_mint_integrity_2(e: Env) {
     let to = nondet_address();
     clog!(cvlr_soroban::Addr(&to));
@@ -111,7 +111,7 @@ pub fn rwa_mint_integrity_2(e: Env) {
 
 #[rule]
 // burn decreases balance of user appropriately
-// status: timeout
+// status: https://prover.certora.com/output/33158/5d4db829fe6f4c6fa97d1e24d46bfb96
 pub fn rwa_burn_integrity_1(e: Env) {
     let user = nondet_address();
     clog!(cvlr_soroban::Addr(&user));
@@ -218,7 +218,7 @@ pub fn rwa_set_identity_verifier_integrity(e: Env) {
 
 #[rule]
 // transfer changes balance of from appropriately
-// status: timeout
+// status: https://prover.certora.com/output/33158/d20d7948e52e4e3f80e063f752943316
 pub fn rwa_transfer_integrity_1(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -240,7 +240,7 @@ pub fn rwa_transfer_integrity_1(e: Env) {
 
 #[rule]
 // transfer changes balance of to appropriately
-// status: timeout
+// status: https://prover.certora.com/output/33158/7166d4a5413a42b69c0a77d3893967a8
 pub fn rwa_transfer_integrity_2(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));
@@ -284,7 +284,7 @@ pub fn rwa_transfer_integrity_3(e: Env) {
 
 #[rule]
 // transfer_from does not change total supply
-// status: timeout
+// status: https://prover.certora.com/output/33158/e628639846c44e87a18f6d1a9996b741
 pub fn rwa_transfer_from_integrity_1(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
@@ -304,7 +304,7 @@ pub fn rwa_transfer_from_integrity_1(e: Env) {
 
 #[rule]
 // transfer_from changes the balance of from accordingly
-// status: timeout
+// status: violation: https://prover.certora.com/output/33158/0346362181ca4fea9c0869bf30077948/
 pub fn rwa_transfer_from_integrity_2(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
@@ -324,7 +324,7 @@ pub fn rwa_transfer_from_integrity_2(e: Env) {
 
 #[rule]
 // transfer_from changes the balance of to accordingly
-// status: timeout
+// status: violation https://prover.certora.com/output/33158/264be89058014264932d978e5ce699fb
 pub fn rwa_transfer_from_integrity_3(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
@@ -343,7 +343,7 @@ pub fn rwa_transfer_from_integrity_3(e: Env) {
 
 #[rule]
 // transfer_from changes allowance accordingly
-// status: timeout
+// status: violation https://prover.certora.com/output/33158/61aa0d179f40419889d3857850770761
 pub fn rwa_transfer_from_integrity_4(e: Env) {
     let spender = nondet_address();
     let from = nondet_address();
@@ -406,7 +406,7 @@ pub fn rwa_recover_balance_integrity_1(e: Env) {
 
 #[rule]
 // after recover_balance the old account has no balance
-// status: timeout
+// status: verified https://prover.certora.com/output/33158/5103c07236b24a98aa4314b95444651c
 pub fn rwa_recover_balance_integrity_2(e: Env) {
     let old_account = nondet_address();
     clog!(cvlr_soroban::Addr(&old_account));
@@ -435,7 +435,7 @@ pub fn rwa_recover_balance_integrity_2(e: Env) {
 
 #[rule]
 // after recover_balance the new account has the balance of the old account
-// status: timeout
+// status: verified https://prover.certora.com/output/33158/655e283772ab43e494f7599bb5a256a2
 pub fn rwa_recover_balance_integrity_3(e: Env) {
     let old_account = nondet_address();
     clog!(cvlr_soroban::Addr(&old_account));
@@ -465,7 +465,7 @@ pub fn rwa_recover_balance_integrity_3(e: Env) {
 
 #[rule]
 // after recover_balance the new account has the frozen tokens of the old account
-// status: timeout
+// status: verified: https://prover.certora.com/output/33158/5336dbb94c6f4f77a83ae09c9be3c031
 pub fn rwa_recover_balance_integrity_4(e: Env) {
     let old_account = nondet_address();
     clog!(cvlr_soroban::Addr(&old_account));
