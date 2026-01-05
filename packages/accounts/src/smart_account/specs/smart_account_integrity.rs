@@ -262,20 +262,19 @@ pub fn remove_context_rule_integrity_3(e: Env) {
 
 #[rule]
 // after add_signer the signer is added.
-// status: verified - review 
+// status: without storage setup it is violated
+// but the storage setup is very limiting, it says that there can be no signers before!
+// note that putting .set(nondet_signers_vec()) doesn't work.
 #[rule]
 pub fn add_signer_integrity(e: Env) {
     let id: u32 = nondet();
     let signer = Signer::nondet();
     let meta = Meta::nondet();
 
-    // important: setup storage to be consistent
-    // e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
-    // let signers = nondet_signers_vec();
+    // with this storage setup the rule verifies
     let signers: Vec<Signer> = Vec::new(&e);
+    // perhaps it would also verify if we push one signer e.g
     e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
-    // e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &Vec::<Address>::new(&e));
-    // raz: doesn't make sense to me
     
     add_signer(&e, id, &signer);
 

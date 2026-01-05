@@ -7,7 +7,7 @@ use crate::{
     crypto::sha256::Sha256,
     merkle_distributor::{
         specs::merkle_distributor_contract::{Leaf, MerkleDistributorContract},
-        IndexableLeaf, MerkleDistributor,
+        IndexableLeaf, MerkleDistributor, MerkleDistributorStorageKey,
     },
 };
 
@@ -29,6 +29,23 @@ pub fn set_claimed_integrity(e: Env) {
     clog!(index);
     MerkleDistributorContract::set_claimed(&e, index);
     let claimed = MerkleDistributorContract::is_claimed(&e, index);
+    clog!(claimed);
+    cvlr_assert!(claimed);
+}
+
+#[rule]
+// status: violation - spurious
+pub fn set_claimed_integrity_no_contract(e: Env) {
+    let index: u32 = nondet();
+    clog!(index);
+
+    // storage setup
+    let key = MerkleDistributorStorageKey::Claimed(index);
+    let nondet_bool: bool = nondet();
+    e.storage().persistent().set(&key, &nondet_bool);
+
+    MerkleDistributor::<Sha256>::set_claimed(&e, index);
+    let claimed = MerkleDistributor::<Sha256>::is_claimed(&e, index);
     clog!(claimed);
     cvlr_assert!(claimed);
 }
