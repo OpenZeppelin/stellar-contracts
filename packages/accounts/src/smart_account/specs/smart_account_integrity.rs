@@ -25,7 +25,7 @@ use crate::smart_account::{
 
 #[rule]
 // after add_context_rule the rule_count increases by 1
-// status: timeout
+// status: verified https://prover.certora.com/output/33158/9a7a12d7c8f840768bdcc6ce30a016e2
 pub fn add_context_rule_integrity_1(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -72,7 +72,7 @@ pub fn add_context_rule_integrity_3(e: Env) {
 // after add_context_rule the rule appears
 // in get_valid_context_rules (in first index)
 // most important!
-// status: verified - very unclear (without SMT?)
+// status: global timeout even with reachability
 pub fn add_context_rule_integrity_4(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -81,7 +81,8 @@ pub fn add_context_rule_integrity_4(e: Env) {
     let policies = nondet_policy_map();
     let rule = add_context_rule(&e, &ctx_typ, &name, valid_until, &signers, &policies);
     let rules = get_valid_context_rules(&e, &ctx_typ);
-    cvlr_assert!(rules.get(0).unwrap().id == rule.id);
+    cvlr_assert!(false);
+    // cvlr_assert!(rules.get(0).unwrap().id == rule.id);
     // cvlr_assert!(rules.contains(&rule));
 }
 
@@ -127,7 +128,7 @@ pub fn add_context_rule_integrity_7(e: Env) {
 
 #[rule]
 // after add_context_rule the valid until is set as valid until
-// status: verified - very unclear (without SMT?)
+// status: global timeout even with reachability
 pub fn add_context_rule_integrity_8(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -135,8 +136,9 @@ pub fn add_context_rule_integrity_8(e: Env) {
     let signers = nondet_signers_vec();
     let policies = nondet_policy_map();
     let rule = add_context_rule(&e, &ctx_typ, &name, valid_until, &signers, &policies);
-    let rule_valid_until = rule.valid_until;
-    cvlr_assert!(rule_valid_until == valid_until);
+    cvlr_assert!(false);
+    // let rule_valid_until = rule.valid_until;
+    // cvlr_assert!(rule_valid_until == valid_until);
 }
 
 #[rule]
