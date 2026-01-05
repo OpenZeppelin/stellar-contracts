@@ -80,14 +80,14 @@ use crate::rwa::claim_issuer::{
 #[cfg(feature = "certora")]
 use crate::rwa::claim_topics_and_issuers::ClaimTopicsAndIssuers;
 #[cfg(feature = "certora")]
-use crate::rwa::specs::claim_topics_and_issuers::ClaimTopicsAndIssuersContract;
 use crate::rwa::{
     claim_issuer::{
         ClaimIssuerError, SignatureVerifier, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
         KEYS_EXTEND_AMOUNT, KEYS_TTL_THRESHOLD, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
     },
-    claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
+    claim_topics_and_issuers::ClaimTopicsAndIssuersClient
 };
+use crate::rwa::claim_topics_and_issuers::storage::has_claim_topic;
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -430,7 +430,7 @@ pub fn is_authorized_for(e: &Env, registry: &Address, claim_topic: u32) -> bool 
     #[cfg(not(feature = "certora"))]
     return registry_client.has_claim_topic(&e.current_contract_address(), &claim_topic);
     #[cfg(feature = "certora")]
-    ClaimTopicsAndIssuersContract::has_claim_topic(e, e.current_contract_address(), claim_topic)
+    has_claim_topic(e, &e.current_contract_address(), claim_topic)
 }
 
 /// Allows a public key to sign claims for specific topic and
@@ -482,7 +482,7 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
         panic_with_error!(e, ClaimIssuerError::NotAllowed)
     }
     #[cfg(feature = "certora")]
-    if !ClaimTopicsAndIssuersContract::has_claim_topic(e, e.current_contract_address(), claim_topic) {
+    if !has_claim_topic(e, &e.current_contract_address(), claim_topic) {
         panic_with_error!(e, ClaimIssuerError::NotAllowed)
     }
 

@@ -1,5 +1,6 @@
 use cvlr::nondet::{nondet, Nondet};
-use soroban_sdk::{contract, contractimpl, Address, Env, Vec};
+use cvlr_soroban::nondet_address;
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
 
 use crate::rwa::{
     compliance::{Compliance, ComplianceHook, ComplianceModule, storage},
@@ -57,5 +58,44 @@ impl Compliance for ComplianceTrivial {
 
     fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
         nondet()
+    }
+}
+
+pub struct ComplianceModuleTrivial;
+
+// we should probably have more than 1 compliance module
+// and have ghost implementations like in other places.
+
+impl ComplianceModule for ComplianceModuleTrivial {
+    fn on_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) {
+        // do nothing
+    }
+
+    fn on_created(e: &Env, to: Address, amount: i128, token: Address) {
+        // do nothing
+    }
+
+    fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address) {
+        // do nothing
+    }
+
+    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
+        nondet()
+    }
+
+    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
+        nondet()
+    }
+
+    fn name(e: &Env) -> String {
+        String::from_str(e, "")
+    }
+
+    fn get_compliance_address(e: &Env) -> Address {
+        nondet_address()
+    }
+
+    fn set_compliance_address(e: &Env, compliance: Address) {
+        // do nothing
     }
 }

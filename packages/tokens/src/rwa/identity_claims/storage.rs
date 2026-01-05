@@ -30,7 +30,7 @@ use soroban_sdk::{
 #[cfg(not(feature = "certora"))]
 use super::emit_claim_event;
 use super::{ClaimEvent, ClaimsError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD};
-use crate::rwa::{claim_issuer::{ClaimIssuer, ClaimIssuerClient}, specs::claim_issuer::ClaimIssuerContract};
+use crate::rwa::{claim_issuer::{ClaimIssuer, ClaimIssuerClient}, specs::claim_issuer_trivial::ClaimIssuerTrivial};
 
 /// Represents a claim stored on-chain.
 #[contracttype]
@@ -102,7 +102,7 @@ pub fn add_claim(
 
     #[cfg(not(feature = "certora"))]
     claim_issuer_client.is_claim_valid(&identity, &topic, &scheme, signature, data);
-    ClaimIssuerContract::is_claim_valid(
+    ClaimIssuerTrivial::is_claim_valid(
         e,
         identity,
         topic,

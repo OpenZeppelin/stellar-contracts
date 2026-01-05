@@ -3,9 +3,15 @@ use soroban_sdk::{contractclient, contracttype, panic_with_error, Address, Env};
 #[cfg(not(feature = "certora"))]
 use crate::rwa::emit_claim_topics_and_issuers_set;
 #[cfg(feature = "certora")]
-use crate::rwa::{claim_issuer::ClaimIssuer, claim_topics_and_issuers::ClaimTopicsAndIssuers, specs::{claim_issuer::{ClaimIssuerContract, try_is_claim_valid}, claim_topics_and_issuers::ClaimTopicsAndIssuersContract, identity_registry_storage::IdentityRegistryStorageContract}};
 use crate::rwa::{
-    RWAError, claim_issuer::ClaimIssuerClient, claim_topics_and_issuers::ClaimTopicsAndIssuersClient, identity_claims::{Claim, IdentityClaims, IdentityClaimsClient, generate_claim_id}, specs::identity_claims::IdentityClaimsContract
+    claim_issuer::ClaimIssuer,
+    claim_topics_and_issuers::{ClaimTopicsAndIssuers, storage as claim_topics_and_issuers_storage},
+    identity_claims::storage as identity_claims_storage,
+    identity_registry_storage::storage as identity_registry_storage_storage,
+    specs::claim_issuer_trivial::{ClaimIssuerTrivial, try_is_claim_valid},
+};
+use crate::rwa::{
+    RWAError, claim_issuer::ClaimIssuerClient, claim_topics_and_issuers::ClaimTopicsAndIssuersClient, identity_claims::{Claim, IdentityClaims, IdentityClaimsClient, generate_claim_id}
 };
 
 /// Storage keys for the data associated with `RWA` token
@@ -85,7 +91,7 @@ pub fn verify_identity(e: &Env, account: &Address) {
     #[cfg(not(feature = "certora"))]
     let identity_addr = irs_client.stored_identity(account);
     #[cfg(feature = "certora")]
-    let identity_addr = <IdentityRegistryStorageContract as crate::rwa::identity_registry_storage::IdentityRegistryStorage>::stored_identity(e, account.clone());
+    let identity_addr = identity_registry_storage_storage::stored_identity(e, account);
     #[cfg(not(feature = "certora"))]
     let identity_client = IdentityClaimsClient::new(e, &identity_addr);
 
@@ -95,7 +101,7 @@ pub fn verify_identity(e: &Env, account: &Address) {
     #[cfg(not(feature = "certora"))]
     let topics_and_issuers = cti_client.get_claim_topics_and_issuers();
     #[cfg(feature = "certora")]
-    let topics_and_issuers = ClaimTopicsAndIssuersContract::get_claim_topics_and_issuers(e);
+    let topics_and_issuers = claim_topics_and_issuers_storage::get_claim_topics_and_issuers(e);
 
     for (claim_topic, issuers) in topics_and_issuers.iter() {
         let issuers_with_claim_ids = issuers.iter().enumerate().map(|(i, issuer)| {
@@ -108,7 +114,7 @@ pub fn verify_identity(e: &Env, account: &Address) {
         #[cfg(not(feature = "certora"))]
         let account_claim_ids = identity_client.get_claim_ids_by_topic(&claim_topic);
         #[cfg(feature = "certora")]
-        let account_claim_ids = IdentityClaimsContract::get_claim_ids_by_topic(e, claim_topic);
+        let account_claim_ids = identity_claims_storage::get_claim_ids_by_topic(e, claim_topic);
 
         for (issuer, claim_id, is_last) in issuers_with_claim_ids {
             if account_claim_ids.contains(&claim_id) {
@@ -116,7 +122,7 @@ pub fn verify_identity(e: &Env, account: &Address) {
                 #[cfg(not(feature = "certora"))]
                 let claim: Claim = identity_client.get_claim(&claim_id);
                 #[cfg(feature = "certora")]
-                let claim: Claim = IdentityClaimsContract::get_claim(e, claim_id);
+                let claim: Claim = identity_claims_storage::get_claim(e, &claim_id);
                 if validate_claim(e, &claim, claim_topic, &issuer, &identity_addr) {
                     break;
                 } else if is_last {
@@ -188,7 +194,7 @@ pub fn recovery_target(e: &Env, old_account: &Address) -> Option<Address> {
     #[cfg(not(feature = "certora"))]
     return irs_client.get_recovered_to(old_account);
     #[cfg(feature = "certora")]
-    <IdentityRegistryStorageContract as crate::rwa::identity_registry_storage::IdentityRegistryStorage>::get_recovered_to(e, old_account.clone())
+    identity_registry_storage_storage::get_recovered_to(e, old_account)
 }
 
 /// Sets the claim topics and issuers contract of the token.

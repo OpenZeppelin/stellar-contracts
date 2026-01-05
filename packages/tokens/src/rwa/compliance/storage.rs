@@ -3,7 +3,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 #[cfg(not(feature = "certora"))]
 use crate::rwa::compliance::{emit_module_added, emit_module_removed};
 #[cfg(feature = "certora")]
-use crate::rwa::{compliance::ComplianceModule, specs::compliance::ComplianceContract};
+use crate::rwa::{compliance::ComplianceModule, specs::compliance_trivial::ComplianceModuleTrivial};
 use crate::rwa::{
     compliance::{
         ComplianceError, ComplianceHook, ComplianceModuleClient, COMPLIANCE_EXTEND_AMOUNT,
@@ -208,7 +208,7 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Add
         #[cfg(not(feature = "certora"))]
         client.on_transfer(&from, &to, &amount, &token);
         #[cfg(feature = "certora")]
-        ComplianceContract::on_transfer(e, from.clone(), to.clone(), amount, token.clone());
+        ComplianceModuleTrivial::on_transfer(e, from.clone(), to.clone(), amount, token.clone());
     }
 }
 
@@ -242,7 +242,7 @@ pub fn created(e: &Env, to: Address, amount: i128, token: Address) {
         #[cfg(not(feature = "certora"))]
         client.on_created(&to, &amount, &token);
         #[cfg(feature = "certora")]
-        ComplianceContract::on_created(e, to.clone(), amount, token.clone());
+        ComplianceModuleTrivial::on_created(e, to.clone(), amount, token.clone());
     }
 }
 
@@ -276,7 +276,7 @@ pub fn destroyed(e: &Env, from: Address, amount: i128, token: Address) {
         #[cfg(not(feature = "certora"))]
         client.on_destroyed(&from, &amount, &token);
         #[cfg(feature = "certora")]
-        ComplianceContract::on_destroyed(e, from.clone(), amount, token.clone());
+        ComplianceModuleTrivial::on_destroyed(e, from.clone(), amount, token.clone());
     }
 }
 
@@ -314,7 +314,7 @@ pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Ad
         #[cfg(not(feature = "certora"))]
         let result = client.can_transfer(&from, &to, &amount, &token);
         #[cfg(feature = "certora")]
-        let result = ComplianceContract::can_transfer(e, from.clone(), to.clone(), amount, token.clone());
+        let result = ComplianceModuleTrivial::can_transfer(e, from.clone(), to.clone(), amount, token.clone());
 
         // If any module returns false, the entire check fails
         if !result {
@@ -358,7 +358,7 @@ pub fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
         #[cfg(not(feature = "certora"))]
         let result = client.can_create(&to, &amount, &token);
         #[cfg(feature = "certora")]
-        let result = ComplianceContract::can_create(e, to.clone(), amount, token.clone());
+        let result = ComplianceModuleTrivial::can_create(e, to.clone(), amount, token.clone());
 
         // If any module returns false, the entire check fails
         if !result {

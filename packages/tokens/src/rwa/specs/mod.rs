@@ -1,20 +1,27 @@
+// pub mod compliance;
+// pub mod compliance_sanity;
+// pub mod claim_issuer;
+// pub mod claim_issuer_sanity;
+// pub mod claim_topics_and_issuers;
+// pub mod claim_topics_and_issuers_sanity;
+// pub mod identity_claims;
+// pub mod identity_claims_sanity;
+// pub mod identity_registry_storage;
+// pub mod identity_registry_storage_sanity;
+// pub mod identity_verifier;
+// pub mod identity_verifier_sanity;
+// pub mod rwa_storage_sanity;
+
 pub mod nondet;
-pub mod compliance;
-pub mod compliance_sanity;
-pub mod claim_issuer;
-pub mod claim_issuer_sanity;
-pub mod claim_topics_and_issuers;
-pub mod claim_topics_and_issuers_sanity;
-pub mod identity_claims;
-pub mod identity_claims_sanity;
-pub mod identity_registry_storage;
-pub mod identity_registry_storage_sanity;
-pub mod identity_verifier;
-pub mod identity_verifier_sanity;
-pub mod rwa_storage_sanity;
+pub mod ghosts;
+
+pub mod compliance_trivial;
+pub mod identity_verifier_trivial;
+pub mod claim_issuer_trivial;
 
 pub mod rwa_integrity;
 pub mod rwa_panics;
-pub mod compliance_trivial;
-pub mod identity_verifier_trivial;
-pub mod ghosts;
+
+pub mod compliance_integrity;
+
+pub mod identity_verifier_integrity;

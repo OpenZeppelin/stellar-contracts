@@ -2,9 +2,9 @@ use soroban_sdk::{Address, Bytes, Env, contract, contractimpl, panic_with_error,
 
 use crate::rwa::claim_issuer::{ClaimIssuer, ClaimIssuerError};
 
-pub struct ClaimIssuerContract;
+pub struct ClaimIssuerTrivial;
 
-impl ClaimIssuer for ClaimIssuerContract {
+impl ClaimIssuer for ClaimIssuerTrivial {
     fn is_claim_valid(
         e: &Env,
         identity: Address,
@@ -13,11 +13,14 @@ impl ClaimIssuer for ClaimIssuerContract {
         sig_data: Bytes,
         claim_data: Bytes,
     ) {
+        // should panic under some scenarios
+        // todo ghost here.
         // TODO: Implement something here, not sure what would be appropriate.
     }
 }
 
-// this is a workaround to make this function available.
+// this function needs to be implemented in a ClaimIssuer, even 
+// though it is not part of the trait.
 pub fn try_is_claim_valid(
     e: &Env,
     identity: Address,
@@ -26,6 +29,8 @@ pub fn try_is_claim_valid(
     sig_data: Bytes,
     claim_data: Bytes,
 ) -> Result<Result<(), ClaimIssuerError>, Error> {
-    ClaimIssuerContract::is_claim_valid(e, identity, claim_topic, scheme, sig_data, claim_data);
+    // should return the same as above but instead of panicking should 
+    // return an error.
+    ClaimIssuerTrivial::is_claim_valid(e, identity, claim_topic, scheme, sig_data, claim_data);
     Ok(Ok(()))
 }
