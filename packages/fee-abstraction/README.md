@@ -42,7 +42,19 @@ sequenceDiagram
 - Optional Token Sweeping (fees are collected on the forwarding contract and transferred later on)
 - Validation Utilities
 
-## Examples
+## Getting Started
+
+### Installation
+
+Add this to your `Cargo.toml`:
+
+```toml
+[dependencies]
+# We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
+stellar-fee-abstraction = "=0.6.0"
+```
+
+### Examples
 
 - [fee-forwarder-permissioned](../../examples/fee-forwarder-permissioned)
 
@@ -52,8 +64,3 @@ sequenceDiagram
 - [fee-forwarder-permissionless](../../examples/fee-forwarder-permissionless)
   - Anyone can call `forward`; there is no executor allowlist.
   - The relayer (transaction submitter) receives the collected fee.
-
-Together, these examples show how to combine the auth helper
-(`auth_user_and_invoke`) with the shared fee collection helper (`collect_fee`)
-by selecting the appropriate [`FeeAbstractionApproval`] strategy (`Eager` or
-`Lazy`) for different use cases.
