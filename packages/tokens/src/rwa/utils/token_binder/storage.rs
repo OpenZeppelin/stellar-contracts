@@ -104,6 +104,7 @@ pub fn get_token_index(e: &Env, token: &Address) -> u32 {
 ///
 /// Performs a linear scan across all buckets.
 pub fn is_token_bound(e: &Env, token: &Address) -> bool {
+    // todo: munge it to nondet.
     let count = linked_token_count(e);
     if count == 0 {
         return false;
