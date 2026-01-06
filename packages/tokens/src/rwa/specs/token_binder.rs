@@ -77,7 +77,23 @@ pub fn bind_token_integrity_2_sanity(e: Env) {
 
 #[rule]
 // after bind_token the token is in bound_tokens
-// status: violation - review
+// status: violation - spurious
+// I get a counterexample where:
+// cvlr_soroban::Addr(&token): 0x800...4d4
+// count: 100
+// MAX_TOKENS: 10000
+// BUCKET_SIZE: 100
+// bucket_index: 1
+// the bucket at bucket_index 1 is initially empty
+// then contains just 0x800...4d4
+// and count is updated to 101
+// but then in linked_tokens:
+// the loop starts from bucket_idx = 0 
+// we have just the token 0 (length 1)
+// then in bucket_idx = 1 
+// we have just token 0x800...4d4 (length 1)
+// but then the tokens vector that is printed at the end of the loop has just 0,0 (length 2)
+// which doesn't make sense, because should be 0,0x800...4d4
 pub fn bind_token_integrity_3(e: Env) {
     let token = nondet_address();
     clog!(cvlr_soroban::Addr(&token));
@@ -165,7 +181,7 @@ pub fn bind_tokens_integrity_2_sanity(e: Env) {
 
 #[rule]
 // after bind_tokens any token is in bound_tokens
-// status: violation - review
+// status: see bind_token_integrity_3
 pub fn bind_tokens_integrity_3(e: Env) {
     let tokens: Vec<Address> = nondet_vec_address();
     clog_tokens_vector(&tokens);
@@ -281,3 +297,7 @@ pub fn unbind_token_integrity_3_sanity(e: Env) {
     clog!(token_in_bound_tokens);   
     cvlr_satisfy!(true);
 }
+
+// invariants
+
+// invariant: 
