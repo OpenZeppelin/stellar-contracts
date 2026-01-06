@@ -25,3 +25,5 @@ pub mod rwa_panics;
 pub mod compliance_integrity;
 
 pub mod identity_verifier_integrity;
+
+pub mod token_binder;

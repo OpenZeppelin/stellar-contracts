@@ -103,6 +103,7 @@ pub fn verify_identity(e: &Env, account: &Address) {
     #[cfg(feature = "certora")]
     let topics_and_issuers = claim_topics_and_issuers_storage::get_claim_topics_and_issuers(e);
 
+    // maybe run test with issuers.len() = 0 
     for (claim_topic, issuers) in topics_and_issuers.iter() {
         let issuers_with_claim_ids = issuers.iter().enumerate().map(|(i, issuer)| {
             (

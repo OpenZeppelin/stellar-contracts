@@ -1,6 +1,6 @@
 use cvlr::nondet::{*};
-use cvlr_soroban::{nondet_map, nondet_symbol};
-use soroban_sdk::{Env, Map, String, Symbol, Vec};
+use cvlr_soroban::{nondet_address, nondet_map, nondet_symbol};
+use soroban_sdk::{Address, Env, Map, String, Symbol, Vec};
 
 use crate::rwa::{compliance::ComplianceHook, identity_registry_storage::{CountryData, CountryRelation, IndividualCountryRelation, OrganizationCountryRelation}};
 
@@ -106,6 +106,24 @@ pub fn nondet_vec_country() -> Vec<CountryData> {
     while i < n {
         let country_data = CountryData::nondet();
         out.push_back(nondet());
+        i += 1;
+    }
+    out
+}
+
+pub fn nondet_vec_address() -> Vec<Address> {
+    let env = Env::default();
+
+    const MAX: u32 = 5;
+    let mut n: u32 = nondet();
+    if n > MAX {
+        n %= MAX + 1;
+    }
+
+    let mut out: Vec<Address> = Vec::new(&env);
+    let mut i = 0u32;
+    while i < n {
+        out.push_back(nondet_address());
         i += 1;
     }
     out
