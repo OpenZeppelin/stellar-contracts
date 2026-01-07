@@ -284,7 +284,7 @@ pub fn rwa_transfer_integrity_3(e: Env) {
 
 #[rule]
 // transfer_from does not change total supply
-// status: https://prover.certora.com/output/33158/e628639846c44e87a18f6d1a9996b741
+// status: verified https://prover.certora.com/output/33158/e628639846c44e87a18f6d1a9996b741
 pub fn rwa_transfer_from_integrity_1(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
@@ -304,7 +304,7 @@ pub fn rwa_transfer_from_integrity_1(e: Env) {
 
 #[rule]
 // transfer_from changes the balance of from accordingly
-// status: violation: https://prover.certora.com/output/33158/0346362181ca4fea9c0869bf30077948/
+// status: verified
 pub fn rwa_transfer_from_integrity_2(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
@@ -319,12 +319,16 @@ pub fn rwa_transfer_from_integrity_2(e: Env) {
     RWA::transfer_from(&e, &spender, &from, &to, amount);
     let balance_from_post = RWA::balance(&e, &from);
     clog!(balance_from_post);
-    cvlr_assert!(balance_from_post == balance_from_pre - amount);
+    if from != to {
+        cvlr_assert!(balance_from_post == balance_from_pre - amount);
+    } else {
+        cvlr_assert!(balance_from_post == balance_from_pre);
+    }
 }
 
 #[rule]
 // transfer_from changes the balance of to accordingly
-// status: violation https://prover.certora.com/output/33158/264be89058014264932d978e5ce699fb
+// status: timeout (with -split false)
 pub fn rwa_transfer_from_integrity_3(e: Env) {
     let spender = nondet_address();
     clog!(cvlr_soroban::Addr(&spender));
@@ -338,12 +342,18 @@ pub fn rwa_transfer_from_integrity_3(e: Env) {
     RWA::transfer_from(&e, &spender, &from, &to, amount);
     let balance_to_post = RWA::balance(&e, &to);
     clog!(balance_to_post);
-    cvlr_assert!(balance_to_post == balance_to_pre + amount);
+    if from != to {
+        cvlr_assert!(balance_to_post == balance_to_pre + amount);
+    } else {
+        cvlr_assert!(balance_to_post == balance_to_pre);
+    }
 }
 
 #[rule]
 // transfer_from changes allowance accordingly
-// status: violation https://prover.certora.com/output/33158/61aa0d179f40419889d3857850770761
+// status: bug
+// https://prover.certora.com/output/33158/61aa0d179f40419889d3857850770761
+// same bug as the bug in fungible
 pub fn rwa_transfer_from_integrity_4(e: Env) {
     let spender = nondet_address();
     let from = nondet_address();
