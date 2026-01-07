@@ -217,7 +217,7 @@ pub fn after_token_approve_solvency(e: Env) {
 }
 
 #[rule]
-// status:
+// status: timeout
 pub fn conert_to_shares_and_solvency(e: Env) {
     safe_assumptions(&e);
     assume_pre_solvency(&e);
@@ -237,7 +237,7 @@ pub fn conert_to_shares_and_solvency(e: Env) {
 }
 
 #[rule]
-// status:
+// status: timeout
 pub fn convert_to_assets_and_solvency(e: Env) {
     safe_assumptions(&e);
     assume_pre_solvency(&e);

@@ -32,27 +32,6 @@ pub fn remove_module_from_integrity(e: Env) {
 // todo: panic properties for these functions
 // should only be called by the bound token.
 
-#[rule]
-pub fn transferred_integrity(e: Env) {
-    // we would want to say all the hooks are called todo 
-}
+// todo: rules that show that all hooks are called: transferred, created, destroyed
 
-#[rule]
-pub fn created_integrity(e: Env) {
-    // we would want to say all the hooks are called todo 
-}
-
-#[rule]
-pub fn destroyed_integrity(e: Env) {
-    // we would want to say all the hooks are called todo 
-}
-
-#[rule]
-pub fn can_transfer_integrity(e: Env) {
-    // should return the and of all the can_transfer of all modules
-}
-
-#[rule]
-pub fn can_create_integrity(e: Env) {
-    // should return the and of all the can_create of all modules
-}
+// todo: rules that show that can_transfer and can_create are the And of all those of the modules
