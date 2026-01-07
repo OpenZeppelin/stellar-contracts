@@ -300,4 +300,117 @@ pub fn unbind_token_integrity_3_sanity(e: Env) {
 
 // invariants
 
-// invariant: 
+// this will have the same issues we had in access_control and elsewhere
+
+// invariant: get_token_by_index(get_token_index(token)) = token
+
+// invariant: get_token_index(get_token_by_index(index)) = index
+
+// helpers
+use crate::rwa::utils::token_binder::storage::{get_token_by_index, get_token_index};
+
+pub fn assume_pre_inverse_1(e: Env, token: Address) {
+    let index = get_token_index(&e, &token);
+    clog!(index);
+    let token_by_index = get_token_by_index(&e, index);
+    clog!(cvlr_soroban::Addr(&token_by_index));
+    cvlr_assume!(token_by_index == token);
+}
+
+pub fn assert_post_inverse_1(e: Env, token: Address) {
+    let index = get_token_index(&e, &token);
+    clog!(index);
+    let token_by_index = get_token_by_index(&e, index);
+    clog!(cvlr_soroban::Addr(&token_by_index));
+    cvlr_assert!(token_by_index == token);
+}
+
+pub fn assume_pre_inverse_2(e: Env, index: u32) {
+    let token = get_token_by_index(&e, index);
+    clog!(cvlr_soroban::Addr(&token));
+    let index_by_token = get_token_index(&e, &token);
+    clog!(index_by_token);
+    cvlr_assume!(index_by_token == index);
+}
+
+pub fn assert_post_inverse_2(e: Env, index: u32) {
+    let token = get_token_by_index(&e, index);
+    clog!(cvlr_soroban::Addr(&token));
+    let index_by_token = get_token_index(&e, &token);
+    clog!(index_by_token);
+    cvlr_assert!(index_by_token == index);
+}
+
+// rules
+
+#[rule]
+// status: sanity failure?
+pub fn after_bind_token_inverse_1(e: Env) {
+    let token = nondet_address();
+    clog!(cvlr_soroban::Addr(&token));
+    let binded_token = nondet_address();
+    clog!(cvlr_soroban::Addr(&binded_token));
+    assume_pre_inverse_1(e.clone(), token.clone());
+    bind_token(&e.clone(), &binded_token);
+    assert_post_inverse_1(e.clone(), token.clone());
+}
+
+#[rule]
+// status: sanity failure?
+pub fn after_bind_token_inverse_2(e: Env) {
+    let index = u32::nondet();
+    clog!(index);
+    let binded_token = nondet_address();
+    clog!(cvlr_soroban::Addr(&binded_token));
+    assume_pre_inverse_2(e.clone(), index.clone());
+    bind_token(&e.clone(), &binded_token);
+    assert_post_inverse_2(e.clone(), index.clone());
+}
+
+#[rule]
+// status: sanity failure?
+pub fn after_bind_tokens_inverse_1(e: Env) {
+    let token = nondet_address();
+    clog!(cvlr_soroban::Addr(&token));
+    let tokens: Vec<Address> = nondet_vec_address();
+    clog_tokens_vector(&tokens);
+    assume_pre_inverse_1(e.clone(), token.clone());
+    bind_tokens(&e.clone(), &tokens);
+    assert_post_inverse_1(e.clone(), token.clone());
+}
+
+#[rule]
+// status: sanity failure?
+pub fn after_bind_tokens_inverse_2(e: Env) {
+    let index = u32::nondet();
+    clog!(index);
+    let tokens: Vec<Address> = nondet_vec_address();
+    clog_tokens_vector(&tokens);
+    assume_pre_inverse_2(e.clone(), index.clone());
+    bind_tokens(&e.clone(), &tokens);
+    assert_post_inverse_2(e.clone(), index.clone());
+}
+
+#[rule]
+// status: sanity failure?
+pub fn after_unbind_token_inverse_1(e: Env) {
+    let token = nondet_address();
+    clog!(cvlr_soroban::Addr(&token));
+    let unbound_token = nondet_address();
+    clog!(cvlr_soroban::Addr(&unbound_token));
+    assume_pre_inverse_1(e.clone(), token.clone());
+    unbind_token(&e.clone(), &unbound_token);
+    assert_post_inverse_1(e.clone(), token.clone());
+}
+
+#[rule]
+// status: sanity failure?
+pub fn after_unbind_token_inverse_2(e: Env) {
+    let index = u32::nondet();
+    clog!(index);
+    let unbound_token = nondet_address();
+    clog!(cvlr_soroban::Addr(&unbound_token));
+    assume_pre_inverse_2(e.clone(), index.clone());
+    unbind_token(&e.clone(), &unbound_token);
+    assert_post_inverse_2(e.clone(), index.clone());
+}
