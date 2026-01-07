@@ -157,7 +157,3 @@ pub fn burn_from_panics_if_amount_less_than_zero(e: Env) {
 }
 
 // non-panic rules are in fungible_non_panics.rs
-
-// ################## INVARIANT RULES ##################
-
-// again, we would like to show total_supply >= balance, but that requires ghosts and hooks.

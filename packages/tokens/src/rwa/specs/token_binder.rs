@@ -78,6 +78,16 @@ pub fn bind_token_integrity_2_sanity(e: Env) {
 #[rule]
 // after bind_token the token is in bound_tokens
 // status: violation - spurious
+pub fn bind_token_integrity_3(e: Env) {
+    let token = nondet_address();
+    clog!(cvlr_soroban::Addr(&token));
+    bind_token(&e, &token);
+    let bound_tokens = linked_tokens(&e);
+    clog_tokens_vector(&bound_tokens);
+    let token_in_bound_tokens = bound_tokens.contains(&token);
+    clog!(token_in_bound_tokens);   
+    cvlr_assert!(token_in_bound_tokens);
+}
 // I get a counterexample where:
 // cvlr_soroban::Addr(&token): 0x800...4d4
 // count: 100
@@ -94,16 +104,6 @@ pub fn bind_token_integrity_2_sanity(e: Env) {
 // we have just token 0x800...4d4 (length 1)
 // but then the tokens vector that is printed at the end of the loop has just 0,0 (length 2)
 // which doesn't make sense, because should be 0,0x800...4d4
-pub fn bind_token_integrity_3(e: Env) {
-    let token = nondet_address();
-    clog!(cvlr_soroban::Addr(&token));
-    bind_token(&e, &token);
-    let bound_tokens = linked_tokens(&e);
-    clog_tokens_vector(&bound_tokens);
-    let token_in_bound_tokens = bound_tokens.contains(&token);
-    clog!(token_in_bound_tokens);   
-    cvlr_assert!(token_in_bound_tokens);
-}
 
 #[rule]
 pub fn bind_token_integrity_3_sanity(e: Env) {
