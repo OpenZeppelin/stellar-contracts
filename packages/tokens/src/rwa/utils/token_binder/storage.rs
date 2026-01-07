@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map, TryFromVal, Val, Vec};
 use cvlr::clog;
-use crate::rwa::specs::token_binder::clog_tokens_vector;
+use crate::rwa::specs::helpers::clogs::clog_vec_addresses;
 
 #[cfg(not(feature = "certora"))]
 use crate::rwa::utils::token_binder::{emit_token_bound, emit_token_unbound};
@@ -132,7 +132,7 @@ pub fn linked_tokens(e: &Env) -> Vec<Address> {
     let count = linked_token_count(e);
     clog!(count);
     let mut tokens = Vec::new(e);
-    clog_tokens_vector(&tokens);
+    clog_vec_addresses(&tokens);
     if count == 0 {
         return tokens;
     }
@@ -145,10 +145,10 @@ pub fn linked_tokens(e: &Env) -> Vec<Address> {
         let bucket: Vec<Address> =
             get_persistent_entry(e, &TokenBinderStorageKey::TokenBucket(bucket_idx))
                 .unwrap_or_else(|| Vec::new(e));
-        clog_tokens_vector(&bucket);
+        clog_vec_addresses(&bucket);
         tokens.append(&bucket);
     }
-    clog_tokens_vector(&tokens);
+    clog_vec_addresses(&tokens);
     tokens
 }
 
@@ -201,9 +201,9 @@ pub fn bind_token(e: &Env, token: &Address) {
     let mut bucket: Vec<Address> =
         e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
     
-    clog_tokens_vector(&bucket);
+    clog_vec_addresses(&bucket);
     bucket.push_back(token.clone());
-    clog_tokens_vector(&bucket);
+    clog_vec_addresses(&bucket);
     e.storage().persistent().set(&key, &bucket);
 
     count += 1;

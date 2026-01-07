@@ -8,6 +8,7 @@ use soroban_sdk::{BytesN,Vec};
 use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::{nondet_address, nondet_bytes, nondet_bytes_n, nondet_string};
 use crate::rwa::specs::mocks::claim_issuer_trivial::try_is_claim_valid;
+use crate::rwa::specs::helpers::clogs::clog_vec_bytes_n;
 
 // helpers
 
@@ -32,6 +33,7 @@ pub fn add_claim_integrity_1(e: Env) {
     let data = nondet_bytes();
     let uri = nondet_string();
     let claim_id = add_claim(&e, topic, scheme, &issuer, &signature, &data, &uri);
+    clog!(cvlr_soroban::BN(&claim_id));
     let claim_post = get_claim_non_pancicking(e, claim_id);
     cvlr_assert!(claim_post.is_some());
 }
@@ -41,14 +43,17 @@ pub fn add_claim_integrity_1(e: Env) {
 // status: verified
 pub fn add_claim_integrity_2(e: Env) {
     let topic: u32 = nondet();
+    clog!(topic);
     let scheme: u32 = nondet();
     let issuer = nondet_address();
     let signature = nondet_bytes();
     let data = nondet_bytes();
     let uri = nondet_string();
     let claim_id = add_claim(&e, topic, scheme, &issuer, &signature, &data, &uri);
+    clog!(cvlr_soroban::BN(&claim_id));
     let claim_post = get_claim_non_pancicking(e, claim_id);
     let claim_post_topic = claim_post.unwrap().topic;
+    clog!(claim_post_topic);
     cvlr_assert!(claim_post_topic == topic);
 }
 
@@ -58,13 +63,16 @@ pub fn add_claim_integrity_2(e: Env) {
 pub fn add_claim_integrity_3(e: Env) {
     let topic: u32 = nondet();
     let scheme: u32 = nondet();
+    clog!(scheme);
     let issuer = nondet_address();
     let signature = nondet_bytes();
     let data = nondet_bytes();
     let uri = nondet_string();
     let claim_id = add_claim(&e, topic, scheme, &issuer, &signature, &data, &uri);
+    clog!(cvlr_soroban::BN(&claim_id));
     let claim_post = get_claim_non_pancicking(e, claim_id);
     let claim_post_scheme = claim_post.unwrap().scheme;
+    clog!(claim_post_scheme);
     cvlr_assert!(claim_post_scheme == scheme);
 }
 
@@ -75,12 +83,15 @@ pub fn add_claim_integrity_4(e: Env) {
     let topic: u32 = nondet();
     let scheme: u32 = nondet();
     let issuer = nondet_address();
+    clog!(cvlr_soroban::Addr(&issuer));
     let signature = nondet_bytes();
     let data = nondet_bytes();
     let uri = nondet_string();
     let claim_id = add_claim(&e, topic, scheme, &issuer, &signature, &data, &uri);
+    clog!(cvlr_soroban::BN(&claim_id));
     let claim_post = get_claim_non_pancicking(e, claim_id);
     let claim_post_issuer = claim_post.unwrap().issuer;
+    clog!(cvlr_soroban::Addr(&claim_post_issuer));
     cvlr_assert!(claim_post_issuer == issuer);
 }
 
@@ -92,11 +103,14 @@ pub fn add_claim_integrity_5(e: Env) {
     let scheme: u32 = nondet();
     let issuer = nondet_address();
     let signature = nondet_bytes();
+    clog!(cvlr_soroban::B(&signature));
     let data = nondet_bytes();
     let uri = nondet_string();
     let claim_id = add_claim(&e, topic, scheme, &issuer, &signature, &data, &uri);
+    clog!(cvlr_soroban::BN(&claim_id));
     let claim_post = get_claim_non_pancicking(e, claim_id);
     let claim_post_signature = claim_post.unwrap().signature;
+    clog!(cvlr_soroban::B(&claim_post_signature));
     cvlr_assert!(claim_post_signature == signature);
 }
 
@@ -109,10 +123,13 @@ pub fn add_claim_integrity_6(e: Env) {
     let issuer = nondet_address();
     let signature = nondet_bytes();
     let data = nondet_bytes();
+    clog!(cvlr_soroban::B(&data));
     let uri = nondet_string();
     let claim_id = add_claim(&e, topic, scheme, &issuer, &signature, &data, &uri);
+    clog!(cvlr_soroban::BN(&claim_id));
     let claim_post = get_claim_non_pancicking(e, claim_id);
     let claim_post_data = claim_post.unwrap().data;
+    clog!(cvlr_soroban::B(&claim_post_data));
     cvlr_assert!(claim_post_data == data);
 }
 
@@ -127,6 +144,7 @@ pub fn add_claim_integrity_7(e: Env) {
     let data = nondet_bytes();
     let uri = nondet_string();
     let claim_id = add_claim(&e, topic, scheme, &issuer, &signature, &data, &uri);
+    clog!(cvlr_soroban::BN(&claim_id));
     let claim_post = get_claim_non_pancicking(e, claim_id);
     let claim_post_uri = claim_post.unwrap().uri;
     cvlr_assert!(claim_post_uri == uri);
@@ -147,10 +165,14 @@ pub fn remove_claim_integrity_1(e: Env) {
 // status: spurious violation
 pub fn remove_claim_integrity_2(e: Env) {
     let claim_id = nondet_bytes_n();
+    clog!(cvlr_soroban::BN(&claim_id));
     let topic = nondet();
+    clog!(topic);
     remove_claim(&e, &claim_id);
-    let claims_by_topic_post = get_claim_ids_by_topic_non_pancicking(e, topic);
-    let claims_by_topic_post_contains_claim_id = claims_by_topic_post.unwrap().contains(&claim_id);
+    let claims_by_topic_post = get_claim_ids_by_topic_non_pancicking(e, topic).unwrap();
+    clog_vec_bytes_n(&claims_by_topic_post);
+    let claims_by_topic_post_contains_claim_id = claims_by_topic_post.contains(&claim_id);
+    clog!(claims_by_topic_post_contains_claim_id);
     cvlr_assert!(!claims_by_topic_post_contains_claim_id);
 }
 
@@ -184,7 +206,9 @@ pub fn assert_post_claim_in_claims_by_topic(e: Env, claim_id: BytesN<32>) {
 
 pub fn assume_pre_claims_by_topic_then_claim_exists(e: Env, topic: u32, claim_id: BytesN<32>) {
     let claims_by_topic = get_claim_ids_by_topic(&e, topic);
+    clog_vec_bytes_n(&claims_by_topic);
     let claims_contain_claim_id = claims_by_topic.contains(claim_id.clone());
+    clog!(claims_contain_claim_id);
     if claims_contain_claim_id {
         let claim_option = get_claim_non_pancicking(e, claim_id);
         cvlr_assume!(claim_option.is_some());
@@ -193,7 +217,9 @@ pub fn assume_pre_claims_by_topic_then_claim_exists(e: Env, topic: u32, claim_id
 
 pub fn assert_post_claims_by_topic_then_claim_exists(e: Env, topic: u32, claim_id: BytesN<32>) {
     let claims_by_topic = get_claim_ids_by_topic(&e, topic);
+    clog_vec_bytes_n(&claims_by_topic);
     let claims_contain_claim_id = claims_by_topic.contains(claim_id.clone());
+    clog!(claims_contain_claim_id);
     if claims_contain_claim_id {
         let claim_option = get_claim_non_pancicking(e, claim_id);
         cvlr_assert!(claim_option.is_some());
@@ -204,12 +230,14 @@ pub fn assert_post_claims_by_topic_then_claim_exists(e: Env, topic: u32, claim_i
 
 pub fn assume_pre_claim_valid(e: Env, claim_id: BytesN<32>) {
     let claim = get_claim(&e, &claim_id);
+    clog!(cvlr_soroban::BN(&claim_id));
     let is_valid = try_is_claim_valid(&e, claim.issuer, claim.topic, claim.scheme, claim.signature, claim.data);
     cvlr_assume!(is_valid.unwrap().is_ok());
 }
 
 pub fn assert_post_claim_valid(e: Env, claim_id: BytesN<32>) {
     let claim = get_claim(&e, &claim_id);
+    clog!(cvlr_soroban::BN(&claim_id));
     let is_valid = try_is_claim_valid(&e, claim.issuer, claim.topic, claim.scheme, claim.signature, claim.data);
     cvlr_assert!(is_valid.unwrap().is_ok());
 }
@@ -235,8 +263,10 @@ pub fn after_add_claim_inv1(e: Env) {
     let data = nondet_bytes();
     let uri = nondet_string();
     let claim_id = nondet_bytes_n();
+    clog!(cvlr_soroban::BN(&claim_id));
     assume_pre_claim_in_claims_by_topic(e.clone(), claim_id.clone());
-    add_claim(&e.clone(), topic, scheme, &issuer, &signature, &data, &uri);
+    let new_id = add_claim(&e.clone(), topic, scheme, &issuer, &signature, &data, &uri);
+    clog!(cvlr_soroban::BN(&new_id));
     assert_post_claim_in_claims_by_topic(e, claim_id);
 }
 
