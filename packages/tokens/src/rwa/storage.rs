@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, String};
 use stellar_contract_utils::pausable::{paused, PausableError};
 
 #[cfg(feature = "certora")]
-use crate::rwa::{compliance::Compliance, identity_verifier::IdentityVerifier, specs::{compliance_trivial::ComplianceTrivial, identity_verifier_trivial::IdentityVerifierTrivial}};
+use crate::rwa::{compliance::Compliance, identity_verifier::IdentityVerifier, specs::mocks::{compliance_trivial::ComplianceTrivial, identity_verifier_trivial::IdentityVerifierTrivial}};
 #[cfg(not(feature = "certora"))]
 use crate::{
     fungible::emit_transfer,

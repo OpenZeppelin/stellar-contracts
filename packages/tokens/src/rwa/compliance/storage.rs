@@ -3,7 +3,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 #[cfg(not(feature = "certora"))]
 use crate::rwa::compliance::{emit_module_added, emit_module_removed};
 #[cfg(feature = "certora")]
-use crate::rwa::{compliance::ComplianceModule, specs::compliance_trivial::ComplianceModuleTrivial};
+use crate::rwa::{compliance::ComplianceModule, specs::mocks::compliance_trivial::ComplianceModuleTrivial};
 use crate::rwa::{
     compliance::{
         ComplianceError, ComplianceHook, ComplianceModuleClient, COMPLIANCE_EXTEND_AMOUNT,

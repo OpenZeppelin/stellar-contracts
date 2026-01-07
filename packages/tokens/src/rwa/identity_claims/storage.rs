@@ -30,7 +30,7 @@ use soroban_sdk::{
 #[cfg(not(feature = "certora"))]
 use super::emit_claim_event;
 use super::{ClaimEvent, ClaimsError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD};
-use crate::rwa::{claim_issuer::{ClaimIssuer, ClaimIssuerClient}, specs::claim_issuer_trivial::ClaimIssuerTrivial};
+use crate::rwa::{claim_issuer::{ClaimIssuer, ClaimIssuerClient}, specs::mocks::claim_issuer_trivial::ClaimIssuerTrivial};
 
 /// Represents a claim stored on-chain.
 #[contracttype]

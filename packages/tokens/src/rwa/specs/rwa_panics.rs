@@ -8,8 +8,8 @@ use crate::rwa::RWA;
 use crate::fungible::ContractOverrides;
 use crate::fungible::FungibleToken;
 use crate::rwa::compliance::Compliance;
-use crate::rwa::specs::compliance_trivial::ComplianceTrivial;
-use crate::rwa::specs::identity_verifier_trivial::IdentityVerifierTrivial;
+use crate::rwa::specs::mocks::compliance_trivial::ComplianceTrivial;
+use crate::rwa::specs::mocks::identity_verifier_trivial::IdentityVerifierTrivial;
 
 // due to the discrepency between trait function and storage functions
 // we cannot verify the fact that authorization of the operator is required
@@ -66,10 +66,10 @@ pub fn rwa_forced_transfer_panics_if_amount_less_than_zero(e: Env) {
 // mint DOES NOT panic if the recipient address is frozen
 
 pub fn assume_verify_identity_result_map_is_uninit() {
-    use crate::rwa::specs::ghosts::GhostMap::UnInit;
-    use crate::rwa::specs::identity_verifier_trivial::VERIFY_IDENTITY_RESULT_MAP;
+    use crate::rwa::specs::helpers::ghosts::GhostMap::UnInit;
+    use crate::rwa::specs::mocks::identity_verifier_trivial::VERIFY_IDENTITY_RESULT_MAP;
     unsafe {
-    let verify_identity_result_map: &crate::rwa::specs::ghosts::GhostMap<Address, bool> = &VERIFY_IDENTITY_RESULT_MAP;
+    let verify_identity_result_map: &crate::rwa::specs::helpers::ghosts::GhostMap<Address, bool> = &VERIFY_IDENTITY_RESULT_MAP;
         let is_uninit = verify_identity_result_map.is_uninit();
         clog!(is_uninit);
         cvlr_assume!(is_uninit);
@@ -77,9 +77,9 @@ pub fn assume_verify_identity_result_map_is_uninit() {
 }
 
 pub fn clog_verify_identity_result_map() {
-    use crate::rwa::specs::identity_verifier_trivial::VERIFY_IDENTITY_RESULT_MAP;
+    use crate::rwa::specs::mocks::identity_verifier_trivial::VERIFY_IDENTITY_RESULT_MAP;
     unsafe {
-        let verify_identity_result_map: &crate::rwa::specs::ghosts::GhostMap<Address, bool> = &VERIFY_IDENTITY_RESULT_MAP;
+        let verify_identity_result_map: &crate::rwa::specs::helpers::ghosts::GhostMap<Address, bool> = &VERIFY_IDENTITY_RESULT_MAP;
         let is_uninit = verify_identity_result_map.is_uninit();
         clog!(is_uninit);
     }

@@ -3,7 +3,7 @@ use cvlr_soroban::{nondet_address, nondet_bytes, nondet_bytes_n, nondet_string};
 use cvlr_soroban_derive::rule;
 use soroban_sdk::{Address, Env, Vec};
 use crate::rwa::utils::token_binder::{bind_token, bind_tokens, is_token_bound, linked_tokens, unbind_token};
-use crate::rwa::specs::nondet::nondet_vec_address;
+use crate::rwa::specs::helpers::nondet::nondet_vec_address;
 use crate::rwa::utils::token_binder::storage::linked_token_count;
 
 // to do invariants with these:

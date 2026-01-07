@@ -6,7 +6,7 @@ use crate::rwa::claim_issuer::{ClaimIssuer, ClaimIssuerError};
 
 pub struct ClaimIssuerTrivial;
 
-use crate::rwa::specs::ghosts::GhostMap;
+use crate::rwa::specs::helpers::ghosts::GhostMap;
 pub static mut IS_CLAIM_VALID_RESULT_MAP: GhostMap<(Address, u32, u32, Bytes, Bytes), bool> = GhostMap::UnInit;
 
 use soroban_sdk::contracterror;

@@ -7,7 +7,7 @@ use crate::rwa::identity_claims::storage::{
 use soroban_sdk::{BytesN,Vec};
 use cvlr::{clog, cvlr_assert, cvlr_assume, cvlr_satisfy, nondet::*};
 use cvlr_soroban::{nondet_address, nondet_bytes, nondet_bytes_n, nondet_string};
-use crate::rwa::specs::claim_issuer_trivial::try_is_claim_valid;
+use crate::rwa::specs::mocks::claim_issuer_trivial::try_is_claim_valid;
 
 // helpers
 

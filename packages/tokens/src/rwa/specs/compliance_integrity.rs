@@ -4,6 +4,7 @@ use cvlr_soroban_derive::rule;
 use soroban_sdk::Env;
 use crate::rwa::compliance::storage;
 use crate::rwa::compliance::ComplianceHook;
+use crate::rwa::specs::helpers::nondet;
 
 #[rule]
 // after add_module the modules contain the module

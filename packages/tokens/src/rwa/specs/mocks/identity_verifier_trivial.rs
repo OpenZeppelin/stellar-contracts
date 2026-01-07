@@ -8,7 +8,7 @@ use crate::rwa::RWAError;
 
 pub struct IdentityVerifierTrivial; 
 
-use crate::rwa::specs::ghosts::GhostMap;
+use crate::rwa::specs::helpers::ghosts::GhostMap;
 pub static mut VERIFY_IDENTITY_RESULT_MAP: GhostMap<Address, bool> = GhostMap::UnInit;
 
 impl IdentityVerifier for IdentityVerifierTrivial {

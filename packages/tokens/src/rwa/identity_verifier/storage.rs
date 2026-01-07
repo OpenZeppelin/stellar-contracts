@@ -8,7 +8,7 @@ use crate::rwa::{
     claim_topics_and_issuers::{ClaimTopicsAndIssuers, storage as claim_topics_and_issuers_storage},
     identity_claims::storage as identity_claims_storage,
     identity_registry_storage::storage as identity_registry_storage_storage,
-    specs::claim_issuer_trivial::{ClaimIssuerTrivial, try_is_claim_valid},
+    specs::mocks::claim_issuer_trivial::{ClaimIssuerTrivial, try_is_claim_valid},
 };
 use crate::rwa::{
     RWAError, claim_issuer::ClaimIssuerClient, claim_topics_and_issuers::ClaimTopicsAndIssuersClient, identity_claims::{Claim, IdentityClaims, IdentityClaimsClient, generate_claim_id}

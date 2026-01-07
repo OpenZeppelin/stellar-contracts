@@ -40,3 +40,11 @@ pub fn recovery_target_matches_identity_registry_storage(e: Env) {
 
 // todo: verify_identity function 
 // only panics/non-panics - doesn't return anything.
+
+// todo
+// maybe make a non-panicking version of verify_identity
+
+// if there is some invalidity it should panic.
+
+// conjungtive over claims
+// disjunctive over issuers
