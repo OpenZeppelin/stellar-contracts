@@ -3,11 +3,7 @@ pub mod mocks;
 
 pub mod rwa_integrity;
 pub mod rwa_panics;
-
-pub mod compliance_integrity;
-
+pub mod compliance;
 pub mod identity_verifier;
-
 pub mod token_binder;
-
 pub mod identity_claims;
