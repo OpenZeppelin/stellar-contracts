@@ -12,7 +12,7 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-stellar-access = { workspace = true }
+stellar-access = { workspace = true, features = ["ownable"] }
 stellar-macros = { workspace = true }
 
 [dev-dependencies]

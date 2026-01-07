@@ -1,5 +1,7 @@
 //! Access control module for Soroban contracts
 //!
+//! **Feature**: This module requires the `roles` feature flag.
+//!
 //! This module provides functionality to manage role-based access control in
 //! Soroban contracts.
 //!

@@ -1,5 +1,7 @@
 //! # Ownable Contract Module.
 //!
+//! **Feature**: This module requires the `ownable` feature flag.
+//!
 //! This module introduces a simple access control mechanism where a contract
 //! has an account (owner) that can be granted exclusive access to specific
 //! functions.

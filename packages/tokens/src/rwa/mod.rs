@@ -1,5 +1,7 @@
 //! # Real World Asset (RWA) Token Contract Module
 //!
+//! **Feature**: This module requires the `rwa` feature flag.
+//!
 //! Implements utilities for handling Real World Asset tokens in a Soroban
 //! contract. This module is based on the T-REX (Token for Regulated Exchanges)
 //! standard, providing comprehensive functionality for compliant security

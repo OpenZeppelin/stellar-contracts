@@ -1,3 +1,10 @@
+//! # Vault Token Contract Module.
+//!
+//! **Feature**: This module requires the `vault` feature flag.
+//!
+//! Implements utilities for tokenized vaults (similar to ERC-4626) in a Soroban
+//! contract.
+
 pub mod storage;
 
 #[cfg(test)]

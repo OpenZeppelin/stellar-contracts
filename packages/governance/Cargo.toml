@@ -7,6 +7,9 @@ version.workspace = true
 publish = true
 description = "Governance Utilities for Stellar contracts."
 
+[features]
+default = ["timelock"]
+timelock = []
 
 [lib]
 crate-type = ["lib", "cdylib"]

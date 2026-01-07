@@ -7,6 +7,13 @@ version.workspace = true
 publish = true
 description = "Utilities for Stellar contracts."
 
+[features]
+default = ["crypto", "math", "merkle-distributor", "pausable", "upgradeable"]
+crypto = []
+math = []
+merkle-distributor = ["crypto"]
+pausable = []
+upgradeable = []
 
 [lib]
 crate-type = ["lib", "cdylib"]

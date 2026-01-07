@@ -12,8 +12,8 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-stellar-access = { workspace = true }
-stellar-governance = { workspace = true }
+stellar-access = { workspace = true, features = ["roles"] }
+stellar-governance = { workspace = true, features = ["timelock"] }
 stellar-macros = { workspace = true }
 
 [dev-dependencies]

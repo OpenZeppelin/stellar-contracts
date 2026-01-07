@@ -1,5 +1,7 @@
 //! # Merkle Distributor
 //!
+//! **Feature**: This module requires the `merkle-distributor` feature flag.
+//!
 //! This module implements a Merkle-based claim distribution system using Merkle
 //! proofs for verification.
 //!

@@ -16,5 +16,5 @@ stellar-fee-abstraction = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-stellar-tokens = { workspace = true }
+stellar-tokens = { workspace = true, features = ["fungible"] }
 stellar-macros = { workspace = true }

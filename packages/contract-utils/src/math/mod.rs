@@ -1,5 +1,7 @@
 //! # Fixed-Point Math Library
 //!
+//! **Feature**: This module requires the `math` feature flag.
+//!
 //! Provides utilities for precise fixed-point arithmetic operations in Soroban
 //! smart contracts.
 //!

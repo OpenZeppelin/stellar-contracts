@@ -1,5 +1,7 @@
 //! # Lightweight upgradeability framework
 //!
+//! **Feature**: This module requires the `upgradeable` feature flag.
+//!
 //! This module defines a minimal system for managing contract upgrades, with
 //! optional support for handling migrations in a structured and safe manner.
 //! The framework enforces correct sequencing of operations, e.g. migration can

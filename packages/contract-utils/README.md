@@ -147,6 +147,25 @@ stellar-contract-utils = "=0.5.1"
 stellar-macros = "=0.5.1"
 ```
 
+### Feature Flags
+
+This crate uses feature flags to allow selective compilation of modules, reducing final contract binary size.
+
+| Feature | Description | Dependencies |
+|---------|-------------|--------------|
+| `crypto` | Cryptographic utilities (hash functions, Merkle verification) | - |
+| `math` | Mathematical utilities | - |
+| `merkle-distributor` | Merkle-based claim distribution system | `crypto` |
+| `pausable` | Pause/unpause contract utilities | - |
+| `upgradeable` | Contract upgrade framework | - |
+
+All features are enabled by default. To use only specific features:
+
+```toml
+[dependencies]
+stellar-contract-utils = { version = "=0.5.1", default-features = false, features = ["pausable"] }
+```
+
 ## Examples
 
 See the following examples in the repository:

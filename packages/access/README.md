@@ -150,6 +150,22 @@ stellar-access = "=0.5.1"
 stellar-macros = "=0.5.1"
 ```
 
+### Feature Flags
+
+This crate uses feature flags to allow selective compilation of modules, reducing final contract binary size.
+
+| Feature | Description | Dependencies |
+|---------|-------------|--------------|
+| `ownable` | Simple single-owner access control | - |
+| `roles` | Role-based access control with hierarchical permissions | - |
+
+All features are enabled by default. To use only specific features:
+
+```toml
+[dependencies]
+stellar-access = { version = "=0.5.1", default-features = false, features = ["ownable"] }
+```
+
 ## Examples
 
 See the following examples in the repository:

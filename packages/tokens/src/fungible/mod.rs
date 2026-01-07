@@ -1,5 +1,7 @@
 //! # Fungible Token Contract Module.
 //!
+//! **Feature**: This module requires the `fungible` feature flag.
+//!
 //! Implements utilities for handling fungible tokens in a Soroban contract.
 //!
 //! This module provides essential storage functionalities required for managing

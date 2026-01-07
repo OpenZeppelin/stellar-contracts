@@ -7,6 +7,10 @@ version.workspace = true
 publish = true
 description = "Access Control, Ownable, and Role Transfer utilities for Stellar contracts."
 
+[features]
+default = ["ownable", "roles"]
+ownable = []
+roles = []
 
 [lib]
 crate-type = ["lib", "cdylib"]

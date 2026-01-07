@@ -663,7 +663,6 @@ version = "0.5.1"
 dependencies = [
  "hex-literal 1.0.0",
  "soroban-sdk",
- "stellar-access",
  "stellar-contract-utils",
  "stellar-macros",
  "stellar-tokens",
@@ -684,8 +683,6 @@ name = "fungible-vault-example"
 version = "0.5.1"
 dependencies = [
  "soroban-sdk",
- "stellar-access",
- "stellar-macros",
  "stellar-tokens",
 ]
 

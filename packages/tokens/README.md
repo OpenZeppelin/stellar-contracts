@@ -145,6 +145,24 @@ stellar-tokens = "=0.5.1"
 stellar-macros = "=0.5.1"
 ```
 
+## Feature Flags
+
+This crate uses feature flags to allow selective compilation of modules, reducing final contract binary size.
+
+| Feature | Description | Dependencies |
+|---------|-------------|--------------|
+| `fungible` | Fungible token (similar to ERC-20) | - |
+| `non-fungible` | Non-fungible token (similar to ERC-721) | - |
+| `vault` | Tokenized vault (similar to ERC-4626) | `fungible`, `stellar-contract-utils/math` |
+| `rwa` | Real-World Asset token | `fungible`, `stellar-contract-utils/pausable` |
+
+All features are enabled by default. To use only specific features:
+
+```toml
+[dependencies]
+stellar-tokens = { version = "=0.5.1", default-features = false, features = ["fungible"] }
+```
+
 ## Examples
 
 See the following examples in the repository:

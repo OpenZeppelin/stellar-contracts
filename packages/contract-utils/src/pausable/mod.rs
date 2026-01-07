@@ -1,5 +1,7 @@
 //! Pausable Contract Module.
 //!
+//! **Feature**: This module requires the `pausable` feature flag.
+//!
 //! This contract module allows implementing a configurable stop mechanism for
 //! your contract.
 //!

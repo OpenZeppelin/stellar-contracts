@@ -1,5 +1,7 @@
 //! # Non-Fungible Token Contract Module.
 //!
+//! **Feature**: This module requires the `non-fungible` feature flag.
+//!
 //! Implements utilities for handling non-fungible tokens in a Soroban contract.
 //!
 //! This module provides essential storage functionalities required for managing
