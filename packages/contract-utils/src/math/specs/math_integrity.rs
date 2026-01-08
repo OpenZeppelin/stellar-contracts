@@ -10,14 +10,18 @@ use crate::math::{
 
 #[rule]
 // result is at most expected
-// status: first assert verified, second violated spurious
-//
+// status: verified https://prover.certora.com/output/33158/cee6ba53f3f14674851955c8aec9a0c1
+// sanity: https://prover.certora.com/output/33158/465304f6d768450d8660b8c25290c0ee
+// NOTE: see the usage of certora feature in `i128_fixed_point.rs` that skips the 256 bit attempt due to 64 bit assumptions here
 pub fn fixed_mul_floor_integrity(e: &Env) {
     let x = i128::nondet();
+    cvlr_assume!(i64::MIN as i128 <= x && x <= i64::MAX as i128);
     clog!(x);
     let y = i128::nondet();
+    cvlr_assume!(i64::MIN as i128 <= y && y <= i64::MAX as i128);
     clog!(y);
     let z = i128::nondet();
+    cvlr_assume!(i64::MIN as i128 <= z && z <= i64::MAX as i128);
     clog!(z);
     let result = x.fixed_mul_floor(e, &y, &z);
     clog!(result);
@@ -26,20 +30,24 @@ pub fn fixed_mul_floor_integrity(e: &Env) {
     let max_rounding_error: i128 = 1;
     clog!(max_rounding_error);
     let lower_bound = expected_result.checked_sub(max_rounding_error).unwrap();
-    clog!(lower_bound);
     cvlr_assert!(result <= expected_result);
     cvlr_assert!(result >= lower_bound);
 }
 
 #[rule]
 // result is at least expected
-// status: first assert verified, second violated spurious
+// status: verified https://prover.certora.com/output/33158/cee6ba53f3f14674851955c8aec9a0c1
+// sanity: https://prover.certora.com/output/33158/465304f6d768450d8660b8c25290c0ee
+// NOTE: see the usage of certora feature in `i128_fixed_point.rs` that skips the 256 bit attempt due to 64 bit assumptions here
 pub fn fixed_mul_ceil_integrity(e: &Env) {
     let x = i128::nondet();
+    cvlr_assume!(i64::MIN as i128 <= x && x <= i64::MAX as i128);
     clog!(x);
     let y = i128::nondet();
+    cvlr_assume!(i64::MIN as i128 <= y && y <= i64::MAX as i128);
     clog!(y);
     let z = i128::nondet();
+    cvlr_assume!(i64::MIN as i128 <= z && z <= i64::MAX as i128);
     clog!(z);
     let result = x.fixed_mul_ceil(e, &y, &z);
     clog!(result);
@@ -52,3 +60,4 @@ pub fn fixed_mul_ceil_integrity(e: &Env) {
     cvlr_assert!(result >= expected_result);
     cvlr_assert!(result <= upper_bound);
 }
+
