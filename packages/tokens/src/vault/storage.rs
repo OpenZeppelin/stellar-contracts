@@ -649,7 +649,7 @@ impl Vault {
             .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
         #[cfg(feature = "certora")]
-        let pow = 0;
+        let pow = 1_i128;
 
         // Effective total supply = totalSupply + virtual offset
         let y = Self::total_supply(e)
@@ -706,7 +706,7 @@ impl Vault {
             .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
         #[cfg(feature = "certora")]
-        let pow = 0;
+        let pow = 1_i128;
         
         // Effective total supply = totalSupply + virtual offset
         let denominator = Self::total_supply(e)
