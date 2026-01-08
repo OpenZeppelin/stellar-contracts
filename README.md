@@ -17,6 +17,8 @@ OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stel
   - [`access/`](packages/access): Role-based access controls and ownable
   - [`accounts/`](packages/accounts): Smart accounts with custom authentication and authorization
   - [`contract-utils/`](packages/contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
+  - [`fee-abstraction/`](packages/fee-abstraction): Utilities for covering transaction fees with fungible tokens instead of XLM
+  - [`governance/`](packages/governance): Governance utilities such as timelock
   - [`macros/`](packages/macros): Proc and derive macros for some of the modules (`#[only_owner]`, `#[when_not_paused]`, `#[derive(Upgradeable)]`, etc.)
   - [`test-utils/`](packages/test-utils): Utilities for testing
   - [`tokens/`](packages/tokens): Various token types (fungible, non-fungible, real-world assets, vaults)
