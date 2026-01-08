@@ -240,7 +240,8 @@ pub fn preview_redeem_matches_convert_to_assets(e: Env) {
 
 #[rule]
 // deposit matches preview_deposit
-// status: timeout
+// status: https://prover.certora.com/output/33158/ca249b3fb0aa473ca2335a5634d0d346
+// Note the i64 assumption and the virtual offset being set to 0 in `storage.rs` (which is the default value)
 pub fn deposit_matches_preview_deposit(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();
