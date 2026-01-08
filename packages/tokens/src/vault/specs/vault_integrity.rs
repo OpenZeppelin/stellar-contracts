@@ -65,7 +65,7 @@ pub fn deposit_integrity_1(e: Env) {
 
 #[rule]
 // deposit increases the shares balance by shares (output)
-// status:
+// status: timeout
 pub fn deposit_integrity_2(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();
@@ -88,7 +88,7 @@ pub fn deposit_integrity_2(e: Env) {
 
 #[rule]
 // deposit increases total_assets by assets
-// status:
+// status: timeout
 pub fn deposit_integrity_3(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();
@@ -111,7 +111,7 @@ pub fn deposit_integrity_3(e: Env) {
 
 #[rule]
 // deposit increases the shares balance by shares (output)
-// status:
+// status: timeout
 pub fn deposit_integrity_4(e: Env) {
     safe_assumptions(&e);
     let assets: i128 = nondet();

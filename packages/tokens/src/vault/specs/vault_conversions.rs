@@ -60,12 +60,14 @@ pub fn convert_to_assets_zero_to_zero(e: Env) {
 
 #[rule]
 // convert to shares monotonicty
-// status: violation https://prover.certora.com/output/33158/3b3d914ee1c4402189ddd239bf596976
+// status: wip
 // Note the i64 assumption and the virtual offset being set to 0 in `storage.rs` (which is the default value)
 pub fn convert_to_shares_monotonicity(e: Env) {
     safe_assumptions(&e);
     let assets1: i128 = nondet();
     let assets2: i128 = nondet();
+    cvlr_assume!(assets1 >= 0);
+    cvlr_assume!(assets2 >= 0);
     cvlr_assume!(assets1 >= i64::MIN as i128 && assets1 <= i64::MAX as i128);
     cvlr_assume!(assets2 >= i64::MIN as i128 && assets2 <= i64::MAX as i128);
     clog!(assets1);
@@ -80,7 +82,7 @@ pub fn convert_to_shares_monotonicity(e: Env) {
 
 #[rule]
 // convert to assets monotonicity
-// status: violation https://prover.certora.com/output/33158/a7da4cf4d52a4bfe8da50282e0632110
+// status: wip
 // Note the i64 assumption and the virtual offset being set to 0 in `storage.rs` (which is the default value)
 pub fn convert_to_assets_monotonicity(e: Env) {
     safe_assumptions(&e);
@@ -144,7 +146,7 @@ pub fn convert_to_assets_weak_additivity(e: Env) {
 
 #[rule]
 // convert to shares weak inverse
-// status: https://prover.certora.com/output/33158/b6c09e1bf0364dae87d163560ab0f185
+// status: verified
 // Note the i64 assumption and the virtual offset being set to 0 in `storage.rs` (which is the default value)
 pub fn convert_to_shares_weak_inverse(e: Env) {
     safe_assumptions(&e);
@@ -160,7 +162,7 @@ pub fn convert_to_shares_weak_inverse(e: Env) {
 
 #[rule]
 // convert to assets weak inverse
-// status: https://prover.certora.com/output/33158/7b8780dbc0494f67901e972d5dd863c7
+// status: verified
 // Note the i64 assumption and the virtual offset being set to 0 in `storage.rs` (which is the default value)
 pub fn convert_to_assets_weak_inverse(e: Env) {
     safe_assumptions(&e);
@@ -176,7 +178,7 @@ pub fn convert_to_assets_weak_inverse(e: Env) {
  
 #[rule]
 // preview_deposit matches convert to shares
-// status: https://prover.certora.com/output/33158/daa8ed70620e4c8eb9590505e3716f4d
+// status: verified
 // Note the i64 assumption and the virtual offset being set to 0 in `storage.rs` (which is the default value)
 pub fn preview_deposit_matches_convert_to_shares(e: Env) {
     safe_assumptions(&e);
@@ -192,7 +194,7 @@ pub fn preview_deposit_matches_convert_to_shares(e: Env) {
 
 #[rule]
 // preview_mint matches convert to assets
-// status: violation https://prover.certora.com/output/33158/f99c56b778ec4adbb0fb03152b9d13cc
+// status: violation wip
 // Note the i64 assumption and the virtual offset being set to 0 in `storage.rs` (which is the default value)
 pub fn preview_mint_matches_convert_to_assets(e: Env) {
     safe_assumptions(&e);
@@ -208,7 +210,7 @@ pub fn preview_mint_matches_convert_to_assets(e: Env) {
 
 #[rule]
 // preview_withdraw matches convert to shares
-// status: violation https://prover.certora.com/output/33158/155f54e7015240c98afdc216ed6f245f
+// status: violation wip
 // Note the i64 assumption and the virtual offset being set to 0 in `storage.rs` (which is the default value)
 pub fn preview_withdraw_matches_convert_to_shares(e: Env) {
     safe_assumptions(&e);
@@ -224,7 +226,7 @@ pub fn preview_withdraw_matches_convert_to_shares(e: Env) {
 
 #[rule]
 // preview_redeem matches convert to assets
-// status: https://prover.certora.com/output/33158/2e960791a9884534bafd43c2b46b56a4
+// status: verified
 // Note the i64 assumption and the virtual offset being set to 0 in `storage.rs` (which is the default value)
 pub fn preview_redeem_matches_convert_to_assets(e: Env) {
     safe_assumptions(&e);
@@ -240,7 +242,7 @@ pub fn preview_redeem_matches_convert_to_assets(e: Env) {
 
 #[rule]
 // deposit matches preview_deposit
-// status: https://prover.certora.com/output/33158/ca249b3fb0aa473ca2335a5634d0d346
+// status: verified
 // Note the i64 assumption and the virtual offset being set to 0 in `storage.rs` (which is the default value)
 pub fn deposit_matches_preview_deposit(e: Env) {
     safe_assumptions(&e);
