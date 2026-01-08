@@ -643,9 +643,13 @@ impl Vault {
         let x = assets;
 
         // Virtual offset = 10^offset
+        #[cfg(not(feature = "certora"))]
         let pow = 10_i128
             .checked_pow(Self::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
+
+        #[cfg(feature = "certora")]
+        let pow = 0;
 
         // Effective total supply = totalSupply + virtual offset
         let y = Self::total_supply(e)
@@ -696,10 +700,14 @@ impl Vault {
             .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
         // Virtual offset = 10^offset
+        #[cfg(not(feature = "certora"))]
         let pow = 10_i128
             .checked_pow(Self::get_decimals_offset(e))
             .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
 
+        #[cfg(feature = "certora")]
+        let pow = 0;
+        
         // Effective total supply = totalSupply + virtual offset
         let denominator = Self::total_supply(e)
             .checked_add(pow)
