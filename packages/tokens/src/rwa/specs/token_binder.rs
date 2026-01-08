@@ -5,26 +5,19 @@ use soroban_sdk::{Address, Env, Vec};
 use crate::rwa::utils::token_binder::{bind_token, bind_tokens, is_token_bound, linked_tokens, unbind_token};
 use crate::rwa::specs::helpers::nondet::nondet_vec_address;
 use crate::rwa::utils::token_binder::storage::linked_token_count;
+use crate::rwa::specs::helpers::clogs::clog_vec_addresses;
 
-// to do invariants with these:
-// get_token_by_index
-// get_token_index
+//
+// Properties:
+// is_token_bound returns True <=> token is bounded <=> the token address appears in the Vec returned by linked_tokens
+//If get_token_by_index does not panic for some index = N, then it does not panic for all indices <N.
+// Invariant:
+// The length of the vector returned by linked_tokens = the integer returned by linked_token_count
+//The list linked_tokens contains no duplicates.
+//Starting from an arbitrary state, the storage state resulting from applying bind_tokens with a vector of N<= 2 * BUCKET_SIZE unique token addresses is the same as applying bind_token sequently to every element of the vector.
+
 
 // helpers
-
-pub fn clog_tokens_vector(tokens: &Vec<Address>) {
-    // important to put the clogs in optional because i don't want to prevent the case of empty vector by clogs
-    let token_0 = tokens.get(0);
-    if let Some(token_0) = token_0 {
-        clog!(cvlr_soroban::Addr(&token_0));
-    }
-    let token_1 = tokens.get(1);
-    if let Some(token_1) = token_1 {
-        clog!(cvlr_soroban::Addr(&token_1));
-    }
-    let length = tokens.len();
-    clog!(length);
-}
 
 #[rule]
 // after bind_token the token is bound
@@ -83,7 +76,7 @@ pub fn bind_token_integrity_3(e: Env) {
     clog!(cvlr_soroban::Addr(&token));
     bind_token(&e, &token);
     let bound_tokens = linked_tokens(&e);
-    clog_tokens_vector(&bound_tokens);
+    clog_vec_addresses(&bound_tokens);
     let token_in_bound_tokens = bound_tokens.contains(&token);
     clog!(token_in_bound_tokens);   
     cvlr_assert!(token_in_bound_tokens);
@@ -111,7 +104,7 @@ pub fn bind_token_integrity_3_sanity(e: Env) {
     clog!(cvlr_soroban::Addr(&token));
     bind_token(&e, &token);
     let bound_tokens = linked_tokens(&e);
-    clog_tokens_vector(&bound_tokens);
+    clog_vec_addresses(&bound_tokens);
     let token_in_bound_tokens = bound_tokens.contains(&token);
     clog!(token_in_bound_tokens);   
     cvlr_satisfy!(true);
@@ -122,7 +115,7 @@ pub fn bind_token_integrity_3_sanity(e: Env) {
 // status: verified
 pub fn bind_tokens_integrity_1(e: Env) {
     let tokens: Vec<Address> = nondet_vec_address();
-    clog_tokens_vector(&tokens);
+    clog_vec_addresses(&tokens);
     let token: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&token));
     let token_in_tokens = tokens.contains(&token);
@@ -137,7 +130,7 @@ pub fn bind_tokens_integrity_1(e: Env) {
 #[rule]
 pub fn bind_tokens_integrity_1_sanity(e: Env) {
     let tokens = nondet_vec_address();
-    clog_tokens_vector(&tokens);
+    clog_vec_addresses(&tokens);
     let token = nondet_address();
     clog!(cvlr_soroban::Addr(&token));
     let token_in_tokens = tokens.contains(&token);
@@ -154,7 +147,7 @@ pub fn bind_tokens_integrity_1_sanity(e: Env) {
 // status: verified
 pub fn bind_tokens_integrity_2(e: Env) {
     let tokens = nondet_vec_address();
-    clog_tokens_vector(&tokens);
+    clog_vec_addresses(&tokens);
     let tokens_length = tokens.len();
     clog!(tokens_length);
     let token_count_pre = linked_token_count(&e);
@@ -168,7 +161,7 @@ pub fn bind_tokens_integrity_2(e: Env) {
 #[rule]
 pub fn bind_tokens_integrity_2_sanity(e: Env) {
     let tokens = nondet_vec_address();
-    clog_tokens_vector(&tokens);
+    clog_vec_addresses(&tokens);
     let tokens_length = tokens.len();
     clog!(tokens_length);
     let token_count_pre = linked_token_count(&e);
@@ -184,7 +177,7 @@ pub fn bind_tokens_integrity_2_sanity(e: Env) {
 // status: see bind_token_integrity_3
 pub fn bind_tokens_integrity_3(e: Env) {
     let tokens: Vec<Address> = nondet_vec_address();
-    clog_tokens_vector(&tokens);
+    clog_vec_addresses(&tokens);
     let token: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&token));
     let token_in_tokens = tokens.contains(&token);
@@ -192,7 +185,7 @@ pub fn bind_tokens_integrity_3(e: Env) {
     cvlr_assume!(token_in_tokens);
     bind_tokens(&e, &tokens);
     let bound_tokens = linked_tokens(&e);
-    clog_tokens_vector(&bound_tokens);
+    clog_vec_addresses(&bound_tokens);
     let token_in_bound_tokens = bound_tokens.contains(&token);
     clog!(token_in_bound_tokens);   
     cvlr_assert!(token_in_bound_tokens);
@@ -201,7 +194,7 @@ pub fn bind_tokens_integrity_3(e: Env) {
 #[rule]
 pub fn bind_tokens_integrity_3_sanity(e: Env) {
     let tokens: Vec<Address> = nondet_vec_address();
-    clog_tokens_vector(&tokens);
+    clog_vec_addresses(&tokens);
     let token: Address = nondet_address();
     clog!(cvlr_soroban::Addr(&token));
     let token_in_tokens = tokens.contains(&token);
@@ -209,7 +202,7 @@ pub fn bind_tokens_integrity_3_sanity(e: Env) {
     cvlr_assume!(token_in_tokens);
     bind_tokens(&e, &tokens);
     let bound_tokens = linked_tokens(&e);
-    clog_tokens_vector(&bound_tokens);
+    clog_vec_addresses(&bound_tokens);
     let token_in_bound_tokens = bound_tokens.contains(&token);
     clog!(token_in_bound_tokens);   
     cvlr_satisfy!(true);
@@ -278,7 +271,7 @@ pub fn unbind_token_integrity_3(e: Env) {
     clog!(cvlr_soroban::Addr(&token));
     unbind_token(&e, &token);
     let bound_tokens = linked_tokens(&e);
-    clog_tokens_vector(&bound_tokens);
+    clog_vec_addresses(&bound_tokens);
     let token_in_bound_tokens = bound_tokens.contains(&token);
     clog!(token_in_bound_tokens);   
     cvlr_assert!(!token_in_bound_tokens);
@@ -292,7 +285,7 @@ pub fn unbind_token_integrity_3_sanity(e: Env) {
     clog!(cvlr_soroban::Addr(&token));
     unbind_token(&e, &token);
     let bound_tokens = linked_tokens(&e);
-    clog_tokens_vector(&bound_tokens);
+    clog_vec_addresses(&bound_tokens);
     let token_in_bound_tokens = bound_tokens.contains(&token);
     clog!(token_in_bound_tokens);   
     cvlr_satisfy!(true);
@@ -373,7 +366,7 @@ pub fn after_bind_tokens_inverse_1(e: Env) {
     let token = nondet_address();
     clog!(cvlr_soroban::Addr(&token));
     let tokens: Vec<Address> = nondet_vec_address();
-    clog_tokens_vector(&tokens);
+    clog_vec_addresses(&tokens);
     assume_pre_inverse_1(e.clone(), token.clone());
     bind_tokens(&e.clone(), &tokens);
     assert_post_inverse_1(e.clone(), token.clone());
@@ -385,7 +378,7 @@ pub fn after_bind_tokens_inverse_2(e: Env) {
     let index = u32::nondet();
     clog!(index);
     let tokens: Vec<Address> = nondet_vec_address();
-    clog_tokens_vector(&tokens);
+    clog_vec_addresses(&tokens);
     assume_pre_inverse_2(e.clone(), index.clone());
     bind_tokens(&e.clone(), &tokens);
     assert_post_inverse_2(e.clone(), index.clone());

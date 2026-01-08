@@ -2,7 +2,8 @@ use cvlr::nondet::{*};
 use cvlr_soroban::{nondet_address, nondet_map, nondet_symbol};
 use soroban_sdk::{Address, Env, Map, String, Symbol, Vec};
 
-use crate::rwa::{compliance::ComplianceHook, identity_registry_storage::{CountryData, CountryRelation, IndividualCountryRelation, OrganizationCountryRelation}};
+use crate::rwa::{compliance::ComplianceHook, identity_registry_storage::
+    {CountryData, CountryRelation, IndividualCountryRelation, OrganizationCountryRelation, IdentityType}};
 
 pub fn nondet_vec_u32() -> Vec<u32> {
     let env = Env::default();
@@ -89,6 +90,16 @@ impl Nondet for CountryData {
             None
         };
         Self { country: country_relation, metadata }
+    }
+}
+
+impl Nondet for IdentityType {
+    fn nondet() -> Self {
+        let choice = u8::nondet() % 2;
+        match choice {
+            0 => IdentityType::Individual,
+            _ => IdentityType::Organization,
+        }
     }
 }
 
