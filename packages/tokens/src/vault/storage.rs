@@ -632,6 +632,8 @@ impl Vault {
     /// * [`VaultTokenError::MathOverflow`] - When mathematical operations
     ///   result in overflow.
     pub fn convert_to_shares_with_rounding(e: &Env, assets: i128, rounding: Rounding) -> i128 {
+        use cvlr::clog;
+        clog!(assets);
         if assets < 0 {
             panic_with_error!(e, VaultTokenError::VaultInvalidAssetsAmount);
         }
@@ -641,7 +643,7 @@ impl Vault {
 
         // Assets being deposited
         let x = assets;
-
+        clog!(x);
         // Virtual offset = 10^offset
         #[cfg(not(feature = "certora"))]
         let pow = 10_i128
@@ -650,17 +652,17 @@ impl Vault {
 
         #[cfg(feature = "certora")]
         let pow = 1_i128;
-
+        clog!(pow);
         // Effective total supply = totalSupply + virtual offset
         let y = Self::total_supply(e)
             .checked_add(pow)
             .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
-
+        clog!(y);
         // Effective total assets = totalAssets + 1 (prevents division by zero)
         let denominator = Self::total_assets(e)
             .checked_add(1_i128)
             .unwrap_or_else(|| panic_with_error!(e, VaultTokenError::MathOverflow));
-
+        clog!(denominator);
         // (assets × (totalSupply + 10^offset)) / (totalAssets + 1)
         muldiv(e, x, y, denominator, rounding)
     }
