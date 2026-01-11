@@ -9,7 +9,8 @@ use crate::rwa::claim_topics_and_issuers::{
     ClaimTopicsAndIssuersError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD, ISSUERS_EXTEND_AMOUNT,
     ISSUERS_TTL_THRESHOLD, MAX_CLAIM_TOPICS, MAX_ISSUERS,
 };
-
+use crate::rwa::specs::helpers::clogs::clog_vec;
+use cvlr::clog;
 /// Storage keys for the data associated with the claim topics and issuers
 /// extension
 #[contracttype]
@@ -180,6 +181,10 @@ pub fn has_claim_topic(e: &Env, issuer: &Address, claim_topic: u32) -> bool {
 /// security risks as it could allow unauthorized modifications.
 pub fn add_claim_topic(e: &Env, claim_topic: u32) {
     let mut claim_topics = get_claim_topics(e);
+    clog_vec(&claim_topics);
+    clog!(claim_topic);
+    let claim_topic_in_claim_topics = claim_topics.contains(claim_topic);
+    clog!(claim_topic_in_claim_topics);
 
     if claim_topics.len() >= MAX_CLAIM_TOPICS {
         panic_with_error!(e, ClaimTopicsAndIssuersError::MaxClaimTopicsLimitReached);
