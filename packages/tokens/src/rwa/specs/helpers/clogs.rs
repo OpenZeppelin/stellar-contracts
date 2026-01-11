@@ -1,5 +1,6 @@
 use cvlr::{clog, log::CvlrLog};
 use soroban_sdk::{Address, BytesN, IntoVal, TryFromVal, Val, Vec};
+use crate::rwa::claim_issuer::storage::SigningKey;
 
 pub fn clog_vec<T>(vec: &Vec<T>) 
 where
@@ -39,6 +40,20 @@ pub fn clog_vec_bytes_n(vec_bytes_n: &Vec<BytesN<32>>) {
         let bytes_n = vec_bytes_n.get(i);
         if let Some(bytes_n) = bytes_n {
             clog!(cvlr_soroban::BN(&bytes_n));
+        }
+        i = i + 1;
+    }
+}
+
+pub fn clog_vec_signing_keys(vec_signing_keys: &Vec<SigningKey>) {
+    let length = vec_signing_keys.len();
+    clog!(length);
+    let mut i = 0;
+    while i < length {
+        let signing_key = vec_signing_keys.get(i);
+        if let Some(signing_key) = signing_key {
+            clog!(cvlr_soroban::B(&signing_key.public_key));
+            clog!(signing_key.scheme);
         }
         i = i + 1;
     }

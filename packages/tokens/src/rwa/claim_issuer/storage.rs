@@ -366,9 +366,15 @@ pub fn is_key_allowed_for_topic(
 ) -> bool {
     let topics_storage_key = ClaimIssuerStorageKey::Topics(claim_topic);
 
+    use cvlr::clog;
+    use crate::rwa::specs::helpers::clogs::clog_vec_signing_keys;
+    clog!(cvlr_soroban::B(&public_key));
+    clog!(scheme);
+    clog!(claim_topic);
     if let Some(topic_keys) =
         e.storage().persistent().get::<_, Vec<SigningKey>>(&topics_storage_key)
     {
+        clog_vec_signing_keys(&topic_keys);
         e.storage().persistent().extend_ttl(
             &topics_storage_key,
             KEYS_TTL_THRESHOLD,
@@ -400,7 +406,6 @@ pub fn is_key_allowed_for_registry(
 ) -> bool {
     let signing_key = SigningKey { public_key: public_key.clone(), scheme };
     let pairs_storage_key = ClaimIssuerStorageKey::Pairs(signing_key);
-
     if let Some(pairs) = e.storage().persistent().get::<_, Vec<(u32, Address)>>(&pairs_storage_key)
     {
         e.storage().persistent().extend_ttl(
@@ -488,17 +493,24 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
 
     let signing_key = SigningKey { public_key: public_key.clone(), scheme };
 
+    use cvlr::clog;
+    use crate::rwa::specs::helpers::clogs::clog_vec_signing_keys;
+    clog!(cvlr_soroban::B(&signing_key.public_key));
+    clog!(scheme);
+    clog!(claim_topic);
+    clog!(is_key_allowed_for_topic(e, &signing_key.public_key, scheme, claim_topic));
     // Check if key already exists for this topic
     if !is_key_allowed_for_topic(e, &signing_key.public_key, scheme, claim_topic) {
         let key = ClaimIssuerStorageKey::Topics(claim_topic);
         let mut topic_keys: Vec<SigningKey> =
             e.storage().persistent().get(&key).unwrap_or_else(|| Vec::new(e));
-
+        clog_vec_signing_keys(&topic_keys);
         if topic_keys.len() >= MAX_KEYS_PER_TOPIC {
             panic_with_error!(e, ClaimIssuerError::LimitExceeded)
         }
 
         topic_keys.push_back(signing_key.clone());
+        clog_vec_signing_keys(&topic_keys);
         e.storage().persistent().set(&key, &topic_keys);
     }
 
