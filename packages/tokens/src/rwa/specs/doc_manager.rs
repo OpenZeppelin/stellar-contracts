@@ -8,9 +8,7 @@ use crate::rwa::extensions::doc_manager::{
     DocumentStorageKey, get_document_count, BUCKET_SIZE,
 };
 
-// swap and pop mechanism, 
-// integrity
-// invariants
+// todo invariants - swap and pop mechanism 
 
 // helpers 
 pub fn get_index_non_pancicking(e: Env, name: &BytesN<32>) -> Option<u32> {
