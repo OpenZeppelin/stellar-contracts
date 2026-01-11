@@ -1,5 +1,5 @@
 use soroban_sdk::{panic_with_error, Bytes, BytesN, Env};
-
+use cvlr::clog;
 use crate::crypto::{error::CryptoError, hasher::Hasher};
 
 /// Struct to store bytes that will be consumed by the keccak256 [`Hasher`]
@@ -7,6 +7,23 @@ use crate::crypto::{error::CryptoError, hasher::Hasher};
 pub struct Keccak256 {
     state: Option<Bytes>,
     env: Env,
+}
+
+#[cfg(feature = "certora")]
+impl Clone for Keccak256 {
+    fn clone(&self) -> Self {
+        Keccak256 {
+            state: self.state.clone(),
+            env: self.env.clone(),
+        }
+    }
+}
+
+#[cfg(feature = "certora")]
+impl Keccak256 {
+    pub fn get_state(&self) -> Option<Bytes> {
+        self.state.clone()
+    }
 }
 
 impl Hasher for Keccak256 {
@@ -27,6 +44,7 @@ impl Hasher for Keccak256 {
         let data = self
             .state
             .unwrap_or_else(|| panic_with_error!(&self.env, CryptoError::HasherEmptyState));
+        clog!(cvlr_soroban::B(&data));
         self.env.crypto().keccak256(&data).to_bytes()
     }
 }
