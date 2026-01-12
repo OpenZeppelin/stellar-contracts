@@ -72,7 +72,7 @@ pub fn after_update_context_rule_valid_until_valid_signers_and_policies(e: Env) 
 }
 
 #[rule]
-// status: 
+// status: verified
 pub fn after_remove_context_rule_valid_signers_and_policies(e: Env) {
     let id: u32 = nondet();
     let rule_pre = get_context_rule(&e, id);

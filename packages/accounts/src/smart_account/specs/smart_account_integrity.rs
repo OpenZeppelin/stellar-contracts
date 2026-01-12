@@ -40,7 +40,7 @@ pub fn add_context_rule_integrity_1(e: Env) {
 
 #[rule]
 // after add_context_rule the id increases by 1
-// status:
+// status: timeout
 pub fn add_context_rule_integrity_2(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -55,6 +55,7 @@ pub fn add_context_rule_integrity_2(e: Env) {
 
 #[rule]
 // after add_context_rule the id appears in the ids for ctx type
+// status: timeout
 pub fn add_context_rule_integrity_3(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -86,9 +87,9 @@ pub fn add_context_rule_integrity_4(e: Env) {
     // cvlr_assert!(rules.contains(&rule));
 }
 
-// todo:
 #[rule]
 // the policies are set as policies(id)
+// status: timeout
 pub fn add_context_rule_integrity_5(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -102,6 +103,7 @@ pub fn add_context_rule_integrity_5(e: Env) {
 
 #[rule]
 // after add_context_rule the signers are set as signers(id)
+// status: timeout
 pub fn add_context_rule_integrity_6(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -115,6 +117,7 @@ pub fn add_context_rule_integrity_6(e: Env) {
 
 #[rule]
 // after add_context_rule the metadata is set as meta(id)
+// status: timeout
 pub fn add_context_rule_integrity_7(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -143,6 +146,7 @@ pub fn add_context_rule_integrity_8(e: Env) {
 
 #[rule]
 // after add_context_rule the context type is set as context type
+// status: timeout
 pub fn add_context_rule_integrity_9(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -156,6 +160,7 @@ pub fn add_context_rule_integrity_9(e: Env) {
 
 #[rule]
 // after add_context_rule the policies is set as policies(id)
+// status: timeout
 pub fn add_context_rule_integrity_10(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -170,6 +175,7 @@ pub fn add_context_rule_integrity_10(e: Env) {
 
 #[rule]
 // after add_context_rule the signers are set as signers(id)
+// status: timeout
 pub fn add_context_rule_integrity_11(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -184,6 +190,7 @@ pub fn add_context_rule_integrity_11(e: Env) {
 
 #[rule]
 // after add_context_rule the metadata is set as meta(id)
+// status: timeout
 pub fn add_context_rule_integrity_12(e: Env) {
     let ctx_typ = ContextRuleType::nondet();
     let name = nondet_string();
@@ -238,6 +245,8 @@ pub fn remove_context_rule_integrity_1(e: Env) {
 
 #[rule]
 // the rule is removed from the id list for context type
+// status: violation - unclear
+// https://prover.certora.com/output/5771024/d016e59196844edc86f53fc55950ddd4/
 pub fn remove_context_rule_integrity_2(e: Env) {
     let id = nondet();
     let ctx_type = get_meta_of_id(e.clone(), id).context_type;
@@ -248,6 +257,7 @@ pub fn remove_context_rule_integrity_2(e: Env) {
 
 #[rule]
 // same but with rule -> type (better/worse?)
+// status:
 pub fn remove_context_rule_integrity_3(e: Env) {
     let id = nondet();
     let rule = get_context_rule(&e, id);
