@@ -1,1 +1,0 @@
-// non-panics rules for all functions
