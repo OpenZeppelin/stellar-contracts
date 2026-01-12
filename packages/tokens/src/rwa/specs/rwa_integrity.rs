@@ -11,7 +11,8 @@ use crate::fungible::FungibleToken;
 
 #[rule]
 // forced_transfer changes balance of from appropriately
-// status: verified https://prover.certora.com/output/33158/82f91444a64247649c1ea229fc9eb2c3
+// status: verified
+// https://prover.certora.com/output/33158/82f91444a64247649c1ea229fc9eb2c3
 pub fn rwa_forced_transfer_integrity_1(e: Env) {
     let from = nondet_address();
     clog!(cvlr_soroban::Addr(&from));

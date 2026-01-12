@@ -33,14 +33,22 @@ pub fn get_recovered_to_non_pancicking(e: Env, account: Address) -> Option<Addre
 
 #[rule]
 // after add_identity the stored identity is some
-// status: violation
+// status: verified
 pub fn add_identity_integrity_1(e: Env) {
     let account: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&account));
     let identity = nondet_address();
+    clog!(cvlr_soroban::Addr(&identity));
     let identity_type: IdentityType = nondet();
+    clog!(identity_type.clone() as u32);
     let initial_countries = nondet_vec_country();
+    clog!(initial_countries.len());
+    add_identity(&e, &account, &identity, identity_type, &initial_countries);
     let key = IRSStorageKey::Identity(account.clone());
     let stored_identity: Option<Address> = get_stored_identity_non_pancicking(e, account);
+    if let Some(stored_identity) = stored_identity.clone() {
+        clog!(cvlr_soroban::Addr(&stored_identity));
+    }
     cvlr_assert!(stored_identity.is_some());
 }
 
@@ -59,7 +67,8 @@ pub fn add_identity_integrity_2(e: Env) {
 
 #[rule]
 // after add_identity the identity_profile has the same identity_type
-// status: ?
+// status: verified
+// 33 minutes
 pub fn add_identity_integrity_3(e: Env) {
     let account: Address = nondet_address();
     let identity = nondet_address();
@@ -121,8 +130,10 @@ pub fn modify_identity_integrity_1(e: Env) {
 // status: spurious violation
 pub fn modify_identity_integrity_2(e: Env) {
     let account: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&account));
     let identity_profile_pre = get_identity_profile(&e, &account);
     let new_identity = nondet_address();
+    clog!(cvlr_soroban::Addr(&new_identity));
     modify_identity(&e, &account, &new_identity);
     let identity_profile_post = get_identity_profile(&e, &account);
     cvlr_assert!(identity_profile_post == identity_profile_pre);
@@ -273,9 +284,11 @@ pub fn modify_country_data_integrity_4(e: Env) {
 // after delete_country_data the country_data in index is none
 // status: violation
 pub fn delete_country_data_integrity_1(e: Env) {
-// after delete_country_data the country_data in index is none
     let account: Address = nondet_address();
+    clog!(cvlr_soroban::Addr(&account));
     let index: u32 = nondet();
+    let country_data_entries_pre = get_country_data_entries(&e, &account);
+    clog!(index);
     delete_country_data(&e, &account, index);
     let country_data_entries_post = get_country_data_entries(&e, &account);
     let country_data_in_entries_post = country_data_entries_post.get(index);

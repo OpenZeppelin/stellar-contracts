@@ -287,16 +287,23 @@ pub fn after_add_claim_inv2(e: Env) {
 }
 
 #[rule]
-// status: spurious violation (probably, can't clog bytes_n)
+// status: spurious violation - ghost does not work correctly.
 pub fn after_add_claim_valid_claims(e: Env) {
     let topic: u32 = nondet();
+    clog!(topic);
     let scheme: u32 = nondet();
+    clog!(scheme);
     let issuer = nondet_address();
+    clog!(cvlr_soroban::Addr(&issuer));
     let signature = nondet_bytes();
+    clog!(cvlr_soroban::B(&signature));
     let data = nondet_bytes();
+    clog!(cvlr_soroban::B(&data));
     let uri = nondet_string();
     let claim_id = nondet_bytes_n();
+    clog!(cvlr_soroban::BN(&claim_id));
     let claim_id_inv = nondet_bytes_n();
+    clog!(cvlr_soroban::BN(&claim_id_inv));
     assume_pre_claim_valid(e.clone(), claim_id_inv.clone());
     add_claim(&e.clone(), topic, scheme, &issuer, &signature, &data, &uri);
     assert_post_claim_valid(e, claim_id_inv);
@@ -314,20 +321,28 @@ pub fn after_remove_claim_inv1(e: Env) {
 
 #[rule]
 // status: spurious violation
+// https://prover.certora.com/output/5771024/1667686bdbab4fa3889d101bb7b7a009?anonymousKey=dadedb00c1ec9ad9d0cc113057d1ffb36de254e8
+// the assumption does not hold - don't know why, prob .contains() problem.
 pub fn after_remove_claim_inv2(e: Env) {
     let claim_id = nondet_bytes_n();
+    clog!(cvlr_soroban::BN(&claim_id));
     let topic_inv = nondet();
+    clog!(topic_inv);
     let claim_id_inv = nondet_bytes_n();
+    clog!(cvlr_soroban::BN(&claim_id_inv));
     assume_pre_claims_by_topic_then_claim_exists(e.clone(), topic_inv, claim_id_inv.clone());
     remove_claim(&e.clone(), &claim_id);
     assert_post_claims_by_topic_then_claim_exists(e, topic_inv, claim_id_inv);
 }
 
 #[rule]
-// status: spurious violation (probably, can't clog bytes_n)
+// status: spurious violation
+// ghost does not behave as expected
 pub fn after_remove_claim_valid_claims(e: Env) {
     let claim_id = nondet_bytes_n();
+    clog!(cvlr_soroban::BN(&claim_id));
     let claim_id_inv = nondet_bytes_n();
+    clog!(cvlr_soroban::BN(&claim_id_inv));
     assume_pre_claim_valid(e.clone(), claim_id_inv.clone());
     remove_claim(&e.clone(), &claim_id);
     assert_post_claim_valid(e, claim_id_inv);
