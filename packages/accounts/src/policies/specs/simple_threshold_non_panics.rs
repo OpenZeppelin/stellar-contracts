@@ -10,19 +10,17 @@ use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
     policies::{
-        simple_threshold::{get_threshold, SimpleThresholdAccountParams},
-        specs::simple_threshold_contract::SimpleThresholdPolicy,
-        Policy,
+        simple_threshold::{
+            can_enforce, enforce, get_threshold, install, set_threshold, uninstall,
+            SimpleThresholdAccountParams, SimpleThresholdStorageKey,
+        },
     },
     smart_account::{specs::nondet::nondet_signers_vec, ContextRule, Signer},
 };
 
 fn storage_setup_threshold(e: Env, ctx_rule_id: u32, account_id: Address) {
     let threshold: u32 = u32::nondet();
-    let key = crate::policies::simple_threshold::SimpleThresholdStorageKey::AccountContext(
-        account_id.clone(),
-        ctx_rule_id,
-    );
+    let key = SimpleThresholdStorageKey::AccountContext(account_id.clone(), ctx_rule_id);
     e.storage().persistent().set(&key, &threshold);
     clog!(threshold);
 }
@@ -44,7 +42,7 @@ pub fn set_threshold_non_panic(e: Env) {
     cvlr_assume!(threshold != 0 && threshold <= ctx_rule.signers.len());
     clog!(threshold);
     clog!(ctx_rule.signers.len());
-    SimpleThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
     cvlr_assert!(true);
 }
 
@@ -56,13 +54,10 @@ pub fn get_threshold_non_panic(e: Env) {
     let ctx_rule_id: u32 = u32::nondet();
     let account_id = nondet_address();
     storage_setup_threshold(e.clone(), ctx_rule_id, account_id.clone());
-    let key = crate::policies::simple_threshold::SimpleThresholdStorageKey::AccountContext(
-        account_id.clone(),
-        ctx_rule_id,
-    );
+    let key = SimpleThresholdStorageKey::AccountContext(account_id.clone(), ctx_rule_id);
     let threshold_opt: Option<u32> = e.storage().persistent().get(&key);
     cvlr_assume!(threshold_opt.is_some());
-    SimpleThresholdPolicy::get_threshold(&e, ctx_rule_id, account_id);
+    get_threshold(&e, ctx_rule_id, &account_id);
     cvlr_assert!(true);
 }
 
@@ -74,7 +69,7 @@ pub fn can_enforce_non_panic(e: Env, context: soroban_sdk::auth::Context) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     storage_setup_threshold(e.clone(), ctx_rule.id, account_id.clone());
-    SimpleThresholdPolicy::can_enforce(&e, context, authenticated_signers, ctx_rule, account_id);
+    can_enforce(&e, &context, &authenticated_signers, &ctx_rule, &account_id);
     cvlr_assert!(true);
 }
 
@@ -91,15 +86,15 @@ pub fn enforce_non_panic(
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     storage_setup_threshold(e.clone(), ctx_rule.id, account_id.clone());
-    let can_enforce = SimpleThresholdPolicy::can_enforce(
+    let can_enforce_result = can_enforce(
         &e,
-        unused_context,
-        authenticated_signers.clone(),
-        ctx_rule.clone(),
-        account_id.clone(),
+        &unused_context,
+        &authenticated_signers,
+        &ctx_rule,
+        &account_id,
     );
-    cvlr_assume!(can_enforce && is_auth(account_id.clone()));
-    SimpleThresholdPolicy::enforce(&e, context, authenticated_signers, ctx_rule, account_id);
+    cvlr_assume!(can_enforce_result && is_auth(account_id.clone()));
+    enforce(&e, &context, &authenticated_signers, &ctx_rule, &account_id);
     cvlr_assert!(true);
 }
 
@@ -116,7 +111,7 @@ pub fn install_non_panic(e: Env) {
     cvlr_assume!(is_auth(account_id.clone()));
     let threshold = params.threshold;
     cvlr_assume!(threshold != 0 && threshold <= ctx_rule.signers.len());
-    SimpleThresholdPolicy::install(&e, params, ctx_rule.clone(), account_id.clone());
+    install(&e, &params, &ctx_rule, &account_id);
     cvlr_assert!(true);
 }
 
@@ -129,6 +124,6 @@ pub fn uninstall_non_panic(e: Env) {
     let account_id = nondet_address();
     storage_setup_threshold(e.clone(), ctx_rule.id, account_id.clone());
     cvlr_assume!(is_auth(account_id.clone()));
-    SimpleThresholdPolicy::uninstall(&e, ctx_rule.clone(), account_id.clone());
+    uninstall(&e, &ctx_rule, &account_id);
     cvlr_assert!(true);
 }

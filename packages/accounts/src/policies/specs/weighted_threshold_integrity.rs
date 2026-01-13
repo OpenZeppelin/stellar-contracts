@@ -6,7 +6,11 @@ use soroban_sdk::{Address, Env, Vec};
 use crate::policies::weighted_threshold;
 use crate::{
     policies::{
-        Policy, specs::weighted_threshold_contract::WeightedThresholdPolicy, weighted_threshold::{WeightedThresholdAccountParams, WeightedThresholdStorageKey}
+        weighted_threshold::{
+            calculate_total_weight, can_enforce, get_signer_weights, get_threshold, install,
+            set_signer_weight, set_threshold, uninstall, WeightedThresholdAccountParams,
+            WeightedThresholdStorageKey,
+        },
     },
     smart_account::{ContextRule, Signer, specs::nondet::{nondet_context, nondet_signers_vec}},
 };
@@ -26,26 +30,25 @@ pub fn wt_can_enforce_integrity(e: Env) {
     let auth_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
-    let threshold_pre = WeightedThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
-    let can_enforce = WeightedThresholdPolicy::can_enforce(
+    let threshold_pre = get_threshold(&e, ctx_rule.id, &account_id);
+    let can_enforce_result = can_enforce(
         &e,
-        context,
-        auth_signers.clone(),
-        ctx_rule.clone(),
-        account_id.clone(),
+        &context,
+        &auth_signers,
+        &ctx_rule,
+        &account_id,
     );
     clog!(threshold_pre);
-    clog!(can_enforce);
+    clog!(can_enforce_result);
     clog!(ctx_rule.id);
     clog!(cvlr_soroban::Addr(&account_id));
-    let signer_weights =
-        WeightedThresholdPolicy::get_signer_weights(&e, ctx_rule.clone(), account_id.clone());
+    let signer_weights = get_signer_weights(&e, &ctx_rule, &account_id);
     let total_weight = weighted_threshold::calculate_weight(&e, &auth_signers, &ctx_rule, &account_id);
     clog!(total_weight);
     clog!(threshold_pre);
     let expected_result = total_weight >= threshold_pre;
     clog!(expected_result);
-    cvlr_assert!(can_enforce == expected_result);
+    cvlr_assert!(can_enforce_result == expected_result);
 }
 
 // can't write an integrity rule for enforce because it panics if can_enforce
@@ -61,8 +64,8 @@ pub fn wt_set_threshold_integrity(e: Env) {
     clog!(ctx_rule.id);
     let account_id = nondet_address();
     clog!(cvlr_soroban::Addr(&account_id));
-    WeightedThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
-    let threshold_post = WeightedThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id);
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
+    let threshold_post = get_threshold(&e, ctx_rule.id, &account_id);
     clog!(threshold_post);
     cvlr_assert!(threshold_post == threshold);
 }
@@ -78,15 +81,8 @@ pub fn wt_set_signer_weight_integrity(e: Env) {
     clog!(ctx_rule.id);
     let account_id = nondet_address();
     clog!(cvlr_soroban::Addr(&account_id));
-    WeightedThresholdPolicy::set_signer_weight(
-        &e,
-        signer.clone(),
-        weight,
-        ctx_rule.clone(),
-        account_id.clone(),
-    );
-    let signer_weights =
-        WeightedThresholdPolicy::get_signer_weights(&e, ctx_rule.clone(), account_id.clone());
+    set_signer_weight(&e, &signer, weight, &ctx_rule, &account_id);
+    let signer_weights = get_signer_weights(&e, &ctx_rule, &account_id);
     let signer_weight_post = signer_weights.get(signer.clone());
     clog!(signer_weight_post);
     cvlr_assert!(signer_weight_post == Some(weight));
@@ -101,13 +97,11 @@ pub fn wt_install_integrity(e: Env) {
     clog!(ctx_rule.id);
     let account_id = nondet_address();
     clog!(cvlr_soroban::Addr(&account_id));
-    WeightedThresholdPolicy::install(&e, params.clone(), ctx_rule.clone(), account_id.clone());
-    let threshold_post =
-        WeightedThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
+    install(&e, &params, &ctx_rule, &account_id);
+    let threshold_post = get_threshold(&e, ctx_rule.id, &account_id);
     clog!(threshold_post);
     cvlr_assert!(threshold_post == params.threshold);
-    let signer_weights =
-        WeightedThresholdPolicy::get_signer_weights(&e, ctx_rule.clone(), account_id.clone());
+    let signer_weights = get_signer_weights(&e, &ctx_rule, &account_id);
     cvlr_assert!(signer_weights == params.signer_weights);
 }
 
@@ -119,7 +113,7 @@ pub fn wt_uninstall_integrity(e: Env) {
     clog!(ctx_rule.id);
     let account_id = nondet_address();
     clog!(cvlr_soroban::Addr(&account_id));
-    WeightedThresholdPolicy::uninstall(&e, ctx_rule.clone(), account_id.clone());
+    uninstall(&e, &ctx_rule, &account_id);
     let key = WeightedThresholdStorageKey::AccountContext(account_id.clone(), ctx_rule.id);
     let account_ctx_opt: Option<WeightedThresholdAccountParams> =
         e.storage().persistent().get(&key);

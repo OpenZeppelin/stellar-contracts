@@ -10,8 +10,10 @@ use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
     policies::{
-        simple_threshold::SimpleThresholdAccountParams,
-        specs::simple_threshold_contract::SimpleThresholdPolicy, Policy,
+        simple_threshold::{
+            can_enforce, enforce, get_threshold, install, set_threshold, uninstall,
+            SimpleThresholdAccountParams,
+        },
     },
     smart_account::{specs::nondet::nondet_signers_vec, ContextRule, Signer},
 };
@@ -21,13 +23,13 @@ use crate::{
 // helpers
 
 pub fn assume_pre_threshold_non_zero(e: Env, ctx_rule: ContextRule, account_id: Address) {
-    let threshold: u32 = SimpleThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
+    let threshold: u32 = get_threshold(&e, ctx_rule.id, &account_id);
     clog!(threshold);
     cvlr_assume!(threshold != 0);
 }
 
 pub fn assert_post_threshold_non_zero(e: Env, ctx_rule: ContextRule, account_id: Address) {
-    let threshold: u32 = SimpleThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
+    let threshold: u32 = get_threshold(&e, ctx_rule.id, &account_id);
     clog!(threshold);
     cvlr_assert!(threshold != 0);
 }
@@ -38,7 +40,7 @@ pub fn assert_post_threshold_non_zero(e: Env, ctx_rule: ContextRule, account_id:
 pub fn after_install_threshold_non_zero(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
-    SimpleThresholdPolicy::install(&e, SimpleThresholdAccountParams::nondet(), ctx_rule.clone(), account_id.clone());
+    install(&e, &SimpleThresholdAccountParams::nondet(), &ctx_rule, &account_id);
     assert_post_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -50,7 +52,7 @@ pub fn after_uninstall_threshold_non_zero(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     assume_pre_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
-    SimpleThresholdPolicy::uninstall(&e, ctx_rule.clone(), account_id.clone());
+    uninstall(&e, &ctx_rule, &account_id);
     assert_post_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -61,7 +63,7 @@ pub fn after_set_threshold_threshold_non_zero(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     assume_pre_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
-    SimpleThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
     assert_post_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -72,7 +74,7 @@ pub fn after_can_enforce_threshold_non_zero(e: Env, context: soroban_sdk::auth::
     let account_id: Address = nondet_address();
     assume_pre_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
     let auth_signers: Vec<Signer> = nondet_signers_vec();
-    let can_enforce = SimpleThresholdPolicy::can_enforce(&e, context, auth_signers, ctx_rule.clone(), account_id.clone());
+    can_enforce(&e, &context, &auth_signers, &ctx_rule, &account_id);
     assert_post_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -83,7 +85,7 @@ pub fn after_enforce_threshold_non_zero(e: Env, context: soroban_sdk::auth::Cont
     let account_id: Address = nondet_address();
     assume_pre_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
     let auth_signers: Vec<Signer> = nondet_signers_vec();
-    SimpleThresholdPolicy::enforce(&e, context, auth_signers, ctx_rule.clone(), account_id.clone());
+    enforce(&e, &context, &auth_signers, &ctx_rule, &account_id);
     assert_post_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -94,7 +96,7 @@ pub fn after_enforce_threshold_non_zero(e: Env, context: soroban_sdk::auth::Cont
 // helpers
 
 pub fn assume_pre_threshold_less_than_signers(e: Env, ctx_rule: ContextRule, account_id: Address) {
-    let threshold: u32 = SimpleThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
+    let threshold: u32 = get_threshold(&e, ctx_rule.id, &account_id);
     let signers: Vec<Signer> = ctx_rule.signers;
     let signers_length: u32 = signers.len();
     clog!(threshold);
@@ -103,7 +105,7 @@ pub fn assume_pre_threshold_less_than_signers(e: Env, ctx_rule: ContextRule, acc
 }
 
 pub fn assert_post_threshold_less_than_signers(e: Env, ctx_rule: ContextRule, account_id: Address) {
-    let threshold: u32 = SimpleThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
+    let threshold: u32 = get_threshold(&e, ctx_rule.id, &account_id);
     let signers: Vec<Signer> = ctx_rule.signers;
     let signers_length: u32 = signers.len();
     clog!(threshold);
@@ -118,7 +120,7 @@ pub fn after_set_threshold_threshold_leq_signers_length(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     assume_pre_threshold_less_than_signers(e.clone(), ctx_rule.clone(), account_id.clone());
-    SimpleThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
     assert_post_threshold_less_than_signers(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -129,7 +131,7 @@ pub fn after_install_threshold_leq_signers_length(e: Env) {
     let account_id: Address = nondet_address();
     let threshold: u32 = u32::nondet();
     let params: SimpleThresholdAccountParams = SimpleThresholdAccountParams { threshold };
-    SimpleThresholdPolicy::install(&e, params, ctx_rule.clone(), account_id.clone());
+    install(&e, &params, &ctx_rule, &account_id);
     assert_post_threshold_less_than_signers(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -140,7 +142,7 @@ pub fn after_uninstall_threshold_leq_signers_length(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     assume_pre_threshold_less_than_signers(e.clone(), ctx_rule.clone(), account_id.clone());
-    SimpleThresholdPolicy::uninstall(&e, ctx_rule.clone(), account_id.clone());
+    uninstall(&e, &ctx_rule, &account_id);
     assert_post_threshold_less_than_signers(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -151,7 +153,7 @@ pub fn after_can_enforce_threshold_leq_signers_length(e: Env, context: soroban_s
     let account_id: Address = nondet_address();
     assume_pre_threshold_less_than_signers(e.clone(), ctx_rule.clone(), account_id.clone());
     let auth_signers: Vec<Signer> = nondet_signers_vec();
-    let can_enforce = SimpleThresholdPolicy::can_enforce(&e, context, auth_signers, ctx_rule.clone(), account_id.clone());
+    can_enforce(&e, &context, &auth_signers, &ctx_rule, &account_id);
     assert_post_threshold_less_than_signers(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -162,6 +164,6 @@ pub fn after_enforce_threshold_leq_signers_length(e: Env, context: soroban_sdk::
     let account_id: Address = nondet_address();
     assume_pre_threshold_less_than_signers(e.clone(), ctx_rule.clone(), account_id.clone());
     let auth_signers: Vec<Signer> = nondet_signers_vec();
-    SimpleThresholdPolicy::enforce(&e, context, auth_signers, ctx_rule.clone(), account_id.clone());
+    enforce(&e, &context, &auth_signers, &ctx_rule, &account_id);
     assert_post_threshold_less_than_signers(e.clone(), ctx_rule.clone(), account_id.clone());
 }

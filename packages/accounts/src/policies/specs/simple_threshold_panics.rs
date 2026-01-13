@@ -10,8 +10,10 @@ use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
     policies::{
-        simple_threshold::SimpleThresholdAccountParams,
-        specs::simple_threshold_contract::SimpleThresholdPolicy, Policy,
+        simple_threshold::{
+            can_enforce, enforce, get_threshold, install, set_threshold, uninstall,
+            SimpleThresholdAccountParams, SimpleThresholdStorageKey,
+        },
     },
     smart_account::{specs::nondet::nondet_signers_vec, ContextRule, Signer},
 };
@@ -24,7 +26,7 @@ pub fn set_threshold_panics_if_invalid_threshold(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     cvlr_assume!(threshold == 0 || threshold > ctx_rule.signers.len());
-    SimpleThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -36,7 +38,7 @@ pub fn set_threshold_panics_if_unauth(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     cvlr_assume!(!is_auth(account_id.clone()));
-    SimpleThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -46,13 +48,10 @@ pub fn set_threshold_panics_if_unauth(e: Env) {
 pub fn get_threshold_panics_if_no_threshold(e: Env) {
     let ctx_rule_id: u32 = u32::nondet();
     let account_id = nondet_address();
-    let key = crate::policies::simple_threshold::SimpleThresholdStorageKey::AccountContext(
-        account_id.clone(),
-        ctx_rule_id,
-    );
+    let key = SimpleThresholdStorageKey::AccountContext(account_id.clone(), ctx_rule_id);
     let threshold_opt: Option<u32> = e.storage().persistent().get(&key);
     cvlr_assume!(threshold_opt.is_none());
-    SimpleThresholdPolicy::get_threshold(&e, ctx_rule_id, account_id);
+    get_threshold(&e, ctx_rule_id, &account_id);
     cvlr_assert!(false);
 }
 
@@ -65,15 +64,15 @@ pub fn enforce_panics_if_can_enforce_returns_false(e: Env, context: soroban_sdk:
     let authenticated_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
-    let can_enforce = SimpleThresholdPolicy::can_enforce(
+    let can_enforce_result = can_enforce(
         &e,
-        context.clone(),
-        authenticated_signers.clone(),
-        ctx_rule.clone(),
-        account_id.clone(),
+        &context,
+        &authenticated_signers,
+        &ctx_rule,
+        &account_id,
     );
-    cvlr_assume!(!can_enforce);
-    SimpleThresholdPolicy::enforce(&e, context, authenticated_signers, ctx_rule, account_id);
+    cvlr_assume!(!can_enforce_result);
+    enforce(&e, &context, &authenticated_signers, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -86,7 +85,7 @@ pub fn install_panics_if_invalid_threshold(e: Env) {
     let account_id = nondet_address();
     let threshold = params.threshold;
     cvlr_assume!(threshold == 0 || threshold > ctx_rule.signers.len());
-    SimpleThresholdPolicy::install(&e, params, ctx_rule.clone(), account_id.clone());
+    install(&e, &params, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -98,7 +97,7 @@ pub fn install_panics_if_unauth(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     cvlr_assume!(!is_auth(account_id.clone()));
-    SimpleThresholdPolicy::install(&e, params, ctx_rule.clone(), account_id.clone());
+    install(&e, &params, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -109,6 +108,6 @@ pub fn uninstall_panics_if_unauth(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     cvlr_assume!(!is_auth(account_id.clone()));
-    SimpleThresholdPolicy::uninstall(&e, ctx_rule.clone(), account_id.clone());
+    uninstall(&e, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }

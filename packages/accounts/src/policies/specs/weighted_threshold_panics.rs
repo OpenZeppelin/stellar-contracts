@@ -10,8 +10,11 @@ use soroban_sdk::{Address, Env, Map, Vec};
 
 use crate::{
     policies::{
-        weighted_threshold::{WeightedThresholdAccountParams, WeightedThresholdStorageKey},
-        specs::weighted_threshold_contract::WeightedThresholdPolicy, Policy,
+        weighted_threshold::{
+            calculate_total_weight, can_enforce, enforce, get_signer_weights, get_threshold,
+            install, set_signer_weight, set_threshold, uninstall, WeightedThresholdAccountParams,
+            WeightedThresholdStorageKey,
+        },
     },
     smart_account::{specs::nondet::nondet_signers_vec, ContextRule, Signer},
 };
@@ -24,7 +27,7 @@ pub fn wt_set_threshold_panics_if_threshold_zero(e: Env) {
     let threshold: u32 = 0;
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
-    WeightedThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -35,10 +38,10 @@ pub fn wt_set_threshold_panics_if_threshold_exceeds_total_weight(e: Env) {
     let threshold: u32 = u32::nondet();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
-    let signer_weights = WeightedThresholdPolicy::get_signer_weights(&e, ctx_rule.clone(), account_id.clone());
-    let total_weight = weighted_threshold::calculate_total_weight(&e, &signer_weights);
+    let signer_weights = get_signer_weights(&e, &ctx_rule, &account_id);
+    let total_weight = calculate_total_weight(&e, &signer_weights);
     cvlr_assume!(threshold > total_weight);
-    WeightedThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -50,7 +53,7 @@ pub fn wt_set_threshold_panics_if_unauth(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     cvlr_assume!(!is_auth(account_id.clone()));
-    WeightedThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -65,7 +68,7 @@ pub fn wt_set_threshold_panics_if_not_installed(e: Env) {
     let params_opt: Option<WeightedThresholdAccountParams> = e.storage().persistent().get(&key);
     cvlr_assume!(params_opt.is_none());
     cvlr_assume!(threshold != 0);
-    WeightedThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -79,12 +82,12 @@ pub fn wt_set_signer_weight_panics_if_threshold_exceeds_total_weight(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     clog!(cvlr_soroban::Addr(&account_id));
-    WeightedThresholdPolicy::set_signer_weight(&e, signer.clone(), weight, ctx_rule.clone(), account_id.clone());
-    let signer_weights = WeightedThresholdPolicy::get_signer_weights(&e, ctx_rule.clone(), account_id.clone());
+    set_signer_weight(&e, &signer, weight, &ctx_rule, &account_id);
+    let signer_weights = get_signer_weights(&e, &ctx_rule, &account_id);
     clog!(signer_weights.get(signer.clone()));
-    let total_weight = WeightedThresholdPolicy::calculate_total_weight(&e, signer_weights);
+    let total_weight = calculate_total_weight(&e, &signer_weights);
     clog!(total_weight);
-    let threshold = WeightedThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
+    let threshold = get_threshold(&e, ctx_rule.id, &account_id);
     clog!(threshold);
     cvlr_assume!(threshold > total_weight); // kind of weird where we do the assume after but it makes sense.
     cvlr_assert!(false)
@@ -99,7 +102,7 @@ pub fn wt_set_signer_weight_panics_if_unauth(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     cvlr_assume!(!is_auth(account_id.clone()));
-    WeightedThresholdPolicy::set_signer_weight(&e, signer.clone(), weight, ctx_rule.clone(), account_id.clone());
+    set_signer_weight(&e, &signer, weight, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -114,7 +117,7 @@ pub fn wt_set_signer_weight_panics_if_not_installed(e: Env) {
     let key = WeightedThresholdStorageKey::AccountContext(account_id.clone(), ctx_rule.id);
     let params_opt: Option<WeightedThresholdAccountParams> = e.storage().persistent().get(&key);
     cvlr_assume!(params_opt.is_none());
-    WeightedThresholdPolicy::set_signer_weight(&e, signer.clone(), weight, ctx_rule.clone(), account_id.clone());
+    set_signer_weight(&e, &signer, weight, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -127,7 +130,7 @@ pub fn wt_get_threshold_panics_if_no_threshold(e: Env) {
     let key = WeightedThresholdStorageKey::AccountContext(account_id.clone(), ctx_rule_id);
     let params_opt: Option<WeightedThresholdAccountParams> = e.storage().persistent().get(&key);
     cvlr_assume!(params_opt.is_none());
-    WeightedThresholdPolicy::get_threshold(&e, ctx_rule_id, account_id);
+    get_threshold(&e, ctx_rule_id, &account_id);
     cvlr_assert!(false);
 }
 
@@ -140,7 +143,7 @@ pub fn wt_get_signer_weights_panics_if_not_installed(e: Env) {
     let key = WeightedThresholdStorageKey::AccountContext(account_id.clone(), ctx_rule.id);
     let params_opt: Option<WeightedThresholdAccountParams> = e.storage().persistent().get(&key);
     cvlr_assume!(params_opt.is_none());
-    WeightedThresholdPolicy::get_signer_weights(&e, ctx_rule.clone(), account_id);
+    get_signer_weights(&e, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -155,15 +158,15 @@ pub fn wt_enforce_panics_if_can_enforce_returns_false(e: Env, context: soroban_s
     let authenticated_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
-    let can_enforce = WeightedThresholdPolicy::can_enforce(
+    let can_enforce_result = can_enforce(
         &e,
-        context.clone(),
-        authenticated_signers.clone(),
-        ctx_rule.clone(),
-        account_id.clone(),
+        &context,
+        &authenticated_signers,
+        &ctx_rule,
+        &account_id,
     );
-    cvlr_assume!(!can_enforce);
-    WeightedThresholdPolicy::enforce(&e, context, authenticated_signers, ctx_rule, account_id);
+    cvlr_assume!(!can_enforce_result);
+    enforce(&e, &context, &authenticated_signers, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -175,7 +178,7 @@ pub fn wt_enforce_panics_if_unauth(e: Env, context: soroban_sdk::auth::Context) 
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     cvlr_assume!(!is_auth(account_id.clone()));
-    WeightedThresholdPolicy::enforce(&e, context, authenticated_signers, ctx_rule, account_id);
+    enforce(&e, &context, &authenticated_signers, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -187,7 +190,7 @@ pub fn wt_install_panics_if_threshold_zero(e: Env) {
     params.threshold = 0;
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
-    WeightedThresholdPolicy::install(&e, params, ctx_rule.clone(), account_id.clone());
+    install(&e, &params, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -198,10 +201,10 @@ pub fn wt_install_panics_if_threshold_exceeds_total_weight(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     let params: WeightedThresholdAccountParams = WeightedThresholdAccountParams::nondet();
-    WeightedThresholdPolicy::install(&e, params, ctx_rule.clone(), account_id.clone());
-    let signer_weights = WeightedThresholdPolicy::get_signer_weights(&e, ctx_rule.clone(), account_id.clone());
-    let threshold = WeightedThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
-    let total_weight = weighted_threshold::calculate_total_weight(&e, &signer_weights);
+    install(&e, &params, &ctx_rule, &account_id);
+    let signer_weights = get_signer_weights(&e, &ctx_rule, &account_id);
+    let threshold = get_threshold(&e, ctx_rule.id, &account_id);
+    let total_weight = calculate_total_weight(&e, &signer_weights);
     cvlr_assume!(threshold > total_weight);
     cvlr_assert!(false);
 }
@@ -214,7 +217,7 @@ pub fn wt_install_panics_if_unauth(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     cvlr_assume!(!is_auth(account_id.clone()));
-    WeightedThresholdPolicy::install(&e, params, ctx_rule.clone(), account_id.clone());
+    install(&e, &params, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }
 
@@ -225,6 +228,6 @@ pub fn wt_uninstall_panics_if_unauth(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
     cvlr_assume!(!is_auth(account_id.clone()));
-    WeightedThresholdPolicy::uninstall(&e, ctx_rule.clone(), account_id.clone());
+    uninstall(&e, &ctx_rule, &account_id);
     cvlr_assert!(false);
 }

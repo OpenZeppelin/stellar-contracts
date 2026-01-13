@@ -6,7 +6,11 @@ use soroban_sdk::{Address, Env, Map, Vec};
 use crate::policies::weighted_threshold;
 use crate::{
     policies::{
-        Policy, specs::weighted_threshold_contract::WeightedThresholdPolicy, weighted_threshold::{WeightedThresholdAccountParams, WeightedThresholdStorageKey}
+        weighted_threshold::{
+            calculate_total_weight, can_enforce, enforce, get_signer_weights, get_threshold,
+            install, set_signer_weight, set_threshold, uninstall, WeightedThresholdAccountParams,
+            WeightedThresholdStorageKey,
+        },
     },
     smart_account::{ContextRule, Signer, specs::nondet::{nondet_context, nondet_signers_vec}},
 };
@@ -16,13 +20,13 @@ use crate::{
 // helpers
 
 pub fn assume_pre_threshold_non_zero(e: Env, ctx_rule: ContextRule, account_id: Address) {
-    let threshold: u32 = WeightedThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
+    let threshold: u32 = get_threshold(&e, ctx_rule.id, &account_id);
     clog!(threshold);
     cvlr_assume!(threshold != 0);
 }
 
 pub fn assert_post_threshold_non_zero(e: Env, ctx_rule: ContextRule, account_id: Address) {
-    let threshold: u32 = WeightedThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
+    let threshold: u32 = get_threshold(&e, ctx_rule.id, &account_id);
     clog!(threshold);
     cvlr_assert!(threshold != 0);
 }
@@ -32,7 +36,7 @@ pub fn assert_post_threshold_non_zero(e: Env, ctx_rule: ContextRule, account_id:
 pub fn wt_after_install_threshold_non_zero(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
-    WeightedThresholdPolicy::install(&e, WeightedThresholdAccountParams::nondet(), ctx_rule.clone(), account_id.clone());
+    install(&e, &WeightedThresholdAccountParams::nondet(), &ctx_rule, &account_id);
     assert_post_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -43,7 +47,7 @@ pub fn wt_after_uninstall_threshold_non_zero(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     assume_pre_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
-    WeightedThresholdPolicy::uninstall(&e, ctx_rule.clone(), account_id.clone());
+    uninstall(&e, &ctx_rule, &account_id);
     assert_post_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -54,7 +58,7 @@ pub fn wt_after_set_threshold_threshold_non_zero(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     assume_pre_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
-    WeightedThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
     assert_post_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -66,7 +70,7 @@ pub fn wt_after_set_signer_weight_threshold_non_zero(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     assume_pre_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
-    WeightedThresholdPolicy::set_signer_weight(&e, signer, weight, ctx_rule.clone(), account_id.clone());
+    set_signer_weight(&e, &signer, weight, &ctx_rule, &account_id);
     assert_post_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -77,7 +81,7 @@ pub fn wt_after_can_enforce_threshold_non_zero(e: Env, context: soroban_sdk::aut
     let account_id: Address = nondet_address();
     assume_pre_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
     let auth_signers: Vec<Signer> = nondet_signers_vec();
-    let can_enforce = WeightedThresholdPolicy::can_enforce(&e, context, auth_signers, ctx_rule.clone(), account_id.clone());
+    can_enforce(&e, &context, &auth_signers, &ctx_rule, &account_id);
     assert_post_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -88,7 +92,7 @@ pub fn wt_enforce_threshold_non_zero(e: Env, context: soroban_sdk::auth::Context
     let account_id: Address = nondet_address();
     assume_pre_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
     let auth_signers: Vec<Signer> = nondet_signers_vec();
-    WeightedThresholdPolicy::enforce(&e, context, auth_signers, ctx_rule.clone(), account_id.clone());
+    enforce(&e, &context, &auth_signers, &ctx_rule, &account_id);
     assert_post_threshold_non_zero(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -100,18 +104,18 @@ pub fn wt_enforce_threshold_non_zero(e: Env, context: soroban_sdk::auth::Context
 // helpers
 
 pub fn assume_pre_threshold_leq_weight_sum(e: Env, ctx_rule: ContextRule, account_id: Address) {
-    let threshold: u32 = WeightedThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
-    let signer_weights = WeightedThresholdPolicy::get_signer_weights(&e, ctx_rule.clone(), account_id.clone());
-    let weight_sum: u32 = weighted_threshold::calculate_total_weight(&e, &signer_weights);
+    let threshold: u32 = get_threshold(&e, ctx_rule.id, &account_id);
+    let signer_weights = get_signer_weights(&e, &ctx_rule, &account_id);
+    let weight_sum: u32 = calculate_total_weight(&e, &signer_weights);
     clog!(threshold);
     clog!(weight_sum);
     cvlr_assume!(threshold <= weight_sum);
 }
 
 pub fn assert_post_threshold_leq_weight_sum(e: Env, ctx_rule: ContextRule, account_id: Address) {
-    let threshold: u32 = WeightedThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
-    let signer_weights = WeightedThresholdPolicy::get_signer_weights(&e, ctx_rule.clone(), account_id.clone());
-    let weight_sum: u32 = weighted_threshold::calculate_total_weight(&e, &signer_weights);
+    let threshold: u32 = get_threshold(&e, ctx_rule.id, &account_id);
+    let signer_weights = get_signer_weights(&e, &ctx_rule, &account_id);
+    let weight_sum: u32 = calculate_total_weight(&e, &signer_weights);
     clog!(threshold);
     clog!(weight_sum);
     cvlr_assert!(threshold <= weight_sum);
@@ -124,7 +128,7 @@ pub fn wt_after_set_threshold_threshold_leq_weight_sum(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     assume_pre_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
-    WeightedThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
     assert_post_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -136,7 +140,7 @@ pub fn wt_after_set_signer_weight_threshold_leq_weight_sum(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     assume_pre_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
-    WeightedThresholdPolicy::set_signer_weight(&e, signer, weight, ctx_rule.clone(), account_id.clone());
+    set_signer_weight(&e, &signer, weight, &ctx_rule, &account_id);
     assert_post_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -146,7 +150,7 @@ pub fn wt_after_install_threshold_leq_weight_sum(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     assume_pre_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
-    WeightedThresholdPolicy::install(&e, WeightedThresholdAccountParams::nondet(), ctx_rule.clone(), account_id.clone());
+    install(&e, &WeightedThresholdAccountParams::nondet(), &ctx_rule, &account_id);
     assert_post_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -157,7 +161,7 @@ pub fn wt_after_uninstall_threshold_leq_weight_sum(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id: Address = nondet_address();
     assume_pre_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
-    WeightedThresholdPolicy::uninstall(&e, ctx_rule.clone(), account_id.clone());
+    uninstall(&e, &ctx_rule, &account_id);
     assert_post_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -168,7 +172,7 @@ pub fn wt_after_can_enforce_threshold_leq_weight_sum(e: Env, context: soroban_sd
     let account_id: Address = nondet_address();
     assume_pre_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
     let auth_signers: Vec<Signer> = nondet_signers_vec();
-    let can_enforce = WeightedThresholdPolicy::can_enforce(&e, context, auth_signers, ctx_rule.clone(), account_id.clone());
+    can_enforce(&e, &context, &auth_signers, &ctx_rule, &account_id);
     assert_post_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
 }
 
@@ -179,6 +183,6 @@ pub fn wt_enforce_threshold_leq_weight_sum(e: Env, context: soroban_sdk::auth::C
     let account_id: Address = nondet_address();
     assume_pre_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
     let auth_signers: Vec<Signer> = nondet_signers_vec();
-    WeightedThresholdPolicy::enforce(&e, context, auth_signers, ctx_rule.clone(), account_id.clone());
+    enforce(&e, &context, &auth_signers, &ctx_rule, &account_id);
     assert_post_threshold_leq_weight_sum(e.clone(), ctx_rule.clone(), account_id.clone());
 }

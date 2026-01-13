@@ -10,8 +10,10 @@ use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
     policies::{
-        simple_threshold::SimpleThresholdAccountParams,
-        specs::simple_threshold_contract::SimpleThresholdPolicy, Policy,
+        simple_threshold::{
+            can_enforce, get_threshold, install, set_threshold, uninstall,
+            SimpleThresholdAccountParams, SimpleThresholdStorageKey,
+        },
     },
     smart_account::{specs::nondet::nondet_signers_vec, ContextRule, Signer},
 };
@@ -23,8 +25,8 @@ pub fn st_set_threshold_integrity(e: Env) {
     let threshold: u32 = u32::nondet();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
-    SimpleThresholdPolicy::set_threshold(&e, threshold, ctx_rule.clone(), account_id.clone());
-    let threshold_post = SimpleThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id);
+    set_threshold(&e, threshold, &ctx_rule, &account_id);
+    let threshold_post = get_threshold(&e, ctx_rule.id, &account_id);
     cvlr_assert!(threshold_post == threshold);
 }
 
@@ -36,16 +38,16 @@ pub fn st_can_enforce_integrity(e: Env, context: soroban_sdk::auth::Context) {
     let auth_signers: Vec<Signer> = nondet_signers_vec();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
-    let threshold_pre = SimpleThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
-    let can_enforce = SimpleThresholdPolicy::can_enforce(
+    let threshold_pre = get_threshold(&e, ctx_rule.id, &account_id);
+    let can_enforce_result = can_enforce(
         &e,
-        context,
-        auth_signers.clone(),
-        ctx_rule.clone(),
-        account_id.clone(),
+        &context,
+        &auth_signers,
+        &ctx_rule,
+        &account_id,
     );
     let expected_result = auth_signers.len() >= threshold_pre;
-    cvlr_assert!(can_enforce == expected_result);
+    cvlr_assert!(can_enforce_result == expected_result);
 }
 
 // can't write an integrity rule for enforce because it panics if can_enforce
@@ -58,8 +60,8 @@ pub fn st_install_integrity(e: Env) {
     let params: SimpleThresholdAccountParams = SimpleThresholdAccountParams::nondet();
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
-    SimpleThresholdPolicy::install(&e, params.clone(), ctx_rule.clone(), account_id.clone());
-    let threshold_post = SimpleThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
+    install(&e, &params, &ctx_rule, &account_id);
+    let threshold_post = get_threshold(&e, ctx_rule.id, &account_id);
     cvlr_assert!(threshold_post == params.threshold);
 }
 
@@ -69,11 +71,8 @@ pub fn st_install_integrity(e: Env) {
 pub fn st_uninstall_integrity(e: Env) {
     let ctx_rule: ContextRule = ContextRule::nondet();
     let account_id = nondet_address();
-    SimpleThresholdPolicy::uninstall(&e, ctx_rule.clone(), account_id.clone());
-    let key = crate::policies::simple_threshold::SimpleThresholdStorageKey::AccountContext(
-        account_id.clone(),
-        ctx_rule.id,
-    );
-    let account_ctx_opt: Option<SimpleThresholdAccountParams> = e.storage().persistent().get(&key);
+    uninstall(&e, &ctx_rule, &account_id);
+    let key = SimpleThresholdStorageKey::AccountContext(account_id.clone(), ctx_rule.id);
+    let account_ctx_opt: Option<u32> = e.storage().persistent().get(&key);
     cvlr_assert!(account_ctx_opt.is_none());
 }
