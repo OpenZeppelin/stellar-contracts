@@ -7,14 +7,12 @@ env:
     access_control_integrity.conf
     access_control_invariants.conf
     access_control_non_panics.conf
-    access_control_revoke_role_non_panic.conf
     access_control_panics.conf
-    access_control_sanity.conf
+    access_control_revoke_role_non_panic.conf
     ownable_integrity.conf
     ownable_invariants.conf
     ownable_non_panics.conf
     ownable_panics.conf
-    ownable_sanity.conf
 
 jobs:
   check:

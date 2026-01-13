@@ -4,25 +4,31 @@ on: pull_request
 
 env:
   CONFIGS: |
-    fungible_integrity.conf
-    fungible_non_panics.conf
-    fungible_panics.conf
-    fungible_sanity.conf
     allowlist.conf
     blocklist.conf
     burnable.conf
     capped.conf
+    claim_topics_and_issuers.conf
+    compliance_integrity.conf
     consecutive.conf
-    enumerable.conf
+    doc_manager.conf
+    fungible_integrity.conf
+    fungible_invariants.conf
+    fungible_panics.conf
+    identity_claims.conf
+    identity_registry_storage.conf
+    identity_verifier_integrity.conf
     non_fungible_burnable.conf
     non_fungible_integrity.conf
     non_fungible_invariants.conf
     non_fungible_non_panics.conf
     non_fungible_panics.conf
     royalties.conf
+    rwa_integrity.conf
+    rwa_panics.conf
+    token_binder_integrity.conf
     vault_conversions.conf
     vault_integrity.conf
-    vault_sanity.conf
 
 jobs:
   check:

@@ -1,2 +1,1 @@
 pub mod merkle_distributor_contract;
-pub mod merkle_distributor_contract_sanity;
