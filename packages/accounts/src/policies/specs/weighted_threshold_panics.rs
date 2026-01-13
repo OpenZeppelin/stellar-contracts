@@ -71,7 +71,7 @@ pub fn wt_set_threshold_panics_if_not_installed(e: Env) {
 
 #[rule]
 // set_signer_weight_panics if threshold > total_weight after update
-// status: violation spurious? unclear?
+// status: verified
 pub fn wt_set_signer_weight_panics_if_threshold_exceeds_total_weight(e: Env) {
     let signer: Signer = Signer::nondet();
     let weight: u32 = u32::nondet();
@@ -86,7 +86,7 @@ pub fn wt_set_signer_weight_panics_if_threshold_exceeds_total_weight(e: Env) {
     clog!(total_weight);
     let threshold = WeightedThresholdPolicy::get_threshold(&e, ctx_rule.id, account_id.clone());
     clog!(threshold);
-    cvlr_assume!(total_weight > threshold); // kind of weird where we do the assume after but it makes sense.
+    cvlr_assume!(threshold > total_weight); // kind of weird where we do the assume after but it makes sense.
     cvlr_assert!(false)
 }
 
