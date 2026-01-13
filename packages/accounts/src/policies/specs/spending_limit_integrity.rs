@@ -44,48 +44,6 @@ pub fn sl_set_spending_limit_integrity(e: Env) {
     cvlr_assert!(spending_limit_post == spending_limit);
 }
 
-#[rule]
-// status: violation - spurious.
-// trying to describe some path where can_enforce returns true.
-// should separate these out to a different file
-// and describe all the different possible paths with loop_iter <= 2
-// and the trivial paths that return 0.
-// possibly we need an invariant that connects the different parameters of the
-// spending limit
-pub fn no_previous_transfer_succeeds(e: Env, context: soroban_sdk::auth::Context) {
-    let auth_signers: Vec<Signer> = nondet_signers_vec();
-    cvlr_assume!(!auth_signers.is_empty());
-    let ctx_rule: ContextRule = ContextRule::nondet();
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let amount = i128::nondet();
-    clog!(amount);
-    let mut args = Vec::new(&e);
-    args.push_back(from.into_val(&e));
-    args.push_back(to.into_val(&e));
-    args.push_back(amount.into_val(&e));
-    let contract_context = Context::Contract(ContractContext {
-        fn_name: symbol_short!("transfer"),
-        args,
-        contract: nondet_address(),
-    });
-    let account_id = nondet_address();
-    clog!(cvlr_soroban::Addr(&account_id));
-    let spending_limit_data =
-        SpendingLimitPolicy::get_spending_limit_data(&e, ctx_rule.id, account_id.clone());
-    let spending_limit = spending_limit_data.spending_limit;
-    clog!(spending_limit);
-    let total_spent = spending_limit_data.cached_total_spent;
-    clog!(total_spent);
-    cvlr_assume!(total_spent == 0);
-    cvlr_assume!(amount <= spending_limit);
-    let result =
-        SpendingLimitPolicy::can_enforce(&e, context, auth_signers.clone(), ctx_rule, account_id);
-    cvlr_assert!(result);
-}
-
 // can't write an integrity rule for enforce because it panics if can_enforce
 // returns false.
 

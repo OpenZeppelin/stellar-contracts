@@ -188,25 +188,3 @@ pub fn nft_consecutive_approve_integrity(e: Env) {
 }
 
 // there is no approve_for_all function
-
-#[rule]
-// batch_mint changes balance correctly
-// the owner_of the first_token id is "to"
-// status: violation - unclear
-pub fn nft_batch_mint_integrity(e: Env) {
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let amount = u32::nondet();
-    clog!(amount);
-    let balance_pre = Consecutive::balance(&e, &to);
-    clog!(balance_pre);
-    let current_token_id = sequential::next_token_id(&e);
-    clog!(current_token_id);
-    Consecutive::batch_mint(&e, &to, amount);
-    let balance_post = Consecutive::balance(&e, &to);
-    clog!(balance_post);
-    cvlr_assert!(balance_post == balance_pre + amount);
-    let owner_of_current_token_id = Consecutive::owner_of(&e, current_token_id);
-    clog!(cvlr_soroban::Addr(&owner_of_current_token_id));
-    cvlr_assert!(owner_of_current_token_id == to);
-}

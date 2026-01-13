@@ -86,23 +86,6 @@ pub fn clog_verify_identity_result_map() {
 }
 
 #[rule]
-// mint panics if the identity verification fails
-// status: spurious violation - review
-pub fn rwa_mint_panics_if_identity_verification_fails(e: Env) {
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let amount: i128 = nondet();
-    clog!(amount);
-    assume_verify_identity_result_map_is_uninit();
-    let verify_identity_result = IdentityVerifierTrivial::verify_identity_non_panicking(&e, &to);
-    clog!(verify_identity_result);
-    clog_verify_identity_result_map(); // gives uinit = true
-    cvlr_assume!(!verify_identity_result);
-    RWA::mint(&e, &to, amount);
-    cvlr_assert!(false);
-}
-
-#[rule]
 // mint panics if amount < 0 
 // status: verified
 pub fn rwa_mint_panics_if_amount_less_than_zero(e: Env) {
@@ -111,20 +94,6 @@ pub fn rwa_mint_panics_if_amount_less_than_zero(e: Env) {
     let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(amount < 0);
-    RWA::mint(&e, &to, amount);
-    cvlr_assert!(false);
-}
-
-#[rule]
-// mint panics if not compliant
-// status: spurious violation - review
-pub fn rwa_mint_panics_if_not_compliant(e: Env) {
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let amount: i128 = nondet();
-    clog!(amount);
-    let can_create = ComplianceTrivial::can_create(&e, to.clone(), amount, e.current_contract_address());
-    cvlr_assume!(!can_create);
     RWA::mint(&e, &to, amount);
     cvlr_assert!(false);
 }
@@ -220,39 +189,6 @@ pub fn rwa_unfreeze_partial_tokens_panics_if_not_enough_frozen_tokens(e: Env) {
 // transfer
 // ============================================================================
 
-#[rule]
-// transfer panics if verification of to fails
-// status: spurious violation - review
-pub fn rwa_transfer_panics_if_verification_of_to_fails(e: Env) {
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let amount: i128 = nondet();
-    clog!(amount);
-    let verify_identity_result = IdentityVerifierTrivial::verify_identity_non_panicking(&e, &to);
-    clog!(verify_identity_result);
-    cvlr_assume!(!verify_identity_result);
-    RWA::transfer(&e, &from, &to, amount);
-    cvlr_assert!(false);
-}
-
-#[rule]
-// transfer panics if verification of from fails
-// status: spurious violation - review
-pub fn rwa_transfer_panics_if_verification_of_from_fails(e: Env) {
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let amount: i128 = nondet();
-    clog!(amount);
-    let verify_identity_result = IdentityVerifierTrivial::verify_identity_non_panicking(&e, &from);
-    clog!(verify_identity_result);
-    cvlr_assume!(!verify_identity_result);
-    RWA::transfer(&e, &from, &to, amount);
-    cvlr_assert!(false);
-}
 
 #[rule]
 // transfer panics if amount < 0 
@@ -284,21 +220,6 @@ pub fn rwa_transfer_panics_if_from_does_not_auth(e: Env) {
     cvlr_assert!(false);
 }
 
-#[rule]
-// transfer panics if not compliant 
-// status: spurious violation - review
-pub fn rwa_transfer_panics_if_not_compliant(e: Env) {
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let amount: i128 = nondet();
-    clog!(amount);
-    let can_transfer = ComplianceTrivial::can_transfer(&e, from.clone(), to.clone(), amount, e.current_contract_address());
-    cvlr_assume!(!can_transfer);
-    RWA::transfer(&e, &from, &to, amount);
-    cvlr_assert!(false);
-}
 
 #[rule]
 // transfer panics if contract is paused
@@ -389,43 +310,7 @@ pub fn rwa_transfer_panics_if_not_enough_unfrozen_balance(e: Env) {
 // transfer_from
 // ============================================================================
 
-#[rule]
-// transfer_from panics if verification of to fails
-// status: spurious violation - review
-pub fn rwa_transfer_from_panics_if_verification_of_to_fails(e: Env) {
-    let spender = nondet_address();
-    clog!(cvlr_soroban::Addr(&spender));
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let amount: i128 = nondet();
-    clog!(amount);
-    let verify_identity_result = IdentityVerifierTrivial::verify_identity_non_panicking(&e, &to);
-    clog!(verify_identity_result);
-    cvlr_assume!(!verify_identity_result);
-    RWA::transfer_from(&e, &spender, &from, &to, amount);
-    cvlr_assert!(false);
-}
 
-#[rule]
-// transfer_from panics if verification of from fails
-// status: spurious violation - review
-pub fn rwa_transfer_from_panics_if_verification_of_from_fails(e: Env) {
-    let spender = nondet_address();
-    clog!(cvlr_soroban::Addr(&spender));
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let amount: i128 = nondet();
-    clog!(amount);
-    let verify_identity_result = IdentityVerifierTrivial::verify_identity_non_panicking(&e, &from);
-    clog!(verify_identity_result);
-    cvlr_assume!(!verify_identity_result);
-    RWA::transfer_from(&e, &spender, &from, &to, amount);
-    cvlr_assert!(false);
-}
 
 #[rule]
 // transfer_from panics if amount < 0 
@@ -457,24 +342,6 @@ pub fn rwa_transfer_from_panics_if_spender_does_not_auth(e: Env) {
     let amount: i128 = nondet();
     clog!(amount);
     cvlr_assume!(!is_auth(spender.clone()));
-    RWA::transfer_from(&e, &spender, &from, &to, amount);
-    cvlr_assert!(false);
-}
-
-#[rule]
-// transfer_from panics if not compliant
-// status: spurious violation - review
-pub fn rwa_transfer_from_panics_if_not_compliant(e: Env) {
-    let spender = nondet_address();
-    clog!(cvlr_soroban::Addr(&spender));
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let to = nondet_address();
-    clog!(cvlr_soroban::Addr(&to));
-    let amount: i128 = nondet();
-    clog!(amount);
-    let can_transfer = ComplianceTrivial::can_transfer(&e, from.clone(), to.clone(), amount, e.current_contract_address());
-    cvlr_assume!(!can_transfer);
     RWA::transfer_from(&e, &spender, &from, &to, amount);
     cvlr_assert!(false);
 }

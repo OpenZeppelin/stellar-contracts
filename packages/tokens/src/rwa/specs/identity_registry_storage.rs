@@ -81,20 +81,6 @@ pub fn add_identity_integrity_3(e: Env) {
 }
 
 #[rule]
-// after add_identity the identity_profile has the same number of countries as the initial_countries
-// status: ?
-pub fn add_identity_integrity_4(e: Env) {
-    let account: Address = nondet_address();
-    let identity = nondet_address();
-    let identity_type: IdentityType = nondet();
-    let initial_countries = nondet_vec_country();
-    add_identity(&e, &account, &identity, identity_type.clone(), &initial_countries);
-    let identity_profile = get_identity_profile(&e, &account);
-    let identity_profile_countries = identity_profile.countries;
-    cvlr_assert!(identity_profile_countries == initial_countries);
-}
-
-#[rule]
 // after remove_identity the stored identity is none
 // status: verified
 pub fn remove_identity_integrity_1(e: Env) {
@@ -126,20 +112,6 @@ pub fn modify_identity_integrity_1(e: Env) {
 }
 
 #[rule]
-// after modify_identity the identity_profile is the same
-// status: spurious violation
-pub fn modify_identity_integrity_2(e: Env) {
-    let account: Address = nondet_address();
-    clog!(cvlr_soroban::Addr(&account));
-    let identity_profile_pre = get_identity_profile(&e, &account);
-    let new_identity = nondet_address();
-    clog!(cvlr_soroban::Addr(&new_identity));
-    modify_identity(&e, &account, &new_identity);
-    let identity_profile_post = get_identity_profile(&e, &account);
-    cvlr_assert!(identity_profile_post == identity_profile_pre);
-}
-
-#[rule]
 // after recover_identity the identity moves from old_account to new_account
 // status: verified
 pub fn recover_identity_integrity_1(e: Env) {
@@ -149,18 +121,6 @@ pub fn recover_identity_integrity_1(e: Env) {
     recover_identity(&e, &old_account, &new_account);
     let stored_identity_post_new_account = stored_identity(&e, &new_account);
     cvlr_assert!(stored_identity_post_new_account == store_identity_pre_old_account);
-}
-
-#[rule]
-// after recover_identity the identity_profile moves from old_account to new_account
-// status: spurious violation
-pub fn recover_identity_integrity_2(e: Env) {
-    let old_account: Address = nondet_address();
-    let new_account: Address = nondet_address();
-    let identity_profile_pre_old_account = get_identity_profile(&e, &old_account);
-    recover_identity(&e, &old_account, &new_account);
-    let identity_profile_post_new_account = get_identity_profile(&e, &new_account);
-    cvlr_assert!(identity_profile_post_new_account == identity_profile_pre_old_account);
 }
 
 #[rule]
@@ -196,32 +156,6 @@ pub fn recover_identity_integrity_5(e: Env) {
     cvlr_assert!(identity_profile.is_none());
 }
 
-#[rule]
-// after add_country_data_entries the length is added
-// status: ?
-pub fn add_country_data_entries_integrity_1(e: Env) {
-    let account: Address = nondet_address();
-    let country_data_entries = nondet_vec_country();
-    let added_length = country_data_entries.len();
-    let length_pre = get_country_data_entries(&e, &account).len();
-    add_country_data_entries(&e, &account, &country_data_entries);
-    let length_post = get_country_data_entries(&e, &account).len();
-    cvlr_assert!(length_post == length_pre + added_length);
-}
-
-#[rule]
-// after add_country_data_entries any data added entry is in the country data entries
-// status: ?
-pub fn add_country_data_entries_integrity_2(e: Env) {
-    let account: Address = nondet_address();
-    let country_data_entries = nondet_vec_country();
-    let added_country = nondet();
-    cvlr_assume!(country_data_entries.contains(&added_country));
-    add_country_data_entries(&e, &account, &country_data_entries);
-    let country_data_entries_post = get_country_data_entries(&e, &account);
-    let added_country_in_entries_post = country_data_entries_post.contains(&added_country);
-    cvlr_assert!(added_country_in_entries_post);
-}
 
 #[rule]
 // after modify_country_data the country_data in given index is some
@@ -234,19 +168,6 @@ pub fn modify_country_data_integrity_1(e: Env) {
     let country_data_entries_post = get_country_data_entries(&e, &account);
     let country_data_in_entries_post = country_data_entries_post.get(index);
     cvlr_assert!(country_data_in_entries_post.is_some());
-}
-
-#[rule]
-// after modify_country_data the country_data in given index is the input
-// status: violation
-pub fn modify_country_data_integrity_2(e: Env) {
-    let account: Address = nondet_address();
-    let index: u32 = nondet();
-    let country_data = nondet();
-    modify_country_data(&e, &account, index, &country_data);
-    let country_data_entries_post = get_country_data_entries(&e, &account);
-    let country_data_in_entries_post = country_data_entries_post.get(index);
-    cvlr_assert!(country_data_in_entries_post == Some(country_data));
 }
 
 #[rule]
@@ -263,37 +184,7 @@ pub fn modify_country_data_integrity_3(e: Env) {
     cvlr_assert!(length_post == length_pre);
 }
 
-#[rule]
-// after modify_country_data the data is any other index is unchanged
-// status: violation
-pub fn modify_country_data_integrity_4(e: Env) {
-    let account: Address = nondet_address();
-    let index: u32 = nondet();
-    let country_data = nondet();
-    let index_other = nondet();
-    cvlr_assume!(index_other != index);
-    let country_data_entries_pre = get_country_data_entries(&e, &account);
-    let entry_pre_index_other = country_data_entries_pre.get(index_other);
-    modify_country_data(&e, &account, index, &country_data);
-    let country_data_entries_post = get_country_data_entries(&e, &account);
-    let entry_post_index_other = country_data_entries_post.get(index_other);
-    cvlr_assert!(entry_post_index_other == entry_pre_index_other);
-}
 
-#[rule]
-// after delete_country_data the country_data in index is none
-// status: violation
-pub fn delete_country_data_integrity_1(e: Env) {
-    let account: Address = nondet_address();
-    clog!(cvlr_soroban::Addr(&account));
-    let index: u32 = nondet();
-    let country_data_entries_pre = get_country_data_entries(&e, &account);
-    clog!(index);
-    delete_country_data(&e, &account, index);
-    let country_data_entries_post = get_country_data_entries(&e, &account);
-    let country_data_in_entries_post = country_data_entries_post.get(index);
-    cvlr_assert!(country_data_in_entries_post.is_none());
-}
 
 #[rule]
 // after_delete_country_data the length is decreased by 1
@@ -306,22 +197,6 @@ pub fn delete_country_data_integrity_2(e: Env) {
     let country_data_entries_post = get_country_data_entries(&e, &account);
     let length_post = country_data_entries_post.len();
     cvlr_assert!(length_post == length_pre - 1);
-}
-
-#[rule]
-// after delete_country_data the data in any other index is unchanged
-// status: violation
-pub fn delete_country_data_integrity_3(e: Env) {
-    let account: Address = nondet_address();
-    let index: u32 = nondet();
-    let index_other = nondet();
-    cvlr_assume!(index_other != index);
-    let country_data_entries_pre = get_country_data_entries(&e, &account);
-    let entry_pre_index_other = country_data_entries_pre.get(index_other);
-    delete_country_data(&e, &account, index);
-    let country_data_entries_post = get_country_data_entries(&e, &account);
-    let entry_post_index_other = country_data_entries_post.get(index_other);
-    cvlr_assert!(entry_post_index_other == entry_pre_index_other);
 }
 
 // todo

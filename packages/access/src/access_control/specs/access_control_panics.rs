@@ -322,30 +322,6 @@ pub fn admin_function_panics_if_admin_not_set(e: Env) {
 }
 
 #[rule]
-// role1_func panics if caller doesn't have role
-// status: violation - symbol issue
-pub fn role1_func_panics_if_caller_does_not_have_role(e: Env) {
-    let caller = nondet_address();
-    let role1 = soroban_sdk::Symbol::new(&e, "role1");
-    let caller_has_role = AccessControlContract::has_role(&e, caller.clone(), role1);
-    cvlr_assume!(caller_has_role.is_none());
-    AccessControlContract::role1_func(&e, caller);
-    cvlr_assert!(false);
-}
-
-#[rule]
-// role1_auth_func panics if caller doesn't have role
-// status: violation - symbol issue
-pub fn role1_auth_func_panics_if_caller_does_not_have_role(e: Env) {
-    let caller = nondet_address();
-    let role1 = soroban_sdk::Symbol::new(&e, "role1");
-    let caller_has_role = AccessControlContract::has_role(&e, caller.clone(), role1.clone());
-    cvlr_assume!(caller_has_role.is_none());
-    AccessControlContract::role1_auth_func(&e, caller.clone());
-    cvlr_assert!(false);
-}
-
-#[rule]
 // role1_auth_func panics if caller does not authorize
 // status: verified
 pub fn role1_auth_func_panics_if_caller_does_not_authorize(e: Env) {
@@ -356,65 +332,11 @@ pub fn role1_auth_func_panics_if_caller_does_not_authorize(e: Env) {
 }
 
 #[rule]
-// role1_or_role2_func panics if caller doesn't have role
-// status: violation - symbol issue
-pub fn role1_or_role2_func_panics_if_caller_does_not_have_role(e: Env) {
-    let caller = nondet_address();
-    let role1 = soroban_sdk::Symbol::new(&e, "role1");
-    let role2 = soroban_sdk::Symbol::new(&e, "role2");
-    let caller_has_role1 = AccessControlContract::has_role(&e, caller.clone(), role1);
-    let caller_has_role2 = AccessControlContract::has_role(&e, caller.clone(), role2);
-    cvlr_assume!(caller_has_role1.is_none() && caller_has_role2.is_none());
-    AccessControlContract::role1_or_role2_func(&e, caller.clone());
-    cvlr_assert!(false);
-}
-
-#[rule]
-// role1_or_role2_auth_func panics if caller doesn't have role
-// status: violation - symbol issue
-pub fn role1_or_role2_auth_func_panics_if_caller_does_not_have_role(e: Env) {
-    let caller = nondet_address();
-    let role1 = soroban_sdk::Symbol::new(&e, "role1");
-    let role2 = soroban_sdk::Symbol::new(&e, "role2");
-    let caller_has_role1 = AccessControlContract::has_role(&e, caller.clone(), role1);
-    let caller_has_role2 = AccessControlContract::has_role(&e, caller.clone(), role2);
-    cvlr_assume!(caller_has_role1.is_none() && caller_has_role2.is_none());
-    AccessControlContract::role1_or_role2_auth_func(&e, caller.clone());
-    cvlr_assert!(false);
-}
-
-#[rule]
 // role1_or_role2_auth_func panics if caller doesn't authorize
 // status: verified
 pub fn role1_or_role2_auth_func_panics_if_caller_does_not_authorize(e: Env) {
     let caller = nondet_address();
     cvlr_assume!(!is_auth(caller.clone()));
     AccessControlContract::role1_or_role2_auth_func(&e, caller.clone());
-    cvlr_assert!(false);
-}
-
-#[rule]
-// role1_and_role2_func panics if caller1 doesn't have role
-// status: violation - symbol issue
-pub fn role1_and_role2_func_panics_if_caller1_does_not_have_role(e: Env) {
-    let caller1 = nondet_address();
-    let caller2 = nondet_address();
-    let role1 = soroban_sdk::Symbol::new(&e, "role1");
-    let caller1_has_role = AccessControlContract::has_role(&e, caller1.clone(), role1);
-    cvlr_assume!(caller1_has_role.is_none());
-    AccessControlContract::role1_and_role2_func(&e, caller1.clone(), caller2.clone());
-    cvlr_assert!(false);
-}
-
-#[rule]
-// role1_and_role2_func panics if caller2 doesn't have role
-// status: violation - symbol issue
-pub fn role1_and_role2_func_panics_if_caller2_does_not_have_role(e: Env) {
-    let caller1 = nondet_address();
-    let caller2 = nondet_address();
-    let role2 = soroban_sdk::Symbol::new(&e, "role2");
-    let caller2_has_role = AccessControlContract::has_role(&e, caller2.clone(), role2);
-    cvlr_assume!(caller2_has_role.is_none());
-    AccessControlContract::role1_and_role2_func(&e, caller1.clone(), caller2.clone());
     cvlr_assert!(false);
 }

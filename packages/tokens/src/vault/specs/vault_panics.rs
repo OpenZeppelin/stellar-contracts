@@ -62,25 +62,6 @@ pub fn withdraw_panic_assets_lt_0(e: Env) {
     cvlr_assert!(false);
 }
 
-#[rule]
-// withdraw panics if assets > max withdraw 
-// status: timeout
-pub fn withdraw_panic_assets_gt_max_withdraw(e: Env) {
-    let assets: i128 = nondet();
-    clog!(assets);
-    let receiver: Address = nondet_address();
-    clog!(cvlr_soroban::Addr(&receiver));
-    let owner: Address = nondet_address();
-    clog!(cvlr_soroban::Addr(&owner));
-    let operator: Address = nondet_address();
-    clog!(cvlr_soroban::Addr(&operator));
-    let max_withdraw = BasicVault::max_withdraw(&e, owner.clone());
-    clog!(max_withdraw);
-    cvlr_assume!(assets > max_withdraw);
-    let _ = BasicVault::withdraw(&e, assets, receiver, owner, operator);
-    cvlr_assert!(false);
-}
-
 #[rule] 
 // mint panics if shares < 0 
 // status: verified

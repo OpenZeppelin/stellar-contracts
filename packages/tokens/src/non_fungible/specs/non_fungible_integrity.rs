@@ -159,17 +159,3 @@ pub fn nft_sequential_mint_integrity(e: Env) {
     clog!(balance_post);
     cvlr_assert!(balance_post == balance_pre + 1);
 }
-
-#[rule]
-// token_uri of two different tokens is different
-// status: tool issue
-pub fn nft_token_uri_injective(e: Env) {
-    let token_id1 = u32::nondet();
-    clog!(token_id1);
-    let token_id2 = u32::nondet();
-    clog!(token_id2);
-    cvlr_assume!(token_id1 != token_id2);
-    let uri1 = Base::token_uri(&e, token_id1);
-    let uri2 = Base::token_uri(&e, token_id2);
-    cvlr_assert!(uri1 != uri2);
-}

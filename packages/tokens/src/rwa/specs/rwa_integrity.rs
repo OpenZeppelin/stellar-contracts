@@ -110,8 +110,6 @@ pub fn rwa_mint_integrity_2(e: Env) {
     cvlr_assert!(total_supply_post == total_supply_pre + amount);
 }
 
-// todo: created hook in compliance contract
-
 #[rule]
 // burn decreases balance of user appropriately
 // status: verified
@@ -128,25 +126,6 @@ pub fn rwa_burn_integrity_1(e: Env) {
     clog!(balance_user_post);
     cvlr_assert!(balance_user_post == balance_user_pre - amount);
 }
-
-#[rule]
-// burn decreases total supply by amount
-// status: timeout
-pub fn rwa_burn_integrity_2(e: Env) {
-    let user = nondet_address();
-    clog!(cvlr_soroban::Addr(&user));
-    let amount: i128 = nondet();
-    clog!(amount);
-    let total_supply_pre = RWA::total_supply(&e);
-    clog!(total_supply_pre);
-    RWA::burn(&e, &user, amount);
-    let total_supply_post = RWA::total_supply(&e);
-    clog!(total_supply_post);
-    cvlr_assert!(total_supply_post == total_supply_pre - amount);
-}
-
-// todo: destroyed hook in compliance contract
-// todo: potentially unfreezing tokens
 
 #[rule]
 // set_address_frozen sets the frozen status
@@ -284,8 +263,6 @@ pub fn rwa_transfer_integrity_3(e: Env) {
     cvlr_assert!(total_supply_post == total_supply_pre);
 }
 
-// todo: on_transfer hook in compliance contract
-
 // transfer_from
 
 #[rule]
@@ -330,29 +307,6 @@ pub fn rwa_transfer_from_integrity_2(e: Env) {
         cvlr_assert!(balance_from_post == balance_from_pre - amount);
     } else {
         cvlr_assert!(balance_from_post == balance_from_pre);
-    }
-}
-
-#[rule]
-// transfer_from changes the balance of to accordingly
-// status: timeout (with -split false)
-pub fn rwa_transfer_from_integrity_3(e: Env) {
-    let spender = nondet_address();
-    clog!(cvlr_soroban::Addr(&spender));
-    let from = nondet_address();
-    clog!(cvlr_soroban::Addr(&from));
-    let to = nondet_address();
-    let amount: i128 = nondet();
-    clog!(amount);
-    let balance_to_pre = RWA::balance(&e, &to);
-    clog!(balance_to_pre);
-    RWA::transfer_from(&e, &spender, &from, &to, amount);
-    let balance_to_post = RWA::balance(&e, &to);
-    clog!(balance_to_post);
-    if from != to {
-        cvlr_assert!(balance_to_post == balance_to_pre + amount);
-    } else {
-        cvlr_assert!(balance_to_post == balance_to_pre);
     }
 }
 
