@@ -593,12 +593,9 @@ impl RWA {
         emit_identity_verifier_set(e, identity_verifier);
     }
 
-    /// Internal helper for [`Self::transfer`] and [`Self::transfer_from`]
-    /// overrides.
-    ///
     /// This function performs all the checks and operations that are required
-    /// for a transfer but does not require authorization. It is used by the
-    /// `transfer_*` overrides to avoid code duplication.
+    /// for a transfer but does not require authorization. It is used by
+    /// [`Self::transfer`] and [`Self::transfer_from`] overrides.
     ///
     /// # Arguments
     ///
@@ -621,26 +618,21 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - ["transfer", from: Address, to: Address]
+    /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `["to_muxed_id: Option<u64>, amount: i128"]`
-    ///
-    /// # Security Warning
-    ///
-    /// **IMPORTANT**: This function bypasses authorization checks, it acts only
-    /// as a helper for transfer functions. Please use [`Self::transfer`] or
-    /// [`Self::transfer_from`] instead, unless you want to tweak the transfer
-    /// authorization.
-    pub fn transfer_no_auth(e: &Env, from: &Address, to: &Address, amount: i128) {
+    pub fn validate_transfer<'a>(
+        e: &Env,
+        from: &Address,
+        to: &Address,
+        amount: i128,
+    ) -> ComplianceClient<'a> {
         // Check if contract is paused
         if paused(e) {
             panic_with_error!(e, PausableError::EnforcedPause);
         }
 
         // Check if addresses are frozen
-        if Self::is_frozen(e, from) {
-            panic_with_error!(e, RWAError::AddressFrozen);
-        }
-        if Self::is_frozen(e, to) {
+        if Self::is_frozen(e, from) || Self::is_frozen(e, to) {
             panic_with_error!(e, RWAError::AddressFrozen);
         }
 
@@ -665,15 +657,14 @@ impl RWA {
             panic_with_error!(e, RWAError::TransferNotCompliant);
         }
 
-        Base::update(e, Some(from), Some(to), amount);
-
-        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
-
-        emit_transfer(e, from, to, None, amount);
+        compliance_client
     }
 
     // ################## OVERRIDDEN FUNCTIONS ##################
 
+    /// `transfer` override with added compliance and identity verification
+    /// checks.
+    ///
     /// This is ultimately a wrapper around [`Base::update()`] to enable
     /// the compatibility across [`crate::fungible::FungibleToken`]
     /// with [`crate::rwa::RWAToken`]
@@ -687,21 +678,47 @@ impl RWA {
     /// - enforces compliance rules for the transfer
     /// - triggers `transferred` hook call from the compliance contract
     ///
-    /// Please refer to [`Base::update`] for the inline documentation.
+    /// Please refer to [`Base::update`] and [`Self::validate_transfer`] for the
+    /// inline documentation.
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         from.require_auth();
-        Self::transfer_no_auth(e, from, to, amount);
+
+        let compliance_client = Self::validate_transfer(e, from, to, amount);
+        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
+
+        Base::update(e, Some(from), Some(to), amount);
+
+        emit_transfer(e, from, to, None, amount);
     }
 
+    /// `transfer_from` override with added compliance and identity verification
+    /// checks.
+    ///
     /// This is ultimately a wrapper around [`Base::update()`] to enable
     /// the compatibility across [`crate::fungible::FungibleToken`]
     /// with [`crate::rwa::RWAToken`]
     ///
-    /// Please refer to [`Base::update`] and [`Self::transfer`] for the inline
-    /// documentation.
+    /// The main differences are:
+    /// - checks for if the contract is paused
+    /// - checks for if the addresses are frozen
+    /// - checks for if the from address have enough free tokens (unfrozen
+    ///   tokens)
+    /// - enforces identity verification for both addresses
+    /// - enforces compliance rules for the transfer
+    /// - triggers `transferred` hook call from the compliance contract
+    ///
+    /// Please refer to [`Base::update`] and [`Self::validate_transfer`] for the
+    /// inline documentation.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         spender.require_auth();
+
         Base::spend_allowance(e, from, spender, amount);
-        Self::transfer_no_auth(e, from, to, amount);
+
+        let compliance_client = Self::validate_transfer(e, from, to, amount);
+        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
+
+        Base::update(e, Some(from), Some(to), amount);
+
+        emit_transfer(e, from, to, None, amount);
     }
 }
