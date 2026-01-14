@@ -5,6 +5,7 @@ members = [
     "examples/fungible-blocklist",
     "examples/fungible-capped",
     "examples/fungible-merkle-airdrop",
+    "examples/fungible-votes",
     "examples/fee-forwarder-permissioned",
     "examples/fee-forwarder-permissionless",
     "examples/fungible-pausable",
