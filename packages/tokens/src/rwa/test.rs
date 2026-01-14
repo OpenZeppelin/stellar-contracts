@@ -4,6 +4,7 @@ use soroban_sdk::{
     contract, contractimpl, panic_with_error, symbol_short, testutils::Address as _, Address, Env,
     String,
 };
+use stellar_contract_utils::pausable;
 
 use crate::{
     fungible::ContractOverrides,
@@ -851,6 +852,53 @@ fn transfer_fails_when_insufficient_free_tokens() {
         assert_eq!(RWA::get_free_tokens(&e, &from), 20);
 
         // Try to transfer 50 tokens (more than free) - should fail
+        RWA::transfer(&e, &from, &to, 50);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1000)")]
+fn transfer_fails_when_contract_paused() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        RWA::mint(&e, &from, 100);
+
+        // Pause the contract
+        pausable::pause(&e);
+
+        // Try to transfer - should fail with EnforcedPause error
+        RWA::transfer(&e, &from, &to, 50);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #305)")]
+fn transfer_fails_when_not_compliant() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let _ = set_and_return_identity_verifier(&e);
+        let compliance = set_and_return_compliance(&e);
+
+        RWA::mint(&e, &from, 100);
+
+        // Set compliance to reject transfers
+        e.as_contract(&compliance, || {
+            e.storage().persistent().set(&symbol_short!("tx_ok"), &false);
+        });
+
+        // Try to transfer - should fail with TransferNotCompliant error
         RWA::transfer(&e, &from, &to, 50);
     });
 }
