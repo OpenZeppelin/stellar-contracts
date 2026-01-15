@@ -620,12 +620,7 @@ impl RWA {
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `["to_muxed_id: Option<u64>, amount: i128"]`
-    pub fn validate_transfer<'a>(
-        e: &Env,
-        from: &Address,
-        to: &Address,
-        amount: i128,
-    ) -> ComplianceClient<'a> {
+    pub fn validate_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         // Check if contract is paused
         if paused(e) {
             panic_with_error!(e, PausableError::EnforcedPause);
@@ -656,8 +651,6 @@ impl RWA {
         if !can_transfer {
             panic_with_error!(e, RWAError::TransferNotCompliant);
         }
-
-        compliance_client
     }
 
     // ################## OVERRIDDEN FUNCTIONS ##################
@@ -683,11 +676,12 @@ impl RWA {
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         from.require_auth();
 
-        let compliance_client = Self::validate_transfer(e, from, to, amount);
-        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
+        Self::validate_transfer(e, from, to, amount);
 
         Base::update(e, Some(from), Some(to), amount);
 
+        let compliance_client = ComplianceClient::new(e, &Self::compliance(e));
+        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
         emit_transfer(e, from, to, None, amount);
     }
 
@@ -714,11 +708,10 @@ impl RWA {
 
         Base::spend_allowance(e, from, spender, amount);
 
-        let compliance_client = Self::validate_transfer(e, from, to, amount);
-        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
-
         Base::update(e, Some(from), Some(to), amount);
 
+        let compliance_client = ComplianceClient::new(e, &Self::compliance(e));
+        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
         emit_transfer(e, from, to, None, amount);
     }
 }
