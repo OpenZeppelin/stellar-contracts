@@ -1,9 +1,12 @@
-use soroban_sdk::{panic_with_error, symbol_short, Env, Symbol};
+use soroban_sdk::{contracttype, panic_with_error, Env};
 
-use crate::fungible::{FungibleTokenError, StorageKey};
+use crate::fungible::{FungibleStorageKey, FungibleTokenError};
 
-/// Storage key
-pub const CAP_KEY: Symbol = symbol_short!("CAP");
+/// Storage key for the cap value
+#[contracttype]
+pub enum CapStorageKey {
+    Cap,
+}
 
 /// Set the maximum supply of tokens.
 ///
@@ -33,7 +36,7 @@ pub fn set_cap(e: &Env, cap: i128) {
     if cap < 0 {
         panic_with_error!(e, FungibleTokenError::InvalidCap);
     }
-    e.storage().instance().set(&CAP_KEY, &cap);
+    e.storage().instance().set(&CapStorageKey::Cap, &cap);
 }
 
 /// Returns the maximum supply of tokens.
@@ -48,7 +51,7 @@ pub fn set_cap(e: &Env, cap: i128) {
 pub fn query_cap(e: &Env) -> i128 {
     e.storage()
         .instance()
-        .get(&CAP_KEY)
+        .get(&CapStorageKey::Cap)
         .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::CapNotSet))
 }
 
@@ -69,7 +72,8 @@ pub fn query_cap(e: &Env) -> i128 {
 ///   will exceed the cap.
 pub fn check_cap(e: &Env, amount: i128) {
     let cap: i128 = query_cap(e);
-    let total_supply: i128 = e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0);
+    let total_supply: i128 =
+        e.storage().instance().get(&FungibleStorageKey::TotalSupply).unwrap_or(0);
     let Some(sum) = total_supply.checked_add(amount) else {
         panic_with_error!(e, FungibleTokenError::MathOverflow);
     };

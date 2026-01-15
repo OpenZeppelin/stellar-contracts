@@ -1,14 +1,9 @@
-use soroban_sdk::{
-    contracttype, panic_with_error, symbol_short, Address, Env, MuxedAddress, String, Symbol,
-};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress, String};
 
 use crate::fungible::{
     emit_approve, emit_mint, emit_transfer, Base, FungibleTokenError, BALANCE_EXTEND_AMOUNT,
     BALANCE_TTL_THRESHOLD,
 };
-
-/// Storage key that maps to [`Metadata`]
-pub const METADATA_KEY: Symbol = symbol_short!("METADATA");
 
 /// Storage key that maps to [`AllowanceData`]
 #[contracttype]
@@ -25,20 +20,21 @@ pub struct AllowanceData {
     pub live_until_ledger: u32,
 }
 
-/// Storage keys for the data associated with `FungibleToken`
-#[contracttype]
-pub enum StorageKey {
-    TotalSupply,
-    Balance(Address),
-    Allowance(AllowanceKey),
-}
-
 /// Storage container for token metadata
 #[contracttype]
 pub struct Metadata {
     pub decimals: u32,
     pub name: String,
     pub symbol: String,
+}
+
+/// Storage keys for the data associated with `FungibleToken`
+#[contracttype]
+pub enum FungibleStorageKey {
+    Meta,
+    TotalSupply,
+    Balance(Address),
+    Allowance(AllowanceKey),
 }
 
 impl Base {
@@ -51,7 +47,7 @@ impl Base {
     ///
     /// * `e` - Access to the Soroban environment.
     pub fn total_supply(e: &Env) -> i128 {
-        e.storage().instance().get(&StorageKey::TotalSupply).unwrap_or(0)
+        e.storage().instance().get(&FungibleStorageKey::TotalSupply).unwrap_or(0)
     }
 
     /// Returns the amount of tokens held by `account`. Defaults to `0` if no
@@ -62,7 +58,7 @@ impl Base {
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address for which the balance is being queried.
     pub fn balance(e: &Env, account: &Address) -> i128 {
-        let key = StorageKey::Balance(account.clone());
+        let key = FungibleStorageKey::Balance(account.clone());
         if let Some(balance) = e.storage().persistent().get::<_, i128>(&key) {
             e.storage().persistent().extend_ttl(&key, BALANCE_TTL_THRESHOLD, BALANCE_EXTEND_AMOUNT);
             balance
@@ -91,7 +87,7 @@ impl Base {
         let allowance_data = e
             .storage()
             .temporary()
-            .get(&StorageKey::Allowance(key))
+            .get(&FungibleStorageKey::Allowance(key))
             .unwrap_or(AllowanceData { amount: 0, live_until_ledger: 0 });
 
         if allowance_data.live_until_ledger < e.ledger().sequence() {
@@ -126,7 +122,7 @@ impl Base {
     pub fn get_metadata(e: &Env) -> Metadata {
         e.storage()
             .instance()
-            .get(&METADATA_KEY)
+            .get(&FungibleStorageKey::Meta)
             .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::UnsetMetadata))
     }
 
@@ -262,8 +258,10 @@ impl Base {
             panic_with_error!(e, FungibleTokenError::InvalidLiveUntilLedger);
         }
 
-        let key =
-            StorageKey::Allowance(AllowanceKey { owner: owner.clone(), spender: spender.clone() });
+        let key = FungibleStorageKey::Allowance(AllowanceKey {
+            owner: owner.clone(),
+            spender: spender.clone(),
+        });
         let allowance = AllowanceData { amount, live_until_ledger };
 
         e.storage().temporary().set(&key, &allowance);
@@ -415,27 +413,31 @@ impl Base {
             }
             // NOTE: can't underflow because of the check above.
             from_balance -= amount;
-            e.storage().persistent().set(&StorageKey::Balance(account.clone()), &from_balance);
+            e.storage()
+                .persistent()
+                .set(&FungibleStorageKey::Balance(account.clone()), &from_balance);
         } else {
             // `from` is None, so we're minting tokens.
             let total_supply = Base::total_supply(e);
             let Some(new_total_supply) = total_supply.checked_add(amount) else {
                 panic_with_error!(e, FungibleTokenError::MathOverflow);
             };
-            e.storage().instance().set(&StorageKey::TotalSupply, &new_total_supply);
+            e.storage().instance().set(&FungibleStorageKey::TotalSupply, &new_total_supply);
         }
 
         if let Some(account) = to {
             // NOTE: can't overflow because balance + amount is at most total_supply.
             let to_balance = Base::balance(e, account) + amount;
-            e.storage().persistent().set(&StorageKey::Balance(account.clone()), &to_balance);
+            e.storage()
+                .persistent()
+                .set(&FungibleStorageKey::Balance(account.clone()), &to_balance);
         } else {
             // `to` is None, so we're burning tokens.
 
             // NOTE: can't overflow because amount <= total_supply or amount <= from_balance
             // <= total_supply.
             let total_supply = Base::total_supply(e) - amount;
-            e.storage().instance().set(&StorageKey::TotalSupply, &total_supply);
+            e.storage().instance().set(&FungibleStorageKey::TotalSupply, &total_supply);
         }
     }
 
@@ -493,6 +495,6 @@ impl Base {
     /// admin-only authorization.
     pub fn set_metadata(e: &Env, decimals: u32, name: String, symbol: String) {
         let metadata = Metadata { decimals, name, symbol };
-        e.storage().instance().set(&METADATA_KEY, &metadata);
+        e.storage().instance().set(&FungibleStorageKey::Meta, &metadata);
     }
 }
