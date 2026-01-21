@@ -43,6 +43,7 @@ jobs:
 
   publish:
     name: Publish
+    needs: dry-run
     env:
       CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
     runs-on: ubuntu-latest
