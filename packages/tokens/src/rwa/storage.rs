@@ -593,7 +593,7 @@ impl RWA {
         emit_identity_verifier_set(e, identity_verifier);
     }
 
-    /// This function performs all the checks and operations that are required
+    /// This function performs all the checks that are required
     /// for a transfer but does not require authorization. It is used by
     /// [`Self::transfer`] and [`Self::transfer_from`] overrides.
     ///
