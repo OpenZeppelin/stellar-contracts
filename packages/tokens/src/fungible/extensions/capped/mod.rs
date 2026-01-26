@@ -10,6 +10,6 @@
 /// - `check_cap`: Panics if minting a specified `amount` would exceed the cap.
 ///   Should be used before calling `mint()`.
 mod storage;
-pub use self::storage::{check_cap, query_cap, set_cap, CAP_KEY};
+pub use self::storage::{check_cap, query_cap, set_cap, CapStorageKey};
 #[cfg(test)]
 mod test;

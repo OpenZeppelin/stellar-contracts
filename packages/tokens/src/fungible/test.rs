@@ -12,7 +12,7 @@ use soroban_sdk::{
 use stellar_event_assertion::EventAssertion;
 
 use crate::fungible::{
-    Base, StorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
+    Base, FungibleStorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
 };
 
 #[contract]
@@ -153,7 +153,7 @@ fn spend_allowance_expired_ledger_fails_edge_case() {
     e.as_contract(&address, || {
         Base::approve(&e, &owner, &spender, 10, 1000);
 
-        let key = crate::fungible::StorageKey::Allowance(super::AllowanceKey {
+        let key = crate::fungible::FungibleStorageKey::Allowance(super::AllowanceKey {
             owner: owner.clone(),
             spender: spender.clone(),
         });
@@ -301,7 +301,7 @@ fn extend_balance_ttl_thru_transfer() {
     e.as_contract(&address, || {
         Base::mint(&e, &from, 100);
 
-        let key = StorageKey::Balance(from.clone());
+        let key = FungibleStorageKey::Balance(from.clone());
 
         let ttl = e.storage().persistent().get_ttl(&key);
         e.ledger().with_mut(|l| {

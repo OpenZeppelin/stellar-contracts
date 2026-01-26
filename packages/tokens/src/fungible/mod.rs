@@ -80,7 +80,7 @@ pub use overrides::{Base, ContractOverrides};
 use soroban_sdk::{
     contracterror, contractevent, contracttrait, Address, Env, MuxedAddress, String,
 };
-pub use storage::{AllowanceData, AllowanceKey, StorageKey};
+pub use storage::{AllowanceData, AllowanceKey, FungibleStorageKey};
 pub use utils::{sac_admin_generic, sac_admin_wrapper};
 
 /// Vanilla Fungible Token Trait
