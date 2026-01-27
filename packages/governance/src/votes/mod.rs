@@ -136,9 +136,11 @@ pub trait Votes {
     ///
     /// # Events
     ///
-    /// * [`DelegateChanged`] - Emitted when delegation changes.
-    /// * [`DelegateVotesChanged`] - Emitted for both old and new delegates if
-    ///   their voting power changes.
+    /// * topics - `["DelegateChanged", delegator: Address]`
+    /// * data - `[from_delegate: Option<Address>, to_delegate: Address]`
+    ///
+    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * data - `[old_votes: u128, new_votes: u128]`
     ///
     /// # Notes
     ///
@@ -158,7 +160,7 @@ pub enum VotesError {
     FutureLookup = 4100,
     /// Arithmetic overflow occurred
     MathOverflow = 4101,
-    /// Try to transfer more than available
+    /// Attempting to transfer more voting units than available
     InsufficientVotingUnits = 4102,
 }
 

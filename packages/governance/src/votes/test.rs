@@ -19,8 +19,6 @@ fn setup_env() -> (Env, Address) {
     (e, contract_address)
 }
 
-// ################## BASIC FUNCTIONALITY TESTS ##################
-
 #[test]
 fn initial_state_has_zero_votes() {
     let (e, contract_address) = setup_env();
@@ -31,19 +29,9 @@ fn initial_state_has_zero_votes() {
         assert_eq!(get_voting_units(&e, &alice), 0);
         assert_eq!(num_checkpoints(&e, &alice), 0);
         assert_eq!(get_delegate(&e, &alice), None);
-    });
-}
-
-#[test]
-fn initial_total_supply_is_zero() {
-    let (e, contract_address) = setup_env();
-
-    e.as_contract(&contract_address, || {
         assert_eq!(get_total_supply(&e), 0);
     });
 }
-
-// ################## TRANSFER VOTING UNITS TESTS ##################
 
 #[test]
 fn mint_increases_voting_units() {
@@ -163,24 +151,6 @@ fn change_delegate() {
         delegate(&e, &alice, &charlie);
         assert_eq!(get_votes(&e, &bob), 0);
         assert_eq!(get_votes(&e, &charlie), 100);
-    });
-}
-
-#[test]
-fn multiple_delegators_to_same_delegate() {
-    let (e, contract_address) = setup_env();
-    let alice = Address::generate(&e);
-    let bob = Address::generate(&e);
-    let charlie = Address::generate(&e);
-
-    e.as_contract(&contract_address, || {
-        transfer_voting_units(&e, None, Some(&alice), 100);
-        transfer_voting_units(&e, None, Some(&bob), 50);
-
-        delegate(&e, &alice, &charlie);
-        delegate(&e, &bob, &charlie);
-
-        assert_eq!(get_votes(&e, &charlie), 150);
     });
 }
 
@@ -467,5 +437,174 @@ fn binary_search_with_many_checkpoints() {
         assert_eq!(get_past_votes(&e, &bob, 1000), 1100);
         assert_eq!(get_past_votes(&e, &bob, 1500), 1150);
         assert_eq!(get_past_votes(&e, &bob, 2000), 1200);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4102)")]
+fn transfer_voting_units_insufficient_balance() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        transfer_voting_units(&e, None, Some(&alice), 100);
+        // Try to transfer more than available
+        transfer_voting_units(&e, Some(&alice), Some(&bob), 150);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4101)")]
+fn mint_overflow_voting_units() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        transfer_voting_units(&e, None, Some(&alice), u128::MAX);
+        // Try to mint more, causing overflow
+        transfer_voting_units(&e, None, Some(&alice), 1);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4101)")]
+fn delegate_votes_overflow() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+    let charlie = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        // Give alice max voting units and delegate to charlie
+        transfer_voting_units(&e, None, Some(&alice), u128::MAX);
+        delegate(&e, &alice, &charlie);
+
+        // Give bob 1 voting unit and delegate to charlie - should overflow
+        transfer_voting_units(&e, None, Some(&bob), 1);
+        delegate(&e, &bob, &charlie);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4100)")]
+fn get_past_votes_at_current_timestamp() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    e.ledger().set_timestamp(1000);
+
+    e.as_contract(&contract_address, || {
+        // Query at exact current timestamp should fail
+        get_past_votes(&e, &alice, 1000);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4100)")]
+fn get_past_total_supply_at_current_timestamp() {
+    let (e, contract_address) = setup_env();
+    e.ledger().set_timestamp(1000);
+
+    e.as_contract(&contract_address, || {
+        // Query at exact current timestamp should fail
+        get_past_total_supply(&e, 1000);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4100)")]
+fn get_past_votes_future_timestamp() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    e.ledger().set_timestamp(1000);
+
+    e.as_contract(&contract_address, || {
+        // Query at future timestamp should fail
+        get_past_votes(&e, &alice, 2000);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4100)")]
+fn get_past_total_supply_future_timestamp() {
+    let (e, contract_address) = setup_env();
+    e.ledger().set_timestamp(1000);
+
+    e.as_contract(&contract_address, || {
+        // Query at future timestamp should fail
+        get_past_total_supply(&e, 2000);
+    });
+}
+
+#[test]
+fn get_past_votes_before_first_checkpoint() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        e.ledger().set_timestamp(1000);
+        transfer_voting_units(&e, None, Some(&alice), 100);
+        delegate(&e, &alice, &bob);
+
+        e.ledger().set_timestamp(2000);
+        // Query before first checkpoint
+        assert_eq!(get_past_votes(&e, &bob, 500), 0);
+    });
+}
+
+#[test]
+fn get_past_total_supply_before_first_checkpoint() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        e.ledger().set_timestamp(1000);
+        transfer_voting_units(&e, None, Some(&alice), 100);
+
+        e.ledger().set_timestamp(2000);
+        // Query before first checkpoint
+        assert_eq!(get_past_total_supply(&e, 500), 0);
+    });
+}
+
+#[test]
+fn transfer_to_self_with_delegation() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        transfer_voting_units(&e, None, Some(&alice), 100);
+        delegate(&e, &alice, &alice);
+        assert_eq!(get_votes(&e, &alice), 100);
+
+        // Transfer to self should be a no-op for votes
+        transfer_voting_units(&e, Some(&alice), Some(&alice), 50);
+        assert_eq!(get_votes(&e, &alice), 100);
+        assert_eq!(get_voting_units(&e, &alice), 100);
+    });
+}
+
+#[test]
+fn total_supply_checkpoint_updates_on_mint_burn() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        e.ledger().set_timestamp(1000);
+        transfer_voting_units(&e, None, Some(&alice), 100);
+
+        e.ledger().set_timestamp(2000);
+        transfer_voting_units(&e, None, Some(&alice), 50);
+
+        e.ledger().set_timestamp(3000);
+        transfer_voting_units(&e, Some(&alice), None, 75);
+
+        e.ledger().set_timestamp(4000);
+
+        assert_eq!(get_past_total_supply(&e, 1000), 100);
+        assert_eq!(get_past_total_supply(&e, 2000), 150);
+        assert_eq!(get_past_total_supply(&e, 3000), 75);
+        assert_eq!(get_total_supply(&e), 75);
     });
 }

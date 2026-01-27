@@ -234,9 +234,11 @@ pub fn get_voting_units(e: &Env, account: &Address) -> u128 {
 ///
 /// # Events
 ///
-/// * [`DelegateChanged`] - Emitted when delegation changes.
-/// * [`DelegateVotesChanged`] - Emitted for both old and new delegates if their
-///   voting power changes.
+/// * topics - `["DelegateChanged", delegator: Address]`
+/// * data - `[from_delegate: Option<Address>, to_delegate: Address]`
+///
+/// * topics - `["DelegateVotesChanged", delegate: Address]`
+/// * data - `[old_votes: u128, new_votes: u128]`
 ///
 /// # Notes
 ///
