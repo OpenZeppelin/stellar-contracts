@@ -593,35 +593,41 @@ impl RWA {
         emit_identity_verifier_set(e, identity_verifier);
     }
 
-    // ################## OVERRIDDEN FUNCTIONS ##################
-
-    /// This is a wrapper around [`Base::update()`] to enable
-    /// the compatibility across [`crate::fungible::FungibleToken`]
-    /// with [`crate::rwa::RWAToken`]
+    /// This function performs all the checks that are required
+    /// for a transfer but does not require authorization. It is used by
+    /// [`Self::transfer`] and [`Self::transfer_from`] overrides.
     ///
-    /// The main differences are:
-    /// - checks for if the contract is paused
-    /// - checks for if the addresses are frozen
-    /// - checks for if the from address have enough free tokens (unfrozen
-    ///   tokens)
-    /// - enforces identity verification for both addresses
-    /// - enforces compliance rules for the transfer
-    /// - triggers `transferred` hook call from the compliance contract
+    /// # Arguments
     ///
-    /// Please refer to [`Base::update`] for the inline documentation.
-    pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
-        from.require_auth();
-
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The address of the sender.
+    /// * `to` - The address of the receiver.
+    /// * `amount` - The amount of tokens to transfer.
+    ///
+    /// # Errors
+    ///
+    /// * [`PausableError::EnforcedPause`] - If the contract is paused.
+    /// * [`RWAError::AddressFrozen`] - If either the sender or receiver is
+    ///   frozen.
+    /// * [`RWAError::InsufficientFreeTokens`] - If the sender does not have
+    ///   enough free tokens.
+    /// * refer to [`Self::identity_verifier`] errors.
+    /// * refer to [`Self::compliance`] errors.
+    /// * refer to [`IdentityVerifierClient::verify_identity`] errors.
+    /// * refer to [`Base::update`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `["to_muxed_id: Option<u64>, amount: i128"]`
+    pub fn validate_transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         // Check if contract is paused
         if paused(e) {
             panic_with_error!(e, PausableError::EnforcedPause);
         }
 
         // Check if addresses are frozen
-        if Self::is_frozen(e, from) {
-            panic_with_error!(e, RWAError::AddressFrozen);
-        }
-        if Self::is_frozen(e, to) {
+        if Self::is_frozen(e, from) || Self::is_frozen(e, to) {
             panic_with_error!(e, RWAError::AddressFrozen);
         }
 
@@ -645,22 +651,67 @@ impl RWA {
         if !can_transfer {
             panic_with_error!(e, RWAError::TransferNotCompliant);
         }
-
-        Base::update(e, Some(from), Some(to), amount);
-
-        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
-
-        emit_transfer(e, from, to, None, amount);
     }
 
-    /// This is a wrapper around [`Base::update()`] to enable
+    // ################## OVERRIDDEN FUNCTIONS ##################
+
+    /// `transfer` override with added compliance and identity verification
+    /// checks.
+    ///
+    /// This is ultimately a wrapper around [`Base::update()`] to enable
     /// the compatibility across [`crate::fungible::FungibleToken`]
     /// with [`crate::rwa::RWAToken`]
     ///
-    /// Please refer to [`Base::update`] and [`Self::transfer`] for the inline
-    /// documentation.
+    /// The main differences are:
+    /// - checks for if the contract is paused
+    /// - checks for if the addresses are frozen
+    /// - checks for if the from address have enough free tokens (unfrozen
+    ///   tokens)
+    /// - enforces identity verification for both addresses
+    /// - enforces compliance rules for the transfer
+    /// - triggers `transferred` hook call from the compliance contract
+    ///
+    /// Please refer to [`Base::update`] and [`Self::validate_transfer`] for the
+    /// inline documentation.
+    pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+        from.require_auth();
+
+        Self::validate_transfer(e, from, to, amount);
+
+        Base::update(e, Some(from), Some(to), amount);
+
+        let compliance_client = ComplianceClient::new(e, &Self::compliance(e));
+        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
+        emit_transfer(e, from, to, None, amount);
+    }
+
+    /// `transfer_from` override with added compliance and identity verification
+    /// checks.
+    ///
+    /// This is ultimately a wrapper around [`Base::update()`] to enable
+    /// the compatibility across [`crate::fungible::FungibleToken`]
+    /// with [`crate::rwa::RWAToken`]
+    ///
+    /// The main differences are:
+    /// - checks for if the contract is paused
+    /// - checks for if the addresses are frozen
+    /// - checks for if the from address have enough free tokens (unfrozen
+    ///   tokens)
+    /// - enforces identity verification for both addresses
+    /// - enforces compliance rules for the transfer
+    /// - triggers `transferred` hook call from the compliance contract
+    ///
+    /// Please refer to [`Base::update`] and [`Self::validate_transfer`] for the
+    /// inline documentation.
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
+        spender.require_auth();
+
         Base::spend_allowance(e, from, spender, amount);
-        Self::transfer(e, from, to, amount);
+
+        Base::update(e, Some(from), Some(to), amount);
+
+        let compliance_client = ComplianceClient::new(e, &Self::compliance(e));
+        compliance_client.transferred(from, to, &amount, &e.current_contract_address());
+        emit_transfer(e, from, to, None, amount);
     }
 }
