@@ -1,8 +1,5 @@
 //! # Votes Module
 //!
-//! This module provides vote tracking functionality with delegation and
-//! historical checkpointing for governance mechanisms.
-//!
 //! The module tracks voting power per account with historical checkpoints,
 //! supports delegation (an account can delegate its voting power to another
 //! account), and provides historical vote queries at any past timestamp.
@@ -15,8 +12,6 @@
 //!   account (delegatee)
 //! - **Checkpoints**: Historical snapshots of voting power at specific
 //!   timestamps
-//! - **Clock Mode**: Uses ledger timestamps (`e.ledger().timestamp()`) as the
-//!   timepoint reference
 //!
 //! # Design
 //!
@@ -29,7 +24,8 @@
 //!
 //! This module provides storage functions that can be integrated into a token
 //! contract. The contract is responsible for:
-//! - Calling `transfer_voting_units` on every balance change (mint/burn/transfer)
+//! - Calling `transfer_voting_units` on every balance change
+//!   (mint/burn/transfer)
 //! - Exposing delegation functionality to users
 //!
 //! # Example
@@ -59,7 +55,7 @@ mod test;
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env};
 
 pub use crate::votes::storage::{
-    delegate, delegates, get_past_total_supply, get_past_votes, get_total_supply, get_votes,
+    delegate, get_delegate, get_past_total_supply, get_past_votes, get_total_supply, get_votes,
     get_voting_units, num_checkpoints, transfer_voting_units, Checkpoint, VotesStorageKey,
 };
 
@@ -126,8 +122,8 @@ pub trait Votes {
     ///
     /// * `Some(Address)` - The delegate address if delegation is set.
     /// * `None` - If the account has not delegated.
-    fn delegates(e: &Env, account: Address) -> Option<Address> {
-        delegates(e, &account)
+    fn get_delegate(e: &Env, account: Address) -> Option<Address> {
+        get_delegate(e, &account)
     }
 
     /// Delegates voting power from `account` to `delegatee`.
@@ -141,8 +137,8 @@ pub trait Votes {
     /// # Events
     ///
     /// * [`DelegateChanged`] - Emitted when delegation changes.
-    /// * [`DelegateVotesChanged`] - Emitted for both old and new delegates
-    ///   if their voting power changes.
+    /// * [`DelegateVotesChanged`] - Emitted for both old and new delegates if
+    ///   their voting power changes.
     ///
     /// # Notes
     ///
@@ -162,6 +158,8 @@ pub enum VotesError {
     FutureLookup = 4100,
     /// Arithmetic overflow occurred
     MathOverflow = 4101,
+    /// Try to transfer more than available
+    InsufficientVotingUnits = 4102,
 }
 
 // ################## CONSTANTS ##################

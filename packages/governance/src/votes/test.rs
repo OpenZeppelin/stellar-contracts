@@ -1,7 +1,11 @@
-use soroban_sdk::{contract, testutils::{Address as _, Ledger}, Address, Env};
+use soroban_sdk::{
+    contract,
+    testutils::{Address as _, Ledger},
+    Address, Env,
+};
 
 use crate::votes::{
-    delegate, delegates, get_past_total_supply, get_past_votes, get_total_supply, get_votes,
+    delegate, get_delegate, get_past_total_supply, get_past_votes, get_total_supply, get_votes,
     get_voting_units, num_checkpoints, transfer_voting_units,
 };
 
@@ -26,7 +30,7 @@ fn initial_state_has_zero_votes() {
         assert_eq!(get_votes(&e, &alice), 0);
         assert_eq!(get_voting_units(&e, &alice), 0);
         assert_eq!(num_checkpoints(&e, &alice), 0);
-        assert_eq!(delegates(&e, &alice), None);
+        assert_eq!(get_delegate(&e, &alice), None);
     });
 }
 
@@ -120,7 +124,7 @@ fn delegate_to_self() {
         transfer_voting_units(&e, None, Some(&alice), 100);
         delegate(&e, &alice, &alice);
 
-        assert_eq!(delegates(&e, &alice), Some(alice.clone()));
+        assert_eq!(get_delegate(&e, &alice), Some(alice.clone()));
         assert_eq!(get_votes(&e, &alice), 100);
     });
 }
@@ -135,7 +139,7 @@ fn delegate_to_other() {
         transfer_voting_units(&e, None, Some(&alice), 100);
         delegate(&e, &alice, &bob);
 
-        assert_eq!(delegates(&e, &alice), Some(bob.clone()));
+        assert_eq!(get_delegate(&e, &alice), Some(bob.clone()));
         assert_eq!(get_votes(&e, &alice), 0);
         assert_eq!(get_votes(&e, &bob), 100);
     });
@@ -359,7 +363,7 @@ fn delegate_without_voting_units() {
     e.as_contract(&contract_address, || {
         delegate(&e, &alice, &bob);
 
-        assert_eq!(delegates(&e, &alice), Some(bob.clone()));
+        assert_eq!(get_delegate(&e, &alice), Some(bob.clone()));
         assert_eq!(get_votes(&e, &bob), 0);
     });
 }
@@ -409,9 +413,7 @@ fn delegate_to_same_delegate_is_noop() {
         delegate(&e, &alice, &bob);
     });
 
-    let checkpoints_before = e.as_contract(&contract_address, || {
-        num_checkpoints(&e, &bob)
-    });
+    let checkpoints_before = e.as_contract(&contract_address, || num_checkpoints(&e, &bob));
 
     e.ledger().set_timestamp(2000);
     e.as_contract(&contract_address, || {
@@ -459,7 +461,7 @@ fn binary_search_with_many_checkpoints() {
 
         // Query various historical points
         e.ledger().set_timestamp(3000);
-        assert_eq!(get_past_votes(&e, &bob, 50), 1000);  // After initial delegation
+        assert_eq!(get_past_votes(&e, &bob, 50), 1000); // After initial delegation
         assert_eq!(get_past_votes(&e, &bob, 100), 1010);
         assert_eq!(get_past_votes(&e, &bob, 500), 1050);
         assert_eq!(get_past_votes(&e, &bob, 1000), 1100);

@@ -66,270 +66,10 @@ pub fn get_votes(e: &Env, account: &Address) -> u128 {
 ///
 /// * [`VotesError::FutureLookup`] - If `timepoint` >= current timestamp.
 pub fn get_past_votes(e: &Env, account: &Address, timepoint: u64) -> u128 {
-    let current = e.ledger().timestamp();
-    if timepoint >= current {
+    if timepoint >= e.ledger().timestamp() {
         panic_with_error!(e, VotesError::FutureLookup);
     }
-    checkpoint_lookup(e, account, timepoint)
-}
 
-/// Returns the current total supply of voting units.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-pub fn get_total_supply(e: &Env) -> u128 {
-    let num = num_total_supply_checkpoints(e);
-    if num == 0 {
-        return 0;
-    }
-    get_total_supply_checkpoint(e, num - 1).votes
-}
-
-/// Returns the total supply of voting units at a specific past timestamp.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `timepoint` - The timestamp to query (must be in the past).
-///
-/// # Errors
-///
-/// * [`VotesError::FutureLookup`] - If `timepoint` >= current timestamp.
-pub fn get_past_total_supply(e: &Env, timepoint: u64) -> u128 {
-    let current = e.ledger().timestamp();
-    if timepoint >= current {
-        panic_with_error!(e, VotesError::FutureLookup);
-    }
-    total_supply_checkpoint_lookup(e, timepoint)
-}
-
-/// Returns the delegate for an account.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `account` - The address to query the delegate for.
-///
-/// # Returns
-///
-/// * `Some(Address)` - The delegate address if delegation is set.
-/// * `None` - If the account has not delegated.
-pub fn delegates(e: &Env, account: &Address) -> Option<Address> {
-    let key = VotesStorageKey::Delegatee(account.clone());
-    if let Some(delegatee) = e.storage().persistent().get::<_, Address>(&key) {
-        e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
-        Some(delegatee)
-    } else {
-        None
-    }
-}
-
-/// Returns the number of checkpoints for an account.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `account` - The address to query checkpoints for.
-pub fn num_checkpoints(e: &Env, account: &Address) -> u32 {
-    let key = VotesStorageKey::NumCheckpoints(account.clone());
-    e.storage().persistent().get(&key).unwrap_or(0)
-}
-
-/// Returns the voting units held by an account.
-///
-/// Voting units represent the underlying balance that can be delegated.
-/// This is tracked separately from the delegated voting power.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `account` - The address to query voting units for.
-pub fn get_voting_units(e: &Env, account: &Address) -> u128 {
-    let key = VotesStorageKey::VotingUnits(account.clone());
-    if let Some(units) = e.storage().persistent().get::<_, u128>(&key) {
-        e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
-        units
-    } else {
-        0
-    }
-}
-
-// ################## CHANGE STATE ##################
-
-/// Delegates voting power from `account` to `delegatee`.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `account` - The account delegating its voting power.
-/// * `delegatee` - The account receiving the delegated voting power.
-///
-/// # Events
-///
-/// * [`DelegateChanged`] - Emitted when delegation changes.
-/// * [`DelegateVotesChanged`] - Emitted for both old and new delegates
-///   if their voting power changes.
-///
-/// # Notes
-///
-/// Authorization for `account` is required.
-pub fn delegate(e: &Env, account: &Address, delegatee: &Address) {
-    account.require_auth();
-    let old_delegate = delegates(e, account);
-
-    let key = VotesStorageKey::Delegatee(account.clone());
-    e.storage().persistent().set(&key, delegatee);
-
-    emit_delegate_changed(e, account, old_delegate.clone(), delegatee);
-
-    let voting_units = get_voting_units(e, account);
-    move_delegate_votes(e, old_delegate.as_ref(), Some(delegatee), voting_units);
-}
-
-/// Transfers voting units between accounts.
-///
-/// This function should be called by the token contract whenever tokens
-/// are transferred, minted, or burned. It updates the voting power of
-/// the delegates accordingly.
-///
-/// # Arguments
-///
-/// * `e` - Access to Soroban environment.
-/// * `from` - The source account (`None` for minting).
-/// * `to` - The destination account (`None` for burning).
-/// * `amount` - The amount of voting units to transfer.
-///
-/// # Notes
-///
-/// This function does not perform authorization - it should be called
-/// from within the token contract's transfer/mint/burn logic.
-pub fn transfer_voting_units(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: u128) {
-    if amount == 0 {
-        return;
-    }
-
-    // Update total supply checkpoints for mint/burn
-    if from.is_none() {
-        // Minting: increase total supply
-        push_total_supply_checkpoint(e, true, amount);
-    }
-    if to.is_none() {
-        // Burning: decrease total supply
-        push_total_supply_checkpoint(e, false, amount);
-    }
-
-    // Update voting units and move delegate votes
-    if let Some(from_addr) = from {
-        let from_units = get_voting_units(e, from_addr);
-        let new_from_units = from_units.saturating_sub(amount);
-        set_voting_units(e, from_addr, new_from_units);
-
-        let from_delegate = delegates(e, from_addr);
-        move_delegate_votes(e, from_delegate.as_ref(), None, amount);
-    }
-
-    if let Some(to_addr) = to {
-        let to_units = get_voting_units(e, to_addr);
-        let Some(new_to_units) = to_units.checked_add(amount) else {
-            panic_with_error!(e, VotesError::MathOverflow);
-        };
-        set_voting_units(e, to_addr, new_to_units);
-
-        let to_delegate = delegates(e, to_addr);
-        move_delegate_votes(e, None, to_delegate.as_ref(), amount);
-    }
-}
-
-// ################## INTERNAL HELPERS ##################
-
-/// Sets the voting units for an account.
-fn set_voting_units(e: &Env, account: &Address, units: u128) {
-    let key = VotesStorageKey::VotingUnits(account.clone());
-    if units == 0 {
-        e.storage().persistent().remove(&key);
-    } else {
-        e.storage().persistent().set(&key, &units);
-    }
-}
-
-/// Moves delegated votes from one delegate to another.
-fn move_delegate_votes(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: u128) {
-    if amount == 0 {
-        return;
-    }
-
-    // Handle case where from and to are the same
-    if from == to {
-        return;
-    }
-
-    if let Some(from_addr) = from {
-        let (old_value, new_value) = push_checkpoint(e, from_addr, false, amount);
-        emit_delegate_votes_changed(e, from_addr, old_value, new_value);
-    }
-
-    if let Some(to_addr) = to {
-        let (old_value, new_value) = push_checkpoint(e, to_addr, true, amount);
-        emit_delegate_votes_changed(e, to_addr, old_value, new_value);
-    }
-}
-
-/// Gets a checkpoint for a delegate at a specific index.
-fn get_checkpoint(e: &Env, account: &Address, index: u32) -> Checkpoint {
-    let key = VotesStorageKey::DelegateCheckpoint(account.clone(), index);
-    if let Some(checkpoint) = e.storage().persistent().get::<_, Checkpoint>(&key) {
-        e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
-        checkpoint
-    } else {
-        Checkpoint { timestamp: 0, votes: 0 }
-    }
-}
-
-/// Pushes a new checkpoint or updates the last one if same timestamp.
-/// Returns (old_value, new_value).
-fn push_checkpoint(e: &Env, account: &Address, add: bool, delta: u128) -> (u128, u128) {
-    let num = num_checkpoints(e, account);
-    let current_timestamp = e.ledger().timestamp();
-
-    let old_value = if num > 0 { get_checkpoint(e, account, num - 1).votes } else { 0 };
-
-    let new_value = if add {
-        old_value
-            .checked_add(delta)
-            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
-    } else {
-        old_value.saturating_sub(delta)
-    };
-
-    // Check if we can update the last checkpoint (same timestamp)
-    if num > 0 {
-        let last_checkpoint = get_checkpoint(e, account, num - 1);
-        if last_checkpoint.timestamp == current_timestamp {
-            // Update existing checkpoint
-            let key = VotesStorageKey::DelegateCheckpoint(account.clone(), num - 1);
-            e.storage()
-                .persistent()
-                .set(&key, &Checkpoint { timestamp: current_timestamp, votes: new_value });
-            return (old_value, new_value);
-        }
-    }
-
-    // Create new checkpoint
-    let key = VotesStorageKey::DelegateCheckpoint(account.clone(), num);
-    e.storage()
-        .persistent()
-        .set(&key, &Checkpoint { timestamp: current_timestamp, votes: new_value });
-
-    // Update checkpoint count
-    let num_key = VotesStorageKey::NumCheckpoints(account.clone());
-    e.storage().persistent().set(&num_key, &(num + 1));
-
-    (old_value, new_value)
-}
-
-/// Binary search for checkpoint value at a given timestamp.
-fn checkpoint_lookup(e: &Env, account: &Address, timepoint: u64) -> u128 {
     let num = num_checkpoints(e, account);
     if num == 0 {
         return 0;
@@ -364,66 +104,34 @@ fn checkpoint_lookup(e: &Env, account: &Address, timepoint: u64) -> u128 {
     get_checkpoint(e, account, low).votes
 }
 
-// ################## TOTAL SUPPLY CHECKPOINTS ##################
-
-/// Returns the number of total supply checkpoints.
-fn num_total_supply_checkpoints(e: &Env) -> u32 {
-    let key = VotesStorageKey::NumTotalSupplyCheckpoints;
-    e.storage().instance().get(&key).unwrap_or(0)
-}
-
-/// Gets a total supply checkpoint at a specific index.
-fn get_total_supply_checkpoint(e: &Env, index: u32) -> Checkpoint {
-    let key = VotesStorageKey::TotalSupplyCheckpoint(index);
-    if let Some(checkpoint) = e.storage().persistent().get::<_, Checkpoint>(&key) {
-        e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
-        checkpoint
-    } else {
-        Checkpoint { timestamp: 0, votes: 0 }
-    }
-}
-
-/// Pushes a new total supply checkpoint or updates the last one if same timestamp.
-fn push_total_supply_checkpoint(e: &Env, add: bool, delta: u128) {
+/// Returns the current total supply of voting units.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+pub fn get_total_supply(e: &Env) -> u128 {
     let num = num_total_supply_checkpoints(e);
-    let current_timestamp = e.ledger().timestamp();
-
-    let old_value = if num > 0 { get_total_supply_checkpoint(e, num - 1).votes } else { 0 };
-
-    let new_value = if add {
-        old_value
-            .checked_add(delta)
-            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
-    } else {
-        old_value.saturating_sub(delta)
-    };
-
-    // Check if we can update the last checkpoint (same timestamp)
-    if num > 0 {
-        let last_checkpoint = get_total_supply_checkpoint(e, num - 1);
-        if last_checkpoint.timestamp == current_timestamp {
-            // Update existing checkpoint
-            let key = VotesStorageKey::TotalSupplyCheckpoint(num - 1);
-            e.storage()
-                .persistent()
-                .set(&key, &Checkpoint { timestamp: current_timestamp, votes: new_value });
-            return;
-        }
+    if num == 0 {
+        return 0;
     }
-
-    // Create new checkpoint
-    let key = VotesStorageKey::TotalSupplyCheckpoint(num);
-    e.storage()
-        .persistent()
-        .set(&key, &Checkpoint { timestamp: current_timestamp, votes: new_value });
-
-    // Update checkpoint count
-    let num_key = VotesStorageKey::NumTotalSupplyCheckpoints;
-    e.storage().instance().set(&num_key, &(num + 1));
+    get_total_supply_checkpoint(e, num - 1).votes
 }
 
-/// Binary search for total supply checkpoint value at a given timestamp.
-fn total_supply_checkpoint_lookup(e: &Env, timepoint: u64) -> u128 {
+/// Returns the total supply of voting units at a specific past timestamp.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `timepoint` - The timestamp to query (must be in the past).
+///
+/// # Errors
+///
+/// * [`VotesError::FutureLookup`] - If `timepoint` >= current timestamp.
+pub fn get_past_total_supply(e: &Env, timepoint: u64) -> u128 {
+    if timepoint >= e.ledger().timestamp() {
+        panic_with_error!(e, VotesError::FutureLookup);
+    }
+
     let num = num_total_supply_checkpoints(e);
     if num == 0 {
         return 0;
@@ -456,4 +164,282 @@ fn total_supply_checkpoint_lookup(e: &Env, timepoint: u64) -> u128 {
     }
 
     get_total_supply_checkpoint(e, low).votes
+}
+
+/// Returns the delegate for an account.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `account` - The address to query the delegate for.
+///
+/// # Returns
+///
+/// * `Some(Address)` - The delegate address if delegation is set.
+/// * `None` - If the account has not delegated.
+pub fn get_delegate(e: &Env, account: &Address) -> Option<Address> {
+    let key = VotesStorageKey::Delegatee(account.clone());
+    if let Some(delegatee) = e.storage().persistent().get::<_, Address>(&key) {
+        e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
+        Some(delegatee)
+    } else {
+        None
+    }
+}
+
+/// Returns the number of checkpoints for an account.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `account` - The address to query checkpoints for.
+pub fn num_checkpoints(e: &Env, account: &Address) -> u32 {
+    let key = VotesStorageKey::NumCheckpoints(account.clone());
+    if let Some(checkpoints) = e.storage().persistent().get::<_, u32>(&key) {
+        e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
+        checkpoints
+    } else {
+        0
+    }
+}
+
+/// Returns the voting units held by an account.
+///
+/// Voting units represent the underlying balance that can be delegated.
+/// This is tracked separately from the delegated voting power.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `account` - The address to query voting units for.
+pub fn get_voting_units(e: &Env, account: &Address) -> u128 {
+    let key = VotesStorageKey::VotingUnits(account.clone());
+    if let Some(units) = e.storage().persistent().get::<_, u128>(&key) {
+        e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
+        units
+    } else {
+        0
+    }
+}
+
+// ################## CHANGE STATE ##################
+
+/// Delegates voting power from `account` to `delegatee`.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `account` - The account delegating its voting power.
+/// * `delegatee` - The account receiving the delegated voting power.
+///
+/// # Events
+///
+/// * [`DelegateChanged`] - Emitted when delegation changes.
+/// * [`DelegateVotesChanged`] - Emitted for both old and new delegates if their
+///   voting power changes.
+///
+/// # Notes
+///
+/// Authorization for `account` is required.
+pub fn delegate(e: &Env, account: &Address, delegatee: &Address) {
+    account.require_auth();
+    let old_delegate = get_delegate(e, account);
+
+    e.storage().persistent().set(&VotesStorageKey::Delegatee(account.clone()), delegatee);
+
+    emit_delegate_changed(e, account, old_delegate.clone(), delegatee);
+
+    let voting_units = get_voting_units(e, account);
+    move_delegate_votes(e, old_delegate.as_ref(), Some(delegatee), voting_units);
+}
+
+/// Transfers voting units between accounts.
+///
+/// This function should be called by the token contract whenever tokens
+/// are transferred, minted, or burned. It updates the voting power of
+/// the delegates accordingly.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `from` - The source account (`None` for minting).
+/// * `to` - The destination account (`None` for burning).
+/// * `amount` - The amount of voting units to transfer.
+///
+/// # Notes
+///
+/// This function does not perform authorization - it should be called
+/// from within the token contract's transfer/mint/burn logic.
+pub fn transfer_voting_units(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: u128) {
+    if amount == 0 {
+        return;
+    }
+
+    if let Some(from_addr) = from {
+        let from_units = get_voting_units(e, from_addr);
+        let Some(new_from_units) = from_units.checked_sub(amount) else {
+            panic_with_error!(e, VotesError::InsufficientVotingUnits);
+        };
+        set_voting_units(e, from_addr, new_from_units);
+
+        let from_delegate = get_delegate(e, from_addr);
+        move_delegate_votes(e, from_delegate.as_ref(), None, amount);
+    } else {
+        // Minting: increase total supply
+        push_total_supply_checkpoint(e, true, amount);
+    }
+
+    if let Some(to_addr) = to {
+        let to_units = get_voting_units(e, to_addr);
+        let Some(new_to_units) = to_units.checked_add(amount) else {
+            panic_with_error!(e, VotesError::MathOverflow);
+        };
+        set_voting_units(e, to_addr, new_to_units);
+
+        let to_delegate = get_delegate(e, to_addr);
+        move_delegate_votes(e, None, to_delegate.as_ref(), amount);
+    } else {
+        // Burning: decrease total supply
+        push_total_supply_checkpoint(e, false, amount);
+    }
+}
+
+// ################## INTERNAL HELPERS ##################
+
+/// Sets the voting units for an account.
+fn set_voting_units(e: &Env, account: &Address, units: u128) {
+    let key = VotesStorageKey::VotingUnits(account.clone());
+    if units == 0 {
+        e.storage().persistent().remove(&key);
+    } else {
+        e.storage().persistent().set(&key, &units);
+    }
+}
+
+/// Moves delegated votes from one delegate to another.
+fn move_delegate_votes(e: &Env, from: Option<&Address>, to: Option<&Address>, amount: u128) {
+    if amount == 0 {
+        return;
+    }
+
+    if from == to {
+        return;
+    }
+
+    if let Some(from_addr) = from {
+        let (old_votes, new_votes) = push_checkpoint(e, from_addr, false, amount);
+        emit_delegate_votes_changed(e, from_addr, old_votes, new_votes);
+    }
+
+    if let Some(to_addr) = to {
+        let (old_votes, new_votes) = push_checkpoint(e, to_addr, true, amount);
+        emit_delegate_votes_changed(e, to_addr, old_votes, new_votes);
+    }
+}
+
+/// Gets a checkpoint for a delegate at a specific index.
+fn get_checkpoint(e: &Env, account: &Address, index: u32) -> Checkpoint {
+    let key = VotesStorageKey::DelegateCheckpoint(account.clone(), index);
+    if let Some(checkpoint) = e.storage().persistent().get::<_, Checkpoint>(&key) {
+        e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
+        checkpoint
+    } else {
+        Checkpoint { timestamp: 0, votes: 0 }
+    }
+}
+
+/// Pushes a new checkpoint or updates the last one if same timestamp.
+/// Returns (last_votes, new_votes).
+fn push_checkpoint(e: &Env, account: &Address, add: bool, delta: u128) -> (u128, u128) {
+    let num = num_checkpoints(e, account);
+    let current_timestamp = e.ledger().timestamp();
+
+    let last_votes = if num > 0 { get_checkpoint(e, account, num - 1).votes } else { 0 };
+
+    let votes = if add {
+        last_votes
+            .checked_add(delta)
+            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
+    } else {
+        last_votes
+            .checked_sub(delta)
+            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
+    };
+
+    // Check if we can update the last checkpoint (same timestamp)
+    if num > 0 {
+        let last_checkpoint = get_checkpoint(e, account, num - 1);
+        if last_checkpoint.timestamp == current_timestamp {
+            // Update existing checkpoint
+            let key = VotesStorageKey::DelegateCheckpoint(account.clone(), num - 1);
+            e.storage().persistent().set(&key, &Checkpoint { timestamp: current_timestamp, votes });
+            return (last_votes, votes);
+        }
+    }
+
+    // Create new checkpoint
+    let key = VotesStorageKey::DelegateCheckpoint(account.clone(), num);
+    e.storage().persistent().set(&key, &Checkpoint { timestamp: current_timestamp, votes });
+
+    // Update checkpoint count
+    let num_key = VotesStorageKey::NumCheckpoints(account.clone());
+    e.storage().persistent().set(&num_key, &(num + 1));
+
+    (last_votes, votes)
+}
+
+// ################## TOTAL SUPPLY CHECKPOINTS ##################
+
+/// Returns the number of total supply checkpoints.
+fn num_total_supply_checkpoints(e: &Env) -> u32 {
+    let key = VotesStorageKey::NumTotalSupplyCheckpoints;
+    e.storage().instance().get(&key).unwrap_or(0)
+}
+
+/// Gets a total supply checkpoint at a specific index.
+fn get_total_supply_checkpoint(e: &Env, index: u32) -> Checkpoint {
+    let key = VotesStorageKey::TotalSupplyCheckpoint(index);
+    if let Some(checkpoint) = e.storage().persistent().get::<_, Checkpoint>(&key) {
+        e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
+        checkpoint
+    } else {
+        Checkpoint { timestamp: 0, votes: 0 }
+    }
+}
+
+/// Pushes a new total supply checkpoint or updates the last one if same
+/// timestamp.
+fn push_total_supply_checkpoint(e: &Env, add: bool, delta: u128) {
+    let num = num_total_supply_checkpoints(e);
+    let current_timestamp = e.ledger().timestamp();
+
+    let last_votes = if num > 0 { get_total_supply_checkpoint(e, num - 1).votes } else { 0 };
+
+    let votes = if add {
+        last_votes
+            .checked_add(delta)
+            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
+    } else {
+        last_votes
+            .checked_sub(delta)
+            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
+    };
+
+    // Check if we can update the last checkpoint (same timestamp)
+    if num > 0 {
+        let last_checkpoint = get_total_supply_checkpoint(e, num - 1);
+        if last_checkpoint.timestamp == current_timestamp {
+            let key = VotesStorageKey::TotalSupplyCheckpoint(num - 1);
+            e.storage().persistent().set(&key, &Checkpoint { timestamp: current_timestamp, votes });
+            return;
+        }
+    }
+
+    // Create new checkpoint
+    let key = VotesStorageKey::TotalSupplyCheckpoint(num);
+    e.storage().persistent().set(&key, &Checkpoint { timestamp: current_timestamp, votes });
+
+    // Update checkpoint count
+    let num_key = VotesStorageKey::NumTotalSupplyCheckpoints;
+    e.storage().instance().set(&num_key, &(num + 1));
 }
