@@ -7,12 +7,13 @@ use soroban_sdk::{
         storage::{Instance, Persistent},
         Address as _, AuthorizedFunction, Events, Ledger, MuxedAddress as _,
     },
-    vec, Address, Env, IntoVal, MuxedAddress, String,
+    vec, Address, Env, Event, IntoVal, MuxedAddress, String,
 };
 use stellar_event_assertion::EventAssertion;
 
 use crate::fungible::{
-    Base, FungibleStorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
+    Approve, Base, FungibleStorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT,
+    INSTANCE_TTL_THRESHOLD,
 };
 
 #[contract]
@@ -72,9 +73,16 @@ fn approve_with_event() {
         assert_eq!(allowance_val, 50);
 
         let events = e.events().all();
-        assert_eq!(events.len(), 1);
-        let event = events.get(0).unwrap();
-        assert_eq!(event.0, address);
+        assert_eq!(events.events().len(), 1);
+        let event = events.events().first().unwrap();
+        let expected = Approve {
+            owner: owner.clone(),
+            spender: spender.clone(),
+            amount: allowance_data.0,
+            live_until_ledger: allowance_data.1,
+        }
+        .to_xdr(&e, &address);
+        assert_eq!(event, &expected);
     });
 }
 
@@ -265,7 +273,7 @@ fn transfer_zero_works() {
         assert_eq!(Base::balance(&e, &recipient), 0);
 
         let events = e.events().all();
-        assert_eq!(events.len(), 1);
+        assert_eq!(events.events().len(), 1);
     });
 }
 

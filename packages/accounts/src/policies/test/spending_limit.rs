@@ -256,7 +256,7 @@ fn enforce_within_limit() {
         assert_eq!(data.cached_total_spent, 500_000);
 
         // Check event was emitted
-        assert!(!e.events().all().is_empty());
+        assert!(!e.events().all().events().is_empty());
     });
 }
 
@@ -793,6 +793,7 @@ fn enforce_missing_amount_arg_errors() {
 #[should_panic(expected = "Error(Contract, #3224)")]
 fn enforce_history_capacity_exceeded() {
     let e = Env::default();
+    e.cost_estimate().disable_resource_limits();
     let address = e.register(MockContract, ());
     let smart_account = Address::generate(&e);
     let context_rule = create_context_rule(&e);

@@ -303,7 +303,7 @@ fn add_context_rule_success() {
         assert_eq!(rule.signers.len(), 2);
         assert_eq!(rule.policies.len(), 0);
         assert_eq!(rule.valid_until, Some(future_sequence));
-        assert_eq!(e.events().all().len(), 1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -412,7 +412,7 @@ fn update_context_rule_success() {
         // Update name and valid_until separately
         update_context_rule_name(&e, rule.id, &String::from_str(&e, "modified_rule"));
         update_context_rule_valid_until(&e, rule.id, Some(future_sequence));
-        assert_eq!(e.events().all().len(), 2);
+        assert_eq!(e.events().all().events().len(), 2);
 
         let modified_rule = get_context_rule(&e, rule.id);
 
@@ -473,7 +473,7 @@ fn remove_context_rule_success() {
         assert_eq!(retrieved_rule.id, rule.id);
 
         remove_context_rule(&e, rule.id);
-        assert_eq!(e.events().all().len(), 1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 
     let rule = e.as_contract(&address, || {
@@ -497,7 +497,7 @@ fn remove_context_rule_success() {
     // Removal succeeds
     e.as_contract(&address, || {
         remove_context_rule(&e, rule.id);
-        assert_eq!(e.events().all().len(), 1);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 

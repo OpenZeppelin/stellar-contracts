@@ -1,9 +1,10 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Events, vec, Env, IntoVal, Symbol};
+use soroban_sdk::{contract, testutils::Events, Env, Event};
 
-use crate::pausable::storage::{
-    pause, paused, unpause, when_not_paused, when_paused, PausableStorageKey,
+use crate::pausable::{
+    storage::{pause, paused, unpause, when_not_paused, when_paused, PausableStorageKey},
+    Paused, Unpaused,
 };
 
 #[contract]
@@ -30,10 +31,10 @@ fn pause_works() {
         assert!(paused(&e));
 
         let events = e.events().all();
-        assert_eq!(events.len(), 1);
-        let event = events.get(0).unwrap();
-        assert_eq!(event.0, address);
-        assert_eq!(event.1, vec![&e, Symbol::new(&e, "paused").into_val(&e)]);
+        assert_eq!(events.events().len(), 1);
+        let event = events.events().first().unwrap();
+        let expected = Paused {}.to_xdr(&e, &address);
+        assert_eq!(event, &expected);
     });
 }
 
@@ -50,10 +51,10 @@ fn unpause_works() {
         unpause(&e);
         assert!(!paused(&e));
         let events = e.events().all();
-        assert_eq!(events.len(), 1);
-        let event = events.get(0).unwrap();
-        assert_eq!(event.0, address);
-        assert_eq!(event.1, vec![&e, Symbol::new(&e, "unpaused").into_val(&e)]);
+        assert_eq!(events.events().len(), 1);
+        let event = events.events().first().unwrap();
+        let expected = Unpaused {}.to_xdr(&e, &address);
+        assert_eq!(event, &expected);
     });
 }
 
