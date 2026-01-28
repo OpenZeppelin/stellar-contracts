@@ -59,14 +59,14 @@ serde = { version = "1", default-features = false }
 serde-json-core = { version = "0.6.0", default-features = false }
 
 # members
-stellar-access = { path = "packages/access" }
-stellar-accounts = { path = "packages/accounts" }
-stellar-contract-utils = { path = "packages/contract-utils" }
+stellar-access = { path = "packages/access", version = "0.6.0" }
+stellar-accounts = { path = "packages/accounts", version = "0.6.0" }
+stellar-contract-utils = { path = "packages/contract-utils", version = "0.6.0" }
 stellar-event-assertion = { path = "packages/test-utils/event-assertion" }
-stellar-fee-abstraction = { path = "packages/fee-abstraction" }
-stellar-governance = { path = "packages/governance" }
-stellar-tokens = { path = "packages/tokens" }
-stellar-macros = { path = "packages/macros" }
+stellar-fee-abstraction = { path = "packages/fee-abstraction", version = "0.6.0" }
+stellar-governance = { path = "packages/governance", version = "0.6.0" }
+stellar-tokens = { path = "packages/tokens", version = "0.6.0" }
+stellar-macros = { path = "packages/macros", version = "0.6.0" }
 
 [profile.release]
 opt-level = "z"
