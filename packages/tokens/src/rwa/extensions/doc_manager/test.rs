@@ -381,6 +381,7 @@ fn get_document_by_index_out_of_bounds() {
 #[test]
 fn add_document_to_new_bucket() {
     let e = Env::default();
+    e.cost_estimate().disable_resource_limits();
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
@@ -417,6 +418,7 @@ fn add_document_to_new_bucket() {
 #[test]
 fn swap_and_pop_across_different_buckets() {
     let e = Env::default();
+    e.cost_estimate().disable_resource_limits();
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {
@@ -454,6 +456,7 @@ fn swap_and_pop_across_different_buckets() {
 #[test]
 fn remove_last_document_in_bucket() {
     let e = Env::default();
+    e.cost_estimate().disable_resource_limits();
     let contract_id = e.register(MockContract, ());
 
     e.as_contract(&contract_id, || {

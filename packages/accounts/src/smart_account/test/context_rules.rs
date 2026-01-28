@@ -1180,6 +1180,7 @@ fn add_context_rule_duplicate_signer_fails() {
 #[should_panic(expected = "Error(Contract, #3012)")]
 fn add_context_rule_too_many_rules_fails() {
     let e = Env::default();
+    e.cost_estimate().disable_resource_limits();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
@@ -1219,6 +1220,7 @@ fn add_context_rule_too_many_rules_fails() {
 #[test]
 fn add_context_rule_count_allows_reuse_after_removal() {
     let e = Env::default();
+    e.cost_estimate().disable_resource_limits();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {

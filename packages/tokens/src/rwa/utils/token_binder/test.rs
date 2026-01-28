@@ -27,6 +27,7 @@ fn linked_token_count_empty() {
 #[should_panic(expected = "Error(Contract, #332)")]
 fn bind_token_max_tokens_reached() {
     let e = Env::default();
+    e.cost_estimate().disable_resource_limits();
     let address = e.register(MockContract, ());
     e.as_contract(&address, || {
         e.storage().persistent().set(&TokenBinderStorageKey::TotalCount, &MAX_TOKENS);
@@ -403,6 +404,7 @@ fn rebind_after_unbind() {
 #[test]
 fn bind_tokens_spill_across_three_buckets() {
     let e = Env::default();
+    e.cost_estimate().disable_resource_limits();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
