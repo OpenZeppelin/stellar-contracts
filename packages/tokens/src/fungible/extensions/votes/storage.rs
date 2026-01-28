@@ -26,6 +26,19 @@ impl FungibleVotes {
     /// * `to` - The address receiving the transferred tokens.
     /// * `amount` - The amount of tokens to be transferred.
     ///
+    /// # Errors
+    ///
+    /// * refer to [`Base::transfer`] errors.
+    /// * refer to [`transfer_voting_units`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["Transfer", from: Address, to: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * data - `[previous_votes: u128, new_votes: u128]`
+    ///
     /// # Notes
     ///
     /// Authorization for `from` is required.
@@ -48,6 +61,19 @@ impl FungibleVotes {
     /// * `to` - The address receiving the transferred tokens.
     /// * `amount` - The amount of tokens to be transferred.
     ///
+    /// # Errors
+    ///
+    /// * refer to [`Base::transfer_from`] errors.
+    /// * refer to [`transfer_voting_units`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["Transfer", from: Address, to: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * data - `[previous_votes: u128, new_votes: u128]`
+    ///
     /// # Notes
     ///
     /// Authorization for `spender` is required.
@@ -67,6 +93,19 @@ impl FungibleVotes {
     /// * `to` - The address receiving the new tokens.
     /// * `amount` - The amount of tokens to mint.
     ///
+    /// # Errors
+    ///
+    /// * refer to [`Base::mint`] errors.
+    /// * refer to [`transfer_voting_units`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["Mint", to: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * data - `[previous_votes: u128, new_votes: u128]`
+    ///
     /// # Security Warning
     ///
     /// This function has NO AUTHORIZATION CONTROLS.
@@ -79,7 +118,7 @@ impl FungibleVotes {
     }
 
     /// Destroys `amount` of tokens from `from`. Updates the total
-    /// supply accordingly. Also updates voting units for the recipient's
+    /// supply accordingly. Also updates voting units for the owner's
     /// delegate.
     ///
     /// # Arguments
@@ -87,6 +126,19 @@ impl FungibleVotes {
     /// * `e` - Access to the Soroban environment.
     /// * `from` - The account whose tokens are destroyed.
     /// * `amount` - The amount of tokens to burn.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`Base::burn`] errors.
+    /// * refer to [`transfer_voting_units`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["Burn", from: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * data - `[previous_votes: u128, new_votes: u128]`
     ///
     /// # Notes
     ///
@@ -99,7 +151,7 @@ impl FungibleVotes {
     }
 
     /// Destroys `amount` of tokens from `from`. Updates the total
-    /// supply accordingly. Also updates voting units for the recipient's
+    /// supply accordingly. Also updates voting units for the owner's
     /// delegate.
     ///
     /// # Arguments
@@ -108,6 +160,19 @@ impl FungibleVotes {
     /// * `spender` - The address authorized to burn the tokens.
     /// * `from` - The account whose tokens are destroyed.
     /// * `amount` - The amount of tokens to burn.
+    ///
+    /// # Errors
+    ///
+    /// * refer to [`Base::burn_from`] errors.
+    /// * refer to [`transfer_voting_units`] errors.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["Burn", from: Address]`
+    /// * data - `[amount: i128]`
+    ///
+    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * data - `[previous_votes: u128, new_votes: u128]`
     ///
     /// # Notes
     ///

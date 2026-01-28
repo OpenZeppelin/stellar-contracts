@@ -268,6 +268,11 @@ pub fn delegate(e: &Env, account: &Address, delegatee: &Address) {
 /// * `to` - The destination account (`None` for burning).
 /// * `amount` - The amount of voting units to transfer.
 ///
+/// # Events
+///
+/// * topics - `["DelegateVotesChanged", delegate: Address]`
+/// * data - `[previous_votes: u128, new_votes: u128]`
+///
 /// # Notes
 ///
 /// This function does not perform authorization - it should be called
@@ -351,19 +356,19 @@ fn get_checkpoint(e: &Env, account: &Address, index: u32) -> Checkpoint {
 }
 
 /// Pushes a new checkpoint or updates the last one if same timestamp.
-/// Returns (last_votes, new_votes).
+/// Returns (previous_votes, new_votes).
 fn push_checkpoint(e: &Env, account: &Address, add: bool, delta: u128) -> (u128, u128) {
     let num = num_checkpoints(e, account);
     let current_timestamp = e.ledger().timestamp();
 
-    let last_votes = if num > 0 { get_checkpoint(e, account, num - 1).votes } else { 0 };
+    let previous_votes = if num > 0 { get_checkpoint(e, account, num - 1).votes } else { 0 };
 
     let votes = if add {
-        last_votes
+        previous_votes
             .checked_add(delta)
             .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
     } else {
-        last_votes
+        previous_votes
             .checked_sub(delta)
             .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
     };
@@ -375,7 +380,7 @@ fn push_checkpoint(e: &Env, account: &Address, add: bool, delta: u128) -> (u128,
             // Update existing checkpoint
             let key = VotesStorageKey::DelegateCheckpoint(account.clone(), num - 1);
             e.storage().persistent().set(&key, &Checkpoint { timestamp: current_timestamp, votes });
-            return (last_votes, votes);
+            return (previous_votes, votes);
         }
     }
 
@@ -387,7 +392,7 @@ fn push_checkpoint(e: &Env, account: &Address, add: bool, delta: u128) -> (u128,
     let num_key = VotesStorageKey::NumCheckpoints(account.clone());
     e.storage().persistent().set(&num_key, &(num + 1));
 
-    (last_votes, votes)
+    (previous_votes, votes)
 }
 
 // ################## TOTAL SUPPLY CHECKPOINTS ##################
@@ -415,14 +420,14 @@ fn push_total_supply_checkpoint(e: &Env, add: bool, delta: u128) {
     let num = num_total_supply_checkpoints(e);
     let current_timestamp = e.ledger().timestamp();
 
-    let last_votes = if num > 0 { get_total_supply_checkpoint(e, num - 1).votes } else { 0 };
+    let previous_votes = if num > 0 { get_total_supply_checkpoint(e, num - 1).votes } else { 0 };
 
     let votes = if add {
-        last_votes
+        previous_votes
             .checked_add(delta)
             .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
     } else {
-        last_votes
+        previous_votes
             .checked_sub(delta)
             .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
     };

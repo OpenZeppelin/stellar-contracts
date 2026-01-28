@@ -140,7 +140,7 @@ pub trait Votes {
     /// * data - `[from_delegate: Option<Address>, to_delegate: Address]`
     ///
     /// * topics - `["DelegateVotesChanged", delegate: Address]`
-    /// * data - `[old_votes: u128, new_votes: u128]`
+    /// * data - `[previous_votes: u128, new_votes: u128]`
     ///
     /// # Notes
     ///
@@ -219,7 +219,7 @@ pub struct DelegateVotesChanged {
     #[topic]
     pub delegate: Address,
     /// The previous voting power
-    pub old_votes: u128,
+    pub previous_votes: u128,
     /// The new voting power
     pub new_votes: u128,
 }
@@ -230,8 +230,13 @@ pub struct DelegateVotesChanged {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `delegate` - The delegate whose voting power changed.
-/// * `old_votes` - The previous voting power.
+/// * `previous_votes` - The previous voting power.
 /// * `new_votes` - The new voting power.
-pub fn emit_delegate_votes_changed(e: &Env, delegate: &Address, old_votes: u128, new_votes: u128) {
-    DelegateVotesChanged { delegate: delegate.clone(), old_votes, new_votes }.publish(e);
+pub fn emit_delegate_votes_changed(
+    e: &Env,
+    delegate: &Address,
+    previous_votes: u128,
+    new_votes: u128,
+) {
+    DelegateVotesChanged { delegate: delegate.clone(), previous_votes, new_votes }.publish(e);
 }
