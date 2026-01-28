@@ -282,15 +282,16 @@ pub fn transfer_voting_units(e: &Env, from: Option<&Address>, to: Option<&Addres
         return;
     }
 
+    // Look up delegates first so we can make a single move_delegate_votes call
+    let from_delegate = from.and_then(|addr| get_delegate(e, addr));
+    let to_delegate = to.and_then(|addr| get_delegate(e, addr));
+
     if let Some(from_addr) = from {
         let from_units = get_voting_units(e, from_addr);
         let Some(new_from_units) = from_units.checked_sub(amount) else {
             panic_with_error!(e, VotesError::InsufficientVotingUnits);
         };
         set_voting_units(e, from_addr, new_from_units);
-
-        let from_delegate = get_delegate(e, from_addr);
-        move_delegate_votes(e, from_delegate.as_ref(), None, amount);
     } else {
         // Minting: increase total supply
         push_total_supply_checkpoint(e, true, amount);
@@ -302,13 +303,12 @@ pub fn transfer_voting_units(e: &Env, from: Option<&Address>, to: Option<&Addres
             panic_with_error!(e, VotesError::MathOverflow);
         };
         set_voting_units(e, to_addr, new_to_units);
-
-        let to_delegate = get_delegate(e, to_addr);
-        move_delegate_votes(e, None, to_delegate.as_ref(), amount);
     } else {
         // Burning: decrease total supply
         push_total_supply_checkpoint(e, false, amount);
     }
+
+    move_delegate_votes(e, from_delegate.as_ref(), to_delegate.as_ref(), amount);
 }
 
 // ################## INTERNAL HELPERS ##################
