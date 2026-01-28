@@ -24,12 +24,19 @@ fn initial_state_has_zero_votes() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
 
+    e.ledger().set_timestamp(1000);
     e.as_contract(&contract_address, || {
         assert_eq!(get_votes(&e, &alice), 0);
         assert_eq!(get_voting_units(&e, &alice), 0);
         assert_eq!(num_checkpoints(&e, &alice), 0);
         assert_eq!(get_delegate(&e, &alice), None);
         assert_eq!(get_total_supply(&e), 0);
+
+        // Test get_past_votes returns 0 when num_checkpoints == 0
+        assert_eq!(get_past_votes(&e, &alice, 500), 0);
+
+        // Test get_past_total_supply returns 0 when num_total_supply_checkpoints == 0
+        assert_eq!(get_past_total_supply(&e, 500), 0);
     });
 }
 
