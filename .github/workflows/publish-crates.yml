@@ -72,5 +72,7 @@ jobs:
       - name: Publish stellar-macros
         run: cargo publish -p stellar-macros --target wasm32v1-none --token $CRATES_IO_TOKEN
 
+      # "stellar-token" is dependant on "stellar-contract-utils" and if there's some latency from crates.io, it might be useful to add a sleep step e.g. `sleep 300`
+
       - name: Publish stellar-tokens
         run: cargo publish -p stellar-tokens --target wasm32v1-none --token $CRATES_IO_TOKEN
