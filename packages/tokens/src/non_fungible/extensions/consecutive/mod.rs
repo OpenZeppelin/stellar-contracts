@@ -65,7 +65,7 @@ pub mod storage;
 use soroban_sdk::{contractevent, Address, Env};
 pub use storage::Consecutive;
 
-use crate::non_fungible::NonFungibleToken;
+use crate::non_fungible::{enumerable::NonFungibleEnumerable, NonFungibleToken};
 
 /// Consecutive Marker Trait for Non-Fungible Token
 ///
@@ -74,7 +74,7 @@ use crate::non_fungible::NonFungibleToken;
 /// The `consecutive` extension provides its own business logic for creating and
 /// destroying tokens. Therefore, this trait is INCOMPATIBLE with the
 /// `Enumerable` extension.
-pub trait NonFungibleConsecutive: NonFungibleToken<ContractType = Consecutive> {}
+pub trait NonFungibleConsecutive: NonFungibleToken {}
 
 #[cfg(test)]
 mod test;
@@ -103,3 +103,5 @@ pub struct ConsecutiveMint {
 pub fn emit_consecutive_mint(e: &Env, to: &Address, from_token_id: u32, to_token_id: u32) {
     ConsecutiveMint { to: to.clone(), from_token_id, to_token_id }.publish(e);
 }
+
+impl<T: NonFungibleConsecutive> !NonFungibleEnumerable for T {}

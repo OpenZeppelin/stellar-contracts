@@ -12,6 +12,7 @@
 //! working with the respective token type.
 
 #![no_std]
+#![feature(negative_impls)]
 
 pub mod fungible;
 pub mod non_fungible;

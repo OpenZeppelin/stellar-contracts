@@ -6,7 +6,7 @@ mod test;
 use soroban_sdk::{contracttrait, Address, Env};
 pub use storage::Enumerable;
 
-use crate::non_fungible::NonFungibleToken;
+use crate::non_fungible::{consecutive::NonFungibleConsecutive, NonFungibleToken};
 
 /// Enumerable Trait for Non-Fungible Token
 ///
@@ -41,7 +41,7 @@ use crate::non_fungible::NonFungibleToken;
 ///    exists for the use-cases where the enumeration is required as an on-chain
 ///    operation.
 #[contracttrait]
-pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
+pub trait NonFungibleEnumerable: NonFungibleToken {
     /// Returns the total amount of tokens stored by the contract.
     ///
     /// # Arguments
@@ -94,3 +94,5 @@ pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
         Enumerable::get_token_id(e, index)
     }
 }
+
+impl<T: NonFungibleEnumerable> !NonFungibleConsecutive for T {}
