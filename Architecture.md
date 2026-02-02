@@ -33,7 +33,7 @@ stellar-contracts/
 
 ### 1. Trait-Based Design with Associated Types
 
-Polymorphism is not directly possible in Rust. Instead, we achieve polymorphism like behavior through **associated types** and **trait bounds**.
+Polymorphism is not directly possible in Rust. Instead, we achieve polymorphism-like behavior through **associated types** and **trait bounds**.
 
 The library extensively uses Rust traits to define standard interfaces and behaviors, with a sophisticated approach to enable method overriding.
 
