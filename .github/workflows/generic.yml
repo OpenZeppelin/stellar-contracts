@@ -47,7 +47,7 @@ jobs:
       - name: install rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: stable, nightly
+          toolchain: nightly
           components: clippy, rustfmt, llvm-tools-preview
           target: wasm32v1-none
 
@@ -55,7 +55,7 @@ jobs:
         run: cargo install cargo-llvm-cov
 
       - name: Check format
-        run: cargo +nightly fmt --all -- --check
+        run: cargo fmt --all -- --check
 
       - name: Check clippy
         run: cargo clippy --release --locked --all-targets -- -D warnings

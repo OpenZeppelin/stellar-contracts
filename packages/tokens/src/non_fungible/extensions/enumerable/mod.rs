@@ -6,7 +6,7 @@ mod test;
 use soroban_sdk::{contracttrait, Address, Env};
 pub use storage::Enumerable;
 
-use crate::non_fungible::{consecutive::NonFungibleConsecutive, NonFungibleToken};
+use crate::non_fungible::NonFungibleToken;
 
 /// Enumerable Trait for Non-Fungible Token
 ///
@@ -94,5 +94,3 @@ pub trait NonFungibleEnumerable: NonFungibleToken {
         Enumerable::get_token_id(e, index)
     }
 }
-
-impl<T: NonFungibleEnumerable> !NonFungibleConsecutive for T {}

@@ -36,7 +36,7 @@ use crate::fungible::FungibleToken;
 /// authorization should be configured. Not providing a default implementation
 /// for this trait is a reminder for the implementor to provide the
 /// authorization logic for this trait.
-pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
+pub trait FungibleAllowList: FungibleToken {
     /// Returns the allowed status of an account.
     ///
     /// # Arguments
