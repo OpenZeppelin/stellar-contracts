@@ -127,7 +127,7 @@ pub trait Governor {
     /// # Errors
     ///
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
-    fn state(e: &Env, proposal_id: BytesN<32>) -> ProposalState {
+    fn proposal_state(e: &Env, proposal_id: BytesN<32>) -> ProposalState {
         storage::get_proposal_state(e, &proposal_id)
     }
 
@@ -267,44 +267,7 @@ pub trait Governor {
         storage::cast_vote(e, &voter, &proposal_id, vote_type, reason)
     }
 
-    /// Queues a successful proposal for execution.
-    ///
-    /// This function is only relevant when using the *TimelockControl*
-    /// extension. Without it, proposals can be executed directly after success.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `targets` - The addresses of contracts to call.
-    /// * `functions` - The function names to invoke on each target.
-    /// * `args` - The arguments for each function call.
-    /// * `description_hash` - The hash of the proposal description.
-    ///
-    /// # Returns
-    ///
-    /// The unique identifier of the proposal.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
-    /// * [`GovernorError::ProposalNotSuccessful`] - If the proposal has not
-    ///   succeeded.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["proposal_queued", proposal_id: BytesN<32>]`
-    /// * data - `[eta: u64]`
-    fn queue(
-        e: &Env,
-        targets: Vec<Address>,
-        functions: Vec<Symbol>,
-        args: Vec<Vec<Val>>,
-        description_hash: BytesN<32>,
-    ) -> BytesN<32> {
-        storage::queue(e, targets, functions, args, &description_hash)
-    }
-
-    /// Executes a queued proposal.
+    /// Executes a proposal.
     ///
     /// # Arguments
     ///
@@ -322,7 +285,7 @@ pub trait Governor {
     ///
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
     /// * [`GovernorError::ProposalNotQueued`] - If the proposal has not been
-    ///   queued.
+    ///   queued (only relevant when using queuing extensions).
     ///
     /// # Events
     ///
@@ -374,29 +337,6 @@ pub trait Governor {
         storage::cancel(e, targets, functions, args, &description_hash)
     }
 
-    /// Computes the proposal ID from the proposal parameters.
-    ///
-    /// The proposal ID is a deterministic hash of the targets, functions,
-    /// args, and description hash. This allows anyone to compute the ID
-    /// without storing the full proposal data.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `targets` - The addresses of contracts to call.
-    /// * `functions` - The function names to invoke on each target.
-    /// * `args` - The arguments for each function call.
-    /// * `description_hash` - The hash of the proposal description.
-    fn hash_proposal(
-        e: &Env,
-        targets: Vec<Address>,
-        functions: Vec<Symbol>,
-        args: Vec<Vec<Val>>,
-        description_hash: BytesN<32>,
-    ) -> BytesN<32> {
-        storage::hash_proposal(e, &targets, &functions, &args, &description_hash)
-    }
-
     /// Returns the voting power of an account at a specific ledger.
     ///
     /// This function queries the configured Votes contract to retrieve
@@ -414,7 +354,7 @@ pub trait Governor {
     /// Returns a string describing how votes are counted.
     ///
     /// This is used by UIs to display the counting mode to users. The format
-    /// follows a URI-like pattern, e.g., `"support=bravo&quorum=for,abstain"`.
+    /// follows a URI-like pattern, e.g., `"support=bravo&quorum=for,abstain"`. // TODO: change the wording here, it is cryptic
     ///
     /// The base implementation returns an empty string. Counting extensions
     /// (like *CountingSimple*) should override this to return their mode.
@@ -424,19 +364,6 @@ pub trait Governor {
     /// * `e` - Access to the Soroban environment.
     fn counting_mode(e: &Env) -> String {
         String::from_str(e, "")
-    }
-
-    /// Returns the estimated execution time for a queued proposal.
-    ///
-    /// This is only meaningful when using an extension that enables queuing
-    /// (like *TimelockControl*). The base implementation returns `0`.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `proposal_id` - The unique identifier of the proposal.
-    fn proposal_eta(_e: &Env, _proposal_id: BytesN<32>) -> u64 {
-        0
     }
 
     /// Returns whether proposals need to be queued before execution.
@@ -468,7 +395,7 @@ pub enum ProposalState {
     Canceled = 2,
     /// The proposal was defeated (did not meet quorum or majority).
     Defeated = 3,
-    /// The proposal succeeded and can be queued.
+    /// The proposal succeeded and can be executed. If there is a queuing extension enabled, this state means the proposal is ready to be queued.
     Succeeded = 4,
     /// The proposal is queued for execution (when using an extension that enables the queue step, like TimelockControl).
     Queued = 5,
