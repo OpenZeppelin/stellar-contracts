@@ -72,10 +72,10 @@ pub trait Governor {
         storage::get_version(e)
     }
 
-    /// Returns the voting delay - the number of ledgers between proposal
-    /// creation and the start of voting.
+    /// Returns the voting delay in ledgers.
     ///
-    /// This delay allows voters to review the proposal before voting begins.
+    /// The voting delay is the number of ledgers between proposal creation
+    /// and the start of voting.
     ///
     /// # Arguments
     ///
@@ -84,8 +84,9 @@ pub trait Governor {
         storage::get_voting_delay(e)
     }
 
-    /// Returns the voting period - the number of ledgers during which voting
-    /// is open.
+    /// Returns the voting period in ledgers.
+    ///
+    /// The voting period is the number of ledgers during which voting is open.
     ///
     /// # Arguments
     ///
@@ -101,20 +102,6 @@ pub trait Governor {
     /// * `e` - Access to the Soroban environment.
     fn proposal_threshold(e: &Env) -> u128 {
         storage::get_proposal_threshold(e)
-    }
-
-    /// Returns the quorum required for a proposal to pass.
-    ///
-    /// The quorum represents the minimum voting power that must participate
-    /// for a vote to be valid.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `ledger` - The ledger number at which to evaluate quorum (typically
-    ///   the proposal snapshot).
-    fn quorum(e: &Env, ledger: u32) -> u128 {
-        storage::get_quorum(e, ledger)
     }
 
     /// Returns the current state of a proposal.
@@ -442,8 +429,6 @@ pub enum GovernorError {
     ProposalThresholdNotSet = 5013,
     /// The votes contract address has not been set.
     VotesContractNotSet = 5014,
-    /// The timelock contract address has not been set.
-    TimelockContractNotSet = 5015,
     /// Invalid voting delay value.
     InvalidVotingDelay = 5016,
     /// Invalid voting period value.
