@@ -367,7 +367,7 @@ fn enforce_success() {
 
         enforce(&e, &context, &authenticated_signers, &context_rule, &smart_account);
 
-        assert_eq!(e.events().all().len(), 1)
+        assert_eq!(e.events().all().events().len(), 1)
     });
 }
 
