@@ -12,8 +12,7 @@ use soroban_sdk::{
 use stellar_event_assertion::EventAssertion;
 
 use crate::fungible::{
-    Approve, Base, FungibleStorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT,
-    INSTANCE_TTL_THRESHOLD,
+    Base, FungibleStorageKey, BALANCE_EXTEND_AMOUNT, INSTANCE_EXTEND_AMOUNT, INSTANCE_TTL_THRESHOLD,
 };
 
 #[contract]
@@ -72,17 +71,9 @@ fn approve_with_event() {
         let allowance_val = Base::allowance(&e, &owner, &spender);
         assert_eq!(allowance_val, 50);
 
-        let events = e.events().all();
-        assert_eq!(events.events().len(), 1);
-        let event = events.events().first().unwrap();
-        let expected = Approve {
-            owner: owner.clone(),
-            spender: spender.clone(),
-            amount: allowance_data.0,
-            live_until_ledger: allowance_data.1,
-        }
-        .to_xdr(&e, &address);
-        assert_eq!(event, &expected);
+        let mut event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_fungible_approve(&owner, &spender, allowance_data.0, allowance_data.1);
     });
 }
 
