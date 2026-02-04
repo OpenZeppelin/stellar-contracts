@@ -74,7 +74,7 @@ use crate::non_fungible::NonFungibleToken;
 /// The `consecutive` extension provides its own business logic for creating and
 /// destroying tokens. Therefore, this trait is INCOMPATIBLE with the
 /// `Enumerable` extension.
-pub trait NonFungibleConsecutive: NonFungibleToken<ContractType = Consecutive> {}
+pub trait NonFungibleConsecutive: NonFungibleToken {}
 
 #[cfg(test)]
 mod test;

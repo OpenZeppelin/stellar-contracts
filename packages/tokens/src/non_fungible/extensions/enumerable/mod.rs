@@ -41,7 +41,7 @@ use crate::non_fungible::NonFungibleToken;
 ///    exists for the use-cases where the enumeration is required as an on-chain
 ///    operation.
 #[contracttrait]
-pub trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
+pub trait NonFungibleEnumerable: NonFungibleToken {
     /// Returns the total amount of tokens stored by the contract.
     ///
     /// # Arguments

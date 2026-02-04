@@ -1,4 +1,4 @@
 [toolchain]
-channel = "stable"
+channel = "nightly"
 targets = ["wasm32v1-none"]
 components = ["rustfmt", "clippy", "rust-src"]

@@ -124,7 +124,7 @@ use crate::fungible::FungibleToken;
 /// - Freezing mechanisms for regulatory enforcement
 /// - Recovery system for lost/old account scenarios
 /// - Administrative controls for token management
-pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
+pub trait RWAToken: Pausable + FungibleToken {
     // ################## CORE TOKEN FUNCTIONS ##################
 
     /// Forces a transfer of tokens between two whitelisted wallets.

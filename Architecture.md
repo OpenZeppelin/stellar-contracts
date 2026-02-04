@@ -33,69 +33,13 @@ stellar-contracts/
 
 ### 1. Trait-Based Design with Associated Types
 
-The library extensively uses Rust traits to define standard interfaces and behaviors, with a sophisticated approach to enable method overriding, and enforce mutually exclusive extensions through associated types:
+Polymorphism is not directly possible in Rust. Instead, we achieve polymorphism-like behavior through **associated types** and **trait bounds**.
 
-#### Enforcing Mutually Exclusive Extensions
+The library extensively uses Rust traits to define standard interfaces and behaviors, with a sophisticated approach to enable method overriding.
 
-One of the most sophisticated aspects of this architecture is how it prevents incompatible extensions from being used together. This is achieved through **associated types** and **trait bounds**:
+#### Override Mechanism Through *Overrides* Traits
 
-```rust
-// Core trait with associated type
-trait NonFungibleToken {
-    type ContractType: ContractOverrides;
-
-    fn transfer(e: &Env, from: Address, to: Address, token_id: u32) {
-        Self::ContractType::transfer(e, from, to, token_id);
-    }
-    // ... other methods
-}
-
-// Contract type markers
-pub struct Base;        // Default implementation
-pub struct Enumerable;  // For enumeration features
-pub struct Consecutive; // For batch minting optimization
-```
-
-#### Extension Trait Constraints
-
-Extensions are constrained to specific contract types using associated type bounds:
-
-```rust
-// Enumerable can only be used with Enumerable contract type
-trait NonFungibleEnumerable: NonFungibleToken<ContractType = Enumerable> {
-    fn total_supply(e: &Env) -> u32;
-    fn get_owner_token_id(e: &Env, owner: Address, index: u32) -> u32;
-    // ...
-}
-
-// Consecutive can only be used with Consecutive contract type
-trait NonFungibleConsecutive: NonFungibleToken<ContractType = Consecutive> {
-    // Batch minting functionality
-}
-```
-
-#### Mutual Exclusivity Enforcement
-
-This design makes it **impossible** to implement conflicting extensions:
-
-```rust
-// ✅ This works - using Enumerable
-impl NonFungibleToken for MyContract {
-    type ContractType = Enumerable;
-    // ... implementations
-}
-impl NonFungibleEnumerable for MyContract {
-    // ... enumerable methods
-}
-
-// ❌ This CANNOT compile - Consecutive requires different ContractType
-// impl NonFungibleConsecutive for MyContract { ... }
-//     ^^^ Error: expected `Consecutive`, found `Enumerable`
-```
-
-#### Override Mechanism Through ContractOverrides
-
-The `ContractOverrides` trait provides the actual implementations that vary by contract type:
+For example, the `ContractOverrides` trait provides the actual implementations that vary by contract type:
 
 ```rust
 trait ContractOverrides {
@@ -126,6 +70,16 @@ impl ContractOverrides for Consecutive {
 }
 ```
 
+#### Enforcing Mutually Exclusive Extensions
+
+We are using nightly feature `#![feature(negative_impls)]` to enforce mutually exclusive extensions.
+
+For example, Consecutive and Enumerable extensions for NonFungibleToken trait are mutually exclusive. If a contract implements both extensions, the compiler will generate an error. We achieve this through negative trait bounds:
+
+```rust
+impl<T: NonFungibleEnumerable> !NonFungibleConsecutive for T {}
+```
+
 #### Benefits of This Approach
 
 1. **Compile-Time Safety**: Incompatible extensions cannot be combined
@@ -133,8 +87,6 @@ impl ContractOverrides for Consecutive {
 3. **Intuitive API**: Developers don't need to specify generics or complex types
 4. **Automatic Behavior Override**: Methods automatically use the correct implementation based on contract type
 5. **Modular Design**: Extensions can be developed and maintained independently
-
-This pattern represents a novel solution to the challenge of providing both type safety and developer ergonomics in a trait-based extension system, avoiding the need for runtime checks or complex generic constraints.
 
 ### 2. Dual-Layer Architecture
 
