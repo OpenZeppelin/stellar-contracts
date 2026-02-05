@@ -35,7 +35,8 @@
 //!
 //! 1. **Propose**: A user with sufficient voting power creates a proposal
 //! 2. **Vote**: Token holders vote during the voting period
-//! 3. **Execute**: Successful proposals (above quorum threshold) can be executed
+//! 3. **Execute**: Successful proposals (above quorum threshold) can be
+//!    executed
 //!
 //! When using an extension for `Queue` mechanism, like `TimelockControl`, an
 //! additional `Queue` step is added between voting and execution:
@@ -112,7 +113,8 @@ pub trait Votes {
 /// It provides a standard interface for creating proposals, voting, and
 /// executing approved actions.
 ///
-/// The contract that implements this trait is expected to implement [`Votes`] trait.
+/// The contract that implements this trait is expected to implement [`Votes`]
+/// trait.
 #[contracttrait]
 pub trait Governor: Votes {
     /// Returns the name of the governor.
@@ -136,7 +138,8 @@ pub trait Governor: Votes {
     ///
     /// # Errors
     ///
-    /// * [`GovernorError::VersionNotSet`] - Occurs if the version has not been set.
+    /// * [`GovernorError::VersionNotSet`] - Occurs if the version has not been
+    ///   set.
     fn version(e: &Env) -> String {
         storage::get_version(e)
     }
@@ -152,7 +155,8 @@ pub trait Governor: Votes {
     ///
     /// # Errors
     ///
-    /// * [`GovernorError::VotingDelayNotSet`] - Occurs if the voting delay has not been set.
+    /// * [`GovernorError::VotingDelayNotSet`] - Occurs if the voting delay has
+    ///   not been set.
     fn voting_delay(e: &Env) -> u32 {
         storage::get_voting_delay(e)
     }
@@ -167,7 +171,8 @@ pub trait Governor: Votes {
     ///
     /// # Errors
     ///
-    /// * [`GovernorError::VotingPeriodNotSet`] - Occurs if the voting period has not been set.
+    /// * [`GovernorError::VotingPeriodNotSet`] - Occurs if the voting period
+    ///   has not been set.
     fn voting_period(e: &Env) -> u32 {
         storage::get_voting_period(e)
     }
@@ -180,7 +185,8 @@ pub trait Governor: Votes {
     ///
     /// # Errors
     ///
-    /// * [`GovernorError::ProposalThresholdNotSet`] - Occurs if the proposal threshold has not been set.
+    /// * [`GovernorError::ProposalThresholdNotSet`] - Occurs if the proposal
+    ///   threshold has not been set.
     fn proposal_threshold(e: &Env) -> u128 {
         storage::get_proposal_threshold(e)
     }

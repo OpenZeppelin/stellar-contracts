@@ -580,7 +580,8 @@ pub fn cast_vote(
     voter_weight
 }
 
-/// Executes a successful proposal and returns its unique identifier (proposal ID).
+/// Executes a successful proposal and returns its unique identifier (proposal
+/// ID).
 ///
 /// # Arguments
 ///
