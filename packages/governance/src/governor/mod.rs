@@ -7,21 +7,26 @@
 //!
 //! ## Structure
 //!
-//! The base module includes:
+//! The [`Governor`] trait includes:
 //!
 //! - Proposal lifecycle management (creation, voting, execution, cancellation)
 //! - Integration with Votes interface for voting power snapshots
+//!
+//! The [`Governor`] trait needs the following concepts to be defined and made
+//! available by the implementer:
+//!
+//! - *Votes*: Governor trait does not define how to store, manage, and access
+//!   votes. But Governor trait needs to be able to access the voting power of
+//!   an account at a specific ledger. A separate Votes trait is provided by
+//!   this library as a default implementation.
 //!
 //! The following optional extensions are available:
 //!
 //! - *GovernorSettings* provides configurable parameters like voting delay,
 //!   voting period, and proposal threshold.
-//! - *Quorum* defines quorum as a percentage of total voting power.
-//! - *TimelockControl* integrates with the Timelock contract for
-//!   delayed execution (queue step before execute).
-//! - *Votes* integrates with a token contract that implements the
-//!   Votes interface.
-//! - *CountingSimple* provides standard For/Against/Abstain counting.
+//! - *TimelockControl* enables the optional `Queue` step in exectuion. It integrates the Governor Contract with the Timelock Contract for delayed
+//!   execution (queue step before execute).
+//! - *Quorum* provides configurable parameters like quorum threshold.
 //!
 //! ## Governance Flow
 //!
@@ -29,10 +34,73 @@
 //! 2. **Vote**: Token holders vote during the voting period
 //! 3. **Execute**: Successful proposals can be executed
 //!
-//! When using the *TimelockControl* extension, an additional step is
-//! added between voting and execution:
+//! When using an extension for `Queue` mechanism, like `TimelockControl`, an
+//! additional step is added between voting and execution:
 //!
 //! 1. **Propose** → 2. **Vote** → 3. **Queue** → 4. **Execute**
+//!
+//! //! # Security Considerations
+//!
+//! ## Flash Loan Voting Attack
+//!
+//! ### Vulnerability Overview
+//!
+//! Governance systems are vulnerable to flash loan attacks where an attacker
+//! borrows a large amount of voting tokens, votes on a proposal, and returns
+//! the tokens within the same transaction.
+//!
+//! ### Mitigation
+//!
+//! This implementation uses **snapshot-based voting power**. When a proposal
+//! is created, the current ledger number is recorded as the "snapshot". All
+//! voting power calculations use [`get_past_votes()`] which queries the
+//! voting power at the snapshot ledger, not the current ledger.
+//!
+//! This means an attacker must hold tokens *before* a proposal is created
+//! to have voting power on that proposal, making flash loan attacks
+//! ineffective.
+//!
+//! ## Proposal Spam Attack
+//!
+//! ### Vulnerability Overview
+//!
+//! An attacker could create many proposals to overwhelm governance
+//! participants, making it difficult to focus on legitimate proposals.
+//!
+//! ### Mitigation
+//!
+//! The **proposal threshold** ([`get_proposal_threshold()`]) requires
+//! proposers to hold a minimum amount of voting power to create proposals.
+//! This makes spam attacks economically costly.
+//!
+//! ## Governance Capture
+//!
+//! ### Vulnerability Overview
+//!
+//! An attacker could accumulate voting power over time to eventually control
+//! governance decisions.
+//!
+//! ### Mitigation
+//!
+//! - **Quorum requirements** ([`get_quorum_numerator()`]) ensure a minimum
+//!   percentage of total voting supply participates in each proposal
+//! - **Voting delay** ([`get_voting_delay()`]) gives token holders time to
+//!   acquire more tokens or delegate before voting starts
+//! - **Immutable configuration** - all governance parameters are set once
+//!   during initialization and cannot be changed, preventing governance from
+//!   weakening its own security
+//!
+//! ## Configuration Immutability
+//!
+//! All setter functions in this module can only be called once. This ensures
+//! that governance parameters cannot be modified after deployment, even by
+//! the contract admin. This is critical for governance security as it
+//! prevents:
+//!
+//! - Lowering the proposal threshold to enable spam
+//! - Reducing quorum to pass proposals with minimal participation
+//! - Shortening voting periods to rush through malicious proposals
+//! - Changing the votes contract to one with manipulated voting power
 
 mod storage;
 
@@ -43,9 +111,12 @@ use soroban_sdk::{
     contracterror, contractevent, contracttrait, contracttype, Address, BytesN, Env, String,
     Symbol, Val, Vec,
 };
-pub use storage::*;
+pub use storage;
 
-// ################## TRAIT ##################
+/// TODO: delete this after Votes PR is merged
+pub trait Votes {
+    fn get_past_total_supply(e: &Env, ledger: u32) -> u128;
+}
 
 /// Base Governor Trait
 ///
@@ -53,7 +124,7 @@ pub use storage::*;
 /// It provides a standard interface for creating proposals, voting, and
 /// executing approved actions.
 #[contracttrait]
-pub trait Governor {
+pub trait Governor: Votes {
     /// Returns the name of the governor.
     ///
     /// # Arguments
@@ -191,8 +262,8 @@ pub trait Governor {
     ///
     /// * [`GovernorError::InsufficientProposerVotes`] - If the proposer does
     ///   not have enough voting power.
-    /// * [`GovernorError::ProposalAlreadyExists`] - If a proposal with the
-    ///   same parameters already exists.
+    /// * [`GovernorError::ProposalAlreadyExists`] - If a proposal with the same
+    ///   parameters already exists.
     /// * [`GovernorError::InvalidProposalLength`] - If the targets, functions,
     ///   and args vectors have different lengths.
     /// * [`GovernorError::EmptyProposal`] - If the proposal contains no
@@ -223,8 +294,8 @@ pub trait Governor {
     /// * `voter` - The address casting the vote.
     /// * `proposal_id` - The unique identifier of the proposal.
     /// * `vote_type` - The type of vote. The interpretation depends on the
-    ///   counting module used. For simple counting: 0 = Against, 1 = For,
-    ///   2 = Abstain.
+    ///   counting module used. For simple counting: 0 = Against, 1 = For, 2 =
+    ///   Abstain.
     /// * `reason` - An optional explanation for the vote.
     ///
     /// # Returns
@@ -237,8 +308,8 @@ pub trait Governor {
     /// * [`GovernorError::ProposalNotActive`] - If voting is not currently
     ///   open.
     /// * [`GovernorError::AlreadyVoted`] - If the voter has already voted.
-    /// * [`GovernorError::InvalidVoteType`] - If the vote type is not valid
-    ///   for the counting module.
+    /// * [`GovernorError::InvalidVoteType`] - If the vote type is not valid for
+    ///   the counting module.
     ///
     /// # Events
     ///
@@ -324,24 +395,11 @@ pub trait Governor {
         storage::cancel(e, targets, functions, args, &description_hash)
     }
 
-    /// Returns the voting power of an account at a specific ledger.
-    ///
-    /// This function queries the configured Votes contract to retrieve
-    /// the historical voting power of an account.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `account` - The address to query voting power for.
-    /// * `ledger` - The ledger number at which to evaluate voting power.
-    fn get_votes(e: &Env, account: Address, ledger: u32) -> u128 {
-        storage::get_votes(e, &account, ledger)
-    }
-
     /// Returns a string describing how votes are counted.
     ///
     /// This is used by UIs to display the counting mode to users. The format
-    /// follows a URI-like pattern, e.g., `"support=bravo&quorum=for,abstain"`. // TODO: change the wording here, it is cryptic
+    /// follows a URI-like pattern, e.g., `"support=bravo&quorum=for,abstain"`.
+    /// // TODO: change the wording here, it is cryptic
     ///
     /// The base implementation returns an empty string. Counting extensions
     /// (like *CountingSimple*) should override this to return their mode.
@@ -349,8 +407,8 @@ pub trait Governor {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn counting_mode(e: &Env) -> String {
-        String::from_str(e, "")
+    fn counting_mode(e: &Env) -> Symbol {
+        Symbol::new(e, "") // TODO:
     }
 
     /// Returns whether proposals need to be queued before execution.
@@ -364,6 +422,22 @@ pub trait Governor {
     /// * `e` - Access to the Soroban environment.
     fn proposal_needs_queuing(_e: &Env) -> bool {
         false
+    }
+
+    /// Returns the quorum (minimum votes required) at a specific ledger.
+    ///
+    /// This calculates the quorum as a percentage of the total voting supply
+    /// at the given ledger. The percentage is determined by the stored quorum
+    /// numerator (e.g., 10 means 10% of total supply).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `ledger` - The ledger number at which to calculate the quorum.
+    fn quorum(e: &Env, ledger: u32) -> u128 {
+        let numerator = storage::get_quorum_numerator(e) as u128;
+        let total_supply = Self::get_past_total_supply(e, ledger);
+        total_supply * numerator / 100
     }
 }
 
@@ -382,9 +456,11 @@ pub enum ProposalState {
     Canceled = 2,
     /// The proposal was defeated (did not meet quorum or majority).
     Defeated = 3,
-    /// The proposal succeeded and can be executed. If there is a queuing extension enabled, this state means the proposal is ready to be queued.
+    /// The proposal succeeded and can be executed. If there is a queuing
+    /// extension enabled, this state means the proposal is ready to be queued.
     Succeeded = 4,
-    /// The proposal is queued for execution (when using an extension that enables the queue step, like TimelockControl).
+    /// The proposal is queued for execution (when using an extension that
+    /// enables the queue step, like TimelockControl).
     Queued = 5,
     /// The proposal has expired and can no longer be executed.
     Expired = 6,
@@ -429,6 +505,8 @@ pub enum GovernorError {
     ProposalThresholdNotSet = 5013,
     /// The votes contract address has not been set.
     VotesContractNotSet = 5014,
+    /// The quorum numerator has not been set.
+    QuorumNotSet = 5015,
     /// Invalid voting delay value.
     InvalidVotingDelay = 5016,
     /// Invalid voting period value.
@@ -441,6 +519,20 @@ pub enum GovernorError {
     VersionNotSet = 5020,
     /// The vote type is not valid for the counting module.
     InvalidVoteType = 5021,
+    /// The name has already been set.
+    NameAlreadySet = 5022,
+    /// The version has already been set.
+    VersionAlreadySet = 5023,
+    /// The voting delay has already been set.
+    VotingDelayAlreadySet = 5024,
+    /// The voting period has already been set.
+    VotingPeriodAlreadySet = 5025,
+    /// The proposal threshold has already been set.
+    ProposalThresholdAlreadySet = 5026,
+    /// The votes contract address has already been set.
+    VotesContractAlreadySet = 5027,
+    /// The quorum numerator has already been set.
+    QuorumAlreadySet = 5028,
 }
 
 // ################## CONSTANTS ##################

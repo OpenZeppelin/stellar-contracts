@@ -4,7 +4,7 @@
 //! It defines storage keys and helper functions for managing proposal state,
 //! votes, and configuration parameters.
 
-use soroban_sdk::{contracttype, Address, BytesN, Env, String, Symbol, Val, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, BytesN, Env, String, Symbol, Val, Vec};
 
 use crate::governor::{GovernorError, ProposalState};
 
@@ -26,6 +26,8 @@ pub enum GovernorStorageKey {
     ProposalThreshold,
     /// The address of the Votes contract.
     VotesContract,
+    /// The quorum numerator (percentage out of 100).
+    QuorumNumerator,
     /// Proposal data indexed by proposal ID.
     Proposal(BytesN<32>),
     /// Vote receipt for a specific voter and proposal.
@@ -176,6 +178,23 @@ pub fn get_votes_contract(e: &Env) -> Address {
         .unwrap_or_else(|| panic_with_error!(e, GovernorError::VotesContractNotSet))
 }
 
+/// Returns the quorum numerator (percentage out of 100).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * [`GovernorError::QuorumNotSet`] - Occurs if the quorum numerator has not
+///   been set.
+pub fn get_quorum_numerator(e: &Env) -> u32 {
+    e.storage()
+        .instance()
+        .get(&GovernorStorageKey::QuorumNumerator)
+        .unwrap_or_else(|| panic_with_error!(e, GovernorError::QuorumNotSet))
+}
+
 /// Returns the core proposal data.
 ///
 /// # Arguments
@@ -295,66 +314,244 @@ pub fn has_voted(e: &Env, proposal_id: &BytesN<32>, account: &Address) -> bool {
 
 // ################## SETTER FUNCTIONS ##################
 
-// TODO: for the setters below, set only once logic should be added
-
 /// Sets the name of the governor.
+///
+/// The name is not validated here. It is the responsibility of the
+/// implementer to ensure that the name is appropriate.
+///
+/// This function should typically be called once during contract
+/// initialization and the name should remain immutable thereafter.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `name` - The name to set.
+///
+/// # Errors
+///
+/// * [`GovernorError::NameAlreadySet`] - Occurs if the name has already been
+///   set.
+///
+/// # Security Warning
+///
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can set the
+/// name. We recommend using this function in the constructor of your
+/// smart contract.
 pub fn set_name(e: &Env, name: String) {
+    if e.storage().instance().has(&GovernorStorageKey::Name) {
+        panic_with_error!(e, GovernorError::NameAlreadySet);
+    }
     e.storage().instance().set(&GovernorStorageKey::Name, &name);
 }
 
 /// Sets the version of the governor contract.
 ///
+/// The version is not validated here. It is the responsibility of the
+/// implementer to ensure that the version string is appropriate.
+///
+/// This function should typically be called once during contract
+/// initialization and the version should remain immutable thereafter.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `version` - The version string to set.
+///
+/// # Errors
+///
+/// * [`GovernorError::VersionAlreadySet`] - Occurs if the version has already
+///   been set.
+///
+/// # Security Warning
+///
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can set the
+/// version. We recommend using this function in the constructor of your
+/// smart contract.
 pub fn set_version(e: &Env, version: String) {
+    if e.storage().instance().has(&GovernorStorageKey::Version) {
+        panic_with_error!(e, GovernorError::VersionAlreadySet);
+    }
     e.storage().instance().set(&GovernorStorageKey::Version, &version);
 }
 
 /// Sets the proposal threshold.
 ///
+/// The threshold value is not validated here. It is the responsibility of
+/// the implementer to ensure that the threshold is reasonable for the
+/// governance use case (e.g., not so high that no one can propose).
+///
+/// This function should typically be called once during contract
+/// initialization and the threshold should remain immutable thereafter.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `threshold` - The minimum voting power required to create a proposal.
+///
+/// # Errors
+///
+/// * [`GovernorError::ProposalThresholdAlreadySet`] - Occurs if the proposal
+///   threshold has already been set.
+///
+/// # Security Warning
+///
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can set the
+/// threshold. We recommend using this function in the constructor of your
+/// smart contract.
 pub fn set_proposal_threshold(e: &Env, threshold: u128) {
+    if e.storage().instance().has(&GovernorStorageKey::ProposalThreshold) {
+        panic_with_error!(e, GovernorError::ProposalThresholdAlreadySet);
+    }
     e.storage().instance().set(&GovernorStorageKey::ProposalThreshold, &threshold);
 }
 
 /// Sets the voting delay.
 ///
+/// The delay value is not validated here. It is the responsibility of
+/// the implementer to ensure that the delay is appropriate (e.g., enough
+/// time for token holders to prepare, but not so long that governance
+/// becomes unresponsive).
+///
+/// This function should typically be called once during contract
+/// initialization and the voting delay should remain immutable thereafter.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `delay` - The voting delay in ledgers.
+///
+/// # Errors
+///
+/// * [`GovernorError::VotingDelayAlreadySet`] - Occurs if the voting delay has
+///   already been set.
+///
+/// # Security Warning
+///
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can set the
+/// voting delay. We recommend using this function in the constructor of
+/// your smart contract.
 pub fn set_voting_delay(e: &Env, delay: u32) {
+    if e.storage().instance().has(&GovernorStorageKey::VotingDelay) {
+        panic_with_error!(e, GovernorError::VotingDelayAlreadySet);
+    }
     e.storage().instance().set(&GovernorStorageKey::VotingDelay, &delay);
 }
 
 /// Sets the voting period.
 ///
+/// The period value is not validated here. It is the responsibility of
+/// the implementer to ensure that the period is appropriate (e.g., enough
+/// time for voters to participate, but not so long that urgent actions
+/// cannot be taken).
+///
+/// This function should typically be called once during contract
+/// initialization and the voting period should remain immutable thereafter.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `period` - The voting period in ledgers.
+///
+/// # Errors
+///
+/// * [`GovernorError::VotingPeriodAlreadySet`] - Occurs if the voting period
+///   has already been set.
+///
+/// # Security Warning
+///
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can set the
+/// voting period. We recommend using this function in the constructor of
+/// your smart contract.
 pub fn set_voting_period(e: &Env, period: u32) {
+    if e.storage().instance().has(&GovernorStorageKey::VotingPeriod) {
+        panic_with_error!(e, GovernorError::VotingPeriodAlreadySet);
+    }
     e.storage().instance().set(&GovernorStorageKey::VotingPeriod, &period);
 }
 
 /// Sets the address of the Votes contract.
 ///
+/// The votes contract address is not validated here. It is the
+/// responsibility of the implementer to ensure that the address points
+/// to a valid Votes contract that implements the required interface.
+///
+/// This function should typically be called once during contract
+/// initialization and the votes contract address should remain immutable
+/// thereafter.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `votes_contract` - The address of the Votes contract.
+///
+/// # Errors
+///
+/// * [`GovernorError::VotesContractAlreadySet`] - Occurs if the votes contract
+///   address has already been set.
+///
+/// # Security Warning
+///
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can set the
+/// votes contract address. We recommend using this function in the
+/// constructor of your smart contract.
 pub fn set_votes_contract(e: &Env, votes_contract: &Address) {
+    if e.storage().instance().has(&GovernorStorageKey::VotesContract) {
+        panic_with_error!(e, GovernorError::VotesContractAlreadySet);
+    }
     e.storage().instance().set(&GovernorStorageKey::VotesContract, votes_contract);
+}
+
+/// Sets the quorum numerator (percentage out of 100).
+///
+/// The numerator value is not validated here. It is the responsibility of
+/// the implementer to ensure that the quorum is reasonable (e.g., not 0
+/// which would allow proposals to pass with no votes, and not over 100
+/// which would make proposals impossible to pass).
+///
+/// This function should typically be called once during contract
+/// initialization and the quorum numerator should remain immutable thereafter.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `numerator` - The quorum percentage (e.g., 10 for 10%).
+///
+/// # Errors
+///
+/// * [`GovernorError::QuorumAlreadySet`] - Occurs if the quorum numerator has
+///   already been set.
+///
+/// # Security Warning
+///
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
+///
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can set the
+/// quorum numerator. We recommend using this function in the constructor
+/// of your smart contract.
+pub fn set_quorum_numerator(e: &Env, numerator: u32) {
+    if e.storage().instance().has(&GovernorStorageKey::QuorumNumerator) {
+        panic_with_error!(e, GovernorError::QuorumAlreadySet);
+    }
+    e.storage().instance().set(&GovernorStorageKey::QuorumNumerator, &numerator);
 }
 
 // ################## PROPOSAL FUNCTIONS ##################
@@ -456,15 +653,16 @@ pub fn propose(
 /// * `e` - Access to the Soroban environment.
 /// * `voter` - The address casting the vote.
 /// * `proposal_id` - The unique identifier of the proposal.
-/// * `vote_type` - The type of vote (interpretation depends on counting module).
+/// * `vote_type` - The type of vote (interpretation depends on counting
+///   module).
 /// * `reason` - An optional explanation for the vote.
 ///
 /// # Errors
 ///
 /// * [`GovernorError::ProposalNotActive`] - Occurs if the proposal is not in
 ///   the active state.
-/// * [`GovernorError::AlreadyVoted`] - Occurs if the voter has already voted
-///   on this proposal.
+/// * [`GovernorError::AlreadyVoted`] - Occurs if the voter has already voted on
+///   this proposal.
 pub fn cast_vote(
     e: &Env,
     voter: &Address,
@@ -607,7 +805,8 @@ pub fn cancel(
 
 /// Returns the voting power of an account at a specific ledger.
 ///
-/// This queries the configured Votes contract using the `get_past_votes` function.
+/// This queries the configured Votes contract using the `get_past_votes`
+/// function.
 ///
 /// # Arguments
 ///
