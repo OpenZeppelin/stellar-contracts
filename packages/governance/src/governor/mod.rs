@@ -18,28 +18,31 @@
 //! - *Votes*: Governor trait does not define how to store, manage, and access
 //!   votes. But Governor trait needs to be able to access the voting power of
 //!   an account at a specific ledger. A separate Votes trait is provided by
-//!   this library as a default implementation.
+//!   this library as a default implementation. // TODO: hyperlink the Votes
+//!   trait here, and revise the paragraph accordingly.
 //!
 //! The following optional extensions are available:
 //!
 //! - *GovernorSettings* provides configurable parameters like voting delay,
 //!   voting period, and proposal threshold.
-//! - *TimelockControl* enables the optional `Queue` step in exectuion. It integrates the Governor Contract with the Timelock Contract for delayed
+//! - *TimelockControl* enables the optional `Queue` step in execution. It
+//!   integrates the Governor Contract with the Timelock Contract for delayed
 //!   execution (queue step before execute).
-//! - *Quorum* provides configurable parameters like quorum threshold.
+//! - *Quorum* manages how many votes are required to pass a proposal. Can
+//!   introduce complex computation such as fractional quorum, etc.
 //!
 //! ## Governance Flow
 //!
 //! 1. **Propose**: A user with sufficient voting power creates a proposal
 //! 2. **Vote**: Token holders vote during the voting period
-//! 3. **Execute**: Successful proposals can be executed
+//! 3. **Execute**: Successful proposals (above quorum threshold) can be executed
 //!
 //! When using an extension for `Queue` mechanism, like `TimelockControl`, an
-//! additional step is added between voting and execution:
+//! additional `Queue` step is added between voting and execution:
 //!
 //! 1. **Propose** → 2. **Vote** → 3. **Queue** → 4. **Execute**
 //!
-//! //! # Security Considerations
+//! # Security Considerations
 //!
 //! ## Flash Loan Voting Attack
 //!
@@ -86,23 +89,8 @@
 //!   percentage of total voting supply participates in each proposal
 //! - **Voting delay** ([`get_voting_delay()`]) gives token holders time to
 //!   acquire more tokens or delegate before voting starts
-//! - **Immutable configuration** - all governance parameters are set once
-//!   during initialization and cannot be changed, preventing governance from
-//!   weakening its own security
-//!
-//! ## Configuration Immutability
-//!
-//! All setter functions in this module can only be called once. This ensures
-//! that governance parameters cannot be modified after deployment, even by
-//! the contract admin. This is critical for governance security as it
-//! prevents:
-//!
-//! - Lowering the proposal threshold to enable spam
-//! - Reducing quorum to pass proposals with minimal participation
-//! - Shortening voting periods to rush through malicious proposals
-//! - Changing the votes contract to one with manipulated voting power
 
-mod storage;
+pub mod storage;
 
 #[cfg(test)]
 mod test;
@@ -111,10 +99,10 @@ use soroban_sdk::{
     contracterror, contractevent, contracttrait, contracttype, Address, BytesN, Env, String,
     Symbol, Val, Vec,
 };
-pub use storage;
 
 /// TODO: delete this after Votes PR is merged
 pub trait Votes {
+    fn get_past_votes(e: &Env, account: Address, ledger: u32) -> u128;
     fn get_past_total_supply(e: &Env, ledger: u32) -> u128;
 }
 
@@ -123,6 +111,8 @@ pub trait Votes {
 /// The `Governor` trait defines the core functionality for on-chain governance.
 /// It provides a standard interface for creating proposals, voting, and
 /// executing approved actions.
+///
+/// The contract that implements this trait is expected to implement [`Votes`] trait.
 #[contracttrait]
 pub trait Governor: Votes {
     /// Returns the name of the governor.
@@ -130,6 +120,10 @@ pub trait Governor: Votes {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`GovernorError::NameNotSet`] - Occurs if the name has not been set.
     fn name(e: &Env) -> String {
         storage::get_name(e)
     }
@@ -139,6 +133,10 @@ pub trait Governor: Votes {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`GovernorError::VersionNotSet`] - Occurs if the version has not been set.
     fn version(e: &Env) -> String {
         storage::get_version(e)
     }
@@ -151,6 +149,10 @@ pub trait Governor: Votes {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`GovernorError::VotingDelayNotSet`] - Occurs if the voting delay has not been set.
     fn voting_delay(e: &Env) -> u32 {
         storage::get_voting_delay(e)
     }
@@ -162,6 +164,10 @@ pub trait Governor: Votes {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`GovernorError::VotingPeriodNotSet`] - Occurs if the voting period has not been set.
     fn voting_period(e: &Env) -> u32 {
         storage::get_voting_period(e)
     }
@@ -171,6 +177,10 @@ pub trait Governor: Votes {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`GovernorError::ProposalThresholdNotSet`] - Occurs if the proposal threshold has not been set.
     fn proposal_threshold(e: &Env) -> u128 {
         storage::get_proposal_threshold(e)
     }
@@ -243,7 +253,30 @@ pub trait Governor: Votes {
         storage::has_voted(e, &proposal_id, &account)
     }
 
-    /// Creates a new proposal.
+    /// Returns the proposal ID computed from the proposal details.
+    ///
+    /// The proposal ID is a deterministic keccak256 hash of the targets,
+    /// functions, args, and description hash. This allows anyone to compute
+    /// the ID without storing the full proposal data.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `targets` - The addresses of contracts to call.
+    /// * `functions` - The function names to invoke on each target.
+    /// * `args` - The arguments for each function call.
+    /// * `description_hash` - The hash of the proposal description.
+    fn get_proposal_id(
+        e: &Env,
+        targets: Vec<Address>,
+        functions: Vec<Symbol>,
+        args: Vec<Vec<Val>>,
+        description_hash: BytesN<32>,
+    ) -> BytesN<32> {
+        storage::hash_proposal(e, &targets, &functions, &args, &description_hash)
+    }
+
+    /// Creates a new proposal and returns its unique identifier (hash).
     ///
     /// # Arguments
     ///
@@ -253,10 +286,6 @@ pub trait Governor: Votes {
     /// * `functions` - The function names to invoke on each target.
     /// * `args` - The arguments for each function call.
     /// * `description` - A description of the proposal.
-    ///
-    /// # Returns
-    ///
-    /// The unique identifier (hash) of the created proposal.
     ///
     /// # Errors
     ///
@@ -268,6 +297,14 @@ pub trait Governor: Votes {
     ///   and args vectors have different lengths.
     /// * [`GovernorError::EmptyProposal`] - If the proposal contains no
     ///   actions.
+    /// * [`GovernorError::ProposalThresholdNotSet`] - If the proposal threshold
+    ///   has not been set.
+    /// * [`GovernorError::VotingDelayNotSet`] - If the voting delay has not
+    ///   been set.
+    /// * [`GovernorError::VotingPeriodNotSet`] - If the voting period has not
+    ///   been set.
+    /// * [`GovernorError::VotesContractNotSet`] - If the votes contract has not
+    ///   been set.
     ///
     /// # Events
     ///
@@ -283,10 +320,12 @@ pub trait Governor: Votes {
         args: Vec<Vec<Val>>,
         description: String,
     ) -> BytesN<32> {
-        storage::propose(e, &proposer, targets, functions, args, description)
+        let current_ledger = e.ledger().sequence();
+        let proposer_votes = Self::get_past_votes(e, proposer.clone(), current_ledger);
+        storage::propose(e, &proposer, proposer_votes, targets, functions, args, description)
     }
 
-    /// Casts a vote on a proposal.
+    /// Casts a vote on a proposal and returns the voter's voting power.
     ///
     /// # Arguments
     ///
@@ -297,10 +336,6 @@ pub trait Governor: Votes {
     ///   counting module used. For simple counting: 0 = Against, 1 = For, 2 =
     ///   Abstain.
     /// * `reason` - An optional explanation for the vote.
-    ///
-    /// # Returns
-    ///
-    /// The voting power of the voter.
     ///
     /// # Errors
     ///
@@ -314,18 +349,20 @@ pub trait Governor: Votes {
     /// # Events
     ///
     /// * topics - `["vote_cast", voter: Address, proposal_id: BytesN<32>]`
-    /// * data - `[vote_type: u8, weight: u128, reason: String]`
+    /// * data - `[vote_type: u32, weight: u128, reason: String]`
     fn cast_vote(
         e: &Env,
         voter: Address,
         proposal_id: BytesN<32>,
-        vote_type: u8,
+        vote_type: u32,
         reason: String,
     ) -> u128 {
-        storage::cast_vote(e, &voter, &proposal_id, vote_type, reason)
+        let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
+        let voter_weight = Self::get_past_votes(e, voter.clone(), snapshot);
+        storage::cast_vote(e, &voter, &proposal_id, vote_type, voter_weight, reason)
     }
 
-    /// Executes a proposal.
+    /// Executes a proposal and returns its unique identifier.
     ///
     /// # Arguments
     ///
@@ -335,15 +372,15 @@ pub trait Governor: Votes {
     /// * `args` - The arguments for each function call.
     /// * `description_hash` - The hash of the proposal description.
     ///
-    /// # Returns
-    ///
-    /// The unique identifier of the proposal.
-    ///
     /// # Errors
     ///
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
     /// * [`GovernorError::ProposalNotQueued`] - If the proposal has not been
     ///   queued (only relevant when using queuing extensions).
+    /// * [`GovernorError::ProposalNotSuccessful`] - If the proposal has not
+    ///   succeeded.
+    /// * [`GovernorError::ProposalAlreadyExecuted`] - If the proposal has
+    ///   already been executed.
     ///
     /// # Events
     ///
@@ -357,9 +394,9 @@ pub trait Governor: Votes {
         description_hash: BytesN<32>,
     ) -> BytesN<32> {
         storage::execute(e, targets, functions, args, &description_hash)
-    }
+    } // TODO: shouldn't this get the proposal id instead?
 
-    /// Cancels a proposal.
+    /// Cancels a proposal and returns its unique identifier.
     ///
     /// Can only be called by the proposer before the proposal is executed.
     ///
@@ -370,10 +407,6 @@ pub trait Governor: Votes {
     /// * `functions` - The function names to invoke on each target.
     /// * `args` - The arguments for each function call.
     /// * `description_hash` - The hash of the proposal description.
-    ///
-    /// # Returns
-    ///
-    /// The unique identifier of the cancelled proposal.
     ///
     /// # Errors
     ///
@@ -434,6 +467,11 @@ pub trait Governor: Votes {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `ledger` - The ledger number at which to calculate the quorum.
+    ///
+    /// # Errors
+    ///
+    /// * [`GovernorError::QuorumNotSet`] - Occurs if the quorum numerator has
+    ///   not been set.
     fn quorum(e: &Env, ledger: u32) -> u128 {
         let numerator = storage::get_quorum_numerator(e) as u128;
         let total_supply = Self::get_past_total_supply(e, ledger);
@@ -495,44 +533,20 @@ pub enum GovernorError {
     ProposalNotQueued = 5008,
     /// The proposal has already been executed.
     ProposalAlreadyExecuted = 5009,
-    /// The caller is not authorized to perform this action.
-    Unauthorized = 5010,
     /// The voting delay has not been set.
-    VotingDelayNotSet = 5011,
+    VotingDelayNotSet = 5010,
     /// The voting period has not been set.
-    VotingPeriodNotSet = 5012,
+    VotingPeriodNotSet = 5011,
     /// The proposal threshold has not been set.
-    ProposalThresholdNotSet = 5013,
-    /// The votes contract address has not been set.
-    VotesContractNotSet = 5014,
+    ProposalThresholdNotSet = 5012,
     /// The quorum numerator has not been set.
-    QuorumNotSet = 5015,
-    /// Invalid voting delay value.
-    InvalidVotingDelay = 5016,
-    /// Invalid voting period value.
-    InvalidVotingPeriod = 5017,
-    /// Invalid proposal threshold value.
-    InvalidProposalThreshold = 5018,
+    QuorumNotSet = 5013,
     /// The name has not been set.
-    NameNotSet = 5019,
+    NameNotSet = 5014,
     /// The version has not been set.
-    VersionNotSet = 5020,
+    VersionNotSet = 5015,
     /// The vote type is not valid for the counting module.
-    InvalidVoteType = 5021,
-    /// The name has already been set.
-    NameAlreadySet = 5022,
-    /// The version has already been set.
-    VersionAlreadySet = 5023,
-    /// The voting delay has already been set.
-    VotingDelayAlreadySet = 5024,
-    /// The voting period has already been set.
-    VotingPeriodAlreadySet = 5025,
-    /// The proposal threshold has already been set.
-    ProposalThresholdAlreadySet = 5026,
-    /// The votes contract address has already been set.
-    VotesContractAlreadySet = 5027,
-    /// The quorum numerator has already been set.
-    QuorumAlreadySet = 5028,
+    InvalidVoteType = 5016,
 }
 
 // ################## CONSTANTS ##################
@@ -610,7 +624,7 @@ pub struct VoteCast {
     #[topic]
     pub proposal_id: BytesN<32>,
     /// The type of vote cast.
-    pub vote_type: u8,
+    pub vote_type: u32,
     /// The voting power used.
     pub weight: u128,
     /// The voter's explanation for their vote.
@@ -631,7 +645,7 @@ pub fn emit_vote_cast(
     e: &Env,
     voter: &Address,
     proposal_id: &BytesN<32>,
-    vote_type: u8,
+    vote_type: u32,
     weight: u128,
     reason: &String,
 ) {
