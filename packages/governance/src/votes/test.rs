@@ -5,8 +5,8 @@ use soroban_sdk::{
 };
 
 use crate::votes::{
-    delegate, get_delegate, get_past_total_supply, get_past_votes, get_total_supply, get_votes,
-    get_voting_units, num_checkpoints, transfer_voting_units,
+    delegate, get_delegate, get_past_total_supply, get_total_supply, get_votes,
+    get_votes_at_checkpoint, get_voting_units, num_checkpoints, transfer_voting_units,
 };
 
 #[contract]
@@ -32,8 +32,8 @@ fn initial_state_has_zero_votes() {
         assert_eq!(get_delegate(&e, &alice), None);
         assert_eq!(get_total_supply(&e), 0);
 
-        // Test get_past_votes returns 0 when num_checkpoints == 0
-        assert_eq!(get_past_votes(&e, &alice, 500), 0);
+        // Test get_votes_at_checkpoint returns 0 when num_checkpoints == 0
+        assert_eq!(get_votes_at_checkpoint(&e, &alice, 500), 0);
 
         // Test get_past_total_supply returns 0 when num_total_supply_checkpoints == 0
         assert_eq!(get_past_total_supply(&e, 500), 0);
@@ -249,7 +249,7 @@ fn different_timestamps_create_new_checkpoints() {
 // ################## HISTORICAL QUERY TESTS ##################
 
 #[test]
-fn get_past_votes_returns_historical_value() {
+fn get_votes_at_checkpoint_returns_historical_value() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
@@ -268,25 +268,25 @@ fn get_past_votes_returns_historical_value() {
         // Query at different timepoints
         e.ledger().set_timestamp(4000);
 
-        assert_eq!(get_past_votes(&e, &bob, 999), 0);
-        assert_eq!(get_past_votes(&e, &bob, 1000), 100);
-        assert_eq!(get_past_votes(&e, &bob, 1500), 100);
-        assert_eq!(get_past_votes(&e, &bob, 2000), 150);
-        assert_eq!(get_past_votes(&e, &bob, 2500), 150);
-        assert_eq!(get_past_votes(&e, &bob, 3000), 175);
-        assert_eq!(get_past_votes(&e, &bob, 3500), 175);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 999), 0);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 1000), 100);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 1500), 100);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 2000), 150);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 2500), 150);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 3000), 175);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 3500), 175);
     });
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #4100)")]
-fn get_past_votes_fails_for_future_timepoint() {
+fn get_votes_at_checkpoint_fails_for_future_timepoint() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
     e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
-        get_past_votes(&e, &alice, 1000);
+        get_votes_at_checkpoint(&e, &alice, 1000);
     });
 }
 
@@ -379,7 +379,8 @@ fn burn_all_voting_units() {
 }
 
 #[test]
-fn delegate_to_same_delegate_is_noop() {
+#[should_panic(expected = "Error(Contract, #4103)")]
+fn delegate_to_same_delegate_errors() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
@@ -390,13 +391,10 @@ fn delegate_to_same_delegate_is_noop() {
         delegate(&e, &alice, &bob);
     });
 
-    let checkpoints_before = e.as_contract(&contract_address, || num_checkpoints(&e, &bob));
-
     e.ledger().set_timestamp(2000);
     e.as_contract(&contract_address, || {
+        // Should panic with SameDelegateReassignment
         delegate(&e, &alice, &bob);
-        // No new checkpoints should be created since votes didn't change
-        assert_eq!(num_checkpoints(&e, &bob), checkpoints_before);
     });
 }
 
@@ -438,12 +436,12 @@ fn binary_search_with_many_checkpoints() {
 
         // Query various historical points
         e.ledger().set_timestamp(3000);
-        assert_eq!(get_past_votes(&e, &bob, 50), 1000); // After initial delegation
-        assert_eq!(get_past_votes(&e, &bob, 100), 1010);
-        assert_eq!(get_past_votes(&e, &bob, 500), 1050);
-        assert_eq!(get_past_votes(&e, &bob, 1000), 1100);
-        assert_eq!(get_past_votes(&e, &bob, 1500), 1150);
-        assert_eq!(get_past_votes(&e, &bob, 2000), 1200);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 50), 1000); // After initial delegation
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 100), 1010);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 500), 1050);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 1000), 1100);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 1500), 1150);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 2000), 1200);
     });
 }
 
@@ -495,14 +493,14 @@ fn delegate_votes_overflow() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #4100)")]
-fn get_past_votes_at_current_timestamp() {
+fn get_votes_at_checkpoint_at_current_timestamp() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
     e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         // Query at exact current timestamp should fail
-        get_past_votes(&e, &alice, 1000);
+        get_votes_at_checkpoint(&e, &alice, 1000);
     });
 }
 
@@ -520,14 +518,14 @@ fn get_past_total_supply_at_current_timestamp() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #4100)")]
-fn get_past_votes_future_timestamp() {
+fn get_votes_at_checkpoint_future_timestamp() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
     e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         // Query at future timestamp should fail
-        get_past_votes(&e, &alice, 2000);
+        get_votes_at_checkpoint(&e, &alice, 2000);
     });
 }
 
@@ -544,7 +542,7 @@ fn get_past_total_supply_future_timestamp() {
 }
 
 #[test]
-fn get_past_votes_before_first_checkpoint() {
+fn get_votes_at_checkpoint_before_first_checkpoint() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
@@ -556,7 +554,7 @@ fn get_past_votes_before_first_checkpoint() {
 
         e.ledger().set_timestamp(2000);
         // Query before first checkpoint
-        assert_eq!(get_past_votes(&e, &bob, 500), 0);
+        assert_eq!(get_votes_at_checkpoint(&e, &bob, 500), 0);
     });
 }
 

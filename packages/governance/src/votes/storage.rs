@@ -5,19 +5,35 @@ use crate::votes::{
     VOTES_TTL_THRESHOLD,
 };
 
+// ################## ENUMS ##################
+
+/// Represents the direction of a checkpoint delta operation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CheckpointOp {
+    /// Add the delta to the previous value (e.g., minting, receiving votes).
+    Add,
+    /// Subtract the delta from the previous value (e.g., burning, losing
+    /// votes).
+    Sub,
+}
+
 // ################## TYPES ##################
 
-/// A checkpoint recording voting power at a specific timestamp.
+/// A checkpoint recording voting power at a specific timepoint.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Checkpoint {
-    /// The timestamp when this checkpoint was created
+    /// The timepoint when this checkpoint was created
     pub timestamp: u64,
-    /// The voting power at this timestamp
+    /// The voting power at this timepoint
     pub votes: u128,
 }
 
 /// Storage keys for the votes module.
+///
+/// Only delegated voting power counts as votes (i.e., only delegatees can
+/// vote), so the storage design tracks delegates and their checkpointed
+/// voting power separately from the raw voting units held by each account.
 #[derive(Clone)]
 #[contracttype]
 pub enum VotesStorageKey {
@@ -37,10 +53,12 @@ pub enum VotesStorageKey {
 
 // ################## QUERY STATE ##################
 
-/// Returns the current voting power of an account.
+/// Returns the current voting power (delegated votes) of an account.
 ///
 /// This is the total voting power delegated to this account by others
-/// (and itself if self-delegated).
+/// (and itself if self-delegated). Returns `0` if no voting power has been
+/// delegated to this account, or if the account does not exist in the
+/// contract.
 ///
 /// # Arguments
 ///
@@ -54,18 +72,22 @@ pub fn get_votes(e: &Env, account: &Address) -> u128 {
     get_checkpoint(e, account, num - 1).votes
 }
 
-/// Returns the voting power of an account at a specific past timestamp.
+/// Returns the voting power (delegated votes) of an account at a specific
+/// past timepoint.
+///
+/// Returns `0` if no voting power had been delegated to this account at the
+/// given timepoint, or if the account does not exist in the contract.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `account` - The address to query voting power for.
-/// * `timepoint` - The timestamp to query (must be in the past).
+/// * `timepoint` - The timepoint to query (must be in the past).
 ///
 /// # Errors
 ///
 /// * [`VotesError::FutureLookup`] - If `timepoint` >= current timestamp.
-pub fn get_past_votes(e: &Env, account: &Address, timepoint: u64) -> u128 {
+pub fn get_votes_at_checkpoint(e: &Env, account: &Address, timepoint: u64) -> u128 {
     if timepoint >= e.ledger().timestamp() {
         panic_with_error!(e, VotesError::FutureLookup);
     }
@@ -75,33 +97,7 @@ pub fn get_past_votes(e: &Env, account: &Address, timepoint: u64) -> u128 {
         return 0;
     }
 
-    // Check if timepoint is after the latest checkpoint
-    let latest = get_checkpoint(e, account, num - 1);
-    if latest.timestamp <= timepoint {
-        return latest.votes;
-    }
-
-    // Check if timepoint is before the first checkpoint
-    let first = get_checkpoint(e, account, 0);
-    if first.timestamp > timepoint {
-        return 0;
-    }
-
-    // Binary search
-    let mut low: u32 = 0;
-    let mut high: u32 = num - 1;
-
-    while low < high {
-        let mid = (low + high).div_ceil(2);
-        let checkpoint = get_checkpoint(e, account, mid);
-        if checkpoint.timestamp <= timepoint {
-            low = mid;
-        } else {
-            high = mid - 1;
-        }
-    }
-
-    get_checkpoint(e, account, low).votes
+    lookup_checkpoint_at(e, timepoint, num, |e, index| get_checkpoint(e, account, index))
 }
 
 /// Returns the current total supply of voting units.
@@ -117,12 +113,14 @@ pub fn get_total_supply(e: &Env) -> u128 {
     get_total_supply_checkpoint(e, num - 1).votes
 }
 
-/// Returns the total supply of voting units at a specific past timestamp.
+/// Returns the total supply of voting units at a specific past timepoint.
+///
+/// Returns `0` if there were no voting units at the given timepoint.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `timepoint` - The timestamp to query (must be in the past).
+/// * `timepoint` - The timepoint to query (must be in the past).
 ///
 /// # Errors
 ///
@@ -137,33 +135,7 @@ pub fn get_past_total_supply(e: &Env, timepoint: u64) -> u128 {
         return 0;
     }
 
-    // Check if timepoint is after the latest checkpoint
-    let latest = get_total_supply_checkpoint(e, num - 1);
-    if latest.timestamp <= timepoint {
-        return latest.votes;
-    }
-
-    // Check if timepoint is before the first checkpoint
-    let first = get_total_supply_checkpoint(e, 0);
-    if first.timestamp > timepoint {
-        return 0;
-    }
-
-    // Binary search
-    let mut low: u32 = 0;
-    let mut high: u32 = num - 1;
-
-    while low < high {
-        let mid = (low + high).div_ceil(2);
-        let checkpoint = get_total_supply_checkpoint(e, mid);
-        if checkpoint.timestamp <= timepoint {
-            low = mid;
-        } else {
-            high = mid - 1;
-        }
-    }
-
-    get_total_supply_checkpoint(e, low).votes
+    lookup_checkpoint_at(e, timepoint, num, get_total_supply_checkpoint)
 }
 
 /// Returns the delegate for an account.
@@ -240,12 +212,21 @@ pub fn get_voting_units(e: &Env, account: &Address) -> u128 {
 /// * topics - `["DelegateVotesChanged", delegate: Address]`
 /// * data - `[old_votes: u128, new_votes: u128]`
 ///
+/// # Errors
+///
+/// * [`VotesError::SameDelegate`] - If `delegatee` is already the
+///   current delegate for `account`.
+///
 /// # Notes
 ///
 /// Authorization for `account` is required.
 pub fn delegate(e: &Env, account: &Address, delegatee: &Address) {
     account.require_auth();
     let old_delegate = get_delegate(e, account);
+
+    if old_delegate.as_ref() == Some(delegatee) {
+        panic_with_error!(e, VotesError::SameDelegate);
+    }
 
     e.storage().persistent().set(&VotesStorageKey::Delegatee(account.clone()), delegatee);
 
@@ -294,7 +275,7 @@ pub fn transfer_voting_units(e: &Env, from: Option<&Address>, to: Option<&Addres
         set_voting_units(e, from_addr, new_from_units);
     } else {
         // Minting: increase total supply
-        push_total_supply_checkpoint(e, true, amount);
+        push_total_supply_checkpoint(e, CheckpointOp::Add, amount);
     }
 
     if let Some(to_addr) = to {
@@ -305,7 +286,7 @@ pub fn transfer_voting_units(e: &Env, from: Option<&Address>, to: Option<&Addres
         set_voting_units(e, to_addr, new_to_units);
     } else {
         // Burning: decrease total supply
-        push_total_supply_checkpoint(e, false, amount);
+        push_total_supply_checkpoint(e, CheckpointOp::Sub, amount);
     }
 
     move_delegate_votes(e, from_delegate.as_ref(), to_delegate.as_ref(), amount);
@@ -334,13 +315,64 @@ fn move_delegate_votes(e: &Env, from: Option<&Address>, to: Option<&Address>, am
     }
 
     if let Some(from_addr) = from {
-        let (old_votes, new_votes) = push_checkpoint(e, from_addr, false, amount);
+        let (old_votes, new_votes) = push_checkpoint(e, from_addr, CheckpointOp::Sub, amount);
         emit_delegate_votes_changed(e, from_addr, old_votes, new_votes);
     }
 
     if let Some(to_addr) = to {
-        let (old_votes, new_votes) = push_checkpoint(e, to_addr, true, amount);
+        let (old_votes, new_votes) = push_checkpoint(e, to_addr, CheckpointOp::Add, amount);
         emit_delegate_votes_changed(e, to_addr, old_votes, new_votes);
+    }
+}
+
+/// Binary search over checkpoints to find votes at a given timepoint.
+///
+/// `num` must be > 0. `get_fn` retrieves a checkpoint at the given index.
+fn lookup_checkpoint_at(
+    e: &Env,
+    timepoint: u64,
+    num: u32,
+    get_fn: impl Fn(&Env, u32) -> Checkpoint,
+) -> u128 {
+    // Check if timepoint is after the latest checkpoint
+    let latest = get_fn(e, num - 1);
+    if latest.timestamp <= timepoint {
+        return latest.votes;
+    }
+
+    // Check if timepoint is before the first checkpoint
+    let first = get_fn(e, 0);
+    if first.timestamp > timepoint {
+        return 0;
+    }
+
+    // Binary search
+    let mut low: u32 = 0;
+    let mut high: u32 = num - 1;
+
+    while low < high {
+        let mid = (low + high).div_ceil(2);
+        let checkpoint = get_fn(e, mid);
+        if checkpoint.timestamp <= timepoint {
+            low = mid;
+        } else {
+            high = mid - 1;
+        }
+    }
+
+    get_fn(e, low).votes
+}
+
+/// Applies a [`CheckpointOp`] to compute the new votes value from the
+/// previous value and a delta.
+fn apply_checkpoint_op(e: &Env, previous: u128, op: CheckpointOp, delta: u128) -> u128 {
+    match op {
+        CheckpointOp::Add => previous
+            .checked_add(delta)
+            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow)),
+        CheckpointOp::Sub => previous
+            .checked_sub(delta)
+            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow)),
     }
 }
 
@@ -355,25 +387,16 @@ fn get_checkpoint(e: &Env, account: &Address, index: u32) -> Checkpoint {
     }
 }
 
-/// Pushes a new checkpoint or updates the last one if same timestamp.
+/// Pushes a new checkpoint or updates the last one if same timepoint.
 /// Returns (previous_votes, new_votes).
-fn push_checkpoint(e: &Env, account: &Address, add: bool, delta: u128) -> (u128, u128) {
+fn push_checkpoint(e: &Env, account: &Address, op: CheckpointOp, delta: u128) -> (u128, u128) {
     let num = num_checkpoints(e, account);
     let current_timestamp = e.ledger().timestamp();
 
     let previous_votes = if num > 0 { get_checkpoint(e, account, num - 1).votes } else { 0 };
+    let votes = apply_checkpoint_op(e, previous_votes, op, delta);
 
-    let votes = if add {
-        previous_votes
-            .checked_add(delta)
-            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
-    } else {
-        previous_votes
-            .checked_sub(delta)
-            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
-    };
-
-    // Check if we can update the last checkpoint (same timestamp)
+    // Check if we can update the last checkpoint (same timepoint)
     if num > 0 {
         let last_checkpoint = get_checkpoint(e, account, num - 1);
         if last_checkpoint.timestamp == current_timestamp {
@@ -415,24 +438,15 @@ fn get_total_supply_checkpoint(e: &Env, index: u32) -> Checkpoint {
 }
 
 /// Pushes a new total supply checkpoint or updates the last one if same
-/// timestamp.
-fn push_total_supply_checkpoint(e: &Env, add: bool, delta: u128) {
+/// timepoint.
+fn push_total_supply_checkpoint(e: &Env, op: CheckpointOp, delta: u128) {
     let num = num_total_supply_checkpoints(e);
     let current_timestamp = e.ledger().timestamp();
 
     let previous_votes = if num > 0 { get_total_supply_checkpoint(e, num - 1).votes } else { 0 };
+    let votes = apply_checkpoint_op(e, previous_votes, op, delta);
 
-    let votes = if add {
-        previous_votes
-            .checked_add(delta)
-            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
-    } else {
-        previous_votes
-            .checked_sub(delta)
-            .unwrap_or_else(|| panic_with_error!(e, VotesError::MathOverflow))
-    };
-
-    // Check if we can update the last checkpoint (same timestamp)
+    // Check if we can update the last checkpoint (same timepoint)
     if num > 0 {
         let last_checkpoint = get_total_supply_checkpoint(e, num - 1);
         if last_checkpoint.timestamp == current_timestamp {

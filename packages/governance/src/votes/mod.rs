@@ -1,41 +1,37 @@
 //! # Votes Module
 //!
-//! The module tracks voting power per account with historical checkpoints,
-//! supports delegation (an account can delegate its voting power to another
-//! account), and provides historical vote queries at any past timestamp.
+//! This module provides utilities for tracking voting power per account with
+//! historical checkpoints. It supports delegation (an account can delegate its
+//! voting power to another account) and provides historical vote queries at any
+//! past timestamp.
 //!
 //! # Core Concepts
 //!
 //! - **Voting Units**: The base unit of voting power, typically 1:1 with token
 //!   balance
 //! - **Delegation**: Accounts can delegate their voting power to another
-//!   account (delegatee)
+//!   account (delegatee). **Only delegated voting power counts as votes** while
+//!   undelegated voting units are not counted. Self-delegation is required for
+//!   an account to use its own voting power.
 //! - **Checkpoints**: Historical snapshots of voting power at specific
 //!   timestamps
 //!
-//! # Design
-//!
-//! This module follows the design of OpenZeppelin's Solidity `Votes.sol`:
-//! - Voting units must be explicitly delegated to count as votes
-//! - Self-delegation is required for an account to use its own voting power
-//! - Historical vote queries use binary search over checkpoints
-//!
 //! # Usage
 //!
-//! This module provides storage functions that can be integrated into a token
-//! contract. The contract is responsible for:
-//! - Calling `transfer_voting_units` on every balance change
-//!   (mint/burn/transfer)
+//! This module is to be integrated into a token contract and is responsible
+//! for:
+//! - Overriding the transfer method to call `transfer_voting_units` on every
+//!   balance change (mint/burn/transfer), as shown in the example below
 //! - Exposing delegation functionality to users
 //!
 //! # Example
 //!
 //! ```ignore
 //! use stellar_governance::votes::{
-//!     delegate, get_votes, get_past_votes, transfer_voting_units,
+//!     delegate, get_votes, get_votes_at_checkpoint, transfer_voting_units,
 //! };
 //!
-//! // In your token contract transfer:
+//! // Override your token contract's transfer to update voting units:
 //! pub fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
 //!     // ... perform transfer logic ...
 //!     transfer_voting_units(e, Some(&from), Some(&to), amount as u128);
@@ -55,8 +51,9 @@ mod test;
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env};
 
 pub use crate::votes::storage::{
-    delegate, get_delegate, get_past_total_supply, get_past_votes, get_total_supply, get_votes,
-    get_voting_units, num_checkpoints, transfer_voting_units, Checkpoint, VotesStorageKey,
+    delegate, get_delegate, get_past_total_supply, get_total_supply, get_votes,
+    get_votes_at_checkpoint, get_voting_units, num_checkpoints, transfer_voting_units, Checkpoint,
+    VotesStorageKey,
 };
 
 /// Trait for contracts that support vote tracking with delegation.
@@ -72,7 +69,10 @@ pub use crate::votes::storage::{
 /// - Expose `delegate` functionality to users
 #[contracttrait]
 pub trait Votes {
-    /// Returns the current voting power of an account.
+    /// Returns the current voting power (delegated votes) of an account.
+    ///
+    /// Returns `0` if the account has no delegated voting power or does not
+    /// exist in the contract.
     ///
     /// # Arguments
     ///
@@ -82,7 +82,11 @@ pub trait Votes {
         get_votes(e, &account)
     }
 
-    /// Returns the voting power of an account at a specific past timestamp.
+    /// Returns the voting power (delegated votes) of an account at a specific
+    /// past timestamp.
+    ///
+    /// Returns `0` if the account had no delegated voting power at the given
+    /// timepoint or does not exist in the contract.
     ///
     /// # Arguments
     ///
@@ -93,11 +97,16 @@ pub trait Votes {
     /// # Errors
     ///
     /// * [`VotesError::FutureLookup`] - If `timepoint` >= current timestamp.
-    fn get_past_votes(e: &Env, account: Address, timepoint: u64) -> u128 {
-        get_past_votes(e, &account, timepoint)
+    fn get_votes_at_checkpoint(e: &Env, account: Address, timepoint: u64) -> u128 {
+        get_votes_at_checkpoint(e, &account, timepoint)
     }
 
     /// Returns the total supply of voting units at a specific past timestamp.
+    ///
+    /// This tracks all voting units in circulation (regardless of delegation
+    /// status), not just delegated votes.
+    ///
+    /// Returns `0` if there were no voting units at the given timepoint.
     ///
     /// # Arguments
     ///
@@ -162,6 +171,8 @@ pub enum VotesError {
     MathOverflow = 4101,
     /// Attempting to transfer more voting units than available
     InsufficientVotingUnits = 4102,
+    /// Attempting to delegate to the same delegate that is already set
+    SameDelegate = 4103,
 }
 
 // ################## CONSTANTS ##################

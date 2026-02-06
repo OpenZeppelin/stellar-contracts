@@ -28,6 +28,7 @@ The `votes` module provides vote tracking functionality with delegation and hist
 - Support delegation (an account can delegate its voting power to another account)
 - Provide historical vote queries at any past timestamp
 - Explicit delegation required (accounts must self-delegate to use their own voting power)
+- Non-delegated voting units are not counted as votes
 
 ### Timelock
 
