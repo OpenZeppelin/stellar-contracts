@@ -11,7 +11,8 @@ mod implementation {
     use std::collections::HashSet;
 
     use soroban_sdk::{
-        symbol_short, testutils::Events, Address, Env, IntoVal, Map, Symbol, Val, Vec,
+        symbol_short, testutils::Events, xdr, Address, Env, FromVal, IntoVal, Map, Symbol,
+        TryFromVal, Val,
     };
 
     pub struct EventAssertion<'a> {
@@ -25,7 +26,58 @@ mod implementation {
             Self { env, contract, processed_events: HashSet::new() }
         }
 
-        fn find_event_by_symbol(&mut self, symbol_name: &str) -> Option<(Address, Vec<Val>, Val)> {
+        fn expect_event(&mut self, symbol_name: &str, missing_message: &str) -> xdr::ContractEvent {
+            self.find_event_by_symbol(symbol_name).expect(missing_message)
+        }
+
+        fn assert_event_contract(&self, event: &xdr::ContractEvent) {
+            assert_eq!(event.contract_id, Some(self.contract_id()), "Event from wrong contract");
+        }
+
+        fn contract_id(&self) -> xdr::ContractId {
+            match xdr::ScAddress::from(&self.contract) {
+                xdr::ScAddress::Contract(contract_id) => contract_id,
+                _ => panic!("expected contract address"),
+            }
+        }
+
+        fn event_topics_data<'b>(
+            &self,
+            event: &'b xdr::ContractEvent,
+        ) -> (&'b xdr::VecM<xdr::ScVal>, &'b xdr::ScVal) {
+            match &event.body {
+                xdr::ContractEventBody::V0(body) => (&body.topics, &body.data),
+            }
+        }
+
+        fn topic_as<T: FromVal<Env, xdr::ScVal>>(
+            &self,
+            topics: &xdr::VecM<xdr::ScVal>,
+            index: usize,
+        ) -> T {
+            T::from_val(self.env, topics.get(index).unwrap())
+        }
+
+        fn topic_as_val<T: FromVal<Env, Val>>(
+            &self,
+            topics: &xdr::VecM<xdr::ScVal>,
+            index: usize,
+        ) -> T {
+            let val = Val::try_from_val(self.env, topics.get(index).unwrap()).unwrap();
+            T::from_val(self.env, &val)
+        }
+
+        fn assert_topic_symbol(
+            &self,
+            topics: &xdr::VecM<xdr::ScVal>,
+            index: usize,
+            expected: Symbol,
+        ) {
+            let topic_symbol: Symbol = self.topic_as(topics, index);
+            assert_eq!(topic_symbol, expected);
+        }
+
+        fn find_event_by_symbol(&mut self, symbol_name: &str) -> Option<xdr::ContractEvent> {
             let events = self.env.events().all();
 
             let target_symbol = match symbol_name {
@@ -36,23 +88,21 @@ mod implementation {
                 _ => Symbol::new(self.env, symbol_name),
             };
 
-            for (index, event) in events.iter().enumerate() {
+            for (index, event) in events.events().iter().enumerate() {
                 let index_u32 = index as u32;
 
                 if self.processed_events.contains(&index_u32) {
                     continue;
                 }
 
-                let (contract, topics, data) = event;
+                let (topics, _data) = self.event_topics_data(event);
 
-                let topics_clone = topics.clone();
-
-                if let Some(first_topic) = topics_clone.first() {
-                    let topic_symbol: Symbol = first_topic.into_val(self.env);
+                if let Some(first_topic) = topics.first() {
+                    let topic_symbol: Symbol = Symbol::from_val(self.env, first_topic);
 
                     if topic_symbol == target_symbol {
                         self.processed_events.insert(index_u32);
-                        return Some((contract.clone(), topics_clone, data));
+                        return Some(event.clone());
                     }
                 }
             }
@@ -66,23 +116,18 @@ mod implementation {
             muxed_id: Option<u64>,
             amount: i128,
         ) {
-            let transfer_event = self.find_event_by_symbol("transfer");
+            let event = self.expect_event("transfer", "Transfer event not found in event log");
+            self.assert_event_contract(&event);
 
-            assert!(transfer_event.is_some(), "Transfer event not found in event log");
-
-            let (contract, topics, data) = transfer_event.unwrap();
-            assert_eq!(contract, self.contract, "Event from wrong contract");
-
-            let topics: Vec<Val> = topics.clone();
+            let (topics, data) = self.event_topics_data(&event);
             assert_eq!(topics.len(), 3, "Transfer event should have 3 topics");
 
-            let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-            assert_eq!(topic_symbol, symbol_short!("transfer"));
+            self.assert_topic_symbol(topics, 0, symbol_short!("transfer"));
 
-            let event_from: Address = topics.get_unchecked(1).into_val(self.env);
-            let event_to: Address = topics.get_unchecked(2).into_val(self.env);
+            let event_from: Address = self.topic_as(topics, 1);
+            let event_to: Address = self.topic_as(topics, 2);
 
-            let data_map: Map<Symbol, Val> = data.into_val(self.env);
+            let data_map: Map<Symbol, Val> = Map::from_val(self.env, data);
             let event_amount: i128 =
                 data_map.get(symbol_short!("amount")).unwrap().into_val(self.env);
             let event_muxed_id: Option<u64> =
@@ -100,23 +145,18 @@ mod implementation {
             to: &Address,
             token_id: u32,
         ) {
-            let transfer_event = self.find_event_by_symbol("transfer");
+            let event = self.expect_event("transfer", "Transfer event not found in event log");
+            self.assert_event_contract(&event);
 
-            assert!(transfer_event.is_some(), "Transfer event not found in event log");
-
-            let (contract, topics, data) = transfer_event.unwrap();
-            assert_eq!(contract, self.contract, "Event from wrong contract");
-
-            let topics: Vec<Val> = topics.clone();
+            let (topics, data) = self.event_topics_data(&event);
             assert_eq!(topics.len(), 3, "Transfer event should have 3 topics");
 
-            let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-            assert_eq!(topic_symbol, symbol_short!("transfer"));
+            self.assert_topic_symbol(topics, 0, symbol_short!("transfer"));
 
-            let event_from: Address = topics.get_unchecked(1).into_val(self.env);
-            let event_to: Address = topics.get_unchecked(2).into_val(self.env);
+            let event_from: Address = self.topic_as(topics, 1);
+            let event_to: Address = self.topic_as(topics, 2);
 
-            let data_map: Map<Symbol, u32> = data.into_val(self.env);
+            let data_map: Map<Symbol, u32> = Map::from_val(self.env, data);
             let event_token_id = data_map.get(Symbol::new(self.env, "token_id")).unwrap();
 
             assert_eq!(&event_from, from, "Transfer event has wrong from address");
@@ -125,22 +165,17 @@ mod implementation {
         }
 
         pub fn assert_fungible_mint(&mut self, to: &Address, amount: i128) {
-            let mint_event = self.find_event_by_symbol("mint");
+            let event = self.expect_event("mint", "Mint event not found in event log");
+            self.assert_event_contract(&event);
 
-            assert!(mint_event.is_some(), "Mint event not found in event log");
-
-            let (contract, topics, data) = mint_event.unwrap();
-            assert_eq!(contract, self.contract, "Event from wrong contract");
-
-            let topics: Vec<Val> = topics.clone();
+            let (topics, data) = self.event_topics_data(&event);
             assert_eq!(topics.len(), 2, "Mint event should have 2 topics");
 
-            let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-            assert_eq!(topic_symbol, symbol_short!("mint"));
+            self.assert_topic_symbol(topics, 0, symbol_short!("mint"));
 
-            let event_to: Address = topics.get_unchecked(1).into_val(self.env);
+            let event_to: Address = self.topic_as(topics, 1);
 
-            let data_map: Map<Symbol, i128> = data.into_val(self.env);
+            let data_map: Map<Symbol, i128> = Map::from_val(self.env, data);
             let event_amount = data_map.get(Symbol::new(self.env, "amount")).unwrap();
 
             assert_eq!(&event_to, to, "Mint event has wrong to address");
@@ -148,22 +183,17 @@ mod implementation {
         }
 
         pub fn assert_non_fungible_mint(&mut self, to: &Address, token_id: u32) {
-            let mint_event = self.find_event_by_symbol("mint");
+            let event = self.expect_event("mint", "Mint event not found in event log");
+            self.assert_event_contract(&event);
 
-            assert!(mint_event.is_some(), "Mint event not found in event log");
-
-            let (contract, topics, data) = mint_event.unwrap();
-            assert_eq!(contract, self.contract, "Event from wrong contract");
-
-            let topics: Vec<Val> = topics.clone();
+            let (topics, data) = self.event_topics_data(&event);
             assert_eq!(topics.len(), 2, "Mint event should have 2 topics");
 
-            let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-            assert_eq!(topic_symbol, symbol_short!("mint"));
+            self.assert_topic_symbol(topics, 0, symbol_short!("mint"));
 
-            let event_to: Address = topics.get_unchecked(1).into_val(self.env);
+            let event_to: Address = self.topic_as(topics, 1);
 
-            let data_map: Map<Symbol, u32> = data.into_val(self.env);
+            let data_map: Map<Symbol, u32> = Map::from_val(self.env, data);
             let event_token_id = data_map.get(Symbol::new(self.env, "token_id")).unwrap();
 
             assert_eq!(&event_to, to, "Mint event has wrong to address");
@@ -171,22 +201,17 @@ mod implementation {
         }
 
         pub fn assert_fungible_burn(&mut self, from: &Address, amount: i128) {
-            let burn_event = self.find_event_by_symbol("burn");
+            let event = self.expect_event("burn", "Burn event not found in event log");
+            self.assert_event_contract(&event);
 
-            assert!(burn_event.is_some(), "Burn event not found in event log");
-
-            let (contract, topics, data) = burn_event.unwrap();
-            assert_eq!(contract, self.contract, "Event from wrong contract");
-
-            let topics: Vec<Val> = topics.clone();
+            let (topics, data) = self.event_topics_data(&event);
             assert_eq!(topics.len(), 2, "Burn event should have 2 topics");
 
-            let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-            assert_eq!(topic_symbol, symbol_short!("burn"));
+            self.assert_topic_symbol(topics, 0, symbol_short!("burn"));
 
-            let event_from: Address = topics.get_unchecked(1).into_val(self.env);
+            let event_from: Address = self.topic_as(topics, 1);
 
-            let data_map: Map<Symbol, i128> = data.into_val(self.env);
+            let data_map: Map<Symbol, i128> = Map::from_val(self.env, data);
             let event_amount = data_map.get(Symbol::new(self.env, "amount")).unwrap();
 
             assert_eq!(&event_from, from, "Burn event has wrong from address");
@@ -194,22 +219,17 @@ mod implementation {
         }
 
         pub fn assert_non_fungible_burn(&mut self, from: &Address, token_id: u32) {
-            let burn_event = self.find_event_by_symbol("burn");
+            let event = self.expect_event("burn", "Burn event not found in event log");
+            self.assert_event_contract(&event);
 
-            assert!(burn_event.is_some(), "Burn event not found in event log");
-
-            let (contract, topics, data) = burn_event.unwrap();
-            assert_eq!(contract, self.contract, "Event from wrong contract");
-
-            let topics: Vec<Val> = topics.clone();
+            let (topics, data) = self.event_topics_data(&event);
             assert_eq!(topics.len(), 2, "Burn event should have 2 topics");
 
-            let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-            assert_eq!(topic_symbol, symbol_short!("burn"));
+            self.assert_topic_symbol(topics, 0, symbol_short!("burn"));
 
-            let event_from: Address = topics.get_unchecked(1).into_val(self.env);
+            let event_from: Address = self.topic_as(topics, 1);
 
-            let data_map: Map<Symbol, u32> = data.into_val(self.env);
+            let data_map: Map<Symbol, u32> = Map::from_val(self.env, data);
             let event_token_id = data_map.get(Symbol::new(self.env, "token_id")).unwrap();
 
             assert_eq!(&event_from, from, "Burn event has wrong from address");
@@ -218,12 +238,11 @@ mod implementation {
 
         pub fn assert_event_count(&self, expected: usize) {
             let events = self.env.events().all();
+            let event_count = events.events().len();
             assert_eq!(
-                events.len() as usize,
-                expected,
+                event_count, expected,
                 "Expected {} events, found {}",
-                expected,
-                events.len()
+                expected, event_count
             );
         }
 
@@ -234,36 +253,30 @@ mod implementation {
             amount: i128,
             live_until_ledger: u32,
         ) {
-            let approve_event = self.find_event_by_symbol("approve");
+            let event = self.expect_event("approve", "Approve event not found in event log");
+            self.assert_event_contract(&event);
 
-            assert!(approve_event.is_some(), "Approve event not found in event log");
-
-            let (contract, topics, data) = approve_event.unwrap();
-            assert_eq!(contract, self.contract, "Event from wrong contract");
-
-            let topics: Vec<Val> = topics.clone();
+            let (topics, data) = self.event_topics_data(&event);
             assert_eq!(topics.len(), 3, "Approve event should have 3 topics");
 
-            let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-            assert_eq!(topic_symbol, symbol_short!("approve"));
+            self.assert_topic_symbol(topics, 0, symbol_short!("approve"));
 
-            let event_owner: Address = topics.get_unchecked(1).into_val(self.env);
-            let event_spender: Address = topics.get_unchecked(2).into_val(self.env);
+            let event_owner: Address = self.topic_as(topics, 1);
+            let event_spender: Address = self.topic_as(topics, 2);
 
-            let data_map: Map<Symbol, Val> = data.into_val(self.env);
+            let data_map: Map<Symbol, Val> = Map::from_val(self.env, data);
             let event_amount: i128 =
                 data_map.get(Symbol::new(self.env, "amount")).unwrap().into_val(self.env);
             let event_live_until_ledger: u32 = data_map
                 .get(Symbol::new(self.env, "live_until_ledger"))
                 .unwrap()
                 .into_val(self.env);
-            let event_data = (event_amount, event_live_until_ledger);
 
             assert_eq!(&event_owner, owner, "Approve event has wrong owner address");
             assert_eq!(&event_spender, spender, "Approve event has wrong spender address");
-            assert_eq!(event_data.0, amount, "Approve event has wrong amount");
+            assert_eq!(event_amount, amount, "Approve event has wrong amount");
             assert_eq!(
-                event_data.1, live_until_ledger,
+                event_live_until_ledger, live_until_ledger,
                 "Approve event has wrong live_until_ledger"
             );
         }
@@ -275,23 +288,18 @@ mod implementation {
             token_id: u32,
             live_until_ledger: u32,
         ) {
-            let approve_event = self.find_event_by_symbol("approve");
+            let event = self.expect_event("approve", "Approve event not found in event log");
+            self.assert_event_contract(&event);
 
-            assert!(approve_event.is_some(), "Approve event not found in event log");
-
-            let (contract, topics, data) = approve_event.unwrap();
-            assert_eq!(contract, self.contract, "Event from wrong contract");
-
-            let topics: Vec<Val> = topics.clone();
+            let (topics, data) = self.event_topics_data(&event);
             assert_eq!(topics.len(), 3, "Approve event should have 3 topics");
 
-            let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-            assert_eq!(topic_symbol, symbol_short!("approve"));
+            self.assert_topic_symbol(topics, 0, symbol_short!("approve"));
 
-            let event_owner: Address = topics.get_unchecked(1).into_val(self.env);
-            let event_token_id: u32 = topics.get_unchecked(2).into_val(self.env);
+            let event_owner: Address = self.topic_as(topics, 1);
+            let event_token_id: u32 = self.topic_as_val(topics, 2);
 
-            let data_map: Map<Symbol, Val> = data.into_val(self.env);
+            let data_map: Map<Symbol, Val> = Map::from_val(self.env, data);
             let event_approved: Address =
                 data_map.get(Symbol::new(self.env, "approved")).unwrap().into_val(self.env);
             let event_live_until_ledger: u32 = data_map
@@ -314,22 +322,18 @@ mod implementation {
             operator: &Address,
             live_until_ledger: u32,
         ) {
-            let approve_event = self.find_event_by_symbol("approve_for_all");
+            let event =
+                self.expect_event("approve_for_all", "ApproveForAll event not found in event log");
+            self.assert_event_contract(&event);
 
-            assert!(approve_event.is_some(), "ApproveForAll event not found in event log");
-
-            let (contract, topics, data) = approve_event.unwrap();
-            assert_eq!(contract, self.contract, "Event from wrong contract");
-
-            let topics: Vec<Val> = topics.clone();
+            let (topics, data) = self.event_topics_data(&event);
             assert_eq!(topics.len(), 2, "ApproveForAll event should have 2 topics");
 
-            let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-            assert_eq!(topic_symbol, Symbol::new(self.env, "approve_for_all"));
+            self.assert_topic_symbol(topics, 0, Symbol::new(self.env, "approve_for_all"));
 
-            let event_owner: Address = topics.get_unchecked(1).into_val(self.env);
+            let event_owner: Address = self.topic_as(topics, 1);
 
-            let data_map: Map<Symbol, Val> = data.into_val(self.env);
+            let data_map: Map<Symbol, Val> = Map::from_val(self.env, data);
             let event_operator: Address =
                 data_map.get(Symbol::new(self.env, "operator")).unwrap().into_val(self.env);
             let event_live_until_ledger: u32 = data_map
@@ -346,29 +350,24 @@ mod implementation {
         }
 
         pub fn assert_consecutive_mint(&mut self, to: &Address, from_id: u32, to_id: u32) {
-            let event = self.find_event_by_symbol("consecutive_mint");
+            let event = self
+                .expect_event("consecutive_mint", "ConsecutiveMint event not found in event log");
+            self.assert_event_contract(&event);
 
-            assert!(event.is_some(), "ConsecutiveMint event not found in event log");
-
-            let (contract, topics, data) = event.unwrap();
-            assert_eq!(contract, self.contract, "Event from wrong contract");
-
-            let topics: Vec<Val> = topics.clone();
+            let (topics, data) = self.event_topics_data(&event);
             assert_eq!(topics.len(), 2, "ConsecutiveMint event should have 2 topics");
 
-            let topic_symbol: Symbol = topics.get_unchecked(0).into_val(self.env);
-            assert_eq!(topic_symbol, Symbol::new(self.env, "consecutive_mint"));
+            self.assert_topic_symbol(topics, 0, Symbol::new(self.env, "consecutive_mint"));
 
-            let event_to: Address = topics.get_unchecked(1).into_val(self.env);
+            let event_to: Address = self.topic_as(topics, 1);
 
-            let data_map: Map<Symbol, u32> = data.into_val(self.env);
+            let data_map: Map<Symbol, u32> = Map::from_val(self.env, data);
             let from_token_id_val = data_map.get(Symbol::new(self.env, "from_token_id")).unwrap();
             let to_token_id_val = data_map.get(Symbol::new(self.env, "to_token_id")).unwrap();
-            let event_data = (from_token_id_val, to_token_id_val);
 
             assert_eq!(&event_to, to, "ConsecutiveMint event has wrong to address");
-            assert_eq!(event_data.0, from_id, "ConsecutiveMint event has wrong from_token_id");
-            assert_eq!(event_data.1, to_id, "ConsecutiveMint event has wrong to_token_id");
+            assert_eq!(from_token_id_val, from_id, "ConsecutiveMint event has wrong from_token_id");
+            assert_eq!(to_token_id_val, to_id, "ConsecutiveMint event has wrong to_token_id");
         }
     }
 }
