@@ -24,14 +24,10 @@ pub enum GovernorStorageKey {
     VotingDelay,
     /// The voting period in ledgers.
     VotingPeriod,
-    /// The proposal threshold.
+    /// Minimum voting power required to propose.
     ProposalThreshold,
-    /// The quorum numerator (percentage out of 100).
-    QuorumNumerator,
     /// Proposal data indexed by proposal ID.
     Proposal(BytesN<32>),
-    /// Vote receipt for a specific voter and proposal.
-    VoteReceipt(BytesN<32>, Address),
 }
 
 // ################## STORAGE TYPES ##################
@@ -46,34 +42,8 @@ pub struct ProposalCore {
     pub vote_start: u32,
     /// The ledger number when voting ends.
     pub vote_end: u32,
-    /// Whether the proposal has been executed.
-    pub executed: bool,
-    /// Whether the proposal has been cancelled.
-    pub cancelled: bool,
-}
-
-/// Vote tallies for a proposal.
-#[derive(Clone)]
-#[contracttype]
-pub struct ProposalVotes {
-    /// Votes in favor.
-    pub for_votes: u128,
-    /// Votes against.
-    pub against_votes: u128,
-    /// Abstain votes.
-    pub abstain_votes: u128,
-}
-
-/// Receipt of a vote cast by a voter.
-#[derive(Clone)]
-#[contracttype]
-pub struct VoteReceipt {
-    /// Whether the voter has voted.
-    pub has_voted: bool,
-    /// The type of vote cast.
-    pub vote_type: u32,
-    /// The voting power used.
-    pub votes: u128,
+    /// The current state of the proposal.
+    pub state: ProposalState,
 }
 
 // ################## QUERY_STATE ##################
@@ -161,23 +131,6 @@ pub fn get_voting_period(e: &Env) -> u32 {
         .unwrap_or_else(|| panic_with_error!(e, GovernorError::VotingPeriodNotSet))
 }
 
-/// Returns the quorum numerator (percentage out of 100).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Errors
-///
-/// * [`GovernorError::QuorumNotSet`] - Occurs if the quorum numerator has not
-///   been set.
-pub fn get_quorum_numerator(e: &Env) -> u32 {
-    e.storage()
-        .instance()
-        .get(&GovernorStorageKey::QuorumNumerator)
-        .unwrap_or_else(|| panic_with_error!(e, GovernorError::QuorumNotSet))
-}
-
 /// Returns the core proposal data.
 ///
 /// # Arguments
@@ -209,15 +162,22 @@ pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
 ///   exist.
 pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState {
     let core = get_proposal_core(e, proposal_id);
+
+    // Terminal and override states take precedence.
+    // These states are set explicitly by the Governor or its extensions
+    // (e.g., TimelockControl sets Queued/Expired, Counting sets Succeeded).
+    match core.state {
+        ProposalState::Executed
+        | ProposalState::Canceled
+        | ProposalState::Succeeded
+        | ProposalState::Queued
+        | ProposalState::Expired => return core.state,
+        _ => {}
+    }
+
+    // The time-based states (Pending, Active, Defeated) depend on the current
+    // ledger relative to vote_start/vote_end.
     let current_ledger = e.ledger().sequence();
-
-    if core.executed {
-        return ProposalState::Executed;
-    }
-
-    if core.cancelled {
-        return ProposalState::Canceled;
-    }
 
     if current_ledger < core.vote_start {
         return ProposalState::Pending;
@@ -227,7 +187,7 @@ pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState {
         return ProposalState::Active;
     }
 
-    // Voting has ended - determine if succeeded or defeated
+    // Voting has ended without being marked as Succeeded
     ProposalState::Defeated
 }
 
@@ -277,22 +237,6 @@ pub fn get_proposal_deadline(e: &Env, proposal_id: &BytesN<32>) -> u32 {
 pub fn get_proposal_proposer(e: &Env, proposal_id: &BytesN<32>) -> Address {
     let core = get_proposal_core(e, proposal_id);
     core.proposer
-}
-
-/// Returns whether an account has voted on a proposal.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `proposal_id` - The unique identifier of the proposal.
-/// * `account` - The address to check.
-pub fn has_voted(e: &Env, proposal_id: &BytesN<32>, account: &Address) -> bool {
-    let key = GovernorStorageKey::VoteReceipt(proposal_id.clone(), account.clone());
-    e.storage()
-        .persistent()
-        .get::<_, VoteReceipt>(&key)
-        .map(|receipt| receipt.has_voted)
-        .unwrap_or(false)
 }
 
 // ################## CHANGE STATE ##################
@@ -407,29 +351,6 @@ pub fn set_voting_period(e: &Env, period: u32) {
     e.storage().instance().set(&GovernorStorageKey::VotingPeriod, &period);
 }
 
-/// Sets the quorum numerator (percentage out of 100).
-///
-/// The numerator value is not validated here. It is the responsibility of
-/// the implementer to ensure that the quorum is reasonable (e.g., not 0
-/// which would allow proposals to pass with no votes, and not over 100
-/// which would make proposals impossible to pass).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `numerator` - The quorum percentage (e.g., 10 for 10%).
-///
-/// # Security Warning
-///
-/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
-///
-/// It is the responsibility of the implementer to establish appropriate
-/// access controls to ensure that only authorized accounts can call this
-/// function.
-pub fn set_quorum_numerator(e: &Env, numerator: u32) {
-    e.storage().instance().set(&GovernorStorageKey::QuorumNumerator, &numerator);
-}
-
 /// Creates a new proposal and returns its unique identifier (proposal ID).
 ///
 /// # Arguments
@@ -504,8 +425,7 @@ pub fn propose(
         proposer: proposer.clone(),
         vote_start,
         vote_end,
-        executed: false,
-        cancelled: false,
+        state: ProposalState::Pending,
     };
     e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
 
@@ -525,59 +445,29 @@ pub fn propose(
     proposal_id
 }
 
-/// Casts a vote on a proposal and returns the voter's voting weight.
+/// Prepares a vote by authorizing the voter, verifying the proposal is active,
+/// and returning the proposal snapshot ledger for voting power lookup.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `voter` - The address casting the vote.
 /// * `proposal_id` - The unique identifier of the proposal.
-/// * `vote_type` - The type of vote (interpretation depends on counting
-///   module).
-/// * `voter_weight` - The voting power of the voter at the proposal snapshot.
-/// * `reason` - An optional explanation for the vote.
 ///
 /// # Errors
 ///
 /// * [`GovernorError::ProposalNotActive`] - Occurs if the proposal is not in
 ///   the active state.
-/// * [`GovernorError::AlreadyVoted`] - Occurs if the voter has already voted on
-///   this proposal.
 /// * refer to [`get_proposal_state()`] errors.
-pub fn cast_vote(
-    e: &Env,
-    voter: &Address,
-    proposal_id: &BytesN<32>,
-    vote_type: u32,
-    voter_weight: u128,
-    reason: String,
-) -> u128 {
-    // Require authorization from the voter
+pub fn prepare_vote(e: &Env, voter: &Address, proposal_id: &BytesN<32>) -> u32 {
     voter.require_auth();
 
-    // Check proposal is active
     let state = get_proposal_state(e, proposal_id);
     if state != ProposalState::Active {
         panic_with_error!(e, GovernorError::ProposalNotActive);
     }
 
-    // Check voter hasn't already voted
-    let receipt_key = GovernorStorageKey::VoteReceipt(proposal_id.clone(), voter.clone());
-    if e.storage().persistent().has(&receipt_key) {
-        let existing: VoteReceipt = e.storage().persistent().get(&receipt_key).unwrap();
-        if existing.has_voted {
-            panic_with_error!(e, GovernorError::AlreadyVoted);
-        }
-    }
-
-    // Record the vote
-    let receipt = VoteReceipt { has_voted: true, vote_type, votes: voter_weight };
-    e.storage().persistent().set(&receipt_key, &receipt);
-
-    // Emit event
-    crate::governor::emit_vote_cast(e, voter, proposal_id, vote_type, voter_weight, &reason);
-
-    voter_weight
+    get_proposal_snapshot(e, proposal_id)
 }
 
 /// Executes a successful proposal and returns its unique identifier (proposal
@@ -617,11 +507,6 @@ pub fn execute(
         panic_with_error!(e, GovernorError::ProposalNotSuccessful);
     }
 
-    // Mark as executed
-    let mut proposal = get_proposal_core(e, &proposal_id);
-    proposal.executed = true;
-    e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
-
     // Execute each action
     for i in 0..targets.len() {
         let target = targets.get(i).unwrap();
@@ -629,6 +514,11 @@ pub fn execute(
         let func_args = args.get(i).unwrap();
         e.invoke_contract::<Val>(&target, &function, func_args);
     }
+
+    // Mark as executed
+    let mut proposal = get_proposal_core(e, &proposal_id);
+    proposal.state = ProposalState::Executed;
+    e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
 
     // Emit event
     crate::governor::emit_proposal_executed(e, &proposal_id);
@@ -650,11 +540,10 @@ pub fn execute(
 ///
 /// # Errors
 ///
-/// * [`GovernorError::ProposalNotFound`] - Occurs if the proposal does not
-///   exist.
-/// * [`GovernorError::ProposalAlreadyExecuted`] - Occurs if the proposal has
-///   already been executed.
+/// * [`GovernorError::ProposalNotCancellable`] - Occurs if the proposal is not
+///   in a cancellable state (Pending, Active, or Succeeded).
 /// * refer to [`get_proposal_core()`] errors.
+/// * refer to [`get_proposal_state()`] errors.
 pub fn cancel(
     e: &Env,
     targets: Vec<Address>,
@@ -670,13 +559,15 @@ pub fn cancel(
     // Only proposer can cancel
     proposal.proposer.require_auth();
 
-    // Cannot cancel if already executed
-    if proposal.executed {
-        panic_with_error!(e, GovernorError::ProposalAlreadyExecuted);
+    // Can only cancel proposals that haven't reached a terminal state
+    let state = get_proposal_state(e, &proposal_id);
+    match state {
+        ProposalState::Pending | ProposalState::Active | ProposalState::Succeeded => {}
+        _ => panic_with_error!(e, GovernorError::ProposalNotCancellable),
     }
 
     // Mark as cancelled
-    proposal.cancelled = true;
+    proposal.state = ProposalState::Canceled;
     e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
 
     // Emit event

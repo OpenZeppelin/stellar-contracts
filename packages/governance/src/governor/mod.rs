@@ -21,6 +21,11 @@
 //!   this library as a default implementation. // TODO: hyperlink the Votes
 //!   trait here, and revise the paragraph accordingly.
 //!
+//! - *Counting*: Governor trait does not define how votes are counted or how
+//!   quorum is determined. A separate Counting trait defines the counting mode,
+//!   quorum logic, and vote recording. // TODO: hyperlink the Counting trait
+//!   here, and revise the paragraph accordingly.
+//!
 //! The following optional extensions are available:
 //!
 //! - *GovernorSettings* provides configurable parameters like voting delay,
@@ -28,8 +33,6 @@
 //! - *TimelockControl* enables the optional `Queue` step in execution. It
 //!   integrates the Governor Contract with the Timelock Contract for delayed
 //!   execution (queue step before execute).
-//! - *Quorum* manages how many votes are required to pass a proposal. Can
-//!   introduce complex computation such as fractional quorum, etc.
 //!
 //! ## Governance Flow
 //!
@@ -86,8 +89,8 @@
 //!
 //! ### Mitigation
 //!
-//! - **Quorum requirements** ([`get_quorum_numerator()`]) ensure a minimum
-//!   percentage of total voting supply participates in each proposal
+//! - **Quorum requirements** (defined by the [`Counting`] trait) ensure a
+//!   minimum percentage of total voting supply participates in each proposal
 //! - **Voting delay** ([`get_voting_delay()`]) gives token holders time to
 //!   acquire more tokens or delegate before voting starts
 
@@ -107,6 +110,16 @@ pub trait Votes {
     fn get_past_total_supply(e: &Env, ledger: u32) -> u128;
 }
 
+/// TODO: delete this after Counting PR is merged
+pub trait Counting {
+    fn counting_mode(e: &Env) -> Symbol;
+    fn has_voted(e: &Env, proposal_id: BytesN<32>, account: Address) -> bool;
+    fn quorum(e: &Env, ledger: u32) -> u128;
+    fn quorum_reached(e: &Env, proposal_id: BytesN<32>) -> bool;
+    fn vote_succeeded(e: &Env, proposal_id: BytesN<32>) -> bool;
+    fn count_vote(e: &Env, proposal_id: BytesN<32>, account: Address, vote_type: u32, weight: u128);
+}
+
 /// Base Governor Trait
 ///
 /// The `Governor` trait defines the core functionality for on-chain governance.
@@ -114,9 +127,9 @@ pub trait Votes {
 /// executing approved actions.
 ///
 /// The contract that implements this trait is expected to implement [`Votes`]
-/// trait.
+/// and [`Counting`] traits.
 #[contracttrait]
-pub trait Governor: Votes {
+pub trait Governor: Votes + Counting {
     /// Returns the name of the governor.
     ///
     /// # Arguments
@@ -248,17 +261,6 @@ pub trait Governor: Votes {
         storage::get_proposal_proposer(e, &proposal_id)
     }
 
-    /// Returns whether an account has voted on a proposal.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `proposal_id` - The unique identifier of the proposal.
-    /// * `account` - The address to check.
-    fn has_voted(e: &Env, proposal_id: BytesN<32>, account: Address) -> bool {
-        storage::has_voted(e, &proposal_id, &account)
-    }
-
     /// Returns the proposal ID computed from the proposal details.
     ///
     /// The proposal ID is a deterministic keccak256 hash of the targets,
@@ -348,9 +350,6 @@ pub trait Governor: Votes {
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
     /// * [`GovernorError::ProposalNotActive`] - If voting is not currently
     ///   open.
-    /// * [`GovernorError::AlreadyVoted`] - If the voter has already voted.
-    /// * [`GovernorError::InvalidVoteType`] - If the vote type is not valid for
-    ///   the counting module.
     ///
     /// # Events
     ///
@@ -363,9 +362,11 @@ pub trait Governor: Votes {
         vote_type: u32,
         reason: String,
     ) -> u128 {
-        let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
+        let snapshot = storage::prepare_vote(e, &voter, &proposal_id);
         let voter_weight = Self::get_past_votes(e, voter.clone(), snapshot);
-        storage::cast_vote(e, &voter, &proposal_id, vote_type, voter_weight, reason)
+        Self::count_vote(e, proposal_id.clone(), voter.clone(), vote_type, voter_weight);
+        crate::governor::emit_vote_cast(e, &voter, &proposal_id, vote_type, voter_weight, &reason);
+        voter_weight
     }
 
     /// Executes a proposal and returns its unique identifier.
@@ -400,7 +401,7 @@ pub trait Governor: Votes {
         description_hash: BytesN<32>,
     ) -> BytesN<32> {
         storage::execute(e, targets, functions, args, &description_hash)
-    } // TODO: shouldn't this get the proposal id instead?
+    }
 
     /// Cancels a proposal and returns its unique identifier.
     ///
@@ -417,8 +418,8 @@ pub trait Governor: Votes {
     /// # Errors
     ///
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
-    /// * [`GovernorError::ProposalAlreadyExecuted`] - If the proposal has
-    ///   already been executed.
+    /// * [`GovernorError::ProposalNotCancellable`] - If the proposal is not in
+    ///   a cancellable state (Pending, Active, or Succeeded).
     ///
     /// # Events
     ///
@@ -434,22 +435,6 @@ pub trait Governor: Votes {
         storage::cancel(e, targets, functions, args, &description_hash)
     }
 
-    /// Returns a string describing how votes are counted.
-    ///
-    /// This is used by UIs to display the counting mode to users. The format
-    /// follows a URI-like pattern, e.g., `"support=bravo&quorum=for,abstain"`.
-    /// // TODO: change the wording here, it is cryptic
-    ///
-    /// The base implementation returns an empty string. Counting extensions
-    /// (like *CountingSimple*) should override this to return their mode.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    fn counting_mode(e: &Env) -> Symbol {
-        Symbol::new(e, "") // TODO:
-    }
-
     /// Returns whether proposals need to be queued before execution.
     ///
     /// The base implementation returns `false`, meaning proposals can be
@@ -461,27 +446,6 @@ pub trait Governor: Votes {
     /// * `e` - Access to the Soroban environment.
     fn proposal_needs_queuing(_e: &Env) -> bool {
         false
-    }
-
-    /// Returns the quorum (minimum votes required) at a specific ledger.
-    ///
-    /// This calculates the quorum as a percentage of the total voting supply
-    /// at the given ledger. The percentage is determined by the stored quorum
-    /// numerator (e.g., 10 means 10% of total supply).
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `ledger` - The ledger number at which to calculate the quorum.
-    ///
-    /// # Errors
-    ///
-    /// * [`GovernorError::QuorumNotSet`] - Occurs if the quorum numerator has
-    ///   not been set.
-    fn quorum(e: &Env, ledger: u32) -> u128 {
-        let numerator = storage::get_quorum_numerator(e) as u128;
-        let total_supply = Self::get_past_total_supply(e, ledger);
-        total_supply * numerator / 100
     }
 }
 
@@ -531,28 +495,25 @@ pub enum GovernorError {
     InvalidProposalLength = 5004,
     /// The proposal is not in the active state.
     ProposalNotActive = 5005,
-    /// The voter has already voted on this proposal.
-    AlreadyVoted = 5006,
     /// The proposal has not succeeded.
-    ProposalNotSuccessful = 5007,
+    ProposalNotSuccessful = 5006,
     /// The proposal has not been queued.
-    ProposalNotQueued = 5008,
+    ProposalNotQueued = 5007,
     /// The proposal has already been executed.
-    ProposalAlreadyExecuted = 5009,
+    ProposalAlreadyExecuted = 5008,
+    /// The proposal is not in a cancellable state (must be Pending, Active,
+    /// or Succeeded).
+    ProposalNotCancellable = 5009,
     /// The voting delay has not been set.
     VotingDelayNotSet = 5010,
     /// The voting period has not been set.
     VotingPeriodNotSet = 5011,
     /// The proposal threshold has not been set.
     ProposalThresholdNotSet = 5012,
-    /// The quorum numerator has not been set.
-    QuorumNotSet = 5013,
     /// The name has not been set.
-    NameNotSet = 5014,
+    NameNotSet = 5013,
     /// The version has not been set.
-    VersionNotSet = 5015,
-    /// The vote type is not valid for the counting module.
-    InvalidVoteType = 5016,
+    VersionNotSet = 5014,
 }
 
 // ################## CONSTANTS ##################
