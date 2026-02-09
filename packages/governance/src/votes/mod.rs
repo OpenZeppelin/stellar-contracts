@@ -51,7 +51,7 @@ mod test;
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env};
 
 pub use crate::votes::storage::{
-    delegate, get_delegate, get_past_total_supply, get_total_supply, get_votes,
+    delegate, get_delegate, get_total_supply, get_total_supply_at_checkpoint, get_votes,
     get_votes_at_checkpoint, get_voting_units, num_checkpoints, transfer_voting_units, Checkpoint,
     VotesStorageKey,
 };
@@ -101,6 +101,20 @@ pub trait Votes {
         get_votes_at_checkpoint(e, &account, timepoint)
     }
 
+    /// Returns the current total supply of voting units.
+    ///
+    /// This tracks all voting units in circulation (regardless of delegation
+    /// status), not just delegated votes.
+    ///
+    /// Returns `0` if no voting units exist.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn get_total_supply(e: &Env) -> u128 {
+        get_total_supply(e)
+    }
+
     /// Returns the total supply of voting units at a specific past timestamp.
     ///
     /// This tracks all voting units in circulation (regardless of delegation
@@ -116,8 +130,8 @@ pub trait Votes {
     /// # Errors
     ///
     /// * [`VotesError::FutureLookup`] - If `timepoint` >= current timestamp.
-    fn get_past_total_supply(e: &Env, timepoint: u64) -> u128 {
-        get_past_total_supply(e, timepoint)
+    fn get_total_supply_at_checkpoint(e: &Env, timepoint: u64) -> u128 {
+        get_total_supply_at_checkpoint(e, timepoint)
     }
 
     /// Returns the current delegate for an account.

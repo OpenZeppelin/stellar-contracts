@@ -20,13 +20,13 @@ pub(crate) enum CheckpointOp {
 /// Selects the checkpoint timeline to operate on.
 ///
 /// Each variant maps to a different set of storage keys so that
-/// per-account voting-power history and aggregate total-supply history
-/// are kept in separate checkpoint sequences.
+/// per-account voting-power history and aggregate total supply history
+/// are kept separate.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum CheckpointType {
-    /// The global total-supply checkpoint timeline.
+    /// The global total supply checkpoint.
     TotalSupply,
-    /// A per-account (delegate) voting-power checkpoint timeline.
+    /// A per-account (delegate) voting-power checkpoint.
     Account(Address),
 }
 
@@ -141,7 +141,7 @@ pub fn get_total_supply(e: &Env) -> u128 {
 /// # Errors
 ///
 /// * [`VotesError::FutureLookup`] - If `timepoint` >= current timestamp.
-pub fn get_past_total_supply(e: &Env, timepoint: u64) -> u128 {
+pub fn get_total_supply_at_checkpoint(e: &Env, timepoint: u64) -> u128 {
     if timepoint >= e.ledger().timestamp() {
         panic_with_error!(e, VotesError::FutureLookup);
     }
@@ -225,8 +225,8 @@ pub fn get_voting_units(e: &Env, account: &Address) -> u128 {
 ///
 /// # Errors
 ///
-/// * [`VotesError::SameDelegate`] - If `delegatee` is already the
-///   current delegate for `account`.
+/// * [`VotesError::SameDelegate`] - If `delegatee` is already the current
+///   delegate for `account`.
 ///
 /// # Notes
 ///
@@ -393,9 +393,8 @@ fn apply_checkpoint_op(e: &Env, previous: u128, op: CheckpointOp, delta: u128) -
 fn checkpoint_storage_key(checkpoint_type: &CheckpointType, index: u32) -> VotesStorageKey {
     match checkpoint_type {
         CheckpointType::TotalSupply => VotesStorageKey::TotalSupplyCheckpoint(index),
-        CheckpointType::Account(account) => {
-            VotesStorageKey::DelegateCheckpoint(account.clone(), index)
-        }
+        CheckpointType::Account(account) =>
+            VotesStorageKey::DelegateCheckpoint(account.clone(), index),
     }
 }
 
@@ -409,9 +408,7 @@ fn get_num_checkpoints(e: &Env, checkpoint_type: &CheckpointType) -> u32 {
         CheckpointType::Account(account) => {
             let key = VotesStorageKey::NumCheckpoints(account.clone());
             if let Some(checkpoints) = e.storage().persistent().get::<_, u32>(&key) {
-                e.storage()
-                    .persistent()
-                    .extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
+                e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
                 checkpoints
             } else {
                 0
@@ -451,9 +448,7 @@ fn push_checkpoint(
         let last_checkpoint = get_checkpoint(e, checkpoint_type, num - 1);
         if last_checkpoint.timestamp == timestamp {
             let key = checkpoint_storage_key(checkpoint_type, num - 1);
-            e.storage()
-                .persistent()
-                .set(&key, &Checkpoint { timestamp, votes });
+            e.storage().persistent().set(&key, &Checkpoint { timestamp, votes });
             return (previous_votes, votes);
         }
     }
