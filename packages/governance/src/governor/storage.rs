@@ -538,8 +538,8 @@ pub fn execute(
 ///
 /// # Errors
 ///
-/// * [`GovernorError::ProposalNotCancellable`] - Occurs if the proposal is not
-///   in a cancellable state (Pending, Active, or Succeeded).
+/// * [`GovernorError::ProposalNotCancellable`] - Occurs if the proposal is in a
+///   non-cancellable state (`Canceled`, `Expired`, or `Executed`).
 /// * refer to [`get_proposal_core()`] errors.
 /// * refer to [`get_proposal_state()`] errors.
 ///
@@ -560,11 +560,13 @@ pub fn cancel(
     // Get proposal and verify it exists
     let mut proposal = get_proposal_core(e, &proposal_id);
 
-    // Can only cancel proposals that haven't reached a terminal state
+    // Blacklist non-cancellable states
     let state = get_proposal_state(e, &proposal_id);
     match state {
-        ProposalState::Pending | ProposalState::Active | ProposalState::Succeeded => {}
-        _ => panic_with_error!(e, GovernorError::ProposalNotCancellable),
+        ProposalState::Canceled | ProposalState::Expired | ProposalState::Executed => {
+            panic_with_error!(e, GovernorError::ProposalNotCancellable)
+        }
+        _ => {}
     }
 
     // Mark as cancelled

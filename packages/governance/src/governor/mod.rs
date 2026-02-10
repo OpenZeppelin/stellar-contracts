@@ -445,8 +445,8 @@ pub trait Governor: Votes + Counting {
     /// # Errors
     ///
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
-    /// * [`GovernorError::ProposalNotCancellable`] - If the proposal is not in
-    ///   a cancellable state (Pending, Active, or Succeeded).
+    /// * [`GovernorError::ProposalNotCancellable`] - If the proposal is in a
+    ///   non-cancellable state (`Canceled`, `Expired`, or `Executed`).
     ///
     /// # Events
     ///
@@ -573,8 +573,8 @@ pub enum GovernorError {
     ProposalNotQueued = 5007,
     /// The proposal has already been executed.
     ProposalAlreadyExecuted = 5008,
-    /// The proposal is not in a cancellable state (must be Pending, Active,
-    /// or Succeeded).
+    /// The proposal is in a non-cancellable state (`Canceled`, `Expired`, or
+    /// `Executed`).
     ProposalNotCancellable = 5009,
     /// The voting delay has not been set.
     VotingDelayNotSet = 5010,
