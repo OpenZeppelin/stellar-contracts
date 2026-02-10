@@ -157,12 +157,7 @@ pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
 
 /// Returns the current state of a proposal.
 ///
-/// If an explicit state has been set (see [`ProposalState`]), it is returned
-/// directly. Otherwise, the state is derived from the current ledger relative
-/// to the proposal's voting schedule (time-based).
-///
-/// If voting has ended and the [`Counting`] module has not transitioned the
-/// proposal to `Succeeded`, the proposal is considered `Defeated`.
+/// See [`ProposalState`] for the full lifecycle flowchart.
 ///
 /// # Arguments
 ///
@@ -173,20 +168,27 @@ pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
 ///
 /// * [`GovernorError::ProposalNotFound`] - Occurs if the proposal does not
 ///   exist.
+///
+/// # Note
+///
+/// Queue logic is expected to be implemented by an extension, so this
+/// function does not handle the `Queued` and `Expired` states.
 pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState {
     let core = get_proposal_core(e, proposal_id);
 
-    // Explicit states take precedence — return directly when set.
+    // These state transitions are ledger-dependent:
+    //   Pending -> Active -> Defeated
+    //   Queued  -> Expired
+    //
+    // Canceled, Succeeded, and Executed are ledger-independent — return
+    // them immediately.
     match core.state {
-        ProposalState::Canceled
-        | ProposalState::Succeeded
-        | ProposalState::Queued
-        | ProposalState::Expired
-        | ProposalState::Executed => return core.state,
+        ProposalState::Canceled | ProposalState::Succeeded | ProposalState::Executed =>
+            return core.state,
         _ => {}
     }
 
-    // Derive time-based state from the current ledger.
+    // Derive Pending, Active, or Defeated from the current ledger.
     let current_ledger = e.ledger().sequence();
 
     if current_ledger < core.vote_start {
@@ -197,7 +199,7 @@ pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState {
         return ProposalState::Active;
     }
 
-    // Voting has ended without the Counting module marking it as Succeeded
+    // Voting has ended without the Counting module marking it as Succeeded.
     ProposalState::Defeated
 }
 
