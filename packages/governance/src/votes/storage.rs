@@ -217,10 +217,10 @@ pub fn get_voting_units(e: &Env, account: &Address) -> u128 {
 ///
 /// # Events
 ///
-/// * topics - `["DelegateChanged", delegator: Address]`
+/// * topics - `["delegate_changed", delegator: Address]`
 /// * data - `[from_delegate: Option<Address>, to_delegate: Address]`
 ///
-/// * topics - `["DelegateVotesChanged", delegate: Address]`
+/// * topics - `["delegate_votes_changed", delegate: Address]`
 /// * data - `[old_votes: u128, new_votes: u128]`
 ///
 /// # Errors
@@ -262,7 +262,7 @@ pub fn delegate(e: &Env, account: &Address, delegatee: &Address) {
 ///
 /// # Events
 ///
-/// * topics - `["DelegateVotesChanged", delegate: Address]`
+/// * topics - `["delegate_votes_changed", delegate: Address]`
 /// * data - `[previous_votes: u128, new_votes: u128]`
 ///
 /// # Notes

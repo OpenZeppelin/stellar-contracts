@@ -1,11 +1,10 @@
+extern crate std;
 use soroban_sdk::{
-    contract,
-    testutils::{Address as _, Ledger},
-    Address, Env,
+    contract, testutils::{Address as _, Events, Ledger}, Address, Env,
 };
 
 use crate::votes::{
-    delegate, get_delegate, get_past_total_supply, get_total_supply, get_votes,
+    delegate, get_delegate, get_total_supply, get_total_supply_at_checkpoint, get_votes,
     get_votes_at_checkpoint, get_voting_units, num_checkpoints, transfer_voting_units,
 };
 
@@ -35,8 +34,9 @@ fn initial_state_has_zero_votes() {
         // Test get_votes_at_checkpoint returns 0 when num_checkpoints == 0
         assert_eq!(get_votes_at_checkpoint(&e, &alice, 500), 0);
 
-        // Test get_past_total_supply returns 0 when num_total_supply_checkpoints == 0
-        assert_eq!(get_past_total_supply(&e, 500), 0);
+        // Test get_total_supply_at_checkpoint returns 0 when
+        // num_total_supply_checkpoints == 0
+        assert_eq!(get_total_supply_at_checkpoint(&e, 500), 0);
     });
 }
 
@@ -119,6 +119,7 @@ fn delegate_to_self() {
         transfer_voting_units(&e, None, Some(&alice), 100);
         delegate(&e, &alice, &alice);
 
+        assert_eq!(e.events().all().len(), 2);
         assert_eq!(get_delegate(&e, &alice), Some(alice.clone()));
         assert_eq!(get_votes(&e, &alice), 100);
     });
@@ -134,6 +135,7 @@ fn delegate_to_other() {
         transfer_voting_units(&e, None, Some(&alice), 100);
         delegate(&e, &alice, &bob);
 
+        assert_eq!(e.events().all().len(), 2);
         assert_eq!(get_delegate(&e, &alice), Some(bob.clone()));
         assert_eq!(get_votes(&e, &alice), 0);
         assert_eq!(get_votes(&e, &bob), 100);
@@ -291,7 +293,7 @@ fn get_votes_at_checkpoint_fails_for_future_timepoint() {
 }
 
 #[test]
-fn get_past_total_supply_returns_historical_value() {
+fn get_total_supply_at_checkpoint_returns_historical_value() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
 
@@ -308,24 +310,24 @@ fn get_past_total_supply_returns_historical_value() {
         // Query at different timepoints
         e.ledger().set_timestamp(4000);
 
-        assert_eq!(get_past_total_supply(&e, 999), 0);
-        assert_eq!(get_past_total_supply(&e, 1000), 100);
-        assert_eq!(get_past_total_supply(&e, 1500), 100);
-        assert_eq!(get_past_total_supply(&e, 2000), 150);
-        assert_eq!(get_past_total_supply(&e, 2500), 150);
-        assert_eq!(get_past_total_supply(&e, 3000), 120);
-        assert_eq!(get_past_total_supply(&e, 3500), 120);
+        assert_eq!(get_total_supply_at_checkpoint(&e, 999), 0);
+        assert_eq!(get_total_supply_at_checkpoint(&e, 1000), 100);
+        assert_eq!(get_total_supply_at_checkpoint(&e, 1500), 100);
+        assert_eq!(get_total_supply_at_checkpoint(&e, 2000), 150);
+        assert_eq!(get_total_supply_at_checkpoint(&e, 2500), 150);
+        assert_eq!(get_total_supply_at_checkpoint(&e, 3000), 120);
+        assert_eq!(get_total_supply_at_checkpoint(&e, 3500), 120);
     });
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #4100)")]
-fn get_past_total_supply_fails_for_future_timepoint() {
+fn get_total_supply_at_checkpoint_fails_for_future_timepoint() {
     let (e, contract_address) = setup_env();
     e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
-        get_past_total_supply(&e, 1000);
+        get_total_supply_at_checkpoint(&e, 1000);
     });
 }
 
@@ -506,13 +508,13 @@ fn get_votes_at_checkpoint_at_current_timestamp() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #4100)")]
-fn get_past_total_supply_at_current_timestamp() {
+fn get_total_supply_at_checkpoint_at_current_timestamp() {
     let (e, contract_address) = setup_env();
     e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         // Query at exact current timestamp should fail
-        get_past_total_supply(&e, 1000);
+        get_total_supply_at_checkpoint(&e, 1000);
     });
 }
 
@@ -531,13 +533,13 @@ fn get_votes_at_checkpoint_future_timestamp() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #4100)")]
-fn get_past_total_supply_future_timestamp() {
+fn get_total_supply_at_checkpoint_future_timestamp() {
     let (e, contract_address) = setup_env();
     e.ledger().set_timestamp(1000);
 
     e.as_contract(&contract_address, || {
         // Query at future timestamp should fail
-        get_past_total_supply(&e, 2000);
+        get_total_supply_at_checkpoint(&e, 2000);
     });
 }
 
@@ -559,7 +561,7 @@ fn get_votes_at_checkpoint_before_first_checkpoint() {
 }
 
 #[test]
-fn get_past_total_supply_before_first_checkpoint() {
+fn get_total_supply_at_checkpoint_before_first_checkpoint() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
 
@@ -569,7 +571,7 @@ fn get_past_total_supply_before_first_checkpoint() {
 
         e.ledger().set_timestamp(2000);
         // Query before first checkpoint
-        assert_eq!(get_past_total_supply(&e, 500), 0);
+        assert_eq!(get_total_supply_at_checkpoint(&e, 500), 0);
     });
 }
 
@@ -607,9 +609,9 @@ fn total_supply_checkpoint_updates_on_mint_burn() {
 
         e.ledger().set_timestamp(4000);
 
-        assert_eq!(get_past_total_supply(&e, 1000), 100);
-        assert_eq!(get_past_total_supply(&e, 2000), 150);
-        assert_eq!(get_past_total_supply(&e, 3000), 75);
+        assert_eq!(get_total_supply_at_checkpoint(&e, 1000), 100);
+        assert_eq!(get_total_supply_at_checkpoint(&e, 2000), 150);
+        assert_eq!(get_total_supply_at_checkpoint(&e, 3000), 75);
         assert_eq!(get_total_supply(&e), 75);
     });
 }

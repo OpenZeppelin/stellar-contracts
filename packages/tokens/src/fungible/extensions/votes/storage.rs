@@ -33,10 +33,10 @@ impl FungibleVotes {
     ///
     /// # Events
     ///
-    /// * topics - `["Transfer", from: Address, to: Address]`
+    /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
     ///
-    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * topics - `["delegate_votes_changed", delegate: Address]`
     /// * data - `[previous_votes: u128, new_votes: u128]`
     ///
     /// # Notes
@@ -68,10 +68,10 @@ impl FungibleVotes {
     ///
     /// # Events
     ///
-    /// * topics - `["Transfer", from: Address, to: Address]`
+    /// * topics - `["transfer", from: Address, to: Address]`
     /// * data - `[amount: i128]`
     ///
-    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * topics - `["delegate_votes_changed", delegate: Address]`
     /// * data - `[previous_votes: u128, new_votes: u128]`
     ///
     /// # Notes
@@ -100,10 +100,10 @@ impl FungibleVotes {
     ///
     /// # Events
     ///
-    /// * topics - `["Mint", to: Address]`
+    /// * topics - `["mint", to: Address]`
     /// * data - `[amount: i128]`
     ///
-    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * topics - `["delegate_votes_changed", delegate: Address]`
     /// * data - `[previous_votes: u128, new_votes: u128]`
     ///
     /// # Security Warning
@@ -134,10 +134,10 @@ impl FungibleVotes {
     ///
     /// # Events
     ///
-    /// * topics - `["Burn", from: Address]`
+    /// * topics - `["burn", from: Address]`
     /// * data - `[amount: i128]`
     ///
-    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * topics - `["delegate_votes_changed", delegate: Address]`
     /// * data - `[previous_votes: u128, new_votes: u128]`
     ///
     /// # Notes
@@ -171,7 +171,7 @@ impl FungibleVotes {
     /// * topics - `["Burn", from: Address]`
     /// * data - `[amount: i128]`
     ///
-    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * topics - `["delegate_votes_changed", delegate: Address]`
     /// * data - `[previous_votes: u128, new_votes: u128]`
     ///
     /// # Notes

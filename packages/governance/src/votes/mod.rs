@@ -159,10 +159,10 @@ pub trait Votes {
     ///
     /// # Events
     ///
-    /// * topics - `["DelegateChanged", delegator: Address]`
+    /// * topics - `["delegate_changed", delegator: Address]`
     /// * data - `[from_delegate: Option<Address>, to_delegate: Address]`
     ///
-    /// * topics - `["DelegateVotesChanged", delegate: Address]`
+    /// * topics - `["delegate_votes_changed", delegate: Address]`
     /// * data - `[previous_votes: u128, new_votes: u128]`
     ///
     /// # Notes
