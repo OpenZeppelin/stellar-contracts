@@ -51,9 +51,9 @@ mod test;
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env};
 
 pub use crate::votes::storage::{
-    delegate, get_delegate, get_total_supply, get_total_supply_at_checkpoint, get_votes,
-    get_votes_at_checkpoint, get_voting_units, num_checkpoints, transfer_voting_units, Checkpoint,
-    VotesStorageKey,
+    delegate, get_checkpoint, get_delegate, get_total_supply, get_total_supply_at_checkpoint,
+    get_votes, get_votes_at_checkpoint, get_voting_units, num_checkpoints, transfer_voting_units,
+    Checkpoint, CheckpointType, VotesStorageKey,
 };
 
 /// Trait for contracts that support vote tracking with delegation.
@@ -187,6 +187,8 @@ pub enum VotesError {
     InsufficientVotingUnits = 4102,
     /// Attempting to delegate to the same delegate that is already set
     SameDelegate = 4103,
+    /// A checkpoint that was expected to exist was not found in storage
+    CheckpointNotFound = 4104,
 }
 
 // ################## CONSTANTS ##################

@@ -1,11 +1,14 @@
 extern crate std;
 use soroban_sdk::{
-    contract, testutils::{Address as _, Events, Ledger}, Address, Env,
+    contract,
+    testutils::{Address as _, Events, Ledger},
+    Address, Env,
 };
 
 use crate::votes::{
-    delegate, get_delegate, get_total_supply, get_total_supply_at_checkpoint, get_votes,
-    get_votes_at_checkpoint, get_voting_units, num_checkpoints, transfer_voting_units,
+    delegate, get_checkpoint, get_delegate, get_total_supply, get_total_supply_at_checkpoint,
+    get_votes, get_votes_at_checkpoint, get_voting_units, num_checkpoints, transfer_voting_units,
+    CheckpointType,
 };
 
 #[contract]
@@ -613,5 +616,16 @@ fn total_supply_checkpoint_updates_on_mint_burn() {
         assert_eq!(get_total_supply_at_checkpoint(&e, 2000), 150);
         assert_eq!(get_total_supply_at_checkpoint(&e, 3000), 75);
         assert_eq!(get_total_supply(&e), 75);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4104)")]
+fn get_checkpoint_directly_panics_when_missing() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        get_checkpoint(&e, &CheckpointType::Account(alice.clone()), 0);
     });
 }

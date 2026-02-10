@@ -17,19 +17,6 @@ pub(crate) enum CheckpointOp {
     Sub,
 }
 
-/// Selects the checkpoint timeline to operate on.
-///
-/// Each variant maps to a different set of storage keys so that
-/// per-account voting-power history and aggregate total supply history
-/// are kept separate.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum CheckpointType {
-    /// The global total supply checkpoint.
-    TotalSupply,
-    /// A per-account (delegate) voting-power checkpoint.
-    Account(Address),
-}
-
 // ################## TYPES ##################
 
 /// A checkpoint recording voting power at a specific timepoint.
@@ -40,6 +27,20 @@ pub struct Checkpoint {
     pub timestamp: u64,
     /// The voting power at this timepoint
     pub votes: u128,
+}
+
+/// Selects the checkpoint timeline to operate on.
+///
+/// Each variant maps to a different set of storage keys so that
+/// per-account voting-power history and aggregate total supply history
+/// are kept separate.
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[contracttype]
+pub enum CheckpointType {
+    /// The global total supply checkpoint.
+    TotalSupply,
+    /// A per-account (delegate) voting-power checkpoint.
+    Account(Address),
 }
 
 /// Storage keys for the votes module.
@@ -65,6 +66,27 @@ pub enum VotesStorageKey {
 }
 
 // ################## QUERY STATE ##################
+
+/// Gets a checkpoint at a specific index for the given checkpoint type.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `checkpoint_type` - Type of the checkpoint (per-account or total supply).
+/// * `index` - Index of the checkpoint.
+///
+/// # Errors
+///
+/// [`VotesError::CheckpointNotFound`] - If no checkpoint exists
+/// at the given index.
+pub fn get_checkpoint(e: &Env, checkpoint_type: &CheckpointType, index: u32) -> Checkpoint {
+    let key = checkpoint_storage_key(checkpoint_type, index);
+    let Some(checkpoint) = e.storage().persistent().get::<_, Checkpoint>(&key) else {
+        panic_with_error!(e, VotesError::CheckpointNotFound);
+    };
+    e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
+    checkpoint
+}
 
 /// Returns the current voting power (delegated votes) of an account.
 ///
@@ -108,9 +130,6 @@ pub fn get_votes_at_checkpoint(e: &Env, account: &Address, timepoint: u64) -> u1
 
     let cp_type = CheckpointType::Account(account.clone());
     let num = get_num_checkpoints(e, &cp_type);
-    if num == 0 {
-        return 0;
-    }
 
     lookup_checkpoint_at(e, timepoint, num, &cp_type)
 }
@@ -148,9 +167,6 @@ pub fn get_total_supply_at_checkpoint(e: &Env, timepoint: u64) -> u128 {
 
     let cp_type = CheckpointType::TotalSupply;
     let num = get_num_checkpoints(e, &cp_type);
-    if num == 0 {
-        return 0;
-    }
 
     lookup_checkpoint_at(e, timepoint, num, &cp_type)
 }
@@ -339,14 +355,16 @@ fn move_delegate_votes(e: &Env, from: Option<&Address>, to: Option<&Address>, am
 }
 
 /// Binary search over checkpoints to find votes at a given timepoint.
-///
-/// `num` must be > 0.
 fn lookup_checkpoint_at(
     e: &Env,
     timepoint: u64,
     num: u32,
     checkpoint_type: &CheckpointType,
 ) -> u128 {
+    if num == 0 {
+        return 0;
+    }
+
     // Check if timepoint is after the latest checkpoint
     let latest = get_checkpoint(e, checkpoint_type, num - 1);
     if latest.timestamp <= timepoint {
@@ -417,17 +435,6 @@ fn get_num_checkpoints(e: &Env, checkpoint_type: &CheckpointType) -> u32 {
     }
 }
 
-/// Gets a checkpoint at a specific index for the given checkpoint type.
-fn get_checkpoint(e: &Env, checkpoint_type: &CheckpointType, index: u32) -> Checkpoint {
-    let key = checkpoint_storage_key(checkpoint_type, index);
-    if let Some(checkpoint) = e.storage().persistent().get::<_, Checkpoint>(&key) {
-        e.storage().persistent().extend_ttl(&key, VOTES_TTL_THRESHOLD, VOTES_EXTEND_AMOUNT);
-        checkpoint
-    } else {
-        Checkpoint { timestamp: 0, votes: 0 }
-    }
-}
-
 /// Pushes a new checkpoint or updates the last one if same timepoint.
 /// Returns (previous_votes, new_votes).
 fn push_checkpoint(
@@ -439,14 +446,15 @@ fn push_checkpoint(
     let num = get_num_checkpoints(e, checkpoint_type);
     let timestamp = e.ledger().timestamp();
 
-    let previous_votes =
-        if num > 0 { get_checkpoint(e, checkpoint_type, num - 1).votes } else { 0 };
+    let last_checkpoint =
+        if num > 0 { Some(get_checkpoint(e, checkpoint_type, num - 1)) } else { None };
+
+    let previous_votes = last_checkpoint.as_ref().map_or(0, |cp| cp.votes);
     let votes = apply_checkpoint_op(e, previous_votes, op, delta);
 
     // Check if we can update the last checkpoint (same timepoint)
-    if num > 0 {
-        let last_checkpoint = get_checkpoint(e, checkpoint_type, num - 1);
-        if last_checkpoint.timestamp == timestamp {
+    if let Some(cp) = &last_checkpoint {
+        if cp.timestamp == timestamp {
             let key = checkpoint_storage_key(checkpoint_type, num - 1);
             e.storage().persistent().set(&key, &Checkpoint { timestamp, votes });
             return (previous_votes, votes);
