@@ -9,7 +9,8 @@ use soroban_sdk::{
 };
 
 use crate::governor::{
-    GovernorError, ProposalState, GOVERNOR_EXTEND_AMOUNT, GOVERNOR_TTL_THRESHOLD,
+    ExplicitState, GovernorError, ProposalState, TimeBasedState, GOVERNOR_EXTEND_AMOUNT,
+    GOVERNOR_TTL_THRESHOLD,
 };
 
 // ################## STORAGE KEYS ##################
@@ -157,16 +158,9 @@ pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
 
 /// Returns the current state of a proposal.
 ///
-/// Terminal states (`Executed`, `Canceled`, `Expired`) and override states
-/// (`Succeeded`, `Queued`) are returned directly from storage. These are set
-/// explicitly by the Governor or its extensions (e.g., the `Counting` module
-/// sets `Succeeded`, `TimelockControl` sets `Queued`/`Expired`).
-///
-/// Time-based states (`Pending`, `Active`, `Defeated`) are derived from the
-/// current ledger relative to the proposal's voting schedule.
-///
-/// If voting has ended and the `Counting` module has not transitioned the
-/// proposal to `Succeeded`, the proposal is considered `Defeated`.
+/// If a [`ExplicitState`] has been set, it is returned directly. Otherwise,
+/// the state is derived from the current ledger relative to the proposal's
+/// voting schedule (see [`TimeBasedState`]).
 ///
 /// # Arguments
 ///
@@ -180,32 +174,24 @@ pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
 pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState {
     let core = get_proposal_core(e, proposal_id);
 
-    // Terminal and override states take precedence.
-    // These states are set explicitly by the Governor or its extensions
-    // (e.g., TimelockControl sets Queued/Expired, Counting sets Succeeded).
-    match core.state {
-        ProposalState::Executed
-        | ProposalState::Canceled
-        | ProposalState::Succeeded
-        | ProposalState::Queued
-        | ProposalState::Expired => return core.state,
-        _ => {}
+    // Explicit states take precedence — return directly when set.
+    if let ProposalState::Explicit(_) = core.state {
+        return core.state;
     }
 
-    // The time-based states (Pending, Active, Defeated) depend on the current
-    // ledger relative to vote_start/vote_end.
+    // Derive time-based state from the current ledger.
     let current_ledger = e.ledger().sequence();
 
     if current_ledger < core.vote_start {
-        return ProposalState::Pending;
+        return ProposalState::TimeBased(TimeBasedState::Pending);
     }
 
     if current_ledger <= core.vote_end {
-        return ProposalState::Active;
+        return ProposalState::TimeBased(TimeBasedState::Active);
     }
 
     // Voting has ended without the Counting module marking it as Succeeded
-    ProposalState::Defeated
+    ProposalState::TimeBased(TimeBasedState::Defeated)
 }
 
 /// Returns the snapshot ledger for a proposal.
@@ -446,7 +432,7 @@ pub fn propose(
         proposer: proposer.clone(),
         vote_start,
         vote_end,
-        state: ProposalState::Pending,
+        state: ProposalState::TimeBased(TimeBasedState::Pending),
     };
     e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
 
@@ -488,7 +474,7 @@ pub fn prepare_vote(e: &Env, voter: &Address, proposal_id: &BytesN<32>) -> u32 {
     voter.require_auth();
 
     let state = get_proposal_state(e, proposal_id);
-    if state != ProposalState::Active {
+    if state != ProposalState::TimeBased(TimeBasedState::Active) {
         panic_with_error!(e, GovernorError::ProposalNotActive);
     }
 
@@ -533,10 +519,10 @@ pub fn execute(
 
     // Check proposal state
     let state = get_proposal_state(e, &proposal_id);
-    if state == ProposalState::Executed {
+    if state == ProposalState::Explicit(ExplicitState::Executed) {
         panic_with_error!(e, GovernorError::ProposalAlreadyExecuted);
     }
-    if state != ProposalState::Succeeded {
+    if state != ProposalState::Explicit(ExplicitState::Succeeded) {
         panic_with_error!(e, GovernorError::ProposalNotSuccessful);
     }
 
@@ -550,7 +536,7 @@ pub fn execute(
 
     // Mark as executed
     let mut proposal = get_proposal_core(e, &proposal_id);
-    proposal.state = ProposalState::Executed;
+    proposal.state = ProposalState::Explicit(ExplicitState::Executed);
     e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
 
     // Emit event
@@ -595,15 +581,16 @@ pub fn cancel(
     // Get proposal and verify it exists
     let mut proposal = get_proposal_core(e, &proposal_id);
 
-    // Can only cancel proposals that haven't reached a terminal state
+    // Can only cancel proposals that are still in a cancellable state
     let state = get_proposal_state(e, &proposal_id);
     match state {
-        ProposalState::Pending | ProposalState::Active | ProposalState::Succeeded => {}
+        ProposalState::TimeBased(TimeBasedState::Pending | TimeBasedState::Active)
+        | ProposalState::Explicit(ExplicitState::Succeeded) => {}
         _ => panic_with_error!(e, GovernorError::ProposalNotCancellable),
     }
 
     // Mark as cancelled
-    proposal.state = ProposalState::Canceled;
+    proposal.state = ProposalState::Explicit(ExplicitState::Canceled);
     e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
 
     // Emit event

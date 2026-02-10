@@ -481,33 +481,69 @@ pub trait Governor: Votes + Counting {
 
 // ################## TYPES ##################
 
-/// The state of a proposal in its lifecycle.
+/// Time-based proposal states, derived from the current ledger relative to
+/// the proposal's voting schedule. These are never set explicitly — they are
+/// computed by [`get_proposal_state()`] when no terminal state has been set.
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
-pub enum ProposalState {
+pub enum TimeBasedState {
     /// The proposal is pending and voting has not started yet.
     Pending = 0,
     /// The proposal is active and voting is ongoing.
     Active = 1,
-    /// The proposal has been cancelled.
-    Canceled = 2,
     /// The proposal was defeated (did not meet quorum or majority). This is
     /// the default outcome when voting ends and the [`Counting`] module has
-    /// not marked the proposal as [`Succeeded`](ProposalState::Succeeded).
-    Defeated = 3,
-    /// The proposal succeeded and can be executed. This state is set by the
-    /// [`Counting`] module when the proposal meets the required quorum and
-    /// vote thresholds. If a queuing extension is enabled, this state means
-    /// the proposal is ready to be queued.
-    Succeeded = 4,
-    /// The proposal is queued for execution (when using an extension that
-    /// enables the queue step, like TimelockControl).
-    Queued = 5,
-    /// The proposal has expired and can no longer be executed.
-    Expired = 6,
+    /// not marked the proposal as
+    /// [`Succeeded`](ExplicitState::Succeeded).
+    Defeated = 2,
+}
+
+/// Explicit proposal states, set by the Governor or its extensions.
+/// Once an explicit state is stored, it takes precedence over any time-based
+/// derivation.
+///
+/// - [`Canceled`](ExplicitState::Canceled) and
+///   [`Executed`](ExplicitState::Executed) are set by the Governor.
+/// - [`Succeeded`](ExplicitState::Succeeded) is set by the [`Counting`]
+///   module.
+/// - [`Queued`](ExplicitState::Queued) and
+///   [`Expired`](ExplicitState::Expired) are set by extensions like
+///   `TimelockControl`.
+#[contracttype]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ExplicitState {
+    /// The proposal has been cancelled.
+    Canceled = 0,
+    /// The proposal succeeded. Set by the [`Counting`] module when the
+    /// proposal meets the required quorum and vote thresholds. If a queuing
+    /// extension is enabled, this state means the proposal is ready to be
+    /// queued.
+    Succeeded = 1,
+    /// The proposal is queued for execution. Set by extensions like
+    /// `TimelockControl`.
+    Queued = 2,
+    /// The proposal has expired and can no longer be executed. Set by
+    /// extensions like `TimelockControl`.
+    Expired = 3,
     /// The proposal has been executed.
-    Executed = 7,
+    Executed = 4,
+}
+
+/// The full lifecycle state of a proposal.
+///
+/// Combines time-based states (derived from the current ledger) and explicit
+/// states (stored explicitly). Explicit states take precedence over time-based
+/// derivation when present.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProposalState {
+    /// A time-based state derived from the current ledger relative to the
+    /// proposal's voting schedule.
+    TimeBased(TimeBasedState),
+    /// An explicit state set by the Governor or its extensions.
+    Explicit(ExplicitState),
 }
 
 // ################## ERRORS ##################
