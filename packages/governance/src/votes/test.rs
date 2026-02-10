@@ -1,7 +1,7 @@
 use soroban_sdk::{
     contract,
     testutils::{Address as _, Events, Ledger},
-    Address, Env
+    Address, Env,
 };
 
 use crate::votes::{
