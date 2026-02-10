@@ -1,8 +1,7 @@
-extern crate std;
 use soroban_sdk::{
     contract,
     testutils::{Address as _, Events, Ledger},
-    Address, Env,
+    Address, Env
 };
 
 use crate::votes::{
@@ -121,9 +120,8 @@ fn delegate_to_self() {
     e.as_contract(&contract_address, || {
         transfer_voting_units(&e, None, Some(&alice), 100);
         delegate(&e, &alice, &alice);
-        let events = e.events().all();
 
-        assert_eq!(events.len(), 2);
+        assert_eq!(e.events().all().events().len(), 2);
         assert_eq!(get_delegate(&e, &alice), Some(alice.clone()));
         assert_eq!(get_votes(&e, &alice), 100);
     });
@@ -138,9 +136,8 @@ fn delegate_to_other() {
     e.as_contract(&contract_address, || {
         transfer_voting_units(&e, None, Some(&alice), 100);
         delegate(&e, &alice, &bob);
-        let events = e.events().all();
 
-        assert_eq!(events.len(), 2);
+        assert_eq!(e.events().all().events().len(), 2);
         assert_eq!(get_delegate(&e, &alice), Some(bob.clone()));
         assert_eq!(get_votes(&e, &alice), 0);
         assert_eq!(get_votes(&e, &bob), 100);
