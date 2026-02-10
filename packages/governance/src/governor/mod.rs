@@ -38,8 +38,8 @@
 //!
 //! 1. **Propose**: A user with sufficient voting power creates a proposal
 //! 2. **Vote**: Token holders vote during the voting period
-//! 3. **Execute**: Successful proposals (above quorum threshold) can be
-//!    executed
+//! 3. **Execute**: Successful proposals (marked as `Succeeded` by the
+//!    [`Counting`] module) can be executed
 //!
 //! When using an extension for `Queue` mechanism, like `TimelockControl`, an
 //! additional `Queue` step is added between voting and execution:
@@ -289,11 +289,11 @@ pub trait Governor: Votes + Counting {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `proposer` - The address creating the proposal.
     /// * `targets` - The addresses of contracts to call.
     /// * `functions` - The function names to invoke on each target.
     /// * `args` - The arguments for each function call.
     /// * `description` - A description of the proposal.
+    /// * `proposer` - The address creating the proposal.
     ///
     /// # Errors
     ///
@@ -311,8 +311,6 @@ pub trait Governor: Votes + Counting {
     ///   been set.
     /// * [`GovernorError::VotingPeriodNotSet`] - If the voting period has not
     ///   been set.
-    /// * [`GovernorError::VotesContractNotSet`] - If the votes contract has not
-    ///   been set.
     ///
     /// # Events
     ///
@@ -320,17 +318,25 @@ pub trait Governor: Votes + Counting {
     ///   Address]`
     /// * data - `[targets: Vec<Address>, functions: Vec<Symbol>, args:
     ///   Vec<Vec<Val>>, vote_start: u32, vote_end: u32, description: String]`
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for `proposer` is required.
+    /// * The `proposer` parameter enables flexible access control. The
+    ///   implementer can pass any address (e.g., an admin or relayer) to
+    ///   customize who is authorized to create proposals.
     fn propose(
         e: &Env,
-        proposer: Address,
         targets: Vec<Address>,
         functions: Vec<Symbol>,
         args: Vec<Vec<Val>>,
         description: String,
+        proposer: Address,
     ) -> BytesN<32> {
-        let current_ledger = e.ledger().sequence();
-        let proposer_votes = Self::get_past_votes(e, proposer.clone(), current_ledger);
-        storage::propose(e, &proposer, proposer_votes, targets, functions, args, description)
+        // Use previous ledger to prevent flash loan based proposals
+        let snapshot = e.ledger().sequence() - 1;
+        let proposer_votes = Self::get_past_votes(e, proposer.clone(), snapshot);
+        storage::propose(e, proposer_votes, targets, functions, args, description, &proposer)
     }
 
     /// Casts a vote on a proposal and returns the voter's voting power.
@@ -338,12 +344,12 @@ pub trait Governor: Votes + Counting {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `voter` - The address casting the vote.
     /// * `proposal_id` - The unique identifier of the proposal.
     /// * `vote_type` - The type of vote. The interpretation depends on the
     ///   counting module used. For simple counting: 0 = Against, 1 = For, 2 =
     ///   Abstain.
     /// * `reason` - An optional explanation for the vote.
+    /// * `voter` - The address casting the vote.
     ///
     /// # Errors
     ///
@@ -355,12 +361,19 @@ pub trait Governor: Votes + Counting {
     ///
     /// * topics - `["vote_cast", voter: Address, proposal_id: BytesN<32>]`
     /// * data - `[vote_type: u32, weight: u128, reason: String]`
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for `voter` is required.
+    /// * The `voter` parameter enables flexible access control. The
+    ///   implementer can pass any address to customize who is authorized
+    ///   to cast votes (e.g., for vote delegation or relaying).
     fn cast_vote(
         e: &Env,
-        voter: Address,
         proposal_id: BytesN<32>,
         vote_type: u32,
         reason: String,
+        voter: Address,
     ) -> u128 {
         let snapshot = storage::prepare_vote(e, &voter, &proposal_id);
         let voter_weight = Self::get_past_votes(e, voter.clone(), snapshot);
@@ -378,6 +391,7 @@ pub trait Governor: Votes + Counting {
     /// * `functions` - The function names to invoke on each target.
     /// * `args` - The arguments for each function call.
     /// * `description_hash` - The hash of the proposal description.
+    /// * `executor` - The address executing the proposal.
     ///
     /// # Errors
     ///
@@ -393,19 +407,26 @@ pub trait Governor: Votes + Counting {
     ///
     /// * topics - `["proposal_executed", proposal_id: BytesN<32>]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for `executor` is required.
+    /// * The `executor` parameter enables flexible access control. The
+    ///   implementer can pass any address to customize who is authorized
+    ///   to execute proposals (e.g., restrict to a timelock contract or
+    ///   allow any account).
     fn execute(
         e: &Env,
         targets: Vec<Address>,
         functions: Vec<Symbol>,
         args: Vec<Vec<Val>>,
         description_hash: BytesN<32>,
+        executor: Address,
     ) -> BytesN<32> {
-        storage::execute(e, targets, functions, args, &description_hash)
+        storage::execute(e, targets, functions, args, &description_hash, &executor)
     }
 
     /// Cancels a proposal and returns its unique identifier.
-    ///
-    /// Can only be called by the proposer before the proposal is executed.
     ///
     /// # Arguments
     ///
@@ -414,6 +435,7 @@ pub trait Governor: Votes + Counting {
     /// * `functions` - The function names to invoke on each target.
     /// * `args` - The arguments for each function call.
     /// * `description_hash` - The hash of the proposal description.
+    /// * `operator` - The address cancelling the proposal.
     ///
     /// # Errors
     ///
@@ -425,14 +447,22 @@ pub trait Governor: Votes + Counting {
     ///
     /// * topics - `["proposal_cancelled", proposal_id: BytesN<32>]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for `operator` is required.
+    /// * The `operator` parameter enables flexible access control. The
+    ///   implementer decides who can cancel proposals (e.g., only the
+    ///   original proposer, an admin, or a guardian role).
     fn cancel(
         e: &Env,
         targets: Vec<Address>,
         functions: Vec<Symbol>,
         args: Vec<Vec<Val>>,
         description_hash: BytesN<32>,
+        operator: Address,
     ) -> BytesN<32> {
-        storage::cancel(e, targets, functions, args, &description_hash)
+        storage::cancel(e, targets, functions, args, &description_hash, &operator)
     }
 
     /// Returns whether proposals need to be queued before execution.
@@ -462,10 +492,14 @@ pub enum ProposalState {
     Active = 1,
     /// The proposal has been cancelled.
     Canceled = 2,
-    /// The proposal was defeated (did not meet quorum or majority).
+    /// The proposal was defeated (did not meet quorum or majority). This is
+    /// the default outcome when voting ends and the [`Counting`] module has
+    /// not marked the proposal as [`Succeeded`](ProposalState::Succeeded).
     Defeated = 3,
-    /// The proposal succeeded and can be executed. If there is a queuing
-    /// extension enabled, this state means the proposal is ready to be queued.
+    /// The proposal succeeded and can be executed. This state is set by the
+    /// [`Counting`] module when the proposal meets the required quorum and
+    /// vote thresholds. If a queuing extension is enabled, this state means
+    /// the proposal is ready to be queued.
     Succeeded = 4,
     /// The proposal is queued for execution (when using an extension that
     /// enables the queue step, like TimelockControl).
@@ -520,10 +554,10 @@ pub enum GovernorError {
 
 const DAY_IN_LEDGERS: u32 = 17280;
 
-/// TTL threshold for extending storage entries (in ledgers)
+/// TTL extension amount for storage entries (in ledgers)
 pub const GOVERNOR_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 
-/// TTL extension amount for storage entries (in ledgers)
+/// TTL threshold for extending storage entries (in ledgers)
 pub const GOVERNOR_TTL_THRESHOLD: u32 = GOVERNOR_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 // ################## EVENTS ##################
