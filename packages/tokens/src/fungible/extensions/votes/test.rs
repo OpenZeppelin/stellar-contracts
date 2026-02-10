@@ -3,7 +3,7 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env, MuxedAddress};
 use stellar_governance::votes::{delegate, get_delegate, get_votes, get_voting_units};
 
-use crate::fungible::{extensions::votes::FungibleVotes, Base};
+use crate::fungible::{extensions::votes::FungibleVotes, Base, ContractOverrides};
 
 #[contract]
 struct MockContract;
@@ -368,6 +368,54 @@ fn transfer_between_delegated_accounts() {
 
         assert_eq!(get_votes(&e, &alice), 70);
         assert_eq!(get_votes(&e, &bob), 80);
+    });
+}
+
+#[test]
+fn contract_overrides_transfer() {
+    let (e, contract_address) = setup_env();
+    let alice = Address::generate(&e);
+    let bob = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        FungibleVotes::mint(&e, &alice, 100);
+        assert_eq!(get_voting_units(&e, &alice), 100);
+    });
+
+    e.as_contract(&contract_address, || {
+        <FungibleVotes as ContractOverrides>::transfer(
+            &e,
+            &alice,
+            &MuxedAddress::from(bob.clone()),
+            40,
+        );
+
+        assert_eq!(Base::balance(&e, &alice), 60);
+        assert_eq!(Base::balance(&e, &bob), 40);
+        assert_eq!(get_voting_units(&e, &alice), 60);
+        assert_eq!(get_voting_units(&e, &bob), 40);
+    });
+}
+
+#[test]
+fn contract_overrides_transfer_from() {
+    let (e, contract_address) = setup_env();
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&contract_address, || {
+        FungibleVotes::mint(&e, &owner, 100);
+        Base::approve(&e, &owner, &spender, 50, 1000);
+    });
+
+    e.as_contract(&contract_address, || {
+        <FungibleVotes as ContractOverrides>::transfer_from(&e, &spender, &owner, &recipient, 30);
+
+        assert_eq!(Base::balance(&e, &owner), 70);
+        assert_eq!(Base::balance(&e, &recipient), 30);
+        assert_eq!(get_voting_units(&e, &owner), 70);
+        assert_eq!(get_voting_units(&e, &recipient), 30);
     });
 }
 
