@@ -214,6 +214,14 @@ pub trait Governor: Votes + Counting {
     /// # Errors
     ///
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
+    ///
+    /// # Note
+    ///
+    /// Queue logic is expected to be implemented by an extension, so the
+    /// default implementation does not handle the `Queued` and `Expired`
+    /// states. If you are utilizing an extension that enables
+    /// queueing, don't forget to override this function to handle `Queued` and
+    /// `Expired` states.
     fn proposal_state(e: &Env, proposal_id: BytesN<32>) -> ProposalState {
         storage::get_proposal_state(e, &proposal_id)
     }
@@ -486,58 +494,65 @@ pub trait Governor: Votes + Counting {
     }
 }
 
+// ################## TYPES ##################
+
 /// The state of a proposal in its lifecycle.
 ///
-///                  ┌──────────┐
-///                  │ Pending  │
-///                  └────┬─────┘
-///                       │
-///                  ┌────▼─────┐
-///            ┌─────│  Active  │─────┐
-///            │     └──────────┘     │
-///            │                      │
-///       ┌────▼─────┐         ┌──────▼────┐
-///       │ Defeated │         │ Succeeded │
-///       └──────────┘         └─────┬─────┘
-///                                  │
-///                            ┌─────▼─────┐
-///                            │  Queued   │
-///                            └──┬─────┬──┘
-///                               │     │
-///                        ┌──────▼┐  ┌─▼───────┐
-///                        │Expired│  │Executed │
-///                        └───────┘  └─────────┘
+/// States are divided into two categories:
 ///
-///   * Canceled can occur from any state except Canceled, Expired, or Executed.
-///   * Queued and Expired are optional states that require Queueing extensions
-///     (e.g., TimelockControl). Without Queueing extensions, Succeeded
-///     transitions directly to Executed.
+/// ## Time-based states (derived, never stored explicitly)
+///
+/// These are computed by [`get_proposal_state()`] from the current ledger
+/// relative to the proposal's voting schedule. They are only returned when
+/// no explicit state has been set.
+///
+/// - [`Pending`](ProposalState::Pending) — voting has not started yet.
+/// - [`Active`](ProposalState::Active) — voting is ongoing.
+/// - [`Defeated`](ProposalState::Defeated) — voting ended without the
+///   [`Counting`] module marking the proposal as `Succeeded`.
+///
+/// ## Explicit states
+///
+/// Set explicitly by the Governor or its extensions and persisted in
+/// storage. Once set, they take precedence over any time-based derivation.
+///
+/// - [`Canceled`](ProposalState::Canceled) — set by the Governor.
+/// - [`Succeeded`](ProposalState::Succeeded) — set by the [`Counting`] module.
+/// - [`Queued`](ProposalState::Queued) / [`Expired`](ProposalState::Expired) —
+///   set by extensions like `TimelockControl`.
+/// - [`Executed`](ProposalState::Executed) — set by the Governor.
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum ProposalState {
-    /// Initial state. Voting has not started yet
-    /// (`current_ledger < vote_start`).
+    // ==================== Time-based states ====================
+    // Derived from the current ledger.
+    /// The proposal is pending and voting has not started yet.
     Pending = 0,
-    /// Voting is ongoing (`vote_start <= current_ledger <= vote_end`).
+    /// The proposal is active and voting is ongoing.
     Active = 1,
-    /// Voting ended without meeting quorum or vote thresholds. This is the
-    /// default outcome when the [`Counting`] module has not marked the
-    /// proposal as [`Succeeded`](ProposalState::Succeeded).
+    /// The proposal was defeated (did not meet quorum or majority). This is
+    /// the default outcome when voting ends and the [`Counting`] module has
+    /// not marked the proposal as [`Succeeded`](ProposalState::Succeeded).
     Defeated = 2,
-    /// The proposal has been cancelled by the operator.
+
+    // ==================== Explicit states ====================
+    // Set by the Governor or extensions. Once set, these take precedence
+    // over time-based derivation.
+    /// The proposal has been cancelled. Set by the Governor.
     Canceled = 3,
-    /// Voting ended and the proposal met the required quorum and vote
-    /// thresholds. Set by the [`Counting`] module. The proposal is ready
-    /// to be executed (or queued, if a queuing extension is enabled).
+    /// The proposal succeeded and can be executed. Set by the [`Counting`]
+    /// module when the proposal meets the required quorum and vote
+    /// thresholds. If a queuing extension is enabled, this state means the
+    /// proposal is ready to be queued.
     Succeeded = 4,
-    /// The proposal is queued for execution with a time delay. Set by
-    /// extensions like `TimelockControl`.
-    Queued = 5,
-    /// The proposal's execution window has passed. Set by extensions like
+    /// The proposal is queued for execution. Set by extensions like
     /// `TimelockControl`.
+    Queued = 5,
+    /// The proposal has expired and can no longer be executed. Set by
+    /// extensions like `TimelockControl`.
     Expired = 6,
-    /// The proposal's actions have been executed.
+    /// The proposal has been executed. Set by the Governor.
     Executed = 7,
 }
 
