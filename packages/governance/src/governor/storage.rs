@@ -157,15 +157,11 @@ pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
 
 /// Returns the current state of a proposal.
 ///
-/// Terminal states (`Executed`, `Canceled`, `Expired`) and override states
-/// (`Succeeded`, `Queued`) are returned directly from storage. These are set
-/// explicitly by the Governor or its extensions (e.g., the `Counting` module
-/// sets `Succeeded`, `TimelockControl` sets `Queued`/`Expired`).
+/// If an explicit state has been set (see [`ProposalState`]), it is returned
+/// directly. Otherwise, the state is derived from the current ledger relative
+/// to the proposal's voting schedule (time-based).
 ///
-/// Time-based states (`Pending`, `Active`, `Defeated`) are derived from the
-/// current ledger relative to the proposal's voting schedule.
-///
-/// If voting has ended and the `Counting` module has not transitioned the
+/// If voting has ended and the [`Counting`] module has not transitioned the
 /// proposal to `Succeeded`, the proposal is considered `Defeated`.
 ///
 /// # Arguments
@@ -180,20 +176,17 @@ pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
 pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState {
     let core = get_proposal_core(e, proposal_id);
 
-    // Terminal and override states take precedence.
-    // These states are set explicitly by the Governor or its extensions
-    // (e.g., TimelockControl sets Queued/Expired, Counting sets Succeeded).
+    // Explicit states take precedence — return directly when set.
     match core.state {
-        ProposalState::Executed
-        | ProposalState::Canceled
+        ProposalState::Canceled
         | ProposalState::Succeeded
         | ProposalState::Queued
-        | ProposalState::Expired => return core.state,
+        | ProposalState::Expired
+        | ProposalState::Executed => return core.state,
         _ => {}
     }
 
-    // The time-based states (Pending, Active, Defeated) depend on the current
-    // ledger relative to vote_start/vote_end.
+    // Derive time-based state from the current ledger.
     let current_ledger = e.ledger().sequence();
 
     if current_ledger < core.vote_start {
@@ -394,9 +387,11 @@ pub fn set_voting_period(e: &Env, period: u32) {
 /// * refer to [`get_voting_delay()`] errors.
 /// * refer to [`get_voting_period()`] errors.
 ///
-/// # Notes
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
 ///
-/// * Authorization for `proposer` is required.
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can call this
+/// function.
 pub fn propose(
     e: &Env,
     proposer_votes: u128,
@@ -406,9 +401,6 @@ pub fn propose(
     description: String,
     proposer: &Address,
 ) -> BytesN<32> {
-    // Require authorization from the proposer
-    proposer.require_auth();
-
     // Validate proposal length
     let targets_len = targets.len();
     if targets_len == 0 {
@@ -466,35 +458,6 @@ pub fn propose(
     proposal_id
 }
 
-/// Prepares a vote by authorizing the voter, verifying the proposal is active,
-/// and returning the proposal snapshot ledger for voting power lookup.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `voter` - The address casting the vote.
-/// * `proposal_id` - The unique identifier of the proposal.
-///
-/// # Errors
-///
-/// * [`GovernorError::ProposalNotActive`] - Occurs if the proposal is not in
-///   the active state.
-/// * refer to [`get_proposal_state()`] errors.
-///
-/// # Notes
-///
-/// * Authorization for `voter` is required.
-pub fn prepare_vote(e: &Env, voter: &Address, proposal_id: &BytesN<32>) -> u32 {
-    voter.require_auth();
-
-    let state = get_proposal_state(e, proposal_id);
-    if state != ProposalState::Active {
-        panic_with_error!(e, GovernorError::ProposalNotActive);
-    }
-
-    get_proposal_snapshot(e, proposal_id)
-}
-
 /// Executes a successful proposal and returns its unique identifier (proposal
 /// ID).
 ///
@@ -516,19 +479,18 @@ pub fn prepare_vote(e: &Env, voter: &Address, proposal_id: &BytesN<32>) -> u32 {
 /// * refer to [`get_proposal_state()`] errors.
 /// * refer to [`get_proposal_core()`] errors.
 ///
-/// # Notes
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
 ///
-/// * Authorization for `executor` is required.
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can call this
+/// function.
 pub fn execute(
     e: &Env,
     targets: Vec<Address>,
     functions: Vec<Symbol>,
     args: Vec<Vec<Val>>,
     description_hash: &BytesN<32>,
-    executor: &Address,
 ) -> BytesN<32> {
-    executor.require_auth();
-
     let proposal_id = hash_proposal(e, &targets, &functions, &args, description_hash);
 
     // Check proposal state
@@ -541,10 +503,14 @@ pub fn execute(
     }
 
     // Execute each action
+    //
+    // `propose()` ensures the proposals in the storage are in the
+    // correct state, no further checks on the proposal integrity are needed.
+    // It should be safe to use `get_unchecked` here.
     for i in 0..targets.len() {
-        let target = targets.get(i).unwrap();
-        let function = functions.get(i).unwrap();
-        let func_args = args.get(i).unwrap();
+        let target = targets.get_unchecked(i);
+        let function = functions.get_unchecked(i);
+        let func_args = args.get_unchecked(i);
         e.invoke_contract::<Val>(&target, &function, func_args);
     }
 
@@ -577,19 +543,18 @@ pub fn execute(
 /// * refer to [`get_proposal_core()`] errors.
 /// * refer to [`get_proposal_state()`] errors.
 ///
-/// # Notes
+/// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
 ///
-/// * Authorization for `operator` is required.
+/// It is the responsibility of the implementer to establish appropriate
+/// access controls to ensure that only authorized accounts can call this
+/// function.
 pub fn cancel(
     e: &Env,
     targets: Vec<Address>,
     functions: Vec<Symbol>,
     args: Vec<Vec<Val>>,
     description_hash: &BytesN<32>,
-    operator: &Address,
 ) -> BytesN<32> {
-    operator.require_auth();
-
     let proposal_id = hash_proposal(e, &targets, &functions, &args, description_hash);
 
     // Get proposal and verify it exists
@@ -644,4 +609,27 @@ pub fn hash_proposal(
     data.append(&Bytes::from_slice(e, description_hash.to_array().as_slice()));
 
     e.crypto().keccak256(&data).to_bytes()
+}
+
+/// Prepares a vote by authorizing the voter, verifying the proposal is active,
+/// and returning the proposal snapshot ledger for voting power lookup.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `voter` - The address casting the vote.
+/// * `proposal_id` - The unique identifier of the proposal.
+///
+/// # Errors
+///
+/// * [`GovernorError::ProposalNotActive`] - Occurs if the proposal is not in
+///   the active state.
+/// * refer to [`get_proposal_state()`] errors.
+pub fn prepare_vote(e: &Env, proposal_id: &BytesN<32>) -> u32 {
+    let state = get_proposal_state(e, proposal_id);
+    if state != ProposalState::Active {
+        panic_with_error!(e, GovernorError::ProposalNotActive);
+    }
+
+    get_proposal_snapshot(e, proposal_id)
 }

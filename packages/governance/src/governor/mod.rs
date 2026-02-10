@@ -333,6 +333,7 @@ pub trait Governor: Votes + Counting {
         description: String,
         proposer: Address,
     ) -> BytesN<32> {
+        proposer.require_auth();
         // Use previous ledger to prevent flash loan based proposals
         let snapshot = e.ledger().sequence() - 1;
         let proposer_votes = Self::get_past_votes(e, proposer.clone(), snapshot);
@@ -375,7 +376,9 @@ pub trait Governor: Votes + Counting {
         reason: String,
         voter: Address,
     ) -> u128 {
-        let snapshot = storage::prepare_vote(e, &voter, &proposal_id);
+        voter.require_auth();
+
+        let snapshot = storage::prepare_vote(e, &proposal_id);
         let voter_weight = Self::get_past_votes(e, voter.clone(), snapshot);
         Self::count_vote(e, proposal_id.clone(), voter.clone(), vote_type, voter_weight);
         crate::governor::emit_vote_cast(e, &voter, &proposal_id, vote_type, voter_weight, &reason);
@@ -423,7 +426,9 @@ pub trait Governor: Votes + Counting {
         description_hash: BytesN<32>,
         executor: Address,
     ) -> BytesN<32> {
-        storage::execute(e, targets, functions, args, &description_hash, &executor)
+        executor.require_auth();
+
+        storage::execute(e, targets, functions, args, &description_hash)
     }
 
     /// Cancels a proposal and returns its unique identifier.
@@ -462,7 +467,9 @@ pub trait Governor: Votes + Counting {
         description_hash: BytesN<32>,
         operator: Address,
     ) -> BytesN<32> {
-        storage::cancel(e, targets, functions, args, &description_hash, &operator)
+        operator.require_auth();
+
+        storage::cancel(e, targets, functions, args, &description_hash)
     }
 
     /// Returns whether proposals need to be queued before execution.
@@ -482,31 +489,62 @@ pub trait Governor: Votes + Counting {
 // ################## TYPES ##################
 
 /// The state of a proposal in its lifecycle.
+///
+/// States are divided into two categories:
+///
+/// ## Time-based states (derived, never stored explicitly)
+///
+/// These are computed by [`get_proposal_state()`] from the current ledger
+/// relative to the proposal's voting schedule. They are only returned when
+/// no explicit state has been set.
+///
+/// - [`Pending`](ProposalState::Pending) — voting has not started yet.
+/// - [`Active`](ProposalState::Active) — voting is ongoing.
+/// - [`Defeated`](ProposalState::Defeated) — voting ended without the
+///   [`Counting`] module marking the proposal as `Succeeded`.
+///
+/// ## Explicit states
+///
+/// Set explicitly by the Governor or its extensions and persisted in
+/// storage. Once set, they take precedence over any time-based derivation.
+///
+/// - [`Canceled`](ProposalState::Canceled) — set by the Governor.
+/// - [`Succeeded`](ProposalState::Succeeded) — set by the [`Counting`] module.
+/// - [`Queued`](ProposalState::Queued) / [`Expired`](ProposalState::Expired) —
+///   set by extensions like `TimelockControl`.
+/// - [`Executed`](ProposalState::Executed) — set by the Governor.
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum ProposalState {
+    // ==================== Time-based states ====================
+    // Derived from the current ledger.
     /// The proposal is pending and voting has not started yet.
     Pending = 0,
     /// The proposal is active and voting is ongoing.
     Active = 1,
-    /// The proposal has been cancelled.
-    Canceled = 2,
     /// The proposal was defeated (did not meet quorum or majority). This is
     /// the default outcome when voting ends and the [`Counting`] module has
     /// not marked the proposal as [`Succeeded`](ProposalState::Succeeded).
-    Defeated = 3,
-    /// The proposal succeeded and can be executed. This state is set by the
-    /// [`Counting`] module when the proposal meets the required quorum and
-    /// vote thresholds. If a queuing extension is enabled, this state means
-    /// the proposal is ready to be queued.
+    Defeated = 2,
+
+    // ==================== Explicit states ====================
+    // Set by the Governor or extensions. Once set, these take precedence
+    // over time-based derivation.
+    /// The proposal has been cancelled. Set by the Governor.
+    Canceled = 3,
+    /// The proposal succeeded and can be executed. Set by the [`Counting`]
+    /// module when the proposal meets the required quorum and vote
+    /// thresholds. If a queuing extension is enabled, this state means the
+    /// proposal is ready to be queued.
     Succeeded = 4,
-    /// The proposal is queued for execution (when using an extension that
-    /// enables the queue step, like TimelockControl).
+    /// The proposal is queued for execution. Set by extensions like
+    /// `TimelockControl`.
     Queued = 5,
-    /// The proposal has expired and can no longer be executed.
+    /// The proposal has expired and can no longer be executed. Set by
+    /// extensions like `TimelockControl`.
     Expired = 6,
-    /// The proposal has been executed.
+    /// The proposal has been executed. Set by the Governor.
     Executed = 7,
 }
 
