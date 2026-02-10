@@ -1,0 +1,78 @@
+name: Publish on crates.io
+# This workflow publishes all crates on crates.io.
+on:
+  push:
+    tags:
+      - v*
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  dry-run:
+    name: Dry run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32v1-none
+
+      - name: Check stellar-access
+        run: cargo publish -p stellar-access --target wasm32v1-none --dry-run
+
+      - name: Check stellar-accounts
+        run: cargo publish -p stellar-accounts --target wasm32v1-none --dry-run
+
+      - name: Check stellar-contract-utils
+        run: cargo publish -p stellar-contract-utils --target wasm32v1-none --dry-run
+
+      - name: Check stellar-fee-abstraction
+        run: cargo publish -p stellar-fee-abstraction --target wasm32v1-none --dry-run
+
+      - name: Check stellar-governance
+        run: cargo publish -p stellar-governance --target wasm32v1-none --dry-run
+
+      - name: Check stellar-macros
+        run: cargo publish -p stellar-macros --target wasm32v1-none --dry-run
+
+        # Intentionally skipping "stellar-tokens" because dependant on "stellar-contract-utils"
+
+  publish:
+    name: Publish
+    needs: dry-run
+    env:
+      CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: wasm32v1-none
+      - name: Publish stellar-access
+        run: cargo publish -p stellar-access --target wasm32v1-none --token $CRATES_IO_TOKEN
+
+      - name: Publish stellar-accounts
+        run: cargo publish -p stellar-accounts --target wasm32v1-none --token $CRATES_IO_TOKEN
+
+      - name: Publish stellar-contract-utils
+        run: cargo publish -p stellar-contract-utils --target wasm32v1-none --token $CRATES_IO_TOKEN
+
+      - name: Publish stellar-fee-abstraction
+        run: cargo publish -p stellar-fee-abstraction --target wasm32v1-none --token $CRATES_IO_TOKEN
+
+      - name: Publish stellar-governance
+        run: cargo publish -p stellar-governance --target wasm32v1-none --token $CRATES_IO_TOKEN
+
+      - name: Publish stellar-macros
+        run: cargo publish -p stellar-macros --target wasm32v1-none --token $CRATES_IO_TOKEN
+
+      # "stellar-token" is dependant on "stellar-contract-utils" and if there's some latency from crates.io, it might be useful to add a sleep step e.g. `sleep 300`
+
+      - name: Publish stellar-tokens
+        run: cargo publish -p stellar-tokens --target wasm32v1-none --token $CRATES_IO_TOKEN
