@@ -365,9 +365,9 @@ pub trait Governor: Votes + Counting {
     /// # Notes
     ///
     /// * Authorization for `voter` is required.
-    /// * The `voter` parameter enables flexible access control. The
-    ///   implementer can pass any address to customize who is authorized
-    ///   to cast votes (e.g., for vote delegation or relaying).
+    /// * The `voter` parameter enables flexible access control. The implementer
+    ///   can pass any address to customize who is authorized to cast votes
+    ///   (e.g., for vote delegation or relaying).
     fn cast_vote(
         e: &Env,
         proposal_id: BytesN<32>,
@@ -412,9 +412,9 @@ pub trait Governor: Votes + Counting {
     ///
     /// * Authorization for `executor` is required.
     /// * The `executor` parameter enables flexible access control. The
-    ///   implementer can pass any address to customize who is authorized
-    ///   to execute proposals (e.g., restrict to a timelock contract or
-    ///   allow any account).
+    ///   implementer can pass any address to customize who is authorized to
+    ///   execute proposals (e.g., restrict to a timelock contract or allow any
+    ///   account).
     fn execute(
         e: &Env,
         targets: Vec<Address>,
@@ -452,8 +452,8 @@ pub trait Governor: Votes + Counting {
     ///
     /// * Authorization for `operator` is required.
     /// * The `operator` parameter enables flexible access control. The
-    ///   implementer decides who can cancel proposals (e.g., only the
-    ///   original proposer, an admin, or a guardian role).
+    ///   implementer decides who can cancel proposals (e.g., only the original
+    ///   proposer, an admin, or a guardian role).
     fn cancel(
         e: &Env,
         targets: Vec<Address>,
