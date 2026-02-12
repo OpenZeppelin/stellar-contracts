@@ -6,9 +6,29 @@ Stellar governance functionalities
 
 This package provides governance modules for Soroban smart contracts:
 
+- **Votes**: Vote tracking with delegation and historical checkpointing
 - **Timelock**: Time-delayed execution of operations
 
 ## Modules
+
+### Votes
+
+The `votes` module provides vote tracking functionality with delegation and historical checkpointing for governance mechanisms.
+
+#### Core Concepts
+
+- **Voting Units**: The base unit of voting power, typically 1:1 with token balance
+- **Delegation**: Accounts can delegate their voting power to another account (delegatee)
+- **Checkpoints**: Historical snapshots of voting power at specific timestamps
+- **Clock Mode**: Uses ledger timestamps (`e.ledger().timestamp()`) as the timepoint reference
+
+#### Key Features
+
+- Track voting power per account with historical checkpoints
+- Support delegation (an account can delegate its voting power to another account)
+- Provide historical vote queries at any past timestamp
+- Explicit delegation required (accounts must self-delegate to use their own voting power)
+- Non-delegated voting units are not counted as votes
 
 ### Timelock
 

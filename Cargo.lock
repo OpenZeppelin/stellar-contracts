@@ -707,6 +707,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fungible-votes-example"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-governance",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1940,6 +1951,7 @@ dependencies = [
  "soroban-test-helpers",
  "stellar-contract-utils",
  "stellar-event-assertion",
+ "stellar-governance",
 ]
 
 [[package]]

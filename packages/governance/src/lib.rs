@@ -2,3 +2,4 @@
 
 pub mod governor;
 pub mod timelock;
+pub mod votes;
