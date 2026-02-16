@@ -104,17 +104,7 @@ use soroban_sdk::{
     Symbol, Val, Vec,
 };
 
-use crate::votes::Votes;
-
-/// TODO: delete this after Counting PR is merged
-pub trait Counting {
-    fn counting_mode(e: &Env) -> Symbol;
-    fn has_voted(e: &Env, proposal_id: BytesN<32>, account: Address) -> bool;
-    fn quorum(e: &Env, ledger: u32) -> u128;
-    fn quorum_reached(e: &Env, proposal_id: BytesN<32>) -> bool;
-    fn vote_succeeded(e: &Env, proposal_id: BytesN<32>) -> bool;
-    fn count_vote(e: &Env, proposal_id: BytesN<32>, account: Address, vote_type: u32, weight: u128);
-}
+use crate::{counting::Counting, votes::Votes};
 
 /// Base Governor Trait
 ///
