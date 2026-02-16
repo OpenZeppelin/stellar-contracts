@@ -5,11 +5,13 @@
 //! votes, and configuration parameters.
 
 use soroban_sdk::{
-    contracttype, panic_with_error, xdr::ToXdr, Address, BytesN, Env, String, Symbol, Val, Vec,
+    contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, String, Symbol, Val,
+    Vec,
 };
 
 use crate::governor::{
-    GovernorError, ProposalState, GOVERNOR_EXTEND_AMOUNT, GOVERNOR_TTL_THRESHOLD,
+    emit_proposal_created, GovernorError, ProposalState, GOVERNOR_EXTEND_AMOUNT,
+    GOVERNOR_TTL_THRESHOLD,
 };
 
 // ################## STORAGE KEYS ##################
@@ -175,32 +177,7 @@ pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
 /// function does not handle the `Queued` and `Expired` states.
 pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState {
     let core = get_proposal_core(e, proposal_id);
-
-    // These state transitions are ledger-dependent:
-    //   Pending -> Active -> Defeated
-    //   Queued  -> Expired
-    //
-    // Canceled, Succeeded, and Executed are ledger-independent — return
-    // them immediately.
-    match core.state {
-        ProposalState::Canceled | ProposalState::Succeeded | ProposalState::Executed =>
-            return core.state,
-        _ => {}
-    }
-
-    // Derive Pending, Active, or Defeated from the current ledger.
-    let current_ledger = e.ledger().sequence();
-
-    if current_ledger < core.vote_start {
-        return ProposalState::Pending;
-    }
-
-    if current_ledger <= core.vote_end {
-        return ProposalState::Active;
-    }
-
-    // Voting has ended without the Counting module marking it as Succeeded.
-    ProposalState::Defeated
+    derive_proposal_state(e, &core)
 }
 
 /// Returns the snapshot ledger for a proposal.
@@ -385,6 +362,8 @@ pub fn set_voting_period(e: &Env, period: u32) {
 ///   same parameters already exists.
 /// * [`GovernorError::InsufficientProposerVotes`] - Occurs if the proposer
 ///   lacks sufficient voting power.
+/// * [`GovernorError::MathOverflow`] - Occurs if voting schedule calculation
+///   overflows.
 /// * refer to [`get_proposal_threshold()`] errors.
 /// * refer to [`get_voting_delay()`] errors.
 /// * refer to [`get_voting_period()`] errors.
@@ -432,8 +411,12 @@ pub fn propose(
     // Calculate voting schedule
     let voting_delay = get_voting_delay(e);
     let voting_period = get_voting_period(e);
-    let vote_start = current_ledger + voting_delay;
-    let vote_end = vote_start + voting_period;
+    let Some(vote_start) = current_ledger.checked_add(voting_delay) else {
+        panic_with_error!(e, GovernorError::MathOverflow);
+    };
+    let Some(vote_end) = vote_start.checked_add(voting_period) else {
+        panic_with_error!(e, GovernorError::MathOverflow);
+    };
 
     // Store proposal
     let proposal = ProposalCore {
@@ -445,7 +428,7 @@ pub fn propose(
     e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
 
     // Emit event
-    crate::governor::emit_proposal_created(
+    emit_proposal_created(
         e,
         &proposal_id,
         proposer,
@@ -478,7 +461,6 @@ pub fn propose(
 ///   succeeded.
 /// * [`GovernorError::ProposalAlreadyExecuted`] - Occurs if the proposal has
 ///   already been executed.
-/// * refer to [`get_proposal_state()`] errors.
 /// * refer to [`get_proposal_core()`] errors.
 ///
 /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
@@ -495,8 +477,11 @@ pub fn execute(
 ) -> BytesN<32> {
     let proposal_id = hash_proposal(e, &targets, &functions, &args, description_hash);
 
+    // Get proposal and verify it exists
+    let mut proposal = get_proposal_core(e, &proposal_id);
+
     // Check proposal state
-    let state = get_proposal_state(e, &proposal_id);
+    let state = derive_proposal_state(e, &proposal);
     if state == ProposalState::Executed {
         panic_with_error!(e, GovernorError::ProposalAlreadyExecuted);
     }
@@ -517,7 +502,6 @@ pub fn execute(
     }
 
     // Mark as executed
-    let mut proposal = get_proposal_core(e, &proposal_id);
     proposal.state = ProposalState::Executed;
     e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
 
@@ -543,7 +527,6 @@ pub fn execute(
 /// * [`GovernorError::ProposalNotCancellable`] - Occurs if the proposal is in a
 ///   non-cancellable state (`Canceled`, `Expired`, or `Executed`).
 /// * refer to [`get_proposal_core()`] errors.
-/// * refer to [`get_proposal_state()`] errors.
 ///
 /// ⚠️ SECURITY RISK: This function has NO AUTHORIZATION CONTROLS ⚠️
 ///
@@ -563,7 +546,7 @@ pub fn cancel(
     let mut proposal = get_proposal_core(e, &proposal_id);
 
     // Blacklist non-cancellable states
-    let state = get_proposal_state(e, &proposal_id);
+    let state = derive_proposal_state(e, &proposal);
     match state {
         ProposalState::Canceled | ProposalState::Expired | ProposalState::Executed => {
             panic_with_error!(e, GovernorError::ProposalNotCancellable)
@@ -603,8 +586,6 @@ pub fn hash_proposal(
     args: &Vec<Vec<Val>>,
     description_hash: &BytesN<32>,
 ) -> BytesN<32> {
-    use soroban_sdk::Bytes;
-
     // Concatenate all inputs for hashing
     let mut data = Bytes::new(e);
     data.append(&targets.to_xdr(e));
@@ -628,12 +609,34 @@ pub fn hash_proposal(
 ///
 /// * [`GovernorError::ProposalNotActive`] - Occurs if the proposal is not in
 ///   the active state.
-/// * refer to [`get_proposal_state()`] errors.
+/// * refer to [`get_proposal_core()`] errors.
 pub fn prepare_vote(e: &Env, proposal_id: &BytesN<32>) -> u32 {
-    let state = get_proposal_state(e, proposal_id);
+    let core = get_proposal_core(e, proposal_id);
+    let state = derive_proposal_state(e, &core);
     if state != ProposalState::Active {
         panic_with_error!(e, GovernorError::ProposalNotActive);
     }
 
-    get_proposal_snapshot(e, proposal_id)
+    core.vote_start
+}
+
+fn derive_proposal_state(e: &Env, core: &ProposalCore) -> ProposalState {
+    match core.state {
+        ProposalState::Canceled | ProposalState::Succeeded | ProposalState::Executed => {
+            return core.state;
+        }
+        _ => {}
+    }
+
+    let current_ledger = e.ledger().sequence();
+
+    if current_ledger < core.vote_start {
+        return ProposalState::Pending;
+    }
+
+    if current_ledger <= core.vote_end {
+        return ProposalState::Active;
+    }
+
+    ProposalState::Defeated
 }

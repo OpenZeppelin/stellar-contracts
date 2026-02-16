@@ -104,11 +104,7 @@ use soroban_sdk::{
     Symbol, Val, Vec,
 };
 
-/// TODO: delete this after Votes PR is merged
-pub trait Votes {
-    fn get_past_votes(e: &Env, account: Address, ledger: u32) -> u128;
-    fn get_past_total_supply(e: &Env, ledger: u32) -> u128;
-}
+use crate::votes::Votes;
 
 /// TODO: delete this after Counting PR is merged
 pub trait Counting {
@@ -319,6 +315,8 @@ pub trait Governor: Votes + Counting {
     ///   been set.
     /// * [`GovernorError::VotingPeriodNotSet`] - If the voting period has not
     ///   been set.
+    /// * [`GovernorError::MathOverflow`] - If voting schedule calculation
+    ///   overflows.
     ///
     /// # Events
     ///
@@ -344,7 +342,8 @@ pub trait Governor: Votes + Counting {
         proposer.require_auth();
         // Use previous ledger to prevent flash loan based proposals
         let snapshot = e.ledger().sequence() - 1;
-        let proposer_votes = Self::get_past_votes(e, proposer.clone(), snapshot);
+        let proposer_votes = Self::get_votes_at_checkpoint(e, proposer.clone(), snapshot as u64); // TODO: revert `as u64` cast to snapshot if we go with ledgers instead of
+                                                                                                  // timestamps.
         storage::propose(e, proposer_votes, targets, functions, args, description, &proposer)
     }
 
@@ -387,7 +386,7 @@ pub trait Governor: Votes + Counting {
         voter.require_auth();
 
         let snapshot = storage::prepare_vote(e, &proposal_id);
-        let voter_weight = Self::get_past_votes(e, voter.clone(), snapshot);
+        let voter_weight = Self::get_votes_at_checkpoint(e, voter.clone(), snapshot as u64);
         Self::count_vote(e, proposal_id.clone(), voter.clone(), vote_type, voter_weight);
         crate::governor::emit_vote_cast(e, &voter, &proposal_id, vote_type, voter_weight, &reason);
         voter_weight
@@ -594,6 +593,8 @@ pub enum GovernorError {
     NameNotSet = 5013,
     /// The version has not been set.
     VersionNotSet = 5014,
+    /// Arithmetic overflow occurred.
+    MathOverflow = 5015,
 }
 
 // ################## CONSTANTS ##################
