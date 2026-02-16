@@ -60,7 +60,7 @@
 //!
 //! This implementation uses **snapshot-based voting power**. When a proposal
 //! is created, the current ledger number is recorded as the "snapshot". All
-//! voting power calculations use [`get_past_votes()`] which queries the
+//! voting power calculations use [`get_votes_at_checkpoint()`] which queries the
 //! voting power at the snapshot ledger, not the current ledger.
 //!
 //! This means an attacker must hold tokens *before* a proposal is created
