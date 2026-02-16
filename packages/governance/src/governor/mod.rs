@@ -60,8 +60,8 @@
 //!
 //! This implementation uses **snapshot-based voting power**. When a proposal
 //! is created, the current ledger number is recorded as the "snapshot". All
-//! voting power calculations use [`get_votes_at_checkpoint()`] which queries the
-//! voting power at the snapshot ledger, not the current ledger.
+//! voting power calculations use [`get_votes_at_checkpoint()`] which queries
+//! the voting power at the snapshot ledger, not the current ledger.
 //!
 //! This means an attacker must hold tokens *before* a proposal is created
 //! to have voting power on that proposal, making flash loan attacks
@@ -385,10 +385,10 @@ pub trait Governor: Votes + Counting {
     ) -> u128 {
         voter.require_auth();
 
-        let snapshot = storage::prepare_vote(e, &proposal_id);
+        let snapshot = storage::check_proposal_state(e, &proposal_id);
         let voter_weight = Self::get_votes_at_checkpoint(e, voter.clone(), snapshot as u64);
         Self::count_vote(e, proposal_id.clone(), voter.clone(), vote_type, voter_weight);
-        crate::governor::emit_vote_cast(e, &voter, &proposal_id, vote_type, voter_weight, &reason);
+        emit_vote_cast(e, &voter, &proposal_id, vote_type, voter_weight, &reason);
         voter_weight
     }
 

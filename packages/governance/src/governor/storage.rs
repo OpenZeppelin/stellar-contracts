@@ -610,7 +610,7 @@ pub fn hash_proposal(
 /// * [`GovernorError::ProposalNotActive`] - Occurs if the proposal is not in
 ///   the active state.
 /// * refer to [`get_proposal_core()`] errors.
-pub fn prepare_vote(e: &Env, proposal_id: &BytesN<32>) -> u32 {
+pub fn check_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> u32 {
     let core = get_proposal_core(e, proposal_id);
     let state = derive_proposal_state(e, &core);
     if state != ProposalState::Active {
@@ -630,7 +630,8 @@ fn derive_proposal_state(e: &Env, core: &ProposalCore) -> ProposalState {
 
     let current_ledger = e.ledger().sequence();
 
-    if current_ledger < core.vote_start {
+    // `vote_start` is the snapshot ledger, so voting opens on the next ledger.
+    if current_ledger <= core.vote_start {
         return ProposalState::Pending;
     }
 
