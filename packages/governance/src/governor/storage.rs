@@ -615,7 +615,7 @@ pub fn hash_proposal(
     e.crypto().keccak256(&data).to_bytes()
 }
 
-/// Prepares a vote by authorizing the voter, verifying the proposal is active,
+/// Prepares a vote by verifying the proposal is active,
 /// and returning the proposal snapshot ledger for voting power lookup.
 ///
 /// # Arguments
