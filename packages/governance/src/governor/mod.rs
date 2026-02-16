@@ -508,7 +508,7 @@ pub trait Governor: Votes + Counting {
 ///
 /// - [`Pending`](ProposalState::Pending) — voting has not started yet.
 /// - [`Active`](ProposalState::Active) — voting is ongoing.
-/// - [`Defeated`](ProposalState::Defeated) — voting ended without the
+/// - [`Defeated`](ProposalState::Defeated) — voting ended **without** the
 ///   [`Counting`] module marking the proposal as `Succeeded`.
 ///
 /// ## Explicit states
