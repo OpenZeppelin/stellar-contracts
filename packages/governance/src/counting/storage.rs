@@ -71,7 +71,12 @@ pub fn counting_mode(e: &Env) -> Symbol {
 /// * `account` - The address to check.
 pub fn has_voted(e: &Env, proposal_id: &BytesN<32>, account: &Address) -> bool {
     let key = CountingStorageKey::HasVoted(proposal_id.clone(), account.clone());
-    e.storage().persistent().has(&key)
+    if e.storage().persistent().has(&key) {
+        e.storage().persistent().extend_ttl(&key, COUNTING_TTL_THRESHOLD, COUNTING_EXTEND_AMOUNT);
+        true
+    } else {
+        false
+    }
 }
 
 /// Returns the quorum value.
@@ -105,11 +110,17 @@ pub fn get_quorum(e: &Env) -> u128 {
 ///
 /// # Errors
 ///
-/// * refer to [`get_quorum()`] errors.
+/// * [`CountingError::MathOverflow`] - Occurs if participation tally overflows.
+/// * also refer to [`get_quorum()`] errors.
 pub fn quorum_reached(e: &Env, proposal_id: &BytesN<32>) -> bool {
     let quorum = get_quorum(e);
     let counts = get_proposal_vote_counts(e, proposal_id);
-    counts.for_votes + counts.abstain_votes >= quorum
+
+    let Some(participation) = counts.for_votes.checked_add(counts.abstain_votes) else {
+        panic_with_error!(e, CountingError::MathOverflow);
+    };
+
+    participation >= quorum
 }
 
 /// Returns whether the tally has succeeded for a proposal.
@@ -127,8 +138,15 @@ pub fn tally_succeeded(e: &Env, proposal_id: &BytesN<32>) -> bool {
 
 /// Returns the vote tallies for a proposal.
 ///
-/// Returns a zero-initialized [`ProposalVoteCounts`] if no votes have been
-/// cast yet.
+/// If no tally exists yet, this returns a zero-initialized
+/// [`ProposalVoteCounts`].
+///
+/// Vote tally entries are created lazily on the first recorded vote, not at
+/// proposal creation time. This keeps the counting module loosely coupled to
+/// governor proposal lifecycle/storage.
+///
+/// Because of that design, a missing storage entry is interpreted as
+/// "no votes cast yet" rather than an error (`panic`) or `Option::None`.
 ///
 /// # Arguments
 ///
@@ -136,12 +154,17 @@ pub fn tally_succeeded(e: &Env, proposal_id: &BytesN<32>) -> bool {
 /// * `proposal_id` - The unique identifier of the proposal.
 pub fn get_proposal_vote_counts(e: &Env, proposal_id: &BytesN<32>) -> ProposalVoteCounts {
     let key = CountingStorageKey::ProposalVote(proposal_id.clone());
-    if let Some(counts) = e.storage().persistent().get::<_, ProposalVoteCounts>(&key) {
-        e.storage().persistent().extend_ttl(&key, COUNTING_TTL_THRESHOLD, COUNTING_EXTEND_AMOUNT);
-        counts
-    } else {
-        ProposalVoteCounts { against_votes: 0, for_votes: 0, abstain_votes: 0 }
-    }
+    e.storage()
+        .persistent()
+        .get::<_, ProposalVoteCounts>(&key)
+        .inspect(|_| {
+            e.storage().persistent().extend_ttl(
+                &key,
+                COUNTING_TTL_THRESHOLD,
+                COUNTING_EXTEND_AMOUNT,
+            );
+        })
+        .unwrap_or(ProposalVoteCounts { against_votes: 0, for_votes: 0, abstain_votes: 0 })
 }
 
 // ################## CHANGE STATE ##################
@@ -202,6 +225,12 @@ pub fn count_vote(
     // Check if the account has already voted
     let voted_key = CountingStorageKey::HasVoted(proposal_id.clone(), account.clone());
     if e.storage().persistent().has(&voted_key) {
+        e.storage().persistent().extend_ttl(
+            &voted_key,
+            COUNTING_TTL_THRESHOLD,
+            COUNTING_EXTEND_AMOUNT,
+        );
+
         panic_with_error!(e, CountingError::AlreadyVoted);
     }
 
@@ -237,5 +266,4 @@ pub fn count_vote(
 
     // Mark account as having voted
     e.storage().persistent().set(&voted_key, &true);
-    e.storage().persistent().extend_ttl(&voted_key, COUNTING_TTL_THRESHOLD, COUNTING_EXTEND_AMOUNT);
 }
