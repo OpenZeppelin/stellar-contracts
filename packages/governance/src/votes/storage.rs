@@ -19,13 +19,13 @@ pub(crate) enum CheckpointOp {
 
 // ################## TYPES ##################
 
-/// A checkpoint recording voting power at a specific timepoint.
+/// A checkpoint recording voting power at a specific ledger sequence number.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Checkpoint {
-    /// The timepoint when this checkpoint was created
-    pub timestamp: u64,
-    /// The voting power at this timepoint
+    /// The ledger sequence number when this checkpoint was created
+    pub ledger: u32,
+    /// The voting power at this ledger sequence number
     pub votes: u128,
 }
 
@@ -109,29 +109,30 @@ pub fn get_votes(e: &Env, account: &Address) -> u128 {
 }
 
 /// Returns the voting power (delegated votes) of an account at a specific
-/// past timepoint.
+/// past ledger sequence number.
 ///
 /// Returns `0` if no voting power had been delegated to this account at the
-/// given timepoint, or if the account does not exist in the contract.
+/// given ledger, or if the account does not exist in the contract.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
 /// * `account` - The address to query voting power for.
-/// * `timepoint` - The timepoint to query (must be in the past).
+/// * `ledger` - The ledger sequence number to query (must be in the past).
 ///
 /// # Errors
 ///
-/// * [`VotesError::FutureLookup`] - If `timepoint` >= current timestamp.
-pub fn get_votes_at_checkpoint(e: &Env, account: &Address, timepoint: u64) -> u128 {
-    if timepoint >= e.ledger().timestamp() {
+/// * [`VotesError::FutureLookup`] - If `ledger` >= current ledger sequence
+///   number.
+pub fn get_votes_at_checkpoint(e: &Env, account: &Address, ledger: u32) -> u128 {
+    if ledger >= e.ledger().sequence() {
         panic_with_error!(e, VotesError::FutureLookup);
     }
 
     let cp_type = CheckpointType::Account(account.clone());
     let num = get_num_checkpoints(e, &cp_type);
 
-    lookup_checkpoint_at(e, timepoint, num, &cp_type)
+    lookup_checkpoint_at(e, ledger, num, &cp_type)
 }
 
 /// Returns the current total supply of voting units.
@@ -148,27 +149,29 @@ pub fn get_total_supply(e: &Env) -> u128 {
     get_checkpoint(e, &cp_type, num - 1).votes
 }
 
-/// Returns the total supply of voting units at a specific past timepoint.
+/// Returns the total supply of voting units at a specific past ledger
+/// sequence number.
 ///
-/// Returns `0` if there were no voting units at the given timepoint.
+/// Returns `0` if there were no voting units at the given ledger.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `timepoint` - The timepoint to query (must be in the past).
+/// * `ledger` - The ledger sequence number to query (must be in the past).
 ///
 /// # Errors
 ///
-/// * [`VotesError::FutureLookup`] - If `timepoint` >= current timestamp.
-pub fn get_total_supply_at_checkpoint(e: &Env, timepoint: u64) -> u128 {
-    if timepoint >= e.ledger().timestamp() {
+/// * [`VotesError::FutureLookup`] - If `ledger` >= current ledger sequence
+///   number.
+pub fn get_total_supply_at_checkpoint(e: &Env, ledger: u32) -> u128 {
+    if ledger >= e.ledger().sequence() {
         panic_with_error!(e, VotesError::FutureLookup);
     }
 
     let cp_type = CheckpointType::TotalSupply;
     let num = get_num_checkpoints(e, &cp_type);
 
-    lookup_checkpoint_at(e, timepoint, num, &cp_type)
+    lookup_checkpoint_at(e, ledger, num, &cp_type)
 }
 
 /// Returns the delegate for an account.
@@ -354,26 +357,21 @@ fn move_delegate_votes(e: &Env, from: Option<&Address>, to: Option<&Address>, am
     }
 }
 
-/// Binary search over checkpoints to find votes at a given timepoint.
-fn lookup_checkpoint_at(
-    e: &Env,
-    timepoint: u64,
-    num: u32,
-    checkpoint_type: &CheckpointType,
-) -> u128 {
+/// Binary search over checkpoints to find votes at a given ledger.
+fn lookup_checkpoint_at(e: &Env, ledger: u32, num: u32, checkpoint_type: &CheckpointType) -> u128 {
     if num == 0 {
         return 0;
     }
 
-    // Check if timepoint is after the latest checkpoint
+    // Check if ledger is after the latest checkpoint
     let latest = get_checkpoint(e, checkpoint_type, num - 1);
-    if latest.timestamp <= timepoint {
+    if latest.ledger <= ledger {
         return latest.votes;
     }
 
-    // Check if timepoint is before the first checkpoint
+    // Check if ledger is before the first checkpoint
     let first = get_checkpoint(e, checkpoint_type, 0);
-    if first.timestamp > timepoint {
+    if first.ledger > ledger {
         return 0;
     }
 
@@ -384,7 +382,7 @@ fn lookup_checkpoint_at(
     while low < high {
         let mid = (low + high).div_ceil(2);
         let checkpoint = get_checkpoint(e, checkpoint_type, mid);
-        if checkpoint.timestamp <= timepoint {
+        if checkpoint.ledger <= ledger {
             low = mid;
         } else {
             high = mid - 1;
@@ -435,8 +433,8 @@ fn get_num_checkpoints(e: &Env, checkpoint_type: &CheckpointType) -> u32 {
     }
 }
 
-/// Pushes a new checkpoint or updates the last one if same timepoint.
-/// Returns (previous_votes, new_votes).
+/// Pushes a new checkpoint or updates the last one if same ledger sequence
+/// number. Returns (previous_votes, new_votes).
 fn push_checkpoint(
     e: &Env,
     checkpoint_type: &CheckpointType,
@@ -444,7 +442,7 @@ fn push_checkpoint(
     delta: u128,
 ) -> (u128, u128) {
     let num = get_num_checkpoints(e, checkpoint_type);
-    let timestamp = e.ledger().timestamp();
+    let ledger = e.ledger().sequence();
 
     let last_checkpoint =
         if num > 0 { Some(get_checkpoint(e, checkpoint_type, num - 1)) } else { None };
@@ -452,18 +450,18 @@ fn push_checkpoint(
     let previous_votes = last_checkpoint.as_ref().map_or(0, |cp| cp.votes);
     let votes = apply_checkpoint_op(e, previous_votes, op, delta);
 
-    // Check if we can update the last checkpoint (same timepoint)
+    // Check if we can update the last checkpoint (same ledger sequence number)
     if let Some(cp) = &last_checkpoint {
-        if cp.timestamp == timestamp {
+        if cp.ledger == ledger {
             let key = checkpoint_storage_key(checkpoint_type, num - 1);
-            e.storage().persistent().set(&key, &Checkpoint { timestamp, votes });
+            e.storage().persistent().set(&key, &Checkpoint { ledger, votes });
             return (previous_votes, votes);
         }
     }
 
     // Create new checkpoint
     let key = checkpoint_storage_key(checkpoint_type, num);
-    e.storage().persistent().set(&key, &Checkpoint { timestamp, votes });
+    e.storage().persistent().set(&key, &Checkpoint { ledger, votes });
 
     // Update checkpoint count
     match checkpoint_type {

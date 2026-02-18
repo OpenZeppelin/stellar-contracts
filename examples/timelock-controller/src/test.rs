@@ -91,7 +91,7 @@ fn schedule_and_execute_operation() {
     assert!(!client.is_operation_ready(&operation_id));
 
     // Advance ledgers to make operation ready
-    e.ledger().with_mut(|li| li.timestamp += 10);
+    e.ledger().with_mut(|li| li.sequence_number += 10);
 
     assert!(client.is_operation_ready(&operation_id));
 
@@ -140,7 +140,7 @@ fn schedule_and_execute_operation_no_executors() {
     assert!(client.is_operation_pending(&operation_id));
     assert!(!client.is_operation_ready(&operation_id));
 
-    e.ledger().with_mut(|li| li.timestamp += 10);
+    e.ledger().with_mut(|li| li.sequence_number += 10);
 
     assert!(client.is_operation_ready(&operation_id));
 
@@ -207,7 +207,7 @@ fn schedule_and_execute_self_admin_operation() {
     assert!(client.is_operation_pending(&operation_id));
     assert!(!client.is_operation_ready(&operation_id));
 
-    e.ledger().with_mut(|li| li.timestamp += 10);
+    e.ledger().with_mut(|li| li.sequence_number += 10);
 
     assert!(client.is_operation_ready(&operation_id));
 

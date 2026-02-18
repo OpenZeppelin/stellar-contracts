@@ -4,8 +4,8 @@ use soroban_sdk::{
 
 use crate::timelock::{
     emit_min_delay_changed, emit_operation_cancelled, emit_operation_executed,
-    emit_operation_scheduled, TimelockError, DONE_TIMESTAMP, TIMELOCK_EXTEND_AMOUNT,
-    TIMELOCK_TTL_THRESHOLD, UNSET_TIMESTAMP,
+    emit_operation_scheduled, TimelockError, DONE_LEDGER, TIMELOCK_EXTEND_AMOUNT,
+    TIMELOCK_TTL_THRESHOLD, UNSET_LEDGER,
 };
 
 // ################## TYPES ##################
@@ -50,17 +50,17 @@ pub enum OperationState {
 #[derive(Clone)]
 #[contracttype]
 pub enum TimelockStorageKey {
-    /// Minimum delay in seconds for operations
+    /// Minimum delay in ledgers for operations
     MinDelay,
-    /// Maps operation ID to the timestamp when it will be in a
+    /// Maps operation ID to the ledger sequence number when it will be in a
     /// [`OperationState::Ready`] state (Note: value is 0 for
-    /// [`OperationState::Unset`], 1 for [`OperationState:Done`]).
-    Timestamp(BytesN<32>),
+    /// [`OperationState::Unset`], 1 for [`OperationState::Done`]).
+    OperationLedger(BytesN<32>),
 }
 
 // ################## QUERY STATE ##################
 
-/// Returns the minimum delay in seconds required for operations.
+/// Returns the minimum delay in ledgers required for operations.
 ///
 /// # Arguments
 ///
@@ -68,7 +68,7 @@ pub enum TimelockStorageKey {
 ///
 /// # Returns
 ///
-/// The minimum delay in seconds.
+/// The minimum delay in ledgers.
 ///
 /// # Errors
 ///
@@ -80,7 +80,7 @@ pub fn get_min_delay(e: &Env) -> u32 {
         .unwrap_or_else(|| panic_with_error!(e, TimelockError::MinDelayNotSet))
 }
 
-/// Returns the timestamp at which an operation becomes ready.
+/// Returns the ledger sequence number at which an operation becomes ready.
 ///
 /// # Arguments
 ///
@@ -89,16 +89,17 @@ pub fn get_min_delay(e: &Env) -> u32 {
 ///
 /// # Returns
 ///
-/// - `UNSET_TIMESTAMP` for unset operations
-/// - `DONE_TIMESTAMP` for done operations
-/// - Unix timestamp when the operation becomes ready for scheduled operations
-pub fn get_timestamp(e: &Env, operation_id: &BytesN<32>) -> u64 {
-    let key = TimelockStorageKey::Timestamp(operation_id.clone());
-    if let Some(timestamp) = e.storage().persistent().get::<_, u64>(&key) {
+/// - `UNSET_LEDGER` for unset operations
+/// - `DONE_LEDGER` for done operations
+/// - Ledger sequence number when the operation becomes ready for scheduled
+///   operations
+pub fn get_operation_ledger(e: &Env, operation_id: &BytesN<32>) -> u32 {
+    let key = TimelockStorageKey::OperationLedger(operation_id.clone());
+    if let Some(ready_ledger) = e.storage().persistent().get::<_, u32>(&key) {
         e.storage().persistent().extend_ttl(&key, TIMELOCK_TTL_THRESHOLD, TIMELOCK_EXTEND_AMOUNT);
-        timestamp
+        ready_ledger
     } else {
-        UNSET_TIMESTAMP
+        UNSET_LEDGER
     }
 }
 
@@ -113,13 +114,13 @@ pub fn get_timestamp(e: &Env, operation_id: &BytesN<32>) -> u64 {
 ///
 /// The current [`OperationState`] of the operation.
 pub fn get_operation_state(e: &Env, operation_id: &BytesN<32>) -> OperationState {
-    let ready_timestamp = get_timestamp(e, operation_id);
-    let current_timestamp = e.ledger().timestamp();
+    let ready_ledger = get_operation_ledger(e, operation_id);
+    let current_ledger = e.ledger().sequence();
 
-    match ready_timestamp {
-        UNSET_TIMESTAMP => OperationState::Unset,
-        DONE_TIMESTAMP => OperationState::Done,
-        ready if ready > current_timestamp => OperationState::Waiting,
+    match ready_ledger {
+        UNSET_LEDGER => OperationState::Unset,
+        DONE_LEDGER => OperationState::Done,
+        ready if ready > current_ledger => OperationState::Waiting,
         _ => OperationState::Ready,
     }
 }
@@ -172,7 +173,7 @@ pub fn is_operation_done(e: &Env, operation_id: &BytesN<32>) -> bool {
 /// # Arguments
 ///
 /// * `e` - Access to Soroban environment.
-/// * `min_delay` - The new minimum delay in seconds.
+/// * `min_delay` - The new minimum delay in ledgers.
 ///
 /// # Events
 ///
@@ -196,7 +197,7 @@ pub fn set_min_delay(e: &Env, min_delay: u32) {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `operation` - The operation to schedule.
-/// * `delay` - The delay in seconds before the operation can be executed.
+/// * `delay` - The delay in ledgers before the operation can be executed.
 ///
 /// # Returns
 ///
@@ -235,11 +236,11 @@ pub fn schedule_operation(e: &Env, operation: &Operation, delay: u32) -> BytesN<
         panic_with_error!(e, TimelockError::InsufficientDelay);
     }
 
-    let current_timestamp = e.ledger().timestamp();
-    let ready_timestamp = current_timestamp + (delay as u64);
+    let current_ledger = e.ledger().sequence();
+    let ready_ledger = current_ledger + delay;
 
-    let key = TimelockStorageKey::Timestamp(id.clone());
-    e.storage().persistent().set(&key, &ready_timestamp);
+    let key = TimelockStorageKey::OperationLedger(id.clone());
+    e.storage().persistent().set(&key, &ready_ledger);
 
     emit_operation_scheduled(
         e,
@@ -337,8 +338,8 @@ pub fn set_execute_operation(e: &Env, operation: &Operation) {
         panic_with_error!(e, TimelockError::UnexecutedPredecessor);
     }
 
-    let key = TimelockStorageKey::Timestamp(id.clone());
-    e.storage().persistent().set(&key, &DONE_TIMESTAMP);
+    let key = TimelockStorageKey::OperationLedger(id.clone());
+    e.storage().persistent().set(&key, &DONE_LEDGER);
 
     emit_operation_executed(
         e,
@@ -377,7 +378,7 @@ pub fn cancel_operation(e: &Env, operation_id: &BytesN<32>) {
         panic_with_error!(e, TimelockError::InvalidOperationState);
     }
 
-    let key = TimelockStorageKey::Timestamp(operation_id.clone());
+    let key = TimelockStorageKey::OperationLedger(operation_id.clone());
     e.storage().persistent().remove(&key);
 
     emit_operation_cancelled(e, operation_id);
