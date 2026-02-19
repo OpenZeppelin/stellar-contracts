@@ -6,10 +6,11 @@ use soroban_sdk::{
     String, Symbol, Val, Vec,
 };
 pub use storage::{
-    add_context_rule, add_policy, add_signer, authenticate, do_check_auth, get_context_rule,
-    get_context_rules, get_context_rules_count, get_validated_context, remove_context_rule,
-    remove_policy, remove_signer, update_context_rule_name, update_context_rule_valid_until,
-    ContextRule, ContextRuleType, Meta, Signatures, Signer, SmartAccountStorageKey,
+    add_context_rule, add_policy, add_signer, authenticate, contains_canonical_duplicate,
+    do_check_auth, get_context_rule, get_context_rules, get_context_rules_count,
+    get_validated_context, remove_context_rule, remove_policy, remove_signer,
+    update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType, Meta,
+    Signatures, Signer, SmartAccountStorageKey,
 };
 
 /// Core trait for smart account functionality, extending Soroban's

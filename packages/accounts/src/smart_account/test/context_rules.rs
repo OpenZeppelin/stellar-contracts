@@ -7,7 +7,7 @@ use soroban_sdk::{
     },
     contract, contractimpl, symbol_short,
     testutils::{Address as _, Events, Ledger},
-    vec, Address, Bytes, BytesN, Env, Map, String, Symbol, Val, Vec,
+    vec, Address, Bytes, BytesN, Env, Map, String, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::{
@@ -15,8 +15,8 @@ use crate::{
     smart_account::{
         get_context_rules, get_context_rules_count, get_validated_context,
         storage::{
-            add_context_rule, authenticate, can_enforce_all_policies, do_check_auth,
-            get_authenticated_signers, get_context_rule, get_valid_context_rules,
+            add_context_rule, authenticate, can_enforce_all_policies, contains_canonical_duplicate,
+            do_check_auth, get_authenticated_signers, get_context_rule, get_valid_context_rules,
             remove_context_rule, update_context_rule_name, update_context_rule_valid_until,
             ContextRule, ContextRuleType, Signatures, Signer,
         },
@@ -70,6 +70,14 @@ struct MockVerifierContract;
 impl MockVerifierContract {
     pub fn verify(e: &Env, _hash: Bytes, _key_data: Val, _sig_data: Val) -> bool {
         e.storage().persistent().get(&symbol_short!("verify")).unwrap_or(true)
+    }
+
+    pub fn canonicalize_key(e: &Env, key_data: Val) -> Bytes {
+        Bytes::try_from_val(e, &key_data).unwrap()
+    }
+
+    pub fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes> {
+        Vec::from_iter(e, key_data.iter().map(|key| Bytes::try_from_val(e, &key).unwrap()))
     }
 }
 
@@ -1282,5 +1290,108 @@ fn add_context_rule_count_allows_reuse_after_removal() {
                 &policies_map,
             );
         }
+    });
+}
+
+// ################## CANONICAL DUPLICATE DETECTION TESTS ##################
+
+/// Mock verifier that canonicalizes keys by returning only the first 32
+/// bytes. This simulates a verifier (like WebAuthn) where key_data contains
+/// both a cryptographic key and additional metadata (like a credential ID).
+#[contract]
+struct MockCanonicalizingVerifier;
+
+#[contractimpl]
+impl MockCanonicalizingVerifier {
+    pub fn verify(e: &Env, _hash: Bytes, _key_data: Val, _sig_data: Val) -> bool {
+        e.storage().persistent().get(&symbol_short!("verify")).unwrap_or(true)
+    }
+
+    pub fn canonicalize_key(e: &Env, key_data: Val) -> Bytes {
+        let key = Bytes::try_from_val(e, &key_data).unwrap();
+        key.slice(0..32)
+    }
+
+    pub fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes> {
+        Vec::from_iter(
+            e,
+            key_data.iter().map(|key| Bytes::try_from_val(e, &key).unwrap().slice(0..32)),
+        )
+    }
+}
+
+#[test]
+fn contains_canonical_duplicate_same_canonical_keys() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let verifier = e.register(MockCanonicalizingVerifier, ());
+
+        let mut existing = Bytes::from_array(&e, &[1u8; 32]);
+        existing.extend_from_array(&[0xAA; 8]);
+        let signers = Vec::from_array(&e, [Signer::External(verifier.clone(), existing)]);
+
+        let mut candidate = Bytes::from_array(&e, &[1u8; 32]);
+        candidate.extend_from_array(&[0xBB; 8]);
+        let new_signer = Signer::External(verifier.clone(), candidate);
+
+        assert!(contains_canonical_duplicate(&e, &signers, &new_signer));
+    });
+}
+
+#[test]
+fn contains_canonical_duplicate_different_canonical_keys() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let verifier = e.register(MockCanonicalizingVerifier, ());
+
+        let mut existing = Bytes::from_array(&e, &[1u8; 32]);
+        existing.extend_from_array(&[0xAA; 8]);
+        let signers = Vec::from_array(&e, [Signer::External(verifier.clone(), existing)]);
+
+        let mut candidate = Bytes::from_array(&e, &[2u8; 32]);
+        candidate.extend_from_array(&[0xBB; 8]);
+        let new_signer = Signer::External(verifier.clone(), candidate);
+
+        assert!(!contains_canonical_duplicate(&e, &signers, &new_signer));
+    });
+}
+
+#[test]
+fn contains_canonical_duplicate_no_matching_verifier() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let verifier1 = e.register(MockCanonicalizingVerifier, ());
+        let verifier2 = e.register(MockCanonicalizingVerifier, ());
+
+        let mut existing = Bytes::from_array(&e, &[3u8; 32]);
+        existing.extend_from_array(&[0xAA; 8]);
+        let signers = Vec::from_array(&e, [Signer::External(verifier1, existing)]);
+
+        let mut candidate = Bytes::from_array(&e, &[3u8; 32]);
+        candidate.extend_from_array(&[0xBB; 8]);
+        let new_signer = Signer::External(verifier2, candidate);
+
+        assert!(!contains_canonical_duplicate(&e, &signers, &new_signer));
+    });
+}
+
+#[test]
+fn contains_canonical_duplicate_delegated_signers() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let delegated_a = Address::generate(&e);
+        let delegated_b = Address::generate(&e);
+        let signers = Vec::from_array(&e, [Signer::Delegated(delegated_a.clone())]);
+
+        assert!(contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_a)));
+        assert!(!contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_b)));
     });
 }

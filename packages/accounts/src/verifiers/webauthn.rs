@@ -67,6 +67,8 @@ pub enum WebAuthnError {
     VerifiedBitNotSet = 3117,
     /// Invalid relationship between Backup Eligibility and State bits.
     BackupEligibilityAndStateNotSet = 3118,
+    /// The provided key data does not contain a valid 65-byte public key.
+    KeyDataInvalid = 3119,
 }
 
 /// Parsed client data JSON structure for WebAuthn authentication.
@@ -354,4 +356,22 @@ pub fn verify(
     e.crypto().secp256r1_verify(pub_key, &e.crypto().sha256(&message_digest), signature);
 
     true
+}
+
+/// Returns the canonical byte representation of a WebAuthn public key.
+///
+/// WebAuthn key data may contain the 65-byte uncompressed secp256r1 public key
+/// followed by an optional credential ID suffix. The credential ID is metadata
+/// and not part of the cryptographic key identity. This function strips that
+/// suffix and returns only the canonical public key bytes.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `key_data` - Bytes containing the 65-byte public key and optional
+///   credential ID suffix.
+pub fn canonicalize_key(e: &Env, key_data: &Bytes) -> Bytes {
+    let pub_key: BytesN<65> = extract_from_bytes(e, key_data, 0..65)
+        .unwrap_or_else(|| panic_with_error!(e, WebAuthnError::KeyDataInvalid));
+    Bytes::from_slice(e, &pub_key.to_array())
 }

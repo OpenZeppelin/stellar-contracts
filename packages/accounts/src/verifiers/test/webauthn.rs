@@ -14,10 +14,10 @@ use soroban_sdk::{contract, crypto::Hash, Bytes, BytesN, Env};
 use crate::verifiers::{
     utils::base64_url_encode,
     webauthn::{
-        validate_backup_eligibility_and_state, validate_challenge, validate_expected_type,
-        validate_user_present_bit_set, validate_user_verified_bit_set, verify, ClientDataJson,
-        WebAuthnSigData, AUTH_DATA_FLAGS_BE, AUTH_DATA_FLAGS_BS, AUTH_DATA_FLAGS_UP,
-        AUTH_DATA_FLAGS_UV, CLIENT_DATA_MAX_LEN,
+        canonicalize_key, validate_backup_eligibility_and_state, validate_challenge,
+        validate_expected_type, validate_user_present_bit_set, validate_user_verified_bit_set,
+        verify, ClientDataJson, WebAuthnSigData, AUTH_DATA_FLAGS_BE, AUTH_DATA_FLAGS_BS,
+        AUTH_DATA_FLAGS_UP, AUTH_DATA_FLAGS_UV, CLIENT_DATA_MAX_LEN,
     },
 };
 
@@ -352,6 +352,33 @@ fn verify_client_data_too_long() {
         };
 
         verify(&e, &signature_payload, &key_data, &sig_data);
+    });
+}
+
+#[test]
+fn canonicalize_key_strips_credential_id_suffix() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let pub_key = Bytes::from_array(&e, &[7u8; 65]);
+        let mut key_data = pub_key.clone();
+        key_data.extend_from_array(&[9u8; 16]);
+
+        let canonical = canonicalize_key(&e, &key_data);
+        assert_eq!(canonical, pub_key);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3119)")]
+fn canonicalize_key_short_input_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let short_key_data = Bytes::from_array(&e, &[1u8; 64]);
+        canonicalize_key(&e, &short_key_data);
     });
 }
 

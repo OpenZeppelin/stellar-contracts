@@ -563,6 +563,54 @@ pub fn compute_fingerprint(
     e.crypto().sha256(&rule_data).to_bytes()
 }
 
+/// Checks if any signer in `signers` has the same canonical key identity as
+/// `new_signer`.
+///
+/// For [`Signer::External`] signers, this calls the verifier's
+/// `batch_canonicalize_key` to compare cryptographic identities rather than raw
+/// bytes. Two external signers with the same verifier are considered
+/// duplicates if their canonical key representations match, even if their
+/// raw key bytes differ.
+///
+/// For [`Signer::Delegated`] signers, this falls back to direct byte
+/// equality since `Address` values are already canonical.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signers` - The existing list of signers to check against.
+/// * `new_signer` - The signer to check for duplicates.
+pub fn contains_canonical_duplicate(e: &Env, signers: &Vec<Signer>, new_signer: &Signer) -> bool {
+    match new_signer {
+        Signer::External(verifier, key_data) => {
+            let client = VerifierClient::new(e, verifier);
+
+            let mut key_batch = Vec::new(e);
+
+            // Filter signers with the same verifier
+            for existing in signers.iter() {
+                if let Signer::External(existing_verifier, existing_key_data) = existing {
+                    if existing_verifier == *verifier {
+                        key_batch.push_back(existing_key_data.into_val(e));
+                    }
+                }
+            }
+
+            if key_batch.is_empty() {
+                return false;
+            }
+
+            key_batch.push_back(key_data.into_val(e));
+
+            let canonical_batch = client.batch_canonicalize_key(&key_batch);
+            let new_canonical = canonical_batch.last().expect("new canonical key to be present");
+
+            canonical_batch.iter().rev().skip(1).any(|canonical| canonical == new_canonical)
+        }
+        Signer::Delegated(_) => signers.contains(new_signer),
+    }
+}
+
 // ################## CHANGE STATE ##################
 
 /// Creates a new context rule with the specified configuration. Returns the
@@ -622,10 +670,10 @@ pub fn add_context_rule(
     let mut same_key_ids: Vec<u32> =
         e.storage().persistent().get(&ids_key).unwrap_or_else(|| Vec::new(e));
 
-    // Check for duplicate signers
+    // Check for duplicate signers using canonical key comparison
     let mut unique_signers = Vec::new(e);
     for signer in signers.iter() {
-        if unique_signers.contains(&signer) {
+        if contains_canonical_duplicate(e, &unique_signers, &signer) {
             panic_with_error!(e, SmartAccountError::DuplicateSigner);
         }
         unique_signers.push_back(signer);
@@ -887,8 +935,8 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
     let rule = get_context_rule(e, id);
     let mut signers = rule.signers.clone();
 
-    // Check if signer already exists
-    if signers.contains(signer) {
+    // Check if signer already exists using canonical key comparison
+    if contains_canonical_duplicate(e, &signers, signer) {
         panic_with_error!(e, SmartAccountError::DuplicateSigner)
     }
 
