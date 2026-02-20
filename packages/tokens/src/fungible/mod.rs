@@ -75,12 +75,22 @@ mod utils;
 #[cfg(test)]
 mod test;
 
-pub use extensions::{allowlist, blocklist, burnable, capped, votes};
+#[cfg(feature = "allowlist")]
+pub use extensions::allowlist;
+#[cfg(feature = "blocklist")]
+pub use extensions::blocklist;
+#[cfg(feature = "burnable")]
+pub use extensions::burnable;
+#[cfg(feature = "capped")]
+pub use extensions::capped;
+#[cfg(feature = "votes")]
+pub use extensions::votes;
 pub use overrides::{Base, ContractOverrides};
 use soroban_sdk::{
     contracterror, contractevent, contracttrait, Address, Env, MuxedAddress, String,
 };
 pub use storage::{AllowanceData, AllowanceKey, FungibleStorageKey};
+#[cfg(feature = "sac")]
 pub use utils::{sac_admin_generic, sac_admin_wrapper};
 
 /// Vanilla Fungible Token Trait

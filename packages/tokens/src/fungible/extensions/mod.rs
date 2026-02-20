@@ -1,5 +1,10 @@
+#[cfg(feature = "allowlist")]
 pub mod allowlist;
+#[cfg(feature = "blocklist")]
 pub mod blocklist;
+#[cfg(feature = "burnable")]
 pub mod burnable;
+#[cfg(feature = "capped")]
 pub mod capped;
+#[cfg(feature = "votes")]
 pub mod votes;

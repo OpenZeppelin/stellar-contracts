@@ -138,6 +138,7 @@ impl ContractOverrides for Base {}
 /// Trait for overriding `burn` and `burn_from` functions.
 /// The behavior of `burn` and `burn_from` changes across implementations,
 /// i.e. enumerable, consecutive, hence the need for an abstraction
+#[cfg(feature = "burnable")]
 pub trait BurnableOverrides {
     fn burn(e: &Env, from: &Address, token_id: u32) {
         Base::burn(e, from, token_id);
@@ -148,4 +149,5 @@ pub trait BurnableOverrides {
     }
 }
 
+#[cfg(feature = "burnable")]
 impl BurnableOverrides for Base {}

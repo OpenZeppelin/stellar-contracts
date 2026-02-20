@@ -13,7 +13,14 @@
 
 #![no_std]
 
+// Ensure soroban-sdk's panic handler is linked for cdylib builds.
+extern crate soroban_sdk;
+
+#[cfg(feature = "fungible")]
 pub mod fungible;
+#[cfg(feature = "non-fungible")]
 pub mod non_fungible;
+#[cfg(feature = "rwa")]
 pub mod rwa;
+#[cfg(feature = "vault")]
 pub mod vault;

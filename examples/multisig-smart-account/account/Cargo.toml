@@ -13,7 +13,7 @@ doctest = false
 [dependencies]
 soroban-sdk = { workspace = true }
 stellar-accounts = { workspace = true }
-stellar-contract-utils = { workspace = true }
+stellar-contract-utils = { workspace = true, features = ["upgradeable"] }
 stellar-macros = { workspace = true }
 
 

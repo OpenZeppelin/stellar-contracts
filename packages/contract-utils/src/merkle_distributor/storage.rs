@@ -101,7 +101,7 @@ where
     pub fn set_claimed(e: &Env, index: u32) {
         let key = MerkleDistributorStorageKey::Claimed(index);
         e.storage().persistent().set(&key, &true);
-        emit_set_claimed(e, index.into());
+        emit_set_claimed(e, index);
     }
 
     /// Verifies a Merkle proof for a leaf and marks its index as claimed if the

@@ -11,10 +11,27 @@ description = "Fungible and NonFungible Tokens for the Stellar contracts."
 crate-type = ["lib", "cdylib"]
 doctest = false
 
+[features]
+default = []
+fungible = []
+non-fungible = []
+burnable = []
+sac = ["fungible"]
+pausable = ["stellar-contract-utils/pausable"]
+rwa = ["fungible", "pausable"]
+vault = ["fungible", "stellar-contract-utils/math"]
+allowlist = ["fungible", "burnable"]
+blocklist = ["fungible", "burnable"]
+capped = ["fungible"]
+votes = ["dep:stellar-governance", "burnable"]
+enumerable = ["non-fungible", "burnable"]
+consecutive = ["non-fungible", "burnable"]
+royalties = ["non-fungible"]
+
 [dependencies]
 soroban-sdk = { workspace = true }
 stellar-contract-utils = { workspace = true }
-stellar-governance = { workspace = true }
+stellar-governance = { workspace = true, optional = true }
 
 [dev-dependencies]
 ed25519-dalek = { workspace = true }

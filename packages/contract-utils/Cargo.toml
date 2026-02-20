@@ -12,6 +12,14 @@ description = "Utilities for Stellar contracts."
 crate-type = ["lib", "cdylib"]
 doctest = false
 
+[features]
+default = []
+crypto = []
+math = []
+merkle-distributor = ["crypto"]
+pausable = []
+upgradeable = []
+
 [dependencies]
 soroban-sdk = { workspace = true }
 

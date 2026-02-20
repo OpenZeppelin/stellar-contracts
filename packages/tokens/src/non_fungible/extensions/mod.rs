@@ -1,5 +1,10 @@
+#[cfg(feature = "burnable")]
 pub mod burnable;
+#[cfg(feature = "consecutive")]
 pub mod consecutive;
+#[cfg(feature = "enumerable")]
 pub mod enumerable;
+#[cfg(feature = "royalties")]
 pub mod royalties;
+#[cfg(feature = "votes")]
 pub mod votes;

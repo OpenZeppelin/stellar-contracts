@@ -72,7 +72,16 @@ mod utils;
 #[cfg(test)]
 mod test;
 
-pub use extensions::{burnable, consecutive, enumerable, royalties, votes};
+#[cfg(feature = "burnable")]
+pub use extensions::burnable;
+#[cfg(feature = "consecutive")]
+pub use extensions::consecutive;
+#[cfg(feature = "enumerable")]
+pub use extensions::enumerable;
+#[cfg(feature = "royalties")]
+pub use extensions::royalties;
+#[cfg(feature = "votes")]
+pub use extensions::votes;
 pub use overrides::{Base, ContractOverrides};
 // ################## TRAIT ##################
 use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, String};

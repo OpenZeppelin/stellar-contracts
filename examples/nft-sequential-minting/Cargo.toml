@@ -13,7 +13,7 @@ doctest = false
 [dependencies]
 stellar-macros = { workspace = true }
 soroban-sdk = { workspace = true }
-stellar-tokens = { workspace = true }
+stellar-tokens = { workspace = true, features = ["non-fungible", "burnable"] }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
