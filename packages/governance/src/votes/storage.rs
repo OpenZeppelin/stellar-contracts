@@ -380,7 +380,7 @@ fn lookup_checkpoint_at(e: &Env, ledger: u32, num: u32, checkpoint_type: &Checkp
     let mut high: u32 = num - 1;
 
     while low < high {
-        let mid = (low + high).div_ceil(2);
+        let mid = low + (high - low).div_ceil(2);
         let checkpoint = get_checkpoint(e, checkpoint_type, mid);
         if checkpoint.ledger <= ledger {
             low = mid;

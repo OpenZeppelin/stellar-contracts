@@ -237,7 +237,7 @@ pub fn schedule_operation(e: &Env, operation: &Operation, delay: u32) -> BytesN<
     }
 
     let current_ledger = e.ledger().sequence();
-    let ready_ledger = current_ledger + delay;
+    let ready_ledger = current_ledger.saturating_add(delay);
 
     let key = TimelockStorageKey::OperationLedger(id.clone());
     e.storage().persistent().set(&key, &ready_ledger);
