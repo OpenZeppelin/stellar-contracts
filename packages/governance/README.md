@@ -19,14 +19,14 @@ The `votes` module provides vote tracking functionality with delegation and hist
 
 - **Voting Units**: The base unit of voting power, typically 1:1 with token balance
 - **Delegation**: Accounts can delegate their voting power to another account (delegatee)
-- **Checkpoints**: Historical snapshots of voting power at specific timestamps
-- **Clock Mode**: Uses ledger timestamps (`e.ledger().timestamp()`) as the timepoint reference
+- **Checkpoints**: Historical snapshots of voting power at specific ledger sequence numbers
+- **Clock Mode**: Uses ledger sequence numbers (`e.ledger().sequence()`) as the timepoint reference
 
 #### Key Features
 
 - Track voting power per account with historical checkpoints
 - Support delegation (an account can delegate its voting power to another account)
-- Provide historical vote queries at any past timestamp
+- Provide historical vote queries at any past ledger sequence number
 - Explicit delegation required (accounts must self-delegate to use their own voting power)
 - Non-delegated voting units are not counted as votes
 
