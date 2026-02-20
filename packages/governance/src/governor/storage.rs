@@ -474,8 +474,7 @@ pub fn propose(
 
     // Use previous ledger to prevent flash loan based proposals
     let snapshot = e.ledger().sequence() - 1;
-    let proposer_votes = get_voting_power(e, proposer, snapshot as u64); // TODO: revert `as u64` cast to snapshot if we go with ledgers instead of
-                                                                         // timestamps.
+    let proposer_votes = get_voting_power(e, proposer, snapshot);
 
     // Check proposer has sufficient voting power
     let threshold = get_proposal_threshold(e);
@@ -984,8 +983,7 @@ pub fn cast_vote(
     voter: &Address,
 ) -> u128 {
     let snapshot = check_proposal_state(e, proposal_id);
-    let voter_weight = get_voting_power(e, voter, snapshot as u64); // TODO: revert `as u64` cast to snapshot if we go with ledgers instead of
-                                                                    // timestamps.
+    let voter_weight = get_voting_power(e, voter, snapshot);
     count_vote(e, proposal_id, voter, vote_type, voter_weight);
     emit_vote_cast(e, voter, proposal_id, vote_type, voter_weight, reason);
     voter_weight
@@ -993,23 +991,24 @@ pub fn cast_vote(
 
 // ################## INTERNAL HELPERS ##################
 
-/// Fetches the voting power of an account at a specific timepoint from the
-/// token contract via a cross-contract call to `get_votes_at_checkpoint`.
+/// Fetches the voting power of an account at a specific ledger sequence
+/// number from the token contract via a cross-contract call to
+/// `get_votes_at_checkpoint`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address to query voting power for.
-/// * `timepoint` - The timepoint to query.
+/// * `ledger` - The ledger sequence number to query.
 ///
 /// # Errors
 ///
 /// * refer to [`get_token_contract()`] errors.
-fn get_voting_power(e: &Env, account: &Address, timepoint: u64) -> u128 {
+fn get_voting_power(e: &Env, account: &Address, ledger: u32) -> u128 {
     let token = get_token_contract(e);
     e.invoke_contract(
         &token,
         &Symbol::new(e, "get_votes_at_checkpoint"),
-        soroban_sdk::vec![e, account.into_val(e), timepoint.into_val(e)],
+        soroban_sdk::vec![e, account.into_val(e), ledger.into_val(e)],
     )
 }

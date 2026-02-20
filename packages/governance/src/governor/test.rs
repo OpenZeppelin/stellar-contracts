@@ -25,7 +25,7 @@ struct MockTokenContract;
 
 #[contractimpl]
 impl MockTokenContract {
-    pub fn get_votes_at_checkpoint(e: &Env, _account: Address, _timepoint: u64) -> u128 {
+    pub fn get_votes_at_checkpoint(e: &Env, _account: Address, _ledger: u32) -> u128 {
         e.storage().instance().get(&Symbol::new(e, "power")).unwrap_or(0)
     }
 }
