@@ -4,7 +4,7 @@ extern crate std;
 use soroban_sdk::{
     contract, contractimpl, symbol_short,
     testutils::{Address as _, Events},
-    Address, Env, Map, String, Val, Vec,
+    Address, Bytes, Env, Map, String, Val, Vec,
 };
 
 use super::super::{
@@ -132,6 +132,22 @@ fn add_signer_duplicate_fails() {
     e.as_contract(&address, || {
         let existing_signer = rule.signers.get(0).unwrap();
         add_signer(&e, rule.id, &existing_signer); // Duplicate signer
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3013)")]
+fn add_signer_oversized_external_key_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    let rule = setup_test_rule(&e, &address);
+
+    e.as_contract(&address, || {
+        let verifier = Address::generate(&e);
+        let oversized_key = Bytes::from_slice(&e, &[0u8; 257]);
+        let signer = Signer::External(verifier, oversized_key);
+        add_signer(&e, rule.id, &signer);
     });
 }
 

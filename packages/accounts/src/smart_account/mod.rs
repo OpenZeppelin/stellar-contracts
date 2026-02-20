@@ -9,8 +9,8 @@ pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, contains_canonical_duplicate,
     do_check_auth, get_context_rule, get_context_rules, get_context_rules_count,
     get_validated_context, remove_context_rule, remove_policy, remove_signer,
-    update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType, Meta,
-    Signatures, Signer, SmartAccountStorageKey,
+    update_context_rule_name, update_context_rule_valid_until, validate_signer_key_size,
+    ContextRule, ContextRuleType, Meta, Signatures, Signer, SmartAccountStorageKey,
 };
 
 /// Core trait for smart account functionality, extending Soroban's
@@ -310,6 +310,8 @@ pub const MAX_POLICIES: u32 = 5;
 pub const MAX_SIGNERS: u32 = 15;
 /// Maximum number of context rules allowed per smart account.
 pub const MAX_CONTEXT_RULES: u32 = 15;
+/// Maximum size in bytes for external signer key data.
+pub const MAX_EXTERNAL_KEY_SIZE: u32 = 256;
 
 // ################## ERRORS ##################
 
@@ -344,6 +346,8 @@ pub enum SmartAccountError {
     TooManyPolicies = 3011,
     /// Too many context rules in the smart account.
     TooManyContextRules = 3012,
+    /// External signer key data exceeds the maximum allowed size.
+    KeyDataTooLarge = 3013,
 }
 
 // ################## EVENTS ##################

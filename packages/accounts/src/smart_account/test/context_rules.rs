@@ -20,7 +20,7 @@ use crate::{
             remove_context_rule, update_context_rule_name, update_context_rule_valid_until,
             ContextRule, ContextRuleType, Signatures, Signer,
         },
-        MAX_CONTEXT_RULES,
+        MAX_CONTEXT_RULES, MAX_EXTERNAL_KEY_SIZE,
     },
 };
 
@@ -1393,5 +1393,57 @@ fn contains_canonical_duplicate_delegated_signers() {
 
         assert!(contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_a)));
         assert!(!contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_b)));
+    });
+}
+
+// ################## KEY SIZE VALIDATION TESTS ##################
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3013)")]
+fn add_context_rule_oversized_external_key_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let verifier = e.register(MockVerifierContract, ());
+
+    e.as_contract(&address, || {
+        let oversized_key = Bytes::from_array(&e, &[0u8; 257]);
+        let signer = Signer::External(verifier.clone(), oversized_key);
+        let signers = Vec::from_array(&e, [signer]);
+
+        add_context_rule(
+            &e,
+            &ContextRuleType::Default,
+            &String::from_str(&e, "oversized_key_rule"),
+            None,
+            &signers,
+            &Map::new(&e),
+        );
+    });
+}
+
+#[test]
+fn add_context_rule_max_size_external_key_succeeds() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let verifier = e.register(MockVerifierContract, ());
+
+    e.as_contract(&address, || {
+        let max_key = Bytes::from_slice(&e, &[0u8; 256]);
+        let signer = Signer::External(verifier.clone(), max_key);
+        let signers = Vec::from_array(&e, [signer]);
+
+        let rule = add_context_rule(
+            &e,
+            &ContextRuleType::Default,
+            &String::from_str(&e, "max_key_rule"),
+            None,
+            &signers,
+            &Map::new(&e),
+        );
+
+        assert_eq!(rule.signers.len(), 1);
+        if let Signer::External(_, key_data) = rule.signers.get(0).unwrap() {
+            assert_eq!(key_data.len(), MAX_EXTERNAL_KEY_SIZE);
+        }
     });
 }

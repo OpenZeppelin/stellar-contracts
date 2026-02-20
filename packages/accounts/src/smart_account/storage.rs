@@ -101,7 +101,7 @@ use crate::{
     smart_account::{
         emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
         emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
-        SmartAccountError, MAX_CONTEXT_RULES, MAX_POLICIES, MAX_SIGNERS,
+        SmartAccountError, MAX_CONTEXT_RULES, MAX_EXTERNAL_KEY_SIZE, MAX_POLICIES, MAX_SIGNERS,
         SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
     },
     verifiers::VerifierClient,
@@ -460,6 +460,26 @@ pub fn validate_signers_and_policies(e: &Env, signers: &Vec<Signer>, policies: &
     }
 }
 
+/// Validates that a signer's external key data does not exceed the maximum
+/// allowed size.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer` - The signer to validate.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::KeyDataTooLarge`] - When the external signer key
+///   data exceeds [`MAX_EXTERNAL_KEY_SIZE`] bytes.
+pub fn validate_signer_key_size(e: &Env, signer: &Signer) {
+    if let Signer::External(_, key_data) = signer {
+        if key_data.len() > MAX_EXTERNAL_KEY_SIZE {
+            panic_with_error!(e, SmartAccountError::KeyDataTooLarge);
+        }
+    }
+}
+
 /// Performs complete authorization check for multiple contexts. Authenticates
 /// signatures, validates contexts against rules, and enforces all applicable
 /// policies. Returns success if all contexts are successfully authorized.
@@ -639,6 +659,8 @@ pub fn contains_canonical_duplicate(e: &Env, signers: &Vec<Signer>, new_signer: 
 /// * [`SmartAccountError::DuplicateSigner`] - When the same signer appears
 ///   multiple times.
 /// * [`SmartAccountError::PastValidUntil`] - When valid_until is in the past.
+/// * [`SmartAccountError::KeyDataTooLarge`] - When an external signer's key
+///   data exceeds MAX_EXTERNAL_KEY_SIZE (256) bytes.
 ///
 /// # Events
 ///
@@ -673,6 +695,7 @@ pub fn add_context_rule(
     // Check for duplicate signers using canonical key comparison
     let mut unique_signers = Vec::new(e);
     for signer in signers.iter() {
+        validate_signer_key_size(e, &signer);
         if contains_canonical_duplicate(e, &unique_signers, &signer) {
             panic_with_error!(e, SmartAccountError::DuplicateSigner);
         }
@@ -914,6 +937,8 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 ///   the context rule.
 /// * [`SmartAccountError::TooManySigners`] - When adding this signer would
 ///   exceed MAX_SIGNERS (15).
+/// * [`SmartAccountError::KeyDataTooLarge`] - When the external signer's key
+///   data exceeds MAX_EXTERNAL_KEY_SIZE (256) bytes.
 ///
 /// # Events
 ///
@@ -932,6 +957,8 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 /// * This function modifies storage without requiring authorization. Ensure
 ///   proper access control is implemented at the contract level.
 pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
+    validate_signer_key_size(e, signer);
+
     let rule = get_context_rule(e, id);
     let mut signers = rule.signers.clone();
 
