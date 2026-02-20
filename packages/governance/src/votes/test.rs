@@ -25,7 +25,7 @@ fn initial_state_has_zero_votes() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
 
-    e.ledger().set_timestamp(1000);
+    e.ledger().set_sequence_number(1000);
     e.as_contract(&contract_address, || {
         assert_eq!(get_votes(&e, &alice), 0);
         assert_eq!(get_voting_units(&e, &alice), 0);
@@ -197,7 +197,7 @@ fn checkpoints_created_on_delegation() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    e.ledger().set_timestamp(1000);
+    e.ledger().set_sequence_number(1000);
 
     e.as_contract(&contract_address, || {
         transfer_voting_units(&e, None, Some(&alice), 100);
@@ -212,7 +212,7 @@ fn multiple_operations_same_timestamp_single_checkpoint() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
-    e.ledger().set_timestamp(1000);
+    e.ledger().set_sequence_number(1000);
 
     e.as_contract(&contract_address, || {
         transfer_voting_units(&e, None, Some(&alice), 100);
@@ -233,16 +233,16 @@ fn different_timestamps_create_new_checkpoints() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        e.ledger().set_timestamp(1000);
+        e.ledger().set_sequence_number(1000);
         transfer_voting_units(&e, None, Some(&alice), 100);
         delegate(&e, &alice, &bob);
         assert_eq!(num_checkpoints(&e, &bob), 1);
 
-        e.ledger().set_timestamp(2000);
+        e.ledger().set_sequence_number(2000);
         transfer_voting_units(&e, None, Some(&alice), 50);
         assert_eq!(num_checkpoints(&e, &bob), 2);
 
-        e.ledger().set_timestamp(3000);
+        e.ledger().set_sequence_number(3000);
         transfer_voting_units(&e, None, Some(&alice), 25);
         assert_eq!(num_checkpoints(&e, &bob), 3);
 
@@ -259,18 +259,18 @@ fn get_votes_at_checkpoint_returns_historical_value() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        e.ledger().set_timestamp(1000);
+        e.ledger().set_sequence_number(1000);
         transfer_voting_units(&e, None, Some(&alice), 100);
         delegate(&e, &alice, &bob);
 
-        e.ledger().set_timestamp(2000);
+        e.ledger().set_sequence_number(2000);
         transfer_voting_units(&e, None, Some(&alice), 50);
 
-        e.ledger().set_timestamp(3000);
+        e.ledger().set_sequence_number(3000);
         transfer_voting_units(&e, None, Some(&alice), 25);
 
-        // Query at different timepoints
-        e.ledger().set_timestamp(4000);
+        // Query at different ledgers
+        e.ledger().set_sequence_number(4000);
 
         assert_eq!(get_votes_at_checkpoint(&e, &bob, 999), 0);
         assert_eq!(get_votes_at_checkpoint(&e, &bob, 1000), 100);
@@ -284,10 +284,10 @@ fn get_votes_at_checkpoint_returns_historical_value() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #4100)")]
-fn get_votes_at_checkpoint_fails_for_future_timepoint() {
+fn get_votes_at_checkpoint_fails_for_future_ledger() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
-    e.ledger().set_timestamp(1000);
+    e.ledger().set_sequence_number(1000);
 
     e.as_contract(&contract_address, || {
         get_votes_at_checkpoint(&e, &alice, 1000);
@@ -300,17 +300,17 @@ fn get_total_supply_at_checkpoint_returns_historical_value() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        e.ledger().set_timestamp(1000);
+        e.ledger().set_sequence_number(1000);
         transfer_voting_units(&e, None, Some(&alice), 100);
 
-        e.ledger().set_timestamp(2000);
+        e.ledger().set_sequence_number(2000);
         transfer_voting_units(&e, None, Some(&alice), 50);
 
-        e.ledger().set_timestamp(3000);
+        e.ledger().set_sequence_number(3000);
         transfer_voting_units(&e, Some(&alice), None, 30);
 
-        // Query at different timepoints
-        e.ledger().set_timestamp(4000);
+        // Query at different ledgers
+        e.ledger().set_sequence_number(4000);
 
         assert_eq!(get_total_supply_at_checkpoint(&e, 999), 0);
         assert_eq!(get_total_supply_at_checkpoint(&e, 1000), 100);
@@ -324,9 +324,9 @@ fn get_total_supply_at_checkpoint_returns_historical_value() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #4100)")]
-fn get_total_supply_at_checkpoint_fails_for_future_timepoint() {
+fn get_total_supply_at_checkpoint_fails_for_future_ledger() {
     let (e, contract_address) = setup_env();
-    e.ledger().set_timestamp(1000);
+    e.ledger().set_sequence_number(1000);
 
     e.as_contract(&contract_address, || {
         get_total_supply_at_checkpoint(&e, 1000);
@@ -389,13 +389,13 @@ fn delegate_to_same_delegate_errors() {
     let alice = Address::generate(&e);
     let bob = Address::generate(&e);
 
-    e.ledger().set_timestamp(1000);
+    e.ledger().set_sequence_number(1000);
     e.as_contract(&contract_address, || {
         transfer_voting_units(&e, None, Some(&alice), 100);
         delegate(&e, &alice, &bob);
     });
 
-    e.ledger().set_timestamp(2000);
+    e.ledger().set_sequence_number(2000);
     e.as_contract(&contract_address, || {
         // Should panic with SameDelegateReassignment
         delegate(&e, &alice, &bob);
@@ -431,7 +431,7 @@ fn binary_search_with_many_checkpoints() {
 
         // Create many more checkpoints (starting at timestamp 100)
         for i in 1..=20 {
-            e.ledger().set_timestamp(i * 100);
+            e.ledger().set_sequence_number(i * 100);
             transfer_voting_units(&e, None, Some(&alice), 10);
         }
 
@@ -439,7 +439,7 @@ fn binary_search_with_many_checkpoints() {
         assert_eq!(num_checkpoints(&e, &bob), 21);
 
         // Query various historical points
-        e.ledger().set_timestamp(3000);
+        e.ledger().set_sequence_number(3000);
         assert_eq!(get_votes_at_checkpoint(&e, &bob, 50), 1000); // After initial delegation
         assert_eq!(get_votes_at_checkpoint(&e, &bob, 100), 1010);
         assert_eq!(get_votes_at_checkpoint(&e, &bob, 500), 1050);
@@ -500,7 +500,7 @@ fn delegate_votes_overflow() {
 fn get_votes_at_checkpoint_at_current_timestamp() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
-    e.ledger().set_timestamp(1000);
+    e.ledger().set_sequence_number(1000);
 
     e.as_contract(&contract_address, || {
         // Query at exact current timestamp should fail
@@ -512,7 +512,7 @@ fn get_votes_at_checkpoint_at_current_timestamp() {
 #[should_panic(expected = "Error(Contract, #4100)")]
 fn get_total_supply_at_checkpoint_at_current_timestamp() {
     let (e, contract_address) = setup_env();
-    e.ledger().set_timestamp(1000);
+    e.ledger().set_sequence_number(1000);
 
     e.as_contract(&contract_address, || {
         // Query at exact current timestamp should fail
@@ -525,7 +525,7 @@ fn get_total_supply_at_checkpoint_at_current_timestamp() {
 fn get_votes_at_checkpoint_future_timestamp() {
     let (e, contract_address) = setup_env();
     let alice = Address::generate(&e);
-    e.ledger().set_timestamp(1000);
+    e.ledger().set_sequence_number(1000);
 
     e.as_contract(&contract_address, || {
         // Query at future timestamp should fail
@@ -537,7 +537,7 @@ fn get_votes_at_checkpoint_future_timestamp() {
 #[should_panic(expected = "Error(Contract, #4100)")]
 fn get_total_supply_at_checkpoint_future_timestamp() {
     let (e, contract_address) = setup_env();
-    e.ledger().set_timestamp(1000);
+    e.ledger().set_sequence_number(1000);
 
     e.as_contract(&contract_address, || {
         // Query at future timestamp should fail
@@ -552,11 +552,11 @@ fn get_votes_at_checkpoint_before_first_checkpoint() {
     let bob = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        e.ledger().set_timestamp(1000);
+        e.ledger().set_sequence_number(1000);
         transfer_voting_units(&e, None, Some(&alice), 100);
         delegate(&e, &alice, &bob);
 
-        e.ledger().set_timestamp(2000);
+        e.ledger().set_sequence_number(2000);
         // Query before first checkpoint
         assert_eq!(get_votes_at_checkpoint(&e, &bob, 500), 0);
     });
@@ -568,10 +568,10 @@ fn get_total_supply_at_checkpoint_before_first_checkpoint() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        e.ledger().set_timestamp(1000);
+        e.ledger().set_sequence_number(1000);
         transfer_voting_units(&e, None, Some(&alice), 100);
 
-        e.ledger().set_timestamp(2000);
+        e.ledger().set_sequence_number(2000);
         // Query before first checkpoint
         assert_eq!(get_total_supply_at_checkpoint(&e, 500), 0);
     });
@@ -600,16 +600,16 @@ fn total_supply_checkpoint_updates_on_mint_burn() {
     let alice = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        e.ledger().set_timestamp(1000);
+        e.ledger().set_sequence_number(1000);
         transfer_voting_units(&e, None, Some(&alice), 100);
 
-        e.ledger().set_timestamp(2000);
+        e.ledger().set_sequence_number(2000);
         transfer_voting_units(&e, None, Some(&alice), 50);
 
-        e.ledger().set_timestamp(3000);
+        e.ledger().set_sequence_number(3000);
         transfer_voting_units(&e, Some(&alice), None, 75);
 
-        e.ledger().set_timestamp(4000);
+        e.ledger().set_sequence_number(4000);
 
         assert_eq!(get_total_supply_at_checkpoint(&e, 1000), 100);
         assert_eq!(get_total_supply_at_checkpoint(&e, 2000), 150);

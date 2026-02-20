@@ -3,7 +3,7 @@
 //! This module provides utilities for tracking voting power per account with
 //! historical checkpoints. It supports delegation (an account can delegate its
 //! voting power to another account) and provides historical vote queries at any
-//! past timestamp.
+//! past ledger sequence number.
 //!
 //! # Core Concepts
 //!
@@ -13,8 +13,8 @@
 //!   account (delegatee). **Only delegated voting power counts as votes** while
 //!   undelegated voting units are not counted. Self-delegation is required for
 //!   an account to use its own voting power.
-//! - **Checkpoints**: Historical snapshots of voting power at specific
-//!   timestamps
+//! - **Checkpoints**: Historical snapshots of voting power at specific ledger
+//!   sequence numbers
 //!
 //! # Usage
 //!
@@ -83,22 +83,23 @@ pub trait Votes {
     }
 
     /// Returns the voting power (delegated votes) of an account at a specific
-    /// past timestamp.
+    /// past ledger sequence number.
     ///
     /// Returns `0` if the account had no delegated voting power at the given
-    /// timepoint or does not exist in the contract.
+    /// ledger or does not exist in the contract.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to query voting power for.
-    /// * `timepoint` - The timestamp to query (must be in the past).
+    /// * `ledger` - The ledger sequence number to query (must be in the past).
     ///
     /// # Errors
     ///
-    /// * [`VotesError::FutureLookup`] - If `timepoint` >= current timestamp.
-    fn get_votes_at_checkpoint(e: &Env, account: Address, timepoint: u64) -> u128 {
-        get_votes_at_checkpoint(e, &account, timepoint)
+    /// * [`VotesError::FutureLookup`] - If `ledger` >= current ledger sequence
+    ///   number.
+    fn get_votes_at_checkpoint(e: &Env, account: Address, ledger: u32) -> u128 {
+        get_votes_at_checkpoint(e, &account, ledger)
     }
 
     /// Returns the current total supply of voting units.
@@ -115,23 +116,25 @@ pub trait Votes {
         get_total_supply(e)
     }
 
-    /// Returns the total supply of voting units at a specific past timestamp.
+    /// Returns the total supply of voting units at a specific past ledger
+    /// sequence number.
     ///
     /// This tracks all voting units in circulation (regardless of delegation
     /// status), not just delegated votes.
     ///
-    /// Returns `0` if there were no voting units at the given timepoint.
+    /// Returns `0` if there were no voting units at the given ledger.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `timepoint` - The timestamp to query (must be in the past).
+    /// * `ledger` - The ledger sequence number to query (must be in the past).
     ///
     /// # Errors
     ///
-    /// * [`VotesError::FutureLookup`] - If `timepoint` >= current timestamp.
-    fn get_total_supply_at_checkpoint(e: &Env, timepoint: u64) -> u128 {
-        get_total_supply_at_checkpoint(e, timepoint)
+    /// * [`VotesError::FutureLookup`] - If `ledger` >= current ledger sequence
+    ///   number.
+    fn get_total_supply_at_checkpoint(e: &Env, ledger: u32) -> u128 {
+        get_total_supply_at_checkpoint(e, ledger)
     }
 
     /// Returns the current delegate for an account.
@@ -179,7 +182,7 @@ pub trait Votes {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum VotesError {
-    /// The timepoint is in the future
+    /// The ledger is in the future
     FutureLookup = 4100,
     /// Arithmetic overflow occurred
     MathOverflow = 4101,
