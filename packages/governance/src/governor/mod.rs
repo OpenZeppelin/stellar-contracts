@@ -3,28 +3,30 @@
 //! Implements on-chain governance functionality for Soroban contracts.
 //!
 //! This module provides the core governance primitives for decentralized
-//! decision-making, including proposal creation, voting, and execution.
+//! decision-making, including proposal creation, voting, counting, and
+//! execution.
 //!
 //! ## Structure
 //!
 //! The [`Governor`] trait includes:
 //!
 //! - Proposal lifecycle management (creation, voting, execution, cancellation)
-//! - Integration with Votes interface for voting power snapshots
+//! - Vote counting and quorum logic (simple counting by default)
 //!
-//! The [`Governor`] trait needs the following concepts to be defined and made
-//! available by the implementer:
+//! The default counting implementation provides **simple counting**:
 //!
-//! - *Votes*: Governor trait does not define how to store, manage, and access
-//!   votes. But Governor trait needs to be able to access the voting power of
-//!   an account at a specific ledger. A separate Votes trait is provided by
-//!   this library as a default implementation. // TODO: hyperlink the Votes
-//!   trait here, and revise the paragraph accordingly.
+//! - **Vote types**: Against (0), For (1), Abstain (2)
+//! - **Vote success**: `for` votes strictly exceed `against` votes
+//! - **Quorum**: Sum of `for` and `abstain` votes meets or exceeds the single
+//!   configured quorum value (shared across all proposal tallies)
 //!
-//! - *Counting*: Governor trait does not define how votes are counted or how
-//!   quorum is determined. A separate Counting trait defines the counting mode,
-//!   quorum logic, and vote recording. // TODO: hyperlink the Counting trait
-//!   here, and revise the paragraph accordingly.
+//! The [`Governor`] trait does not define how to store, manage, and access
+//! votes. But Governor trait needs to be able to access the voting power of
+//! an account at a specific ledger. [`crate::votes::Votes`] trait is expected
+//! to be implemented on a token contract, and the governor contract (which
+//! implements [`Governor`] trait) is expected to call the
+//! [`crate::votes::Votes`] trait methods on the token contract to access the
+//! voting power of an account.
 //!
 //! The following optional extensions are available:
 //!
@@ -38,8 +40,10 @@
 //!
 //! 1. **Propose**: A user with sufficient voting power creates a proposal
 //! 2. **Vote**: Token holders vote during the voting period
-//! 3. **Execute**: Successful proposals (marked as `Succeeded` by the
-//!    [`Counting`] module) can be executed
+//! 3. **Execute**: Successful proposals (meeting quorum and vote thresholds)
+//!    can be executed
+//! 4. **Cancel**: Proposals can be canceled by the proposer before the voting
+//!    period ends
 //!
 //! When using an extension for `Queue` mechanism, like `TimelockControl`, an
 //! additional `Queue` step is added between voting and execution:
@@ -60,8 +64,9 @@
 //!
 //! This implementation uses **snapshot-based voting power**. When a proposal
 //! is created, the current ledger number is recorded as the "snapshot". All
-//! voting power calculations use [`get_votes_at_checkpoint()`] which queries
-//! the voting power at the snapshot ledger, not the current ledger.
+//! voting power calculations use
+//! [`crate::votes::Votes::get_votes_at_checkpoint()`] which queries the voting
+//! power at the snapshot ledger, not the current ledger.
 //!
 //! This means an attacker must hold tokens *before* a proposal is created
 //! to have voting power on that proposal, making flash loan attacks
@@ -89,8 +94,8 @@
 //!
 //! ### Mitigation
 //!
-//! - **Quorum requirements** (defined by the [`Counting`] trait) ensure a
-//!   minimum percentage of total voting supply participates in each proposal
+//! - **Quorum requirements** ensure a minimum percentage of total voting supply
+//!   participates in each proposal
 //! - **Voting delay** ([`get_voting_delay()`]) gives token holders time to
 //!   acquire more tokens or delegate before voting starts
 
@@ -104,28 +109,23 @@ use soroban_sdk::{
     Symbol, Val, Vec,
 };
 
-use crate::votes::Votes;
+pub use crate::governor::storage::{ProposalVoteCounts, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR};
 
-/// TODO: delete this after Counting PR is merged
-pub trait Counting {
-    fn counting_mode(e: &Env) -> Symbol;
-    fn has_voted(e: &Env, proposal_id: BytesN<32>, account: Address) -> bool;
-    fn quorum(e: &Env, ledger: u32) -> u128;
-    fn quorum_reached(e: &Env, proposal_id: BytesN<32>) -> bool;
-    fn vote_succeeded(e: &Env, proposal_id: BytesN<32>) -> bool;
-    fn count_vote(e: &Env, proposal_id: BytesN<32>, account: Address, vote_type: u32, weight: u128);
-}
-
-/// Base Governor Trait
-///
 /// The `Governor` trait defines the core functionality for on-chain governance.
-/// It provides a standard interface for creating proposals, voting, and
-/// executing approved actions.
+/// It provides a standard interface for creating proposals, counting,
+/// and executing approved actions.
 ///
-/// The contract that implements this trait is expected to implement [`Votes`]
-/// and [`Counting`] traits.
+/// # Default Counting Implementation
+///
+/// The default implementation provides simple counting with three vote
+/// types (Against, For, Abstain), simple majority for success, and a
+/// fixed quorum value.
+///
+/// Implementers can override the counting-related trait methods to provide
+/// custom counting strategies (e.g., fractional voting, weighted quorum
+/// based on total supply, etc.).
 #[contracttrait]
-pub trait Governor: Votes + Counting {
+pub trait Governor {
     /// Returns the name of the governor.
     ///
     /// # Arguments
@@ -198,6 +198,66 @@ pub trait Governor: Votes + Counting {
     ///   threshold has not been set.
     fn proposal_threshold(e: &Env) -> u128 {
         storage::get_proposal_threshold(e)
+    }
+
+    /// Returns the address of the token contract that implements the Votes
+    /// trait.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`GovernorError::TokenContractNotSet`] - Occurs if the token contract
+    ///   has not been set.
+    fn get_token_contract(e: &Env) -> Address {
+        storage::get_token_contract(e)
+    }
+
+    /// Returns a symbol identifying the counting strategy.
+    ///
+    /// This function is expected to be used to display human-readable
+    /// information about the counting strategy, for example in UIs.
+    ///
+    /// For simple counting, this returns `"simple"`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn counting_mode(e: &Env) -> Symbol {
+        storage::counting_mode(e)
+    }
+
+    /// Returns whether an account has voted on a proposal.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `proposal_id` - The unique identifier of the proposal.
+    /// * `account` - The address to check.
+    fn has_voted(e: &Env, proposal_id: BytesN<32>, account: Address) -> bool {
+        storage::has_voted(e, &proposal_id, &account)
+    }
+
+    /// Returns the quorum required at the given ledger.
+    ///
+    /// For simple counting, this returns the configured fixed quorum value
+    /// and the `ledger` parameter is ignored. Custom implementations (e.g.,
+    /// fractional quorum based on total supply) may use the `ledger`
+    /// parameter to compute a dynamic quorum.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `ledger` - The ledger number at which to query the quorum.
+    ///
+    /// # Errors
+    ///
+    /// * [`GovernorError::QuorumNotSet`] - If the quorum has not been set.
+    fn quorum(e: &Env, ledger: u32) -> u128 {
+        let _ = ledger;
+        storage::get_quorum(e)
     }
 
     /// Returns the current state of a proposal.
@@ -340,11 +400,7 @@ pub trait Governor: Votes + Counting {
         proposer: Address,
     ) -> BytesN<32> {
         proposer.require_auth();
-        // Use previous ledger to prevent flash loan based proposals
-        let snapshot = e.ledger().sequence() - 1;
-        let proposer_votes = Self::get_votes_at_checkpoint(e, proposer.clone(), snapshot as u64); // TODO: revert `as u64` cast to snapshot if we go with ledgers instead of
-                                                                                                  // timestamps.
-        storage::propose(e, proposer_votes, targets, functions, args, description, &proposer)
+        storage::propose(e, targets, functions, args, description, &proposer)
     }
 
     /// Casts a vote on a proposal and returns the voter's voting power.
@@ -353,9 +409,8 @@ pub trait Governor: Votes + Counting {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `proposal_id` - The unique identifier of the proposal.
-    /// * `vote_type` - The type of vote. The interpretation depends on the
-    ///   counting module used. For simple counting: 0 = Against, 1 = For, 2 =
-    ///   Abstain.
+    /// * `vote_type` - The type of vote. For simple counting: 0 = Against, 1 =
+    ///   For, 2 = Abstain.
     /// * `reason` - An optional explanation for the vote.
     /// * `voter` - The address casting the vote.
     ///
@@ -384,12 +439,7 @@ pub trait Governor: Votes + Counting {
         voter: Address,
     ) -> u128 {
         voter.require_auth();
-
-        let snapshot = storage::check_proposal_state(e, &proposal_id);
-        let voter_weight = Self::get_votes_at_checkpoint(e, voter.clone(), snapshot as u64);
-        Self::count_vote(e, proposal_id.clone(), voter.clone(), vote_type, voter_weight);
-        emit_vote_cast(e, &voter, &proposal_id, vote_type, voter_weight, &reason);
-        voter_weight
+        storage::cast_vote(e, &proposal_id, vote_type, &reason, &voter)
     }
 
     /// Executes a proposal and returns its unique identifier.
@@ -508,7 +558,7 @@ pub trait Governor: Votes + Counting {
 /// - [`Pending`](ProposalState::Pending) — voting has not started yet.
 /// - [`Active`](ProposalState::Active) — voting is ongoing.
 /// - [`Defeated`](ProposalState::Defeated) — voting ended **without** the
-///   [`Counting`] module marking the proposal as `Succeeded`.
+///   counting logic marking the proposal as `Succeeded`.
 ///
 /// ## Explicit states
 ///
@@ -516,7 +566,7 @@ pub trait Governor: Votes + Counting {
 /// storage. Once set, they take precedence over any time-based derivation.
 ///
 /// - [`Canceled`](ProposalState::Canceled) — set by the Governor.
-/// - [`Succeeded`](ProposalState::Succeeded) — set by the [`Counting`] module.
+/// - [`Succeeded`](ProposalState::Succeeded) — set by the counting logic.
 /// - [`Queued`](ProposalState::Queued) / [`Expired`](ProposalState::Expired) —
 ///   set by extensions like `TimelockControl`.
 /// - [`Executed`](ProposalState::Executed) — set by the Governor.
@@ -531,7 +581,7 @@ pub enum ProposalState {
     /// The proposal is active and voting is ongoing.
     Active = 1,
     /// The proposal was defeated (did not meet quorum or majority). This is
-    /// the default outcome when voting ends and the [`Counting`] module has
+    /// the default outcome when voting ends and the counting logic has
     /// not marked the proposal as [`Succeeded`](ProposalState::Succeeded).
     Defeated = 2,
 
@@ -540,8 +590,8 @@ pub enum ProposalState {
     // over time-based derivation.
     /// The proposal has been cancelled. Set by the Governor.
     Canceled = 3,
-    /// The proposal succeeded and can be executed. Set by the [`Counting`]
-    /// module when the proposal meets the required quorum and vote
+    /// The proposal succeeded and can be executed. Set by the counting
+    /// logic when the proposal meets the required quorum and vote
     /// thresholds. If a queuing extension is enabled, this state means the
     /// proposal is ready to be queued.
     Succeeded = 4,
@@ -595,6 +645,16 @@ pub enum GovernorError {
     VersionNotSet = 5014,
     /// Arithmetic overflow occurred.
     MathOverflow = 5015,
+    /// The account has already voted on this proposal.
+    AlreadyVoted = 5016,
+    /// The vote type is invalid (must be 0, 1, or 2).
+    InvalidVoteType = 5017,
+    /// The quorum has not been set.
+    QuorumNotSet = 5018,
+    /// The token contract has already been set (can only be initialized once).
+    TokenContractAlreadySet = 5019,
+    /// The token contract has not been set.
+    TokenContractNotSet = 5020,
 }
 
 // ################## CONSTANTS ##################
@@ -761,4 +821,23 @@ pub struct ProposalCancelled {
 /// * `proposal_id` - The unique identifier of the proposal.
 pub fn emit_proposal_cancelled(e: &Env, proposal_id: &BytesN<32>) {
     ProposalCancelled { proposal_id: proposal_id.clone() }.publish(e);
+}
+
+/// Event emitted when the quorum value is changed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct QuorumChanged {
+    pub old_quorum: u128,
+    pub new_quorum: u128,
+}
+
+/// Emits an event when the quorum value is changed.
+///
+/// # Arguments
+///
+/// * `e` - Access to Soroban environment.
+/// * `old_quorum` - The previous quorum value.
+/// * `new_quorum` - The new quorum value.
+pub fn emit_quorum_changed(e: &Env, old_quorum: u128, new_quorum: u128) {
+    QuorumChanged { old_quorum, new_quorum }.publish(e);
 }
