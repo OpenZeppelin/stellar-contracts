@@ -9,7 +9,7 @@
 //! - **Vote types**: Against (0), For (1), Abstain (2)
 //! - **Vote success**: `for` votes strictly exceed `against` votes
 //! - **Quorum**: Sum of `for` and `abstain` votes meets or exceeds the
-//!   configured quorum value
+//!   configured quorum value (shared across all proposal tallies)
 //!
 //! # Usage
 //!

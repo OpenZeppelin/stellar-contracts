@@ -225,12 +225,6 @@ pub fn count_vote(
     // Check if the account has already voted
     let voted_key = CountingStorageKey::HasVoted(proposal_id.clone(), account.clone());
     if e.storage().persistent().has(&voted_key) {
-        e.storage().persistent().extend_ttl(
-            &voted_key,
-            COUNTING_TTL_THRESHOLD,
-            COUNTING_EXTEND_AMOUNT,
-        );
-
         panic_with_error!(e, CountingError::AlreadyVoted);
     }
 
