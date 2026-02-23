@@ -224,6 +224,18 @@ pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
     }
 }
 
+/// Retrieves all context rule IDs of a specific context type. Returns a vector
+/// of all context rule IDs matching the specified type, including expired rules.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `context_rule_type` - The type of context rules to retrieve.
+pub fn get_context_rule_ids(e: &Env, context_rule_type: &ContextRuleType) -> Vec<u32> {
+    let ids_key = SmartAccountStorageKey::Ids(context_rule_type.clone());
+    get_persistent_entry(e, &ids_key).unwrap_or_else(|| Vec::new(e))
+}
+
 /// Retrieves all context rules of a specific context type. Returns a vector of
 /// all context rules matching the specified type, including expired rules.
 ///
@@ -231,9 +243,9 @@ pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context_rule_type` - The type of context rules to retrieve.
+#[deprecated(note = "use `get_context_rule_ids` and `get_context_rule` instead")]
 pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<ContextRule> {
-    let ids_key = SmartAccountStorageKey::Ids(context_rule_type.clone());
-    let ids: Vec<u32> = get_persistent_entry(e, &ids_key).unwrap_or_else(|| Vec::new(e));
+    let ids = get_context_rule_ids(e, context_rule_type);
 
     Vec::from_iter(e, ids.iter().map(|id| get_context_rule(e, id)))
 }

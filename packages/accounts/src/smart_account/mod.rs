@@ -5,12 +5,14 @@ use soroban_sdk::{
     auth::CustomAccountInterface, contractclient, contracterror, contractevent, Address, Env, Map,
     String, Symbol, Val, Vec,
 };
+#[allow(deprecated)]
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, contains_canonical_duplicate,
-    do_check_auth, get_context_rule, get_context_rules, get_context_rules_count,
-    get_validated_context, remove_context_rule, remove_policy, remove_signer,
-    update_context_rule_name, update_context_rule_valid_until, validate_signer_key_size,
-    ContextRule, ContextRuleType, Meta, Signatures, Signer, SmartAccountStorageKey,
+    do_check_auth, get_context_rule, get_context_rule_ids, get_context_rules,
+    get_context_rules_count, get_validated_context, remove_context_rule, remove_policy,
+    remove_signer, update_context_rule_name, update_context_rule_valid_until,
+    validate_signer_key_size, ContextRule, ContextRuleType, Meta, Signatures, Signer,
+    SmartAccountStorageKey,
 };
 
 /// Core trait for smart account functionality, extending Soroban's
@@ -45,15 +47,44 @@ pub trait SmartAccount: CustomAccountInterface {
     ///   exists with the given ID.
     fn get_context_rule(e: &Env, context_rule_id: u32) -> ContextRule;
 
-    /// Retrieves all context rules of a specific type, returning a vector of
-    /// all `ContextRule`s matching the specified type. Returns an empty
-    /// vector if no rules of the given type exist.
+    /// Retrieves all context rule IDs of a specific type, returning a vector
+    /// of all IDs matching the specified type. Returns an empty vector if no
+    /// rules of the given type exist. Use [`get_context_rule`] to retrieve a
+    /// full `ContextRule` by ID.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `context_rule_type` - The type of context rules to retrieve (e.g.,
     ///   Default, CallContract).
+    fn get_context_rule_ids(e: &Env, context_rule_type: ContextRuleType) -> Vec<u32>;
+
+    /// Retrieves all context rules of a specific type, returning a vector of
+    /// all `ContextRule`s matching the specified type. Returns an empty
+    /// vector if no rules of the given type exist.
+    ///
+    /// # Deprecated
+    ///
+    /// Use [`get_context_rule_ids`] and [`get_context_rule`] instead.
+    ///
+    /// This function aggregates full [`ContextRule`] structs, including all
+    /// signer key data and policies, for every rule of a given type. This
+    /// makes it susceptible to exceeding the network's maximum return value
+    /// size (~16 KB). As the maximum number of context rules per account
+    /// increases, even usage at not full capacity (rules × signers × key size)
+    /// can exceed the limit. Going forward, the goal is to increase
+    /// significantly `MAX_CONTEXT_RULES`, or even completely remove it, and
+    /// this function is a bottleneck.
+    ///
+    /// Prefer fetching IDs first via [`get_context_rule_ids`] and then loading
+    /// individual rules on demand with [`get_context_rule`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `context_rule_type` - The type of context rules to retrieve (e.g.,
+    ///   Default, CallContract).
+    #[deprecated(note = "use `get_context_rule_ids` and `get_context_rule` instead")]
     fn get_context_rules(e: &Env, context_rule_type: ContextRuleType) -> Vec<ContextRule>;
 
     /// Retrieves the number of all context rules, including expired rules.

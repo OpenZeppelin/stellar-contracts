@@ -10,11 +10,13 @@ use soroban_sdk::{
     crypto::Hash,
     Address, Env, Map, String, Symbol, Val, Vec,
 };
+#[allow(deprecated)]
 use stellar_accounts::smart_account::{
-    add_context_rule, add_policy, add_signer, do_check_auth, get_context_rule, get_context_rules,
-    get_context_rules_count, remove_context_rule, remove_policy, remove_signer,
-    update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType,
-    ExecutionEntryPoint, Signatures, Signer, SmartAccount, SmartAccountError,
+    add_context_rule, add_policy, add_signer, do_check_auth, get_context_rule,
+    get_context_rule_ids, get_context_rules, get_context_rules_count, remove_context_rule,
+    remove_policy, remove_signer, update_context_rule_name, update_context_rule_valid_until,
+    ContextRule, ContextRuleType, ExecutionEntryPoint, Signatures, Signer, SmartAccount,
+    SmartAccountError,
 };
 use stellar_contract_utils::upgradeable::UpgradeableInternal;
 use stellar_macros::Upgradeable;
@@ -84,7 +86,13 @@ impl SmartAccount for MultisigContract {
         get_context_rule(e, context_rule_id)
     }
 
+    /// Retrieve all context rule IDs of a specific type.
+    fn get_context_rule_ids(e: &Env, context_rule_type: ContextRuleType) -> Vec<u32> {
+        get_context_rule_ids(e, &context_rule_type)
+    }
+
     /// Retrieve all context rules of a specific type.
+    #[allow(deprecated)]
     fn get_context_rules(e: &Env, context_rule_type: ContextRuleType) -> Vec<ContextRule> {
         get_context_rules(e, &context_rule_type)
     }
