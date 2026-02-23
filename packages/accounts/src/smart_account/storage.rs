@@ -1286,7 +1286,6 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
 /// * `e` - Access to the Soroban environment.
 /// * `signers` - The signers for the context rule.
 /// * `policies` - The policies for the context rule.
-/// * `valid_until` - Optional expiration ledger sequence.
 ///
 /// # Errors
 ///
