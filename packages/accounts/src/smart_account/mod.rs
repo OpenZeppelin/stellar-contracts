@@ -341,6 +341,8 @@ pub const MAX_POLICIES: u32 = 5;
 pub const MAX_SIGNERS: u32 = 15;
 /// Maximum number of context rules allowed per smart account.
 pub const MAX_CONTEXT_RULES: u32 = 15;
+/// Maximum length in bytes for a context rule name.
+pub const MAX_NAME_SIZE: u32 = 20;
 /// Maximum size in bytes for external signer key data.
 pub const MAX_EXTERNAL_KEY_SIZE: u32 = 256;
 
@@ -381,6 +383,8 @@ pub enum SmartAccountError {
     KeyDataTooLarge = 3013,
     /// context_rule_ids length does not match auth_contexts length.
     ContextRuleIdsLengthMismatch = 3014,
+    /// Context rule name exceeds the maximum allowed length.
+    NameTooLong = 3015,
 }
 
 // ################## EVENTS ##################

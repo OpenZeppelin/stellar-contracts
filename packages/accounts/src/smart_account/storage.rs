@@ -75,6 +75,7 @@
 //!     signers: [admin1, admin2, admin3],
 //!     policies: [],
 //! }
+
 //!
 //! // Rule 2: User group - 3 of 5 signers, with spending limit policy
 //! ContextRule {
@@ -101,8 +102,8 @@ use crate::{
     smart_account::{
         emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
         emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
-        SmartAccountError, MAX_CONTEXT_RULES, MAX_EXTERNAL_KEY_SIZE, MAX_POLICIES, MAX_SIGNERS,
-        SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
+        SmartAccountError, MAX_CONTEXT_RULES, MAX_EXTERNAL_KEY_SIZE, MAX_NAME_SIZE, MAX_POLICIES,
+        MAX_SIGNERS, SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
     },
     verifiers::VerifierClient,
 };
@@ -597,6 +598,24 @@ pub fn validate_signer_key_size(e: &Env, signer: &Signer) {
     }
 }
 
+/// Validates that a context rule name does not exceed the maximum allowed
+/// length.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `name` - The context rule name to validate.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::NameTooLong`] - When the name exceeds
+///   [`MAX_NAME_SIZE`] bytes.
+pub fn validate_context_rule_name(e: &Env, name: &String) {
+    if name.len() > MAX_NAME_SIZE {
+        panic_with_error!(e, SmartAccountError::NameTooLong);
+    }
+}
+
 /// Performs complete authorization check for multiple contexts. Authenticates
 /// signatures, validates contexts against rules, and enforces all applicable
 /// policies. Returns success if all contexts are successfully authorized.
@@ -798,7 +817,9 @@ pub fn contains_canonical_duplicate(e: &Env, signers: &Vec<Signer>, new_signer: 
 ///   multiple times.
 /// * [`SmartAccountError::PastValidUntil`] - When valid_until is in the past.
 /// * [`SmartAccountError::KeyDataTooLarge`] - When an external signer's key
-///   data exceeds MAX_EXTERNAL_KEY_SIZE (256) bytes.
+///   data exceeds MAX_EXTERNAL_KEY_SIZE bytes.
+/// * [`SmartAccountError::NameTooLong`] - When the provided context rule name
+///   exceeds MAX_NAME_SIZE bytes.
 ///
 /// # Events
 ///
@@ -818,6 +839,8 @@ pub fn add_context_rule(
     signers: &Vec<Signer>,
     policies: &Map<Address, Val>,
 ) -> ContextRule {
+    validate_context_rule_name(e, name);
+
     let id = e.storage().instance().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
 
     let count = get_context_rules_count(e);
@@ -903,6 +926,8 @@ pub fn add_context_rule(
 ///
 /// * [`SmartAccountError::ContextRuleNotFound`] - When the context rule with
 ///   the specified ID does not exist.
+/// * [`SmartAccountError::NameTooLong`] - When the provided context rule name
+///   exceeds MAX_NAME_SIZE bytes.
 ///
 /// # Events
 ///
@@ -915,6 +940,8 @@ pub fn add_context_rule(
 /// This function modifies storage without requiring authorization. Ensure
 /// proper access control is implemented at the contract level.
 pub fn update_context_rule_name(e: &Env, id: u32, name: &String) -> ContextRule {
+    validate_context_rule_name(e, name);
+
     let existing_rule = get_context_rule(e, id);
 
     // Update only the name in meta information

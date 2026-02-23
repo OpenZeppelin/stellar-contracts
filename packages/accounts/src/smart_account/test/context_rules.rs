@@ -20,7 +20,7 @@ use crate::{
             get_validated_context_by_id, remove_context_rule, update_context_rule_name,
             update_context_rule_valid_until, ContextRule, ContextRuleType, Signatures, Signer,
         },
-        MAX_CONTEXT_RULES, MAX_EXTERNAL_KEY_SIZE,
+        MAX_CONTEXT_RULES, MAX_EXTERNAL_KEY_SIZE, MAX_NAME_SIZE,
     },
 };
 
@@ -161,6 +161,28 @@ fn do_check_auth_single_context_with_policies_success() {
         let result = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
 
         assert!(result.is_ok());
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3015)")]
+fn add_context_rule_name_too_long_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let signers = create_test_signers(&e);
+        let contract_addr = Address::generate(&e);
+        let too_long_name = String::from_str(&e, "name_that_is_way_too_long");
+
+        add_context_rule(
+            &e,
+            &ContextRuleType::CallContract(contract_addr),
+            &too_long_name,
+            None,
+            &signers,
+            &Map::new(&e),
+        );
     });
 }
 
@@ -438,6 +460,19 @@ fn update_context_rule_success() {
 
         assert_eq!(modified_rule.id, rule.id);
         assert_eq!(modified_rule.valid_until, None);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3015)")]
+fn update_context_rule_name_too_long_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    let rule = setup_test_rule(&e, &address);
+
+    e.as_contract(&address, || {
+        update_context_rule_name(&e, rule.id, &String::from_str(&e, "name_that_is_way_too_long"));
     });
 }
 
