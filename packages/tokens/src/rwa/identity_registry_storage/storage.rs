@@ -520,7 +520,7 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
     let old_identity_key = IRSStorageKey::Identity(old_account.clone());
     let new_identity_key = IRSStorageKey::Identity(new_account.clone());
 
-    let identity: IdentityProfile = get_persistent_entry(e, &old_identity_key)
+    let identity: Address = get_persistent_entry(e, &old_identity_key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
 
     // Check if new_account is not already linked to another identity
