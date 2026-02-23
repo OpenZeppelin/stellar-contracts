@@ -90,7 +90,7 @@ impl SorobanMulDiv for i128 {
                 let y_i256 = &I256::from_i128(e, *y);
                 let z_i256 = &I256::from_i128(e, *denominator);
 
-                let res = x_i256.mul_div_floor(e, y_i256, z_i256);
+                let res = x_i256.mul_div_floor(y_i256, z_i256);
 
                 res.to_i128()
                     .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
@@ -122,7 +122,7 @@ impl SorobanMulDiv for i128 {
                 let y_i256 = &I256::from_i128(e, *y);
                 let z_i256 = &I256::from_i128(e, *denominator);
 
-                let res = x_i256.mul_div_ceil(e, y_i256, z_i256);
+                let res = x_i256.mul_div_ceil(y_i256, z_i256);
 
                 res.to_i128()
                     .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
@@ -257,14 +257,14 @@ fn checked_div_floor(r: i128, z: i128) -> Option<i128> {
 fn div_floor(r: i128, z: i128) -> i128 {
     if (r < 0 && z > 0) || (r > 0 && z < 0) {
         // ceiling is taken by default for a negative result
-        let remainder = r.rem_euclid(z)?;
+        let remainder = r.rem_euclid(z);
 
         // no need to check for div overflow (i128::MIN / -1),
         // because it doesn't fall under this if branch
-        (r / z).sub(if remainder > 0 { 1 } else { 0 })
+        (r / z) - (if remainder > 0 { 1 } else { 0 })
     } else {
         // floor taken by default for a positive or zero result
-        r.div(z)
+        r / z
     }
 }
 
@@ -289,9 +289,9 @@ fn div_ceil(r: i128, z: i128) -> i128 {
         r / z
     } else {
         // floor taken by default for a positive result
-        let remainder = r.rem_euclid(z)?;
+        let remainder = r.rem_euclid(z);
 
         // check for div overflow (i128::MIN / -1)
-        (r / z).add(if remainder > 0 { 1 } else { 0 })
+        r / z + (if remainder > 0 { 1 } else { 0 })
     }
 }

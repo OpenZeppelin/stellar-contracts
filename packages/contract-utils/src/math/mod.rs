@@ -65,13 +65,6 @@ pub trait SorobanMulDiv: Sized {
     /// * `env` - Access to the Soroban environment.
     /// * `y` - The multiplicand.
     /// * `denominator` - The divisor.
-    ///
-    /// # Errors
-    ///
-    /// * [`SorobanFixedPointError::DivisionByZero`] - When `denominator` is
-    ///   zero.
-    /// * [`SorobanFixedPointError::Overflow`] - When a phantom overflow occurs
-    ///   or the result does not fit in `Self`.
     fn mul_div_floor(&self, e: &Env, y: &Self, denominator: &Self) -> Self;
 
     /// Calculates ceil(x * y / denominator).
