@@ -43,95 +43,13 @@
 mod i128_fixed_point;
 mod i256_fixed_point;
 pub mod wad;
-pub use i128_fixed_point::{checked_mul_div_i128, mul_div_i128};
-pub use i256_fixed_point::{checked_mul_div_i256, mul_div_i256};
+pub use i128_fixed_point::{checked_mul_div_with_rounding_i128, mul_div_with_rounding_i128};
+pub use i256_fixed_point::{checked_mul_div_with_rounding_i256, mul_div_with_rounding_i256};
 
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contracttype, Env};
-
-/// Trait for computing mul_div fixed-point calculations with Soroban host
-/// objects.
-///
-/// Provides both panicking and checked variants for floor and ceiling division
-/// operations. Implementations automatically handle phantom overflow by scaling
-/// to larger integer types when necessary.
-pub trait SorobanMulDiv: Sized {
-    /// Calculates floor(x * y / denominator).
-    ///
-    /// # Arguments
-    ///
-    /// * `env` - Access to the Soroban environment.
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    fn mul_div_floor(&self, e: &Env, y: &Self, denominator: &Self) -> Self;
-
-    /// Calculates ceil(x * y / denominator).
-    ///
-    /// # Arguments
-    ///
-    /// * `env` - Access to the Soroban environment.
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    ///
-    /// # Errors
-    ///
-    /// * [`SorobanFixedPointError::DivisionByZero`] - When `denominator` is
-    ///   zero.
-    /// * [`SorobanFixedPointError::Overflow`] - When a phantom overflow occurs
-    ///   or the result does not fit in `Self`.
-    fn mul_div_ceil(&self, e: &Env, y: &Self, denominator: &Self) -> Self;
-
-    /// Calculates (x * y / denominator).
-    ///
-    /// # Arguments
-    ///
-    /// * `env` - Access to the Soroban environment.
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    ///
-    /// # Errors
-    ///
-    /// * [`SorobanFixedPointError::DivisionByZero`] - When `denominator` is
-    ///   zero.
-    /// * [`SorobanFixedPointError::Overflow`] - When a phantom overflow occurs
-    ///   or the result does not fit in `Self`.
-    fn mul_div(&self, e: &Env, y: &Self, denominator: &Self) -> Self;
-
-    /// Checked version of floor(x * y / denominator).
-    ///
-    /// Returns `None` if the result overflows or if `denominator` is zero.
-    ///
-    /// # Arguments
-    ///
-    /// * `env` - Access to the Soroban environment.
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    fn checked_mul_div_floor(&self, e: &Env, y: &Self, denominator: &Self) -> Option<Self>;
-
-    /// Checked version of ceil(x * y / denominator).
-    ///
-    /// Returns `None` if the result overflows or if `denominator` is zero.
-    ///
-    /// # Arguments
-    ///
-    /// * `env` - Access to the Soroban environment.
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    fn checked_mul_div_ceil(&self, e: &Env, y: &Self, denominator: &Self) -> Option<Self>;
-
-    /// Checked version of (x * y / denominator).
-    ///
-    /// Returns `None` if the result overflows or if `denominator` is zero.
-    ///
-    /// # Arguments
-    ///
-    /// * `env` - Access to the Soroban environment.
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    fn checked_mul_div(&self, e: &Env, y: &Self, denominator: &Self) -> Option<Self>;
-}
+use soroban_sdk::{contracterror, contracttype};
 
 // ################## ERRORS ##################
 

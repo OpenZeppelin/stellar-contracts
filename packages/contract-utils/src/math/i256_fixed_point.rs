@@ -4,151 +4,139 @@
 // NOTE: I256 arithmetic operations in the soroban-sdk do not have checked
 // variants as of yet, the `checked` variants in this codebase may result in
 // panicking behavior.
+//
+// NOTE: Unlike the i128 variants, phantom overflow is NOT handled here.
+// Handling I256 multiplication overflow would require a custom I512 type.
+// Overflowing two large I256 values is considered rare enough in practice
+// that this trade-off is acceptable.
 
 use soroban_sdk::{Env, I256};
 
-use crate::math::{Rounding, SorobanMulDiv};
+use crate::math::Rounding;
 
-/// Calculates `x * y / denominator` with full precision.
-///
-/// Performs multiplication and division with phantom overflow handling,
-/// following the specified rounding direction.
+/// Calculates `x * y / denominator` following the specified rounding direction.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to the Soroban environment.
 /// * `x` - The first operand.
 /// * `y` - The second operand.
 /// * `denominator` - The divisor.
 /// * `rounding` - The rounding direction to use.
-///
-/// # Errors
-///
-/// * refer to the errors of [`I256::mul_div_floor`]
-/// * refer to the errors of [`I256::mul_div_ceil`]
-/// * refer to the errors of [`I256::mul_div`]
-///
-/// # Notes
-///
-/// Automatically handles phantom overflow by scaling to `I256` when necessary.
-pub fn mul_div_i256(e: &Env, x: I256, y: I256, denominator: I256, rounding: Rounding) -> I256 {
+pub fn mul_div_with_rounding_i256(x: I256, y: I256, denominator: I256, rounding: Rounding) -> I256 {
     match rounding {
-        Rounding::Floor => x.mul_div_floor(e, &y, &denominator),
-        Rounding::Ceil => x.mul_div_ceil(e, &y, &denominator),
-        Rounding::Truncate => x.mul_div(e, &y, &denominator),
+        Rounding::Floor => mul_div_floor_i256(&x, &y, &denominator),
+        Rounding::Ceil => mul_div_ceil_i256(&x, &y, &denominator),
+        Rounding::Truncate => mul_div_i256(&x, &y, &denominator),
     }
 }
 
-/// Checked version of [`muldiv`].
+/// Checked version of [`mul_div_with_rounding_i256`].
 ///
-/// Calculates `x * y / denominator` with full precision, returning `None`
-/// instead of panicking on error.
+/// Calculates `x * y / denominator`, returning `None` on division by zero or
+/// overflow instead of panicking.
 ///
 /// # Arguments
 ///
-/// * `e` - Access to the Soroban environment.
 /// * `x` - The first operand.
 /// * `y` - The second operand.
 /// * `denominator` - The divisor.
 /// * `rounding` - The rounding direction to use.
-///
-/// # Notes
-///
-/// Automatically handles phantom overflow by scaling to `I256` when necessary.
-pub fn checked_mul_div_i256(
-    e: &Env,
+pub fn checked_mul_div_with_rounding_i256(
     x: I256,
     y: I256,
     denominator: I256,
     rounding: Rounding,
 ) -> Option<I256> {
     match rounding {
-        Rounding::Floor => x.checked_mul_div_floor(e, &y, &denominator),
-        Rounding::Ceil => x.checked_mul_div_ceil(e, &y, &denominator),
-        Rounding::Truncate => x.checked_mul_div(e, &y, &denominator),
+        Rounding::Floor => checked_mul_div_floor_i256(&x, &y, &denominator),
+        Rounding::Ceil => checked_mul_div_ceil_i256(&x, &y, &denominator),
+        Rounding::Truncate => checked_mul_div_i256(&x, &y, &denominator),
     }
 }
 
-impl SorobanMulDiv for I256 {
-    /// Calculates floor(x * y / denominator).
-    ///
-    /// # Arguments
-    ///
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    fn mul_div_floor(&self, y: &I256, denominator: &I256) -> I256 {
-        let r = self.mul(y);
-        div_floor(&r, denominator)
+/// Calculates floor(x * y / denominator).
+///
+/// # Arguments
+///
+/// * `x` - The first operand.
+/// * `y` - The multiplicand.
+/// * `denominator` - The divisor.
+pub fn mul_div_floor_i256(x: &I256, y: &I256, denominator: &I256) -> I256 {
+    let r = x.mul(y);
+    div_floor(&r, denominator)
+}
+
+/// Calculates ceil(x * y / denominator).
+///
+/// # Arguments
+///
+/// * `x` - The first operand.
+/// * `y` - The multiplicand.
+/// * `denominator` - The divisor.
+pub fn mul_div_ceil_i256(x: &I256, y: &I256, denominator: &I256) -> I256 {
+    let r = x.mul(y);
+    div_ceil(&r, denominator)
+}
+
+/// Calculates `x * y / denominator` (truncated toward zero).
+///
+/// # Arguments
+///
+/// * `x` - The first operand.
+/// * `y` - The multiplicand.
+/// * `denominator` - The divisor.
+pub fn mul_div_i256(x: &I256, y: &I256, denominator: &I256) -> I256 {
+    let r = x.mul(y);
+    r.div(denominator)
+}
+
+/// Calculates floor(x * y / denominator).
+///
+/// Returns `None` if `denominator` is zero or if the division overflows.
+///
+/// # Arguments
+///
+/// * `x` - The first operand.
+/// * `y` - The multiplicand.
+/// * `denominator` - The divisor.
+pub fn checked_mul_div_floor_i256(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
+    let r = x.mul(y);
+    checked_div_floor(&r, denominator)
+}
+
+/// Calculates ceil(x * y / denominator).
+///
+/// Returns `None` if `denominator` is zero or if the division overflows.
+///
+/// # Arguments
+///
+/// * `x` - The first operand.
+/// * `y` - The multiplicand.
+/// * `denominator` - The divisor.
+pub fn checked_mul_div_ceil_i256(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
+    let r = x.mul(y);
+    checked_div_ceil(&r, denominator)
+}
+
+/// Calculates `x * y / denominator` (truncated toward zero).
+///
+/// Returns `None` if `denominator` is zero.
+///
+/// # Arguments
+///
+/// * `x` - The first operand.
+/// * `y` - The multiplicand.
+/// * `denominator` - The divisor.
+pub fn checked_mul_div_i256(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
+    let zero = I256::from_i32(&Env::default(), 0);
+
+    // TODO: remove this check when `checked_div` is available: https://github.com/stellar/rs-soroban-sdk/issues/1659,
+    if *denominator == zero {
+        return None;
     }
 
-    /// Calculates ceil(x * y / denominator).
-    ///
-    /// # Arguments
-    ///
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    fn mul_div_ceil(&self, y: &I256, denominator: &I256) -> I256 {
-        let r = self.mul(y);
-        div_ceil(&r, denominator)
-    }
-
-    /// Calculates (x * y / denominator).
-    ///
-    /// # Arguments
-    ///
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    fn mul_div(&self, y: &I256, denominator: &I256) -> I256 {
-        let r = self.mul(y);
-        r.div(denominator)
-    }
-
-    /// Calculates floor(x * y / denominator).
-    ///
-    /// Returns `None` if denominator is zero or if the result overflows.
-    ///
-    /// # Arguments
-    ///
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    fn checked_mul_div_floor(&self, y: &I256, denominator: &I256) -> Option<I256> {
-        let r = self.mul(y);
-        checked_div_floor(&r, denominator)
-    }
-
-    /// Calculates ceil(x * y / denominator).
-    ///
-    /// Returns `None` if denominator is zero or if the result overflows.
-    ///
-    /// # Arguments
-    ///
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    fn checked_mul_div_ceil(&self, y: &I256, denominator: &I256) -> Option<I256> {
-        let r = self.mul(y);
-        checked_div_ceil(&r, denominator)
-    }
-
-    /// Calculates (x * y / denominator).
-    ///
-    /// Returns `None` if denominator is zero or if the result overflows.
-    ///
-    /// # Arguments
-    ///
-    /// * `env` - Access to the Soroban environment.
-    /// * `y` - The multiplicand.
-    /// * `denominator` - The divisor.
-    fn checked_mul_div(&self, e: &Env, y: &I256, denominator: &I256) -> Option<I256> {
-        let zero = I256::from_i32(e, 0);
-
-        // TODO: remove this check when `checked_div` is available: https://github.com/stellar/rs-soroban-sdk/issues/1659,
-        if *denominator == zero {
-            return None;
-        }
-
-        let r = self.mul(y);
-        Some(r.div(denominator))
-    }
+    let r = x.mul(y);
+    Some(r.div(denominator))
 }
 
 // ###################### HELPERS ######################
@@ -237,10 +225,11 @@ fn check_div_overflow(r: &I256, z: &I256) -> bool {
 
 /// Returns the minimum representable i256 value: -2^255.
 ///
-/// The I256 is constructed from 4 parts (big-endian order): hi_hi: i64, hi_lo: u64, lo_hi: u64, lo_lo: u64.
-/// The minimum i256 value (-2^255) in two's complement is:
-/// Bit pattern: 1 followed by 255 zeros
-/// That means: hi_hi = 0x8000000000000000 (which is i64::MIN), and all other parts = 0
+/// The I256 is constructed from 4 parts (big-endian order): hi_hi: i64, hi_lo:
+/// u64, lo_hi: u64, lo_lo: u64. The minimum i256 value (-2^255) in two's
+/// complement is: Bit pattern: 1 followed by 255 zeros
+/// That means: hi_hi = 0x8000000000000000 (which is i64::MIN), and all other
+/// parts = 0
 ///
 /// Replace with `I256::MIN` once https://github.com/stellar/stellar-protocol/issues/1885 is fixed
 fn i256_min() -> I256 {
