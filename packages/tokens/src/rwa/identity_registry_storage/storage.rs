@@ -410,10 +410,7 @@ pub fn add_identity(
 pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
     let key = IRSStorageKey::Identity(account.clone());
 
-    let old_identity: Address = e
-        .storage()
-        .persistent()
-        .get(&key)
+    let old_identity = get_persistent_entry(e, &key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
 
     e.storage().persistent().set(&key, new_identity);
@@ -523,10 +520,7 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
     let old_identity_key = IRSStorageKey::Identity(old_account.clone());
     let new_identity_key = IRSStorageKey::Identity(new_account.clone());
 
-    let identity: Address = e
-        .storage()
-        .persistent()
-        .get(&old_identity_key)
+    let identity = get_persistent_entry(e, &old_identity_key)
         .unwrap_or_else(|| panic_with_error!(e, IRSError::IdentityNotFound));
 
     // Check if new_account is not already linked to another identity
