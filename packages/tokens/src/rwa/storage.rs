@@ -706,6 +706,8 @@ impl RWA {
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         spender.require_auth();
 
+        Self::validate_transfer(e, from, to, amount);
+
         Base::spend_allowance(e, from, spender, amount);
 
         Base::update(e, Some(from), Some(to), amount);
