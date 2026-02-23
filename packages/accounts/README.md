@@ -464,7 +464,7 @@ This changes the XDR encoding. A tuple struct is serialized as `ScVal::Vec`, whi
 
 The `signature` field in `SorobanAddressCredentials` must change from a single-element `ScVal::Vec` wrapping the signer map to an `ScVal::Map` with two `Symbol`-keyed entries:
 
-```
+```rust
 // Before — tuple struct encoding
 ScVal::Vec([
     ScVal::Map(/* signer -> signature entries */)

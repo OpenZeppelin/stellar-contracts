@@ -1284,6 +1284,7 @@ pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+/// * `context_type` - The type of context this rule applies to.
 /// * `signers` - The signers for the context rule.
 /// * `policies` - The policies for the context rule.
 ///
