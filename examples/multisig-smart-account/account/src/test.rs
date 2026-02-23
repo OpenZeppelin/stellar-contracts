@@ -1,7 +1,4 @@
-use soroban_sdk::{
-    contract, contractimpl, map, vec, Address, Bytes, Env, TryFromVal,
-    Val, Vec,
-};
+use soroban_sdk::{contract, contractimpl, map, vec, Address, Bytes, Env, TryFromVal, Val, Vec};
 use stellar_accounts::{
     policies::{simple_threshold::SimpleThresholdAccountParams, Policy},
     smart_account::{ContextRule, Signer},

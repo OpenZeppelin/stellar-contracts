@@ -174,6 +174,8 @@ This trait provides a secure mechanism for updating policy configuration after i
 
 Authorization is determined by matching the current call context against the account’s context rules. Rules are gathered, ordered by recency, and evaluated until one satisfies the requirements. If a matching rule is found, its policies (if any) are enforced. Otherwise, authorization fails.
 
+Callers may optionally provide per-context rule-ID hints in the `Signatures` struct to skip iteration and authenticate directly against specific rules. See [Direct Rule Selection](#direct-rule-selection) below.
+
 The evaluation proceeds as follows:
 
 ### 1. Rule Collection
@@ -186,7 +188,7 @@ The evaluation proceeds as follows:
 
 For each rule in order:
 
-1. Signer Filtering: Extract authenticated signers from the context rule's signer list
+1. Signer Filtering: Extract authenticated signers from the context rule’s signer list
 2. Policy Validation: If policies exist, verify all can be enforced via `can_enforce()`
 3. Authorization Check:
    - With policies: Success if all policies are enforceable
@@ -202,6 +204,32 @@ For each rule in order:
 
 - **Success**: Authorization granted, transaction proceeds
 - **Failure**: Authorization denied, transaction reverts
+
+### Direct Rule Selection
+
+The `Signatures` struct accepts a `context_rule_ids: Vec<u32>` field. When non-empty, each entry specifies the rule ID to validate against for the auth context at the same index, bypassing iteration entirely:
+
+```rust
+// Two auth contexts → two rule IDs, one per context.
+Signatures {
+    signers: signature_map,
+    context_rule_ids: vec![&e, rule_a_id, rule_b_id],
+}
+```
+
+The length of `context_rule_ids` must equal the number of auth contexts; a mismatch is rejected with `ContextRuleIdsLengthMismatch`. When the vec is empty, the standard newest-first iteration applies to every context.
+
+Each hinted rule must:
+- Exist (not have been removed)
+- Not be expired
+- Have a context type compatible with its corresponding auth context (`Default` matches any context)
+- Have its signer and policy requirements satisfied
+
+If any check fails the transaction is rejected with no fallback to iteration.
+
+This is useful when the account has many rules and the caller already knows which rules apply, avoiding unnecessary iteration and cross-contract calls to policy contracts for non-matching rules.
+
+> **Security note:** Iteration order is a convenience, not a security mechanism. Any non-expired rule that passes its own validation is valid regardless of how it was selected. Account owners should remove outdated permissive rules rather than relying on newer rules to suppress them.
 
 #### Example
 
@@ -326,13 +354,29 @@ impl CustomAccountInterface for MySmartAccount {
         e: Env,
         signature_payload: Hash<32>,
         signatures: Signatures,
-        auth_context: Vec<Context>,
+        auth_contexts: Vec<Context>,
     ) -> Result<(), SmartAccountError> {
-        do_check_auth(e, signature_payload, signatures, auth_contexts)
-
-        Ok(())
+        do_check_auth(&e, &signature_payload, &signatures, &auth_contexts)
     }
 }
+```
+
+#### Constructing `Signatures`
+
+Build the `Signatures` value in the client (SDK/wallet) before submitting the transaction:
+
+```rust
+// Standard: let the account iterate through rules automatically.
+let signatures = Signatures {
+    signers: signature_map,
+    context_rule_ids: Vec::new(&e),
+};
+
+// Optimized: one rule ID per auth context, skipping iteration.
+let signatures = Signatures {
+    signers: signature_map,
+    context_rule_ids: vec![&e, rule_a_id, rule_b_id],
+};
 ```
 
 ### 3. Create Context Rules
@@ -389,13 +433,84 @@ For external signers, there are two options:
 
 ## Caveats
 
-- Multiple context rules for the same context can co‑exist; the most recently added one takes precedence.
+- Multiple context rules for the same context can co‑exist; the most recently added one takes precedence when using the default iteration algorithm.
+- When using `context_rule_ids` to target rules directly, iteration order is bypassed entirely. Each specified rule is validated on its own merits regardless of whether newer rules exist for the same context. Remove outdated permissive rules when you want to enforce stricter ones unconditionally.
 - For simple cases like threshold‑based multisig, using a policy may feel verbose compared to embedding logic directly in the account, but keeping business rules in policies preserves separation of concerns and allows for a greater flexibility.
 - Authorization composes independent contracts (the smart account, verifiers, and policies). Protocol 23 makes cross‑contract calls cheap, but not free, so the framework sets explicit limits to keep costs predictable:
   - Maximum signers per context rule: 15
   - Maximum policies per context rule: 5
   - Maximum context rules per smart account: 15
 
+## Migration Guide: from v0.6.0 to 0.7.0
+
+### `Signatures` struct (breaking change)
+
+`Signatures` changed from a tuple struct to a named-field struct:
+
+```rust
+// Before
+pub struct Signatures(pub Map<Signer, Bytes>);
+
+// After
+pub struct Signatures {
+    pub signers: Map<Signer, Bytes>,
+    pub context_rule_ids: Vec<u32>,
+}
+```
+
+This changes the XDR encoding. A tuple struct is serialized as `ScVal::Vec`, while a named struct is serialized as `ScVal::Map` with `Symbol` keys.
+
+#### XDR / off-chain clients (JS SDK, CLI tools, etc.)
+
+The `signature` field in `SorobanAddressCredentials` must change from a single-element `ScVal::Vec` wrapping the signer map to an `ScVal::Map` with two `Symbol`-keyed entries:
+
+```
+// Before — tuple struct encoding
+ScVal::Vec([
+    ScVal::Map(/* signer -> signature entries */)
+])
+
+// After — named struct encoding
+ScVal::Map([
+    (Symbol("context_rule_ids"), ScVal::Vec(/* empty or rule IDs */)),
+    (Symbol("signers"),          ScVal::Map(/* signer → signature entries */)),
+])
+```
+
+Concrete example (with the `stellar_xdr` crate):
+
+```rust
+// Before
+let sig_map = ScVal::Map(Some(ScMap::sorted_from(signatures)?));
+creds.signature = ScVal::Vec(Some(ScVec(VecM::try_from([sig_map])?)));
+
+// After — no rule hints (empty vec preserves iteration behavior)
+creds.signature = ScVal::Map(Some(ScMap::sorted_from([
+    (
+        ScVal::Symbol("context_rule_ids".try_into()?),
+        ScVal::Vec(Some(ScVec(VecM::default()))),
+    ),
+    (
+        ScVal::Symbol("signers".try_into()?),
+        sig_map,
+    ),
+])?));
+
+// After — with rule hints (one ID per auth context)
+creds.signature = ScVal::Map(Some(ScMap::sorted_from([
+    (
+        ScVal::Symbol("context_rule_ids".try_into()?),
+        ScVal::Vec(Some(ScVec(VecM::try_from([
+            ScVal::U32(rule_id_for_context_0),
+            ScVal::U32(rule_id_for_context_1),
+        ])?))),
+    ),
+    (
+        ScVal::Symbol("signers".try_into()?),
+        sig_map,
+    ),
+])?));
+```
 ## Crate Structure
 
 This crate is organized into three submodules that provide building blocks for implementing smart accounts. These submodules can be used independently or together, allowing developers to implement only the components they need, create custom smart account architectures, mix and match different authentication methods, and build specialized authorization policies.

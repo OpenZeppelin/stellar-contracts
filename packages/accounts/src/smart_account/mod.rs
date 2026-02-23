@@ -9,10 +9,10 @@ use soroban_sdk::{
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, contains_canonical_duplicate,
     do_check_auth, get_context_rule, get_context_rule_ids, get_context_rules,
-    get_context_rules_count, get_validated_context, remove_context_rule, remove_policy,
-    remove_signer, update_context_rule_name, update_context_rule_valid_until,
-    validate_signer_key_size, ContextRule, ContextRuleType, Meta, Signatures, Signer,
-    SmartAccountStorageKey,
+    get_context_rules_count, get_validated_context, get_validated_context_by_id,
+    remove_context_rule, remove_policy, remove_signer, update_context_rule_name,
+    update_context_rule_valid_until, validate_signer_key_size, ContextRule, ContextRuleType, Meta,
+    Signatures, Signer, SmartAccountStorageKey,
 };
 
 /// Core trait for smart account functionality, extending Soroban's
@@ -379,6 +379,8 @@ pub enum SmartAccountError {
     TooManyContextRules = 3012,
     /// External signer key data exceeds the maximum allowed size.
     KeyDataTooLarge = 3013,
+    /// context_rule_ids length does not match auth_contexts length.
+    ContextRuleIdsLengthMismatch = 3014,
 }
 
 // ################## EVENTS ##################
