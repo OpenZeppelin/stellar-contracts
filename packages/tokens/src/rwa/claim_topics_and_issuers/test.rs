@@ -335,6 +335,7 @@ fn add_duplicate_trusted_issuer_panics() {
 #[should_panic(expected = "Error(Contract, #375)")]
 fn add_trusted_issuer_exceeds_limit_panics() {
     let e = Env::default();
+    e.cost_estimate().disable_resource_limits();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
 

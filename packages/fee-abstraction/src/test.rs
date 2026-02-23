@@ -72,7 +72,7 @@ fn collect_fee_with_eager_approval_overwrites_allowance() {
 
     let events = e.events().all();
     // approval, trnasfer and collect fee
-    assert_eq!(events.len(), 3);
+    assert_eq!(events.events().len(), 3);
 
     let allowance = token_client.allowance(&user, &contract_address);
     assert_eq!(allowance, 30);
@@ -112,7 +112,7 @@ fn collect_fee_with_lazy_approval_no_previous() {
 
     let events = e.events().all();
     // approval, trnasfer and collect fee
-    assert_eq!(events.len(), 3);
+    assert_eq!(events.events().len(), 3);
 
     let allowance = token_client.allowance(&user, &contract_address);
     assert_eq!(allowance, 30);
@@ -286,7 +286,7 @@ fn collect_fee_and_invoke_success() {
     assert_eq!(String::from_val(&e, &greeting), String::from_str(&e, "hello"));
 
     let events = e.events().all();
-    assert_eq!(events.len(), 4);
+    assert_eq!(events.events().len(), 4);
 }
 
 // ################## FEE TOKEN ALLOWLIST TESTS ##################
@@ -319,7 +319,7 @@ fn set_allowed_fee_token_success() {
 
     // Should emit 2 events (2 token allowlist updates)
     let events = e.events().all();
-    assert_eq!(events.len(), 2);
+    assert_eq!(events.events().len(), 2);
 }
 
 #[test]
@@ -471,7 +471,7 @@ fn sweep_token_success() {
 
     // transfer + token swept
     let events = e.events().all();
-    assert_eq!(events.len(), 2);
+    assert_eq!(events.events().len(), 2);
 
     assert_eq!(token_client.balance(&recipient), balance);
     assert_eq!(token_client.balance(&contract_address), 0i128);

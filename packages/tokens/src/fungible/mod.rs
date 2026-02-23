@@ -75,7 +75,7 @@ mod utils;
 #[cfg(test)]
 mod test;
 
-pub use extensions::{allowlist, blocklist, burnable, capped};
+pub use extensions::{allowlist, blocklist, burnable, capped, votes};
 pub use overrides::{Base, ContractOverrides};
 use soroban_sdk::{
     contracterror, contractevent, contracttrait, Address, Env, MuxedAddress, String,

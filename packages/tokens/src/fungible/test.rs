@@ -7,7 +7,7 @@ use soroban_sdk::{
         storage::{Instance, Persistent},
         Address as _, AuthorizedFunction, Events, Ledger, MuxedAddress as _,
     },
-    vec, Address, Env, IntoVal, MuxedAddress, String,
+    vec, Address, Env, Event, IntoVal, MuxedAddress, String,
 };
 use stellar_event_assertion::EventAssertion;
 
@@ -71,10 +71,9 @@ fn approve_with_event() {
         let allowance_val = Base::allowance(&e, &owner, &spender);
         assert_eq!(allowance_val, 50);
 
-        let events = e.events().all();
-        assert_eq!(events.len(), 1);
-        let event = events.get(0).unwrap();
-        assert_eq!(event.0, address);
+        let mut event_assert = EventAssertion::new(&e, address.clone());
+        event_assert.assert_event_count(1);
+        event_assert.assert_fungible_approve(&owner, &spender, allowance_data.0, allowance_data.1);
     });
 }
 
@@ -265,7 +264,7 @@ fn transfer_zero_works() {
         assert_eq!(Base::balance(&e, &recipient), 0);
 
         let events = e.events().all();
-        assert_eq!(events.len(), 1);
+        assert_eq!(events.events().len(), 1);
     });
 }
 
