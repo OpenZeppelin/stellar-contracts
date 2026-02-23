@@ -20,8 +20,9 @@ use crate::math::{Rounding, SorobanFixedPointError, SorobanMulDiv};
 ///
 /// # Errors
 ///
-/// * [`SorobanFixedPointError::DivisionByZero`] - When `denominator` is zero.
-/// * [`SorobanFixedPointError::Overflow`] - When the result overflows `i128`.
+/// * refer to the errors of [`i128::mul_div_floor`]
+/// * refer to the errors of [`i128::mul_div_ceil`]
+/// * refer to the errors of [`i128::mul_div`]
 ///
 /// # Notes
 ///
@@ -34,7 +35,7 @@ pub fn mul_div_i128(e: &Env, x: i128, y: i128, denominator: i128, rounding: Roun
     }
 }
 
-/// Checked version of [`muldiv`].
+/// Checked version of [`i128::mul_div`].
 ///
 /// Calculates `x * y / denominator` with full precision, returning `None`
 /// instead of panicking on error.
@@ -76,18 +77,13 @@ impl SorobanMulDiv for i128 {
     ///
     /// # Errors
     ///
-    /// * [`SorobanFixedPointError::DivisionByZero`] - when `denominator` is
-    ///   zero.
     /// * [`SorobanFixedPointError::Overflow`] - when the result overflows.
+    /// * if `denominator` is zero, it will panic due to standard library behavior.
     fn mul_div_floor(&self, e: &Env, y: &i128, denominator: &i128) -> i128 {
-        if *denominator == 0 {
-            panic_with_error!(e, SorobanFixedPointError::DivisionByZero);
-        }
         match self.checked_mul(*y) {
             // *z == 0 check is already done above, so the only possible error is overflow,
             // where r = i128::MIN and z = -1
-            Some(r) => div_floor(r, *denominator)
-                .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow)),
+            Some(r) => div_floor(r, *denominator),
             None => {
                 // scale to i256 and retry
                 let x_i256 = &I256::from_i128(e, *self);
@@ -113,18 +109,13 @@ impl SorobanMulDiv for i128 {
     ///
     /// # Errors
     ///
-    /// * [`SorobanFixedPointError::DivisionByZero`] - when `denominator` is
-    ///   zero.
     /// * [`SorobanFixedPointError::Overflow`] - when the result overflows.
+    /// * if `denominator` is zero, it will panic due to standard library behavior.
     fn mul_div_ceil(&self, e: &Env, y: &i128, denominator: &i128) -> i128 {
-        if *denominator == 0 {
-            panic_with_error!(e, SorobanFixedPointError::DivisionByZero);
-        }
         match self.checked_mul(*y) {
             // *z == 0 check is already done above, so the only possible error is overflow,
             // where r = i128::MIN and z = -1
-            Some(r) => div_ceil(r, *denominator)
-                .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow)),
+            Some(r) => div_ceil(r, *denominator),
             None => {
                 // scale to i256 and retry
                 let x_i256 = &I256::from_i128(e, *self);
@@ -150,13 +141,9 @@ impl SorobanMulDiv for i128 {
     ///
     /// # Errors
     ///
-    /// * [`SorobanFixedPointError::DivisionByZero`] - when `denominator` is
-    ///   zero.
     /// * [`SorobanFixedPointError::Overflow`] - when the result overflows.
+    /// * if `denominator` is zero, it will panic due to standard library behavior.
     fn mul_div(&self, e: &Env, y: &i128, denominator: &i128) -> i128 {
-        if *denominator == 0 {
-            panic_with_error!(e, SorobanFixedPointError::DivisionByZero);
-        }
         match self.checked_mul(*y) {
             Some(r) => r / *denominator,
             None => {
@@ -184,7 +171,7 @@ impl SorobanMulDiv for i128 {
     /// * `denominator` - The divisor.
     fn checked_mul_div_floor(&self, e: &Env, y: &i128, denominator: &i128) -> Option<i128> {
         match self.checked_mul(*y) {
-            Some(r) => div_floor(r, *denominator),
+            Some(r) => checked_div_floor(r, *denominator),
             None => {
                 // scale to i256 and retry
                 let x_i256 = &I256::from_i128(e, *self);
@@ -209,7 +196,7 @@ impl SorobanMulDiv for i128 {
     /// * `denominator` - The divisor.
     fn checked_mul_div_ceil(&self, e: &Env, y: &i128, denominator: &i128) -> Option<i128> {
         match self.checked_mul(*y) {
-            Some(r) => div_ceil(r, *denominator),
+            Some(r) => checked_div_ceil(r, *denominator),
             None => {
                 // scale to i256 and retry
                 let x_i256 = &I256::from_i128(e, *self);
@@ -251,11 +238,14 @@ impl SorobanMulDiv for i128 {
 
 // ###################### HELPERS ######################
 
-/// Performs floor(r / z)
-fn div_floor(r: i128, z: i128) -> Option<i128> {
+/// Performs checked floor(r / z)
+fn checked_div_floor(r: i128, z: i128) -> Option<i128> {
     if (r < 0 && z > 0) || (r > 0 && z < 0) {
         // ceiling is taken by default for a negative result
         let remainder = r.checked_rem_euclid(z)?;
+
+        // no need to check for div overflow (i128::MIN / -1),
+        // because it doesn't fall under this if branch
         (r / z).checked_sub(if remainder > 0 { 1 } else { 0 })
     } else {
         // floor taken by default for a positive or zero result
@@ -263,14 +253,45 @@ fn div_floor(r: i128, z: i128) -> Option<i128> {
     }
 }
 
-/// Performs ceil(r / z)
-fn div_ceil(r: i128, z: i128) -> Option<i128> {
+/// Performs floor(r / z)
+fn div_floor(r: i128, z: i128) -> i128 {
+    if (r < 0 && z > 0) || (r > 0 && z < 0) {
+        // ceiling is taken by default for a negative result
+        let remainder = r.rem_euclid(z)?;
+
+        // no need to check for div overflow (i128::MIN / -1),
+        // because it doesn't fall under this if branch
+        (r / z).sub(if remainder > 0 { 1 } else { 0 })
+    } else {
+        // floor taken by default for a positive or zero result
+        r.div(z)
+    }
+}
+
+/// Performs checked ceil(r / z)
+fn checked_div_ceil(r: i128, z: i128) -> Option<i128> {
     if (r <= 0 && z > 0) || (r >= 0 && z < 0) {
         // ceiling is taken by default for a negative or zero result
         r.checked_div(z)
     } else {
         // floor taken by default for a positive result
         let remainder = r.checked_rem_euclid(z)?;
-        (r / z).checked_add(if remainder > 0 { 1 } else { 0 })
+
+        // check for div overflow (i128::MIN / -1)
+        r.checked_div(z)?.checked_add(if remainder > 0 { 1 } else { 0 })
+    }
+}
+
+/// Performs ceil(r / z)
+fn div_ceil(r: i128, z: i128) -> i128 {
+    if (r <= 0 && z > 0) || (r >= 0 && z < 0) {
+        // ceiling is taken by default for a negative or zero result
+        r / z
+    } else {
+        // floor taken by default for a positive result
+        let remainder = r.rem_euclid(z)?;
+
+        // check for div overflow (i128::MIN / -1)
+        (r / z).add(if remainder > 0 { 1 } else { 0 })
     }
 }

@@ -24,8 +24,9 @@ use crate::math::{Rounding, SorobanFixedPointError, SorobanMulDiv};
 ///
 /// # Errors
 ///
-/// * [`SorobanFixedPointError::DivisionByZero`] - When `denominator` is zero.
-/// * [`SorobanFixedPointError::Overflow`] - When the result overflows `i128`.
+/// * refer to the errors of [`I256::mul_div_floor`]
+/// * refer to the errors of [`I256::mul_div_ceil`]
+/// * refer to the errors of [`I256::mul_div`]
 ///
 /// # Notes
 ///
@@ -225,6 +226,10 @@ fn div_floor(r: &I256, z: &I256) -> Option<I256> {
         Some(r.div(z).sub(if remainder > *zero { &one } else { zero }))
     } else {
         // floor is taken by default for a positive or zero result
+        if check_div_overflow(r, z) {
+            return None;
+        }
+
         Some(r.div(z))
     }
 }
@@ -237,8 +242,17 @@ fn div_ceil(r: &I256, z: &I256) -> Option<I256> {
         Some(r.div(z))
     } else {
         // floor is taken by default for a positive result
+        if check_div_overflow(r, z) {
+            return None;
+        }
+
         let remainder = r.rem_euclid(z);
         let one = I256::from_i32(&Env::default(), 1);
         Some(r.div(z).add(if remainder > *zero { &one } else { zero }))
     }
+}
+
+/// check I256 div overflow
+fn check_div_overflow(r: &I256, z: &I256) -> bool {
+    r == I256::MIN && z == &I256::from_i32(&Env::default(), -1)
 }
