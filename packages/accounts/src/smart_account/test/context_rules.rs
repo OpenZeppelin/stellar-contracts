@@ -20,7 +20,7 @@ use crate::{
             get_validated_context_by_id, remove_context_rule, update_context_rule_name,
             update_context_rule_valid_until, ContextRule, ContextRuleType, Signatures, Signer,
         },
-        MAX_CONTEXT_RULES, MAX_EXTERNAL_KEY_SIZE, MAX_NAME_SIZE,
+        MAX_CONTEXT_RULES, MAX_EXTERNAL_KEY_SIZE,
     },
 };
 
