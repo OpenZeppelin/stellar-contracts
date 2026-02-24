@@ -1099,6 +1099,23 @@ fn propose_fails_with_mismatched_lengths() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #5021)")]
+fn propose_fails_with_description_too_long() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, _) = simple_proposal(&e);
+    // Create a description that exceeds MAX_DESCRIPTION_LENGTH (8192 bytes)
+    let long_desc = String::from_str(&e, &"a".repeat(8193));
+
+    e.as_contract(&contract_address, || {
+        propose(&e, targets, functions, args, long_desc, &proposer);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #5002)")]
 fn propose_fails_with_insufficient_voting_power() {
     let (e, contract_address, token_address) = setup_env_with_token();

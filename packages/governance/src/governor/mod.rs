@@ -42,8 +42,8 @@
 //! 2. **Vote**: Token holders vote during the voting period
 //! 3. **Execute**: Successful proposals (meeting quorum and vote thresholds)
 //!    can be executed
-//! 4. **Cancel**: Proposals can be canceled by the proposer before the voting
-//!    period ends
+//! 4. **Cancel**: Proposals can be canceled by the proposer unless they are
+//!    already Executed, Expired, or Cancelled.
 //!
 //! When using an extension for `Queue` mechanism, like `TimelockControl`, an
 //! additional `Queue` step is added between voting and execution:
@@ -655,6 +655,8 @@ pub enum GovernorError {
     TokenContractAlreadySet = 5019,
     /// The token contract has not been set.
     TokenContractNotSet = 5020,
+    /// The proposal description exceeds the maximum allowed length.
+    DescriptionTooLong = 5021,
 }
 
 // ################## CONSTANTS ##################
@@ -666,6 +668,9 @@ pub const GOVERNOR_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 
 /// TTL threshold for extending storage entries (in ledgers)
 pub const GOVERNOR_TTL_THRESHOLD: u32 = GOVERNOR_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+
+/// Maximum allowed length (in bytes) for a proposal description.
+pub const MAX_DESCRIPTION_LENGTH: u32 = 4096;
 
 // ################## EVENTS ##################
 
@@ -773,7 +778,7 @@ pub fn emit_vote_cast(
 pub struct ProposalQueued {
     #[topic]
     pub proposal_id: BytesN<32>,
-    pub eta: u64,
+    pub eta: u32,
 }
 
 /// Emits an event when a proposal is queued.
@@ -782,8 +787,9 @@ pub struct ProposalQueued {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `proposal_id` - The unique identifier of the proposal.
-/// * `eta` - The estimated time of execution (timestamp).
-pub fn emit_proposal_queued(e: &Env, proposal_id: &BytesN<32>, eta: u64) {
+/// * `eta` - The ledger sequence number at which the proposal becomes
+///   executable.
+pub fn emit_proposal_queued(e: &Env, proposal_id: &BytesN<32>, eta: u32) {
     ProposalQueued { proposal_id: proposal_id.clone(), eta }.publish(e);
 }
 

@@ -10,8 +10,8 @@ use soroban_sdk::{
 };
 
 use crate::governor::{
-    emit_proposal_created, emit_vote_cast, GovernorError, ProposalState, GOVERNOR_EXTEND_AMOUNT,
-    GOVERNOR_TTL_THRESHOLD,
+    emit_proposal_created, emit_quorum_changed, emit_vote_cast, GovernorError, ProposalState,
+    GOVERNOR_EXTEND_AMOUNT, GOVERNOR_TTL_THRESHOLD,
 };
 
 // ################## STORAGE KEYS ##################
@@ -54,6 +54,8 @@ pub struct ProposalCore {
     pub vote_start: u32,
     /// The ledger number when voting ends.
     pub vote_end: u32,
+    /// The quorum required for this proposal, snapshotted at creation time.
+    pub quorum: u128,
     /// The current state of the proposal.
     pub state: ProposalState,
 }
@@ -472,6 +474,11 @@ pub fn propose(
         panic_with_error!(e, GovernorError::InvalidProposalLength);
     }
 
+    // Validate description length to prevent oversized events.
+    if description.len() > crate::governor::MAX_DESCRIPTION_LENGTH {
+        panic_with_error!(e, GovernorError::DescriptionTooLong);
+    }
+
     // Use previous ledger to prevent flash loan based proposals
     let snapshot = e.ledger().sequence() - 1;
     let proposer_votes = get_voting_power(e, proposer, snapshot);
@@ -504,10 +511,12 @@ pub fn propose(
     };
 
     // Store proposal
+    let quorum = get_quorum(e);
     let proposal = ProposalCore {
         proposer: proposer.clone(),
         vote_start,
         vote_end,
+        quorum,
         state: ProposalState::Pending,
     };
     e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
@@ -724,8 +733,13 @@ fn derive_proposal_state(e: &Env, proposal_id: &BytesN<32>, core: &ProposalCore)
         return ProposalState::Active;
     }
 
-    // Voting has ended — check whether the proposal met quorum and majority.
-    if quorum_reached(e, proposal_id) && tally_succeeded(e, proposal_id) {
+    // Voting has ended.
+    // Check whether the proposal met the snapshotted quorum and majority
+    let counts = get_proposal_vote_counts(e, proposal_id);
+    let Some(participation) = counts.for_votes.checked_add(counts.abstain_votes) else {
+        panic_with_error!(e, GovernorError::MathOverflow);
+    };
+    if participation >= core.quorum && counts.for_votes > counts.against_votes {
         return ProposalState::Succeeded;
     }
 
@@ -873,7 +887,7 @@ pub fn get_proposal_vote_counts(e: &Env, proposal_id: &BytesN<32>) -> ProposalVo
 pub fn set_quorum(e: &Env, quorum: u128) {
     let old_quorum = e.storage().instance().get(&GovernorStorageKey::Quorum).unwrap_or(0u128);
     e.storage().instance().set(&GovernorStorageKey::Quorum, &quorum);
-    crate::governor::emit_quorum_changed(e, old_quorum, quorum);
+    emit_quorum_changed(e, old_quorum, quorum);
 }
 
 /// Records a vote on a proposal.
