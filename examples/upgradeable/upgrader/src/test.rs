@@ -1,7 +1,7 @@
 extern crate std;
 
 use contract_v2::Data;
-use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, TryIntoVal};
+use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Symbol, TryIntoVal};
 
 use crate::contract::{Upgrader, UpgraderClient};
 
@@ -23,7 +23,13 @@ fn test_upgrade_with_upgrader() {
     e.mock_all_auths_allowing_non_root_auth();
 
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let migrator = Address::generate(&e);
     let contract_id = e.register(contract_v1::WASM, (&admin,));
+
+    let client_v1 = contract_v1::Client::new(&e, &contract_id);
+    client_v1.grant_role(&manager, &Symbol::new(&e, "manager"), &admin);
+    client_v1.grant_role(&migrator, &Symbol::new(&e, "migrator"), &admin);
 
     let upgrader = e.register(Upgrader, (&admin,));
     let upgrader_client = UpgraderClient::new(&e, &upgrader);
@@ -33,9 +39,9 @@ fn test_upgrade_with_upgrader() {
 
     upgrader_client.upgrade_and_migrate(
         &contract_id,
-        &admin,
+        &manager,
         &new_wasm_hash,
-        &soroban_sdk::vec![&e, data.try_into_val(&e).unwrap(), admin.try_into_val(&e).unwrap()],
+        &soroban_sdk::vec![&e, data.try_into_val(&e).unwrap(), migrator.try_into_val(&e).unwrap()],
     );
 
     let client_v2 = contract_v2::Client::new(&e, &contract_id);
