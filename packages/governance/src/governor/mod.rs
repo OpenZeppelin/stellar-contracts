@@ -468,13 +468,44 @@ pub trait Governor {
     /// * topics - `["proposal_executed", proposal_id: BytesN<32>]`
     /// * data - `[]`
     ///
-    /// # Notes
+    /// # IMPLEMENTATION REQUIRED — ACCESS CONTROL
     ///
-    /// * Authorization for `executor` is required.
-    /// * The `executor` parameter enables flexible access control. The
-    ///   implementer can pass any address to customize who is authorized to
-    ///   execute proposals (e.g., restrict to a timelock contract or allow any
-    ///   account).
+    /// **This function has no default implementation.** The implementer MUST
+    /// define who is authorized to execute proposals. Consider the following:
+    ///
+    /// - **Open execution**: Allow anyone to trigger execution of a succeeded
+    ///   proposal. In this case, `executor.require_auth()` is unnecessary
+    ///   since the `executor` parameter serves no access-control purpose.
+    /// - **Restricted execution**: Restrict execution to a specific role
+    ///   (e.g., a timelock contract, an admin, or the original proposer).
+    ///   Validate `executor` against the allowed role and call
+    ///   `executor.require_auth()` explicitly if needed.
+    ///
+    /// [`storage::execute`] is suggested to perform the actual state transition and
+    /// cross-contract calls after your access control and authorization logic.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Open execution — anyone can trigger a succeeded proposal:
+    /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
+    ///     storage::execute(e, targets, functions, args, &description_hash)
+    /// }
+    ///
+    /// // Restricted — only a timelock contract can execute:
+    /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
+    ///     let timelock = storage::get_timelock(e);
+    ///     assert!(executor == timelock);
+    ///     executor.require_auth();
+    ///     storage::execute(e, targets, functions, args, &description_hash)
+    /// }
+    ///
+    /// // Role-based — using the `stellar-macros` access control macro:
+    /// #[only_role(executor, "executor")]
+    /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
+    ///     storage::execute(e, targets, functions, args, &description_hash)
+    /// }
+    /// ```
     fn execute(
         e: &Env,
         targets: Vec<Address>,
@@ -482,11 +513,7 @@ pub trait Governor {
         args: Vec<Vec<Val>>,
         description_hash: BytesN<32>,
         executor: Address,
-    ) -> BytesN<32> {
-        executor.require_auth();
-
-        storage::execute(e, targets, functions, args, &description_hash)
-    }
+    ) -> BytesN<32>;
 
     /// Cancels a proposal and returns its unique identifier.
     ///
@@ -510,12 +537,39 @@ pub trait Governor {
     /// * topics - `["proposal_cancelled", proposal_id: BytesN<32>]`
     /// * data - `[]`
     ///
-    /// # Notes
+    /// # IMPLEMENTATION REQUIRED — ACCESS CONTROL
     ///
-    /// * Authorization for `operator` is required.
-    /// * The `operator` parameter enables flexible access control. The
-    ///   implementer decides who can cancel proposals (e.g., only the original
-    ///   proposer, an admin, or a guardian role).
+    /// **This function has no default implementation.** The implementer MUST
+    /// define who is authorized to cancel proposals. Consider the following:
+    ///
+    /// - **Proposer-only cancellation**: Only the original proposer can cancel.
+    ///   Validate `operator` against the stored proposer and call
+    ///   `operator.require_auth()` explicitly if needed.
+    /// - **Guardian/admin cancellation**: A privileged role (e.g., guardian or
+    ///   admin) can cancel any proposal. Validate `operator` against the role
+    ///   and call `operator.require_auth()` explicitly if needed.
+    ///
+    /// [`storage::cancel`] is suggested to perform the actual state transition after
+    /// your access control and authorization logic.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Only the original proposer can cancel:
+    /// fn cancel(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
+    ///     let proposal_id = storage::hash_proposal(e, &targets, &functions, &args, &description_hash);
+    ///     let proposer = storage::get_proposal_proposer(e, &proposal_id);
+    ///     assert!(operator == proposer);
+    ///     operator.require_auth();
+    ///     storage::cancel(e, targets, functions, args, &description_hash)
+    /// }
+    ///
+    /// // Role-based — using the `stellar-macros` access control macro:
+    /// #[only_role(operator, "canceller")]
+    /// fn cancel(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
+    ///     storage::cancel(e, targets, functions, args, &description_hash)
+    /// }
+    /// ```
     fn cancel(
         e: &Env,
         targets: Vec<Address>,
@@ -523,11 +577,7 @@ pub trait Governor {
         args: Vec<Vec<Val>>,
         description_hash: BytesN<32>,
         operator: Address,
-    ) -> BytesN<32> {
-        operator.require_auth();
-
-        storage::cancel(e, targets, functions, args, &description_hash)
-    }
+    ) -> BytesN<32>;
 
     /// Returns whether proposals need to be queued before execution.
     ///
