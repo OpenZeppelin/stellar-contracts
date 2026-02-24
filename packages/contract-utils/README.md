@@ -65,17 +65,14 @@ The `upgradeable` module provides a framework for safe contract upgrades and mig
 
 #### Usage Examples
 
-**Simple Upgrade (Upgradeable)**:
+**Simple Upgrade**:
 
 ```rust
-use soroban_sdk::{
-    contract, contractimpl, Address, Env,
-};
+use soroban_sdk::{contract, contractimpl, Address, BytesN, Env};
 use stellar_access::ownable::{self as ownable, Ownable};
-use stellar_contract_utils::upgradeable::UpgradeableInternal;
-use stellar_macros::{only_owner, Upgradeable};
+use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
+use stellar_macros::only_owner;
 
-#[derive(Upgradeable)]
 #[contract]
 pub struct ExampleContract;
 
@@ -92,9 +89,11 @@ impl ExampleContract {
     }
 }
 
-impl UpgradeableInternal for ExampleContract {
-    fn _require_auth(e: &Env, _operator: &Address) {
-        ownable::enforce_owner_auth(e);
+#[contractimpl]
+impl Upgradeable for ExampleContract {
+    #[only_owner]
+    fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, _operator: Address) {
+        upgradeable::upgrade(e, &new_wasm_hash);
     }
 }
 

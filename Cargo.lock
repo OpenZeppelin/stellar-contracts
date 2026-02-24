@@ -1008,7 +1008,6 @@ dependencies = [
  "soroban-sdk",
  "stellar-accounts",
  "stellar-contract-utils",
- "stellar-macros",
 ]
 
 [[package]]
@@ -2104,7 +2103,6 @@ version = "1.0.0"
 dependencies = [
  "soroban-sdk",
  "stellar-contract-utils",
- "stellar-macros",
 ]
 
 [[package]]
@@ -2113,7 +2111,6 @@ version = "2.0.0"
 dependencies = [
  "soroban-sdk",
  "stellar-contract-utils",
- "stellar-macros",
 ]
 
 [[package]]

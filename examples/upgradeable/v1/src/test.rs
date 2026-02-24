@@ -6,16 +6,12 @@ use soroban_sdk::{testutils::Address as _, Address, BytesN, Env};
 use crate::contract::{ExampleContract, ExampleContractClient};
 
 mod contract_v2 {
-    use crate::test::MigrationData;
-
     soroban_sdk::contractimport!(file = "../testdata/upgradeable_v2_example.wasm");
 }
 
 fn install_new_wasm(e: &Env) -> BytesN<32> {
     e.deployer().upload_contract_wasm(contract_v2::WASM)
 }
-
-type MigrationData = Data;
 
 #[test]
 fn test_upgrade() {

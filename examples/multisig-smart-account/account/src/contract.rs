@@ -8,7 +8,7 @@ use soroban_sdk::{
     auth::{Context, CustomAccountInterface},
     contract, contractimpl,
     crypto::Hash,
-    Address, Env, Map, String, Symbol, Val, Vec,
+    Address, BytesN, Env, Map, String, Symbol, Val, Vec,
 };
 use stellar_accounts::smart_account::{
     add_context_rule, add_policy, add_signer, do_check_auth, get_context_rule, get_context_rules,
@@ -16,10 +16,8 @@ use stellar_accounts::smart_account::{
     update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType,
     ExecutionEntryPoint, Signatures, Signer, SmartAccount, SmartAccountError,
 };
-use stellar_contract_utils::upgradeable::UpgradeableInternal;
-use stellar_macros::Upgradeable;
+use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
 
-#[derive(Upgradeable)]
 #[contract]
 pub struct MultisigContract;
 
@@ -42,6 +40,14 @@ impl MultisigContract {
             &signers,
             &policies,
         );
+    }
+}
+
+#[contractimpl]
+impl Upgradeable for MultisigContract {
+    fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, _operator: Address) {
+        e.current_contract_address().require_auth();
+        upgradeable::upgrade(e, &new_wasm_hash);
     }
 }
 
@@ -195,11 +201,5 @@ impl ExecutionEntryPoint for MultisigContract {
         e.current_contract_address().require_auth();
 
         e.invoke_contract::<Val>(&target, &target_fn, target_args);
-    }
-}
-
-impl UpgradeableInternal for MultisigContract {
-    fn _require_auth(e: &Env, _operator: &Address) {
-        e.current_contract_address().require_auth();
     }
 }

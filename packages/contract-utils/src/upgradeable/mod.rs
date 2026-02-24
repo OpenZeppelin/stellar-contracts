@@ -5,10 +5,6 @@
 //! The framework enforces correct sequencing of operations, e.g. migration can
 //! only be invoked after an upgrade.
 //!
-//! It is recommended to use this module via the `#[derive(Upgradeable)]` macro,
-//! or via the `#[derive(UpgradeableMigratable)]` when custom migration logic is
-//! additionally needed.
-//!
 //! If a rollback is required, the contract can be upgraded to a newer version
 //! where the rollback-specific logic is defined and performed as a migration.
 //!
@@ -23,8 +19,73 @@
 //!   inadvertently introduce storage mismatches.
 //!
 //!
-//! Example for upgrade only:
+//! ## Simple Upgrade (no migration)
+//!
+//! Implement the [`Upgradeable`] trait directly and call [`upgrade()`] inside:
+//!
 //! ```rust,ignore
+//! use soroban_sdk::{contract, contractimpl, Address, BytesN, Env};
+//! use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
+//! use stellar_macros::only_role;
+//!
+//! #[contract]
+//! pub struct ExampleContract;
+//!
+//! #[contractimpl]
+//! impl Upgradeable for ExampleContract {
+//!     #[only_role(operator, "admin")]
+//!     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address) {
+//!         upgradeable::upgrade(e, &new_wasm_hash);
+//!     }
+//! }
+//! ```
+//!
+//! ## Upgrade with Migration
+//!
+//! Implement [`Upgradeable`] as above, and add a `migrate` function to your
+//! contract that calls [`run_migration()`] which will prevent you from calling
+//! the `migrate` function twice.
+//!
+//! ```rust,ignore
+//! use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env};
+//! use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
+//! use stellar_macros::only_role;
+//!
+//! #[contracttype]
+//! pub struct Data {
+//!     pub num1: u32,
+//!     pub num2: u32,
+//! }
+//!
+//! #[contract]
+//! pub struct ExampleContract;
+//!
+//! #[contractimpl]
+//! impl Upgradeable for ExampleContract {
+//!     #[only_role(operator, "admin")]
+//!     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address) {
+//!         upgradeable::upgrade(e, &new_wasm_hash);
+//!     }
+//! }
+//!
+//! #[contractimpl]
+//! impl ExampleContract {
+//!     #[only_role(operator, "manager")]
+//!     pub fn migrate(e: &Env, migration_data: Data, operator: Address) {
+//!         upgradeable::run_migration(e, || {
+//!             e.storage().instance().set(&symbol_short!("DATA_KEY"), &migration_data);
+//!         });
+//!     }
+//! }
+//! ```
+//!
+//! ## Migration Guide from `#[derive(Upgradeable)]`
+//!
+//! **Before:**
+//! ```rust,ignore
+//! use stellar_contract_utils::upgradeable::UpgradeableInternal;
+//! use stellar_macros::Upgradeable;
+//!
 //! #[derive(Upgradeable)]
 //! #[contract]
 //! pub struct ExampleContract;
@@ -32,43 +93,29 @@
 //! impl UpgradeableInternal for ExampleContract {
 //!     fn _require_auth(e: &Env, operator: &Address) {
 //!         operator.require_auth();
-//!         let owner = e.storage().instance().get::<_, Address>(&OWNER).unwrap();
-//!         if *operator != owner {
-//!             panic_with_error!(e, ExampleContractError::Unauthorized)
-//!         }
+//!         // access control checks ...
 //!     }
 //! }
 //! ```
 //!
-//! # Example for upgrade and migration:
-//! ```ignore,rust
-//! #[contracttype]
-//! pub struct Data {
-//!     pub num1: u32,
-//!     pub num2: u32,
-//! }
+//! **After:**
+//! ```rust,ignore
+//! use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
 //!
-//! #[derive(UpgradeableMigratable)]
 //! #[contract]
 //! pub struct ExampleContract;
 //!
-//! impl UpgradeableMigratableInternal for ExampleContract {
-//!     type MigrationData = Data;
-//!
-//!     fn _require_auth(e: &Env, operator: &Address) {
+//! #[contractimpl]
+//! impl Upgradeable for ExampleContract {
+//!     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address) {
 //!         operator.require_auth();
-//!         let owner = e.storage().instance().get::<_, Address>(&OWNER).unwrap();
-//!         if *operator != owner {
-//!             panic_with_error!(e, ExampleContractError::Unauthorized)
-//!         }
-//!     }
-//!
-//!     fn _migrate(e: &Env, data: &Self::MigrationData) {
-//!         e.storage().instance().set(&DATA_KEY, data);
+//!         // access control checks ...
+//!         upgradeable::upgrade(e, &new_wasm_hash);
 //!     }
 //! }
 //! ```
-//! Check in the "/examples/upgradeable/" directory for the full example, where
+//!
+//! Check in the `/examples/upgradeable/` directory for the full example, where
 //! you can also find a helper `Upgrader` contract that performs upgrade+migrate
 //! in a single transaction.
 
@@ -77,28 +124,30 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractclient, contracterror, Address, BytesN, Env, FromVal, Val};
+use soroban_sdk::{contractclient, contracterror, Address, BytesN, Env};
 
 pub use crate::upgradeable::storage::{
     can_complete_migration, complete_migration, enable_migration, ensure_can_complete_migration,
+    run_migration, upgrade,
 };
 
-/// High-level trait for contract upgrades.
+/// A trait exposing an entry point for contract upgrades.
 ///
-/// This trait defines the external entry point and can be used in two ways:
+/// All access control and authorization checks are the implementor's
+/// responsibility.
 ///
-/// 1. Standalone – Implement this trait directly when full control over access
-///    control and upgrade logic is required. In this case, the implementor is
-///    responsible for ensuring:
-///    - Proper authorization of the `operator`
-///    - Versioning management
+/// # Example
 ///
-/// 2. Framework-assisted usage – When using the lightweight upgrade framework
-///    provided in this module, you should NOT manually implement this trait.
-///    Instead:
-///    - Derive it using `#[derive(Upgradeable)]`
-///    - Provide access control by implementing [`UpgradeableInternal`] with
-///      your custom logic
+/// ```rust,ignore
+/// #[contractimpl]
+/// impl Upgradeable for MyContract {
+///     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address) {
+///         operator.require_auth();
+///         // ... access control ...
+///         upgradeable::upgrade(e, &new_wasm_hash);
+///     }
+/// }
+/// ```
 #[contractclient(name = "UpgradeableClient")]
 pub trait Upgradeable {
     /// Upgrades the contract by setting a new WASM bytecode. The
@@ -112,87 +161,6 @@ pub trait Upgradeable {
     ///   uploaded to the ledger.
     /// * `operator` - The authorized address performing the upgrade.
     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address);
-}
-
-/// Trait to be implemented for a custom upgrade authorization mechanism.
-/// Requires defining access control logic for who can upgrade the contract.
-pub trait UpgradeableInternal {
-    /// Ensures the `operator` has signed and is authorized to perform the
-    /// upgrade.
-    ///
-    /// This must be implemented by the consuming contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The Soroban environment.
-    /// * `operator` - The address attempting the upgrade. Can be G-account, or
-    ///   another contract (C-account) such as timelock or governor.
-    fn _require_auth(e: &Env, operator: &Address);
-}
-
-/// High-level trait for a combination of upgrade and migration logic in
-/// upgradeable contracts.
-///
-/// This trait defines the external entry points for applying both, an upgrade
-/// and a migration. It is recommended to be used only as part of the
-/// lightweight upgrade framework provided in this module.
-///
-/// When using the framework, this trait is automatically derived with
-/// `#[derive(UpgradeableMigratable)]`, and should NOT be manually implemented.
-/// Instead, the contract must define access control via `_require_auth` and
-/// provide its custom migration logic by implementing
-/// `UpgradeableMigratableInternal`.
-pub trait UpgradeableMigratable: UpgradeableMigratableInternal {
-    /// Upgrades the contract by setting a new WASM bytecode. The
-    /// contract will only be upgraded after the invocation has
-    /// successfully completed.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
-    /// * `new_wasm_hash` - A 32-byte hash identifying the new WASM blob,
-    ///   uploaded to the ledger.
-    /// * `operator` - The authorized address performing the upgrade and the
-    ///   migration.
-    fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address);
-
-    /// Entry point to handle a contract migration.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The Soroban environment.
-    /// * `migration_data` - Arbitrary data passed to the migration logic.
-    /// * `operator` - The authorized address performing the upgrade and the
-    ///   migration.
-    fn migrate(e: &Env, migration_data: Self::MigrationData, operator: Address);
-}
-
-/// Trait to be implemented for custom migration. Requires defining access
-/// control and custom business logic for a migration after an upgrade.
-pub trait UpgradeableMigratableInternal {
-    /// Type representing structured data needed during migration.
-    type MigrationData: FromVal<Env, Val>;
-
-    /// Applies migration logic using the given data.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The Soroban environment.
-    /// * `migration_data` - Migration-specific input data.
-    fn _migrate(e: &Env, migration_data: &Self::MigrationData);
-
-    /// Ensures the `operator` has signed and is authorized to perform the
-    /// upgrade and the migration.
-    ///
-    /// This must be implemented by the consuming contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - The Soroban environment.
-    /// * `operator` - The address attempting the upgrade and the migration. Can
-    ///   be a G-account, or another contract (C-account) such as timelock or
-    ///   governor.
-    fn _require_auth(e: &Env, operator: &Address);
 }
 
 #[contracterror]
