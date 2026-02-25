@@ -26,9 +26,9 @@ use crate::math::{
 ///
 /// # Errors
 ///
-/// * refer to the errors of [`i128::mul_div_floor`]
-/// * refer to the errors of [`i128::mul_div_ceil`]
-/// * refer to the errors of [`i128::mul_div`]
+/// * refer to the errors of [`mul_div_floor_i128`]
+/// * refer to the errors of [`mul_div_ceil_i128`]
+/// * refer to the errors of [`mul_div_i128`]
 ///
 /// # Notes
 ///
@@ -47,7 +47,7 @@ pub fn mul_div_with_rounding_i128(
     }
 }
 
-/// Checked version of [`i128::mul_div`].
+/// Checked version of [`mul_div_with_rounding_i128`].
 ///
 /// Calculates `x * y / denominator` with full precision, returning `None`
 /// instead of panicking on error.
@@ -92,8 +92,6 @@ pub fn checked_mul_div_with_rounding_i128(
 /// * if `denominator` is zero, it will panic due to standard library behavior.
 pub fn mul_div_floor_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
     match x.checked_mul(*y) {
-        // *z == 0 check is already done above, so the only possible error is overflow,
-        // where r = i128::MIN and z = -1
         Some(r) => div_floor(r, *denominator),
         None => {
             // scale to i256 and retry
@@ -123,8 +121,6 @@ pub fn mul_div_floor_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i1
 /// * if `denominator` is zero, it will panic due to standard library behavior.
 pub fn mul_div_ceil_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
     match x.checked_mul(*y) {
-        // *z == 0 check is already done above, so the only possible error is overflow,
-        // where r = i128::MIN and z = -1
         Some(r) => div_ceil(r, *denominator),
         None => {
             // scale to i256 and retry

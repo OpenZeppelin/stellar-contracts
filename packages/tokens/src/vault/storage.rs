@@ -1,5 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
-use stellar_contract_utils::math::{mul_div_with_rounding_i128, Rounding};
+use stellar_contract_utils::math::{i128_fixed_point::mul_div_with_rounding_i128, Rounding};
 
 use crate::{
     fungible::{Base, ContractOverrides},
