@@ -431,7 +431,8 @@ fn tally_succeeded_ignores_abstain() {
     });
 }
 
-/// Stores a minimal ProposalCore with the given quorum so that `quorum_reached` can look it up.
+/// Stores a minimal ProposalCore with the given quorum so that `quorum_reached`
+/// can look it up.
 fn store_proposal_with_quorum(e: &Env, proposal_id: &BytesN<32>, quorum: u128) {
     let proposer = Address::generate(e);
     let core =

@@ -474,15 +474,16 @@ pub trait Governor {
     /// define who is authorized to execute proposals. Consider the following:
     ///
     /// - **Open execution**: Allow anyone to trigger execution of a succeeded
-    ///   proposal. In this case, `executor.require_auth()` is unnecessary
-    ///   since the `executor` parameter serves no access-control purpose.
-    /// - **Restricted execution**: Restrict execution to a specific role
-    ///   (e.g., a timelock contract, an admin, or the original proposer).
-    ///   Validate `executor` against the allowed role and call
-    ///   `executor.require_auth()` explicitly if needed.
+    ///   proposal. In this case, `executor.require_auth()` is unnecessary since
+    ///   the `executor` parameter serves no access-control purpose.
+    /// - **Restricted execution**: Restrict execution to a specific role (e.g.,
+    ///   a timelock contract, an admin, or the original proposer). Validate
+    ///   `executor` against the allowed role and call `executor.require_auth()`
+    ///   explicitly if needed.
     ///
-    /// [`storage::execute`] is suggested to perform the actual state transition and
-    /// cross-contract calls after your access control and authorization logic.
+    /// [`storage::execute`] is suggested to perform the actual state transition
+    /// and cross-contract calls after your access control and authorization
+    /// logic.
     ///
     /// # Examples
     ///
@@ -549,8 +550,8 @@ pub trait Governor {
     ///   admin) can cancel any proposal. Validate `operator` against the role
     ///   and call `operator.require_auth()` explicitly if needed.
     ///
-    /// [`storage::cancel`] is suggested to perform the actual state transition after
-    /// your access control and authorization logic.
+    /// [`storage::cancel`] is suggested to perform the actual state transition
+    /// after your access control and authorization logic.
     ///
     /// # Example
     ///

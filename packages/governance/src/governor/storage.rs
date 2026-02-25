@@ -9,11 +9,12 @@ use soroban_sdk::{
     Vec,
 };
 
-use crate::votes::VotesClient;
-
-use crate::governor::{
-    emit_proposal_created, emit_quorum_changed, emit_vote_cast, GovernorError, ProposalState,
-    GOVERNOR_EXTEND_AMOUNT, GOVERNOR_TTL_THRESHOLD,
+use crate::{
+    governor::{
+        emit_proposal_created, emit_quorum_changed, emit_vote_cast, GovernorError, ProposalState,
+        GOVERNOR_EXTEND_AMOUNT, GOVERNOR_TTL_THRESHOLD,
+    },
+    votes::VotesClient,
 };
 
 // ################## STORAGE KEYS ##################
