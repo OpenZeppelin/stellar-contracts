@@ -10,7 +10,7 @@ use crate::governor::{
     storage::{
         self, cancel, cast_vote, count_vote, counting_mode, execute, get_proposal_vote_counts,
         get_quorum, get_token_contract, has_voted, hash_proposal, propose, quorum_reached,
-        set_quorum, set_token_contract, tally_succeeded,
+        set_quorum, set_token_contract, tally_succeeded, GovernorStorageKey, ProposalCore,
     },
     ProposalState, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
 };
@@ -431,6 +431,14 @@ fn tally_succeeded_ignores_abstain() {
     });
 }
 
+/// Stores a minimal ProposalCore with the given quorum so that `quorum_reached` can look it up.
+fn store_proposal_with_quorum(e: &Env, proposal_id: &BytesN<32>, quorum: u128) {
+    let proposer = Address::generate(e);
+    let core =
+        ProposalCore { proposer, vote_start: 0, vote_end: 0, quorum, state: ProposalState::Active };
+    e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &core);
+}
+
 // ################## QUORUM_REACHED TESTS ##################
 
 #[test]
@@ -440,7 +448,7 @@ fn quorum_reached_with_for_votes_only() {
     let pid = proposal_id(&e, 1);
 
     e.as_contract(&contract_address, || {
-        set_quorum(&e, 100);
+        store_proposal_with_quorum(&e, &pid, 100);
         count_vote(&e, &pid, &alice, VOTE_FOR, 100);
 
         assert!(quorum_reached(&e, &pid));
@@ -454,7 +462,7 @@ fn quorum_reached_with_abstain_votes_only() {
     let pid = proposal_id(&e, 1);
 
     e.as_contract(&contract_address, || {
-        set_quorum(&e, 100);
+        store_proposal_with_quorum(&e, &pid, 100);
         count_vote(&e, &pid, &alice, VOTE_ABSTAIN, 100);
 
         assert!(quorum_reached(&e, &pid));
@@ -469,7 +477,7 @@ fn quorum_reached_with_for_and_abstain_combined() {
     let pid = proposal_id(&e, 1);
 
     e.as_contract(&contract_address, || {
-        set_quorum(&e, 100);
+        store_proposal_with_quorum(&e, &pid, 100);
         count_vote(&e, &pid, &alice, VOTE_FOR, 60);
         count_vote(&e, &pid, &bob, VOTE_ABSTAIN, 40);
 
@@ -485,7 +493,7 @@ fn quorum_not_reached_when_insufficient() {
     let pid = proposal_id(&e, 1);
 
     e.as_contract(&contract_address, || {
-        set_quorum(&e, 100);
+        store_proposal_with_quorum(&e, &pid, 100);
         count_vote(&e, &pid, &alice, VOTE_FOR, 99);
 
         assert!(!quorum_reached(&e, &pid));
@@ -500,7 +508,7 @@ fn quorum_ignores_against_votes() {
     let pid = proposal_id(&e, 1);
 
     e.as_contract(&contract_address, || {
-        set_quorum(&e, 100);
+        store_proposal_with_quorum(&e, &pid, 100);
         count_vote(&e, &pid, &alice, VOTE_AGAINST, 200);
         count_vote(&e, &pid, &bob, VOTE_FOR, 50);
 
@@ -516,7 +524,7 @@ fn quorum_reached_exactly_at_threshold() {
     let pid = proposal_id(&e, 1);
 
     e.as_contract(&contract_address, || {
-        set_quorum(&e, 100);
+        store_proposal_with_quorum(&e, &pid, 100);
         count_vote(&e, &pid, &alice, VOTE_FOR, 100);
 
         // Exactly at threshold: 100 >= 100
@@ -530,7 +538,7 @@ fn quorum_zero_always_reached() {
     let pid = proposal_id(&e, 1);
 
     e.as_contract(&contract_address, || {
-        set_quorum(&e, 0);
+        store_proposal_with_quorum(&e, &pid, 0);
 
         // 0 >= 0 with no votes
         assert!(quorum_reached(&e, &pid));
@@ -538,8 +546,8 @@ fn quorum_zero_always_reached() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5018)")]
-fn quorum_reached_fails_when_quorum_not_set() {
+#[should_panic(expected = "Error(Contract, #5000)")]
+fn quorum_reached_fails_when_proposal_not_found() {
     let (e, contract_address) = setup_env();
     let pid = proposal_id(&e, 1);
 
@@ -697,6 +705,7 @@ fn full_governance_scenario() {
 
     e.as_contract(&contract_address, || {
         set_quorum(&e, 200);
+        store_proposal_with_quorum(&e, &pid, 200);
 
         // Alice votes for with 100 weight
         count_vote(&e, &pid, &alice, VOTE_FOR, 100);
@@ -741,6 +750,7 @@ fn defeated_governance_scenario() {
 
     e.as_contract(&contract_address, || {
         set_quorum(&e, 100);
+        store_proposal_with_quorum(&e, &pid, 100);
 
         count_vote(&e, &pid, &alice, VOTE_FOR, 50);
         count_vote(&e, &pid, &bob, VOTE_AGAINST, 80);
@@ -764,6 +774,8 @@ fn independent_proposals_do_not_interfere() {
 
     e.as_contract(&contract_address, || {
         set_quorum(&e, 50);
+        store_proposal_with_quorum(&e, &pid1, 50);
+        store_proposal_with_quorum(&e, &pid2, 50);
 
         // Proposal 1: alice votes for
         count_vote(&e, &pid1, &alice, VOTE_FOR, 100);

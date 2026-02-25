@@ -5,9 +5,11 @@
 //! votes, and configuration parameters.
 
 use soroban_sdk::{
-    contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, IntoVal, String,
-    Symbol, Val, Vec,
+    contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, String, Symbol, Val,
+    Vec,
 };
+
+use crate::votes::VotesClient;
 
 use crate::governor::{
     emit_proposal_created, emit_quorum_changed, emit_vote_cast, GovernorError, ProposalState,
@@ -809,16 +811,16 @@ pub fn get_quorum(e: &Env) -> u128 {
 /// # Errors
 ///
 /// * [`GovernorError::MathOverflow`] - Occurs if participation tally overflows.
-/// * also refer to [`get_quorum()`] errors.
+/// * also refer to [`get_proposal_core()`] errors.
 pub fn quorum_reached(e: &Env, proposal_id: &BytesN<32>) -> bool {
-    let quorum = get_quorum(e);
+    let core = get_proposal_core(e, proposal_id);
     let counts = get_proposal_vote_counts(e, proposal_id);
 
     let Some(participation) = counts.for_votes.checked_add(counts.abstain_votes) else {
         panic_with_error!(e, GovernorError::MathOverflow);
     };
 
-    participation >= quorum
+    participation >= core.quorum
 }
 
 /// Returns whether the tally has succeeded for a proposal.
@@ -1020,9 +1022,5 @@ pub fn cast_vote(
 /// * refer to [`get_token_contract()`] errors.
 fn get_voting_power(e: &Env, account: &Address, ledger: u32) -> u128 {
     let token = get_token_contract(e);
-    e.invoke_contract(
-        &token,
-        &Symbol::new(e, "get_votes_at_checkpoint"),
-        soroban_sdk::vec![e, account.into_val(e), ledger.into_val(e)],
-    )
+    VotesClient::new(e, &token).get_votes_at_checkpoint(&account.clone(), &ledger)
 }

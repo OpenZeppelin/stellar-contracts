@@ -28,4 +28,31 @@ impl GovernorContract {
 }
 
 #[contractimpl(contracttrait)]
-impl Governor for GovernorContract {}
+impl Governor for GovernorContract {
+    fn execute(
+        e: &Env,
+        targets: Vec<Address>,
+        functions: Vec<Symbol>,
+        args: Vec<Vec<Val>>,
+        description_hash: BytesN<32>,
+        executor: Address,
+    ) -> BytesN<32> {
+        executor.require_auth();
+        storage::execute(e, targets, functions, args, &description_hash)
+    }
+
+    fn cancel(
+        e: &Env,
+        targets: Vec<Address>,
+        functions: Vec<Symbol>,
+        args: Vec<Vec<Val>>,
+        description_hash: BytesN<32>,
+        operator: Address,
+    ) -> BytesN<32> {
+        let proposal_id = storage::hash_proposal(e, &targets, &functions, &args, &description_hash);
+        let proposer = storage::get_proposal_proposer(e, &proposal_id);
+        assert!(operator == proposer);
+        operator.require_auth();
+        storage::cancel(e, targets, functions, args, &description_hash)
+    }
+}
