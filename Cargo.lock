@@ -675,6 +675,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fungible-governor-example"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-governance",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "fungible-merkle-airdrop-example"
 version = "0.6.0"
 dependencies = [
