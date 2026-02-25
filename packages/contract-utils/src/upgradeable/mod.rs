@@ -1,9 +1,9 @@
 //! # Lightweight upgradeability framework
 //!
-//! This module defines a minimal system for managing contract upgrades, with
-//! optional support for handling migrations in a structured and safe manner.
-//! The framework enforces correct sequencing of operations, e.g. migration can
-//! only be invoked after an upgrade.
+//! This module defines a minimal system for managing contract upgrades. It
+//! provides the [`Upgradeable`] trait, which generates a standardized client
+//! ([`UpgradeableClient`]) for calling upgrades from other contracts (e.g. a
+//! helper upgrader, a governance contract, or a multisig).
 //!
 //! If a rollback is required, the contract can be upgraded to a newer version
 //! where the rollback-specific logic is defined and performed as a migration.
@@ -19,7 +19,7 @@
 //!   inadvertently introduce storage mismatches.
 //!
 //!
-//! ## Simple Upgrade (no migration)
+//! # Simple Upgrade (no migration)
 //!
 //! Implement the [`Upgradeable`] trait directly and call [`upgrade()`] inside:
 //!
@@ -40,96 +40,161 @@
 //! }
 //! ```
 //!
-//! ## Upgrade with Migration
+//! # Storage Migration
 //!
-//! Implement [`Upgradeable`] as above, and add a `migrate` function to your
-//! contract that calls [`run_migration()`] which will prevent you from calling
-//! the `migrate` function twice.
+//! When upgrading contracts, data structures may change (e.g., adding new
+//! fields, removing old ones, or restructuring data). This section explains how
+//! to handle those changes safely.
+//!
+//! ## The Problem: Host-Level Type Validation
+//!
+//! Soroban validates types at the host level when reading from storage. If a
+//! data structure's shape changes between versions, the host traps before the
+//! SDK can handle the mismatch:
 //!
 //! ```rust,ignore
-//! use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env};
-//! use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
-//! use stellar_macros::only_role;
+//! #[contracttype]
+//! pub struct ConfigV1 { pub rate: u32 }
 //!
 //! #[contracttype]
-//! pub struct Data {
-//!     pub num1: u32,
-//!     pub num2: u32,
-//! }
+//! pub struct ConfigV2 { pub rate: u32, pub active: bool }
 //!
-//! #[contract]
-//! pub struct ExampleContract;
-//!
-//! #[contractimpl]
-//! impl Upgradeable for ExampleContract {
-//!     #[only_role(operator, "admin")]
-//!     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address) {
-//!         upgradeable::upgrade(e, &new_wasm_hash);
-//!     }
-//! }
-//!
-//! #[contractimpl]
-//! impl ExampleContract {
-//!     #[only_role(operator, "manager")]
-//!     pub fn migrate(e: &Env, migration_data: Data, operator: Address) {
-//!         upgradeable::run_migration(e, || {
-//!             e.storage().instance().set(&symbol_short!("DATA_KEY"), &migration_data);
-//!         });
-//!     }
-//! }
+//! // Developer expects `active` to default to some value, instead this traps
+//! // with Error(Object, UnexpectedSize)
+//! let config: ConfigV2 = e.storage().instance().get(&key).unwrap();
 //! ```
 //!
-//! ## Migration Guide from `#[derive(Upgradeable)]`
+//! ## Pattern 1: Eager Migration (Bounded Data)
 //!
-//! **Before:**
+//! For bounded data in instance storage (config, metadata, settings), add a
+//! `migrate` function to your upgraded contract that reads old-format data and
+//! converts it. Use a schema version to guard against double invocation.
+//!
+//! The old type must be defined in the new contract code so the host
+//! can deserialize it correctly.
+//!
 //! ```rust,ignore
-//! use stellar_contract_utils::upgradeable::UpgradeableInternal;
-//! use stellar_macros::Upgradeable;
+//! // Old type (matches what v1 stored — field names and types must match)
+//! #[contracttype]
+//! pub struct ConfigV1 {
+//!     pub rate: u32,
+//! }
 //!
-//! #[derive(Upgradeable)]
-//! #[contract]
-//! pub struct ExampleContract;
+//! // New type
+//! #[contracttype]
+//! pub struct Config {
+//!     pub rate: u32,
+//!     pub active: bool,
+//! }
 //!
-//! impl UpgradeableInternal for ExampleContract {
-//!     fn _require_auth(e: &Env, operator: &Address) {
-//!         operator.require_auth();
-//!         // access control checks ...
-//!     }
+//! const CONFIG_KEY: Symbol = symbol_short!("CONFIG");
+//! const SCHEMA_VERSION: Symbol = symbol_short!("VERSION");
+//!
+//! pub fn migrate(e: &Env, operator: Address) {
+//!     // Guard: prevent double migration
+//!     let version: u32 = e.storage().instance()
+//!         .get(&SCHEMA_VERSION).unwrap_or(1);
+//!     assert!(version < 2, "already migrated");
+//!
+//!     // Read old data using old type, convert, write back
+//!     let old: ConfigV1 = e.storage().instance().get(&CONFIG_KEY).unwrap();
+//!     let new = Config { rate: old.rate, active: true };
+//!     e.storage().instance().set(&CONFIG_KEY, &new);
+//!     e.storage().instance().set(&SCHEMA_VERSION, &2u32);
 //! }
 //! ```
 //!
-//! **After:**
+//! ## Pattern 2: Lazy Migration (Unbounded Data)
+//!
+//! For unbounded persistent storage (user balances, approvals, etc.),
+//! eager migration is impractical as it's impossible to iterate all entries in
+//! one transaction without hitting resource limits (200 entries / 132 KB writes
+//! per transaction).
+//!
+//! Instead, use **version markers** alongside each entry and convert lazily on
+//! read:
+//!
 //! ```rust,ignore
-//! use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
+//! #[contracttype]
+//! pub struct Balance { pub amount: i128 }
 //!
-//! #[contract]
-//! pub struct ExampleContract;
+//! #[contracttype]
+//! pub struct BalanceV2 { pub amount: i128, pub frozen: bool }
 //!
-//! #[contractimpl]
-//! impl Upgradeable for ExampleContract {
-//!     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address) {
-//!         operator.require_auth();
-//!         // access control checks ...
-//!         upgradeable::upgrade(e, &new_wasm_hash);
+//! fn get_balance(e: &Env, account: &Address) -> BalanceV2 {
+//!     let version: u32 = e.storage().persistent()
+//!         .get(&StorageKey::BalanceVersion(account.clone()))
+//!         .unwrap_or(1);
+//!
+//!     match version {
+//!         1 => {
+//!             let v1: Balance = e.storage().persistent()
+//!                 .get(&StorageKey::Balance(account.clone())).unwrap();
+//!             let v2 = BalanceV2 { amount: v1.amount, frozen: false };
+//!             // Write back in new format (lazy migration)
+//!             set_balance(e, account, &v2);
+//!             v2
+//!         }
+//!         _ => e.storage().persistent()
+//!             .get(&StorageKey::BalanceV2(account.clone())).unwrap(),
+//!     }
+//! }
+//!
+//! fn set_balance(e: &Env, account: &Address, balance: &BalanceV2) {
+//!     e.storage().persistent()
+//!         .set(&StorageKey::BalanceVersion(account.clone()), &2u32);
+//!     e.storage().persistent()
+//!         .set(&StorageKey::BalanceV2(account.clone()), balance);
+//! }
+//! ```
+//!
+//! ## Pattern 3: Enum Wrapper (Plan-Ahead)
+//!
+//! If you anticipate future migrations from the start, wrap stored data in a
+//! versioned enum. Soroban serializes enum variants as `(tag, data)`, so the
+//! host can distinguish between versions without trapping.
+//!
+//! ```rust,ignore
+//! #[contracttype]
+//! pub enum ConfigEntry {
+//!     V1(ConfigV1),
+//! }
+//!
+//! // Store wrapped from day one:
+//! e.storage().instance().set(&key, &ConfigEntry::V1(config));
+//! ```
+//!
+//! When v2 comes, add a variant and a converter:
+//!
+//! ```rust,ignore
+//! #[contracttype]
+//! pub enum ConfigEntry {
+//!     V1(ConfigV1),
+//!     V2(ConfigV2),
+//! }
+//!
+//! impl ConfigEntry {
+//!     pub fn into_latest(self) -> ConfigV2 {
+//!         match self {
+//!             ConfigEntry::V1(v1) => ConfigV2 { rate: v1.rate, active: true },
+//!             ConfigEntry::V2(v2) => v2,
+//!         }
 //!     }
 //! }
 //! ```
 //!
-//! Check in the `/examples/upgradeable/` directory for the full example, where
-//! you can also find a helper `Upgrader` contract that performs upgrade+migrate
-//! in a single transaction.
+//! **Note**: This cannot work retroactively, since reading old bare-struct data
+//! as an enum would trap.
+//!
+//! Check the `examples/upgradeable/` directory for the full example, where you
+//! can also find a helper `Upgrader` contract that performs upgrade+migrate in
+//! a single transaction.
 
 mod storage;
 
-#[cfg(test)]
-mod test;
+use soroban_sdk::{contractclient, Address, BytesN, Env};
 
-use soroban_sdk::{contractclient, contracterror, Address, BytesN, Env};
-
-pub use crate::upgradeable::storage::{
-    can_complete_migration, complete_migration, enable_migration, ensure_can_complete_migration,
-    run_migration, upgrade,
-};
+pub use crate::upgradeable::storage::upgrade;
 
 /// A trait exposing an entry point for contract upgrades.
 ///
@@ -161,12 +226,4 @@ pub trait Upgradeable {
     ///   uploaded to the ledger.
     /// * `operator` - The authorized address performing the upgrade.
     fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address);
-}
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum UpgradeableError {
-    /// When migration is attempted but not allowed due to upgrade state.
-    MigrationNotAllowed = 1100,
 }

@@ -61,11 +61,11 @@ impl Ownable for MyContract {}
 
 ### Upgradeable
 
-The `upgradeable` module provides a framework for safe contract upgrades and migrations with version control.
+The `upgradeable` module provides a trait and helper for contract upgrades. Implementing the `Upgradeable` trait generates an `UpgradeableClient` that other contracts (e.g. a governance contract, upgrader helper, or multisig) can use to trigger upgrades.
+
+For storage migration patterns (eager, lazy, and enum wrapper), see the module-level documentation in `src/upgradeable/mod.rs` and the `examples/upgradeable/` directory.
 
 #### Usage Examples
-
-**Simple Upgrade**:
 
 ```rust
 use soroban_sdk::{contract, contractimpl, Address, BytesN, Env};
