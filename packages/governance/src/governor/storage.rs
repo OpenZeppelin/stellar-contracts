@@ -571,6 +571,7 @@ pub fn execute(
     functions: Vec<Symbol>,
     args: Vec<Vec<Val>>,
     description_hash: &BytesN<32>,
+    queue_enabled: bool,
 ) -> BytesN<32> {
     let proposal_id = hash_proposal(e, &targets, &functions, &args, description_hash);
 
@@ -582,7 +583,11 @@ pub fn execute(
     if state == ProposalState::Executed {
         panic_with_error!(e, GovernorError::ProposalAlreadyExecuted);
     }
-    if state != ProposalState::Succeeded {
+    if queue_enabled {
+        if state != ProposalState::Queued {
+            panic_with_error!(e, GovernorError::ProposalNotQueued);
+        }
+    } else if state != ProposalState::Succeeded {
         panic_with_error!(e, GovernorError::ProposalNotSuccessful);
     }
 
@@ -642,9 +647,10 @@ pub fn cancel(
     // Get proposal and verify it exists
     let mut proposal = get_proposal_core(e, &proposal_id);
 
-    // Blacklist non-cancellable states
-    let state = derive_proposal_state(e, &proposal_id, &proposal);
-    match state {
+    // Blacklist non-cancellable explicit states.
+    // These are always stored directly in `core.state`, so no need to derive
+    // the full proposal state (which would also require a vote-count read).
+    match proposal.state {
         ProposalState::Canceled | ProposalState::Expired | ProposalState::Executed => {
             panic_with_error!(e, GovernorError::ProposalNotCancellable)
         }
@@ -720,6 +726,13 @@ pub fn check_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> u32 {
 fn derive_proposal_state(e: &Env, proposal_id: &BytesN<32>, core: &ProposalCore) -> ProposalState {
     match core.state {
         ProposalState::Canceled | ProposalState::Succeeded | ProposalState::Executed => {
+            return core.state;
+        }
+        // Set by queuing extensions (e.g. `TimelockControl`). A proposal
+        // can only reach these states if such an extension is active, so
+        // this arm is a no-op in the base case. And provides out of the box
+        // compatibility with queuing extensions.
+        ProposalState::Queued | ProposalState::Expired => {
             return core.state;
         }
         _ => {}

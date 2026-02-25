@@ -38,7 +38,14 @@ impl Governor for GovernorContract {
         executor: Address,
     ) -> BytesN<32> {
         executor.require_auth();
-        storage::execute(e, targets, functions, args, &description_hash)
+        storage::execute(
+            e,
+            targets,
+            functions,
+            args,
+            &description_hash,
+            Self::proposal_needs_queuing(e),
+        )
     }
 
     fn cancel(

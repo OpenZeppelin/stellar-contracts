@@ -50,6 +50,12 @@
 //!
 //! 1. **Propose** → 2. **Vote** → 3. **Queue** → 4. **Execute**
 //!
+//! To enable queuing, override [`Governor::proposal_needs_queuing`] to return
+//! `true`. That single change is sufficient to wire up the full queuing flow:
+//! [`storage::execute`] will then require the proposal to be in the `Queued`
+//! state instead of `Succeeded` before executing. For further customization
+//! (e.g. custom delay enforcement), override [`Governor::execute`] as well.
+//!
 //! # Security Considerations
 //!
 //! ## Flash Loan Voting Attack
@@ -270,14 +276,6 @@ pub trait Governor {
     /// # Errors
     ///
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
-    ///
-    /// # Note
-    ///
-    /// Queue logic is expected to be implemented by an extension, so the
-    /// default implementation does not handle the `Queued` and `Expired`
-    /// states. If you are utilizing an extension that enables
-    /// queueing, don't forget to override this function to handle `Queued` and
-    /// `Expired` states.
     fn proposal_state(e: &Env, proposal_id: BytesN<32>) -> ProposalState {
         storage::get_proposal_state(e, &proposal_id)
     }
@@ -490,7 +488,7 @@ pub trait Governor {
     /// ```ignore
     /// // Open execution — anyone can trigger a succeeded proposal:
     /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
-    ///     storage::execute(e, targets, functions, args, &description_hash)
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposal_needs_queuing(e))
     /// }
     ///
     /// // Restricted — only a timelock contract can execute:
@@ -498,13 +496,13 @@ pub trait Governor {
     ///     let timelock = storage::get_timelock(e);
     ///     assert!(executor == timelock);
     ///     executor.require_auth();
-    ///     storage::execute(e, targets, functions, args, &description_hash)
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposal_needs_queuing(e))
     /// }
     ///
     /// // Role-based — using the `stellar-macros` access control macro:
     /// #[only_role(executor, "executor")]
     /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
-    ///     storage::execute(e, targets, functions, args, &description_hash)
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposal_needs_queuing(e))
     /// }
     /// ```
     fn execute(
@@ -582,9 +580,8 @@ pub trait Governor {
 
     /// Returns whether proposals need to be queued before execution.
     ///
-    /// The base implementation returns `false`, meaning proposals can be
-    /// executed directly after success. Extensions like *TimelockControl*
-    /// should override this to return `true`.
+    /// Defaults to `false`. Override to return `true` when using a queuing
+    /// extension. See the module-level docs for details.
     ///
     /// # Arguments
     ///

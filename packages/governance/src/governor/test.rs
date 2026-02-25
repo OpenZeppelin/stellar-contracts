@@ -1692,7 +1692,7 @@ fn execute_succeeded_proposal() {
         create_executable_proposal(&e, &contract_address);
 
     e.as_contract(&contract_address, || {
-        let executed_pid = execute(&e, targets, functions, args, &desc_hash);
+        let executed_pid = execute(&e, targets, functions, args, &desc_hash, false);
         assert_eq!(executed_pid, pid);
         assert_eq!(storage::get_proposal_state(&e, &pid), ProposalState::Executed);
     });
@@ -1712,7 +1712,7 @@ fn execute_fails_when_not_succeeded() {
     e.as_contract(&contract_address, || {
         propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer);
         // Proposal is Pending, not Succeeded
-        execute(&e, targets, functions, args, &desc_hash);
+        execute(&e, targets, functions, args, &desc_hash, false);
     });
 }
 
@@ -1727,9 +1727,9 @@ fn execute_fails_when_already_executed() {
         create_executable_proposal(&e, &contract_address);
 
     e.as_contract(&contract_address, || {
-        execute(&e, targets.clone(), functions.clone(), args.clone(), &desc_hash);
+        execute(&e, targets.clone(), functions.clone(), args.clone(), &desc_hash, false);
         // Second execution should fail
-        execute(&e, targets, functions, args, &desc_hash);
+        execute(&e, targets, functions, args, &desc_hash, false);
     });
 }
 
@@ -1745,7 +1745,7 @@ fn execute_emits_event() {
     let events_before = e.events().all().events().len();
 
     e.as_contract(&contract_address, || {
-        execute(&e, targets, functions, args, &desc_hash);
+        execute(&e, targets, functions, args, &desc_hash, false);
     });
 
     assert!(e.events().all().events().len() > events_before);
@@ -1762,7 +1762,7 @@ fn cancel_fails_when_already_executed() {
         create_executable_proposal(&e, &contract_address);
 
     e.as_contract(&contract_address, || {
-        execute(&e, targets.clone(), functions.clone(), args.clone(), &desc_hash);
+        execute(&e, targets.clone(), functions.clone(), args.clone(), &desc_hash, false);
         // Cancel after execution should fail
         cancel(&e, targets, functions, args, &desc_hash);
     });
@@ -1778,7 +1778,7 @@ fn execute_fails_for_nonexistent_proposal() {
     let args: Vec<Vec<Val>> = vec![&e, vec![&e]];
 
     e.as_contract(&contract_address, || {
-        execute(&e, targets, functions, args, &desc_hash);
+        execute(&e, targets, functions, args, &desc_hash, false);
     });
 }
 
@@ -1833,7 +1833,7 @@ fn full_proposal_lifecycle_to_executed() {
 
     // Execute
     e.as_contract(&contract_address, || {
-        execute(&e, targets, functions, args, &desc_hash);
+        execute(&e, targets, functions, args, &desc_hash, false);
         assert_eq!(storage::get_proposal_state(&e, &pid), ProposalState::Executed);
     });
 }
