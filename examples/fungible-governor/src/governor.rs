@@ -37,6 +37,8 @@ impl Governor for GovernorContract {
         description_hash: BytesN<32>,
         executor: Address,
     ) -> BytesN<32> {
+        // Open execution: any account can trigger a succeeded proposal,
+        // as long as they authenticate themselves as `executor`.
         executor.require_auth();
         storage::execute(
             e,
@@ -56,6 +58,7 @@ impl Governor for GovernorContract {
         description_hash: BytesN<32>,
         operator: Address,
     ) -> BytesN<32> {
+        // Restricted cancellation: only the original proposer can cancel.
         let proposal_id = storage::hash_proposal(e, &targets, &functions, &args, &description_hash);
         let proposer = storage::get_proposal_proposer(e, &proposal_id);
         assert!(operator == proposer);

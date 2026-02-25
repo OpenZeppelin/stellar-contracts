@@ -11,8 +11,9 @@ use soroban_sdk::{
 
 use crate::{
     governor::{
-        emit_proposal_created, emit_quorum_changed, emit_vote_cast, GovernorError, ProposalState,
-        GOVERNOR_EXTEND_AMOUNT, GOVERNOR_TTL_THRESHOLD,
+        emit_proposal_cancelled, emit_proposal_created, emit_proposal_executed,
+        emit_quorum_changed, emit_vote_cast, GovernorError, ProposalState, GOVERNOR_EXTEND_AMOUNT,
+        GOVERNOR_TTL_THRESHOLD, MAX_DESCRIPTION_LENGTH,
     },
     votes::VotesClient,
 };
@@ -206,11 +207,6 @@ pub fn get_proposal_core(e: &Env, proposal_id: &BytesN<32>) -> ProposalCore {
 ///
 /// * [`GovernorError::ProposalNotFound`] - Occurs if the proposal does not
 ///   exist.
-///
-/// # Note
-///
-/// Queue logic is expected to be implemented by an extension, so this
-/// function does not handle the `Queued` and `Expired` states.
 pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState {
     let core = get_proposal_core(e, proposal_id);
     derive_proposal_state(e, proposal_id, &core)
@@ -478,7 +474,7 @@ pub fn propose(
     }
 
     // Validate description length to prevent oversized events.
-    if description.len() > crate::governor::MAX_DESCRIPTION_LENGTH {
+    if description.len() > MAX_DESCRIPTION_LENGTH {
         panic_with_error!(e, GovernorError::DescriptionTooLong);
     }
 
@@ -608,7 +604,7 @@ pub fn execute(
     e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
 
     // Emit event
-    crate::governor::emit_proposal_executed(e, &proposal_id);
+    emit_proposal_executed(e, &proposal_id);
 
     proposal_id
 }
@@ -662,7 +658,7 @@ pub fn cancel(
     e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &proposal);
 
     // Emit event
-    crate::governor::emit_proposal_cancelled(e, &proposal_id);
+    emit_proposal_cancelled(e, &proposal_id);
 
     proposal_id
 }
