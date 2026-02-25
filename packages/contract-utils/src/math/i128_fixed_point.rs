@@ -82,7 +82,7 @@ pub fn checked_mul_div_with_rounding_i128(
 ///
 /// # Arguments
 ///
-/// * `env` - Access to the Soroban environment.
+/// * `e` - Access to the Soroban environment.
 /// * `y` - The multiplicand.
 /// * `denominator` - The divisor.
 ///
