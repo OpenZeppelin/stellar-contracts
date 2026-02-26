@@ -1,6 +1,9 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, Map, String, Symbol, Vec};
+use soroban_sdk::{
+    contract, testutils::Address as _, vec, Address, Env, FromVal, IntoVal, Map, String, Symbol,
+    Val, Vec,
+};
 
 use super::{
     storage::{
@@ -1052,6 +1055,67 @@ fn validate_country_data_panics_if_string_too_long() {
             metadata: Some(metadata),
         };
 
+        validate_country_data(&e, &country_data);
+    });
+}
+
+// ################## METADATA MAP TYPE VALIDATION TESTS ##################
+//
+// These tests verify that `validate_country_data` catches malformed Map
+// contents by forcing eager type deserialization. A `Map` with wrong key or
+// value types is constructed through raw `Val` conversion, simulating what
+// a malicious client could submit via crafted XDR.
+
+#[test]
+#[should_panic]
+fn validate_country_data_catches_invalid_metadata_key_types() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        // Build a map with i128 keys (should be Symbol).
+        let mut bad_map = Map::<i128, String>::new(&e);
+        bad_map.set(42_i128, String::from_str(&e, "value"));
+
+        // Reinterpret as Map<Symbol, String> through raw Val conversion.
+        // This mirrors what happens when a malicious client submits XDR with
+        // wrong key types — the host stores the opaque handle without
+        // checking element types.
+        let raw_val: Val = bad_map.into_val(&e);
+        let typed_map = Map::<Symbol, String>::from_val(&e, &raw_val);
+
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: Some(typed_map),
+        };
+
+        // Iterating the map forces key deserialization as Symbol, which
+        // panics because the actual keys are i128 values.
+        validate_country_data(&e, &country_data);
+    });
+}
+
+#[test]
+#[should_panic]
+fn validate_country_data_catches_invalid_metadata_value_types() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    e.as_contract(&contract_id, || {
+        // Build a map with i128 values (should be String).
+        let mut bad_map = Map::<Symbol, i128>::new(&e);
+        bad_map.set(Symbol::new(&e, "key"), 42_i128);
+
+        let raw_val: Val = bad_map.into_val(&e);
+        let typed_map = Map::<Symbol, String>::from_val(&e, &raw_val);
+
+        let country_data = CountryData {
+            country: CountryRelation::Individual(IndividualCountryRelation::Residence(840)),
+            metadata: Some(typed_map),
+        };
+
+        // Iterating the map forces value deserialization as String, which
+        // panics because the actual values are i128.
         validate_country_data(&e, &country_data);
     });
 }
