@@ -203,7 +203,7 @@ pub trait SignatureVerifier {
 
     /// Builds the message to verify for claim signature validation.
     ///
-    /// The message format is: network_id || claim_issuer || identity ||
+    /// The message format is: 0x01 || network_id || claim_issuer || identity ||
     /// claim_topic || nonce || claim_data
     ///
     /// # Arguments
