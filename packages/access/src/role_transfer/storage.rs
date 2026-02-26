@@ -1,6 +1,13 @@
-use soroban_sdk::{panic_with_error, Address, Env, IntoVal, Val};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, IntoVal, Val};
 
 use crate::role_transfer::RoleTransferError;
+
+/// Stores the pending role holder and the explicit deadline for acceptance.
+#[contracttype]
+pub struct PendingTransfer {
+    pub address: Address,
+    pub live_until_ledger: u32,
+}
 
 /// Initiates the role transfer. If `live_until_ledger == 0`, cancels the
 /// pending transfer.
@@ -31,20 +38,20 @@ use crate::role_transfer::RoleTransferError;
 ///
 /// * This function does not enforce authorization. Ensure that authorization is
 ///   handled at a higher level.
-/// * The period during which the transfer can be accepted is implicitly
-///   timebound by the maximum allowed storage TTL value which is a network
-///   parameter, i.e. one cannot set `live_until_ledger` for a longer period.
-/// * There is also a default minimum TTL and if the computed period is shorter
-///   than it, the entry will outlive `live_until_ledger`.
+/// * `live_until_ledger` is stored explicitly inside [`PendingTransfer`] and is
+///   checked on every [`accept_transfer`] call, regardless of the storage
+///   entry's TTL. This means the deadline is always enforced, even if the
+///   underlying temporary entry is kept alive longer by the network minimum TTL
+///   or by a permissionless `extend_ttl` call.
 pub fn transfer_role<T>(e: &Env, new: &Address, pending_key: &T, live_until_ledger: u32)
 where
     T: IntoVal<Env, Val>,
 {
     if live_until_ledger == 0 {
-        let Some(pending) = e.storage().temporary().get::<T, Address>(pending_key) else {
+        let Some(pending) = e.storage().temporary().get::<T, PendingTransfer>(pending_key) else {
             panic_with_error!(e, RoleTransferError::NoPendingTransfer);
         };
-        if pending != *new {
+        if pending.address != *new {
             panic_with_error!(e, RoleTransferError::InvalidPendingAccount);
         }
         e.storage().temporary().remove(pending_key);
@@ -59,7 +66,8 @@ where
     }
 
     let live_for = live_until_ledger - current_ledger;
-    e.storage().temporary().set(pending_key, new);
+    let pending = PendingTransfer { address: new.clone(), live_until_ledger };
+    e.storage().temporary().set(pending_key, &pending);
     e.storage().temporary().extend_ttl(pending_key, live_for, live_for);
 }
 
@@ -76,6 +84,11 @@ where
 ///
 /// * [`RoleTransferError::NoPendingTransfer`] - If there is no pending transfer
 ///   to accept.
+/// * [`RoleTransferError::TransferExpired`] - If the current ledger is past the
+///   `live_until_ledger` stored in [`PendingTransfer`]. The deadline is checked
+///   explicitly here, so it is enforced even if the storage entry is still
+///   alive due to the network minimum TTL or a permissionless `extend_ttl`
+///   call.
 pub fn accept_transfer<T, U>(e: &Env, active_key: &T, pending_key: &U) -> Address
 where
     T: IntoVal<Env, Val>,
@@ -84,13 +97,17 @@ where
     let pending = e
         .storage()
         .temporary()
-        .get::<U, Address>(pending_key)
+        .get::<U, PendingTransfer>(pending_key)
         .unwrap_or_else(|| panic_with_error!(e, RoleTransferError::NoPendingTransfer));
 
-    pending.require_auth();
+    if e.ledger().sequence() > pending.live_until_ledger {
+        panic_with_error!(e, RoleTransferError::TransferExpired);
+    }
+
+    pending.address.require_auth();
 
     e.storage().temporary().remove(pending_key);
-    e.storage().instance().set(active_key, &pending);
+    e.storage().instance().set(active_key, &pending.address);
 
-    pending
+    pending.address
 }

@@ -3,9 +3,12 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
-use crate::ownable::{
-    accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
-    transfer_ownership, OwnableStorageKey,
+use crate::{
+    ownable::{
+        accept_ownership, enforce_owner_auth, get_owner, renounce_ownership, set_owner,
+        transfer_ownership, OwnableStorageKey,
+    },
+    role_transfer::PendingTransfer,
 };
 
 #[contract]
@@ -27,9 +30,9 @@ fn transfer_ownership_sets_pending() {
     e.as_contract(&contract, || {
         transfer_ownership(&e, &new_owner, 1000);
 
-        let pending: Option<Address> =
+        let pending: Option<PendingTransfer> =
             e.storage().temporary().get(&OwnableStorageKey::PendingOwner);
-        assert_eq!(pending, Some(new_owner));
+        assert_eq!(pending.map(|p| p.address), Some(new_owner));
 
         let assert = EventAssertion::new(&e, contract.clone());
         assert.assert_event_count(1);
@@ -46,7 +49,8 @@ fn accept_ownership_completes_transfer() {
 
     e.as_contract(&contract, || {
         set_owner(&e, &old_owner);
-        e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &new_owner);
+        let pending = PendingTransfer { address: new_owner.clone(), live_until_ledger: u32::MAX };
+        e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &pending);
 
         accept_ownership(&e);
 
@@ -131,7 +135,9 @@ fn renounce_fails_if_pending_transfer_exists() {
 
     e.as_contract(&contract, || {
         set_owner(&e, &owner);
-        e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &pending);
+        let pending_transfer =
+            PendingTransfer { address: pending.clone(), live_until_ledger: u32::MAX };
+        e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &pending_transfer);
     });
 
     e.mock_all_auths();
