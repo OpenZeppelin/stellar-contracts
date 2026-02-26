@@ -106,6 +106,11 @@
 //! }
 //! ```
 //!
+//! Migration must happen in a separate transaction after the upgrade completes,
+//! or atomically via a third-party upgrader contract that calls upgrade in one
+//! cross-contract call and migrate in a second (see `examples/upgradeable/
+//! upgrader`).
+//!
 //! ## Pattern 2: Lazy Migration (Unbounded Data)
 //!
 //! For unbounded persistent storage (user balances, approvals, etc.),

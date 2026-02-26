@@ -47,6 +47,7 @@ impl LeaderboardContract {
         let version: u32 =
             e.storage().persistent().get(&StorageKey::ScoreVersion(user.clone())).unwrap_or(1);
 
+        // MIGRATION HAPPENS LAZILY HERE
         match version {
             1 => {
                 let v1: ScoreV1 =
