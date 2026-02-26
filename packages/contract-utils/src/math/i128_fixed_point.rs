@@ -5,8 +5,9 @@ use soroban_sdk::{panic_with_error, Env, I256};
 
 use crate::math::{
     i256_fixed_point::{
-        checked_mul_div_ceil_i256, checked_mul_div_floor_i256, checked_mul_div_i256,
-        mul_div_ceil_i256, mul_div_floor_i256, mul_div_i256,
+        checked_mul_div as checked_mul_div_i256, checked_mul_div_ceil as checked_mul_div_ceil_i256,
+        checked_mul_div_floor as checked_mul_div_floor_i256, mul_div as mul_div_i256,
+        mul_div_ceil as mul_div_ceil_i256, mul_div_floor as mul_div_floor_i256,
     },
     Rounding, SorobanFixedPointError,
 };
@@ -33,7 +34,7 @@ use crate::math::{
 /// # Notes
 ///
 /// Automatically handles phantom overflow by scaling to `I256` when necessary.
-pub fn mul_div_with_rounding_i128(
+pub fn mul_div_with_rounding(
     e: &Env,
     x: i128,
     y: i128,
@@ -41,9 +42,9 @@ pub fn mul_div_with_rounding_i128(
     rounding: Rounding,
 ) -> i128 {
     match rounding {
-        Rounding::Floor => mul_div_floor_i128(e, &x, &y, &denominator),
-        Rounding::Ceil => mul_div_ceil_i128(e, &x, &y, &denominator),
-        Rounding::Truncate => mul_div_i128(e, &x, &y, &denominator),
+        Rounding::Floor => mul_div_floor(e, &x, &y, &denominator),
+        Rounding::Ceil => mul_div_ceil(e, &x, &y, &denominator),
+        Rounding::Truncate => mul_div(e, &x, &y, &denominator),
     }
 }
 
@@ -63,7 +64,7 @@ pub fn mul_div_with_rounding_i128(
 /// # Notes
 ///
 /// Automatically handles phantom overflow by scaling to `I256` when necessary.
-pub fn checked_mul_div_with_rounding_i128(
+pub fn checked_mul_div_with_rounding(
     e: &Env,
     x: i128,
     y: i128,
@@ -71,9 +72,9 @@ pub fn checked_mul_div_with_rounding_i128(
     rounding: Rounding,
 ) -> Option<i128> {
     match rounding {
-        Rounding::Floor => checked_mul_div_floor_i128(e, &x, &y, &denominator),
-        Rounding::Ceil => checked_mul_div_ceil_i128(e, &x, &y, &denominator),
-        Rounding::Truncate => checked_mul_div_i128(e, &x, &y, &denominator),
+        Rounding::Floor => checked_mul_div_floor(e, &x, &y, &denominator),
+        Rounding::Ceil => checked_mul_div_ceil(e, &x, &y, &denominator),
+        Rounding::Truncate => checked_mul_div(e, &x, &y, &denominator),
     }
 }
 
@@ -90,7 +91,7 @@ pub fn checked_mul_div_with_rounding_i128(
 ///
 /// * [`SorobanFixedPointError::Overflow`] - when the result overflows.
 /// * if `denominator` is zero, it will panic due to standard library behavior.
-pub fn mul_div_floor_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
+pub fn mul_div_floor(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
     match x.checked_mul(*y) {
         Some(r) => div_floor(r, *denominator),
         None => {
@@ -119,7 +120,7 @@ pub fn mul_div_floor_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i1
 ///
 /// * [`SorobanFixedPointError::Overflow`] - when the result overflows.
 /// * if `denominator` is zero, it will panic due to standard library behavior.
-pub fn mul_div_ceil_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
+pub fn mul_div_ceil(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
     match x.checked_mul(*y) {
         Some(r) => div_ceil(r, *denominator),
         None => {
@@ -148,7 +149,7 @@ pub fn mul_div_ceil_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i12
 ///
 /// * [`SorobanFixedPointError::Overflow`] - when the result overflows.
 /// * if `denominator` is zero, it will panic due to standard library behavior.
-pub fn mul_div_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
+pub fn mul_div(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
     match x.checked_mul(*y) {
         Some(r) => r / *denominator,
         None => {
@@ -173,7 +174,7 @@ pub fn mul_div_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
 /// * `e` - Access to the Soroban environment.
 /// * `y` - The multiplicand.
 /// * `denominator` - The divisor.
-pub fn checked_mul_div_floor_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> Option<i128> {
+pub fn checked_mul_div_floor(e: &Env, x: &i128, y: &i128, denominator: &i128) -> Option<i128> {
     match x.checked_mul(*y) {
         Some(r) => checked_div_floor(r, *denominator),
         None => {
@@ -198,7 +199,7 @@ pub fn checked_mul_div_floor_i128(e: &Env, x: &i128, y: &i128, denominator: &i12
 /// * `e` - Access to the Soroban environment.
 /// * `y` - The multiplicand.
 /// * `denominator` - The divisor.
-pub fn checked_mul_div_ceil_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> Option<i128> {
+pub fn checked_mul_div_ceil(e: &Env, x: &i128, y: &i128, denominator: &i128) -> Option<i128> {
     match x.checked_mul(*y) {
         Some(r) => checked_div_ceil(r, *denominator),
         None => {
@@ -223,7 +224,7 @@ pub fn checked_mul_div_ceil_i128(e: &Env, x: &i128, y: &i128, denominator: &i128
 /// * `e` - Access to the Soroban environment.
 /// * `y` - The multiplicand.
 /// * `denominator` - The divisor.
-pub fn checked_mul_div_i128(e: &Env, x: &i128, y: &i128, denominator: &i128) -> Option<i128> {
+pub fn checked_mul_div(e: &Env, x: &i128, y: &i128, denominator: &i128) -> Option<i128> {
     match x.checked_mul(*y) {
         Some(r) => r.checked_div(*denominator),
         None => {

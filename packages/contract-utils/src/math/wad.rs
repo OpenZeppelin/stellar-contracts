@@ -5,7 +5,7 @@ use core::{
 
 use soroban_sdk::{panic_with_error, Env};
 
-use crate::math::{i128_fixed_point::checked_mul_div_i128, SorobanFixedPointError};
+use crate::math::{i128_fixed_point::checked_mul_div, SorobanFixedPointError};
 
 /// Fixed-point decimal number with 18 decimal places of precision.
 ///
@@ -140,7 +140,7 @@ impl Wad {
         if den == 0 {
             panic_with_error!(e, SorobanFixedPointError::DivisionByZero)
         }
-        checked_mul_div_i128(e, &num, &WAD_SCALE, &den)
+        checked_mul_div(e, &num, &WAD_SCALE, &den)
             .map(Wad)
             .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
     }
@@ -326,7 +326,7 @@ impl Wad {
     /// result fits. Result is truncated toward zero after division by
     /// `WAD_SCALE`.
     pub fn checked_mul(self, e: &Env, rhs: Wad) -> Option<Wad> {
-        checked_mul_div_i128(e, &self.0, &rhs.0, &WAD_SCALE).map(Wad)
+        checked_mul_div(e, &self.0, &rhs.0, &WAD_SCALE).map(Wad)
     }
 
     /// Checked division (Wad / Wad). Returns `None` on overflow or division by
@@ -337,7 +337,7 @@ impl Wad {
         if rhs.0 == 0 {
             return None;
         }
-        checked_mul_div_i128(e, &self.0, &WAD_SCALE, &rhs.0).map(Wad)
+        checked_mul_div(e, &self.0, &WAD_SCALE, &rhs.0).map(Wad)
     }
 
     /// Checked multiplication by integer. Returns `None` on overflow.
@@ -468,14 +468,14 @@ impl Wad {
         while exponent > 0 {
             if exponent & 1 == 1 {
                 // result = result * base (in fixed-point)
-                let new_result = checked_mul_div_i128(e, &result.0, &base.0, &WAD_SCALE)?;
+                let new_result = checked_mul_div(e, &result.0, &base.0, &WAD_SCALE)?;
                 result = Wad(new_result);
             }
 
             exponent >>= 1;
             if exponent > 0 {
                 // base = base * base (in fixed-point)
-                let new_base = checked_mul_div_i128(e, &base.0, &base.0, &WAD_SCALE)?;
+                let new_base = checked_mul_div(e, &base.0, &base.0, &WAD_SCALE)?;
                 base = Wad(new_base);
             }
         }

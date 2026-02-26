@@ -22,11 +22,11 @@ use crate::math::Rounding;
 /// * `y` - The second operand.
 /// * `denominator` - The divisor.
 /// * `rounding` - The rounding direction to use.
-pub fn mul_div_with_rounding_i256(x: I256, y: I256, denominator: I256, rounding: Rounding) -> I256 {
+pub fn mul_div_with_rounding(x: I256, y: I256, denominator: I256, rounding: Rounding) -> I256 {
     match rounding {
-        Rounding::Floor => mul_div_floor_i256(&x, &y, &denominator),
-        Rounding::Ceil => mul_div_ceil_i256(&x, &y, &denominator),
-        Rounding::Truncate => mul_div_i256(&x, &y, &denominator),
+        Rounding::Floor => mul_div_floor(&x, &y, &denominator),
+        Rounding::Ceil => mul_div_ceil(&x, &y, &denominator),
+        Rounding::Truncate => mul_div(&x, &y, &denominator),
     }
 }
 
@@ -48,16 +48,16 @@ pub fn mul_div_with_rounding_i256(x: I256, y: I256, denominator: I256, rounding:
 /// * `y` - The second operand.
 /// * `denominator` - The divisor.
 /// * `rounding` - The rounding direction to use.
-pub fn checked_mul_div_with_rounding_i256(
+pub fn checked_mul_div_with_rounding(
     x: I256,
     y: I256,
     denominator: I256,
     rounding: Rounding,
 ) -> Option<I256> {
     match rounding {
-        Rounding::Floor => checked_mul_div_floor_i256(&x, &y, &denominator),
-        Rounding::Ceil => checked_mul_div_ceil_i256(&x, &y, &denominator),
-        Rounding::Truncate => checked_mul_div_i256(&x, &y, &denominator),
+        Rounding::Floor => checked_mul_div_floor(&x, &y, &denominator),
+        Rounding::Ceil => checked_mul_div_ceil(&x, &y, &denominator),
+        Rounding::Truncate => checked_mul_div(&x, &y, &denominator),
     }
 }
 
@@ -68,7 +68,7 @@ pub fn checked_mul_div_with_rounding_i256(
 /// * `x` - The first operand.
 /// * `y` - The multiplicand.
 /// * `denominator` - The divisor.
-pub fn mul_div_floor_i256(x: &I256, y: &I256, denominator: &I256) -> I256 {
+pub fn mul_div_floor(x: &I256, y: &I256, denominator: &I256) -> I256 {
     let r = x.mul(y);
     div_floor(&r, denominator)
 }
@@ -80,7 +80,7 @@ pub fn mul_div_floor_i256(x: &I256, y: &I256, denominator: &I256) -> I256 {
 /// * `x` - The first operand.
 /// * `y` - The multiplicand.
 /// * `denominator` - The divisor.
-pub fn mul_div_ceil_i256(x: &I256, y: &I256, denominator: &I256) -> I256 {
+pub fn mul_div_ceil(x: &I256, y: &I256, denominator: &I256) -> I256 {
     let r = x.mul(y);
     div_ceil(&r, denominator)
 }
@@ -92,7 +92,7 @@ pub fn mul_div_ceil_i256(x: &I256, y: &I256, denominator: &I256) -> I256 {
 /// * `x` - The first operand.
 /// * `y` - The multiplicand.
 /// * `denominator` - The divisor.
-pub fn mul_div_i256(x: &I256, y: &I256, denominator: &I256) -> I256 {
+pub fn mul_div(x: &I256, y: &I256, denominator: &I256) -> I256 {
     let r = x.mul(y);
     r.div(denominator)
 }
@@ -113,7 +113,7 @@ pub fn mul_div_i256(x: &I256, y: &I256, denominator: &I256) -> I256 {
 /// * `x` - The first operand.
 /// * `y` - The multiplicand.
 /// * `denominator` - The divisor.
-pub fn checked_mul_div_floor_i256(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
+pub fn checked_mul_div_floor(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
     let r = x.mul(y);
     checked_div_floor(&r, denominator)
 }
@@ -134,7 +134,7 @@ pub fn checked_mul_div_floor_i256(x: &I256, y: &I256, denominator: &I256) -> Opt
 /// * `x` - The first operand.
 /// * `y` - The multiplicand.
 /// * `denominator` - The divisor.
-pub fn checked_mul_div_ceil_i256(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
+pub fn checked_mul_div_ceil(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
     let r = x.mul(y);
     checked_div_ceil(&r, denominator)
 }
@@ -155,7 +155,7 @@ pub fn checked_mul_div_ceil_i256(x: &I256, y: &I256, denominator: &I256) -> Opti
 /// * `x` - The first operand.
 /// * `y` - The multiplicand.
 /// * `denominator` - The divisor.
-pub fn checked_mul_div_i256(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
+pub fn checked_mul_div(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
     let zero = I256::from_i32(x.env(), 0);
 
     // TODO: remove this check when `checked_div` is available: https://github.com/stellar/rs-soroban-sdk/issues/1659,
