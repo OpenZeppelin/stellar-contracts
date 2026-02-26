@@ -5,9 +5,6 @@
 //! ([`UpgradeableClient`]) for calling upgrades from other contracts (e.g. a
 //! helper upgrader, a governance contract, or a multisig).
 //!
-//! If a rollback is required, the contract can be upgraded to a newer version
-//! where the rollback-specific logic is defined and performed as a migration.
-//!
 //! **IMPORTANT**: While the module provides an upgrade entrypoint, it does NOT
 //! perform deeper checks and verifications such as:
 //!
@@ -48,6 +45,19 @@
 //! When upgrading contracts, data structures may change (e.g., adding new
 //! fields, removing old ones, or restructuring data). This section explains how
 //! to handle those changes safely.
+//!
+//! ## Why there is no `Migratable` trait
+//!
+//! Migration is deliberately not standardized into a trait. The reasons are:
+//!
+//! - Migration rarely has a single entrypoint: a contract may need to migrate
+//!   several independent storage structures at different times.
+//! - A fixed trait signature would force all migration arguments into a single
+//!   `#[contracttype]` struct, removing the flexibility to choose argument
+//!   types, authorization roles, or split migration across multiple functions.
+//! - Lazy migration (Pattern 2) has no discrete migration call at all.
+//!
+//! The patterns below are therefore guidelines rather than enforced interfaces.
 //!
 //! ## The Problem: Host-Level Type Validation
 //!
@@ -204,6 +214,9 @@
 //!
 //! **Note**: This cannot work retroactively, since reading old bare-struct data
 //! as an enum would trap.
+//!
+//! If a rollback is required, the contract can be upgraded to a newer version
+//! where the rollback-specific logic is defined and performed as a migration.
 //!
 //! See the `examples/upgradeable/` directory for full examples:
 //! - `v1` / `v2` — eager migration of bounded instance storage, with an
