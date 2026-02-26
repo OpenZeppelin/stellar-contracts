@@ -2,58 +2,50 @@
 //!
 //! This module provides the foundational trust anchor for the zkEmail
 //! ecosystem. It stores which DKIM public key hashes are valid for which email
-//! domains. All downstream modules (EmailAuth, EmailRecovery, Email Wallet)
-//! query the registry via [`is_key_hash_valid`].
+//! domains. All downstream modules (TBD) query the registry via
+//! [`is_key_hash_valid`].
 //!
 //! The registry is hash-function agnostic: it stores pre-hashed `BytesN<32>`
 //! values for both domain names and public keys. Callers hash these off-chain
 //! using whatever hash function their system requires (Poseidon, SHA256,
 //! Keccak256, etc.).
 //!
-//! # Architecture
-//!
-//! The module follows the same pattern as [`Pausable`]: read functions have
-//! default implementations delegating to module functions, while write
-//! functions have no default and take an `operator` parameter for the contract
-//! to implement with proper authorization.
-//!
 //! # Usage
 //!
-//! Implement the [`DKIMRegistry`] trait on your contract:
-//!
 //! ```ignore
+//! use stellar_macros::only_role;
 //! use stellar_zk_email::dkim_registry::{self, DKIMRegistry};
 //!
 //! #[contract]
 //! pub struct MyRegistry;
 //!
 //! impl DKIMRegistry for MyRegistry {
+//!     #[only_role(operator, "governance")]
 //!     fn set_dkim_public_key_hash(
 //!         e: &Env,
-//!         operator: Address,
 //!         domain_hash: BytesN<32>,
 //!         public_key_hash: BytesN<32>,
+//!         operator: Address,
 //!     ) {
-//!         operator.require_auth();
 //!         dkim_registry::set_dkim_public_key_hash(e, &domain_hash, &public_key_hash);
 //!     }
 //!
+//!     #[only_role(operator, "governance")]
 //!     fn set_dkim_public_key_hashes(
 //!         e: &Env,
-//!         operator: Address,
 //!         domain_hash: BytesN<32>,
 //!         public_key_hashes: Vec<BytesN<32>>,
+//!         operator: Address,
 //!     ) {
-//!         operator.require_auth();
 //!         dkim_registry::set_dkim_public_key_hashes(e, &domain_hash, &public_key_hashes);
 //!     }
 //!
+//!     #[only_role(operator, "governance")]
 //!     fn revoke_dkim_public_key_hash(
 //!         e: &Env,
-//!         operator: Address,
 //!         public_key_hash: BytesN<32>,
+//!         operator: Address,
 //!     ) {
-//!         operator.require_auth();
 //!         dkim_registry::revoke_dkim_public_key_hash(e, &public_key_hash);
 //!     }
 //! }
@@ -105,25 +97,25 @@ pub trait DKIMRegistry {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `operator` - The address performing the operation.
     /// * `domain_hash` - Hash of the email domain.
     /// * `public_key_hash` - Hash of the DKIM public key.
+    /// * `operator` - The address performing the operation.
     ///
     /// # Notes
     ///
-    /// We recommend using [`set_dkim_public_key_hash`] when implementing this
-    /// function.
+    /// It is recommended to use [`set_dkim_public_key_hash`] when implementing
+    /// this function.
     ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: The base implementation of [`set_dkim_public_key_hash`]
-    /// intentionally lacks authorization controls. You MUST implement proper
-    /// authorization in your contract.
+    /// intentionally lacks authorization controls. Proper authorization must be
+    /// implemented in the contract.
     fn set_dkim_public_key_hash(
         e: &Env,
-        operator: Address,
         domain_hash: BytesN<32>,
         public_key_hash: BytesN<32>,
+        operator: Address,
     );
 
     /// Batch registers DKIM public key hashes for a domain.
@@ -131,25 +123,25 @@ pub trait DKIMRegistry {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `operator` - The address performing the operation.
     /// * `domain_hash` - Hash of the email domain.
     /// * `public_key_hashes` - Hashes of the DKIM public keys.
+    /// * `operator` - The address performing the operation.
     ///
     /// # Notes
     ///
-    /// We recommend using [`set_dkim_public_key_hashes`] when implementing
-    /// this function.
+    /// It is recommended to use [`set_dkim_public_key_hashes`] when
+    /// implementing this function.
     ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: The base implementation of [`set_dkim_public_key_hashes`]
-    /// intentionally lacks authorization controls. You MUST implement proper
-    /// authorization in your contract.
+    /// intentionally lacks authorization controls. Proper authorization must be
+    /// implemented in the contract.
     fn set_dkim_public_key_hashes(
         e: &Env,
-        operator: Address,
         domain_hash: BytesN<32>,
         public_key_hashes: Vec<BytesN<32>>,
+        operator: Address,
     );
 
     /// Globally revokes a DKIM public key hash. Once revoked, it cannot be
@@ -158,20 +150,20 @@ pub trait DKIMRegistry {
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
-    /// * `operator` - The address performing the operation.
     /// * `public_key_hash` - Hash of the DKIM public key.
+    /// * `operator` - The address performing the operation.
     ///
     /// # Notes
     ///
-    /// We recommend using [`revoke_dkim_public_key_hash`] when implementing
-    /// this function.
+    /// It is recommended to use [`revoke_dkim_public_key_hash`] when
+    /// implementing this function.
     ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: The base implementation of
     /// [`revoke_dkim_public_key_hash`] intentionally lacks authorization
-    /// controls. You MUST implement proper authorization in your contract.
-    fn revoke_dkim_public_key_hash(e: &Env, operator: Address, public_key_hash: BytesN<32>);
+    /// controls. Proper authorization must be implemented in the contract.
+    fn revoke_dkim_public_key_hash(e: &Env, public_key_hash: BytesN<32>, operator: Address);
 }
 
 // ################## ERRORS ##################
