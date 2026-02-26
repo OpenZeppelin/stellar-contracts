@@ -23,7 +23,6 @@ pub struct Config {
 }
 
 pub const CONFIG_KEY: Symbol = symbol_short!("CONFIG");
-pub const SCHEMA_VERSION: Symbol = symbol_short!("VERSION");
 
 #[contract]
 pub struct ExampleContract;
@@ -44,13 +43,13 @@ impl ExampleContract {
     /// this from running twice.
     #[only_role(operator, "migrator")]
     pub fn migrate(e: &Env, operator: Address) {
-        let version: u32 = e.storage().instance().get(&SCHEMA_VERSION).unwrap_or(1);
-        assert!(version < 2, "already migrated");
+        assert!(upgradeable::get_schema_version(e) < 2, "already migrated");
 
         let old: ConfigV1 = e.storage().instance().get(&CONFIG_KEY).unwrap();
         let new = Config { rate: old.rate, active: true };
         e.storage().instance().set(&CONFIG_KEY, &new);
-        e.storage().instance().set(&SCHEMA_VERSION, &2u32);
+
+        upgradeable::set_schema_version(e, 2);
     }
 
     pub fn get_rate(e: &Env) -> u32 {

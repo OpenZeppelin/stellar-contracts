@@ -8,7 +8,7 @@
 //! If a rollback is required, the contract can be upgraded to a newer version
 //! where the rollback-specific logic is defined and performed as a migration.
 //!
-//! **IMPORTANT**: While the framework structures the upgrade flow, it does NOT
+//! **IMPORTANT**: While the module provides an upgrade entrypoint, it does NOT
 //! perform deeper checks and verifications such as:
 //!
 //! - Ensuring that the new contract does not include a constructor, as it will
@@ -20,6 +20,9 @@
 //!
 //!
 //! # Simple Upgrade (no migration)
+//!
+//! An upgrade replaces the contract's executable code while preserving all
+//! existing storage.
 //!
 //! Implement the [`Upgradeable`] trait directly and call [`upgrade()`] inside:
 //!
@@ -53,28 +56,31 @@
 //! SDK can handle the mismatch:
 //!
 //! ```rust,ignore
+//! // V1 stored this type:
 //! #[contracttype]
-//! pub struct ConfigV1 { pub rate: u32 }
+//! pub struct Config { pub rate: u32 }
 //!
+//! // V2 adds a field. Reading old storage with the new type traps, because
+//! // the host validates field count before the SDK sees the value.
 //! #[contracttype]
-//! pub struct ConfigV2 { pub rate: u32, pub active: bool }
+//! pub struct Config { pub rate: u32, pub active: bool }
 //!
-//! // Developer expects `active` to default to some value, instead this traps
-//! // with Error(Object, UnexpectedSize)
-//! let config: ConfigV2 = e.storage().instance().get(&key).unwrap();
+//! // Traps with Error(Object, UnexpectedSize)
+//! let config: Config = e.storage().instance().get(&key).unwrap();
 //! ```
 //!
 //! ## Pattern 1: Eager Migration (Bounded Data)
 //!
 //! For bounded data in instance storage (config, metadata, settings), add a
-//! `migrate` function to your upgraded contract that reads old-format data and
-//! converts it. Use a schema version to guard against double invocation.
+//! `migrate` function to the upgraded contract that reads old-format data and
+//! converts it. Use [`set_schema_version`] / [`get_schema_version`] to guard
+//! against double invocation.
 //!
 //! The old type must be defined in the new contract code so the host
 //! can deserialize it correctly.
 //!
 //! ```rust,ignore
-//! // Old type (matches what v1 stored — field names and types must match)
+//! // Old type (matches what v1 stored, field names and types must match)
 //! #[contracttype]
 //! pub struct ConfigV1 {
 //!     pub rate: u32,
@@ -88,19 +94,15 @@
 //! }
 //!
 //! const CONFIG_KEY: Symbol = symbol_short!("CONFIG");
-//! const SCHEMA_VERSION: Symbol = symbol_short!("VERSION");
 //!
 //! pub fn migrate(e: &Env, operator: Address) {
-//!     // Guard: prevent double migration
-//!     let version: u32 = e.storage().instance()
-//!         .get(&SCHEMA_VERSION).unwrap_or(1);
-//!     assert!(version < 2, "already migrated");
+//!     assert!(upgradeable::get_schema_version(e) < 2, "already migrated");
 //!
-//!     // Read old data using old type, convert, write back
 //!     let old: ConfigV1 = e.storage().instance().get(&CONFIG_KEY).unwrap();
 //!     let new = Config { rate: old.rate, active: true };
 //!     e.storage().instance().set(&CONFIG_KEY, &new);
-//!     e.storage().instance().set(&SCHEMA_VERSION, &2u32);
+//!
+//!     upgradeable::set_schema_version(e, 2);
 //! }
 //! ```
 //!
@@ -108,51 +110,63 @@
 //!
 //! For unbounded persistent storage (user balances, approvals, etc.),
 //! eager migration is impractical as it's impossible to iterate all entries in
-//! one transaction without hitting resource limits (200 entries / 132 KB writes
-//! per transaction).
+//! one transaction without hitting resource limits (e.g. max number of keys in
+//! the footprint).
 //!
 //! Instead, use **version markers** alongside each entry and convert lazily on
 //! read:
 //!
 //! ```rust,ignore
+//! // Old type must match what v1 stored exactly.
 //! #[contracttype]
-//! pub struct Balance { pub amount: i128 }
+//! pub struct BalanceV1 { pub amount: i128 }
+//!
+//! // New type with an added field.
+//! #[contracttype]
+//! pub struct Balance { pub amount: i128, pub frozen: bool }
 //!
 //! #[contracttype]
-//! pub struct BalanceV2 { pub amount: i128, pub frozen: bool }
+//! pub enum StorageKey {
+//!     Balance(Address),
+//!     // New in v2: tracks the schema version of each individual entry.
+//!     // Absent for v1 entries, which default to version 1.
+//!     BalanceVersion(Address),
+//! }
 //!
-//! fn get_balance(e: &Env, account: &Address) -> BalanceV2 {
+//! fn get_balance(e: &Env, account: &Address) -> Balance {
 //!     let version: u32 = e.storage().persistent()
 //!         .get(&StorageKey::BalanceVersion(account.clone()))
 //!         .unwrap_or(1);
 //!
 //!     match version {
 //!         1 => {
-//!             let v1: Balance = e.storage().persistent()
+//!             let v1: BalanceV1 = e.storage().persistent()
 //!                 .get(&StorageKey::Balance(account.clone())).unwrap();
-//!             let v2 = BalanceV2 { amount: v1.amount, frozen: false };
-//!             // Write back in new format (lazy migration)
-//!             set_balance(e, account, &v2);
-//!             v2
+//!             let migrated = Balance { amount: v1.amount, frozen: false };
+//!             // Write back in new format so subsequent reads are direct.
+//!             set_balance(e, account, &migrated);
+//!             migrated
 //!         }
 //!         _ => e.storage().persistent()
-//!             .get(&StorageKey::BalanceV2(account.clone())).unwrap(),
+//!             .get(&StorageKey::Balance(account.clone())).unwrap(),
 //!     }
 //! }
 //!
-//! fn set_balance(e: &Env, account: &Address, balance: &BalanceV2) {
+//! fn set_balance(e: &Env, account: &Address, balance: &Balance) {
+//!     // Version marker and data share the same address key but different
+//!     // variants, so they occupy separate storage entries.
 //!     e.storage().persistent()
 //!         .set(&StorageKey::BalanceVersion(account.clone()), &2u32);
 //!     e.storage().persistent()
-//!         .set(&StorageKey::BalanceV2(account.clone()), balance);
+//!         .set(&StorageKey::Balance(account.clone()), balance);
 //! }
 //! ```
 //!
 //! ## Pattern 3: Enum Wrapper (Plan-Ahead)
 //!
-//! If you anticipate future migrations from the start, wrap stored data in a
-//! versioned enum. Soroban serializes enum variants as `(tag, data)`, so the
-//! host can distinguish between versions without trapping.
+//! For contracts that anticipate future migrations from the start, wrap stored
+//! data in a versioned enum. Soroban serializes enum variants as `(tag, data)`,
+//! so the host can distinguish between versions without trapping.
 //!
 //! ```rust,ignore
 //! #[contracttype]
@@ -186,15 +200,19 @@
 //! **Note**: This cannot work retroactively, since reading old bare-struct data
 //! as an enum would trap.
 //!
-//! Check the `examples/upgradeable/` directory for the full example, where you
-//! can also find a helper `Upgrader` contract that performs upgrade+migrate in
-//! a single transaction.
+//! See the `examples/upgradeable/` directory for full examples:
+//! - `v1` / `v2` — eager migration of bounded instance storage, with an
+//!   `Upgrader` helper that atomically combines upgrade+migrate.
+//! - `lazy-v1` / `lazy-v2` — lazy per-entry migration of unbounded persistent
+//!   storage, where entries are converted on first read after the upgrade.
 
 mod storage;
+#[cfg(test)]
+mod test;
 
 use soroban_sdk::{contractclient, Address, BytesN, Env};
 
-pub use crate::upgradeable::storage::upgrade;
+pub use crate::upgradeable::storage::{get_schema_version, set_schema_version, upgrade};
 
 /// A trait exposing an entry point for contract upgrades.
 ///
