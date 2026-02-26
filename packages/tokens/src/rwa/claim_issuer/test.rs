@@ -19,13 +19,15 @@ use soroban_sdk::{
 
 use crate::rwa::{
     claim_issuer::{
+        build_claim_identifier,
         storage::{
-            allow_key, decode_claim_data_expiration, encode_claim_data_expiration,
-            get_current_nonce_for, get_keys_for_topic, get_registries, invalidate_claim_signatures,
-            is_authorized_for, is_claim_expired, is_claim_revoked, is_key_allowed_for_registry,
-            is_key_allowed_for_topic, remove_key, set_claim_revoked, ClaimIssuerStorageKey,
-            Ed25519SignatureData, Ed25519Verifier, Secp256k1SignatureData, Secp256k1Verifier,
-            Secp256r1SignatureData, Secp256r1Verifier, SigningKey,
+            allow_key, build_claim_message, decode_claim_data_expiration,
+            encode_claim_data_expiration, get_current_nonce_for, get_keys_for_topic,
+            get_registries, invalidate_claim_signatures, is_authorized_for, is_claim_expired,
+            is_claim_revoked, is_key_allowed_for_registry, is_key_allowed_for_topic, remove_key,
+            set_claim_revoked, ClaimIssuerStorageKey, Ed25519SignatureData, Ed25519Verifier,
+            Secp256k1SignatureData, Secp256k1Verifier, Secp256r1SignatureData, Secp256r1Verifier,
+            SigningKey,
         },
         SignatureVerifier, MAX_KEYS_PER_TOPIC, MAX_REGISTRIES_PER_KEY,
     },
@@ -470,6 +472,26 @@ fn signature_verifier_build_claim_digest_different_issuers() {
         Ed25519Verifier::build_message(&e, &identity, claim_topic, &claim_data)
     });
     assert_ne!(ed25519_digest_1, ed25519_digest_2);
+}
+
+#[test]
+fn claim_message_and_identifier_are_distinct() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+    let identity = Address::generate(&e);
+    let claim_topic: u32 = 42;
+    let claim_data = Bytes::from_array(&e, &[1, 2, 3, 4]);
+
+    e.as_contract(&contract_id, || {
+        let message = build_claim_message(&e, &identity, claim_topic, &claim_data);
+
+        // Prepend nonce 0
+        let mut new_claim_data = Bytes::new(&e);
+        new_claim_data.extend_from_slice(&0u32.to_be_bytes());
+        new_claim_data.append(&claim_data);
+        let identifier = build_claim_identifier(&e, &identity, claim_topic, &new_claim_data);
+        assert_ne!(message, identifier);
+    });
 }
 
 #[test]
