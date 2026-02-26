@@ -98,6 +98,38 @@ fn accept_transfer_after_expiry_panics() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #2203)")]
+fn accept_transfer_one_ledger_past_deadline_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let new_admin = Address::generate(&e);
+    let active_key = MockRole::Admin;
+    let pending_key = MockRole::PendingAdmin;
+
+    e.ledger().set_sequence_number(500);
+
+    e.as_contract(&address, || {
+        e.storage().instance().set(&active_key, &admin);
+
+        // Transfer with deadline at ledger 1000
+        transfer_role(&e, &new_admin, &pending_key, 1000);
+    });
+
+    // Advance one ledger past the deadline; directly overwrite the TTL so the
+    // entry is still present in storage, isolating the explicit deadline check.
+    e.ledger().set_sequence_number(1001);
+
+    e.as_contract(&address, || {
+        let expired = PendingTransfer { address: new_admin.clone(), live_until_ledger: 1000 };
+        e.storage().temporary().set(&pending_key, &expired);
+
+        accept_transfer(&e, &active_key, &pending_key);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #2200)")]
 fn accept_transfer_with_no_pending_transfer_panics() {
     let e = Env::default();
