@@ -5,7 +5,7 @@ use crate::{
         emit_ownership_renounced, emit_ownership_transfer, emit_ownership_transfer_completed,
         OwnableError,
     },
-    role_transfer::{accept_transfer, transfer_role},
+    role_transfer::{accept_transfer, transfer_role, PendingTransfer},
 };
 
 /// Storage keys for `Ownable` utility.
@@ -51,6 +51,9 @@ pub fn set_owner(e: &Env, owner: &Address) {
 }
 
 /// Initiates a 2-step ownership transfer to a new owner.
+/// Owner privileges for the current owner are not revoked until the
+/// recipient accepts the transfer.
+/// Overrides the previous pending transfer if there is one.
 ///
 /// # Arguments
 ///
@@ -131,7 +134,7 @@ pub fn renounce_ownership(e: &Env) {
     let owner = enforce_owner_auth(e);
     let key = OwnableStorageKey::PendingOwner;
 
-    if e.storage().temporary().get::<_, Address>(&key).is_some() {
+    if e.storage().temporary().get::<_, PendingTransfer>(&key).is_some() {
         panic_with_error!(e, OwnableError::TransferInProgress);
     }
 

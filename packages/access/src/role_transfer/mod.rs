@@ -5,7 +5,7 @@ use soroban_sdk::contracterror;
 
 mod storage;
 
-pub use storage::{accept_transfer, transfer_role};
+pub use storage::{accept_transfer, transfer_role, PendingTransfer};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -14,6 +14,7 @@ pub enum RoleTransferError {
     NoPendingTransfer = 2200,
     InvalidLiveUntilLedger = 2201,
     InvalidPendingAccount = 2202,
+    TransferExpired = 2203,
 }
 
 #[cfg(test)]
