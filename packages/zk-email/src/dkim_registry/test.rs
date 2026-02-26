@@ -88,7 +88,7 @@ fn revoke_key_hash() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5101)")]
+#[should_panic(expected = "Error(Contract, #6001)")]
 fn set_already_registered_key_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());
@@ -103,7 +103,7 @@ fn set_already_registered_key_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5100)")]
+#[should_panic(expected = "Error(Contract, #6000)")]
 fn set_revoked_key_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());
