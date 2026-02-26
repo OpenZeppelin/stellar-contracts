@@ -436,14 +436,19 @@ impl Enumerable {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::MathOverflow`] - When owner has no tokens,
-    ///   and this function is called BEFORE the owner's balance is manipulated,
-    ///   the indexing logic will underflow.
+    /// * [`NonFungibleTokenError::MathOverflow`] - If the owner's balance is
+    ///   `0` when this function is called, the `balance - 1` index calculation
+    ///   will underflow and panic. This only triggers when the balance has not
+    ///   been incremented yet and the owner currently holds no tokens.
     ///
     /// # Notes
     ///
-    /// This function is expected to be called after the balance of the owner
-    /// is already manipulated (mint, transfer, etc.)
+    /// **Calling order invariant**: This function MUST be called AFTER the
+    /// owner's balance has already been incremented (e.g. after mint or
+    /// transfer-in). It uses `balance - 1` as the storage index for the new
+    /// token. If called before the balance is updated, the token will be
+    /// written at the wrong index, silently corrupting the enumeration without
+    /// any panic (except in the zero-balance edge case above).
     pub fn add_to_owner_enumeration(e: &Env, owner: &Address, token_id: u32) {
         // balance is already incremented by 1, we need to subtract 1 from it
         // to get the `last_index + 1` (the index of the new token)

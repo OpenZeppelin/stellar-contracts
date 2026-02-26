@@ -5,7 +5,7 @@ use core::{
 
 use soroban_sdk::{panic_with_error, Env};
 
-use crate::math::{SorobanFixedPointError, SorobanMulDiv};
+use crate::math::{i128_fixed_point::checked_mul_div, SorobanFixedPointError};
 
 /// Fixed-point decimal number with 18 decimal places of precision.
 ///
@@ -62,8 +62,6 @@ use crate::math::{SorobanFixedPointError, SorobanMulDiv};
 pub struct Wad(i128);
 
 pub const WAD_SCALE: i128 = 1_000_000_000_000_000_000;
-
-// ################## ERRORS ##################
 
 fn pow10(e: &Env, exp: u32) -> i128 {
     if exp > 38 {
@@ -142,7 +140,7 @@ impl Wad {
         if den == 0 {
             panic_with_error!(e, SorobanFixedPointError::DivisionByZero)
         }
-        num.checked_mul_div(e, &WAD_SCALE, &den)
+        checked_mul_div(e, &num, &WAD_SCALE, &den)
             .map(Wad)
             .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
     }
@@ -328,7 +326,7 @@ impl Wad {
     /// result fits. Result is truncated toward zero after division by
     /// `WAD_SCALE`.
     pub fn checked_mul(self, e: &Env, rhs: Wad) -> Option<Wad> {
-        self.0.checked_mul_div(e, &rhs.0, &WAD_SCALE).map(Wad)
+        checked_mul_div(e, &self.0, &rhs.0, &WAD_SCALE).map(Wad)
     }
 
     /// Checked division (Wad / Wad). Returns `None` on overflow or division by
@@ -339,7 +337,7 @@ impl Wad {
         if rhs.0 == 0 {
             return None;
         }
-        self.0.checked_mul_div(e, &WAD_SCALE, &rhs.0).map(Wad)
+        checked_mul_div(e, &self.0, &WAD_SCALE, &rhs.0).map(Wad)
     }
 
     /// Checked multiplication by integer. Returns `None` on overflow.
@@ -470,14 +468,14 @@ impl Wad {
         while exponent > 0 {
             if exponent & 1 == 1 {
                 // result = result * base (in fixed-point)
-                let new_result = result.0.checked_mul_div(e, &base.0, &WAD_SCALE)?;
+                let new_result = checked_mul_div(e, &result.0, &base.0, &WAD_SCALE)?;
                 result = Wad(new_result);
             }
 
             exponent >>= 1;
             if exponent > 0 {
                 // base = base * base (in fixed-point)
-                let new_base = base.0.checked_mul_div(e, &base.0, &WAD_SCALE)?;
+                let new_base = checked_mul_div(e, &base.0, &base.0, &WAD_SCALE)?;
                 base = Wad(new_base);
             }
         }
