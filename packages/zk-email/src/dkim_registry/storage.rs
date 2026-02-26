@@ -85,6 +85,8 @@ pub fn is_key_hash_revoked(e: &Env, public_key_hash: &BytesN<32>) -> bool {
 ///
 /// * [`DKIMRegistryError::KeyHashRevoked`] - If the public key hash has been
 ///   revoked.
+/// * [`DKIMRegistryError::KeyHashAlreadyRegistered`] - If the public key hash
+///   is already registered for the given domain.
 ///
 /// # Events
 ///
@@ -103,6 +105,10 @@ pub fn set_dkim_public_key_hash(e: &Env, domain_hash: &BytesN<32>, public_key_ha
         domain_hash: domain_hash.clone(),
         public_key_hash: public_key_hash.clone(),
     });
+
+    if e.storage().persistent().has(&key) {
+        panic_with_error!(e, DKIMRegistryError::KeyHashAlreadyRegistered);
+    }
 
     e.storage().persistent().set(&key, &true);
 
@@ -123,6 +129,8 @@ pub fn set_dkim_public_key_hash(e: &Env, domain_hash: &BytesN<32>, public_key_ha
 ///
 /// * [`DKIMRegistryError::KeyHashRevoked`] - If any public key hash has been
 ///   revoked.
+/// * [`DKIMRegistryError::KeyHashAlreadyRegistered`] - If any public key hash
+///   is already registered for the given domain.
 ///
 /// # Security Warning
 ///

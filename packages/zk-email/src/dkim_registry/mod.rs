@@ -174,7 +174,9 @@ pub trait DKIMRegistry {
 #[repr(u32)]
 pub enum DKIMRegistryError {
     /// The public key hash has been revoked and cannot be re-registered.
-    KeyHashRevoked = 5000,
+    KeyHashRevoked = 5100,
+    /// The public key hash is already registered for the given domain.
+    KeyHashAlreadyRegistered = 5101,
 }
 
 // ################## CONSTANTS ##################
@@ -217,6 +219,7 @@ pub fn emit_key_hash_registered(e: &Env, domain_hash: &BytesN<32>, public_key_ha
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KeyHashRevoked {
+    #[topic]
     pub public_key_hash: BytesN<32>,
 }
 

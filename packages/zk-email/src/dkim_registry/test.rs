@@ -88,7 +88,22 @@ fn revoke_key_hash() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #5000)")]
+#[should_panic(expected = "Error(Contract, #5101)")]
+fn set_already_registered_key_panics() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let dh = domain_hash(&e);
+        let pkh = public_key_hash(&e);
+
+        set_dkim_public_key_hash(&e, &dh, &pkh);
+        set_dkim_public_key_hash(&e, &dh, &pkh);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #5100)")]
 fn set_revoked_key_panics() {
     let e = Env::default();
     let address = e.register(MockContract, ());
