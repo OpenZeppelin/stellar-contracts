@@ -214,9 +214,7 @@ impl Pausable for MyToken {
 
 ### 3. Macros As Helpers
 
-The library provides macros to either:
-- reduce boilerplate (i.e. `#[derive(Upgradeable)]`)
-- improve clarity of the code by annotating the function instead of having the business logic inside the function as a regular code to improve the DevX (i.e. `#[only_owner]`, `#[when_not_paused]`)
+The library provides macros to improve clarity of the code by annotating the function instead of having the business logic inside the function as a regular code to improve the DevX (i.e. `#[only_owner]`, `#[when_not_paused]`)
 
 #### Principles for Introducing New Macros
 

@@ -1019,7 +1019,6 @@ dependencies = [
  "soroban-sdk",
  "stellar-accounts",
  "stellar-contract-utils",
- "stellar-macros",
 ]
 
 [[package]]
@@ -2110,10 +2109,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5f39404a5da50712a4c1eecf25e90dd62b613502b7e925fd4e4d19b5c96512"
 
 [[package]]
+name = "upgradeable-lazy-v1-example"
+version = "1.0.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+]
+
+[[package]]
+name = "upgradeable-lazy-v2-example"
+version = "2.0.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+]
+
+[[package]]
 name = "upgradeable-v1-example"
 version = "1.0.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
  "stellar-contract-utils",
  "stellar-macros",
 ]
@@ -2123,6 +2143,7 @@ name = "upgradeable-v2-example"
 version = "2.0.0"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
  "stellar-contract-utils",
  "stellar-macros",
 ]

@@ -1,13 +1,10 @@
 extern crate std;
 
-use contract_v2::Data;
-use soroban_sdk::{testutils::Address as _, Address, BytesN, Env};
+use soroban_sdk::{testutils::Address as _, Address, BytesN, Env, Symbol};
 
 use crate::contract::{ExampleContract, ExampleContractClient};
 
 mod contract_v2 {
-    use crate::test::MigrationData;
-
     soroban_sdk::contractimport!(file = "../testdata/upgradeable_v2_example.wasm");
 }
 
@@ -15,27 +12,36 @@ fn install_new_wasm(e: &Env) -> BytesN<32> {
     e.deployer().upload_contract_wasm(contract_v2::WASM)
 }
 
-type MigrationData = Data;
-
 #[test]
-fn test_upgrade() {
-    let env = Env::default();
-    env.mock_all_auths();
+fn test_upgrade_and_migrate() {
+    let e = Env::default();
+    e.mock_all_auths();
 
-    let admin = Address::generate(&env);
-    // deploy v1
-    let address = env.register(ExampleContract, (&admin,));
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let migrator = Address::generate(&e);
 
-    let client_v1 = ExampleContractClient::new(&env, &address);
+    // deploy v1 with initial config
+    let address = e.register(ExampleContract, (&admin, &100u32));
+    let client_v1 = ExampleContractClient::new(&e, &address);
 
-    // install the new wasm and upgrade
-    let new_wasm_hash = install_new_wasm(&env);
-    client_v1.upgrade(&new_wasm_hash, &admin);
+    // verify v1 data is stored correctly
+    assert_eq!(client_v1.get_rate(), 100);
 
-    // init the upgraded client and migrate
-    let client_v2 = contract_v2::Client::new(&env, &address);
-    client_v2.migrate(&Data { num1: 12, num2: 34 }, &admin);
+    // grant roles and upgrade
+    client_v1.grant_role(&manager, &Symbol::new(&e, "manager"), &admin);
+    client_v1.grant_role(&migrator, &Symbol::new(&e, "migrator"), &admin);
+    let new_wasm_hash = install_new_wasm(&e);
+    client_v1.upgrade(&new_wasm_hash, &manager);
 
-    // ensure migrate can't be invoked again
-    assert!(client_v2.try_migrate(&Data { num1: 12, num2: 34 }, &admin).is_err());
+    // migrate: reads old Config { rate }, converts to Config { rate, active }
+    let client_v2 = contract_v2::Client::new(&e, &address);
+    client_v2.migrate(&migrator);
+
+    // verify data was preserved and new field has its default
+    assert_eq!(client_v2.get_rate(), 100);
+    assert!(client_v2.is_active());
+
+    // ensure migrate can't be invoked again (schema version guard)
+    assert!(client_v2.try_migrate(&admin).is_err());
 }

@@ -14,7 +14,6 @@ doctest = false
 soroban-sdk = { workspace = true }
 stellar-accounts = { workspace = true }
 stellar-contract-utils = { workspace = true }
-stellar-macros = { workspace = true }
 
 
 [dev-dependencies]

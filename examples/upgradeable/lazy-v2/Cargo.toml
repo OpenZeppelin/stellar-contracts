@@ -1,5 +1,5 @@
 [package]
-name = "upgradeable-v2-example"
+name = "upgradeable-lazy-v2-example"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
