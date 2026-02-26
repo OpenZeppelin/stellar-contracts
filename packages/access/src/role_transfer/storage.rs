@@ -43,6 +43,10 @@ pub struct PendingTransfer {
 ///   entry's TTL. This means the deadline is always enforced, even if the
 ///   underlying temporary entry is kept alive longer by the network minimum TTL
 ///   or by a permissionless `extend_ttl` call.
+/// * To extend the acceptance window after a transfer has already been
+///   initiated, the current role holder can call this function again with the
+///   same `new` address and a later `live_until_ledger`. This overwrites the
+///   existing [`PendingTransfer`] in place, updating the deadline.
 pub fn transfer_role<T>(e: &Env, new: &Address, pending_key: &T, live_until_ledger: u32)
 where
     T: IntoVal<Env, Val>,

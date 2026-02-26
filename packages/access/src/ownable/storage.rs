@@ -51,6 +51,9 @@ pub fn set_owner(e: &Env, owner: &Address) {
 }
 
 /// Initiates a 2-step ownership transfer to a new owner.
+/// Owner privileges for the current owner are not revoked until the
+/// recipient accepts the transfer.
+/// Overrides the previous pending transfer if there is one.
 ///
 /// # Arguments
 ///
