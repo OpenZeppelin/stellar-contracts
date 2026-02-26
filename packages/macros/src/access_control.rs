@@ -177,7 +177,7 @@ pub fn generate_any_role_check(
     let combined_checks = quote! {
         let has_any_role = [#(#roles),*].iter().any(|role| stellar_access::access_control::has_role(#env_arg, #param_reference, &soroban_sdk::Symbol::new(#env_arg, role)).is_some());
         if !has_any_role {
-            panic!("Account does not have any of the required roles");
+            soroban_sdk::panic_with_error!(#env_arg, stellar_access::access_control::AccessControlError::Unauthorized);
         }
     };
 
