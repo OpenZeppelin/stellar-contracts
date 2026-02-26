@@ -262,8 +262,6 @@ fn div_floor(r: i128, z: i128) -> i128 {
         // ceiling is taken by default for a negative result
         let remainder = r.rem_euclid(z);
 
-        // no need to check for div overflow (i128::MIN / -1),
-        // because it doesn't fall under this if branch
         (r / z) - (if remainder > 0 { 1 } else { 0 })
     } else {
         // floor taken by default for a positive or zero result
@@ -294,7 +292,6 @@ fn div_ceil(r: i128, z: i128) -> i128 {
         // floor taken by default for a positive result
         let remainder = r.rem_euclid(z);
 
-        // check for div overflow (i128::MIN / -1)
         r / z + (if remainder > 0 { 1 } else { 0 })
     }
 }

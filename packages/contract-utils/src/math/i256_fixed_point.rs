@@ -33,7 +33,14 @@ pub fn mul_div_with_rounding_i256(x: I256, y: I256, denominator: I256, rounding:
 /// Checked version of [`mul_div_with_rounding_i256`].
 ///
 /// Calculates `x * y / denominator`, returning `None` on division by zero or
-/// overflow instead of panicking.
+/// division overflow instead of panicking.
+///
+/// # Current Limitations
+///
+/// The intermediate `x * y` multiplication uses `I256::mul`, which panics on
+/// overflow because `soroban-sdk` does not yet provide a checked multiply for
+/// `I256`. Once a checked variant becomes available, this function will return
+/// `None` for multiplication overflow as well.
 ///
 /// # Arguments
 ///
@@ -94,6 +101,13 @@ pub fn mul_div_i256(x: &I256, y: &I256, denominator: &I256) -> I256 {
 ///
 /// Returns `None` if `denominator` is zero or if the division overflows.
 ///
+/// # Current Limitations
+///
+/// The intermediate `x * y` multiplication uses `I256::mul`, which panics on
+/// overflow because `soroban-sdk` does not yet provide a checked multiply for
+/// `I256`. Once a checked variant becomes available, this function will return
+/// `None` for multiplication overflow as well.
+///
 /// # Arguments
 ///
 /// * `x` - The first operand.
@@ -107,6 +121,13 @@ pub fn checked_mul_div_floor_i256(x: &I256, y: &I256, denominator: &I256) -> Opt
 /// Calculates ceil(x * y / denominator).
 ///
 /// Returns `None` if `denominator` is zero or if the division overflows.
+///
+/// # Current Limitations
+///
+/// The intermediate `x * y` multiplication uses `I256::mul`, which panics on
+/// overflow because `soroban-sdk` does not yet provide a checked multiply for
+/// `I256`. Once a checked variant becomes available, this function will return
+/// `None` for multiplication overflow as well.
 ///
 /// # Arguments
 ///
@@ -122,13 +143,20 @@ pub fn checked_mul_div_ceil_i256(x: &I256, y: &I256, denominator: &I256) -> Opti
 ///
 /// Returns `None` if `denominator` is zero.
 ///
+/// # Current Limitations
+///
+/// The intermediate `x * y` multiplication uses `I256::mul`, which panics on
+/// overflow because `soroban-sdk` does not yet provide a checked multiply for
+/// `I256`. Once a checked variant becomes available, this function will return
+/// `None` for multiplication overflow as well.
+///
 /// # Arguments
 ///
 /// * `x` - The first operand.
 /// * `y` - The multiplicand.
 /// * `denominator` - The divisor.
 pub fn checked_mul_div_i256(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
-    let zero = I256::from_i32(&Env::default(), 0);
+    let zero = I256::from_i32(x.env(), 0);
 
     // TODO: remove this check when `checked_div` is available: https://github.com/stellar/rs-soroban-sdk/issues/1659,
     if *denominator == zero {
@@ -145,7 +173,8 @@ pub fn checked_mul_div_i256(x: &I256, y: &I256, denominator: &I256) -> Option<I2
 
 /// Performs checked floor(r / z)
 fn checked_div_floor(r: &I256, z: &I256) -> Option<I256> {
-    let zero = &I256::from_i32(&Env::default(), 0);
+    let env = r.env();
+    let zero = &I256::from_i32(env, 0);
 
     if z == zero {
         return None;
@@ -154,7 +183,7 @@ fn checked_div_floor(r: &I256, z: &I256) -> Option<I256> {
     if (r < zero && z > zero) || (r > zero && z < zero) {
         // ceil is taken by default for a negative result
         let remainder = r.rem_euclid(z);
-        let one = I256::from_i32(&Env::default(), 1);
+        let one = I256::from_i32(env, 1);
         Some(r.div(z).sub(if remainder > *zero { &one } else { zero }))
     } else {
         // floor is taken by default for a positive or zero result
@@ -168,11 +197,12 @@ fn checked_div_floor(r: &I256, z: &I256) -> Option<I256> {
 
 /// Performs floor(r / z)
 fn div_floor(r: &I256, z: &I256) -> I256 {
-    let zero = &I256::from_i32(&Env::default(), 0);
+    let env = r.env();
+    let zero = &I256::from_i32(env, 0);
     if (r < zero && z > zero) || (r > zero && z < zero) {
         // ceil is taken by default for a negative result
         let remainder = r.rem_euclid(z);
-        let one = I256::from_i32(&Env::default(), 1);
+        let one = I256::from_i32(env, 1);
         r.div(z).sub(if remainder > *zero { &one } else { zero })
     } else {
         // floor is taken by default for a positive or zero result
@@ -182,7 +212,8 @@ fn div_floor(r: &I256, z: &I256) -> I256 {
 
 /// Performs checked ceil(r / z)
 fn checked_div_ceil(r: &I256, z: &I256) -> Option<I256> {
-    let zero = &I256::from_i32(&Env::default(), 0);
+    let env = r.env();
+    let zero = &I256::from_i32(env, 0);
 
     if z == zero {
         return None;
@@ -198,28 +229,30 @@ fn checked_div_ceil(r: &I256, z: &I256) -> Option<I256> {
         }
 
         let remainder = r.rem_euclid(z);
-        let one = I256::from_i32(&Env::default(), 1);
+        let one = I256::from_i32(env, 1);
         Some(r.div(z).add(if remainder > *zero { &one } else { zero }))
     }
 }
 
 /// Performs ceil(r / z)
 fn div_ceil(r: &I256, z: &I256) -> I256 {
-    let zero = &I256::from_i32(&Env::default(), 0);
+    let env = r.env();
+    let zero = &I256::from_i32(env, 0);
     if (r <= zero && z > zero) || (r >= zero && z < zero) {
         // ceil is taken by default for a negative or zero result
         r.div(z)
     } else {
         let remainder = r.rem_euclid(z);
-        let one = I256::from_i32(&Env::default(), 1);
+        let one = I256::from_i32(env, 1);
         r.div(z).add(if remainder > *zero { &one } else { zero })
     }
 }
 
 /// check I256 div overflow
 fn check_div_overflow(r: &I256, z: &I256) -> bool {
-    let i256_min = i256_min();
-    let neg_one = I256::from_i32(&Env::default(), -1);
+    let env = r.env();
+    let i256_min = i256_min(env);
+    let neg_one = I256::from_i32(env, -1);
     r == &i256_min && z == &neg_one
 }
 
@@ -232,6 +265,6 @@ fn check_div_overflow(r: &I256, z: &I256) -> bool {
 /// parts = 0
 ///
 /// Replace with `I256::MIN` once https://github.com/stellar/stellar-protocol/issues/1885 is fixed
-fn i256_min() -> I256 {
-    I256::from_parts(&Env::default(), i64::MIN, 0, 0, 0)
+fn i256_min(e: &Env) -> I256 {
+    I256::from_parts(e, i64::MIN, 0, 0, 0)
 }
