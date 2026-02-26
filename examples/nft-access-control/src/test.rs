@@ -486,7 +486,7 @@ fn burners_can_call_multi_role_action() {
 }
 
 #[test]
-#[should_panic(expected = "Account does not have any of the required roles")]
+#[should_panic(expected = "Error(Contract, #2000)")]
 fn outsiders_cannot_call_multi_role_action() {
     let e = Env::default();
     let admin = Address::generate(&e);
@@ -531,7 +531,7 @@ fn burners_can_call_multi_role_auth_action() {
 }
 
 #[test]
-#[should_panic(expected = "Account does not have any of the required roles")]
+#[should_panic(expected = "Error(Contract, #2000)")]
 fn outsiders_cannot_call_multi_role_auth_action() {
     let e = Env::default();
     let admin = Address::generate(&e);
