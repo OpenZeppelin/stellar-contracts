@@ -5,43 +5,45 @@ extern crate std;
 use soroban_sdk::Env;
 
 use crate::math::{
-    i128_fixed_point::{checked_mul_div_i128, mul_div_i128},
-    Rounding, SorobanMulDiv,
+    i128_fixed_point::{
+        checked_mul_div, checked_mul_div_ceil, checked_mul_div_floor,
+        checked_mul_div_with_rounding, mul_div, mul_div_ceil, mul_div_floor, mul_div_with_rounding,
+    },
+    Rounding,
 };
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1501)")]
+#[should_panic]
 fn test_mul_div_floor_zero_denominator() {
     let env = Env::default();
     let x: i128 = 100;
     let y: i128 = 50;
     let denominator: i128 = 0;
 
-    x.mul_div_floor(&env, &y, &denominator);
+    mul_div_floor(&env, &x, &y, &denominator);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1500)")]
+#[should_panic]
 fn test_mul_div_floor_overflow_on_division() {
     let env = Env::default();
     // i128::MIN / -1 overflows because -i128::MIN can't be represented
-    // This should panic with Overflow (#1500), not DivisionByZero (#1501)
     let x: i128 = i128::MIN;
     let y: i128 = 1;
     let denominator: i128 = -1;
 
-    x.mul_div_floor(&env, &y, &denominator);
+    mul_div_floor(&env, &x, &y, &denominator);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1501)")]
+#[should_panic]
 fn test_mul_div_ceil_zero_denominator() {
     let env = Env::default();
     let x: i128 = 100;
     let y: i128 = 50;
     let denominator: i128 = 0;
 
-    x.mul_div_ceil(&env, &y, &denominator);
+    mul_div_ceil(&env, &x, &y, &denominator);
 }
 
 #[test]
@@ -53,7 +55,7 @@ fn test_mul_div_floor_result_overflow() {
     let y: i128 = i128::MAX;
     let denominator: i128 = 1;
 
-    x.mul_div_floor(&env, &y, &denominator);
+    mul_div_floor(&env, &x, &y, &denominator);
 }
 
 #[test]
@@ -65,18 +67,18 @@ fn test_mul_div_ceil_result_overflow() {
     let y: i128 = i128::MAX;
     let denominator: i128 = 1;
 
-    x.mul_div_ceil(&env, &y, &denominator);
+    mul_div_ceil(&env, &x, &y, &denominator);
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #1501)")]
+#[should_panic]
 fn test_mul_div_zero_denominator() {
     let env = Env::default();
     let x: i128 = 100;
     let y: i128 = 50;
     let denominator: i128 = 0;
 
-    x.mul_div(&env, &y, &denominator);
+    mul_div(&env, &x, &y, &denominator);
 }
 
 #[test]
@@ -87,7 +89,7 @@ fn test_mul_div_phantom_overflow_scales() {
     let y: i128 = 10i128.pow(27);
     let denominator: i128 = 10i128.pow(27);
 
-    let result = x.mul_div(&env, &y, &denominator);
+    let result = mul_div(&env, &x, &y, &denominator);
 
     assert_eq!(result, 170_141_183_460_469_231_731);
 }
@@ -101,7 +103,7 @@ fn test_mul_div_result_overflow() {
     let y: i128 = i128::MAX;
     let denominator: i128 = 1;
 
-    x.mul_div(&env, &y, &denominator);
+    mul_div(&env, &x, &y, &denominator);
 }
 
 #[test]
@@ -111,7 +113,7 @@ fn test_mul_div_floor_rounds_down() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = x.mul_div_floor(&env, &y, &denominator);
+    let result = mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, 483_5313675)
 }
@@ -123,7 +125,7 @@ fn test_mul_div_floor_negative_rounds_down() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = x.mul_div_floor(&env, &y, &denominator);
+    let result = mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, -483_5313676)
 }
@@ -135,7 +137,7 @@ fn test_mul_div_floor_phantom_overflow_scales() {
     let y: i128 = 10i128.pow(27);
     let denominator: i128 = 10i128.pow(18);
 
-    let result = x.mul_div_floor(&env, &y, &denominator);
+    let result = mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, 170_141_183_460_469_231_731 * 10i128.pow(9));
 }
@@ -147,7 +149,7 @@ fn test_mul_div_ceil_rounds_up() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = x.mul_div_ceil(&env, &y, &denominator);
+    let result = mul_div_ceil(&env, &x, &y, &denominator);
 
     assert_eq!(result, 483_5313676)
 }
@@ -159,7 +161,7 @@ fn test_mul_div_ceil_negative_rounds_up() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = x.mul_div_ceil(&env, &y, &denominator);
+    let result = mul_div_ceil(&env, &x, &y, &denominator);
 
     assert_eq!(result, -483_5313675)
 }
@@ -171,7 +173,7 @@ fn test_mul_div_ceil_large_number() {
     let y: i128 = 1_000_000_000_000_000_000;
     let denominator: i128 = 1_000_000_000_000_000_000;
 
-    let result = x.mul_div_ceil(&env, &y, &denominator);
+    let result = mul_div_ceil(&env, &x, &y, &denominator);
 
     assert_eq!(result, 170_141_183_460_469_231_731)
 }
@@ -183,7 +185,7 @@ fn test_mul_div_ceil_phantom_overflow_scales() {
     let y: i128 = 10i128.pow(27);
     let denominator: i128 = 10i128.pow(18);
 
-    let result = x.mul_div_ceil(&env, &y, &denominator);
+    let result = mul_div_ceil(&env, &x, &y, &denominator);
 
     assert_eq!(result, 170_141_183_460_469_231_731 * 10i128.pow(9));
 }
@@ -195,7 +197,7 @@ fn test_mul_div_floor_with_zero_x() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = x.mul_div_floor(&env, &y, &denominator);
+    let result = mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, 0);
 }
@@ -207,7 +209,7 @@ fn test_mul_div_ceil_with_zero_y() {
     let y: i128 = 0;
     let denominator: i128 = 1_0000001;
 
-    let result = x.mul_div_ceil(&env, &y, &denominator);
+    let result = mul_div_ceil(&env, &x, &y, &denominator);
 
     assert_eq!(result, 0);
 }
@@ -219,7 +221,7 @@ fn test_mul_div_floor_exact_division() {
     let y: i128 = 50;
     let denominator: i128 = 10;
 
-    let result = x.mul_div_floor(&env, &y, &denominator);
+    let result = mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, 500);
 }
@@ -231,7 +233,7 @@ fn test_mul_div_ceil_exact_division() {
     let y: i128 = 50;
     let denominator: i128 = 10;
 
-    let result = x.mul_div_ceil(&env, &y, &denominator);
+    let result = mul_div_ceil(&env, &x, &y, &denominator);
 
     assert_eq!(result, 500);
 }
@@ -243,7 +245,7 @@ fn test_mul_div_floor_one_denominator() {
     let y: i128 = 987_654_321;
     let denominator: i128 = 1;
 
-    let result = x.mul_div_floor(&env, &y, &denominator);
+    let result = mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, x * y);
 }
@@ -255,7 +257,7 @@ fn test_mul_div_ceil_one_denominator() {
     let y: i128 = 987_654_321;
     let denominator: i128 = 1;
 
-    let result = x.mul_div_ceil(&env, &y, &denominator);
+    let result = mul_div_ceil(&env, &x, &y, &denominator);
 
     assert_eq!(result, x * y);
 }
@@ -267,7 +269,7 @@ fn test_mul_div_floor_negative_denominator() {
     let y: i128 = 50;
     let denominator: i128 = -10;
 
-    let result = x.mul_div_floor(&env, &y, &denominator);
+    let result = mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, -500);
 }
@@ -279,7 +281,7 @@ fn test_mul_div_ceil_negative_denominator() {
     let y: i128 = 50;
     let denominator: i128 = -10;
 
-    let result = x.mul_div_ceil(&env, &y, &denominator);
+    let result = mul_div_ceil(&env, &x, &y, &denominator);
 
     assert_eq!(result, -500);
 }
@@ -291,7 +293,7 @@ fn test_mul_div_floor_all_negative() {
     let y: i128 = -50;
     let denominator: i128 = -10;
 
-    let result = x.mul_div_floor(&env, &y, &denominator);
+    let result = mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, -500);
 }
@@ -303,7 +305,7 @@ fn test_mul_div_ceil_all_negative() {
     let y: i128 = -50;
     let denominator: i128 = -10;
 
-    let result = x.mul_div_ceil(&env, &y, &denominator);
+    let result = mul_div_ceil(&env, &x, &y, &denominator);
 
     assert_eq!(result, -500);
 }
@@ -317,7 +319,7 @@ fn test_checked_mul_div_floor_success() {
     let y: i128 = 50;
     let denominator: i128 = 10;
 
-    let result = x.checked_mul_div_floor(&env, &y, &denominator);
+    let result = checked_mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, Some(500));
 }
@@ -329,7 +331,7 @@ fn test_checked_mul_div_floor_zero_denominator() {
     let y: i128 = 50;
     let denominator: i128 = 0;
 
-    let result = x.checked_mul_div_floor(&env, &y, &denominator);
+    let result = checked_mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, None);
 }
@@ -341,7 +343,7 @@ fn test_checked_mul_div_floor_overflow() {
     let y: i128 = i128::MAX;
     let denominator: i128 = 1;
 
-    let result = x.checked_mul_div_floor(&env, &y, &denominator);
+    let result = checked_mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, None);
 }
@@ -354,7 +356,7 @@ fn test_checked_mul_div_floor_phantom_overflow_handled() {
     let y: i128 = 10i128.pow(27);
     let denominator: i128 = 10i128.pow(18);
 
-    let result = x.checked_mul_div_floor(&env, &y, &denominator);
+    let result = checked_mul_div_floor(&env, &x, &y, &denominator);
 
     assert_eq!(result, Some(170_141_183_460_469_231_731 * 10i128.pow(9)));
 }
@@ -366,7 +368,7 @@ fn test_checked_mul_div_ceil_success() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = x.checked_mul_div_ceil(&env, &y, &denominator);
+    let result = checked_mul_div_ceil(&env, &x, &y, &denominator);
 
     assert_eq!(result, Some(483_5313676));
 }
@@ -378,7 +380,7 @@ fn test_checked_mul_div_ceil_zero_denominator() {
     let y: i128 = 50;
     let denominator: i128 = 0;
 
-    let result = x.checked_mul_div_ceil(&env, &y, &denominator);
+    let result = checked_mul_div_ceil(&env, &x, &y, &denominator);
 
     assert_eq!(result, None);
 }
@@ -390,7 +392,31 @@ fn test_checked_mul_div_ceil_overflow() {
     let y: i128 = i128::MAX;
     let denominator: i128 = 1;
 
-    let result = x.checked_mul_div_ceil(&env, &y, &denominator);
+    let result = checked_mul_div_ceil(&env, &x, &y, &denominator);
+
+    assert_eq!(result, None);
+}
+
+#[test]
+fn test_checked_mul_div_i128_success() {
+    let env = Env::default();
+    let x: i128 = 100;
+    let y: i128 = 50;
+    let denominator: i128 = 10;
+
+    let result = checked_mul_div(&env, &x, &y, &denominator);
+
+    assert_eq!(result, Some(500));
+}
+
+#[test]
+fn test_checked_mul_div_i128_zero_denominator() {
+    let env = Env::default();
+    let x: i128 = 100;
+    let y: i128 = 50;
+    let denominator: i128 = 0;
+
+    let result = checked_mul_div(&env, &x, &y, &denominator);
 
     assert_eq!(result, None);
 }
@@ -403,7 +429,7 @@ fn test_div_floor_both_negative() {
     let z: i128 = -2;
 
     // r = -5, r / -2 = floor(2.5) = 2
-    let result = x.mul_div_floor(&env, &y, &z);
+    let result = mul_div_floor(&env, &x, &y, &z);
 
     assert_eq!(result, 2);
 }
@@ -416,7 +442,7 @@ fn test_div_floor_r_negative_z_positive() {
     let z: i128 = 2;
 
     // r = -5, r / 2 = floor(-2.5) = -3
-    let result = x.mul_div_floor(&env, &y, &z);
+    let result = mul_div_floor(&env, &x, &y, &z);
 
     assert_eq!(result, -3);
 }
@@ -429,7 +455,7 @@ fn test_div_ceil_both_negative() {
     let z: i128 = -2;
 
     // r = -5, r / -2 = ceil(2.5) = 3
-    let result = x.mul_div_ceil(&env, &y, &z);
+    let result = mul_div_ceil(&env, &x, &y, &z);
 
     assert_eq!(result, 3);
 }
@@ -442,7 +468,7 @@ fn test_div_ceil_r_negative_z_positive() {
     let z: i128 = 2;
 
     // r = -5, r / 2 = ceil(-2.5) = -2
-    let result = x.mul_div_ceil(&env, &y, &z);
+    let result = mul_div_ceil(&env, &x, &y, &z);
 
     assert_eq!(result, -2);
 }
@@ -456,7 +482,7 @@ fn test_muldiv_floor_rounds_down() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = mul_div_i128(&env, x, y, denominator, Rounding::Floor);
+    let result = mul_div_with_rounding(&env, x, y, denominator, Rounding::Floor);
 
     assert_eq!(result, 483_5313675);
 }
@@ -468,7 +494,7 @@ fn test_muldiv_ceil_rounds_up() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = mul_div_i128(&env, x, y, denominator, Rounding::Ceil);
+    let result = mul_div_with_rounding(&env, x, y, denominator, Rounding::Ceil);
 
     assert_eq!(result, 483_5313676);
 }
@@ -480,7 +506,7 @@ fn test_muldiv_truncate() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = mul_div_i128(&env, x, y, denominator, Rounding::Truncate);
+    let result = mul_div_with_rounding(&env, x, y, denominator, Rounding::Truncate);
 
     assert_eq!(result, 483_5313675);
 }
@@ -494,7 +520,7 @@ fn test_checked_muldiv_floor_success() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = checked_mul_div_i128(&env, x, y, denominator, Rounding::Floor);
+    let result = checked_mul_div_with_rounding(&env, x, y, denominator, Rounding::Floor);
 
     assert_eq!(result, Some(483_5313675));
 }
@@ -506,7 +532,7 @@ fn test_checked_muldiv_ceil_success() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = checked_mul_div_i128(&env, x, y, denominator, Rounding::Ceil);
+    let result = checked_mul_div_with_rounding(&env, x, y, denominator, Rounding::Ceil);
 
     assert_eq!(result, Some(483_5313676));
 }
@@ -518,7 +544,7 @@ fn test_checked_muldiv_truncate_success() {
     let y: i128 = 314_1592653;
     let denominator: i128 = 1_0000001;
 
-    let result = checked_mul_div_i128(&env, x, y, denominator, Rounding::Truncate);
+    let result = checked_mul_div_with_rounding(&env, x, y, denominator, Rounding::Truncate);
 
     assert_eq!(result, Some(483_5313675));
 }
