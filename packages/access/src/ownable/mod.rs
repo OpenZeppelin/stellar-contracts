@@ -55,7 +55,7 @@ pub trait Ownable {
     ///
     /// * `e` - Access to the Soroban environment.
     fn get_owner(e: &Env) -> Option<Address> {
-        get_owner(e)
+        storage::get_owner(e)
     }
 
     /// Initiates a 2-step ownership transfer to a new address.
@@ -85,7 +85,7 @@ pub trait Ownable {
     ///
     /// * Authorization for the current owner is required.
     fn transfer_ownership(e: &Env, new_owner: Address, live_until_ledger: u32) {
-        transfer_ownership(e, &new_owner, live_until_ledger);
+        storage::transfer_ownership(e, &new_owner, live_until_ledger);
     }
 
     /// Accepts a pending ownership transfer.
@@ -104,7 +104,7 @@ pub trait Ownable {
     /// * topics - `["ownership_transfer_completed"]`
     /// * data - `[new_owner: Address]`
     fn accept_ownership(e: &Env) {
-        accept_ownership(e);
+        storage::accept_ownership(e);
     }
 
     /// Renounces ownership of the contract.
@@ -126,7 +126,7 @@ pub trait Ownable {
     ///
     /// * Authorization for the current owner is required.
     fn renounce_ownership(e: &Env) {
-        renounce_ownership(e);
+        storage::renounce_ownership(e);
     }
 }
 

@@ -115,7 +115,7 @@ pub trait AccessControl {
     /// * `account` - The account to check.
     /// * `role` - The role to check for.
     fn has_role(e: &Env, account: Address, role: Symbol) -> Option<u32> {
-        has_role(e, &account, &role)
+        storage::has_role(e, &account, &role)
     }
 
     /// Returns a vector containing all existing roles.
@@ -130,7 +130,7 @@ pub trait AccessControl {
     /// This function returns all roles that currently have at least one member.
     /// The maximum number of roles is limited by [`MAX_ROLES`].
     fn get_existing_roles(e: &Env) -> Vec<Symbol> {
-        get_existing_roles(e)
+        storage::get_existing_roles(e)
     }
 
     /// Returns the total number of accounts that have the specified role.
@@ -141,7 +141,7 @@ pub trait AccessControl {
     /// * `e` - Access to Soroban environment.
     /// * `role` - The role to get the count for.
     fn get_role_member_count(e: &Env, role: Symbol) -> u32 {
-        get_role_member_count(e, &role)
+        storage::get_role_member_count(e, &role)
     }
 
     /// Returns the account at the specified index for a given role.
@@ -164,7 +164,7 @@ pub trait AccessControl {
     /// * [`AccessControlError::IndexOutOfBounds`] - If the index is out of
     ///   bounds for the role's member list.
     fn get_role_member(e: &Env, role: Symbol, index: u32) -> Address {
-        get_role_member(e, &role, index)
+        storage::get_role_member(e, &role, index)
     }
 
     /// Returns the admin role for a specific role.
@@ -175,7 +175,7 @@ pub trait AccessControl {
     /// * `e` - Access to Soroban environment.
     /// * `role` - The role to query the admin role for.
     fn get_role_admin(e: &Env, role: Symbol) -> Option<Symbol> {
-        get_role_admin(e, &role)
+        storage::get_role_admin(e, &role)
     }
 
     /// Returns the admin account.
@@ -184,7 +184,7 @@ pub trait AccessControl {
     ///
     /// * `e` - Access to Soroban environment.
     fn get_admin(e: &Env) -> Option<Address> {
-        get_admin(e)
+        storage::get_admin(e)
     }
 
     /// Grants a role to an account.
@@ -209,7 +209,7 @@ pub trait AccessControl {
     /// * topics - `["role_granted", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
     fn grant_role(e: &Env, account: Address, role: Symbol, caller: Address) {
-        grant_role(e, &account, &role, &caller);
+        storage::grant_role(e, &account, &role, &caller);
     }
 
     /// Revokes a role from an account.
@@ -237,7 +237,7 @@ pub trait AccessControl {
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
     fn revoke_role(e: &Env, account: Address, role: Symbol, caller: Address) {
-        revoke_role(e, &account, &role, &caller);
+        storage::revoke_role(e, &account, &role, &caller);
     }
 
     /// Allows an account to renounce a role assigned to itself.
@@ -261,7 +261,7 @@ pub trait AccessControl {
     /// * topics - `["role_revoked", role: Symbol, account: Address]`
     /// * data - `[caller: Address]`
     fn renounce_role(e: &Env, role: Symbol, caller: Address) {
-        renounce_role(e, &role, &caller);
+        storage::renounce_role(e, &role, &caller);
     }
 
     /// Initiates the admin role transfer.
@@ -299,7 +299,7 @@ pub trait AccessControl {
     ///
     /// * Authorization for the current admin is required.
     fn accept_admin_transfer(e: &Env) {
-        accept_admin_transfer(e);
+        storage::accept_admin_transfer(e);
     }
 
     /// Completes the 2-step admin transfer.
@@ -319,7 +319,7 @@ pub trait AccessControl {
     ///   there is no pending transfer to accept.
     /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
     fn transfer_admin_role(e: &Env, new_admin: Address, live_until_ledger: u32) {
-        transfer_admin_role(e, &new_admin, live_until_ledger);
+        storage::transfer_admin_role(e, &new_admin, live_until_ledger);
     }
 
     /// Sets `admin_role` as the admin role of `role`.
@@ -343,7 +343,7 @@ pub trait AccessControl {
     ///
     /// * Authorization for the current admin is required.
     fn set_role_admin(e: &Env, role: Symbol, admin_role: Symbol) {
-        set_role_admin(e, &role, &admin_role);
+        storage::set_role_admin(e, &role, &admin_role);
     }
 
     /// Allows the current admin to renounce their role, making the contract
@@ -368,7 +368,7 @@ pub trait AccessControl {
     ///
     /// * Authorization for the current admin is required.
     fn renounce_admin(e: &Env) {
-        renounce_admin(e);
+        storage::renounce_admin(e);
     }
 }
 
