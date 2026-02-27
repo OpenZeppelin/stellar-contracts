@@ -18,35 +18,11 @@ pub struct ThresholdPolicyContract;
 impl Policy for ThresholdPolicyContract {
     type AccountParams = simple_threshold::SimpleThresholdAccountParams;
 
-    /// Check if the threshold policy can be enforced.
-    ///
-    /// Verifies that the number of authenticated signers meets or exceeds
-    /// the configured threshold for this context rule.
-    ///
-    /// # Returns
-    ///
-    /// * `true` if the threshold is met
-    /// * `false` otherwise
-    fn can_enforce(
-        e: &Env,
-        context: Context,
-        authenticated_signers: Vec<Signer>,
-        context_rule: ContextRule,
-        smart_account: Address,
-    ) -> bool {
-        simple_threshold::can_enforce(
-            e,
-            &context,
-            &authenticated_signers,
-            &context_rule,
-            &smart_account,
-        )
-    }
-
     /// Enforce the threshold policy.
     ///
-    /// Records that authorization occurred and emits an event.
-    /// This is called after `can_enforce` returns true.
+    /// Validates that the number of authenticated signers meets the
+    /// configured threshold, records that authorization occurred and
+    /// emits an event.
     fn enforce(
         e: &Env,
         context: Context,

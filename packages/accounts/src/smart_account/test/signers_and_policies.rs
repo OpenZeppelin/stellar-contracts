@@ -31,16 +31,6 @@ struct MockPolicyContract;
 impl Policy for MockPolicyContract {
     type AccountParams = Val;
 
-    fn can_enforce(
-        _e: &Env,
-        _context: soroban_sdk::auth::Context,
-        _authenticated_signers: Vec<Signer>,
-        _rule: ContextRule,
-        _smart_account: Address,
-    ) -> bool {
-        true
-    }
-
     fn enforce(
         _e: &Env,
         _context: soroban_sdk::auth::Context,

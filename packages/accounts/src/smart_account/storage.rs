@@ -45,20 +45,25 @@
 //!
 //! ## Authorization Matching Algorithm
 //!
-//! When verifying a context with provided signers:
+//! The caller explicitly selects which rule to use for each context via
+//! [`Signatures::context_rule_ids`], a vector aligned by index with the
+//! `auth_contexts` passed to `__check_auth`. No rule iteration or
+//! auto-discovery is performed.
 //!
-//! I. Get all non-expired rules for the specific context type, plus default
-//! rules.
-//! II. For each rule (iteration starts from the last-stored, which prevails in
-//! case of conflicting non-expired rules):
-//!     1. Identify authenticated signers out of all stored signers.
-//!     2.a. If there are policies, verify they can be enforced:
-//!         - If all policies can be satisfied, return success.
-//!         - Otherwise, move to the next rule.
-//!     2.b. If there are no policies:
-//!         - Return success only if all signers are authenticated.
-//!         - Otherwise, move to the next rule.
-//! III. If no context rule satisfies the above conditions, authorization fails.
+//! For each (context, rule_id) pair:
+//!
+//! I. Authenticate all provided signatures (delegated and external).
+//! II. For each context, look up the rule by its explicit ID:
+//!     1. Reject if the rule is expired.
+//!     2. Reject if the rule's context type does not match the actual context
+//!        (a `Default` rule matches any context).
+//!     3. Identify authenticated signers out of all provided signers.
+//!     4.a. If the rule has no policies, all rule signers must be
+//!          authenticated — otherwise reject.
+//!     4.b. If the rule has policies, defer full signer validation to each
+//!          policy's `enforce()` call.
+//! III. Enforce all policies for every validated (rule, context) pair.
+//! IV. If any check fails, authorization fails.
 //!
 //! ## Benefits
 //!
@@ -102,8 +107,8 @@ use crate::{
     smart_account::{
         emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
         emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
-        SmartAccountError, MAX_CONTEXT_RULES, MAX_EXTERNAL_KEY_SIZE, MAX_NAME_SIZE, MAX_POLICIES,
-        MAX_SIGNERS, SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
+        SmartAccountError, MAX_EXTERNAL_KEY_SIZE, MAX_NAME_SIZE, MAX_POLICIES, MAX_SIGNERS,
+        SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
     },
     verifiers::VerifierClient,
 };
@@ -128,7 +133,6 @@ pub enum SmartAccountStorageKey {
     /// Storage key defining the fingerprint each context rule.
     Fingerprint(BytesN<32>),
     /// Storage key for the count of active context rules.
-    /// Used to enforce MAX_CONTEXT_RULES limit.
     Count,
 }
 
@@ -144,37 +148,20 @@ pub enum Signer {
 }
 
 /// A collection of signatures mapped to their respective signers, with
-/// optional per-context hints to skip rule iteration.
+/// per-context rule IDs specifying which rule to validate against.
 ///
-/// When `context_rule_ids` is non-empty, each entry specifies the rule ID
-/// to validate against for the corresponding `auth_context` (by index).
-/// Its length must equal the number of auth contexts — otherwise the
-/// transaction is rejected with
-/// [`SmartAccountError::ContextRuleIdsLengthMismatch`]. Each rule must
-/// exist, must not be expired, must match its context type, and its
-/// signer/policy requirements must be satisfied. There is no fallback to
-/// iteration for individual entries.
-///
-/// When `context_rule_ids` is empty, the standard matching algorithm
-/// applies to every context: context-specific rules are evaluated first
-/// (newest first), followed by default rules, and the first matching rule
-/// wins.
-///
-/// # Security
-///
-/// The hints are a performance optimization, not a permission grant. A
-/// rule selected by ID undergoes identical validation to one found by
-/// iteration. Callers cannot authorize anything via hints that they could
-/// not also reach through normal iteration. Account owners should remove
-/// outdated permissive rules rather than relying on iteration order to
-/// suppress them.
+/// Each entry in `context_rule_ids` specifies the rule ID to validate
+/// against for the corresponding `auth_context` (by index). Its length
+/// must equal the number of auth contexts — otherwise the transaction is
+/// rejected with [`SmartAccountError::ContextRuleIdsLengthMismatch`].
+/// Each rule must exist, must not be expired, must match its context type,
+/// and its signer/policy requirements must be satisfied.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Signatures {
     /// Signature data mapped to each signer.
     pub signers: Map<Signer, Bytes>,
-    /// Per-context rule ID hints, aligned by index with `auth_contexts`.
-    /// Empty means use the default iteration algorithm for all contexts.
+    /// Per-context rule IDs, aligned by index with `auth_contexts`.
     pub context_rule_ids: Vec<u32>,
 }
 
@@ -268,20 +255,6 @@ pub fn get_context_rule_ids(e: &Env, context_rule_type: &ContextRuleType) -> Vec
     get_persistent_entry(e, &ids_key).unwrap_or_else(|| Vec::new(e))
 }
 
-/// Retrieves all context rules of a specific context type. Returns a vector of
-/// all context rules matching the specified type, including expired rules.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `context_rule_type` - The type of context rules to retrieve.
-#[deprecated(note = "use `get_context_rule_ids` and `get_context_rule` instead")]
-pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<ContextRule> {
-    let ids = get_context_rule_ids(e, context_rule_type);
-
-    Vec::from_iter(e, ids.iter().map(|id| get_context_rule(e, id)))
-}
-
 /// Retrieves the number of all context rules, including expired ones. Defaults
 /// to 0.
 ///
@@ -290,44 +263,6 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
 /// * `e` - Access to the Soroban environment.
 pub fn get_context_rules_count(e: &Env) -> u32 {
     e.storage().instance().get(&SmartAccountStorageKey::Count).unwrap_or(0u32)
-}
-
-/// Retrieves all valid (non-expired) context rules for a specific context type,
-/// including default rules as fallback. Returns rules ordered with most
-/// recently added first for proper authorization precedence.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `context_key` - The context type to find valid rules for.
-pub fn get_valid_context_rules(e: &Env, context_key: &ContextRuleType) -> Vec<ContextRule> {
-    let matched_ids_key = SmartAccountStorageKey::Ids(context_key.clone());
-    let matched_ids: Vec<u32> =
-        get_persistent_entry(e, &matched_ids_key).unwrap_or_else(|| Vec::new(e));
-
-    let default_ids_key = SmartAccountStorageKey::Ids(ContextRuleType::Default);
-    let default_ids: Vec<u32> =
-        get_persistent_entry(e, &default_ids_key).unwrap_or_else(|| Vec::new(e));
-
-    let get_rules = |ids: Vec<u32>| -> Vec<ContextRule> {
-        let mut rules = Vec::new(e);
-        for id in ids.iter() {
-            let rule = get_context_rule(e, id);
-            match rule.valid_until {
-                // skip if expired
-                Some(seq) if seq < e.ledger().sequence() => continue,
-                // push front so that we start from the last added when iterating
-                _ => rules.push_front(rule),
-            }
-        }
-        rules
-    };
-
-    let mut final_rules = get_rules(matched_ids);
-    // append defaults so that there is always a fallback
-    final_rules.append(&get_rules(default_ids));
-
-    final_rules
 }
 
 /// Filters rule signers to find which ones are present in the provided signer
@@ -353,64 +288,12 @@ pub fn get_authenticated_signers(
     authenticated
 }
 
-/// Validates a context against all applicable rules and returns the matching
-/// rule with authenticated signers. Returns a tuple of the matched context
-/// rule, the validated context, and the authenticated signers.
+/// Validates a context against a specific rule identified by `id`. Checks
+/// expiration, context type compatibility, and signer requirements.
 ///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `context` - The authorization context to validate.
-/// * `all_signers` - The signers provided for authentication.
-///
-/// # Errors
-///
-/// * [`SmartAccountError::UnvalidatedContext`] - When no context rule can
-///   validate the provided context and signers.
-pub fn get_validated_context(
-    e: &Env,
-    context: &Context,
-    all_signers: &Vec<Signer>,
-) -> (ContextRule, Context, Vec<Signer>) {
-    let context_rules = match context.clone() {
-        #[rustfmt::skip]
-        Context::Contract(ContractContext { contract, .. }) => {
-            get_valid_context_rules(e, &ContextRuleType::CallContract(contract))
-        },
-        Context::CreateContractHostFn(CreateContractHostFnContext {
-            executable: ContractExecutable::Wasm(wasm),
-            ..
-        }) => get_valid_context_rules(e, &ContextRuleType::CreateContract(wasm)),
-        Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
-            executable: ContractExecutable::Wasm(wasm),
-            ..
-        }) => get_valid_context_rules(e, &ContextRuleType::CreateContract(wasm)),
-    };
-
-    for context_rule in context_rules.iter() {
-        let ContextRule { signers: rule_signers, policies, .. } = context_rule.clone();
-
-        let authenticated_signers = get_authenticated_signers(e, &rule_signers, all_signers);
-        if policies.is_empty() {
-            // if no policies, return only if all rule signers are authenticated
-            if rule_signers.len() == authenticated_signers.len() {
-                return (context_rule, context.clone(), authenticated_signers.clone());
-            }
-        } else {
-            // otherwise, only if all policies can be enforced
-            if can_enforce_all_policies(e, context, &context_rule, &authenticated_signers) {
-                return (context_rule, context.clone(), authenticated_signers.clone());
-            }
-        }
-    }
-
-    panic_with_error!(e, SmartAccountError::UnvalidatedContext)
-}
-
-/// Validates a context against a specific rule identified by `id`, bypassing
-/// the default iteration algorithm (compare with [`get_validated_context`]).
-/// Performs the same checks as the iteration path: expiration, context type
-/// compatibility, and signer/policy requirements.
+/// For rules without policies, all signers must be authenticated. For rules
+/// with policies, validation is deferred to `enforce()` — the policy is the
+/// authority on what signers are needed.
 ///
 /// # Arguments
 ///
@@ -424,8 +307,8 @@ pub fn get_validated_context(
 /// * [`SmartAccountError::ContextRuleNotFound`] - When the rule ID does not
 ///   exist.
 /// * [`SmartAccountError::UnvalidatedContext`] - When the rule is expired, its
-///   context type does not match, or its signer/policy requirements are not
-///   satisfied.
+///   context type does not match, or (for rules without policies) not all
+///   signers are authenticated.
 pub fn get_validated_context_by_id(
     e: &Env,
     context: &Context,
@@ -442,7 +325,7 @@ pub fn get_validated_context_by_id(
     }
 
     // The rule's context type must match the actual context, or be Default
-    // (which applies to any context, consistent with the iteration path).
+    // (which applies to any context).
     let required_type = match context.clone() {
         Context::Contract(ContractContext { contract, .. }) =>
             ContextRuleType::CallContract(contract),
@@ -467,18 +350,14 @@ pub fn get_validated_context_by_id(
     let authenticated_signers = get_authenticated_signers(e, rule_signers, all_signers);
 
     if policies.is_empty() {
-        if rule_signers.len() == authenticated_signers.len() {
-            return (context_rule, context.clone(), authenticated_signers);
+        // Without policies, all rule signers must be authenticated.
+        if rule_signers.len() != authenticated_signers.len() {
+            panic_with_error!(e, SmartAccountError::UnvalidatedContext);
         }
     }
-    // Invoking `policy.can_enforce()` might seem redundant as `policies.enforce()` is called later
-    // on. The point of keeping those invocations is to preserve the behavior
-    // identical to the default iteration path (i.e. when no hints).
-    else if can_enforce_all_policies(e, context, &context_rule, &authenticated_signers) {
-        return (context_rule, context.clone(), authenticated_signers);
-    }
+    // With policies, defer full validation to enforce().
 
-    panic_with_error!(e, SmartAccountError::UnvalidatedContext)
+    (context_rule, context.clone(), authenticated_signers)
 }
 
 /// Authenticates all provided signatures against their respective signers.
@@ -514,35 +393,6 @@ pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signers: &Map<Signer,
             }
         }
     }
-}
-
-/// Checks if all policies in a rule can be enforced with the provided signers.
-/// Returns `true` only if all policies can be satisfied, `false` otherwise.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `context` - The authorization context.
-/// * `context_rule` - The context rule.
-/// * `matched_signers` - The authenticated signers.
-pub fn can_enforce_all_policies(
-    e: &Env,
-    context: &Context,
-    context_rule: &ContextRule,
-    matched_signers: &Vec<Signer>,
-) -> bool {
-    for policy in context_rule.policies.iter() {
-        // policies are all or nothing
-        if !PolicyClient::new(e, &policy).can_enforce(
-            context,
-            matched_signers,
-            context_rule,
-            &e.current_contract_address(),
-        ) {
-            return false;
-        }
-    }
-    true
 }
 
 /// Validates signers and policies against maximum limits and minimum
@@ -622,61 +472,53 @@ pub fn validate_context_rule_name(e: &Env, name: &String) {
 ///
 /// This function is meant to be used in `__check_auth` of a smart account.
 ///
-/// When [`Signatures::context_rule_ids`] is non-empty, each entry is used as
-/// a direct rule-ID hint for the auth context at the same index. Its length
-/// must equal `auth_contexts.len()`. When empty, the standard newest-first
-/// iteration applies to every context.
+/// Each entry in [`Signatures::context_rule_ids`] specifies the rule ID to
+/// validate against for the corresponding auth context (by index). Its length
+/// must equal `auth_contexts.len()`.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
 /// * `signature_payload` - The hash of the data that was signed.
-/// * `signatures` - The signatures and optional per-context rule-ID hints.
+/// * `signatures` - The signatures and per-context rule IDs.
 /// * `auth_contexts` - The contexts to authorize.
 ///
 /// # Errors
 ///
-/// * [`SmartAccountError::ContextRuleIdsLengthMismatch`] - When a non-empty
+/// * [`SmartAccountError::ContextRuleIdsLengthMismatch`] - When
 ///   `context_rule_ids` has a different length than `auth_contexts`.
-/// * [`SmartAccountError::ContextRuleNotFound`] - When a hinted rule ID does
-///   not exist.
+/// * [`SmartAccountError::ContextRuleNotFound`] - When a rule ID does not
+///   exist.
 /// * [`SmartAccountError::ExternalVerificationFailed`] - When signature
 ///   verification fails.
 /// * [`SmartAccountError::UnvalidatedContext`] - When a context cannot be
-///   validated against any rule.
+///   validated against the specified rule.
 pub fn do_check_auth(
     e: &Env,
     signature_payload: &Hash<32>,
     signatures: &Signatures,
     auth_contexts: &Vec<Context>,
 ) -> Result<(), SmartAccountError> {
-    let use_hints = !signatures.context_rule_ids.is_empty();
-    if use_hints && signatures.context_rule_ids.len() != auth_contexts.len() {
+    if signatures.context_rule_ids.len() != auth_contexts.len() {
         panic_with_error!(e, SmartAccountError::ContextRuleIdsLengthMismatch);
     }
 
     authenticate(e, signature_payload, &signatures.signers);
 
-    let all_signers = signatures.signers.keys();
+    // Validate all contexts against their specified rules.
     let validated_contexts = Vec::from_iter(
         e,
         auth_contexts.iter().enumerate().map(|(i, context)| {
-            if use_hints {
-                // length is checked above
-                let context_rule_id = signatures.context_rule_ids.get_unchecked(i as u32);
-                get_validated_context_by_id(e, &context, &all_signers, context_rule_id)
-            } else {
-                get_validated_context(e, &context, &all_signers)
-            }
+            let all_signers = signatures.signers.keys();
+            let context_rule_id = signatures.context_rule_ids.get_unchecked(i as u32);
+
+            get_validated_context_by_id(e, &context, &all_signers, context_rule_id)
         }),
     );
 
-    // After collecting validated context rules and authenticated signers, call for
-    // every policy `PolicyClient::enforce` to trigger the state-changing
-    // effects if any.
+    // Enforce all policies.
     for (rule, context, authenticated_signers) in validated_contexts.iter() {
-        let ContextRule { policies, .. } = rule.clone();
-        for policy in policies.iter() {
+        for policy in rule.policies.iter() {
             PolicyClient::new(e, &policy).enforce(
                 &context,
                 &authenticated_signers,
@@ -805,8 +647,6 @@ pub fn contains_canonical_duplicate(e: &Env, signers: &Vec<Signer>, new_signer: 
 ///
 /// # Errors
 ///
-/// * [`SmartAccountError::TooManyContextRules`] - When the number of context
-///   rules exceeds MAX_CONTEXT_RULES (15).
 /// * [`SmartAccountError::NoSignersAndPolicies`] - When both signers and
 ///   policies are empty.
 /// * [`SmartAccountError::TooManySigners`] - When the number of signers exceeds
@@ -844,9 +684,6 @@ pub fn add_context_rule(
     let id = e.storage().instance().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
 
     let count = get_context_rules_count(e);
-    if count >= MAX_CONTEXT_RULES {
-        panic_with_error!(e, SmartAccountError::TooManyContextRules);
-    }
 
     let ids_key = SmartAccountStorageKey::Ids(context_type.clone());
     // Don't extend TTL here since we set this key later in the same function

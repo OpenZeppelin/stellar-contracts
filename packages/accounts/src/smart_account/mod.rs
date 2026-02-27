@@ -5,14 +5,12 @@ use soroban_sdk::{
     auth::CustomAccountInterface, contractclient, contracterror, contractevent, Address, Env, Map,
     String, Symbol, Val, Vec,
 };
-#[allow(deprecated)]
 pub use storage::{
     add_context_rule, add_policy, add_signer, authenticate, contains_canonical_duplicate,
-    do_check_auth, get_context_rule, get_context_rule_ids, get_context_rules,
-    get_context_rules_count, get_validated_context, get_validated_context_by_id,
-    remove_context_rule, remove_policy, remove_signer, update_context_rule_name,
-    update_context_rule_valid_until, validate_signer_key_size, ContextRule, ContextRuleType, Meta,
-    Signatures, Signer, SmartAccountStorageKey,
+    do_check_auth, get_context_rule, get_context_rule_ids, get_context_rules_count,
+    get_validated_context_by_id, remove_context_rule, remove_policy, remove_signer,
+    update_context_rule_name, update_context_rule_valid_until, validate_signer_key_size,
+    ContextRule, ContextRuleType, Meta, Signatures, Signer, SmartAccountStorageKey,
 };
 
 /// Core trait for smart account functionality, extending Soroban's
@@ -30,6 +28,7 @@ pub use storage::{
 /// - Rules can contain multiple signers and policies
 /// - Rules can have expiration times for temporary authorization
 /// - Rules are validated against maximum limits (MAX_SIGNERS, MAX_POLICIES)
+/// - There is no limit on the number of context rules per account
 #[contractclient(name = "SmartAccountClient")]
 pub trait SmartAccount: CustomAccountInterface {
     /// Retrieves a context rule by its unique ID, returning the
@@ -59,34 +58,6 @@ pub trait SmartAccount: CustomAccountInterface {
     ///   Default, CallContract).
     fn get_context_rule_ids(e: &Env, context_rule_type: ContextRuleType) -> Vec<u32>;
 
-    /// Retrieves all context rules of a specific type, returning a vector of
-    /// all `ContextRule`s matching the specified type. Returns an empty
-    /// vector if no rules of the given type exist.
-    ///
-    /// # Deprecated
-    ///
-    /// Use [`get_context_rule_ids`] and [`get_context_rule`] instead.
-    ///
-    /// This function aggregates full [`ContextRule`] structs, including all
-    /// signer key data and policies, for every rule of a given type. This
-    /// makes it susceptible to exceeding the network's maximum return value
-    /// size (~16 KB). As the maximum number of context rules per account
-    /// increases, even usage at not full capacity (rules × signers × key size)
-    /// can exceed the limit. Going forward, the goal is to increase
-    /// significantly `MAX_CONTEXT_RULES`, or even completely remove it, and
-    /// this function is a bottleneck.
-    ///
-    /// Prefer fetching IDs first via [`get_context_rule_ids`] and then loading
-    /// individual rules on demand with [`get_context_rule`].
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `context_rule_type` - The type of context rules to retrieve (e.g.,
-    ///   Default, CallContract).
-    #[deprecated(note = "use `get_context_rule_ids` and `get_context_rule` instead")]
-    fn get_context_rules(e: &Env, context_rule_type: ContextRuleType) -> Vec<ContextRule>;
-
     /// Retrieves the number of all context rules, including expired rules.
     /// Defaults to 0.
     ///
@@ -110,8 +81,6 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Errors
     ///
-    /// * [`SmartAccountError::TooManyContextRules`] - When the number of
-    ///   context rules exceeds MAX_CONTEXT_RULES (15).
     /// * [`SmartAccountError::NoSignersAndPolicies`] - When both signers and
     ///   policies are empty.
     /// * [`SmartAccountError::TooManySigners`] - When signers exceed
@@ -339,8 +308,6 @@ pub const SMART_ACCOUNT_TTL_THRESHOLD: u32 = SMART_ACCOUNT_EXTEND_AMOUNT - DAY_I
 pub const MAX_POLICIES: u32 = 5;
 /// Maximum number of signers allowed per context rule.
 pub const MAX_SIGNERS: u32 = 15;
-/// Maximum number of context rules allowed per smart account.
-pub const MAX_CONTEXT_RULES: u32 = 15;
 /// Maximum length in bytes for a context rule name.
 pub const MAX_NAME_SIZE: u32 = 20;
 /// Maximum size in bytes for external signer key data.
@@ -377,8 +344,6 @@ pub enum SmartAccountError {
     TooManySigners = 3010,
     /// Too many policies in the context rule.
     TooManyPolicies = 3011,
-    /// Too many context rules in the smart account.
-    TooManyContextRules = 3012,
     /// External signer key data exceeds the maximum allowed size.
     KeyDataTooLarge = 3013,
     /// context_rule_ids length does not match auth_contexts length.

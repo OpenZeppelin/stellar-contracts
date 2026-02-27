@@ -128,40 +128,6 @@ pub fn get_threshold(e: &Env, context_rule_id: u32, smart_account: &Address) -> 
         .unwrap_or_else(|| panic_with_error!(e, SimpleThresholdError::SmartAccountNotInstalled))
 }
 
-/// Checks if the simple threshold policy can be enforced based on the number
-/// of authenticated signers. Returns `true` if the number of authenticated
-/// signers meets or exceeds the threshold, `false` otherwise or if the policy
-/// is not installed.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `_context` - The authorization context (unused).
-/// * `authenticated_signers` - The list of authenticated signers.
-/// * `context_rule` - The context rule for this policy.
-/// * `smart_account` - The address of the smart account.
-pub fn can_enforce(
-    e: &Env,
-    _context: &Context,
-    authenticated_signers: &Vec<Signer>,
-    context_rule: &ContextRule,
-    smart_account: &Address,
-) -> bool {
-    let key = SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
-    let threshold: Option<u32> = e.storage().persistent().get(&key);
-
-    if let Some(threshold) = threshold {
-        e.storage().persistent().extend_ttl(
-            &key,
-            SIMPLE_THRESHOLD_TTL_THRESHOLD,
-            SIMPLE_THRESHOLD_EXTEND_AMOUNT,
-        );
-        authenticated_signers.len() >= threshold
-    } else {
-        false
-    }
-}
-
 // ################## CHANGE STATE ##################
 
 /// Enforces the simple threshold policy if the threshold requirements are met.
