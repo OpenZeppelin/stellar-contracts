@@ -63,7 +63,7 @@ pub trait Pausable {
     ///
     /// * `e` - Access to Soroban environment.
     fn paused(e: &Env) -> bool {
-        crate::pausable::paused(e)
+        storage::paused(e)
     }
 
     /// Triggers `Paused` state.
