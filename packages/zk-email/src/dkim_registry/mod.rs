@@ -1,9 +1,41 @@
 //! # DKIM Registry Module
 //!
-//! This module provides the foundational trust anchor for the zkEmail
-//! ecosystem. It stores which DKIM public key hashes are valid for which email
-//! domains. All downstream modules (TBD) query the registry via
-//! [`is_key_hash_valid`].
+//! ## What is DKIM?
+//!
+//! **DKIM (DomainKeys Identified Mail)** is an email authentication standard.
+//! When a server sends an email, it signs the message with a **private RSA
+//! key**. The corresponding **public key** is published in the domain's DNS
+//! records. Email clients verify the signature against that public key to
+//! confirm the email genuinely came from that domain and wasn't tampered with.
+//!
+//! Example: when Gmail sends an email from `@google.com`, it attaches a DKIM
+//! signature. Mail clients fetch Google's public key from DNS and verify the
+//! signature is valid.
+//!
+//! ## What is zkEmail?
+//!
+//! **zkEmail** enables proving facts about an email without revealing the
+//! email itself by using zero-knowledge proofs.
+//!
+//! The core idea: since emails are DKIM-signed, a ZK proof can assert _"there
+//! is a valid DKIM-signed email from `@google.com` that contains X"_,
+//! provable on-chain without exposing the raw email content.
+//!
+//! Use cases include:
+//!
+//! - Proving ownership of a specific email address
+//! - Proving receipt of a payment confirmation from a bank
+//! - Proving an email from a DAO's domain authorized an action
+//!
+//! ## What does this Module implement?
+//!
+//! This is a **DKIM Registry** — the on-chain trust anchor for a zkEmail
+//! system. Its role is to store which DKIM public key hashes are considered
+//! valid for which domains.
+//!
+//! When a ZK proof is verified on-chain, the verifier calls
+//! [`is_key_hash_valid`]`(domain_hash, public_key_hash)` to confirm the key
+//! used to sign the email is still trusted (not rotated or compromised).
 //!
 //! The registry is hash-function agnostic: it stores pre-hashed `BytesN<32>`
 //! values for both domain names and public keys. Callers hash these off-chain

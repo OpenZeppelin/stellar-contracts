@@ -21,7 +21,7 @@ pub struct DKIMKeyEntry {
 pub enum DKIMRegistryStorageKey {
     /// Maps (domain_hash, public_key_hash) to registration status.
     /// Presence indicates the key hash is registered for the domain.
-    PublicKeyHash(DKIMKeyEntry),
+    DomainPublicKey(DKIMKeyEntry),
     /// Maps public_key_hash to revocation status.
     /// Presence indicates the key hash has been globally revoked.
     RevokedKeyHash(BytesN<32>),
@@ -41,7 +41,7 @@ pub fn is_key_hash_valid(e: &Env, domain_hash: &BytesN<32>, public_key_hash: &By
         return false;
     }
 
-    let key = DKIMRegistryStorageKey::PublicKeyHash(DKIMKeyEntry {
+    let key = DKIMRegistryStorageKey::DomainPublicKey(DKIMKeyEntry {
         domain_hash: domain_hash.clone(),
         public_key_hash: public_key_hash.clone(),
     });
@@ -101,7 +101,7 @@ pub fn set_dkim_public_key_hash(e: &Env, domain_hash: &BytesN<32>, public_key_ha
         panic_with_error!(e, DKIMRegistryError::KeyHashRevoked);
     }
 
-    let key = DKIMRegistryStorageKey::PublicKeyHash(DKIMKeyEntry {
+    let key = DKIMRegistryStorageKey::DomainPublicKey(DKIMKeyEntry {
         domain_hash: domain_hash.clone(),
         public_key_hash: public_key_hash.clone(),
     });
