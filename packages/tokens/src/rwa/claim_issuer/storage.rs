@@ -67,8 +67,8 @@
 //!
 //! A nonce (specific to each identity and claim topic pair) is included by
 //! default in every claim message (see `build_claim_message`) to enable
-//! signature invalidation. The message format is: network_id || claim_issuer ||
-//! identity || claim_topic || nonce || claim_data
+//! signature invalidation. The message format is: 0x01 || network_id ||
+//! claim_issuer || identity || claim_topic || nonce || claim_data
 use core::ops::RangeBounds;
 
 use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, Vec};
@@ -653,8 +653,9 @@ pub fn invalidate_claim_signatures(e: &Env, identity: &Address, claim_topic: u32
 /// Sets the revocation status for a single claim.
 ///
 /// The claim is identified by hashing a nonce-independent identifier consisting
-/// of: network_id || claim_issuer || identity || claim_topic || claim_data.
-/// This ensures that revocation status persists even when the nonce changes.
+/// of: 0x02 || network_id || claim_issuer || identity || claim_topic ||
+/// claim_data. This ensures that revocation status persists even when the nonce
+/// changes.
 ///
 /// # Arguments
 ///
@@ -694,8 +695,9 @@ pub fn set_claim_revoked(
 /// Checks if a claim has been revoked.
 ///
 /// The claim is identified by hashing a nonce-independent identifier consisting
-/// of: network_id || claim_issuer || identity || claim_topic || claim_data.
-/// This ensures that revocation status persists even when the nonce changes.
+/// of: 0x02 || network_id || claim_issuer || identity || claim_topic ||
+/// claim_data. This ensures that revocation status persists even when the nonce
+/// changes.
 ///
 /// # Arguments
 ///
@@ -819,9 +821,15 @@ pub fn is_claim_expired(e: &Env, encoded_claim_data: &Bytes) -> bool {
 
 // ====================== HELPERS =====================
 
+/// Domain separation tags to ensure `build_claim_message` and
+/// `build_claim_identifier` can never produce identical byte sequences,
+/// regardless of `claim_data` contents.
+const CLAIM_MESSAGE_DOMAIN: &[u8; 1] = b"\x01";
+const CLAIM_IDENTIFIER_DOMAIN: &[u8; 1] = b"\x02";
+
 /// Builds and returns the message to verify for claim signature validation.
 ///
-/// The message format is: network_id || claim_issuer || identity ||
+/// The message format is: 0x01 || network_id || claim_issuer || identity ||
 /// claim_topic || nonce || claim_data
 ///
 /// # Arguments
@@ -838,7 +846,9 @@ pub fn build_claim_message(
 ) -> Bytes {
     let nonce = get_current_nonce_for(e, identity, claim_topic);
 
-    let mut data = Bytes::from_array(e, &e.ledger().network_id().to_array());
+    let mut data = Bytes::new(e);
+    data.extend_from_array(CLAIM_MESSAGE_DOMAIN);
+    data.append(&Bytes::from_array(e, &e.ledger().network_id().to_array()));
     data.append(&e.current_contract_address().to_xdr(e));
     data.append(&identity.to_xdr(e));
     data.extend_from_array(&claim_topic.to_be_bytes());
@@ -849,7 +859,7 @@ pub fn build_claim_message(
 
 /// Builds a nonce-independent claim identifier for revocation tracking.
 ///
-/// The identifier format is: network_id || claim_issuer || identity ||
+/// The identifier format is: 0x02 || network_id || claim_issuer || identity ||
 /// claim_topic || claim_data (WITHOUT nonce)
 ///
 /// # Arguments
@@ -864,7 +874,9 @@ pub fn build_claim_identifier(
     claim_topic: u32,
     claim_data: &Bytes,
 ) -> Bytes {
-    let mut data = Bytes::from_array(e, &e.ledger().network_id().to_array());
+    let mut data = Bytes::new(e);
+    data.extend_from_array(CLAIM_IDENTIFIER_DOMAIN);
+    data.append(&Bytes::from_array(e, &e.ledger().network_id().to_array()));
     data.append(&e.current_contract_address().to_xdr(e));
     data.append(&identity.to_xdr(e));
     data.extend_from_array(&claim_topic.to_be_bytes());
