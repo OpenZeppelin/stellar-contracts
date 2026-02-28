@@ -11,7 +11,7 @@ use soroban_sdk::{
     Address, Env, Map, String, Symbol, Val, Vec,
 };
 use stellar_accounts::smart_account::{
-    add_context_rule, add_policy, add_signer, do_check_auth, get_context_rule,
+    add_context_rule, add_policy, add_signer, batch_add_signer, do_check_auth, get_context_rule,
     get_context_rules_count, remove_context_rule, remove_policy, remove_signer,
     update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType,
     ExecutionEntryPoint, Signatures, Signer, SmartAccount, SmartAccountError,
@@ -193,14 +193,22 @@ impl ExecutionEntryPoint for MultisigContract {
     }
 }
 
+#[contractimpl]
 impl MultisigContract {
     pub fn batch_add_signer(e: &Env, context_rule_id: u32, signers: Vec<Signer>) {
-        for signer in signers.iter() {
-            add_signer(e, context_rule_id, &signer);
-        }
+        e.current_contract_address().require_auth();
+
+        batch_add_signer(e, context_rule_id, &signers);
     }
 
-    pub fn batch_add_policy(e: &Env, context_rule_id: u32, policies: Vec<Address>, policy_params: Vec<Val>) {
+    pub fn batch_add_policy(
+        e: &Env,
+        context_rule_id: u32,
+        policies: Vec<Address>,
+        policy_params: Vec<Val>,
+    ) {
+        e.current_contract_address().require_auth();
+
         assert!(policies.len() == policy_params.len());
 
         for (policy, param) in policies.iter().zip(policy_params.iter()) {

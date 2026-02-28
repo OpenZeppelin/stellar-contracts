@@ -1,7 +1,7 @@
 use soroban_sdk::{contract, contractimpl, map, vec, Address, Bytes, Env, TryFromVal, Val, Vec};
 use stellar_accounts::{
     policies::{simple_threshold::SimpleThresholdAccountParams, Policy},
-    smart_account::{ContextRule, Signer},
+    smart_account::{get_context_rule, ContextRule, Signer},
 };
 
 use crate::contract::MultisigContract;
@@ -75,4 +75,38 @@ fn create_account() {
     ];
     let policies = map![&e, (policy, SimpleThresholdAccountParams { threshold: 2 })];
     e.register(MultisigContract, (signers, policies));
+}
+
+#[test]
+fn batch_add_signer_adds_all_signers() {
+    let e = Env::default();
+    e.mock_all_auths();
+
+    let verifier = e.register(MockVerifierContract, ());
+    let initial_signer = Signer::External(
+        verifier.clone(),
+        Bytes::from_array(&e, b"4cb5abf6ad79fbf5abbccafcc269d85cd2651ed4b885b5869f241aedf0a5ba29"),
+    );
+    let account = e.register(
+        MultisigContract,
+        (vec![&e, initial_signer.clone()], soroban_sdk::Map::<Address, Val>::new(&e)),
+    );
+
+    let new_signer_1 = Signer::External(
+        verifier.clone(),
+        Bytes::from_array(&e, b"3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29"),
+    );
+    let new_signer_2 = Signer::External(
+        verifier.clone(),
+        Bytes::from_array(&e, b"1111111111111111111111111111111111111111111111111111111111111111"),
+    );
+
+    let client = crate::contract::MultisigContractClient::new(&e, &account);
+    client.batch_add_signer(&0, &vec![&e, new_signer_1.clone(), new_signer_2.clone()]);
+
+    let rule = get_context_rule(&e, 0);
+    assert_eq!(rule.signers.len(), 3);
+    assert!(rule.signers.contains(&initial_signer));
+    assert!(rule.signers.contains(&new_signer_1));
+    assert!(rule.signers.contains(&new_signer_2));
 }

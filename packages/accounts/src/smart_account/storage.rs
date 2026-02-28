@@ -1087,6 +1087,82 @@ pub fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32) {
     }
 }
 
+/// Adds multiple signers to an existing context rule in a single operation.
+///
+/// More efficient than calling [`add_signer`] in a loop because it resolves
+/// existing signers once, removes and resets the fingerprint once, and writes
+/// the [`ContextRuleEntry`] once regardless of how many signers are added.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `id` - The ID of the context rule.
+/// * `signers` - The signers to add to the context rule.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::ContextRuleNotFound`] - When the context rule with
+///   the specified ID does not exist.
+/// * [`SmartAccountError::DuplicateSigner`] - When any signer already exists in
+///   the context rule or appears more than once in `signers`.
+/// * [`SmartAccountError::TooManySigners`] - When adding all signers would
+///   exceed MAX_SIGNERS (15).
+/// * [`SmartAccountError::KeyDataTooLarge`] - When an external signer's key
+///   data exceeds MAX_EXTERNAL_KEY_SIZE (256) bytes.
+///
+/// # Events
+///
+/// For each signer added:
+/// * topics - `["signer_added", context_rule_id: u32]`
+/// * data - `[signer_id: u32]`
+///
+/// For each signer not previously registered in the global registry:
+/// * topics - `["signer_registered", signer_id: u32]`
+/// * data - `[signer: Signer]`
+///
+/// # Security Warning
+///
+/// * **Threshold Policy Consideration:** If the ContextRule contains a
+///   threshold-based policy (e.g., simple_threshold), adding signers may
+///   silently weaken the security guarantee. For example, a strict N-of-N
+///   multisig becomes an N-of-(N+M) multisig after adding M signers. **Always
+///   update the policy threshold AFTER adding signers** to maintain the desired
+///   security level, especially for N-of-N multisig configurations.
+///
+/// * This function modifies storage without requiring authorization. Ensure
+///   proper access control is implemented at the contract level.
+pub fn batch_add_signer(e: &Env, id: u32, signers: &Vec<Signer>) {
+    let data_key = SmartAccountStorageKey::ContextRuleData(id);
+    let mut entry: ContextRuleEntry = get_persistent_entry(e, &data_key)
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+
+    // Resolve existing signers once for all duplicate checks.
+    let mut existing_signers = resolve_signers(e, &entry.signer_ids);
+
+    remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
+
+    for signer in signers.iter() {
+        validate_signer_key_size(e, &signer);
+
+        if contains_canonical_duplicate(e, &existing_signers, &signer) {
+            panic_with_error!(e, SmartAccountError::DuplicateSigner);
+        }
+
+        let new_signer_id = register_signer(e, &signer);
+
+        entry.signer_ids.push_back(new_signer_id);
+        existing_signers.push_back(signer);
+
+        emit_signer_added(e, id, new_signer_id);
+    }
+
+    validate_signers_and_policies(e, &entry.signer_ids, &entry.policy_ids);
+
+    validate_and_set_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
+
+    e.storage().persistent().set(&data_key, &entry);
+}
+
 // ################## POLICY MANAGEMENT ##################
 
 /// Adds a new policy to an existing context rule and installs it.
