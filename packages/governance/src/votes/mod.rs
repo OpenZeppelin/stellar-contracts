@@ -79,7 +79,7 @@ pub trait Votes {
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to query voting power for.
     fn get_votes(e: &Env, account: Address) -> u128 {
-        get_votes(e, &account)
+        storage::get_votes(e, &account)
     }
 
     /// Returns the voting power (delegated votes) of an account at a specific
@@ -99,7 +99,7 @@ pub trait Votes {
     /// * [`VotesError::FutureLookup`] - If `ledger` >= current ledger sequence
     ///   number.
     fn get_votes_at_checkpoint(e: &Env, account: Address, ledger: u32) -> u128 {
-        get_votes_at_checkpoint(e, &account, ledger)
+        storage::get_votes_at_checkpoint(e, &account, ledger)
     }
 
     /// Returns the current total supply of voting units.
@@ -113,7 +113,7 @@ pub trait Votes {
     ///
     /// * `e` - Access to the Soroban environment.
     fn get_total_supply(e: &Env) -> u128 {
-        get_total_supply(e)
+        storage::get_total_supply(e)
     }
 
     /// Returns the total supply of voting units at a specific past ledger
@@ -134,7 +134,7 @@ pub trait Votes {
     /// * [`VotesError::FutureLookup`] - If `ledger` >= current ledger sequence
     ///   number.
     fn get_total_supply_at_checkpoint(e: &Env, ledger: u32) -> u128 {
-        get_total_supply_at_checkpoint(e, ledger)
+        storage::get_total_supply_at_checkpoint(e, ledger)
     }
 
     /// Returns the current delegate for an account.
@@ -149,7 +149,7 @@ pub trait Votes {
     /// * `Some(Address)` - The delegate address if delegation is set.
     /// * `None` - If the account has not delegated.
     fn get_delegate(e: &Env, account: Address) -> Option<Address> {
-        get_delegate(e, &account)
+        storage::get_delegate(e, &account)
     }
 
     /// Delegates voting power from `account` to `delegatee`.
@@ -172,7 +172,7 @@ pub trait Votes {
     ///
     /// Authorization for `account` is required.
     fn delegate(e: &Env, account: Address, delegatee: Address) {
-        delegate(e, &account, &delegatee);
+        storage::delegate(e, &account, &delegatee);
     }
 }
 // ################## ERRORS ##################

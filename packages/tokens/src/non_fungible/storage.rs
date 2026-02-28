@@ -477,7 +477,9 @@ impl Base {
             return;
         }
 
-        if live_until_ledger < e.ledger().sequence() {
+        if live_until_ledger > e.ledger().max_live_until_ledger()
+            || live_until_ledger < e.ledger().sequence()
+        {
             panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
         }
 

@@ -1,39 +1,42 @@
-/// A basic contract that demonstrates the usage of the `Upgradeable` derive
-/// macro. It only implements `UpgradeableInternal` and the derive macro do the
-/// rest of the job. The goal is to upgrade this "v1" contract with the contract
-/// in "v2".
+/// A basic contract that demonstrates how to implement the `Upgradeable` trait
+/// directly. It stores a `Config` struct that will change shape in "v2",
+/// demonstrating a realistic storage migration scenario.
 use soroban_sdk::{
-    contract, contracterror, contractimpl, panic_with_error, symbol_short, Address, Env, Symbol,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol, Vec,
 };
-use stellar_contract_utils::upgradeable::UpgradeableInternal;
-use stellar_macros::Upgradeable;
+use stellar_access::access_control::{set_admin, AccessControl};
+use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
+use stellar_macros::only_role;
 
-pub const OWNER: Symbol = symbol_short!("OWNER");
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum ExampleContractError {
-    Unauthorized = 1,
+#[contracttype]
+pub struct Config {
+    pub rate: u32,
 }
 
-#[derive(Upgradeable)]
+pub const CONFIG_KEY: Symbol = symbol_short!("CONFIG");
+
 #[contract]
 pub struct ExampleContract;
 
 #[contractimpl]
 impl ExampleContract {
-    pub fn __constructor(e: &Env, admin: Address) {
-        e.storage().instance().set(&OWNER, &admin);
+    pub fn __constructor(e: &Env, admin: Address, rate: u32) {
+        set_admin(e, &admin);
+        e.storage().instance().set(&CONFIG_KEY, &Config { rate });
+    }
+
+    pub fn get_rate(e: &Env) -> u32 {
+        e.storage().instance().get::<_, Config>(&CONFIG_KEY).unwrap().rate
     }
 }
 
-impl UpgradeableInternal for ExampleContract {
-    fn _require_auth(e: &Env, operator: &Address) {
-        operator.require_auth();
-        let owner = e.storage().instance().get::<_, Address>(&OWNER).unwrap();
-        if *operator != owner {
-            panic_with_error!(e, ExampleContractError::Unauthorized)
-        }
+#[contractimpl]
+impl Upgradeable for ExampleContract {
+    #[only_role(operator, "manager")]
+    fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address) {
+        upgradeable::upgrade(e, &new_wasm_hash);
     }
 }
+
+#[contractimpl(contracttrait)]
+impl AccessControl for ExampleContract {}

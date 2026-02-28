@@ -122,48 +122,6 @@ impl MyContract {
 - `#[when_not_paused]`: Function executes only when contract is not paused
 - `#[when_paused]`: Function executes only when contract is paused
 
-### Upgradeable Macros
-
-Derive macros for implementing contract upgradeability.
-
-#### Usage Examples
-
-```rust
-use soroban_sdk::{contract, contractimpl, Address, Env};
-use stellar_contract_utils::upgradeable::UpgradeableInternal;
-use stellar_macros::Upgradeable;
-
-#[derive(Upgradeable)]
-#[contract]
-pub struct MyContract;
-
-#[contractimpl]
-impl MyContract {
-    // deploy this contract with the Stellar CLI:
-    //
-    // stellar contract deploy \
-    // --wasm path/to/file.wasm \
-    // -- \
-    // --owner <owner_address>
-    pub fn __constructor(e: &Env, owner: Address) {
-        // Contract initialization
-    }
-}
-
-impl UpgradeableInternal for MyContract {
-    fn _require_auth(e: &Env, operator: &Address) {
-        // Define who can upgrade the contract
-        operator.require_auth();
-        // Add your access controls: role-based or ownable
-    }
-}
-```
-
-#### Available Derives
-
-- `#[derive(Upgradeable)]`: Basic contract upgradeability
-- `#[derive(UpgradeableMigratable)]`: Upgradeability with migration support
-
 ## Installation
 
 Add this to your `Cargo.toml`:
@@ -179,7 +137,6 @@ stellar-macros = "=0.6.0"
 See the following examples in the repository:
 - [`examples/fungible-pausable/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-pausable) - Pausable macros usage
 - [`examples/nft-access-control/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/nft-access-control) - Access control macros
-- [`examples/upgradeable/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/upgradeable) - Upgradeable derive macros
 
 ## License
 

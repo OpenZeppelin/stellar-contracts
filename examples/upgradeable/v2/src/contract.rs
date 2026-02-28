@@ -1,46 +1,65 @@
-/// The contract in "v1" needs to be upgraded with this one. We are
-/// demonstrating the usage of the `UpgradeableMigratable` macro, because this
-/// time we want to do a migration after the upgrade. That's why we derive
-/// `UpgradeableMigratable`. For it to work, we implement
-/// `UpgradeableMigratableInternal` with the custom migration logic.
+/// The contract in "v1" needs to be upgraded with this one. It demonstrates a
+/// realistic storage migration: the `Config` struct gains a new `active` field,
+/// so the `migrate()` function reads the old format, converts it, and writes
+/// back in the new format. A schema version guard prevents double invocation.
 use soroban_sdk::{
-    contract, contracterror, contracttype, panic_with_error, symbol_short, Address, Env, Symbol,
+    contract, contractimpl, contracttype, symbol_short, Address, BytesN, Env, Symbol, Vec,
 };
-use stellar_contract_utils::upgradeable::UpgradeableMigratableInternal;
-use stellar_macros::UpgradeableMigratable;
+use stellar_access::access_control::AccessControl;
+use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
+use stellar_macros::only_role;
 
-pub const DATA_KEY: Symbol = symbol_short!("DATA_KEY");
-pub const OWNER: Symbol = symbol_short!("OWNER");
-
-#[contracterror]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-#[repr(u32)]
-pub enum ExampleContractError {
-    Unauthorized = 1,
-}
-
+/// The old config type — field names and types must match what v1 stored.
 #[contracttype]
-pub struct Data {
-    pub num1: u32,
-    pub num2: u32,
+pub struct ConfigV1 {
+    pub rate: u32,
 }
 
-#[derive(UpgradeableMigratable)]
+/// The new config type with an additional field.
+#[contracttype]
+pub struct Config {
+    pub rate: u32,
+    pub active: bool,
+}
+
+pub const CONFIG_KEY: Symbol = symbol_short!("CONFIG");
+
 #[contract]
 pub struct ExampleContract;
 
-impl UpgradeableMigratableInternal for ExampleContract {
-    type MigrationData = Data;
-
-    fn _require_auth(e: &Env, operator: &Address) {
-        operator.require_auth();
-        let owner = e.storage().instance().get::<_, Address>(&OWNER).unwrap();
-        if *operator != owner {
-            panic_with_error!(e, ExampleContractError::Unauthorized)
-        }
-    }
-
-    fn _migrate(e: &Env, data: &Self::MigrationData) {
-        e.storage().instance().set(&DATA_KEY, data);
+#[contractimpl]
+impl Upgradeable for ExampleContract {
+    #[only_role(operator, "manager")]
+    fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, operator: Address) {
+        upgradeable::upgrade(e, &new_wasm_hash);
     }
 }
+
+#[contractimpl]
+impl ExampleContract {
+    /// Migrates instance storage from v1 to v2 format. Reads the old `Config`
+    /// (single `rate` field), converts it to the new shape (with `active`
+    /// defaulting to `true`), and writes it back. A schema version prevents
+    /// this from running twice.
+    #[only_role(operator, "migrator")]
+    pub fn migrate(e: &Env, operator: Address) {
+        assert!(upgradeable::get_schema_version(e) < 2, "already migrated");
+
+        let old: ConfigV1 = e.storage().instance().get(&CONFIG_KEY).unwrap();
+        let new = Config { rate: old.rate, active: true };
+        e.storage().instance().set(&CONFIG_KEY, &new);
+
+        upgradeable::set_schema_version(e, 2);
+    }
+
+    pub fn get_rate(e: &Env) -> u32 {
+        e.storage().instance().get::<_, Config>(&CONFIG_KEY).unwrap().rate
+    }
+
+    pub fn is_active(e: &Env) -> bool {
+        e.storage().instance().get::<_, Config>(&CONFIG_KEY).unwrap().active
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl AccessControl for ExampleContract {}

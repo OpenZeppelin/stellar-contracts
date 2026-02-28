@@ -8,18 +8,16 @@ use soroban_sdk::{
     auth::{Context, CustomAccountInterface},
     contract, contractimpl,
     crypto::Hash,
-    Address, Env, Map, String, Symbol, Val, Vec,
+    Address, BytesN, Env, Map, String, Symbol, Val, Vec,
 };
 use stellar_accounts::smart_account::{
-    add_context_rule, add_policy, add_signer, batch_add_signer, do_check_auth, get_context_rule,
+    self, add_context_rule, add_policy, add_signer, batch_add_signer, do_check_auth, get_context_rule,
     get_context_rules_count, remove_context_rule, remove_policy, remove_signer,
     update_context_rule_name, update_context_rule_valid_until, ContextRule, ContextRuleType,
     ExecutionEntryPoint, Signatures, Signer, SmartAccount, SmartAccountError,
 };
-use stellar_contract_utils::upgradeable::UpgradeableInternal;
-use stellar_macros::Upgradeable;
+use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
 
-#[derive(Upgradeable)]
 #[contract]
 pub struct MultisigContract;
 
@@ -42,6 +40,12 @@ impl MultisigContract {
             &signers,
             &policies,
         );
+    }
+
+    pub fn batch_add_signer(e: &Env, context_rule_id: u32, signers: Vec<Signer>) {
+        e.current_contract_address().require_auth();
+
+        smart_account::batch_add_signer(e, context_rule_id, &signers);
     }
 }
 
@@ -194,31 +198,9 @@ impl ExecutionEntryPoint for MultisigContract {
 }
 
 #[contractimpl]
-impl MultisigContract {
-    pub fn batch_add_signer(e: &Env, context_rule_id: u32, signers: Vec<Signer>) {
+impl Upgradeable for MultisigContract {
+    fn upgrade(e: &Env, new_wasm_hash: BytesN<32>, _operator: Address) {
         e.current_contract_address().require_auth();
-
-        batch_add_signer(e, context_rule_id, &signers);
-    }
-
-    pub fn batch_add_policy(
-        e: &Env,
-        context_rule_id: u32,
-        policies: Vec<Address>,
-        policy_params: Vec<Val>,
-    ) {
-        e.current_contract_address().require_auth();
-
-        assert!(policies.len() == policy_params.len());
-
-        for (policy, param) in policies.iter().zip(policy_params.iter()) {
-            add_policy(e, context_rule_id, &policy, param);
-        }
-    }
-}
-
-impl UpgradeableInternal for MultisigContract {
-    fn _require_auth(e: &Env, _operator: &Address) {
-        e.current_contract_address().require_auth();
+        upgradeable::upgrade(e, &new_wasm_hash);
     }
 }

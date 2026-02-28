@@ -1,51 +1,56 @@
-use soroban_sdk::{contracttype, panic_with_error, Env};
-
-use crate::upgradeable::UpgradeableError;
+use soroban_sdk::{contracttype, BytesN, Env};
 
 #[contracttype]
 pub enum UpgradeableStorageKey {
-    Migrating,
+    SchemaVersion,
 }
 
-/// Sets the migrating state to `true`, enabling migration process.
+/// Returns the current schema version stored in instance storage.
+///
+/// Defaults to `0` if no schema version has been set yet (e.g. contracts
+/// deployed before schema versioning was introduced).
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-pub fn enable_migration(e: &Env) {
-    e.storage().instance().set(&UpgradeableStorageKey::Migrating, &true);
+pub fn get_schema_version(e: &Env) -> u32 {
+    e.storage().instance().get(&UpgradeableStorageKey::SchemaVersion).unwrap_or(0)
 }
 
-/// Returns `true` if completing migration is allowed.
+/// Sets the schema version in instance storage.
+///
+/// Call this at the end of a `migrate` function after all storage
+/// transformations have been applied, to record that migration to this
+/// version is complete and prevent re-execution.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-pub fn can_complete_migration(e: &Env) -> bool {
-    e.storage().instance().get::<_, bool>(&UpgradeableStorageKey::Migrating).unwrap_or(false)
+/// * `version` - The schema version to record.
+///
+/// # Security Warning
+///
+/// **IMPORTANT**: This function lacks authorization checks and should only
+/// be used in admin functions that implement their own authorization logic.
+pub fn set_schema_version(e: &Env, version: u32) {
+    e.storage().instance().set(&UpgradeableStorageKey::SchemaVersion, &version);
 }
 
-/// Sets the migrating state to `false`, completing the migration process.
+/// Updates the contract WASM bytecode.
+///
+/// The contract will only be upgraded after the invocation has successfully
+/// completed.
 ///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
-pub fn complete_migration(e: &Env) {
-    e.storage().instance().set(&UpgradeableStorageKey::Migrating, &false);
-}
-
-/// Ensures that completing migration is allowed, otherwise panics.
+/// * `new_wasm_hash` - A 32-byte hash identifying the new WASM blob, uploaded
+///   to the ledger.
 ///
-/// # Arguments
+/// # Security Warning
 ///
-/// * `e` - The Soroban environment.
-///
-/// # Errors
-///
-/// * [`UpgradeableError::MigrationNotAllowed`] - If the migrating state is
-///   `false`.
-pub fn ensure_can_complete_migration(e: &Env) {
-    if !can_complete_migration(e) {
-        panic_with_error!(e, UpgradeableError::MigrationNotAllowed)
-    }
+/// **IMPORTANT**: This function lacks authorization checks and should only
+/// be used in admin functions that implement their own authorization logic.
+pub fn upgrade(e: &Env, new_wasm_hash: &BytesN<32>) {
+    e.deployer().update_current_contract_wasm(new_wasm_hash.clone());
 }
