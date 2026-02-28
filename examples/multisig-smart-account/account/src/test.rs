@@ -1,7 +1,7 @@
 use soroban_sdk::{contract, contractimpl, map, vec, Address, Bytes, Env, TryFromVal, Val, Vec};
 use stellar_accounts::{
     policies::{simple_threshold::SimpleThresholdAccountParams, Policy},
-    smart_account::{get_context_rule, ContextRule, Signer},
+    smart_account::{ContextRule, Signer},
 };
 
 use crate::contract::MultisigContract;
@@ -104,7 +104,7 @@ fn batch_add_signer_adds_all_signers() {
     let client = crate::contract::MultisigContractClient::new(&e, &account);
     client.batch_add_signer(&0, &vec![&e, new_signer_1.clone(), new_signer_2.clone()]);
 
-    let rule = get_context_rule(&e, 0);
+    let rule = client.get_context_rule(&0);
     assert_eq!(rule.signers.len(), 3);
     assert!(rule.signers.contains(&initial_signer));
     assert!(rule.signers.contains(&new_signer_1));
