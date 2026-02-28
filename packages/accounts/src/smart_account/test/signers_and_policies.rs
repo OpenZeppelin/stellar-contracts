@@ -11,6 +11,7 @@ use super::super::{
     storage::{
         add_context_rule, add_policy, add_signer, get_context_rule, remove_policy, remove_signer,
         validate_signers_and_policies, ContextRule, ContextRuleType, Signer,
+        SmartAccountStorageKey,
     },
     MAX_POLICIES, MAX_SIGNERS,
 };
@@ -18,11 +19,6 @@ use crate::policies::Policy;
 
 #[contract]
 struct MockContract;
-
-#[contractimpl]
-impl MockContract {
-    pub fn test() {}
-}
 
 #[contract]
 struct MockPolicyContract;
@@ -62,6 +58,26 @@ fn create_test_signers(e: &Env) -> Vec<Signer> {
     Vec::from_array(e, [signer1, signer2])
 }
 
+// Helper to get signer ID from a rule by signer object
+fn get_signer_id(e: &Env, rule_id: u32, signer: &Signer) -> u32 {
+    let rule = get_context_rule(e, rule_id);
+    let pos = rule.signers.iter().rposition(|s| s == *signer).expect("signer not found");
+    let entry_key = SmartAccountStorageKey::ContextRuleData(rule_id);
+    let entry: crate::smart_account::storage::ContextRuleEntry =
+        e.storage().persistent().get(&entry_key).unwrap();
+    entry.signer_ids.get_unchecked(pos as u32)
+}
+
+// Helper to get policy ID from a rule by policy address
+fn get_policy_id(e: &Env, rule_id: u32, policy: &Address) -> u32 {
+    let rule = get_context_rule(e, rule_id);
+    let pos = rule.policies.iter().rposition(|p| p == *policy).expect("policy not found");
+    let entry_key = SmartAccountStorageKey::ContextRuleData(rule_id);
+    let entry: crate::smart_account::storage::ContextRuleEntry =
+        e.storage().persistent().get(&entry_key).unwrap();
+    entry.policy_ids.get_unchecked(pos as u32)
+}
+
 fn setup_test_rule(e: &Env, address: &Address) -> ContextRule {
     e.as_contract(address, || {
         let signers = create_test_signers(e);
@@ -93,7 +109,8 @@ fn add_signer_success() {
         add_signer(&e, rule.id, &new_signer);
 
         let updated_rule = get_context_rule(&e, rule.id);
-        assert_eq!(e.events().all().events().len(), 1);
+        // Events: 1 SignerAdded + 1 SignerRegistered = 2
+        assert_eq!(e.events().all().events().len(), 2);
         assert_eq!(updated_rule.signers.len(), 3);
         assert!(updated_rule.signers.contains(&new_signer));
     });
@@ -150,12 +167,14 @@ fn remove_signer_success() {
 
     e.as_contract(&address, || {
         let signer_to_remove = rule.signers.get(0).unwrap();
+        let signer_id = get_signer_id(&e, rule.id, &signer_to_remove);
 
-        remove_signer(&e, rule.id, &signer_to_remove);
+        remove_signer(&e, rule.id, signer_id);
 
         let updated_rule = get_context_rule(&e, rule.id);
         assert_eq!(updated_rule.signers.len(), 1);
-        assert_eq!(e.events().all().events().len(), 1);
+        // Events: 1 SignerRemoved + 1 SignerDeregistered = 2
+        assert_eq!(e.events().all().events().len(), 2);
         assert!(!updated_rule.signers.contains(&signer_to_remove));
     });
 }
@@ -167,8 +186,7 @@ fn remove_signer_nonexistent_rule_fails() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let signer = Signer::Delegated(Address::generate(&e));
-        remove_signer(&e, 999, &signer); // Non-existent rule ID
+        remove_signer(&e, 999, 0); // Non-existent rule ID
     });
 }
 
@@ -181,8 +199,7 @@ fn remove_signer_not_found_fails() {
     let rule = setup_test_rule(&e, &address);
 
     e.as_contract(&address, || {
-        let nonexistent_signer = Signer::Delegated(Address::generate(&e));
-        remove_signer(&e, rule.id, &nonexistent_signer); // Signer not in rule
+        remove_signer(&e, rule.id, 999); // Signer ID not in rule
     });
 }
 
@@ -197,11 +214,13 @@ fn remove_signer_last_one_fails() {
     e.as_contract(&address, || {
         // Remove first signer - should succeed (still have one left)
         let signer1 = rule.signers.get(0).unwrap();
-        remove_signer(&e, rule.id, &signer1);
+        let signer1_id = get_signer_id(&e, rule.id, &signer1);
+        remove_signer(&e, rule.id, signer1_id);
 
         // Try to remove last signer - should fail with NoSignersAndPolicies
         let signer2 = rule.signers.get(1).unwrap();
-        remove_signer(&e, rule.id, &signer2);
+        let signer2_id = get_signer_id(&e, rule.id, &signer2);
+        remove_signer(&e, rule.id, signer2_id);
     });
 }
 
@@ -221,9 +240,11 @@ fn remove_signer_with_policy_present_success() {
         // Now we can remove all signers because we have a policy
         let signer1 = rule.signers.get(0).unwrap();
         let signer2 = rule.signers.get(1).unwrap();
+        let signer1_id = get_signer_id(&e, rule.id, &signer1);
+        let signer2_id = get_signer_id(&e, rule.id, &signer2);
 
-        remove_signer(&e, rule.id, &signer1);
-        remove_signer(&e, rule.id, &signer2);
+        remove_signer(&e, rule.id, signer1_id);
+        remove_signer(&e, rule.id, signer2_id);
 
         let updated_rule = get_context_rule(&e, rule.id);
         assert_eq!(updated_rule.signers.len(), 0);
@@ -247,7 +268,8 @@ fn add_policy_success() {
         add_policy(&e, rule.id, &policy_address.clone(), install_param);
 
         let updated_rule = get_context_rule(&e, rule.id);
-        assert_eq!(e.events().all().events().len(), 1);
+        // Events: 1 PolicyAdded + 1 PolicyRegistered = 2
+        assert_eq!(e.events().all().events().len(), 2);
         assert_eq!(updated_rule.policies.len(), 1);
         assert!(updated_rule.policies.contains(&policy_address));
     });
@@ -302,10 +324,13 @@ fn remove_policy_success() {
         add_policy(&e, rule.id, &policy_address, install_param);
 
         // Then remove it
-        remove_policy(&e, rule.id, &policy_address);
+        let policy_id = get_policy_id(&e, rule.id, &policy_address);
+        remove_policy(&e, rule.id, policy_id);
 
         let updated_rule = get_context_rule(&e, rule.id);
-        assert_eq!(e.events().all().events().len(), 2);
+        // Events: 1 PolicyAdded + 1 PolicyRegistered + 1 PolicyRemoved + 1
+        // PolicyDeregistered = 4
+        assert_eq!(e.events().all().events().len(), 4);
         assert_eq!(updated_rule.policies.len(), 0);
         assert!(!updated_rule.policies.contains(&policy_address));
     });
@@ -321,7 +346,8 @@ fn remove_policy_success() {
         add_policy(&e, rule.id, &policy_address, install_param);
 
         // Removal succeeds
-        remove_policy(&e, rule.id, &policy_address);
+        let policy_id = get_policy_id(&e, rule.id, &policy_address);
+        remove_policy(&e, rule.id, policy_id);
     });
 }
 
@@ -330,10 +356,9 @@ fn remove_policy_success() {
 fn remove_policy_nonexistent_rule_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
-    let policy_address = e.register(MockPolicyContract, ());
 
     e.as_contract(&address, || {
-        remove_policy(&e, 999, &policy_address); // Non-existent rule ID
+        remove_policy(&e, 999, 0); // Non-existent rule ID
     });
 }
 
@@ -342,12 +367,10 @@ fn remove_policy_nonexistent_rule_fails() {
 fn remove_policy_not_found_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
-    let policy_address = e.register(MockPolicyContract, ());
-
     let rule = setup_test_rule(&e, &address);
 
     e.as_contract(&address, || {
-        remove_policy(&e, rule.id, &policy_address); // Policy not in rule
+        remove_policy(&e, rule.id, 999); // Policy ID not in rule
     });
 }
 
@@ -374,7 +397,8 @@ fn remove_policy_last_one_fails() {
         );
 
         // Try to remove the only policy - should fail with NoSignersAndPolicies
-        remove_policy(&e, rule.id, &policy_address);
+        let policy_id = get_policy_id(&e, rule.id, &policy_address);
+        remove_policy(&e, rule.id, policy_id);
     });
 }
 
@@ -392,7 +416,8 @@ fn remove_policy_with_signers_present_success() {
         add_policy(&e, rule.id, &policy_address, install_param);
 
         // Remove the policy - should succeed because we still have signers
-        remove_policy(&e, rule.id, &policy_address);
+        let policy_id = get_policy_id(&e, rule.id, &policy_address);
+        remove_policy(&e, rule.id, policy_id);
 
         let updated_rule = get_context_rule(&e, rule.id);
         assert_eq!(updated_rule.policies.len(), 0);
@@ -408,11 +433,11 @@ fn validate_signers_and_policies_success() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let signers = Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]);
-        let policies = Vec::from_array(&e, [Address::generate(&e)]);
+        let signer_ids = Vec::from_array(&e, [0u32]);
+        let policy_ids = Vec::from_array(&e, [0u32]);
 
         // Should not panic
-        validate_signers_and_policies(&e, &signers, &policies);
+        validate_signers_and_policies(&e, &signer_ids, &policy_ids);
     });
 }
 
@@ -423,10 +448,10 @@ fn validate_signers_and_policies_no_signers_and_policies_fails() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let signers = Vec::new(&e);
-        let policies = Vec::new(&e);
+        let signer_ids = Vec::new(&e);
+        let policy_ids = Vec::new(&e);
 
-        validate_signers_and_policies(&e, &signers, &policies);
+        validate_signers_and_policies(&e, &signer_ids, &policy_ids);
     });
 }
 
@@ -437,14 +462,13 @@ fn validate_signers_and_policies_too_many_signers_fails() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let mut signers = Vec::new(&e);
-        // Add more than MAX_SIGNERS (15)
-        for _ in 0..=MAX_SIGNERS {
-            signers.push_back(Signer::Delegated(Address::generate(&e)));
+        let mut signer_ids = Vec::new(&e);
+        for i in 0..=MAX_SIGNERS {
+            signer_ids.push_back(i);
         }
-        let policies = Vec::new(&e);
+        let policy_ids = Vec::new(&e);
 
-        validate_signers_and_policies(&e, &signers, &policies);
+        validate_signers_and_policies(&e, &signer_ids, &policy_ids);
     });
 }
 
@@ -455,13 +479,12 @@ fn validate_signers_and_policies_too_many_policies_fails() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let signers = Vec::new(&e);
-        let mut policies = Vec::new(&e);
-        // Add more than MAX_POLICIES (5)
-        for _ in 0..=MAX_POLICIES {
-            policies.push_back(Address::generate(&e));
+        let signer_ids = Vec::new(&e);
+        let mut policy_ids = Vec::new(&e);
+        for i in 0..=MAX_POLICIES {
+            policy_ids.push_back(i);
         }
 
-        validate_signers_and_policies(&e, &signers, &policies);
+        validate_signers_and_policies(&e, &signer_ids, &policy_ids);
     });
 }

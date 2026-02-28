@@ -10,12 +10,12 @@ use soroban_sdk::{
 use crate::{
     policies::Policy,
     smart_account::{
-        get_context_rule_ids, get_context_rules_count,
         storage::{
             add_context_rule, authenticate, contains_canonical_duplicate, do_check_auth,
-            get_authenticated_signers, get_context_rule, get_validated_context_by_id,
-            remove_context_rule, update_context_rule_name, update_context_rule_valid_until,
-            ContextRule, ContextRuleType, Signatures, Signer,
+            get_authenticated_signers, get_context_rule, get_context_rules_count,
+            get_validated_context_by_id, remove_context_rule, update_context_rule_name,
+            update_context_rule_valid_until, ContextRule, ContextRuleType, Signatures, Signer,
+            SmartAccountStorageKey,
         },
         MAX_EXTERNAL_KEY_SIZE,
     },
@@ -350,9 +350,10 @@ fn add_context_rule_multiple_rules() {
         assert_eq!(rule2.policies.len(), 2);
         assert_eq!(rule2.valid_until, None);
 
-        assert_eq!(e.events().all().events().len(), 2);
+        // Events: 2 ContextRuleAdded + 2 SignerRegistered (shared) + 2 PolicyRegistered
+        // = 6
+        assert_eq!(e.events().all().events().len(), 6);
         assert_eq!(get_context_rules_count(&e), 2);
-        assert_eq!(get_context_rule_ids(&e, &ContextRuleType::Default), vec![&e, 0, 1])
     });
 }
 
@@ -400,7 +401,6 @@ fn add_context_rule_past_valid_until_fails() {
     e.as_contract(&address, || {
         let signers = create_test_signers(&e);
         let contract_addr = Address::generate(&e);
-        //let current = e.ledger().sequence();
         e.ledger().set_sequence_number(100);
 
         add_context_rule(
@@ -604,7 +604,8 @@ fn remove_context_rule_success() {
         assert_eq!(retrieved_rule.id, rule.id);
 
         remove_context_rule(&e, rule.id);
-        assert_eq!(e.events().all().events().len(), 1);
+        // Events: 1 ContextRuleRemoved + 2 SignerDeregistered (no policies) = 3
+        assert_eq!(e.events().all().events().len(), 3);
     });
 
     let rule = e.as_contract(&address, || {
@@ -628,7 +629,9 @@ fn remove_context_rule_success() {
     // Removal succeeds
     e.as_contract(&address, || {
         remove_context_rule(&e, rule.id);
-        assert_eq!(e.events().all().events().len(), 1);
+        // Events: 1 ContextRuleRemoved + 2 SignerDeregistered + 2 PolicyDeregistered =
+        // 5
+        assert_eq!(e.events().all().events().len(), 5);
         assert_eq!(get_context_rules_count(&e), 0);
     });
 }
@@ -1018,5 +1021,77 @@ fn contains_canonical_duplicate_delegated_signers() {
 
         assert!(contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_a)));
         assert!(!contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_b)));
+    });
+}
+
+// ################## MATH OVERFLOW TESTS ##################
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3012)")]
+fn add_context_rule_next_id_overflow_fails() {
+    // When NextId == u32::MAX, incrementing it after storing a new rule
+    // must panic with MathOverflow rather than wrapping.
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        e.storage().instance().set(&SmartAccountStorageKey::NextId, &u32::MAX);
+
+        add_context_rule(
+            &e,
+            &ContextRuleType::Default,
+            &String::from_str(&e, "overflow"),
+            None,
+            &Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]),
+            &Map::new(&e),
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3012)")]
+fn add_context_rule_next_signer_id_overflow_fails() {
+    // When NextSignerId == u32::MAX, registering a new signer must panic
+    // with MathOverflow rather than wrapping.
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        e.storage().instance().set(&SmartAccountStorageKey::NextSignerId, &u32::MAX);
+
+        add_context_rule(
+            &e,
+            &ContextRuleType::Default,
+            &String::from_str(&e, "overflow"),
+            None,
+            &Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]),
+            &Map::new(&e),
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3012)")]
+fn add_context_rule_next_policy_id_overflow_fails() {
+    // When NextPolicyId == u32::MAX, registering a new policy must panic
+    // with MathOverflow rather than wrapping.
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        e.storage().instance().set(&SmartAccountStorageKey::NextPolicyId, &u32::MAX);
+
+        let policy = e.register(MockPolicyContract, ());
+        let mut policies = Map::new(&e);
+        policies.set(policy, Val::from_void().into());
+
+        add_context_rule(
+            &e,
+            &ContextRuleType::Default,
+            &String::from_str(&e, "overflow"),
+            None,
+            &Vec::new(&e),
+            &policies,
+        );
     });
 }
