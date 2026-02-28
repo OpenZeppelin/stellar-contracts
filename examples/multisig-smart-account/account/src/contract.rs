@@ -193,6 +193,22 @@ impl ExecutionEntryPoint for MultisigContract {
     }
 }
 
+impl MultisigContract {
+    pub fn batch_add_signer(e: &Env, context_rule_id: u32, signers: Vec<Signer>) {
+        for signer in signers.iter() {
+            add_signer(e, context_rule_id, &signer);
+        }
+    }
+
+    pub fn batch_add_policy(e: &Env, context_rule_id: u32, policies: Vec<Address>, policy_params: Vec<Val>) {
+        assert!(policies.len() == policy_params.len());
+
+        for (policy, param) in policies.iter().zip(policy_params.iter()) {
+            add_policy(e, context_rule_id, &policy, param);
+        }
+    }
+}
+
 impl UpgradeableInternal for MultisigContract {
     fn _require_auth(e: &Env, _operator: &Address) {
         e.current_contract_address().require_auth();
