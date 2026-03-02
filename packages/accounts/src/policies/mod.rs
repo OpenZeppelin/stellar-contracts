@@ -26,8 +26,7 @@ pub mod weighted_threshold;
 ///
 /// Policies follow a three-phase lifecycle:
 /// 1. **Installation** - Policy is configured and attached to a context rule.
-/// 2. **Enforcement** - Policy validates and potentially modifies authorization
-///    attempts.
+/// 2. **Enforcement** - Policy validates and enforces authorization attempts.
 /// 3. **Uninstallation** - Policy is removed and cleaned up.
 ///
 /// # Type Parameters
@@ -42,79 +41,19 @@ pub mod weighted_threshold;
 ///
 /// # Implementation Guidelines
 ///
-/// - `can_enforce`: Should be pure validation with no state changes
-/// - `enforce`: Can modify state and must be authorized by the smart account
-/// - `install`/`uninstall`: Handle policy-specific setup and cleanup
-///
-/// # Examples
-///
-/// ```rust
-/// use soroban_sdk::{Address, Env, Val};
-/// use stellar_accounts::policies::Policy;
-///
-/// struct SpendingLimitPolicy;
-/// impl Policy for SpendingLimitPolicy {
-///     type AccountParams = u64;
-///
-///     // Daily spending limit
-///
-///     fn can_enforce(/* ... */) -> bool {
-///         // Check if spending limit allows this transaction
-///         true
-///     }
-///
-///     fn enforce(/* ... */) {
-///         // Update spending tracking
-///     }
-///
-///     fn install(/* ... */) {
-///         // Initialize spending limit storage
-///     }
-///
-///     fn uninstall(/* ... */) {
-///         // Clean up policy storage
-///     }
-/// }
-/// ```
+/// - `enforce`: Performs both validation and state changes; must be authorized
+///   by the smart account. Should panic if the policy conditions are not met.
+/// - `install`/`uninstall`: Handle policy-specific setup and cleanup.
 pub trait Policy {
     type AccountParams: FromVal<Env, Val>;
 
-    /// Determines whether this policy can be enforced for the given
-    /// authorization context.
+    /// Enforces the policy's authorization logic, performing both validation
+    /// and any state changes.
     ///
-    /// This method performs read-only validation to check if the policy's
-    /// conditions are satisfied. It should not trigger any state changes as
-    /// it may be called multiple times during authorization evaluation for
-    /// different context rule configurations.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `context` - The authorization context being evaluated.
-    /// * `authenticated_signers` - List of signers that have been
-    ///   cryptographically verified.
-    /// * `context_rule` - The context rule this policy is attached to.
-    /// * `smart_account` - The address of the smart account being authorized.
-    ///
-    /// # Implementation Notes
-    ///
-    /// - Must be idempotent and side-effect free
-    /// - May read from storage but must not modify it
-    /// - Should be efficient as it may be called multiple times
-    fn can_enforce(
-        e: &Env,
-        context: Context,
-        authenticated_signers: Vec<Signer>,
-        context_rule: ContextRule,
-        smart_account: Address,
-    ) -> bool;
-
-    /// Enforces the policy's authorization logic and may trigger state changes.
-    ///
-    /// This method serves as a hook that executes after `can_enforce` returns
-    /// `true`. It can modify storage state and perform actions as part of
-    /// the authorization process. This method must be authorized by the
-    /// smart account.
+    /// This method is called during authorization to verify that policy
+    /// conditions are met. It should panic if the conditions are not
+    /// satisfied. It can modify storage state as part of the authorization
+    /// process and must be authorized by the smart account.
     ///
     /// # Arguments
     ///
@@ -180,16 +119,6 @@ pub trait Policy {
 #[allow(unused)]
 #[contractclient(name = "PolicyClient")]
 trait PolicyClientInterface {
-    fn can_enforce(
-        e: &Env,
-        context: Context,
-        authenticated_signers: Vec<Signer>,
-        context_rule: ContextRule,
-        smart_account: Address,
-    ) -> bool;
-
-    // this serves as a hook and can trigger state changes and must be authorized by
-    // the smart account (`source.require_auth()`)
     fn enforce(
         e: &Env,
         context: Context,

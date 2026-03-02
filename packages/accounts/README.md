@@ -6,7 +6,7 @@ This package provides a comprehensive smart account framework for Soroban, enabl
 
 Smart accounts in Soroban implement `CustomAccountInterface` and define authorization as data and behavior that can be evolved over time. The framework is context‑centric:
 
-It distinguishes who is allowed to act (signers), what they are allowed to do (context rules), and how those permissions are enforced (policies). Under the hood, Protocol 23 improvements make this design practical, with marginal storage read costs and substantially cheaper cross‑contract calls, so composing multiple checks is efficient enough for production.
+It separates authentication (signers prove identity), authorization scope (context rules bind signers and policies to specific operations), and enforcement logic (policies apply business constraints like spending limits or thresholds). Under the hood, Protocol 23 improvements make this design practical, with marginal storage read costs and substantially cheaper cross‑contract calls, so composing multiple checks is efficient enough for production.
 
 In practical terms, a smart account is a contract that manages the composition of authorization intents coming from multiple sources. Those sources can be policies (for example, a spending limit) and signing keys that may use different cryptographic curves. The goal is to enable flexible combinations of authentication methods by allowing several authorization mechanisms to work together seamlessly. For instance, a wallet might require both a session policy and a passkey that expires in 24 hours, and treat this combination as a single composite “key” that the client uses to authorize actions.
 
@@ -21,21 +21,21 @@ The `SmartAccount` trait extends `CustomAccountInterface` from `soroban_sdk` wit
 ```rust
 pub trait SmartAccount: CustomAccountInterface {
     fn get_context_rule(e: &Env, context_rule_id: u32) -> ContextRule;
-    fn get_context_rules(e: &Env, context_rule_type: ContextRuleType) -> Vec<ContextRule>;
-    fn create_context_rule(/* ... */) -> ContextRule;
+    fn get_context_rules_count(e: &Env) -> u32;
+    fn add_context_rule(/* ... */) -> ContextRule;
     fn update_context_rule_name(/* ... */) -> ContextRule;
     fn update_context_rule_valid_until(/* ... */) -> ContextRule;
-    fn remove_context_rule(/* ... */);
-    fn add_signer(/* ... */);
-    fn remove_signer(/* ... */);
-    fn add_policy(/* ... */);
-    fn remove_policy(/* ... */);
+    fn remove_context_rule(e: &Env, context_rule_id: u32);
+    fn add_signer(e: &Env, context_rule_id: u32, signer: Signer);
+    fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32);
+    fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val);
+    fn remove_policy(e: &Env, context_rule_id: u32, policy_id: u32);
 }
 ```
 
 ### 2. Context Rules
 
-Context rules function like routing tables for authorization: for each context, they specify scope, lifetime, and the conditions, signers and policies, that must match before execution proceeds:
+Context rules function like routing tables for authorization: for each `Context`, they specify scope, lifetime, and the conditions, signers and policies, that must match before execution proceeds.
 
 #### Structure
 
@@ -49,14 +49,25 @@ Context rules function like routing tables for authorization: for each context, 
 - **Signers**: List of authorized signers (max: 15)
 - **Policies**: Map of policy contracts and their parameters (max: 5)
 
-In addition, a single smart account can hold multiple context rules across its contexts. The maximum number of context rules per smart account is 15.
+A single smart account can hold any number of context rules. There is no upper limit on the number of context rules per account.
 
 #### Key Properties
 
 - Each rule must contain at least one signer OR one policy
 - Multiple rules can exist for the same context type
-- Rules are evaluated in reverse chronological order (newest first)
-- Expired rules are automatically filtered out
+- Expired rules are rejected at authorization time
+
+#### `soroban_sdk::auth::Context` and `ContextRule`
+
+`soroban_sdk::auth::Context` is a Soroban SDK type representing a single authorized operation within a transaction. When `__check_auth` is invoked, the runtime passes `auth_contexts: Vec<Context>` — one entry per `require_auth` call in the transaction. Each variant captures the operation details:
+
+- `Contract(ContractContext)` — a contract function call, carrying the `contract` address, `fn_name`, and `args`
+- `CreateContractHostFn(CreateContractHostFnContext)` — a contract deployment without constructor arguments, carrying `executable` (WASM hash) and `salt`
+- `CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext)` — a contract deployment with constructor arguments
+
+A `ContextRule` is this library's concept: a stored authorization requirements entry that lives in the smart account's own storage. A `ContextRule` is bound to a `ContextRuleType` that narrows which `Context` variants it can authorize. A smart account can hold **any number of `ContextRule`s covering the same context type** — for example, an admin rule and a time-limited session rule can both be scoped to `CallContract(dex_address)`.
+
+During authorization the caller must supply **exactly one `ContextRule` ID per `Context`** in `AuthPayload::context_rule_ids`. The caller explicitly selects which stored rule to validate against for each operation.
 
 ### 3. Signers
 
@@ -102,16 +113,13 @@ pub trait Verifier {
 
 ### 5. Policies
 
-Policies act as enforcement modules attached to context rules: they perform read‑only prechecks and, when authorized, can update state to enforce limits or workflows.
+Policies act as enforcement modules attached to context rules: they validate authorization requirements and, when authorized, can update state to enforce limits or workflows.
 
 ```rust
 pub trait Policy {
     type AccountParams: FromVal<Env, Val>;
 
-    // Read-only pre-check, no state changes
-    fn can_enforce(/* ... */) -> bool;
-
-    // State-changing hook, requires smart account authorization
+    // Validate authorization and apply any state changes
     fn enforce(/* ... */);
 
     // Initialize policy-specific storage and configuration
@@ -124,13 +132,11 @@ pub trait Policy {
 
 #### Lifecycle
 
-Policies follow a well-defined lifecycle that integrates with context rule management and the authorization matching algorithm.
+Policies follow a well-defined lifecycle that integrates with context rule management and authorization.
 
 **Installation** occurs when a new context rule is created with attached policies. The smart account calls `install()` on each policy contract, passing account-specific and context-specific parameters. This initialization step allows policies to configure their logic (for example, a threshold policy might define the required number of signatures for that particular account and context rule, while a spending limit policy might set daily or per-transaction caps). Installation ensures that each policy has the necessary state and configuration ready before authorization checks begin.
 
-**Pre-check validation** happens during authorization. When the matching algorithm iterates over context rules and their associated policies, it calls `can_enforce()` on each policy as a read-only pre-check. This function examines the current state without modifying it, for instance, verifying that a spending limit has not been exceeded or that enough signers are present. Policies that fail this check cause the algorithm to move to the next context rule.
-
-**Enforcement** is triggered when a context rule successfully matches. Once all policies in the matched rule pass their `can_enforce()` checks, the smart account calls `enforce()` on each policy. This state-changing hook allows policies to update counters, emit events, record timestamps, or perform other mutations that track authorization activity. For example, a spending limit policy might deduct from the available balance and emit an event documenting the transaction.
+**Enforcement** is triggered when a context rule is validated. The smart account calls `enforce()` on each policy in the matched rule. This hook validates authorization requirements (for example, that enough signers are present or that a spending limit is not exceeded) and applies any necessary state changes (for example, updating counters or emitting events). If a policy rejects the authorization attempt, the transaction is reverted.
 
 **Uninstallation** occurs when a context rule is removed from the smart account. The account calls `uninstall()` on each attached policy, allowing them to clean up any stored data associated with that specific account and context rule pairing. This ensures that policies do not leave orphaned state in storage.
 
@@ -154,9 +160,9 @@ Conversely, if signers are added without updating the threshold, the security gu
 
 Administrators must manually update thresholds and weights when modifying signer sets. Before removing signers, verify that the threshold remains achievable. After adding signers, adjust thresholds or assign weights to maintain the desired security level. Ideally, these updates should occur in the same transaction as the signer modifications.
 
-**Pre-check Constraints**
+**`enforce()` Responsibilities**
 
-The `can_enforce()` function must be idempotent, side-effect free, and efficient. It may read from storage but must not modify it. This constraint exists because the matching algorithm may call `can_enforce()` multiple times during rule evaluation, and failed checks should not leave any persistent changes.
+The `enforce()` function handles both validation and state mutation in a single step. It must reject invalid authorization by panicking (which reverts the transaction), and apply any necessary state changes (for example, decrementing a spending allowance or incrementing a counter). Because it runs after signature authentication and context type matching are already confirmed, the focus inside `enforce()` is on business-logic constraints.
 
 ### 6. Execution Entry Point
 
@@ -172,45 +178,54 @@ This trait provides a secure mechanism for updating policy configuration after i
 
 ## Authorization Flow
 
-Authorization is determined by matching the current call context against the account’s context rules. Rules are gathered, ordered by recency, and evaluated until one satisfies the requirements. If a matching rule is found, its policies (if any) are enforced. Otherwise, authorization fails.
+Authorization is determined by explicitly selecting the rule to validate against for each auth context. The caller specifies rule IDs in the `AuthPayload` struct, one per auth context. No rule iteration or auto-discovery is performed.
 
-The evaluation proceeds as follows:
+### 1. Signature Authentication
 
-### 1. Rule Collection
+All provided signatures are authenticated up front:
+- `Delegated` signers use `require_auth_for_args(payload)`.
+- `External` signers are verified through their verifier contract.
 
-- Retrieve all non-expired rules for the specific context type
-- Include default rules that apply to any context
-- Sort by creation time (newest first)
+### 2. Per-Context Validation
 
-### 2. Rule Evaluation
+For each (auth context, rule ID) pair:
 
-For each rule in order:
-
-1. Signer Filtering: Extract authenticated signers from the context rule's signer list
-2. Policy Validation: If policies exist, verify all can be enforced via `can_enforce()`
-3. Authorization Check:
-   - With policies: Success if all policies are enforceable
-   - Without policies: Success if all signers are authenticated
-4. Rule Precedence: First matching rule wins (newest takes precedence)
+1. **Rule Lookup**: Retrieve the rule by ID; reject if it does not exist.
+2. **Expiration Check**: Reject if the rule’s `valid_until` is in the past.
+3. **Context Type Check**: Reject if the rule’s context type does not match the actual context (`Default` matches any context).
+4. **Signer Filtering**: Identify which rule signers are authenticated.
+5. **Signer Requirement**: Without policies, all rule signers must be authenticated. With policies, full signer validation is deferred to `enforce()`.
 
 ### 3. Policy Enforcement
 
-- If authorization succeeds, call `enforce()` on all matched policies
-- This triggers any necessary state changes (spending tracking, etc.)
+After all contexts are validated, `enforce()` is called on every policy in every matched rule. Policies validate authorization requirements (for example, threshold counts or spending limits) and apply any state changes. If a policy rejects, the transaction reverts.
 
 ### 4. Result
 
-- **Success**: Authorization granted, transaction proceeds
-- **Failure**: Authorization denied, transaction reverts
+- **Success**: Authorization granted, transaction proceeds.
+- **Failure**: Authorization denied, transaction reverts.
+
+### Constructing `AuthPayload`
+
+`Vec<context_rule_ids>` must have the same length as `Vec<Context>`, a mismatch is rejected with `ContextRuleIdsLengthMismatch`.
+
+```rust
+// One rule ID per auth context.
+AuthPayload {
+    signers: signature_map,
+    context_rule_ids: vec![&e, rule_a_id, rule_b_id],
+}
+```
+
+Each rule must:
+- Exist (not have been removed).
+- Not be expired.
+- Have a context type compatible with its corresponding auth context (`Default` matches any context).
+- Have its signer and policy requirements satisfied.
 
 #### Example
 
-Consider a call in the `CallContract(dex_address)` context. The client presents two authorization entries: an ed25519 key and a passkey signature. The smart account maintains two relevant rules:
-
-- A default rule with three ed25519 keys.
-- A newer `CallContract(dex_address)` rule that requires both the ed25519 key and the passkey, along with a daily spend policy.
-
-During evaluation, non‑expired rules are gathered and ordered by recency. The specific `CallContract(dex_address)` rule is evaluated first. The account authenticates the ed25519 key and the passkey. Because the rule includes policies, the account verifies that all policies can be enforced. Since checks pass, the policies are enforced (e.g., spending counters are updated) and authorization succeeds. If the specific rule did not match, evaluation would continue to the default rule; if no rule matched, authorization would fail.
+Consider a call in the `CallContract(dex_address)` context. The client presents an ed25519 key and a passkey signature. The smart account has a `CallContract(dex_address)` rule requiring both signers and a daily spending limit policy. The client sets `context_rule_ids = [rule_id]`. The account authenticates both keys, validates the rule, and then calls the spending limit policy’s `enforce()`, which checks the limit and updates counters. Authorization succeeds.
 
 ## Use Cases
 
@@ -296,7 +311,7 @@ stellar-accounts = "=0.6.0"
 ```rust
 use stellar_accounts::smart_account::{
     add_context_rule, do_check_auth, ContextRule, ContextRuleType,
-    Signatures, Signer, SmartAccount, SmartAccountError,
+    AuthPayload, Signer, SmartAccount, SmartAccountError,
 };
 #[contract]
 pub struct MySmartAccount;
@@ -313,26 +328,36 @@ impl SmartAccount for MySmartAccount {
     ) -> ContextRule {
         e.current_contract_address().require_auth();
 
-        add_context_rule(e, &context_type, &name, &valid_until, &signers, &policies)
+        add_context_rule(e, &context_type, &name, valid_until, &signers, &policies)
     }
     // Implement all other methods
 }
 
 #[contractimpl]
 impl CustomAccountInterface for MySmartAccount {
-    type Signature = Signatures;
+    type Signature = AuthPayload;
 
     fn __check_auth(
         e: Env,
         signature_payload: Hash<32>,
-        signatures: Signatures,
-        auth_context: Vec<Context>,
+        signatures: AuthPayload,
+        auth_contexts: Vec<Context>,
     ) -> Result<(), SmartAccountError> {
-        do_check_auth(e, signature_payload, signatures, auth_contexts)
-
-        Ok(())
+        do_check_auth(&e, &signature_payload, &signatures, &auth_contexts)
     }
 }
+```
+
+#### Constructing `AuthPayload`
+
+Build the `AuthPayload` value in the client (SDK/wallet) before submitting the transaction. Always provide one rule ID per auth context:
+
+```rust
+// One rule ID per auth context — always required.
+let signatures = AuthPayload {
+    signers: signature_map,
+    context_rule_ids: vec![&e, rule_a_id, rule_b_id],
+};
 ```
 
 ### 3. Create Context Rules
@@ -389,12 +414,118 @@ For external signers, there are two options:
 
 ## Caveats
 
-- Multiple context rules for the same context can co‑exist; the most recently added one takes precedence.
+- Multiple context rules for the same context can co‑exist. The caller selects which rule to validate against by specifying rule IDs in `context_rule_ids`. Remove outdated permissive rules when they are no longer needed.
 - For simple cases like threshold‑based multisig, using a policy may feel verbose compared to embedding logic directly in the account, but keeping business rules in policies preserves separation of concerns and allows for a greater flexibility.
-- Authorization composes independent contracts (the smart account, verifiers, and policies). Protocol 23 makes cross‑contract calls cheap, but not free, so the framework sets explicit limits to keep costs predictable:
+- Authorization composes independent contracts (the smart account, verifiers, and policies). Protocol 23 makes cross‑contract calls cheap, but not free, so the framework sets explicit limits to keep per-rule costs predictable:
   - Maximum signers per context rule: 15
   - Maximum policies per context rule: 5
-  - Maximum context rules per smart account: 15
+- Signers and policies are stored in a global registry and deduplicated across rules. The same signer object (identified by its XDR encoding) is stored once regardless of how many rules reference it. Each signer and policy is assigned a stable `u32` ID that is used when removing them from a rule (`remove_signer`, `remove_policy`).
+
+## Migration Guide: from v0.6.0 to 0.7.0
+
+### `AuthPayload` struct (breaking change)
+
+`AuthPayload` changed from a tuple struct to a named-field struct:
+
+```rust
+// Before
+pub struct AuthPayload(pub Map<Signer, Bytes>);
+
+// After
+pub struct AuthPayload {
+    pub signers: Map<Signer, Bytes>,
+    pub context_rule_ids: Vec<u32>,  // required: one ID per auth context
+}
+```
+
+This changes the XDR encoding. A tuple struct is serialized as `ScVal::Vec`, while a named struct is serialized as `ScVal::Map` with `Symbol` keys.
+
+#### XDR / off-chain clients (JS SDK, CLI tools, etc.)
+
+The `signature` field in `SorobanAddressCredentials` must change from a single-element `ScVal::Vec` wrapping the signer map to an `ScVal::Map` with two `Symbol`-keyed entries, always including the rule IDs:
+
+```rust
+// Before — tuple struct encoding
+ScVal::Vec([
+    ScVal::Map(/* signer -> signature entries */)
+])
+
+// After — named struct encoding with rule IDs (one per auth context)
+ScVal::Map([
+    (Symbol("context_rule_ids"), ScVal::Vec(/* rule IDs, one per auth context */)),
+    (Symbol("signers"),          ScVal::Map(/* signer → signature entries */)),
+])
+```
+
+Concrete example (with the `stellar_xdr` crate):
+
+```rust
+// Before
+let sig_map = ScVal::Map(Some(ScMap::sorted_from(signatures)?));
+creds.signature = ScVal::Vec(Some(ScVec(VecM::try_from([sig_map])?)));
+
+// After — one rule ID per auth context, always required
+creds.signature = ScVal::Map(Some(ScMap::sorted_from([
+    (
+        ScVal::Symbol("context_rule_ids".try_into()?),
+        ScVal::Vec(Some(ScVec(VecM::try_from([
+            ScVal::U32(rule_id_for_context_0),
+            ScVal::U32(rule_id_for_context_1),
+        ])?))),
+    ),
+    (
+        ScVal::Symbol("signers".try_into()?),
+        sig_map,
+    ),
+])?));
+```
+
+### `Policy` trait (breaking change)
+
+The `can_enforce()` method has been removed. The `enforce()` method is now responsible for both validation and state changes:
+
+```rust
+// Before
+pub trait Policy {
+    fn can_enforce(/* ... */) -> bool;
+    fn enforce(/* ... */);
+    fn install(/* ... */);
+    fn uninstall(/* ... */);
+}
+
+// After — can_enforce removed
+pub trait Policy {
+    fn enforce(/* ... */);  // validates and applies state changes
+    fn install(/* ... */);
+    fn uninstall(/* ... */);
+}
+```
+
+Remove `can_enforce` from all policy contract implementations.
+
+### Iteration removed (behavioral change)
+
+The automatic newest-first rule iteration path has been removed. The `context_rule_ids` field in `AuthPayload` is now mandatory. Every client must explicitly supply the rule ID to validate against for each auth context.
+
+### `get_context_rules` removed (breaking change)
+
+The deprecated `get_context_rules` method that returned a `Vec<ContextRule>` has been removed. Use `get_context_rule` to fetch individual rules by their ID and `get_context_rules_count` to know how many rules exist.
+
+### `TooManyContextRules` replaced by `MathOverflow` (breaking change)
+
+The `TooManyContextRules = 3012` error has been renamed to `MathOverflow = 3012`. There is no longer an upper limit on the number of context rules per smart account. Error code 3012 is now emitted when an internal ID counter (`NextId`, `NextSignerId`, or `NextPolicyId`) reaches `u32::MAX` and cannot be incremented further.
+
+### `remove_signer` and `remove_policy` now take IDs (breaking change)
+
+`remove_signer` now takes a `signer_id: u32` instead of a full `Signer` object. `remove_policy` now takes a `policy_id: u32` instead of an `Address`. IDs are emitted in events when signers and policies are added:
+
+- `context_rule_added` event data includes `signer_ids: Vec<u32>` and `policy_ids: Vec<u32>`
+- `signer_added` event data includes `signer_id: u32`
+- `policy_added` event data includes `policy_id: u32`
+
+### Global signer and policy registry (behavioral change)
+
+Signers and policies are now stored in a global registry and deduplicated across context rules. The same signer (identified by its XDR encoding) or policy address is stored once regardless of how many rules reference it. A reference count is maintained; storage is cleaned up automatically when the count reaches zero. This reduces storage usage when signers or policies are shared across multiple rules.
 
 ## Crate Structure
 

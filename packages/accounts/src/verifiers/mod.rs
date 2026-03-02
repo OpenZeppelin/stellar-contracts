@@ -10,7 +10,7 @@ pub mod ed25519;
 mod test;
 pub mod utils;
 pub mod webauthn;
-use soroban_sdk::{contractclient, Bytes, Env, FromVal, Val};
+use soroban_sdk::{contractclient, Bytes, Env, FromVal, Val, Vec};
 
 /// Core trait for cryptographic signature verification in smart accounts.
 ///
@@ -104,6 +104,50 @@ pub trait Verifier {
     /// }
     /// ```
     fn verify(e: &Env, hash: Bytes, key_data: Self::KeyData, sig_data: Self::SigData) -> bool;
+
+    /// Returns the canonical byte representation of the given key data.
+    ///
+    /// This method maps key data to a unique canonical identity, allowing
+    /// the Smart Account to detect when two different byte representations
+    /// refer to the same underlying cryptographic key. This is used during
+    /// signer registration to prevent a single key holder from registering
+    /// multiple "distinct" signers that share the same cryptographic
+    /// identity, which could bypass N-of-M threshold policies.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `key_data` - The public key data in the format expected by this
+    ///   verifier.
+    ///
+    /// # Panics
+    ///
+    /// Implementations should panic with appropriate error codes when:
+    /// - `key_data` is malformed or has invalid length
+    /// - `key_data` does not represent a valid key for this scheme
+    ///
+    /// # Security Requirements
+    ///
+    /// Implementations must satisfy:
+    /// - `canonicalize_key(a) == canonicalize_key(b)` if and only if `a` and
+    ///   `b` represent the same cryptographic identity
+    /// - All valid representations of a given key must map to the same
+    ///   canonical output
+    fn canonicalize_key(e: &Env, key_data: Self::KeyData) -> Bytes;
+
+    /// Canonicalizes a batch of keys in one call. Returns a vector of canonical
+    /// key bytes. The output order must match input.
+    ///
+    /// This method is a batched variant of [`Verifier::canonicalize_key`]. It
+    /// allows callers to canonicalize multiple keys for the same verifier in a
+    /// single cross-contract invocation, reducing overhead and making duplicate
+    /// detection more efficient.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `key_data` - A vector of key values to canonicalize.
+    fn batch_canonicalize_key(e: &Env, key_data: Vec<Self::KeyData>) -> Vec<Bytes>;
 }
 
 // We need to declare a `VerifierClientInterface` here, instead of using the
@@ -116,4 +160,6 @@ pub trait Verifier {
 #[contractclient(name = "VerifierClient")]
 trait VerifierClientInterface {
     fn verify(e: &Env, hash: Bytes, key_data: Val, sig_data: Val) -> bool;
+    fn canonicalize_key(e: &Env, key_data: Val) -> Bytes;
+    fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes>;
 }

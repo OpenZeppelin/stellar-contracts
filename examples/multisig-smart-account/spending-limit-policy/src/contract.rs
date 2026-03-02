@@ -28,35 +28,11 @@ pub struct SpendingLimitPolicyContract;
 impl Policy for SpendingLimitPolicyContract {
     type AccountParams = spending_limit::SpendingLimitAccountParams;
 
-    /// Check if the spending limit policy can be enforced.
-    ///
-    /// Verifies that the transaction amount does not exceed the remaining
-    /// spending limit for the current time period.
-    ///
-    /// # Returns
-    ///
-    /// * `true` if the spending limit allows the transaction
-    /// * `false` otherwise
-    fn can_enforce(
-        e: &Env,
-        context: Context,
-        authenticated_signers: Vec<Signer>,
-        context_rule: ContextRule,
-        smart_account: Address,
-    ) -> bool {
-        spending_limit::can_enforce(
-            e,
-            &context,
-            &authenticated_signers,
-            &context_rule,
-            &smart_account,
-        )
-    }
-
     /// Enforce the spending limit policy.
     ///
-    /// Records the transaction amount and updates the spending history.
-    /// This is called after `can_enforce` returns true.
+    /// Validates that the transaction amount does not exceed the remaining
+    /// spending limit, records the transaction amount and updates the
+    /// spending history.
     fn enforce(
         e: &Env,
         context: Context,

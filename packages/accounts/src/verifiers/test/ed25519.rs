@@ -99,3 +99,19 @@ fn ed25519_verify_wrong_key() {
         verify(&e, &Bytes::from_array(&e, &signature_payload.to_array()), &key_data, &sig_data);
     });
 }
+
+#[test]
+fn ed25519_canonicalize_key() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let key_bytes = [42u8; 32];
+        let public_key = BytesN::<32>::from_array(&e, &key_bytes);
+
+        let canonical = crate::verifiers::ed25519::canonicalize_key(&e, &public_key);
+
+        assert_eq!(canonical, Bytes::from_array(&e, &key_bytes));
+        assert_eq!(canonical.len(), 32);
+    });
+}

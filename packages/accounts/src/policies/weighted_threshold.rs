@@ -223,40 +223,6 @@ pub fn calculate_weight(
     total_weight
 }
 
-/// Checks if the weighted threshold policy can be enforced based on the total
-/// weight of authenticated signers. Returns `true` if the total weight of
-/// authenticated signers meets or exceeds the threshold, `false` otherwise or
-/// if the policy is not installed.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `_context` - The authorization context (unused).
-/// * `authenticated_signers` - The list of authenticated signers.
-/// * `context_rule` - The context rule for this policy.
-/// * `smart_account` - The address of the smart account.
-pub fn can_enforce(
-    e: &Env,
-    _context: &Context,
-    authenticated_signers: &Vec<Signer>,
-    context_rule: &ContextRule,
-    smart_account: &Address,
-) -> bool {
-    let key = WeightedThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
-    let params: Option<WeightedThresholdAccountParams> = e.storage().persistent().get(&key);
-
-    if let Some(params) = params {
-        e.storage().persistent().extend_ttl(
-            &key,
-            WEIGHTED_THRESHOLD_TTL_THRESHOLD,
-            WEIGHTED_THRESHOLD_EXTEND_AMOUNT,
-        );
-        calculate_weight(e, authenticated_signers, context_rule, smart_account) >= params.threshold
-    } else {
-        false
-    }
-}
-
 // ################## CHANGE STATE ##################
 
 /// Enforces the weighted threshold policy if the weight requirements are met.

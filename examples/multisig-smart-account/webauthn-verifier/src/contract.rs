@@ -16,7 +16,7 @@
 //! be of a variable length. The public key is available on the client side only
 //! during the passkey generation and the credential ID is used to identify the
 //! passkey.
-use soroban_sdk::{contract, contractimpl, xdr::FromXdr, Bytes, BytesN, Env};
+use soroban_sdk::{contract, contractimpl, xdr::FromXdr, Bytes, BytesN, Env, Vec};
 use stellar_accounts::verifiers::{
     utils::extract_from_bytes,
     webauthn::{self, WebAuthnSigData},
@@ -61,5 +61,29 @@ impl Verifier for WebauthnVerifierContract {
             extract_from_bytes(e, &key_data, 0..65).expect("65-byte public key to be extracted");
 
         webauthn::verify(e, &signature_payload, &pub_key, &sig_struct)
+    }
+
+    /// Returns the canonical byte representation of a WebAuthn public key.
+    ///
+    /// The canonical identity is the 65-byte uncompressed secp256r1 public
+    /// key, stripping the variable-length credential ID suffix which is not
+    /// part of the cryptographic identity.
+    ///
+    /// # Arguments
+    ///
+    /// * `key_data` - Bytes containing the 65-byte public key followed by an
+    ///   optional credential ID.
+    fn canonicalize_key(e: &Env, key_data: Bytes) -> Bytes {
+        webauthn::canonicalize_key(e, &key_data)
+    }
+
+    /// Canonicalizes a batch of WebAuthn keys.
+    ///
+    /// # Arguments
+    ///
+    /// * `keys_data` - A vector with bytes containing the 65-byte public key
+    ///   followed by an optional credential ID.
+    fn batch_canonicalize_key(e: &Env, keys_data: Vec<Bytes>) -> Vec<Bytes> {
+        Vec::from_iter(e, keys_data.iter().map(|key| webauthn::canonicalize_key(e, &key)))
     }
 }

@@ -2,25 +2,25 @@ extern crate std;
 
 use soroban_sdk::{
     auth::{
-        Context, ContractContext, CreateContractHostFnContext,
+        Context, ContractContext, ContractExecutable, CreateContractHostFnContext,
         CreateContractWithConstructorHostFnContext,
     },
     contract, contractimpl, symbol_short,
     testutils::{Address as _, Events, Ledger},
-    vec, Address, Bytes, BytesN, Env, Map, String, Symbol, Val, Vec,
+    vec, Address, Bytes, BytesN, Env, Map, String, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::{
     policies::Policy,
     smart_account::{
-        get_context_rules, get_context_rules_count, get_validated_context,
         storage::{
-            add_context_rule, authenticate, can_enforce_all_policies, do_check_auth,
-            get_authenticated_signers, get_context_rule, get_valid_context_rules,
-            remove_context_rule, update_context_rule_name, update_context_rule_valid_until,
-            ContextRule, ContextRuleType, Signatures, Signer,
+            add_context_rule, authenticate, contains_canonical_duplicate, do_check_auth,
+            get_authenticated_signers, get_context_rule, get_context_rules_count,
+            get_validated_context_by_id, remove_context_rule, update_context_rule_name,
+            update_context_rule_valid_until, AuthPayload, ContextRule, ContextRuleType, Signer,
+            SmartAccountStorageKey,
         },
-        MAX_CONTEXT_RULES,
+        MAX_EXTERNAL_KEY_SIZE,
     },
 };
 
@@ -33,16 +33,6 @@ struct MockPolicyContract;
 #[contractimpl]
 impl Policy for MockPolicyContract {
     type AccountParams = Val;
-
-    fn can_enforce(
-        e: &Env,
-        _context: Context,
-        _authenticated_signers: Vec<Signer>,
-        _rule: ContextRule,
-        _smart_account: Address,
-    ) -> bool {
-        e.storage().persistent().get(&symbol_short!("enforce")).unwrap_or(true)
-    }
 
     fn enforce(
         _e: &Env,
@@ -70,6 +60,14 @@ struct MockVerifierContract;
 impl MockVerifierContract {
     pub fn verify(e: &Env, _hash: Bytes, _key_data: Val, _sig_data: Val) -> bool {
         e.storage().persistent().get(&symbol_short!("verify")).unwrap_or(true)
+    }
+
+    pub fn canonicalize_key(e: &Env, key_data: Val) -> Bytes {
+        Bytes::try_from_val(e, &key_data).unwrap()
+    }
+
+    pub fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes> {
+        Vec::from_iter(e, key_data.iter().map(|key| Bytes::try_from_val(e, &key).unwrap()))
     }
 }
 
@@ -115,12 +113,12 @@ fn get_context(contract: Address, fn_name: Symbol, args: Vec<Val>) -> Context {
     Context::Contract(ContractContext { contract, fn_name, args })
 }
 
-fn create_signatures(e: &Env, signers: &Vec<Signer>) -> Signatures {
+fn create_signatures(e: &Env, signers: &Vec<Signer>, context_rule_ids: Vec<u32>) -> AuthPayload {
     let mut signature_map = Map::new(e);
     for signer in signers.iter() {
         signature_map.set(signer, Bytes::new(e));
     }
-    Signatures(signature_map)
+    AuthPayload { signers: signature_map, context_rule_ids }
 }
 
 #[test]
@@ -136,7 +134,7 @@ fn do_check_auth_single_context_with_policies_success() {
 
         // Add rule with policies
         let policies_map = create_test_policies_map(&e);
-        add_context_rule(
+        let rule = add_context_rule(
             &e,
             &context_type,
             &String::from_str(&e, "policy_rule"),
@@ -147,7 +145,7 @@ fn do_check_auth_single_context_with_policies_success() {
 
         let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
         let auth_contexts = Vec::from_array(&e, [context]);
-        let signatures = create_signatures(&e, &Vec::new(&e));
+        let signatures = create_signatures(&e, &Vec::new(&e), vec![&e, rule.id]);
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
         let result = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
@@ -196,7 +194,7 @@ fn do_check_auth_multiple_contexts_success() {
         // Create signatures with all required signers
         let mut all_signers = rule1.signers.clone();
         all_signers.append(&rule2.signers);
-        let signatures = create_signatures(&e, &all_signers);
+        let signatures = create_signatures(&e, &all_signers, vec![&e, rule1.id, rule2.id]);
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
         let result = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
@@ -220,7 +218,7 @@ fn do_check_auth_authentication_fails() {
         let key_data = Bytes::from_array(&e, &[1, 2, 3, 4]);
         let external_signer = Signer::External(verifier_addr.clone(), key_data.clone());
         let signers = Vec::from_array(&e, [external_signer.clone()]);
-        add_context_rule(
+        let rule = add_context_rule(
             &e,
             &context_type,
             &String::from_str(&e, "external_rule"),
@@ -239,7 +237,8 @@ fn do_check_auth_authentication_fails() {
 
         let mut signature_map = Map::new(&e);
         signature_map.set(external_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
-        let signatures = Signatures(signature_map);
+        let signatures =
+            AuthPayload { signers: signature_map, context_rule_ids: vec![&e, rule.id] };
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
         let _ = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
@@ -273,72 +272,93 @@ fn do_check_auth_context_validation_fails() {
 
         // Provide insufficient signers
         let insufficient_signers = rule.signers.slice(..1);
-        let signatures = create_signatures(&e, &insufficient_signers);
+        let signatures = create_signatures(&e, &insufficient_signers, vec![&e, rule.id]);
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
         let _ = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
     });
 }
+
 #[test]
-fn add_context_rule_success() {
+#[should_panic(expected = "Error(Contract, #3014)")]
+fn do_check_auth_context_rule_ids_length_mismatch_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let signers = create_test_signers(&e);
         let contract_addr = Address::generate(&e);
-        let future_sequence = e.ledger().sequence() + 1000;
+        let context_type = ContextRuleType::CallContract(contract_addr.clone());
 
+        let signers = create_test_signers(&e);
         let rule = add_context_rule(
             &e,
-            &ContextRuleType::CallContract(contract_addr),
-            &String::from_str(&e, "test_rule"),
-            Some(future_sequence),
+            &context_type,
+            &String::from_str(&e, "rule"),
+            None,
             &signers,
             &Map::new(&e),
         );
 
-        assert_eq!(rule.id, 0);
-        assert_eq!(rule.name, String::from_str(&e, "test_rule"));
-        assert_eq!(rule.signers.len(), 2);
-        assert_eq!(rule.policies.len(), 0);
-        assert_eq!(rule.valid_until, Some(future_sequence));
-        assert_eq!(e.events().all().events().len(), 1);
+        let context_a = get_context(contract_addr.clone(), symbol_short!("fn_a"), vec![&e]);
+        let context_b = get_context(contract_addr, symbol_short!("fn_b"), vec![&e]);
+        let auth_contexts = Vec::from_array(&e, [context_a, context_b]);
+
+        let mut signature_map = Map::new(&e);
+        for signer in signers.iter() {
+            signature_map.set(signer, Bytes::new(&e));
+        }
+        // 2 auth contexts but only 1 rule ID — must fail.
+        let signatures =
+            AuthPayload { signers: signature_map, context_rule_ids: vec![&e, rule.id] };
+
+        let payload = Bytes::from_array(&e, &[1u8; 32]);
+        let _ = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
     });
 }
 
 #[test]
-fn add_context_rule_multiple_rules_increment_id() {
+fn add_context_rule_multiple_rules() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
         let signers = create_test_signers(&e);
-        let contract_addr1 = Address::generate(&e);
-        let contract_addr2 = Address::generate(&e);
+        let policies_map = create_test_policies_map(&e);
 
         let rule1 = add_context_rule(
             &e,
-            &ContextRuleType::CallContract(contract_addr1),
+            &ContextRuleType::Default,
             &String::from_str(&e, "rule_1"),
-            None,
+            Some(1000),
             &signers,
             &Map::new(&e),
         );
 
         let rule2 = add_context_rule(
             &e,
-            &ContextRuleType::CallContract(contract_addr2),
+            &ContextRuleType::Default,
             &String::from_str(&e, "rule_2"),
-            Some(1000),
+            None,
             &signers,
-            &Map::new(&e),
+            &policies_map,
         );
 
         assert_eq!(rule1.id, 0);
-        assert_eq!(rule2.id, 1);
         assert_eq!(rule1.name, String::from_str(&e, "rule_1"));
+        assert_eq!(rule1.signers.len(), 2);
+        assert_eq!(rule1.policies.len(), 0);
+        assert_eq!(rule1.valid_until, Some(1000));
+
+        assert_eq!(rule2.id, 1);
         assert_eq!(rule2.name, String::from_str(&e, "rule_2"));
+        assert_eq!(rule2.signers.len(), 2);
+        assert_eq!(rule2.policies.len(), 2);
+        assert_eq!(rule2.valid_until, None);
+
+        // Events: 2 ContextRuleAdded + 2 SignerRegistered (shared) + 2 PolicyRegistered
+        // = 6
+        assert_eq!(e.events().all().events().len(), 6);
+        assert_eq!(get_context_rules_count(&e), 2);
     });
 }
 
@@ -386,7 +406,6 @@ fn add_context_rule_past_valid_until_fails() {
     e.as_contract(&address, || {
         let signers = create_test_signers(&e);
         let contract_addr = Address::generate(&e);
-        //let current = e.ledger().sequence();
         e.ledger().set_sequence_number(100);
 
         add_context_rule(
@@ -397,6 +416,110 @@ fn add_context_rule_past_valid_until_fails() {
             &signers,
             &Map::new(&e),
         );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3007)")]
+fn add_context_rule_duplicate_signer_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr);
+        let policies_map = create_test_policies_map(&e);
+
+        // Create signers with duplicate
+        let signer1 = Signer::Delegated(Address::generate(&e));
+        let signer2 = Signer::Delegated(Address::generate(&e));
+        let duplicate_signer = signer1.clone(); // Duplicate of signer1
+
+        let mut signers = Vec::new(&e);
+        signers.push_back(signer1);
+        signers.push_back(signer2);
+        signers.push_back(duplicate_signer); // This should cause the error
+
+        add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "test_rule"),
+            None,
+            &signers,
+            &policies_map,
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3015)")]
+fn add_context_rule_name_too_long_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let signers = create_test_signers(&e);
+        let contract_addr = Address::generate(&e);
+        let too_long_name = String::from_str(&e, "name_that_is_way_too_long");
+
+        add_context_rule(
+            &e,
+            &ContextRuleType::CallContract(contract_addr),
+            &too_long_name,
+            None,
+            &signers,
+            &Map::new(&e),
+        );
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3013)")]
+fn add_context_rule_oversized_external_key_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let verifier = e.register(MockVerifierContract, ());
+
+    e.as_contract(&address, || {
+        let oversized_key = Bytes::from_array(&e, &[0u8; 257]);
+        let signer = Signer::External(verifier.clone(), oversized_key);
+        let signers = Vec::from_array(&e, [signer]);
+
+        add_context_rule(
+            &e,
+            &ContextRuleType::Default,
+            &String::from_str(&e, "oversized_key_rule"),
+            None,
+            &signers,
+            &Map::new(&e),
+        );
+    });
+}
+
+#[test]
+fn add_context_rule_max_size_external_key_succeeds() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let verifier = e.register(MockVerifierContract, ());
+
+    e.as_contract(&address, || {
+        let max_key = Bytes::from_slice(&e, &[0u8; 256]);
+        let signer = Signer::External(verifier.clone(), max_key);
+        let signers = Vec::from_array(&e, [signer]);
+
+        let rule = add_context_rule(
+            &e,
+            &ContextRuleType::Default,
+            &String::from_str(&e, "max_key_rule"),
+            None,
+            &signers,
+            &Map::new(&e),
+        );
+
+        assert_eq!(rule.signers.len(), 1);
+        if let Signer::External(_, key_data) = rule.signers.get(0).unwrap() {
+            assert_eq!(key_data.len(), MAX_EXTERNAL_KEY_SIZE);
+        }
     });
 }
 
@@ -430,6 +553,19 @@ fn update_context_rule_success() {
 
         assert_eq!(modified_rule.id, rule.id);
         assert_eq!(modified_rule.valid_until, None);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3015)")]
+fn update_context_rule_name_too_long_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    let rule = setup_test_rule(&e, &address);
+
+    e.as_contract(&address, || {
+        update_context_rule_name(&e, rule.id, &String::from_str(&e, "name_that_is_way_too_long"));
     });
 }
 
@@ -473,7 +609,8 @@ fn remove_context_rule_success() {
         assert_eq!(retrieved_rule.id, rule.id);
 
         remove_context_rule(&e, rule.id);
-        assert_eq!(e.events().all().events().len(), 1);
+        // Events: 1 ContextRuleRemoved + 2 SignerDeregistered (no policies) = 3
+        assert_eq!(e.events().all().events().len(), 3);
     });
 
     let rule = e.as_contract(&address, || {
@@ -497,7 +634,10 @@ fn remove_context_rule_success() {
     // Removal succeeds
     e.as_contract(&address, || {
         remove_context_rule(&e, rule.id);
-        assert_eq!(e.events().all().events().len(), 1);
+        // Events: 1 ContextRuleRemoved + 2 SignerDeregistered + 2 PolicyDeregistered =
+        // 5
+        assert_eq!(e.events().all().events().len(), 5);
+        assert_eq!(get_context_rules_count(&e), 0);
     });
 }
 
@@ -509,46 +649,6 @@ fn remove_context_rule_nonexistent_fails() {
 
     e.as_contract(&address, || {
         remove_context_rule(&e, 999); // Non-existent ID
-    });
-}
-
-#[test]
-fn can_enforce_all_policies_success() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let mut rule = setup_test_rule(&e, &address);
-        rule.policies = create_test_policies(&e);
-        let matched_signers = rule.signers.clone();
-        let context = get_context(Address::generate(&e), symbol_short!("test"), vec![&e]);
-
-        let result = can_enforce_all_policies(&e, &context, &rule, &matched_signers);
-        assert!(result);
-    });
-}
-
-#[test]
-fn can_enforce_all_policies_one_fails() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let mut rule = setup_test_rule(&e, &address);
-        rule.policies = create_test_policies(&e);
-        let matched_signers = rule.signers.clone();
-        let context = get_context(Address::generate(&e), symbol_short!("test"), vec![&e]);
-
-        // Set first policy to return true, second to return false
-        e.as_contract(&rule.policies.get(0).unwrap(), || {
-            e.storage().persistent().set(&symbol_short!("enforce"), &true);
-        });
-        e.as_contract(&rule.policies.get(1).unwrap(), || {
-            e.storage().persistent().set(&symbol_short!("enforce"), &false);
-        });
-
-        let result = can_enforce_all_policies(&e, &context, &rule, &matched_signers);
-        assert!(!result); // Should fail because one policy returns false
     });
 }
 
@@ -609,105 +709,56 @@ fn authenticate_mixed_signers_success() {
 }
 
 #[test]
-fn get_authenticated_signers_all_match() {
+fn get_authenticated_signers_combos() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
+        // all match
         let rule_signers = create_test_signers(&e);
         let all_signers = rule_signers.clone();
-
         let authenticated = get_authenticated_signers(&e, &rule_signers, &all_signers);
-
         assert_eq!(authenticated.len(), 2);
         assert_eq!(authenticated, rule_signers);
-    });
-}
 
-#[test]
-fn get_authenticated_signers_partial_match() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
+        // empty all_signers
+        let authenticated = get_authenticated_signers(&e, &rule_signers, &Vec::new(&e));
+        assert_eq!(authenticated.len(), 0);
 
-    e.as_contract(&address, || {
+        // empty rule_signers
+        let authenticated = get_authenticated_signers(&e, &Vec::new(&e), &create_test_signers(&e));
+        assert_eq!(authenticated.len(), 0);
+
+        // partial match
         let addr1 = Address::generate(&e);
         let addr2 = Address::generate(&e);
         let addr3 = Address::generate(&e);
-
         let rule_signers = Vec::from_array(
             &e,
             [Signer::Delegated(addr1.clone()), Signer::Delegated(addr2.clone())],
         );
-
         let all_signers = Vec::from_array(
             &e,
             [
                 Signer::Delegated(addr1.clone()),
-                Signer::Delegated(addr3), // addr2 is missing, addr3 is extra
+                Signer::Delegated(addr3.clone()), // addr2 is missing, addr3 is extra
             ],
         );
-
         let authenticated = get_authenticated_signers(&e, &rule_signers, &all_signers);
-
         assert_eq!(authenticated.len(), 1); // Only addr1 matches
-        assert_eq!(authenticated.get(0).unwrap(), Signer::Delegated(addr1));
-    });
-}
+        assert_eq!(authenticated.get(0).unwrap(), Signer::Delegated(addr1.clone()));
 
-#[test]
-fn get_authenticated_signers_no_match() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let addr1 = Address::generate(&e);
-        let addr2 = Address::generate(&e);
-        let addr3 = Address::generate(&e);
-        let addr4 = Address::generate(&e);
-
+        // no match
         let rule_signers =
             Vec::from_array(&e, [Signer::Delegated(addr1), Signer::Delegated(addr2)]);
-
-        let all_signers = Vec::from_array(&e, [Signer::Delegated(addr3), Signer::Delegated(addr4)]);
-
+        let all_signers = Vec::from_array(&e, [Signer::Delegated(addr3)]);
         let authenticated = get_authenticated_signers(&e, &rule_signers, &all_signers);
-
         assert_eq!(authenticated.len(), 0);
     });
 }
 
 #[test]
-fn get_authenticated_signers_empty_rule_signers() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let rule_signers = Vec::new(&e);
-        let all_signers = create_test_signers(&e);
-
-        let authenticated = get_authenticated_signers(&e, &rule_signers, &all_signers);
-
-        assert_eq!(authenticated.len(), 0);
-    });
-}
-
-#[test]
-fn get_authenticated_signers_empty_all_signers() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let rule_signers = create_test_signers(&e);
-        let all_signers = Vec::new(&e);
-
-        let authenticated = get_authenticated_signers(&e, &rule_signers, &all_signers);
-
-        assert_eq!(authenticated.len(), 0);
-    });
-}
-
-#[test]
-fn get_valid_context_rules_matched_rules_only() {
+fn get_validated_context_by_id_direct_match_success() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
@@ -715,367 +766,181 @@ fn get_valid_context_rules_matched_rules_only() {
         let contract_addr = Address::generate(&e);
         let context_type = ContextRuleType::CallContract(contract_addr.clone());
 
-        // Add two rules for the same context type
-        add_context_rule(
-            &e,
-            &context_type,
-            &String::from_str(&e, "rule1"),
-            None,
-            &create_test_signers(&e),
-            &Map::new(&e),
-        );
-        add_context_rule(
-            &e,
-            &context_type,
-            &String::from_str(&e, "rule2"),
-            None,
-            &create_test_signers(&e),
-            &Map::new(&e),
-        );
-
-        let valid_rules = get_valid_context_rules(&e, &context_type);
-
-        // Should return both rules in reverse order (last added first)
-        assert_eq!(valid_rules.len(), 2);
-        assert_eq!(valid_rules.get(0).unwrap().name, String::from_str(&e, "rule2"));
-        assert_eq!(valid_rules.get(1).unwrap().name, String::from_str(&e, "rule1"));
-    });
-}
-
-#[test]
-fn get_valid_context_rules_with_defaults() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let contract_addr = Address::generate(&e);
-        let context_type = ContextRuleType::CallContract(contract_addr.clone());
-
-        // Add a matched rule
-        add_context_rule(
-            &e,
-            &context_type,
-            &String::from_str(&e, "matched"),
-            None,
-            &create_test_signers(&e),
-            &Map::new(&e),
-        );
-
-        // Add default rules
-        add_context_rule(
-            &e,
-            &ContextRuleType::Default,
-            &String::from_str(&e, "default"),
-            None,
-            &create_test_signers(&e),
-            &Map::new(&e),
-        );
-
-        let valid_rules = get_valid_context_rules(&e, &context_type);
-
-        // Should return matched rule first, then defaults
-        assert_eq!(valid_rules.len(), 2);
-        assert_eq!(valid_rules.get(0).unwrap().name, String::from_str(&e, "matched"));
-        assert_eq!(valid_rules.get(1).unwrap().name, String::from_str(&e, "default"));
-    });
-}
-
-#[test]
-fn get_valid_context_rules_only_defaults() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let contract_addr = Address::generate(&e);
-        let context_type = ContextRuleType::CallContract(contract_addr);
-
-        // Add only default rules with different signers to ensure different
-        // fingerprints
-        let signers = create_test_signers(&e);
-        let addr3 = Address::generate(&e);
-        let signers2 = Vec::from_array(&e, [Signer::Delegated(addr3)]);
-
-        add_context_rule(
-            &e,
-            &ContextRuleType::Default,
-            &String::from_str(&e, "default1"),
-            None,
-            &signers,
-            &Map::new(&e),
-        );
-        add_context_rule(
-            &e,
-            &ContextRuleType::Default,
-            &String::from_str(&e, "default2"),
-            Some(1000),
-            &signers2,
-            &Map::new(&e),
-        );
-
-        let valid_rules = get_valid_context_rules(&e, &context_type);
-
-        // Should return only defaults in reverse order
-        assert_eq!(valid_rules.len(), 2);
-        assert_eq!(valid_rules.get(0).unwrap().name, String::from_str(&e, "default2"));
-        assert_eq!(valid_rules.get(1).unwrap().name, String::from_str(&e, "default1"));
-    });
-}
-
-#[test]
-fn get_valid_context_rules_filters_expired() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let contract_addr = Address::generate(&e);
-        let context_type = ContextRuleType::CallContract(contract_addr.clone());
-
-        // Set current ledger sequence
-        e.ledger().set_sequence_number(100);
-
-        // Add valid rule (future expiration)
-        add_context_rule(
-            &e,
-            &context_type,
-            &String::from_str(&e, "valid"),
-            Some(200),
-            &create_test_signers(&e),
-            &Map::new(&e),
-        );
-
-        // Add expired rule
-        add_context_rule(
-            &e,
-            &context_type,
-            &String::from_str(&e, "expired"),
-            Some(150),
-            &create_test_signers(&e),
-            &Map::new(&e),
-        );
-
-        // Forward ledger sequence
-        e.ledger().set_sequence_number(160);
-
-        // Add rule with no expiration
-        add_context_rule(
-            &e,
-            &context_type,
-            &String::from_str(&e, "no_expiry"),
-            None,
-            &create_test_signers(&e),
-            &Map::new(&e),
-        );
-
-        let valid_rules = get_valid_context_rules(&e, &context_type);
-
-        // Should only return non-expired rules
-        assert_eq!(valid_rules.len(), 2);
-        assert_eq!(valid_rules.get(0).unwrap().name, String::from_str(&e, "no_expiry"));
-        assert_eq!(valid_rules.get(1).unwrap().name, String::from_str(&e, "valid"));
-    });
-}
-
-#[test]
-fn get_valid_context_rules_empty_result() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let contract_addr = Address::generate(&e);
-        let context_type = ContextRuleType::CallContract(contract_addr);
-
-        let valid_rules = get_valid_context_rules(&e, &context_type);
-
-        // Should return empty vector when no rules exist
-        assert_eq!(valid_rules.len(), 0);
-    });
-}
-
-#[test]
-fn get_validated_context_call_contract_with_signers_success() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let contract_addr = Address::generate(&e);
-        let context_type = ContextRuleType::CallContract(contract_addr.clone());
-
-        // Add rule with signers
         let rule = add_context_rule(
             &e,
             &context_type,
-            &String::from_str(&e, "test_rule"),
+            &String::from_str(&e, "direct_rule"),
             None,
             &create_test_signers(&e),
             &Map::new(&e),
         );
 
         let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
-
         let (validated_rule, _, authenticated_signers) =
-            get_validated_context(&e, &context, &rule.signers);
+            get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
 
         assert_eq!(validated_rule.id, rule.id);
-        assert_eq!(authenticated_signers.len(), 2);
-        assert_eq!(authenticated_signers, rule.signers);
+        assert_eq!(authenticated_signers.len(), rule.signers.len());
     });
 }
 
 #[test]
-fn get_validated_context_create_contract_with_policies_success() {
+fn get_validated_context_by_id_default_rule_matches_any_context() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let wasm_hash = BytesN::from_array(&e, &[1u8; 32]);
-        let context_type = ContextRuleType::CreateContract(wasm_hash.clone());
+        let contract_addr = Address::generate(&e);
 
-        // Add rule with policies
+        let rule = add_context_rule(
+            &e,
+            &ContextRuleType::Default,
+            &String::from_str(&e, "default_rule"),
+            None,
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
+
+        let context = get_context(contract_addr, symbol_short!("call"), vec![&e]);
+        let (validated_rule, _, authenticated_signers) =
+            get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
+
+        assert_eq!(validated_rule.id, rule.id);
+        assert_eq!(authenticated_signers.len(), rule.signers.len());
+    });
+}
+
+#[test]
+fn get_validated_context_by_id_with_policies_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr.clone());
+
         let policies_map = create_test_policies_map(&e);
-        let empty_signers = Vec::new(&e);
         let rule = add_context_rule(
             &e,
             &context_type,
             &String::from_str(&e, "policy_rule"),
             None,
-            &empty_signers,
+            &Vec::new(&e),
             &policies_map,
         );
 
-        let context =
-            Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
-                executable: soroban_sdk::auth::ContractExecutable::Wasm(wasm_hash),
-                salt: BytesN::from_array(&e, &[2u8; 32]),
-                constructor_args: Vec::new(&e),
-            });
-
-        let (validated_rule, _, authenticated_signers) =
-            get_validated_context(&e, &context, &Vec::new(&e));
+        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
+        let (validated_rule, _, _) =
+            get_validated_context_by_id(&e, &context, &Vec::new(&e), rule.id);
 
         assert_eq!(validated_rule.id, rule.id);
-        assert_eq!(authenticated_signers.len(), 0);
     });
 }
 
 #[test]
-fn get_validated_context_create_contract_success() {
+fn get_validated_context_by_id_not_yet_expired_succeeds() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let wasm_hash = BytesN::from_array(&e, &[1u8; 32]);
-        let context_type = ContextRuleType::CreateContract(wasm_hash.clone());
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr.clone());
+        e.ledger().set_sequence_number(50);
 
-        // Add rule for contract creation
         let rule = add_context_rule(
             &e,
             &context_type,
-            &String::from_str(&e, "create_rule"),
+            &String::from_str(&e, "future_expiry_rule"),
+            Some(100),
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
+
+        // Sequence 50 < valid_until 100 → not expired, should succeed
+        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
+        let (validated_rule, _, _) =
+            get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
+        assert_eq!(validated_rule.id, rule.id);
+    });
+}
+
+#[test]
+fn get_validated_context_by_id_create_contract_host_fn_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let wasm_hash = BytesN::from_array(&e, &[7u8; 32]);
+        let context_type = ContextRuleType::CreateContract(wasm_hash.clone());
+
+        let rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "create_contract_rule"),
             None,
             &create_test_signers(&e),
             &Map::new(&e),
         );
 
         let context = Context::CreateContractHostFn(CreateContractHostFnContext {
-            executable: soroban_sdk::auth::ContractExecutable::Wasm(wasm_hash),
-            salt: BytesN::from_array(&e, &[2u8; 32]),
+            salt: BytesN::from_array(&e, &[1u8; 32]),
+            executable: ContractExecutable::Wasm(wasm_hash),
         });
 
-        let (validated_rule, _, authenticated_signers) =
-            get_validated_context(&e, &context, &rule.signers);
-
+        let (validated_rule, _, _) =
+            get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
         assert_eq!(validated_rule.id, rule.id);
-        assert_eq!(authenticated_signers.len(), 2);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3002)")]
-fn get_validated_context_call_contract_with_policies_fails() {
+fn get_validated_context_by_id_create_contract_with_ctor_success() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let contract_addr = Address::generate(&e);
-        let context_type = ContextRuleType::CallContract(contract_addr.clone());
+        let wasm_hash = BytesN::from_array(&e, &[8u8; 32]);
+        let context_type = ContextRuleType::CreateContract(wasm_hash.clone());
 
-        // Add rule with policies
-        let policies_vec = create_test_policies(&e);
-        let mut policies_map = Map::new(&e);
-        for policy in policies_vec.iter() {
-            policies_map.set(policy, Val::from_void().into());
-        }
-        let context_val_name = String::from_str(&e, "policy_rule");
-        let empty_signers = Vec::new(&e);
-        add_context_rule(&e, &context_type, &context_val_name, None, &empty_signers, &policies_map);
-        let failing_policy = policies_vec.get(1).unwrap();
-        e.as_contract(&failing_policy, || {
-            e.storage().persistent().set(&symbol_short!("enforce"), &false);
-        });
-
-        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
-        get_validated_context(&e, &context, &Vec::new(&e));
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3002)")]
-fn get_validated_context_insufficient_signers_fails() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let contract_addr = Address::generate(&e);
-        let context_type = ContextRuleType::CallContract(contract_addr.clone());
-
-        // Add rule requiring 2 signers
         let rule = add_context_rule(
             &e,
             &context_type,
-            &String::from_str(&e, "strict_rule"),
+            &String::from_str(&e, "ctor_rule"),
             None,
             &create_test_signers(&e),
             &Map::new(&e),
         );
 
-        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
-        let signers = rule.signers.clone();
-        let insufficient_signers = signers.slice(..1); // Only 1 signer
+        let context =
+            Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
+                salt: BytesN::from_array(&e, &[2u8; 32]),
+                executable: ContractExecutable::Wasm(wasm_hash),
+                constructor_args: Vec::new(&e),
+            });
 
-        get_validated_context(&e, &context, &insufficient_signers);
+        let (validated_rule, _, _) =
+            get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
+        assert_eq!(validated_rule.id, rule.id);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3002)")]
-fn get_validated_context_no_matching_rules_fails() {
+#[should_panic(expected = "Error(Contract, #3000)")]
+fn get_validated_context_by_id_nonexistent_rule_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
         let contract_addr = Address::generate(&e);
-        let different_addr = Address::generate(&e);
-
-        // Add rule for different contract
-        let different_context_type = ContextRuleType::CallContract(different_addr);
-        add_context_rule(
-            &e,
-            &different_context_type,
-            &String::from_str(&e, "other_rule"),
-            None,
-            &create_test_signers(&e),
-            &Map::new(&e),
-        );
-
         let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
-        let all_signers = create_test_signers(&e);
 
-        get_validated_context(&e, &context, &all_signers);
+        get_validated_context_by_id(&e, &context, &Vec::new(&e), 999u32);
     });
 }
 
 #[test]
-fn get_context_rules_multiple_rules() {
+#[should_panic(expected = "Error(Contract, #3002)")]
+fn get_validated_context_by_id_expired_rule_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
@@ -1083,204 +948,264 @@ fn get_context_rules_multiple_rules() {
         let contract_addr = Address::generate(&e);
         let context_type = ContextRuleType::CallContract(contract_addr.clone());
 
-        // Add multiple rules with different signers to ensure different fingerprints
-        let signers = create_test_signers(&e);
-        let addr3 = Address::generate(&e);
-        let addr4 = Address::generate(&e);
-        let signers2 = Vec::from_array(&e, [Signer::Delegated(addr3)]);
-        let signers3 = Vec::from_array(&e, [Signer::Delegated(addr4)]);
-
-        let rule1 = add_context_rule(
+        let rule = add_context_rule(
             &e,
             &context_type,
-            &String::from_str(&e, "rule1"),
+            &String::from_str(&e, "expiring_rule"),
+            Some(50),
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
+
+        e.ledger().set_sequence_number(100);
+
+        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
+        get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3002)")]
+fn get_validated_context_by_id_wrong_context_type_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let contract_a = Address::generate(&e);
+        let contract_b = Address::generate(&e);
+
+        let rule = add_context_rule(
+            &e,
+            &ContextRuleType::CallContract(contract_a),
+            &String::from_str(&e, "contract_a_rule"),
             None,
-            &signers.clone(),
-            &Map::new(&e),
-        );
-        let rule2 = add_context_rule(
-            &e,
-            &context_type,
-            &String::from_str(&e, "rule2"),
-            Some(1000),
-            &signers2.clone(),
-            &Map::new(&e),
-        );
-        let rule3 = add_context_rule(
-            &e,
-            &context_type,
-            &String::from_str(&e, "rule3"),
-            Some(2000),
-            &signers3.clone(),
+            &create_test_signers(&e),
             &Map::new(&e),
         );
 
-        let rules = get_context_rules(&e, &context_type);
-
-        assert_eq!(rules.len(), 3);
-        // Rules are returned in order they were added
-        assert_eq!(rules.get(0).unwrap().id, rule1.id);
-        assert_eq!(rules.get(1).unwrap().id, rule2.id);
-        assert_eq!(rules.get(2).unwrap().id, rule3.id);
-        assert_eq!(get_context_rules_count(&e), 3);
+        let context = get_context(contract_b, symbol_short!("test"), vec![&e]);
+        get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
     });
 }
 
 #[test]
-fn get_context_rules_empty_result() {
+#[should_panic(expected = "Error(Contract, #3002)")]
+fn get_validated_context_by_id_insufficient_signers_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
         let contract_addr = Address::generate(&e);
-        let context_type = ContextRuleType::CallContract(contract_addr);
+        let context_type = ContextRuleType::CallContract(contract_addr.clone());
 
-        let rules = get_context_rules(&e, &context_type);
+        let rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "two_signer_rule"),
+            None,
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
 
-        // Should return empty vector when no rules exist
-        assert_eq!(rules.len(), 0);
-
-        assert_eq!(get_context_rules_count(&e), 0)
+        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
+        let only_one = rule.signers.slice(..1);
+        get_validated_context_by_id(&e, &context, &only_one, rule.id);
     });
 }
 
+// ################## CANONICAL DUPLICATE DETECTION TESTS ##################
+
+/// Mock verifier that canonicalizes keys by returning only the first 32
+/// bytes. This simulates a verifier (like WebAuthn) where key_data contains
+/// both a cryptographic key and additional metadata (like a credential ID).
+#[contract]
+struct MockCanonicalizingVerifier;
+
+#[contractimpl]
+impl MockCanonicalizingVerifier {
+    pub fn verify(e: &Env, _hash: Bytes, _key_data: Val, _sig_data: Val) -> bool {
+        e.storage().persistent().get(&symbol_short!("verify")).unwrap_or(true)
+    }
+
+    pub fn canonicalize_key(e: &Env, key_data: Val) -> Bytes {
+        let key = Bytes::try_from_val(e, &key_data).unwrap();
+        key.slice(0..32)
+    }
+
+    pub fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes> {
+        Vec::from_iter(
+            e,
+            key_data.iter().map(|key| Bytes::try_from_val(e, &key).unwrap().slice(0..32)),
+        )
+    }
+}
+
 #[test]
-#[should_panic(expected = "Error(Contract, #3007)")]
-fn add_context_rule_duplicate_signer_fails() {
+fn contains_canonical_duplicate_same_canonical_keys() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let contract_addr = Address::generate(&e);
-        let context_type = ContextRuleType::CallContract(contract_addr);
-        let policies_map = create_test_policies_map(&e);
+        let verifier = e.register(MockCanonicalizingVerifier, ());
 
-        // Create signers with duplicate
-        let signer1 = Signer::Delegated(Address::generate(&e));
-        let signer2 = Signer::Delegated(Address::generate(&e));
-        let duplicate_signer = signer1.clone(); // Duplicate of signer1
+        let mut existing = Bytes::from_array(&e, &[1u8; 32]);
+        existing.extend_from_array(&[0xAA; 8]);
+        let signers = Vec::from_array(&e, [Signer::External(verifier.clone(), existing)]);
 
-        let mut signers = Vec::new(&e);
-        signers.push_back(signer1);
-        signers.push_back(signer2);
-        signers.push_back(duplicate_signer); // This should cause the error
+        let mut candidate = Bytes::from_array(&e, &[1u8; 32]);
+        candidate.extend_from_array(&[0xBB; 8]);
+        let new_signer = Signer::External(verifier.clone(), candidate);
+
+        assert!(contains_canonical_duplicate(&e, &signers, &new_signer));
+    });
+}
+
+#[test]
+fn contains_canonical_duplicate_different_canonical_keys() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let verifier = e.register(MockCanonicalizingVerifier, ());
+
+        let mut existing = Bytes::from_array(&e, &[1u8; 32]);
+        existing.extend_from_array(&[0xAA; 8]);
+        let signers = Vec::from_array(&e, [Signer::External(verifier.clone(), existing)]);
+
+        let mut candidate = Bytes::from_array(&e, &[2u8; 32]);
+        candidate.extend_from_array(&[0xBB; 8]);
+        let new_signer = Signer::External(verifier.clone(), candidate);
+
+        assert!(!contains_canonical_duplicate(&e, &signers, &new_signer));
+    });
+}
+
+#[test]
+fn contains_canonical_duplicate_no_matching_verifier() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let verifier1 = e.register(MockCanonicalizingVerifier, ());
+        let verifier2 = e.register(MockCanonicalizingVerifier, ());
+
+        let mut existing = Bytes::from_array(&e, &[3u8; 32]);
+        existing.extend_from_array(&[0xAA; 8]);
+        let signers = Vec::from_array(&e, [Signer::External(verifier1, existing)]);
+
+        let mut candidate = Bytes::from_array(&e, &[3u8; 32]);
+        candidate.extend_from_array(&[0xBB; 8]);
+        let new_signer = Signer::External(verifier2, candidate);
+
+        assert!(!contains_canonical_duplicate(&e, &signers, &new_signer));
+    });
+}
+
+#[test]
+fn contains_canonical_duplicate_delegated_signers() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let delegated_a = Address::generate(&e);
+        let delegated_b = Address::generate(&e);
+        let signers = Vec::from_array(&e, [Signer::Delegated(delegated_a.clone())]);
+
+        assert!(contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_a)));
+        assert!(!contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_b)));
+    });
+}
+
+#[test]
+fn contains_canonical_duplicate_external_with_delegated_existing() {
+    // When the new signer is External but the existing signer list contains a
+    // Delegated signer, the `if let Signer::External` branch does not match
+    // for the delegated entry — covering the implicit-else path.
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let verifier = e.register(MockCanonicalizingVerifier, ());
+        let delegated_signer = Signer::Delegated(Address::generate(&e));
+        let existing = Vec::from_array(&e, [delegated_signer]);
+
+        let mut key_data = Bytes::from_array(&e, &[5u8; 32]);
+        key_data.extend_from_array(&[0xCC; 8]);
+        let new_signer = Signer::External(verifier, key_data);
+
+        // No External signer with the same verifier in the list → no duplicate
+        assert!(!contains_canonical_duplicate(&e, &existing, &new_signer));
+    });
+}
+
+// ################## MATH OVERFLOW TESTS ##################
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3012)")]
+fn add_context_rule_next_id_overflow_fails() {
+    // When NextId == u32::MAX, incrementing it after storing a new rule
+    // must panic with MathOverflow rather than wrapping.
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        e.storage().instance().set(&SmartAccountStorageKey::NextId, &u32::MAX);
 
         add_context_rule(
             &e,
-            &context_type,
-            &String::from_str(&e, "test_rule"),
+            &ContextRuleType::Default,
+            &String::from_str(&e, "overflow"),
             None,
-            &signers,
-            &policies_map,
+            &Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]),
+            &Map::new(&e),
         );
     });
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3012)")]
-fn add_context_rule_too_many_rules_fails() {
+fn add_context_rule_next_signer_id_overflow_fails() {
+    // When NextSignerId == u32::MAX, registering a new signer must panic
+    // with MathOverflow rather than wrapping.
     let e = Env::default();
-    e.cost_estimate().disable_resource_limits();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let signers = create_test_signers(&e);
-        let policies_map = Map::new(&e);
-
-        // Add MAX_CONTEXT_RULES (15) rules successfully
-        for i in 0..MAX_CONTEXT_RULES {
-            let contract_addr = Address::generate(&e);
-            let context_type = ContextRuleType::CallContract(contract_addr);
-
-            add_context_rule(
-                &e,
-                &context_type,
-                &String::from_str(&e, "test_rule"),
-                Some(i),
-                &signers,
-                &policies_map,
-            );
-        }
-
-        // Try to add the 16th rule - this should fail
-        let contract_addr = Address::generate(&e);
-        let context_type = ContextRuleType::CallContract(contract_addr);
+        e.storage().instance().set(&SmartAccountStorageKey::NextSignerId, &u32::MAX);
 
         add_context_rule(
             &e,
-            &context_type,
-            &String::from_str(&e, "rule_16"),
+            &ContextRuleType::Default,
+            &String::from_str(&e, "overflow"),
             None,
-            &signers,
-            &policies_map,
+            &Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]),
+            &Map::new(&e),
         );
     });
 }
 
 #[test]
-fn add_context_rule_count_allows_reuse_after_removal() {
+#[should_panic(expected = "Error(Contract, #3012)")]
+fn add_context_rule_next_policy_id_overflow_fails() {
+    // When NextPolicyId == u32::MAX, registering a new policy must panic
+    // with MathOverflow rather than wrapping.
     let e = Env::default();
-    e.cost_estimate().disable_resource_limits();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let signers = create_test_signers(&e);
-        let policies_map = Map::new(&e);
+        e.storage().instance().set(&SmartAccountStorageKey::NextPolicyId, &u32::MAX);
 
-        // Add MAX_CONTEXT_RULES (15) rules successfully
-        let mut rule_ids = Vec::new(&e);
-        for i in 0..MAX_CONTEXT_RULES {
-            let contract_addr = Address::generate(&e);
-            let context_type = ContextRuleType::CallContract(contract_addr);
+        let policy = e.register(MockPolicyContract, ());
+        let mut policies = Map::new(&e);
+        policies.set(policy, Val::from_void().into());
 
-            let rule = add_context_rule(
-                &e,
-                &context_type,
-                &String::from_str(&e, "test_rule"),
-                Some(i + 100),
-                &signers,
-                &policies_map,
-            );
-            rule_ids.push_back(rule.id);
-        }
-
-        // At this point, count should be MAX_CONTEXT_RULES and we cannot add more
-        // Remove the first rule
-        remove_context_rule(&e, rule_ids.get(0).unwrap());
-
-        // Now we should be able to add a new rule because count was decremented
-        let new_contract_addr = Address::generate(&e);
-        let new_context_type = ContextRuleType::CallContract(new_contract_addr);
-
-        let new_rule = add_context_rule(
+        add_context_rule(
             &e,
-            &new_context_type,
-            &String::from_str(&e, "new_rule"),
+            &ContextRuleType::Default,
+            &String::from_str(&e, "overflow"),
             None,
-            &signers,
-            &policies_map,
+            &Vec::new(&e),
+            &policies,
         );
-
-        // Verify the new rule was added successfully
-        assert_eq!(new_rule.id, MAX_CONTEXT_RULES);
-
-        // Remove multiple rules
-        remove_context_rule(&e, rule_ids.get(1).unwrap());
-        remove_context_rule(&e, rule_ids.get(2).unwrap());
-
-        // Add two more rules to verify count tracking
-        for i in 0..2 {
-            let contract_addr = Address::generate(&e);
-            let context_type = ContextRuleType::CallContract(contract_addr);
-
-            add_context_rule(
-                &e,
-                &context_type,
-                &String::from_str(&e, "additional_rule"),
-                Some(200 + i),
-                &signers,
-                &policies_map,
-            );
-        }
     });
 }

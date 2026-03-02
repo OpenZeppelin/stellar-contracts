@@ -1,89 +1,3 @@
-//! # Smart Account Storage - Context-Centric Authorization
-//!
-//! This module implements a flexible, context-centric authorization system for
-//! smart accounts that separates concerns into three key dimensions:
-//!
-//! ## Architecture Overview
-//!
-//! ### **Who** - Signers
-//! - **Native Signers**: Soroban native `Address` that use built-in signature
-//!   verification
-//! - **Delegated Signers**: Raw public key bytes paired with external verifier
-//!   contracts for custom cryptographic verification (e.g., different signature
-//!   schemes)
-//!
-//! ### **What** - Context Rules
-//! - Rules define authorization requirements for specific contexts (contract
-//!   calls, deployments).
-//! - Each rule must contain at least one signer or one policy and can have an
-//!   optional expiration (`valid_until`) defined by a ledger sequence.
-//! - Multiple rules can exist for the same context type with different signer
-//!   sets and policies.
-//! - Context types: `Default` (any context), `CallContract(Address)`,
-//!   `CreateContract(BytesN<32>)`.
-//! - Each rule specifies required signers and optional policies
-//!
-//! ### **How** - Policies
-//! - External contracts that customize signer behavior and add business logic
-//! - Policies can enforce additional constraints like basic or weighted
-//!   threshold requirements
-//! - All policies in a rule must be satisfied (all-or-nothing enforcement)
-//!
-//! ## Key Design Principles
-//!
-//! ### Context-Centric Approach
-//! The system flips traditional key-centric reasoning to focus on **what you're
-//! authorizing** rather than **which keys are signing**. This mirrors familiar
-//! web2 OAuth patterns where users primarily care about the scope/permissions
-//! being granted, not the underlying keys.
-//!
-//! ### Multiple Rules Per Context
-//! Different authorization requirements for the same context:
-//! - Admin config: 2-of-3 threshold for contract calls
-//! - User config: 3-of-5 threshold for the same contract calls
-//! - Emergency config: 1-of-1 with additional policy constraints
-//!
-//! ## Authorization Matching Algorithm
-//!
-//! When verifying a context with provided signers:
-//!
-//! I. Get all non-expired rules for the specific context type, plus default
-//! rules.
-//! II. For each rule (iteration starts from the last-stored, which prevails in
-//! case of conflicting non-expired rules):
-//!     1. Identify authenticated signers out of all stored signers.
-//!     2.a. If there are policies, verify they can be enforced:
-//!         - If all policies can be satisfied, return success.
-//!         - Otherwise, move to the next rule.
-//!     2.b. If there are no policies:
-//!         - Return success only if all signers are authenticated.
-//!         - Otherwise, move to the next rule.
-//! III. If no context rule satisfies the above conditions, authorization fails.
-//!
-//! ## Benefits
-//!
-//! - **User-Friendly**: Focus on authorization scope rather than key management
-//! - **Extensible**: Policies allow custom business logic without core changes
-//! - **Flexible**: Multiple authorization paths for different user groups
-//!
-//! ## Example Usage
-//!
-//! ```rust,ignore
-//! // Rule 1: Admin group - 3 of 3 signers, no policies
-//! ContextRule {
-//!     context_type: CallContract(token_contract),
-//!     signers: [admin1, admin2, admin3],
-//!     policies: [],
-//! }
-//!
-//! // Rule 2: User group - 3 of 5 signers, with spending limit policy
-//! ContextRule {
-//!     context_type: CallContract(token_contract),
-//!     signers: [user1, user2, user3, user4, user5],
-//!     policies: [threshold_policy, spending_limit_policy],
-//! }
-//! ```
-
 use soroban_sdk::{
     auth::{
         Context, ContractContext, ContractExecutable, CreateContractHostFnContext,
@@ -99,9 +13,10 @@ use soroban_sdk::{
 use crate::{
     policies::PolicyClient,
     smart_account::{
-        emit_context_rule_added, emit_context_rule_removed, emit_context_rule_updated,
-        emit_policy_added, emit_policy_removed, emit_signer_added, emit_signer_removed,
-        SmartAccountError, MAX_CONTEXT_RULES, MAX_POLICIES, MAX_SIGNERS,
+        emit_context_rule_added, emit_context_rule_meta_updated, emit_context_rule_removed,
+        emit_policy_added, emit_policy_deregistered, emit_policy_registered, emit_policy_removed,
+        emit_signer_added, emit_signer_deregistered, emit_signer_registered, emit_signer_removed,
+        SmartAccountError, MAX_EXTERNAL_KEY_SIZE, MAX_NAME_SIZE, MAX_POLICIES, MAX_SIGNERS,
         SMART_ACCOUNT_EXTEND_AMOUNT, SMART_ACCOUNT_TTL_THRESHOLD,
     },
     verifiers::VerifierClient,
@@ -110,25 +25,71 @@ use crate::{
 /// Storage keys for smart account data.
 #[contracttype]
 pub enum SmartAccountStorageKey {
-    /// Storage key for signers of a context rule.
-    /// Maps context rule ID to `Vec<Signer>`.
-    Signers(u32),
-    /// Storage key for policies of a context rule.
-    /// Maps context rule ID to `Vec<Address>`.
-    Policies(u32),
-    /// Storage key for context rule IDs by type.
-    /// Maps `ContextRuleType` to `Vec<u32>` of rule IDs.
-    Ids(ContextRuleType),
-    /// Storage key for context rule metadata.
-    /// Maps context rule ID to `Meta`.
-    Meta(u32),
+    /// Storage key for combined context rule data.
+    /// Maps context rule ID to `ContextRuleEntry` (signer IDs, policies, and
+    /// metadata stored in a single entry).
+    ContextRuleData(u32),
     /// Storage key for the next available context rule ID.
     NextId,
     /// Storage key defining the fingerprint each context rule.
     Fingerprint(BytesN<32>),
     /// Storage key for the count of active context rules.
-    /// Used to enforce MAX_CONTEXT_RULES limit.
     Count,
+    /// Storage key for global signer data.
+    /// Maps signer ID to `SignerEntry` (stored once, referenced by rules).
+    SignerData(u32),
+    /// Storage key for signer lookup by hash.
+    /// Maps `sha256(Signer XDR)` to signer ID for deduplication.
+    SignerLookup(BytesN<32>),
+    /// Storage key for the next available global signer ID (monotonically
+    /// increasing).
+    NextSignerId,
+    /// Storage key for global policy data.
+    /// Maps policy ID to `PolicyEntry`.
+    PolicyData(u32),
+    /// Storage key for policy lookup by address.
+    /// Maps policy `Address` to its policy ID for deduplication.
+    PolicyLookup(Address),
+    /// Storage key for the next available global policy ID (monotonically
+    /// increasing).
+    NextPolicyId,
+}
+
+/// Combines context rule metadata, signer IDs, and policy addresses into a
+/// single storage entry, reducing persistent reads per auth check from 3 to 1.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct ContextRuleEntry {
+    /// Human-readable name for the context rule.
+    pub name: String,
+    /// The type of context this rule applies to.
+    pub context_type: ContextRuleType,
+    /// Optional expiration ledger sequence.
+    pub valid_until: Option<u32>,
+    /// Global signer IDs referenced by this rule.
+    pub signer_ids: Vec<u32>,
+    /// Policy IDs referenced by this rule.
+    pub policy_ids: Vec<u32>,
+}
+
+/// Combines signer data and its reference count into a single storage entry.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct SignerEntry {
+    /// The signer stored in the global registry.
+    pub signer: Signer,
+    /// Number of context rules referencing this signer.
+    pub count: u32,
+}
+
+/// Combines policy data and its reference count into a single storage entry.
+#[contracttype]
+#[derive(Clone, Debug, PartialEq)]
+pub struct PolicyEntry {
+    /// The policy address stored in the global registry.
+    pub policy: Address,
+    /// Number of context rules referencing this policy.
+    pub count: u32,
 }
 
 /// Represents different types of signers in the smart account system.
@@ -142,10 +103,35 @@ pub enum Signer {
     External(Address, Bytes),
 }
 
-/// A collection of signatures mapped to their respective signers.
+/// The authorization payload passed to `__check_auth`, bundling cryptographic
+/// proofs with context rule selection.
+///
+/// This struct carries two distinct pieces of information that are both
+/// required for authorization but cannot be derived from each other:
+///
+/// - `signers` maps each [`Signer`] to its raw signature bytes, providing
+///   cryptographic proof that the signer actually signed the transaction
+///   payload. A context rule stores which signer *identities* are authorized
+///   (via `signer_ids`), but the rule does not contain the signatures
+///   themselves — those must be supplied here.
+///
+/// - `context_rule_ids` tells the system which rule to validate for each auth
+///   context. Because multiple rules can exist for the same context type, the
+///   caller must explicitly select one per context rather than relying on
+///   auto-discovery. Each entry is aligned by index with the `auth_contexts`
+///   passed to `__check_auth`.
+///
+/// The length of `context_rule_ids` must equal the number of auth contexts;
+/// a mismatch is rejected with
+/// [`SmartAccountError::ContextRuleIdsLengthMismatch`].
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
-pub struct Signatures(pub Map<Signer, Bytes>);
+pub struct AuthPayload {
+    /// Signature data mapped to each signer.
+    pub signers: Map<Signer, Bytes>,
+    /// Per-context rule IDs, aligned by index with `auth_contexts`.
+    pub context_rule_ids: Vec<u32>,
+}
 
 /// Types of contexts that can be authorized by smart account rules.
 #[contracttype]
@@ -157,18 +143,6 @@ pub enum ContextRuleType {
     CallContract(Address),
     /// Rules specific to creating a contract with a particular WASM hash.
     CreateContract(BytesN<32>),
-}
-
-/// Metadata for a context rule.
-#[contracttype]
-#[derive(Clone, Debug, PartialEq)]
-pub struct Meta {
-    /// Human-readable name for the context rule.
-    pub name: String,
-    /// The type of context this rule applies to.
-    pub context_type: ContextRuleType,
-    /// Optional expiration ledger sequence for the rule.
-    pub valid_until: Option<u32>,
 }
 
 /// A complete context rule defining authorization requirements.
@@ -203,39 +177,18 @@ pub struct ContextRule {
 /// * [`SmartAccountError::ContextRuleNotFound`] - When the context rule with
 ///   the specified ID does not exist.
 pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
-    let meta_key = SmartAccountStorageKey::Meta(id);
-    let meta: Meta = get_persistent_entry(e, &meta_key)
-        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
-
-    let signers_key = SmartAccountStorageKey::Signers(id);
-    let signers: Vec<Signer> = get_persistent_entry(e, &signers_key).unwrap_or_else(|| Vec::new(e));
-
-    let policies_key = SmartAccountStorageKey::Policies(id);
-    let policies: Vec<Address> =
-        get_persistent_entry(e, &policies_key).unwrap_or_else(|| Vec::new(e));
+    let entry: ContextRuleEntry =
+        get_persistent_entry(e, &SmartAccountStorageKey::ContextRuleData(id))
+            .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
     ContextRule {
         id,
-        context_type: meta.context_type,
-        name: meta.name,
-        signers,
-        policies,
-        valid_until: meta.valid_until,
+        context_type: entry.context_type,
+        name: entry.name,
+        signers: get_signers(e, &entry.signer_ids),
+        policies: get_policies(e, &entry.policy_ids),
+        valid_until: entry.valid_until,
     }
-}
-
-/// Retrieves all context rules of a specific context type. Returns a vector of
-/// all context rules matching the specified type, including expired rules.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `context_rule_type` - The type of context rules to retrieve.
-pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<ContextRule> {
-    let ids_key = SmartAccountStorageKey::Ids(context_rule_type.clone());
-    let ids: Vec<u32> = get_persistent_entry(e, &ids_key).unwrap_or_else(|| Vec::new(e));
-
-    Vec::from_iter(e, ids.iter().map(|id| get_context_rule(e, id)))
 }
 
 /// Retrieves the number of all context rules, including expired ones. Defaults
@@ -246,44 +199,6 @@ pub fn get_context_rules(e: &Env, context_rule_type: &ContextRuleType) -> Vec<Co
 /// * `e` - Access to the Soroban environment.
 pub fn get_context_rules_count(e: &Env) -> u32 {
     e.storage().instance().get(&SmartAccountStorageKey::Count).unwrap_or(0u32)
-}
-
-/// Retrieves all valid (non-expired) context rules for a specific context type,
-/// including default rules as fallback. Returns rules ordered with most
-/// recently added first for proper authorization precedence.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `context_key` - The context type to find valid rules for.
-pub fn get_valid_context_rules(e: &Env, context_key: &ContextRuleType) -> Vec<ContextRule> {
-    let matched_ids_key = SmartAccountStorageKey::Ids(context_key.clone());
-    let matched_ids: Vec<u32> =
-        get_persistent_entry(e, &matched_ids_key).unwrap_or_else(|| Vec::new(e));
-
-    let default_ids_key = SmartAccountStorageKey::Ids(ContextRuleType::Default);
-    let default_ids: Vec<u32> =
-        get_persistent_entry(e, &default_ids_key).unwrap_or_else(|| Vec::new(e));
-
-    let get_rules = |ids: Vec<u32>| -> Vec<ContextRule> {
-        let mut rules = Vec::new(e);
-        for id in ids.iter() {
-            let rule = get_context_rule(e, id);
-            match rule.valid_until {
-                // skip if expired
-                Some(seq) if seq < e.ledger().sequence() => continue,
-                // push front so that we start from the last added when iterating
-                _ => rules.push_front(rule),
-            }
-        }
-        rules
-    };
-
-    let mut final_rules = get_rules(matched_ids);
-    // append defaults so that there is always a fallback
-    final_rules.append(&get_rules(default_ids));
-
-    final_rules
 }
 
 /// Filters rule signers to find which ones are present in the provided signer
@@ -309,58 +224,75 @@ pub fn get_authenticated_signers(
     authenticated
 }
 
-/// Validates a context against all applicable rules and returns the matching
-/// rule with authenticated signers. Returns a tuple of the matched context
-/// rule, the validated context, and the authenticated signers.
+/// Validates a context against a specific rule identified by `id`. Checks
+/// expiration, context type compatibility, and signer requirements.
+///
+/// For rules without policies, all signers must be authenticated. For rules
+/// with policies, validation is deferred to `enforce()` — the policy is the
+/// authority on what signers are needed.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context` - The authorization context to validate.
 /// * `all_signers` - The signers provided for authentication.
+/// * `id` - The context rule ID to validate against.
 ///
 /// # Errors
 ///
-/// * [`SmartAccountError::UnvalidatedContext`] - When no context rule can
-///   validate the provided context and signers.
-pub fn get_validated_context(
+/// * [`SmartAccountError::UnvalidatedContext`] - When the rule is expired, its
+///   context type does not match, or (for rules without policies) not all
+///   signers are authenticated.
+/// * refer to [`get_context_rule`] errors.
+pub fn get_validated_context_by_id(
     e: &Env,
     context: &Context,
     all_signers: &Vec<Signer>,
+    id: u32,
 ) -> (ContextRule, Context, Vec<Signer>) {
-    let context_rules = match context.clone() {
-        #[rustfmt::skip]
-        Context::Contract(ContractContext { contract, .. }) => {
-            get_valid_context_rules(e, &ContextRuleType::CallContract(contract))
-        },
-        Context::CreateContractHostFn(CreateContractHostFnContext {
-            executable: ContractExecutable::Wasm(wasm),
-            ..
-        }) => get_valid_context_rules(e, &ContextRuleType::CreateContract(wasm)),
-        Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
-            executable: ContractExecutable::Wasm(wasm),
-            ..
-        }) => get_valid_context_rules(e, &ContextRuleType::CreateContract(wasm)),
-    };
+    let context_rule = get_context_rule(e, id);
 
-    for context_rule in context_rules.iter() {
-        let ContextRule { signers: rule_signers, policies, .. } = context_rule.clone();
-
-        let authenticated_signers = get_authenticated_signers(e, &rule_signers, all_signers);
-        if policies.is_empty() {
-            // if no policies, return only if all rule signers are authenticated
-            if rule_signers.len() == authenticated_signers.len() {
-                return (context_rule, context.clone(), authenticated_signers.clone());
-            }
-        } else {
-            // otherwise, only if all policies can be enforced
-            if can_enforce_all_policies(e, context, &context_rule, &authenticated_signers) {
-                return (context_rule, context.clone(), authenticated_signers.clone());
-            }
+    // Reject expired rules.
+    if let Some(valid_until) = context_rule.valid_until {
+        if valid_until < e.ledger().sequence() {
+            panic_with_error!(e, SmartAccountError::UnvalidatedContext);
         }
     }
 
-    panic_with_error!(e, SmartAccountError::UnvalidatedContext)
+    // The rule's context type must match the actual context, or be Default
+    // (which applies to any context).
+    let required_type = match context.clone() {
+        Context::Contract(ContractContext { contract, .. }) =>
+            ContextRuleType::CallContract(contract),
+        Context::CreateContractHostFn(CreateContractHostFnContext {
+            executable: ContractExecutable::Wasm(wasm),
+            ..
+        }) => ContextRuleType::CreateContract(wasm),
+        Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
+            executable: ContractExecutable::Wasm(wasm),
+            ..
+        }) => ContextRuleType::CreateContract(wasm),
+    };
+
+    let context_type_matches = context_rule.context_type == ContextRuleType::Default
+        || context_rule.context_type == required_type;
+
+    if !context_type_matches {
+        panic_with_error!(e, SmartAccountError::UnvalidatedContext);
+    }
+
+    let ContextRule { signers: ref rule_signers, ref policies, .. } = context_rule;
+    let authenticated_signers = get_authenticated_signers(e, rule_signers, all_signers);
+
+    if policies.is_empty() {
+        // Without policies, all rule signers must be authenticated.
+        if rule_signers.len() != authenticated_signers.len() {
+            panic_with_error!(e, SmartAccountError::UnvalidatedContext);
+        }
+    }
+    // With policies, defer full validation to enforce().
+
+    (context_rule, context.clone(), authenticated_signers)
 }
 
 /// Authenticates all provided signatures against their respective signers.
@@ -398,43 +330,14 @@ pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signers: &Map<Signer,
     }
 }
 
-/// Checks if all policies in a rule can be enforced with the provided signers.
-/// Returns `true` only if all policies can be satisfied, `false` otherwise.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `context` - The authorization context.
-/// * `context_rule` - The context rule.
-/// * `matched_signers` - The authenticated signers.
-pub fn can_enforce_all_policies(
-    e: &Env,
-    context: &Context,
-    context_rule: &ContextRule,
-    matched_signers: &Vec<Signer>,
-) -> bool {
-    for policy in context_rule.policies.iter() {
-        // policies are all or nothing
-        if !PolicyClient::new(e, &policy).can_enforce(
-            context,
-            matched_signers,
-            context_rule,
-            &e.current_contract_address(),
-        ) {
-            return false;
-        }
-    }
-    true
-}
-
-/// Validates signers and policies against maximum limits and minimum
+/// Validates signer IDs and policy IDs against maximum limits and minimum
 /// requirements.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `signers` - The vector of signers to validate.
-/// * `policies` - The vector of policies to validate.
+/// * `signer_ids` - The vector of signer IDs to validate.
+/// * `policy_ids` - The vector of policy IDs to validate.
 ///
 /// # Errors
 ///
@@ -444,19 +347,57 @@ pub fn can_enforce_all_policies(
 ///   MAX_POLICIES policies.
 /// * [`SmartAccountError::NoSignersAndPolicies`] - When there are no signers
 ///   and no policies.
-pub fn validate_signers_and_policies(e: &Env, signers: &Vec<Signer>, policies: &Vec<Address>) {
+pub fn validate_signers_and_policies(e: &Env, signer_ids: &Vec<u32>, policy_ids: &Vec<u32>) {
     // Check maximum limits
-    if signers.len() > MAX_SIGNERS {
+    if signer_ids.len() > MAX_SIGNERS {
         panic_with_error!(e, SmartAccountError::TooManySigners);
     }
 
-    if policies.len() > MAX_POLICIES {
+    if policy_ids.len() > MAX_POLICIES {
         panic_with_error!(e, SmartAccountError::TooManyPolicies);
     }
 
     // Check minimum requirements - must have at least one signer or one policy
-    if signers.is_empty() && policies.is_empty() {
+    if signer_ids.is_empty() && policy_ids.is_empty() {
         panic_with_error!(e, SmartAccountError::NoSignersAndPolicies);
+    }
+}
+
+/// Validates that a signer's external key data does not exceed the maximum
+/// allowed size.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer` - The signer to validate.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::KeyDataTooLarge`] - When the external signer key data
+///   exceeds [`MAX_EXTERNAL_KEY_SIZE`] bytes.
+pub fn validate_signer_key_size(e: &Env, signer: &Signer) {
+    if let Signer::External(_, key_data) = signer {
+        if key_data.len() > MAX_EXTERNAL_KEY_SIZE {
+            panic_with_error!(e, SmartAccountError::KeyDataTooLarge);
+        }
+    }
+}
+
+/// Validates that a context rule name does not exceed the maximum allowed
+/// length.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `name` - The context rule name to validate.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::NameTooLong`] - When the name exceeds
+///   [`MAX_NAME_SIZE`] bytes.
+pub fn validate_context_rule_name(e: &Env, name: &String) {
+    if name.len() > MAX_NAME_SIZE {
+        panic_with_error!(e, SmartAccountError::NameTooLong);
     }
 }
 
@@ -466,40 +407,49 @@ pub fn validate_signers_and_policies(e: &Env, signers: &Vec<Signer>, policies: &
 ///
 /// This function is meant to be used in `__check_auth` of a smart account.
 ///
+/// Each entry in [`AuthPayload::context_rule_ids`] specifies the rule ID to
+/// validate against for the corresponding auth context (by index). Its length
+/// must equal `auth_contexts.len()`.
+///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
 /// * `signature_payload` - The hash of the data that was signed.
-/// * `signatures` - The signatures mapped to their signers.
+/// * `signatures` - The signatures and per-context rule IDs.
 /// * `auth_contexts` - The contexts to authorize.
 ///
 /// # Errors
 ///
-/// * [`SmartAccountError::ExternalVerificationFailed`] - When signature
-///   verification fails.
-/// * [`SmartAccountError::UnvalidatedContext`] - When a context cannot be
-///   validated against any rule.
+/// * [`SmartAccountError::ContextRuleIdsLengthMismatch`] - When
+///   `context_rule_ids` has a different length than `auth_contexts`.
+/// * refer to [`authenticate`] errors.
+/// * refer to [`get_validated_context_by_id`] errors.
 pub fn do_check_auth(
     e: &Env,
     signature_payload: &Hash<32>,
-    signatures: &Signatures,
+    signatures: &AuthPayload,
     auth_contexts: &Vec<Context>,
 ) -> Result<(), SmartAccountError> {
-    authenticate(e, signature_payload, &signatures.0);
+    if signatures.context_rule_ids.len() != auth_contexts.len() {
+        panic_with_error!(e, SmartAccountError::ContextRuleIdsLengthMismatch);
+    }
 
+    authenticate(e, signature_payload, &signatures.signers);
+
+    // Validate all contexts against their specified rules.
     let validated_contexts = Vec::from_iter(
         e,
-        auth_contexts
-            .iter()
-            .map(|context| get_validated_context(e, &context, &signatures.0.keys())),
+        auth_contexts.iter().enumerate().map(|(i, context)| {
+            let all_signers = signatures.signers.keys();
+            let context_rule_id = signatures.context_rule_ids.get_unchecked(i as u32);
+
+            get_validated_context_by_id(e, &context, &all_signers, context_rule_id)
+        }),
     );
 
-    // After collecting validated context rules and authenticated signers, call for
-    // every policy `PolicyClient::enforce` to trigger the state-changing
-    // effects if any.
+    // Enforce all policies.
     for (rule, context, authenticated_signers) in validated_contexts.iter() {
-        let ContextRule { policies, .. } = rule.clone();
-        for policy in policies.iter() {
+        for policy in rule.policies.iter() {
             PolicyClient::new(e, &policy).enforce(
                 &context,
                 &authenticated_signers,
@@ -512,55 +462,104 @@ pub fn do_check_auth(
     Ok(())
 }
 
-/// Computes a unique fingerprint for a context rule based on its signers,
-/// policies, and expiration. The fingerprint is used to prevent duplicate rules
-/// with identical authorization requirements.
+/// Computes a unique fingerprint for a context rule based on its type, signer
+/// IDs, and policy IDs. The fingerprint is used to prevent duplicate rules with
+/// identical authorization requirements.
 ///
-/// The fingerprint is calculated by:
-/// 1. Sorting signers and policies to ensure deterministic ordering
-/// 2. Serializing them to XDR format
+/// The fingerprint is computed by:
+/// 1. Sorting signer IDs and policy IDs to ensure consistent ordering
+/// 2. Serializing the context type, sorted signer IDs, and sorted policy IDs to
+///    XDR
 /// 3. Hashing the combined data with SHA-256
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context_type` - The type of context this rule applies to.
-/// * `signers` - The signers for the context rule.
-/// * `policies` - The policies for the context rule.
+/// * `signer_ids` - The signer IDs for the context rule.
+/// * `policy_ids` - The policy IDs for the context rule.
 ///
 /// # Errors
 ///
-/// * [`SmartAccountError::DuplicateSigner`] - When duplicate signers are found
-///   during sorting.
-/// * [`SmartAccountError::DuplicatePolicy`] - When duplicate policies are found
-///   during sorting.
+/// * [`SmartAccountError::DuplicateSigner`] - When duplicate signer IDs are
+///   found during sorting.
+/// * [`SmartAccountError::DuplicatePolicy`] - When duplicate policy IDs are
+///   found during sorting.
 pub fn compute_fingerprint(
     e: &Env,
     context_type: &ContextRuleType,
-    signers: &Vec<Signer>,
-    policies: &Vec<Address>,
+    signer_ids: &Vec<u32>,
+    policy_ids: &Vec<u32>,
 ) -> BytesN<32> {
-    let mut sorted_signers = Vec::new(e);
-    for signer in signers.iter() {
-        match sorted_signers.binary_search(&signer) {
+    let mut sorted_signer_ids = Vec::new(e);
+    for id in signer_ids.iter() {
+        match sorted_signer_ids.binary_search(id) {
             Ok(_) => panic_with_error!(e, SmartAccountError::DuplicateSigner),
-            Err(pos) => sorted_signers.insert(pos, signer),
+            Err(pos) => sorted_signer_ids.insert(pos, id),
         }
     }
 
-    let mut sorted_policies = Vec::new(e);
-    for policy in policies.iter() {
-        match sorted_policies.binary_search(&policy) {
+    let mut sorted_policy_ids = Vec::new(e);
+    for id in policy_ids.iter() {
+        match sorted_policy_ids.binary_search(id) {
             Ok(_) => panic_with_error!(e, SmartAccountError::DuplicatePolicy),
-            Err(pos) => sorted_policies.insert(pos, policy),
+            Err(pos) => sorted_policy_ids.insert(pos, id),
         }
     }
 
     let mut rule_data = context_type.to_xdr(e);
-    rule_data.append(&sorted_signers.to_xdr(e));
-    rule_data.append(&sorted_policies.to_xdr(e));
+    rule_data.append(&sorted_signer_ids.to_xdr(e));
+    rule_data.append(&sorted_policy_ids.to_xdr(e));
 
     e.crypto().sha256(&rule_data).to_bytes()
+}
+
+/// Checks if any signer in `signers` has the same canonical key identity as
+/// `new_signer`.
+///
+/// For [`Signer::External`] signers, this calls the verifier's
+/// `batch_canonicalize_key` to compare cryptographic identities rather than raw
+/// bytes. Two external signers with the same verifier are considered
+/// duplicates if their canonical key representations match, even if their
+/// raw key bytes differ.
+///
+/// For [`Signer::Delegated`] signers, this falls back to direct byte
+/// equality since `Address` values are already canonical.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signers` - The existing list of signers to check against.
+/// * `new_signer` - The signer to check for duplicates.
+pub fn contains_canonical_duplicate(e: &Env, signers: &Vec<Signer>, new_signer: &Signer) -> bool {
+    match new_signer {
+        Signer::External(verifier, key_data) => {
+            let client = VerifierClient::new(e, verifier);
+
+            let mut key_batch = Vec::new(e);
+
+            // Filter signers with the same verifier
+            for existing in signers.iter() {
+                if let Signer::External(existing_verifier, existing_key_data) = existing {
+                    if existing_verifier == *verifier {
+                        key_batch.push_back(existing_key_data.into_val(e));
+                    }
+                }
+            }
+
+            if key_batch.is_empty() {
+                return false;
+            }
+
+            key_batch.push_back(key_data.into_val(e));
+
+            let canonical_batch = client.batch_canonicalize_key(&key_batch);
+            let new_canonical = canonical_batch.last().expect("new canonical key to be present");
+
+            canonical_batch.iter().rev().skip(1).any(|canonical| canonical == new_canonical)
+        }
+        Signer::Delegated(_) => signers.contains(new_signer),
+    }
 }
 
 // ################## CHANGE STATE ##################
@@ -580,23 +579,28 @@ pub fn compute_fingerprint(
 ///
 /// # Errors
 ///
-/// * [`SmartAccountError::TooManyContextRules`] - When the number of context
-///   rules exceeds MAX_CONTEXT_RULES (15).
-/// * [`SmartAccountError::NoSignersAndPolicies`] - When both signers and
-///   policies are empty.
-/// * [`SmartAccountError::TooManySigners`] - When the number of signers exceeds
-///   MAX_SIGNERS (15).
-/// * [`SmartAccountError::TooManyPolicies`] - When the number of policies
-///   exceeds MAX_POLICIES (5).
 /// * [`SmartAccountError::DuplicateSigner`] - When the same signer appears
 ///   multiple times.
-/// * [`SmartAccountError::PastValidUntil`] - When valid_until is in the past.
+/// * [`SmartAccountError::PastValidUntil`] - When `valid_until` is in the past.
+/// * [`SmartAccountError::MathOverflow`] - When the context rule ID counter has
+///   reached `u32::MAX` and cannot be incremented.
+/// * refer to [`validate_context_rule_name`] errors.
+/// * refer to [`validate_signer_key_size`] errors.
+/// * refer to [`validate_signers_and_policies`] errors.
 ///
 /// # Events
 ///
 /// * topics - `["context_rule_added", id: u32]`
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
-///   Option<u32>, signers: Vec<Signer>, policies: Vec<Address>]`
+///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]`
+///
+/// For each signer not previously registered in the global registry:
+/// * topics - `["signer_registered", signer_id: u32]`
+/// * data - `[signer: Signer]`
+///
+/// For each policy not previously registered in the global registry:
+/// * topics - `["policy_registered", policy_id: u32]`
+/// * data - `[policy: Address]`
 ///
 /// # Security Warning
 ///
@@ -610,22 +614,17 @@ pub fn add_context_rule(
     signers: &Vec<Signer>,
     policies: &Map<Address, Val>,
 ) -> ContextRule {
+    validate_context_rule_name(e, name);
+
     let id = e.storage().instance().get(&SmartAccountStorageKey::NextId).unwrap_or(0u32);
 
     let count = get_context_rules_count(e);
-    if count >= MAX_CONTEXT_RULES {
-        panic_with_error!(e, SmartAccountError::TooManyContextRules);
-    }
 
-    let ids_key = SmartAccountStorageKey::Ids(context_type.clone());
-    // Don't extend TTL here since we set this key later in the same function
-    let mut same_key_ids: Vec<u32> =
-        e.storage().persistent().get(&ids_key).unwrap_or_else(|| Vec::new(e));
-
-    // Check for duplicate signers
+    // Check for duplicate signers using canonical key comparison
     let mut unique_signers = Vec::new(e);
     for signer in signers.iter() {
-        if unique_signers.contains(&signer) {
+        validate_signer_key_size(e, &signer);
+        if contains_canonical_duplicate(e, &unique_signers, &signer) {
             panic_with_error!(e, SmartAccountError::DuplicateSigner);
         }
         unique_signers.push_back(signer);
@@ -640,22 +639,29 @@ pub fn add_context_rule(
 
     let policies_vec = Vec::from_iter(e, policies.keys());
 
-    validate_signers_and_policies(e, &unique_signers, &policies_vec);
-    validate_and_set_fingerprint(e, context_type, &unique_signers, &policies_vec);
+    // Register signers in global registry and collect their IDs
+    let signer_ids: Vec<u32> =
+        Vec::from_iter(e, unique_signers.iter().map(|s| register_signer(e, &s)));
 
-    // Store meta information
-    let meta = Meta { name: name.clone(), context_type: context_type.clone(), valid_until };
-    e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
+    // Register policies in global registry and collect their IDs
+    let policy_ids: Vec<u32> =
+        Vec::from_iter(e, policies_vec.iter().map(|p| register_policy(e, &p)));
 
-    // Store signers
-    e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), signers);
+    validate_signers_and_policies(e, &signer_ids, &policy_ids);
 
-    // Store policies
-    e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies_vec);
+    set_fingerprint(e, context_type, &signer_ids, &policy_ids);
 
-    // Update ids list
-    same_key_ids.push_back(id);
-    e.storage().persistent().set(&SmartAccountStorageKey::Ids(context_type.clone()), &same_key_ids);
+    // Store all context rule data in a single entry
+    e.storage().persistent().set(
+        &SmartAccountStorageKey::ContextRuleData(id),
+        &ContextRuleEntry {
+            name: name.clone(),
+            context_type: context_type.clone(),
+            valid_until,
+            signer_ids: signer_ids.clone(),
+            policy_ids: policy_ids.clone(),
+        },
+    );
 
     let context_rule = ContextRule {
         id,
@@ -671,12 +677,15 @@ pub fn add_context_rule(
         PolicyClient::new(e, &policy).install(&param, &context_rule, &e.current_contract_address());
     }
 
-    emit_context_rule_added(e, &context_rule);
+    emit_context_rule_added(e, id, name, context_type, valid_until, &signer_ids, &policy_ids);
 
     // Increment next id
-    e.storage().instance().set(&SmartAccountStorageKey::NextId, &(id + 1));
+    let next_id =
+        id.checked_add(1).unwrap_or_else(|| panic_with_error!(e, SmartAccountError::MathOverflow));
+    e.storage().instance().set(&SmartAccountStorageKey::NextId, &next_id);
 
-    // Increment count
+    // Increment count, overflow will be caught from next_id, next_id is always >=
+    // count
     e.storage().instance().set(&SmartAccountStorageKey::Count, &(count + 1));
 
     context_rule
@@ -694,10 +703,11 @@ pub fn add_context_rule(
 ///
 /// * [`SmartAccountError::ContextRuleNotFound`] - When the context rule with
 ///   the specified ID does not exist.
+/// * refer to [`validate_context_rule_name`] errors.
 ///
 /// # Events
 ///
-/// * topics - `["context_rule_updated", context_rule_id: u32]`
+/// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
 ///   Option<u32>]`
 ///
@@ -706,28 +716,28 @@ pub fn add_context_rule(
 /// This function modifies storage without requiring authorization. Ensure
 /// proper access control is implemented at the contract level.
 pub fn update_context_rule_name(e: &Env, id: u32, name: &String) -> ContextRule {
-    let existing_rule = get_context_rule(e, id);
+    validate_context_rule_name(e, name);
 
-    // Update only the name in meta information
-    let meta = Meta {
-        name: name.clone(),
-        context_type: existing_rule.context_type.clone(),
-        valid_until: existing_rule.valid_until,
-    };
-    e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
+    let data_key = SmartAccountStorageKey::ContextRuleData(id);
+    let mut entry: ContextRuleEntry = e
+        .storage()
+        .persistent()
+        .get(&data_key)
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
-    let context_rule = ContextRule {
+    entry.name = name.clone();
+    e.storage().persistent().set(&data_key, &entry);
+
+    emit_context_rule_meta_updated(e, id, name, &entry.valid_until);
+
+    ContextRule {
         id,
-        context_type: existing_rule.context_type,
+        context_type: entry.context_type,
         name: name.clone(),
-        signers: existing_rule.signers,
-        policies: existing_rule.policies,
-        valid_until: existing_rule.valid_until,
-    };
-
-    emit_context_rule_updated(e, id, &meta);
-
-    context_rule
+        valid_until: entry.valid_until,
+        signers: get_signers(e, &entry.signer_ids),
+        policies: get_policies(e, &entry.policy_ids),
+    }
 }
 
 /// Updates the expiration time for an existing context rule.
@@ -746,7 +756,7 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: &String) -> ContextRule 
 ///
 /// # Events
 ///
-/// * topics - `["context_rule_updated", context_rule_id: u32]`
+/// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
 ///   Option<u32>]`
 ///
@@ -755,35 +765,32 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: &String) -> ContextRule 
 /// This function modifies storage without requiring authorization. Ensure
 /// proper access control is implemented at the contract level.
 pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32>) -> ContextRule {
-    let existing_rule = get_context_rule(e, id);
-
-    // Check valid_until
     if let Some(valid_until) = valid_until {
         if valid_until < e.ledger().sequence() {
             panic_with_error!(e, SmartAccountError::PastValidUntil)
         }
     }
 
-    // Update only the valid_until in meta information
-    let meta = Meta {
-        name: existing_rule.name.clone(),
-        context_type: existing_rule.context_type.clone(),
-        valid_until,
-    };
-    e.storage().persistent().set(&SmartAccountStorageKey::Meta(id), &meta);
+    let data_key = SmartAccountStorageKey::ContextRuleData(id);
+    let mut entry: ContextRuleEntry = e
+        .storage()
+        .persistent()
+        .get(&data_key)
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
-    let context_rule = ContextRule {
+    entry.valid_until = valid_until;
+    e.storage().persistent().set(&data_key, &entry);
+
+    emit_context_rule_meta_updated(e, id, &entry.name, &valid_until);
+
+    ContextRule {
         id,
-        context_type: existing_rule.context_type,
-        name: existing_rule.name,
-        signers: existing_rule.signers,
-        policies: existing_rule.policies,
+        context_type: entry.context_type,
+        name: entry.name,
         valid_until,
-    };
-
-    emit_context_rule_updated(e, id, &meta);
-
-    context_rule
+        signers: get_signers(e, &entry.signer_ids),
+        policies: get_policies(e, &entry.policy_ids),
+    }
 }
 
 /// Removes a context rule and tries to uninstall all its policies. Cleans up
@@ -804,41 +811,53 @@ pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32
 /// * topics - `["context_rule_removed", context_rule_id: u32]`
 /// * data - `[]`
 ///
+/// If this was the last context rule referencing a signer:
+/// * topics - `["signer_deregistered", signer_id: u32]`
+/// * data - `[]`
+///
+/// If this was the last context rule referencing a policy:
+/// * topics - `["policy_deregistered", policy_id: u32]`
+/// * data - `[]`
+///
 /// # Security Warning
 ///
 /// This function modifies storage without requiring authorization. Ensure
 /// proper access control is implemented at the contract level.
 pub fn remove_context_rule(e: &Env, id: u32) {
-    let context_rule = get_context_rule(e, id);
+    let entry: ContextRuleEntry = e
+        .storage()
+        .persistent()
+        .get(&SmartAccountStorageKey::ContextRuleData(id))
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
-    // Uninstall all policies
-    for policy in context_rule.policies.iter() {
-        // try_uninstall so that if the policy panics, complete the removal
+    let policies = get_policies(e, &entry.policy_ids);
+    let context_rule = ContextRule {
+        id,
+        context_type: entry.context_type.clone(),
+        name: entry.name,
+        signers: get_signers(e, &entry.signer_ids),
+        policies: policies.clone(),
+        valid_until: entry.valid_until,
+    };
+
+    for (policy, policy_id) in policies.iter().zip(&entry.policy_ids) {
+        // `try_uninstall` so that if the policy panics, context rule removal can be
+        // completed. This prevents a malicious or misconfigured policy from blocking a
+        // context rule removal.
         let _ = PolicyClient::new(e, &policy)
             .try_uninstall(&context_rule, &e.current_contract_address());
+
+        // Deregister policies from global registry
+        deregister_policy(e, policy_id);
     }
 
-    // Remove all storage entries for this context rule
-    e.storage().persistent().remove(&SmartAccountStorageKey::Meta(id));
-    e.storage().persistent().remove(&SmartAccountStorageKey::Signers(id));
-    e.storage().persistent().remove(&SmartAccountStorageKey::Policies(id));
-    remove_fingerprint(
-        e,
-        &context_rule.context_type,
-        &context_rule.signers,
-        &context_rule.policies,
-    );
-
-    // Remove from ids list
-    let ids_key = SmartAccountStorageKey::Ids(context_rule.context_type);
-    // Don't extend TTL here since we set this key later in the same function
-    let mut ids =
-        e.storage().persistent().get::<_, Vec<u32>>(&ids_key).unwrap_or_else(|| Vec::new(e));
-
-    if let Some(pos) = ids.iter().rposition(|i| i == id) {
-        ids.remove(pos as u32);
-        e.storage().persistent().set(&ids_key, &ids);
+    for signer_id in entry.signer_ids.iter() {
+        deregister_signer(e, signer_id);
     }
+
+    remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
+
+    e.storage().persistent().remove(&SmartAccountStorageKey::ContextRuleData(id));
 
     // Decrement count
     let count: u32 = e.storage().instance().get(&SmartAccountStorageKey::Count).expect("to be set");
@@ -850,7 +869,8 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 
 // ################## SIGNER MANAGEMENT ##################
 
-/// Adds a new signer to an existing context rule.
+/// Adds a new signer to an existing context rule, returning the assigned
+/// signer ID.
 ///
 /// # Arguments
 ///
@@ -864,12 +884,16 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 ///   the specified ID does not exist.
 /// * [`SmartAccountError::DuplicateSigner`] - When the signer already exists in
 ///   the context rule.
-/// * [`SmartAccountError::TooManySigners`] - When adding this signer would
-///   exceed MAX_SIGNERS (15).
+/// * refer to [`validate_signer_key_size`] errors.
+/// * refer to [`validate_signers_and_policies`] errors.
 ///
 /// # Events
 ///
 /// * topics - `["signer_added", context_rule_id: u32]`
+/// * data - `[signer_id: u32]`
+///
+/// If the signer is not previously registered in the global registry:
+/// * topics - `["signer_registered", signer_id: u32]`
 /// * data - `[signer: Signer]`
 ///
 /// # Security Warning
@@ -883,27 +907,36 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 ///
 /// * This function modifies storage without requiring authorization. Ensure
 ///   proper access control is implemented at the contract level.
-pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
-    let rule = get_context_rule(e, id);
-    let mut signers = rule.signers.clone();
+pub fn add_signer(e: &Env, id: u32, signer: &Signer) -> u32 {
+    validate_signer_key_size(e, signer);
 
-    // Check if signer already exists
-    if signers.contains(signer) {
+    // Get current entry to access existing IDs
+    let data_key = SmartAccountStorageKey::ContextRuleData(id);
+    let mut entry: ContextRuleEntry = get_persistent_entry(e, &data_key)
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+
+    // Check if signer already exists using canonical key comparison (against
+    // resolved signers)
+    let signers = get_signers(e, &entry.signer_ids);
+    if contains_canonical_duplicate(e, &signers, signer) {
         panic_with_error!(e, SmartAccountError::DuplicateSigner)
     }
 
-    signers.push_back(signer.clone());
+    remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
 
-    // Validate the updated signers and policies
-    validate_signers_and_policies(e, &signers, &rule.policies);
+    let new_signer_id = register_signer(e, signer);
 
-    validate_and_set_fingerprint(e, &rule.context_type, &signers, &rule.policies);
-    // Remove the old fingerprint
-    remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
+    entry.signer_ids.push_back(new_signer_id);
 
-    e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
+    validate_signers_and_policies(e, &entry.signer_ids, &entry.policy_ids);
 
-    emit_signer_added(e, id, signer);
+    set_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
+
+    e.storage().persistent().set(&data_key, &entry);
+
+    emit_signer_added(e, id, new_signer_id);
+
+    new_signer_id
 }
 
 /// Removes a signer from an existing context rule.
@@ -911,8 +944,8 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `id` - The ID of the context rule.
-/// * `signer` - The signer to remove from the context rule.
+/// * `context_rule_id` - The ID of the context rule.
+/// * `signer_id` - The signer ID to remove from the context rule.
 ///
 /// # Errors
 ///
@@ -920,11 +953,16 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
 ///   the specified ID does not exist.
 /// * [`SmartAccountError::SignerNotFound`] - When the specified signer is not
 ///   found in the context rule.
+/// * refer to [`validate_signers_and_policies`] errors.
 ///
 /// # Events
 ///
 /// * topics - `["signer_removed", context_rule_id: u32]`
-/// * data - `[signer: Signer]`
+/// * data - `[signer_id: u32]`
+///
+/// If this was the last context rule referencing the signer:
+/// * topics - `["signer_deregistered", signer_id: u32]`
+/// * data - `[]`
 ///
 /// # Security Warning
 ///
@@ -936,37 +974,112 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
 ///
 /// * This function modifies storage without requiring authorization. Ensure
 ///   proper access control is implemented at the contract level.
-pub fn remove_signer(e: &Env, id: u32, signer: &Signer) {
-    let rule = get_context_rule(e, id);
-    let mut signers = rule.signers.clone();
+pub fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32) {
+    let data_key = SmartAccountStorageKey::ContextRuleData(context_rule_id);
+    let mut entry: ContextRuleEntry = get_persistent_entry(e, &data_key)
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
-    // Find and remove the signer
-    if let Some(pos) = signers.iter().rposition(|s| s == *signer) {
-        signers.remove(pos as u32);
+    if let Some(pos) = entry.signer_ids.iter().rposition(|s| s == signer_id) {
+        remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
 
-        // Validate that the rule still has at least one signer or one policy
-        validate_signers_and_policies(e, &signers, &rule.policies);
+        entry.signer_ids.remove(pos as u32);
 
-        validate_and_set_fingerprint(e, &rule.context_type, &signers, &rule.policies);
-        // Remove the old fingerprint
-        remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
+        validate_signers_and_policies(e, &entry.signer_ids, &entry.policy_ids);
 
-        e.storage().persistent().set(&SmartAccountStorageKey::Signers(id), &signers);
+        set_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
 
-        emit_signer_removed(e, id, signer);
+        e.storage().persistent().set(&data_key, &entry);
+        deregister_signer(e, signer_id);
+
+        emit_signer_removed(e, context_rule_id, signer_id);
     } else {
         panic_with_error!(e, SmartAccountError::SignerNotFound)
     }
 }
 
-// ################## POLICY MANAGEMENT ##################
-
-/// Adds a new policy to an existing context rule and installs it.
+/// Adds multiple signers to an existing context rule in a single operation.
+///
+/// More efficient than calling [`add_signer`] in a loop because it resolves
+/// existing signers once, removes and resets the fingerprint once, and writes
+/// the [`ContextRuleEntry`] once regardless of how many signers are added.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `id` - The ID of the context rule.
+/// * `signers` - The signers to add to the context rule.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::ContextRuleNotFound`] - When the context rule with
+///   the specified ID does not exist.
+/// * [`SmartAccountError::DuplicateSigner`] - When any signer already exists in
+///   the context rule or appears more than once in `signers`.
+/// * refer to [`validate_signer_key_size`] errors.
+/// * refer to [`validate_signers_and_policies`] errors.
+///
+/// # Events
+///
+/// For each signer added:
+/// * topics - `["signer_added", context_rule_id: u32]`
+/// * data - `[signer_id: u32]`
+///
+/// For each signer not previously registered in the global registry:
+/// * topics - `["signer_registered", signer_id: u32]`
+/// * data - `[signer: Signer]`
+///
+/// # Security Warning
+///
+/// * **Threshold Policy Consideration:** If the ContextRule contains a
+///   threshold-based policy (e.g., simple_threshold), adding signers may
+///   silently weaken the security guarantee. For example, a strict N-of-N
+///   multisig becomes an N-of-(N+M) multisig after adding M signers. **Always
+///   update the policy threshold AFTER adding signers** to maintain the desired
+///   security level, especially for N-of-N multisig configurations.
+///
+/// * This function modifies storage without requiring authorization. Ensure
+///   proper access control is implemented at the contract level.
+pub fn batch_add_signer(e: &Env, id: u32, signers: &Vec<Signer>) {
+    let data_key = SmartAccountStorageKey::ContextRuleData(id);
+    let mut entry: ContextRuleEntry = get_persistent_entry(e, &data_key)
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+
+    // Resolve existing signers once for all duplicate checks.
+    let mut existing_signers = get_signers(e, &entry.signer_ids);
+
+    remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
+
+    for signer in signers.iter() {
+        validate_signer_key_size(e, &signer);
+
+        if contains_canonical_duplicate(e, &existing_signers, &signer) {
+            panic_with_error!(e, SmartAccountError::DuplicateSigner);
+        }
+
+        let new_signer_id = register_signer(e, &signer);
+
+        entry.signer_ids.push_back(new_signer_id);
+        existing_signers.push_back(signer);
+
+        emit_signer_added(e, id, new_signer_id);
+    }
+
+    validate_signers_and_policies(e, &entry.signer_ids, &entry.policy_ids);
+
+    set_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
+
+    e.storage().persistent().set(&data_key, &entry);
+}
+
+// ################## POLICY MANAGEMENT ##################
+
+/// Adds a new policy to an existing context rule, installs it, and returns
+/// the assigned policy ID.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `context_rule_id` - The ID of the context rule.
 /// * `policy` - The address of the policy contract to add.
 /// * `install_param` - The installation parameter for the policy.
 ///
@@ -976,42 +1089,57 @@ pub fn remove_signer(e: &Env, id: u32, signer: &Signer) {
 ///   the specified ID does not exist.
 /// * [`SmartAccountError::DuplicatePolicy`] - When the policy already exists in
 ///   the context rule.
-/// * [`SmartAccountError::TooManyPolicies`] - When adding this policy would
-///   exceed MAX_POLICIES (5).
+/// * refer to [`validate_signers_and_policies`] errors.
 ///
 /// # Events
 ///
 /// * topics - `["policy_added", context_rule_id: u32]`
-/// * data - `[policy: Address, install_param: Val]`
+/// * data - `[policy_id: u32, install_param: Val]`
+///
+/// If the policy is not previously registered in the global registry:
+/// * topics - `["policy_registered", policy_id: u32]`
+/// * data - `[policy: Address]`
 ///
 /// # Security Warning
 ///
 /// This function modifies storage without requiring authorization. Ensure
 /// proper access control is implemented at the contract level.
-pub fn add_policy(e: &Env, id: u32, policy: &Address, install_param: Val) {
-    let rule = get_context_rule(e, id);
-    let mut policies = rule.policies.clone();
+pub fn add_policy(e: &Env, context_rule_id: u32, policy: &Address, install_param: Val) -> u32 {
+    let data_key = SmartAccountStorageKey::ContextRuleData(context_rule_id);
+    let mut entry: ContextRuleEntry = get_persistent_entry(e, &data_key)
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
+
+    // Register in global policy registry and get its ID
+    let policy_id = register_policy(e, policy);
 
     // Check if policy already exists
-    if policies.contains(policy) {
+    if entry.policy_ids.contains(policy_id) {
         panic_with_error!(e, SmartAccountError::DuplicatePolicy)
     }
 
-    // Install the policy
+    remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
+
+    entry.policy_ids.push_back(policy_id);
+
+    validate_signers_and_policies(e, &entry.signer_ids, &entry.policy_ids);
+
+    set_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
+
+    e.storage().persistent().set(&data_key, &entry);
+
+    let rule = ContextRule {
+        id: context_rule_id,
+        context_type: entry.context_type,
+        name: entry.name,
+        signers: get_signers(e, &entry.signer_ids),
+        policies: get_policies(e, &entry.policy_ids),
+        valid_until: entry.valid_until,
+    };
     PolicyClient::new(e, policy).install(&install_param, &rule, &e.current_contract_address());
 
-    policies.push_back(policy.clone());
+    emit_policy_added(e, context_rule_id, policy_id, install_param);
 
-    // Validate the updated signers and policies
-    validate_signers_and_policies(e, &rule.signers, &policies);
-
-    validate_and_set_fingerprint(e, &rule.context_type, &rule.signers, &policies);
-    // Remove the old fingerprint
-    remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
-
-    e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
-
-    emit_policy_added(e, id, policy, install_param);
+    policy_id
 }
 
 /// Removes a policy from an existing context rule and tries to uninstall it.
@@ -1019,8 +1147,8 @@ pub fn add_policy(e: &Env, id: u32, policy: &Address, install_param: Val) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `id` - The ID of the context rule.
-/// * `policy` - The address of the policy contract to remove.
+/// * `context_rule_id` - The ID of the context rule.
+/// * `policy_id` - The policy ID to remove from the context rule.
 ///
 /// # Errors
 ///
@@ -1028,64 +1156,254 @@ pub fn add_policy(e: &Env, id: u32, policy: &Address, install_param: Val) {
 ///   the specified ID does not exist.
 /// * [`SmartAccountError::PolicyNotFound`] - When the specified policy is not
 ///   found in the context rule.
+/// * refer to [`validate_signers_and_policies`] errors.
 ///
 /// # Events
 ///
 /// * topics - `["policy_removed", context_rule_id: u32]`
-/// * data - `[policy: Address]`
+/// * data - `[policy_id: u32]`
+///
+/// If this was the last context rule referencing the policy:
+/// * topics - `["policy_deregistered", policy_id: u32]`
+/// * data - `[]`
 ///
 /// # Security Warning
 ///
 /// This function modifies storage without requiring authorization. Ensure
 /// proper access control is implemented at the contract level.
-pub fn remove_policy(e: &Env, id: u32, policy: &Address) {
-    let rule = get_context_rule(e, id);
-    let mut policies = rule.policies.clone();
+pub fn remove_policy(e: &Env, context_rule_id: u32, policy_id: u32) {
+    let data_key = SmartAccountStorageKey::ContextRuleData(context_rule_id);
+    let mut entry: ContextRuleEntry = get_persistent_entry(e, &data_key)
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
-    // Find and remove the policy
-    if let Some(pos) = policies.iter().rposition(|p| p == *policy) {
-        policies.remove(pos as u32);
+    // Find the policy position in the ID list
+    if let Some(pos) = entry.policy_ids.iter().rposition(|p| p == policy_id) {
+        let policies = get_policies(e, &entry.policy_ids);
 
-        // Validate that the rule still has at least one signer or one policy
-        validate_signers_and_policies(e, &rule.signers, &policies);
+        let rule = ContextRule {
+            id: context_rule_id,
+            context_type: entry.context_type.clone(),
+            name: entry.name.clone(),
+            signers: get_signers(e, &entry.signer_ids),
+            policies: policies.clone(),
+            valid_until: entry.valid_until,
+        };
+        let policy = policies.get_unchecked(pos as u32);
+        let _ = PolicyClient::new(e, &policy).try_uninstall(&rule, &e.current_contract_address());
 
-        validate_and_set_fingerprint(e, &rule.context_type, &rule.signers, &policies);
-        remove_fingerprint(e, &rule.context_type, &rule.signers, &rule.policies);
+        remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
 
-        // Try to uninstall the policy: if the policy panics, complete the removal
-        let _ = PolicyClient::new(e, policy).try_uninstall(&rule, &e.current_contract_address());
+        entry.policy_ids.remove(pos as u32);
 
-        e.storage().persistent().set(&SmartAccountStorageKey::Policies(id), &policies);
+        validate_signers_and_policies(e, &entry.signer_ids, &entry.policy_ids);
 
-        emit_policy_removed(e, id, policy);
+        set_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
+
+        e.storage().persistent().set(&data_key, &entry);
+        deregister_policy(e, policy_id);
+
+        emit_policy_removed(e, context_rule_id, policy_id);
     } else {
         panic_with_error!(e, SmartAccountError::PolicyNotFound)
     }
 }
 
+// ################## HELPERS ##################
+
+/// Registers a signer in the global registry, returning its unique ID.
+///
+/// If the signer already exists (by XDR hash), increments its reference count
+/// and returns the existing ID. Otherwise, assigns a new monotonically
+/// increasing ID, stores the signer data, and sets the reference count to 1.
+/// IDs are never reused after deregistration.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer` - The signer to register.
+///
+/// # Events
+///
+/// * topics - `["signer_registered", signer_id: u32]`
+/// * data - `[signer: Signer]`
+///
+/// # Errors
+///
+/// [`SmartAccountError::MathOverflow`] - When `NextSignerId` has
+/// reached `u32::MAX` and no new signer ID can be assigned.
+fn register_signer(e: &Env, signer: &Signer) -> u32 {
+    let hash = e.crypto().sha256(&signer.to_xdr(e)).to_bytes();
+    let lookup_key = SmartAccountStorageKey::SignerLookup(hash.clone());
+
+    if let Some(existing_id) = get_persistent_entry::<u32>(e, &lookup_key) {
+        let data_key = SmartAccountStorageKey::SignerData(existing_id);
+        let mut entry: SignerEntry =
+            e.storage().persistent().get(&data_key).expect("signer entry to exist");
+
+        entry.count += 1;
+        e.storage().persistent().set(&data_key, &entry);
+
+        existing_id
+    } else {
+        // Assign new signer next ID and store.
+        let id: u32 =
+            e.storage().instance().get(&SmartAccountStorageKey::NextSignerId).unwrap_or(0);
+        e.storage().persistent().set(
+            &SmartAccountStorageKey::SignerData(id),
+            &SignerEntry { signer: signer.clone(), count: 1 },
+        );
+        e.storage().persistent().set(&lookup_key, &id);
+
+        let next_signer_id = id
+            .checked_add(1)
+            .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::MathOverflow));
+        e.storage().instance().set(&SmartAccountStorageKey::NextSignerId, &next_signer_id);
+
+        emit_signer_registered(e, id, signer);
+
+        id
+    }
+}
+
+/// Decrements the reference count for a signer. If the count reaches zero,
+/// removes all associated storage entries. The signer ID is never reused.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer_id` - The signer ID to deregister.
+///
+/// # Events
+///
+/// * topics - `["signer_deregistered", signer_id: u32]`
+/// * data - `[]`
+fn deregister_signer(e: &Env, signer_id: u32) {
+    let data_key = SmartAccountStorageKey::SignerData(signer_id);
+    let entry: SignerEntry =
+        e.storage().persistent().get(&data_key).expect("signer entry to exist");
+
+    if entry.count <= 1 {
+        // Last reference
+        let hash = e.crypto().sha256(&entry.signer.to_xdr(e)).to_bytes();
+
+        e.storage().persistent().remove(&data_key);
+        e.storage().persistent().remove(&SmartAccountStorageKey::SignerLookup(hash));
+
+        emit_signer_deregistered(e, signer_id);
+    } else {
+        e.storage()
+            .persistent()
+            .set(&data_key, &SignerEntry { signer: entry.signer, count: entry.count - 1 });
+    }
+}
+
+/// Registers a policy in the global registry, returning its unique ID.
+///
+/// If the policy address already exists, increments its reference count and
+/// returns the existing ID. Otherwise, assigns a new monotonically increasing
+/// ID, stores the policy address, and sets the reference count to 1.
+/// IDs are never reused after deregistration.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `policy` - The policy address.
+///
+/// # Events
+///
+/// * topics - `["policy_registered", policy_id: u32]`
+/// * data - `[policy: Address]`
+///
+/// # Errors
+///
+/// [`SmartAccountError::MathOverflow`] - When `NextPolicyId` has
+/// reached `u32::MAX` and no new policy ID can be assigned.
+fn register_policy(e: &Env, policy: &Address) -> u32 {
+    let lookup_key = SmartAccountStorageKey::PolicyLookup(policy.clone());
+
+    if let Some(existing_id) = get_persistent_entry::<u32>(e, &lookup_key) {
+        let data_key = SmartAccountStorageKey::PolicyData(existing_id);
+        let mut entry: PolicyEntry =
+            e.storage().persistent().get(&data_key).expect("policy entry to exist");
+
+        entry.count += 1;
+        e.storage().persistent().set(&data_key, &entry);
+
+        existing_id
+    } else {
+        // Assign new policy next ID and store.
+        let id: u32 =
+            e.storage().instance().get(&SmartAccountStorageKey::NextPolicyId).unwrap_or(0);
+        e.storage().persistent().set(
+            &SmartAccountStorageKey::PolicyData(id),
+            &PolicyEntry { policy: policy.clone(), count: 1 },
+        );
+        e.storage().persistent().set(&lookup_key, &id);
+
+        let next_policy_id = id
+            .checked_add(1)
+            .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::MathOverflow));
+        e.storage().instance().set(&SmartAccountStorageKey::NextPolicyId, &next_policy_id);
+
+        emit_policy_registered(e, id, policy);
+
+        id
+    }
+}
+
+/// Decrements the reference count for a policy. If the count reaches zero,
+/// removes all associated storage entries. The policy ID is never reused.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `policy_id` - The policy ID to deregister.
+///
+/// # Events
+///
+/// * topics - `["policy_deregistered", policy_id: u32]`
+/// * data - `[]`
+fn deregister_policy(e: &Env, policy_id: u32) {
+    let data_key = SmartAccountStorageKey::PolicyData(policy_id);
+    let entry: PolicyEntry =
+        e.storage().persistent().get(&data_key).expect("policy entry to exist");
+
+    if entry.count <= 1 {
+        // Last reference
+        e.storage().persistent().remove(&data_key);
+        e.storage().persistent().remove(&SmartAccountStorageKey::PolicyLookup(entry.policy));
+
+        emit_policy_deregistered(e, policy_id);
+    } else {
+        e.storage()
+            .persistent()
+            .set(&data_key, &PolicyEntry { policy: entry.policy, count: entry.count - 1 });
+    }
+}
+
 /// Validates that a context rule with the given authorization requirements
 /// doesn't already exist, then stores its fingerprint. This prevents creating
-/// duplicate rules with identical signers, policies, and expiration.
+/// duplicate rules with identical signers, policies, and context types.
 ///
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+/// * `context_type` - The type of context this rule applies to.
 /// * `signers` - The signers for the context rule.
 /// * `policies` - The policies for the context rule.
-/// * `valid_until` - Optional expiration ledger sequence.
 ///
 /// # Errors
 ///
 /// * [`SmartAccountError::DuplicateContextRule`] - When a rule with identical
 ///   authorization requirements already exists.
-pub fn validate_and_set_fingerprint(
+pub(crate) fn set_fingerprint(
     e: &Env,
     context_type: &ContextRuleType,
-    signers: &Vec<Signer>,
-    policies: &Vec<Address>,
+    signer_ids: &Vec<u32>,
+    policy_ids: &Vec<u32>,
 ) {
-    let fingerprint = compute_fingerprint(e, context_type, signers, policies);
+    let fingerprint = compute_fingerprint(e, context_type, signer_ids, policy_ids);
     let fingerprint_key = SmartAccountStorageKey::Fingerprint(fingerprint);
 
     if e.storage().persistent().has(&fingerprint_key) {
@@ -1095,24 +1413,56 @@ pub fn validate_and_set_fingerprint(
     }
 }
 
-// ################## HELPERS ##################
-
 /// Removes a context rule's fingerprint from storage.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context_type` - The type of context this rule applies to.
-/// * `signers` - The signers for the context rule.
-/// * `policies` - The policies for the context rule.
+/// * `signer_ids` - The signer IDs for the context rule.
+/// * `policy_ids` - The policy IDs for the context rule.
 fn remove_fingerprint(
     e: &Env,
     context_type: &ContextRuleType,
-    signers: &Vec<Signer>,
-    policies: &Vec<Address>,
+    signer_ids: &Vec<u32>,
+    policy_ids: &Vec<u32>,
 ) {
-    let fingerprint = compute_fingerprint(e, context_type, signers, policies);
+    let fingerprint = compute_fingerprint(e, context_type, signer_ids, policy_ids);
     e.storage().persistent().remove(&SmartAccountStorageKey::Fingerprint(fingerprint));
+}
+
+/// Returns a list of signer IDs to their full [`Signer`] objects by
+/// reading each [`SignerEntry`] from persistent storage.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer_ids` - The global signer IDs to resolve.
+fn get_signers(e: &Env, signer_ids: &Vec<u32>) -> Vec<Signer> {
+    Vec::from_iter(
+        e,
+        signer_ids.iter().map(|id| {
+            let key = SmartAccountStorageKey::SignerData(id);
+            get_persistent_entry::<SignerEntry>(e, &key).expect("signer entry to exist").signer
+        }),
+    )
+}
+
+/// Returns a list of policy IDs to their [`Address`] values by
+/// reading each [`PolicyEntry`] from persistent storage.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `policy_ids` - The global policy IDs to resolve.
+fn get_policies(e: &Env, policy_ids: &Vec<u32>) -> Vec<Address> {
+    Vec::from_iter(
+        e,
+        policy_ids.iter().map(|policy_id| {
+            let key = SmartAccountStorageKey::PolicyData(policy_id);
+            get_persistent_entry::<PolicyEntry>(e, &key).expect("policy entry to exist").policy
+        }),
+    )
 }
 
 /// Helper function that tries to retrieve a persistent storage value.

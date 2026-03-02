@@ -1,3 +1,116 @@
+//! # Smart Account Storage - Context-Centric Authorization
+//!
+//! This module implements a flexible, context-centric authorization system for
+//! smart accounts that separates concerns into three key dimensions:
+//!
+//! ## Architecture Overview
+//!
+//! ### Signers - Authentication
+//! - **Delegated**: A Soroban `Address` that uses built-in signature
+//!   verification via `require_auth_for_args`.
+//! - **External**: A public key paired with a verifier contract for custom
+//!   cryptographic verification (e.g., secp256r1, passkeys).
+//!
+//! ### Context Rules - Scope and Routing
+//! - A context rule binds a set of signers and policies to a specific operation
+//!   scope (`Default`, `CallContract(Address)`, or
+//!   `CreateContract(BytesN<32>)`).
+//! - Multiple rules can exist for the same scope with different signer sets and
+//!   policies.
+//! - Each rule must contain at least one signer or one policy, and can have an
+//!   optional expiration (`valid_until`) defined by a ledger sequence.
+//! - The caller explicitly selects which rule to validate against; no rule
+//!   iteration or auto-discovery is performed.
+//!
+//! #### `soroban_sdk::auth::Context` and `ContextRule`
+//!
+//! `soroban_sdk::auth::Context` is a Soroban SDK type representing a single
+//! authorized operation within a transaction. `__check_auth` receives
+//! `auth_contexts: Vec<Context>` — one entry per `require_auth` call. Variants:
+//! - `Contract(ContractContext)` — a contract function call (`contract`,
+//!   `fn_name`, `args`)
+//! - `CreateContractHostFn(CreateContractHostFnContext)` — contract deployment
+//!   without constructor arguments (`executable`, `salt`)
+//! - `CreateContractWithCtorHostFn(...)` — contract deployment with constructor
+//!   arguments
+//!
+//! A [`ContextRule`] is this library's stored authorization entry, bound to a
+//! [`ContextRuleType`] that narrows which `Context` variants it can authorize.
+//! A smart account can hold **multiple [`ContextRule`]s for the same context
+//! type** — for example, an admin rule and a session rule both scoped to the
+//! same contract.
+//!
+//! During authorization the caller must supply **exactly one [`ContextRule`] ID
+//! per `Context`** via [`AuthPayload::context_rule_ids`]. No iteration is
+//! performed; the caller explicitly selects which stored rule to validate
+//! against for each operation.
+//!
+//! ### Policies - Enforcement Logic
+//! - External contracts attached to context rules that enforce business
+//!   constraints (e.g., spending limits, threshold multisig).
+//! - All policies in a rule must be satisfied (all-or-nothing enforcement).
+//!
+//! ## Key Design Principles
+//!
+//! ### Context-Centric Approach
+//! The system flips traditional key-centric reasoning to focus on **what you're
+//! authorizing** rather than **which keys are signing**. This mirrors familiar
+//! web2 OAuth patterns where users primarily care about the scope/permissions
+//! being granted, not the underlying keys.
+//!
+//! ### Multiple Rules Per Context
+//! Different authorization requirements for the same context:
+//! - Admin config: 2-of-3 threshold for contract calls
+//! - User config: 3-of-5 threshold for the same contract calls
+//! - Emergency config: 1-of-1 with additional policy constraints
+//!
+//! ## Authorization Matching Algorithm
+//!
+//! The caller explicitly selects which rule to use for each context via
+//! [`AuthPayload::context_rule_ids`], a vector aligned by index with the
+//! `auth_contexts` passed to `__check_auth`. No rule iteration or
+//! auto-discovery is performed.
+//!
+//! For each (context, rule_id) pair:
+//!
+//! I. Authenticate all provided signatures (delegated and external).
+//! II. For each context, look up the rule by its explicit ID:
+//!     1. Reject if the rule is expired.
+//!     2. Reject if the rule's context type does not match the actual context
+//!        (a `Default` rule matches any context).
+//!     3. Identify authenticated signers out of all provided signers.
+//!     4.a. If the rule has no policies, all rule signers must be
+//!          authenticated — otherwise reject.
+//!     4.b. If the rule has policies, defer full signer validation to each
+//!          policy's `enforce()` call.
+//! III. Enforce all policies for every validated (rule, context) pair.
+//! IV. If any check fails, authorization fails.
+//!
+//! ## Benefits
+//!
+//! - **User-Friendly**: Focus on authorization scope rather than key management
+//! - **Extensible**: Policies allow custom business logic without core changes
+//! - **Flexible**: Multiple authorization paths for different user groups
+//!
+//! ## Example Usage
+//!
+//! ```rust,ignore
+//! // Rule 1: Admin group - 3 of 3 signers, no policies
+//! ContextRule {
+//!     context_type: CallContract(token_contract),
+//!     signers: [admin1, admin2, admin3],
+//!     policies: [],
+//! }
+
+//!
+//! // Rule 2: User group - 3 of 5 signers, with spending limit policy
+//! ContextRule {
+//!     context_type: CallContract(token_contract),
+//!     signers: [user1, user2, user3, user4, user5],
+//!     policies: [threshold_policy, spending_limit_policy],
+//! }
+//! ```
+
 mod storage;
 #[cfg(test)]
 mod test;
@@ -6,10 +119,11 @@ use soroban_sdk::{
     String, Symbol, Val, Vec,
 };
 pub use storage::{
-    add_context_rule, add_policy, add_signer, authenticate, do_check_auth, get_context_rule,
-    get_context_rules, get_context_rules_count, get_validated_context, remove_context_rule,
-    remove_policy, remove_signer, update_context_rule_name, update_context_rule_valid_until,
-    ContextRule, ContextRuleType, Meta, Signatures, Signer, SmartAccountStorageKey,
+    add_context_rule, add_policy, add_signer, authenticate, batch_add_signer,
+    contains_canonical_duplicate, do_check_auth, get_context_rule, get_context_rules_count,
+    get_validated_context_by_id, remove_context_rule, remove_policy, remove_signer,
+    update_context_rule_name, update_context_rule_valid_until, validate_signer_key_size,
+    AuthPayload, ContextRule, ContextRuleEntry, ContextRuleType, Signer, SmartAccountStorageKey,
 };
 
 /// Core trait for smart account functionality, extending Soroban's
@@ -18,17 +132,16 @@ pub use storage::{
 /// This trait provides methods for managing context rules, which define
 /// authorization policies for different types of operations. Context rules can
 /// contain signers and policies.
-///
-/// # Context Rules
-///
-/// Context rules are the fundamental building blocks of smart account
-/// authorization:
-/// - Each rule has a unique ID and applies to a specific context type
-/// - Rules can contain multiple signers and policies
-/// - Rules can have expiration times for temporary authorization
-/// - Rules are validated against maximum limits (MAX_SIGNERS, MAX_POLICIES)
 #[contractclient(name = "SmartAccountClient")]
 pub trait SmartAccount: CustomAccountInterface {
+    /// Retrieves the number of all context rules, including expired rules.
+    /// Defaults to 0.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    fn get_context_rules_count(e: &Env) -> u32;
+
     /// Retrieves a context rule by its unique ID, returning the
     /// `ContextRule` containing all metadata, signers, and policies.
     ///
@@ -43,25 +156,6 @@ pub trait SmartAccount: CustomAccountInterface {
     /// * [`SmartAccountError::ContextRuleNotFound`] - When no context rule
     ///   exists with the given ID.
     fn get_context_rule(e: &Env, context_rule_id: u32) -> ContextRule;
-
-    /// Retrieves all context rules of a specific type, returning a vector of
-    /// all `ContextRule`s matching the specified type. Returns an empty
-    /// vector if no rules of the given type exist.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `context_rule_type` - The type of context rules to retrieve (e.g.,
-    ///   Default, CallContract).
-    fn get_context_rules(e: &Env, context_rule_type: ContextRuleType) -> Vec<ContextRule>;
-
-    /// Retrieves the number of all context rules, including expired rules.
-    /// Defaults to 0.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    fn get_context_rules_count(e: &Env) -> u32;
 
     /// Creates a new context rule with the specified configuration, returning
     /// the newly created `ContextRule` with a unique ID assigned. Installs
@@ -78,8 +172,6 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Errors
     ///
-    /// * [`SmartAccountError::TooManyContextRules`] - When the number of
-    ///   context rules exceeds MAX_CONTEXT_RULES (15).
     /// * [`SmartAccountError::NoSignersAndPolicies`] - When both signers and
     ///   policies are empty.
     /// * [`SmartAccountError::TooManySigners`] - When signers exceed
@@ -90,12 +182,14 @@ pub trait SmartAccount: CustomAccountInterface {
     ///   multiple times.
     /// * [`SmartAccountError::PastValidUntil`] - When valid_until is in the
     ///   past.
+    /// * [`SmartAccountError::MathOverflow`] - When the context rule, signer,
+    ///   or policy ID counter has reached `u32::MAX`.
     ///
     /// # Events
     ///
     /// * topics - `["context_rule_added", id: u32]`
     /// * data - `[name: String, context_type: ContextRuleType, valid_until:
-    ///   Option<u32>, signers: Vec<Signer>, policies: Vec<Address>]`
+    ///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]`
     fn add_context_rule(
         e: &Env,
         context_type: ContextRuleType,
@@ -121,7 +215,7 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Events
     ///
-    /// * topics - `["context_rule_updated", context_rule_id: u32]`
+    /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
     /// * data - `[name: String, context_type: ContextRuleType, valid_until:
     ///   Option<u32>]`
     fn update_context_rule_name(e: &Env, context_rule_id: u32, name: String) -> ContextRule;
@@ -145,7 +239,7 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Events
     ///
-    /// * topics - `["context_rule_updated", context_rule_id: u32]`
+    /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
     /// * data - `[name: String, context_type: ContextRuleType, valid_until:
     ///   Option<u32>]`
     fn update_context_rule_valid_until(
@@ -174,7 +268,8 @@ pub trait SmartAccount: CustomAccountInterface {
     /// * data - `[]`
     fn remove_context_rule(e: &Env, context_rule_id: u32);
 
-    /// Adds a new signer to an existing context rule.
+    /// Adds a new signer to an existing context rule, returning the assigned
+    /// signer ID.
     ///
     /// # Arguments
     ///
@@ -194,8 +289,8 @@ pub trait SmartAccount: CustomAccountInterface {
     /// # Events
     ///
     /// * topics - `["signer_added", context_rule_id: u32]`
-    /// * data - `[signer: Signer]`
-    fn add_signer(e: &Env, context_rule_id: u32, signer: Signer);
+    /// * data - `[signer_id: u32]`
+    fn add_signer(e: &Env, context_rule_id: u32, signer: Signer) -> u32;
 
     /// Removes a signer from an existing context rule. Removing the last signer
     /// is allowed only if the rule has at least one policy.
@@ -204,7 +299,7 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `context_rule_id` - The ID of the context rule to modify.
-    /// * `signer` - The signer to remove from the context rule.
+    /// * `signer_id` - The ID of the signer to remove from the context rule.
     ///
     /// # Errors
     ///
@@ -216,11 +311,12 @@ pub trait SmartAccount: CustomAccountInterface {
     /// # Events
     ///
     /// * topics - `["signer_removed", context_rule_id: u32]`
-    /// * data - `[signer: Signer]`
-    fn remove_signer(e: &Env, context_rule_id: u32, signer: Signer);
+    /// * data - `[signer_id: u32]`
+    fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32);
 
-    /// Adds a new policy to an existing context rule and installs it. The
-    /// policy's `install` method will be called during this operation.
+    /// Adds a new policy to an existing context rule, installs it, and returns
+    /// the assigned policy ID. The policy's `install` method will be called
+    /// during this operation.
     ///
     /// # Arguments
     ///
@@ -241,8 +337,8 @@ pub trait SmartAccount: CustomAccountInterface {
     /// # Events
     ///
     /// * topics - `["policy_added", context_rule_id: u32]`
-    /// * data - `[policy: Address, install_param: Val]`
-    fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val);
+    /// * data - `[policy_id: u32, install_param: Val]`
+    fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val) -> u32;
 
     /// Removes a policy from an existing context rule and uninstalls it. The
     /// policy's `uninstall` method will be called during this operation.
@@ -253,7 +349,7 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `context_rule_id` - The ID of the context rule to modify.
-    /// * `policy` - The address of the policy contract to remove.
+    /// * `policy_id` - The ID of the policy to remove from the context rule.
     ///
     /// # Errors
     ///
@@ -265,8 +361,8 @@ pub trait SmartAccount: CustomAccountInterface {
     /// # Events
     ///
     /// * topics - `["policy_removed", context_rule_id: u32]`
-    /// * data - `[policy: Address]`
-    fn remove_policy(e: &Env, context_rule_id: u32, policy: Address);
+    /// * data - `[policy_id: u32]`
+    fn remove_policy(e: &Env, context_rule_id: u32, policy_id: u32);
 }
 
 /// Simple execution entry-point to call arbitrary contracts from within a smart
@@ -307,8 +403,10 @@ pub const SMART_ACCOUNT_TTL_THRESHOLD: u32 = SMART_ACCOUNT_EXTEND_AMOUNT - DAY_I
 pub const MAX_POLICIES: u32 = 5;
 /// Maximum number of signers allowed per context rule.
 pub const MAX_SIGNERS: u32 = 15;
-/// Maximum number of context rules allowed per smart account.
-pub const MAX_CONTEXT_RULES: u32 = 15;
+/// Maximum length in bytes for a context rule name.
+pub const MAX_NAME_SIZE: u32 = 20;
+/// Maximum size in bytes for external signer key data.
+pub const MAX_EXTERNAL_KEY_SIZE: u32 = 256;
 
 // ################## ERRORS ##################
 
@@ -341,8 +439,15 @@ pub enum SmartAccountError {
     TooManySigners = 3010,
     /// Too many policies in the context rule.
     TooManyPolicies = 3011,
-    /// Too many context rules in the smart account.
-    TooManyContextRules = 3012,
+    /// An internal ID counter (context rule, signer, or policy) has reached
+    /// its maximum value (`u32::MAX`) and cannot be incremented further.
+    MathOverflow = 3012,
+    /// External signer key data exceeds the maximum allowed size.
+    KeyDataTooLarge = 3013,
+    /// context_rule_ids length does not match auth_contexts length.
+    ContextRuleIdsLengthMismatch = 3014,
+    /// Context rule name exceeds the maximum allowed length.
+    NameTooLong = 3015,
 }
 
 // ################## EVENTS ##################
@@ -356,8 +461,8 @@ pub struct ContextRuleAdded {
     pub name: String,
     pub context_type: ContextRuleType,
     pub valid_until: Option<u32>,
-    pub signers: Vec<Signer>,
-    pub policies: Vec<Address>,
+    pub signer_ids: Vec<u32>,
+    pub policy_ids: Vec<u32>,
 }
 
 /// Emits an event indicating a context rule has been added.
@@ -371,51 +476,59 @@ pub struct ContextRuleAdded {
 ///
 /// * topics - `["context_rule_added", context_rule_id: u32]`
 /// * data - `[name: String, context_type: ContextRuleType, valid_until:
-///   Option<u32>, signers: Vec<Signer>, policies: Vec<Address>]`
-pub fn emit_context_rule_added(e: &Env, context_rule: &ContextRule) {
+///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]`
+pub fn emit_context_rule_added(
+    e: &Env,
+    context_rule_id: u32,
+    name: &String,
+    context_type: &ContextRuleType,
+    valid_until: Option<u32>,
+    signer_ids: &Vec<u32>,
+    policy_ids: &Vec<u32>,
+) {
     ContextRuleAdded {
-        context_rule_id: context_rule.id,
-        name: context_rule.name.clone(),
-        context_type: context_rule.context_type.clone(),
-        valid_until: context_rule.valid_until,
-        signers: context_rule.signers.clone(),
-        policies: context_rule.policies.clone(),
+        context_rule_id,
+        name: name.clone(),
+        context_type: context_type.clone(),
+        valid_until,
+        signer_ids: signer_ids.clone(),
+        policy_ids: policy_ids.clone(),
     }
     .publish(e);
 }
 
-/// Event emitted when a context rule is updated.
+/// Event emitted when a context rule name or valid_until are updated.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ContextRuleUpdated {
+pub struct ContextRuleMetaUpdated {
     #[topic]
     pub context_rule_id: u32,
     pub name: String,
-    pub context_type: ContextRuleType,
     pub valid_until: Option<u32>,
 }
 
-/// Emits an event indicating a context rule has been updated.
+/// Emits an event indicating a context rule name or valid_until have been
+/// updated.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context_rule_id` - The ID of the updated context rule.
-/// * `meta` - The meta data of the context rule.
+/// * `name` - The name of the context rule.
+/// * `valid_until` - The validity of the context rule.
 ///
 /// # Events
 ///
 /// * topics - `["context_rule_updated", context_rule_id: u32]`
-/// * data - `[name: String, context_type: ContextRuleType, valid_until:
-///   Option<u32>]`
-pub fn emit_context_rule_updated(e: &Env, context_rule_id: u32, meta: &Meta) {
-    ContextRuleUpdated {
-        context_rule_id,
-        name: meta.name.clone(),
-        context_type: meta.context_type.clone(),
-        valid_until: meta.valid_until,
-    }
-    .publish(e);
+/// * data - `[name: String, valid_until: Option<u32>]`
+pub fn emit_context_rule_meta_updated(
+    e: &Env,
+    context_rule_id: u32,
+    name: &String,
+    valid_until: &Option<u32>,
+) {
+    ContextRuleMetaUpdated { context_rule_id, name: name.clone(), valid_until: *valid_until }
+        .publish(e);
 }
 
 /// Event emitted when a context rule is removed.
@@ -447,7 +560,7 @@ pub fn emit_context_rule_removed(e: &Env, context_rule_id: u32) {
 pub struct SignerAdded {
     #[topic]
     pub context_rule_id: u32,
-    pub signer: Signer,
+    pub signer_id: u32,
 }
 
 /// Emits an event indicating a signer has been added to a context rule.
@@ -456,14 +569,14 @@ pub struct SignerAdded {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context_rule_id` - The ID of the context rule.
-/// * `signer` - The signer that was added.
+/// * `signer_id` - The signer ID that was added.
 ///
 /// # Events
 ///
 /// * topics - `["signer_added", context_rule_id: u32]`
-/// * data - `[signer: Signer]`
-pub fn emit_signer_added(e: &Env, context_rule_id: u32, signer: &Signer) {
-    SignerAdded { context_rule_id, signer: signer.clone() }.publish(e);
+/// * data - `[signer_id: u32]`
+pub fn emit_signer_added(e: &Env, context_rule_id: u32, signer_id: u32) {
+    SignerAdded { context_rule_id, signer_id }.publish(e);
 }
 
 /// Event emitted when a signer is removed from a context rule.
@@ -472,7 +585,7 @@ pub fn emit_signer_added(e: &Env, context_rule_id: u32, signer: &Signer) {
 pub struct SignerRemoved {
     #[topic]
     pub context_rule_id: u32,
-    pub signer: Signer,
+    pub signer_id: u32,
 }
 
 /// Emits an event indicating a signer has been removed from a context rule.
@@ -481,14 +594,14 @@ pub struct SignerRemoved {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context_rule_id` - The ID of the context rule.
-/// * `signer` - The signer that was removed.
+/// * `signer_id` - The signer ID that was removed.
 ///
 /// # Events
 ///
 /// * topics - `["signer_removed", context_rule_id: u32]`
-/// * data - `[signer: Signer]`
-pub fn emit_signer_removed(e: &Env, context_rule_id: u32, signer: &Signer) {
-    SignerRemoved { context_rule_id, signer: signer.clone() }.publish(e);
+/// * data - `[signer_id: u32]`
+pub fn emit_signer_removed(e: &Env, context_rule_id: u32, signer_id: u32) {
+    SignerRemoved { context_rule_id, signer_id }.publish(e);
 }
 
 /// Event emitted when a policy is added to a context rule.
@@ -497,7 +610,7 @@ pub fn emit_signer_removed(e: &Env, context_rule_id: u32, signer: &Signer) {
 pub struct PolicyAdded {
     #[topic]
     pub context_rule_id: u32,
-    pub policy: Address,
+    pub policy_id: u32,
     pub install_param: Val,
 }
 
@@ -507,15 +620,15 @@ pub struct PolicyAdded {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context_rule_id` - The ID of the context rule.
-/// * `policy` - The policy address that was added.
+/// * `policy_id` - The policy ID that was added.
 /// * `install_param` - The installation parameter for the policy.
 ///
 /// # Events
 ///
 /// * topics - `["policy_added", context_rule_id: u32]`
-/// * data - `[policy: Address, install_param: Val]`
-pub fn emit_policy_added(e: &Env, context_rule_id: u32, policy: &Address, install_param: Val) {
-    PolicyAdded { context_rule_id, policy: policy.clone(), install_param }.publish(e);
+/// * data - `[policy_id: u32, install_param: Val]`
+pub fn emit_policy_added(e: &Env, context_rule_id: u32, policy_id: u32, install_param: Val) {
+    PolicyAdded { context_rule_id, policy_id, install_param }.publish(e);
 }
 
 /// Event emitted when a policy is removed from a context rule.
@@ -524,7 +637,7 @@ pub fn emit_policy_added(e: &Env, context_rule_id: u32, policy: &Address, instal
 pub struct PolicyRemoved {
     #[topic]
     pub context_rule_id: u32,
-    pub policy: Address,
+    pub policy_id: u32,
 }
 
 /// Emits an event indicating a policy has been removed from a context rule.
@@ -533,12 +646,112 @@ pub struct PolicyRemoved {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `context_rule_id` - The ID of the context rule.
-/// * `policy` - The policy address that was removed.
+/// * `policy_id` - The policy ID that was removed.
 ///
 /// # Events
 ///
 /// * topics - `["policy_removed", context_rule_id: u32]`
+/// * data - `[policy_id: u32]`
+pub fn emit_policy_removed(e: &Env, context_rule_id: u32, policy_id: u32) {
+    PolicyRemoved { context_rule_id, policy_id }.publish(e);
+}
+
+/// Event emitted when a signer is registered in the global registry.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignerRegistered {
+    #[topic]
+    pub signer_id: u32,
+    pub signer: Signer,
+}
+
+/// Emits an event indicating a signer has been registered in the global
+/// registry.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer_id` - The ID assigned to the signer.
+/// * `signer` - The signer that was registered.
+///
+/// # Events
+///
+/// * topics - `["signer_registered", signer_id: u32]`
+/// * data - `[signer: Signer]`
+pub fn emit_signer_registered(e: &Env, signer_id: u32, signer: &Signer) {
+    SignerRegistered { signer_id, signer: signer.clone() }.publish(e);
+}
+
+/// Event emitted when a signer is deregistered from the global registry.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SignerDeregistered {
+    #[topic]
+    pub signer_id: u32,
+}
+
+/// Emits an event indicating a signer has been deregistered from the global
+/// registry.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer_id` - The ID of the signer that was deregistered.
+///
+/// # Events
+///
+/// * topics - `["signer_deregistered", signer_id: u32]`
+/// * data - `[]`
+pub fn emit_signer_deregistered(e: &Env, signer_id: u32) {
+    SignerDeregistered { signer_id }.publish(e);
+}
+
+/// Event emitted when a policy is registered in the global registry.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PolicyRegistered {
+    #[topic]
+    pub policy_id: u32,
+    pub policy: Address,
+}
+
+/// Emits an event indicating a policy has been registered in the global
+/// registry.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `policy_id` - The ID assigned to the policy.
+/// * `policy` - The policy address that was registered.
+///
+/// # Events
+///
+/// * topics - `["policy_registered", policy_id: u32]`
 /// * data - `[policy: Address]`
-pub fn emit_policy_removed(e: &Env, context_rule_id: u32, policy: &Address) {
-    PolicyRemoved { context_rule_id, policy: policy.clone() }.publish(e);
+pub fn emit_policy_registered(e: &Env, policy_id: u32, policy: &Address) {
+    PolicyRegistered { policy_id, policy: policy.clone() }.publish(e);
+}
+
+/// Event emitted when a policy is deregistered from the global registry.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PolicyDeregistered {
+    #[topic]
+    pub policy_id: u32,
+}
+
+/// Emits an event indicating a policy has been deregistered from the global
+/// registry.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `policy_id` - The ID of the policy that was deregistered.
+///
+/// # Events
+///
+/// * topics - `["policy_deregistered", policy_id: u32]`
+/// * data - `[]`
+pub fn emit_policy_deregistered(e: &Env, policy_id: u32) {
+    PolicyDeregistered { policy_id }.publish(e);
 }

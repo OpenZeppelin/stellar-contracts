@@ -1,8 +1,7 @@
 /// Contract for verifying Ed25519 digital signatures.
 ///
 /// This module provides Ed25519 signature verification functionality for
-/// Stellar smart contracts. Ed25519 is a high-performance public-key signature
-/// system that provides strong security guarantees.
+/// Stellar smart contracts.
 use soroban_sdk::{Bytes, BytesN, Env};
 
 /// Verifies an Ed25519 digital signature.
@@ -38,4 +37,19 @@ pub fn verify(
     e.crypto().ed25519_verify(public_key, signature_payload, signature);
 
     true
+}
+
+/// Returns the canonical byte representation of an Ed25519 public key.
+///
+/// Ed25519 public keys are 32-byte compressed Edwards curve points with a
+/// single canonical encoding per key. The `BytesN<32>` type constraint
+/// already enforces the correct length at deserialization, so this function
+/// simply converts the fixed-size key to a `Bytes` value.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `public_key` - The 32-byte Ed25519 public key.
+pub fn canonicalize_key(e: &Env, public_key: &BytesN<32>) -> Bytes {
+    Bytes::from_slice(e, &public_key.to_array())
 }
