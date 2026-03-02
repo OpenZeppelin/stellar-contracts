@@ -6,7 +6,7 @@ This package provides a comprehensive smart account framework for Soroban, enabl
 
 Smart accounts in Soroban implement `CustomAccountInterface` and define authorization as data and behavior that can be evolved over time. The framework is context‑centric:
 
-It distinguishes who is allowed to act (signers), what they are allowed to do (context rules), and how those permissions are enforced (policies). Under the hood, Protocol 23 improvements make this design practical, with marginal storage read costs and substantially cheaper cross‑contract calls, so composing multiple checks is efficient enough for production.
+It separates authentication (signers prove identity), authorization scope (context rules bind signers and policies to specific operations), and enforcement logic (policies apply business constraints like spending limits or thresholds). Under the hood, Protocol 23 improvements make this design practical, with marginal storage read costs and substantially cheaper cross‑contract calls, so composing multiple checks is efficient enough for production.
 
 In practical terms, a smart account is a contract that manages the composition of authorization intents coming from multiple sources. Those sources can be policies (for example, a spending limit) and signing keys that may use different cryptographic curves. The goal is to enable flexible combinations of authentication methods by allowing several authorization mechanisms to work together seamlessly. For instance, a wallet might require both a session policy and a passkey that expires in 24 hours, and treat this combination as a single composite “key” that the client uses to authorize actions.
 
@@ -35,7 +35,7 @@ pub trait SmartAccount: CustomAccountInterface {
 
 ### 2. Context Rules
 
-Context rules function like routing tables for authorization: for each context, they specify scope, lifetime, and the conditions, signers and policies, that must match before execution proceeds:
+Context rules function like routing tables for authorization: for each `Context`, they specify scope, lifetime, and the conditions, signers and policies, that must match before execution proceeds.
 
 #### Structure
 
@@ -56,6 +56,18 @@ A single smart account can hold any number of context rules. There is no upper l
 - Each rule must contain at least one signer OR one policy
 - Multiple rules can exist for the same context type
 - Expired rules are rejected at authorization time
+
+#### `soroban_sdk::auth::Context` and `ContextRule`
+
+`soroban_sdk::auth::Context` is a Soroban SDK type representing a single authorized operation within a transaction. When `__check_auth` is invoked, the runtime passes `auth_contexts: Vec<Context>` — one entry per `require_auth` call in the transaction. Each variant captures the operation details:
+
+- `Contract(ContractContext)` — a contract function call, carrying the `contract` address, `fn_name`, and `args`
+- `CreateContractHostFn(CreateContractHostFnContext)` — a contract deployment without constructor arguments, carrying `executable` (WASM hash) and `salt`
+- `CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext)` — a contract deployment with constructor arguments
+
+A `ContextRule` is this library's concept: a stored authorization requirements entry that lives in the smart account's own storage. A `ContextRule` is bound to a `ContextRuleType` that narrows which `Context` variants it can authorize. A smart account can hold **any number of `ContextRule`s covering the same context type** — for example, an admin rule and a time-limited session rule can both be scoped to `CallContract(dex_address)`.
+
+During authorization the caller must supply **exactly one `ContextRule` ID per `Context`** in `AuthPayload::context_rule_ids`. The caller explicitly selects which stored rule to validate against for each operation.
 
 ### 3. Signers
 
@@ -166,7 +178,7 @@ This trait provides a secure mechanism for updating policy configuration after i
 
 ## Authorization Flow
 
-Authorization is determined by explicitly selecting the rule to validate against for each auth context. The caller specifies rule IDs in the `Signatures` struct, one per auth context. No rule iteration or auto-discovery is performed.
+Authorization is determined by explicitly selecting the rule to validate against for each auth context. The caller specifies rule IDs in the `AuthPayload` struct, one per auth context. No rule iteration or auto-discovery is performed.
 
 ### 1. Signature Authentication
 
@@ -193,13 +205,13 @@ After all contexts are validated, `enforce()` is called on every policy in every
 - **Success**: Authorization granted, transaction proceeds.
 - **Failure**: Authorization denied, transaction reverts.
 
-### Constructing `Signatures`
+### Constructing `AuthPayload`
 
-The `context_rule_ids` field is always required. Its length must equal the number of auth contexts; a mismatch is rejected with `ContextRuleIdsLengthMismatch`.
+`Vec<context_rule_ids>` must have the same length as `Vec<Context>`, a mismatch is rejected with `ContextRuleIdsLengthMismatch`.
 
 ```rust
 // One rule ID per auth context.
-Signatures {
+AuthPayload {
     signers: signature_map,
     context_rule_ids: vec![&e, rule_a_id, rule_b_id],
 }
@@ -299,7 +311,7 @@ stellar-accounts = "=0.6.0"
 ```rust
 use stellar_accounts::smart_account::{
     add_context_rule, do_check_auth, ContextRule, ContextRuleType,
-    Signatures, Signer, SmartAccount, SmartAccountError,
+    AuthPayload, Signer, SmartAccount, SmartAccountError,
 };
 #[contract]
 pub struct MySmartAccount;
@@ -323,12 +335,12 @@ impl SmartAccount for MySmartAccount {
 
 #[contractimpl]
 impl CustomAccountInterface for MySmartAccount {
-    type Signature = Signatures;
+    type Signature = AuthPayload;
 
     fn __check_auth(
         e: Env,
         signature_payload: Hash<32>,
-        signatures: Signatures,
+        signatures: AuthPayload,
         auth_contexts: Vec<Context>,
     ) -> Result<(), SmartAccountError> {
         do_check_auth(&e, &signature_payload, &signatures, &auth_contexts)
@@ -336,13 +348,13 @@ impl CustomAccountInterface for MySmartAccount {
 }
 ```
 
-#### Constructing `Signatures`
+#### Constructing `AuthPayload`
 
-Build the `Signatures` value in the client (SDK/wallet) before submitting the transaction. Always provide one rule ID per auth context:
+Build the `AuthPayload` value in the client (SDK/wallet) before submitting the transaction. Always provide one rule ID per auth context:
 
 ```rust
 // One rule ID per auth context — always required.
-let signatures = Signatures {
+let signatures = AuthPayload {
     signers: signature_map,
     context_rule_ids: vec![&e, rule_a_id, rule_b_id],
 };
@@ -411,16 +423,16 @@ For external signers, there are two options:
 
 ## Migration Guide: from v0.6.0 to 0.7.0
 
-### `Signatures` struct (breaking change)
+### `AuthPayload` struct (breaking change)
 
-`Signatures` changed from a tuple struct to a named-field struct, and `context_rule_ids` is now always required:
+`AuthPayload` changed from a tuple struct to a named-field struct:
 
 ```rust
 // Before
-pub struct Signatures(pub Map<Signer, Bytes>);
+pub struct AuthPayload(pub Map<Signer, Bytes>);
 
 // After
-pub struct Signatures {
+pub struct AuthPayload {
     pub signers: Map<Signer, Bytes>,
     pub context_rule_ids: Vec<u32>,  // required: one ID per auth context
 }
@@ -493,7 +505,7 @@ Remove `can_enforce` from all policy contract implementations.
 
 ### Iteration removed (behavioral change)
 
-The automatic newest-first rule iteration path has been removed. The `context_rule_ids` field in `Signatures` is now mandatory. Every client must explicitly supply the rule ID to validate against for each auth context. Passing an empty `context_rule_ids` vec is no longer valid and will be rejected with `ContextRuleIdsLengthMismatch`.
+The automatic newest-first rule iteration path has been removed. The `context_rule_ids` field in `AuthPayload` is now mandatory. Every client must explicitly supply the rule ID to validate against for each auth context.
 
 ### `get_context_rules` removed (breaking change)
 
@@ -514,6 +526,7 @@ The `TooManyContextRules = 3012` error has been renamed to `MathOverflow = 3012`
 ### Global signer and policy registry (behavioral change)
 
 Signers and policies are now stored in a global registry and deduplicated across context rules. The same signer (identified by its XDR encoding) or policy address is stored once regardless of how many rules reference it. A reference count is maintained; storage is cleaned up automatically when the count reaches zero. This reduces storage usage when signers or policies are shared across multiple rules.
+
 ## Crate Structure
 
 This crate is organized into three submodules that provide building blocks for implementing smart accounts. These submodules can be used independently or together, allowing developers to implement only the components they need, create custom smart account architectures, mix and match different authentication methods, and build specialized authorization policies.

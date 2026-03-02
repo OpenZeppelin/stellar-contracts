@@ -11,7 +11,7 @@ use soroban_sdk::{
     Address, BytesN, Env, Map, String, Symbol, Val, Vec,
 };
 use stellar_accounts::smart_account::{
-    self, ContextRule, ContextRuleType, ExecutionEntryPoint, Signatures, Signer, SmartAccount,
+    self, AuthPayload, ContextRule, ContextRuleType, ExecutionEntryPoint, Signer, SmartAccount,
     SmartAccountError,
 };
 use stellar_contract_utils::upgradeable::{self as upgradeable, Upgradeable};
@@ -50,7 +50,7 @@ impl MultisigContract {
 #[contractimpl]
 impl CustomAccountInterface for MultisigContract {
     type Error = SmartAccountError;
-    type Signature = Signatures;
+    type Signature = AuthPayload;
 
     /// Verify authorization for the smart account.
     ///
@@ -72,7 +72,7 @@ impl CustomAccountInterface for MultisigContract {
     fn __check_auth(
         e: Env,
         signature_payload: Hash<32>,
-        signatures: Signatures,
+        signatures: AuthPayload,
         auth_contexts: Vec<Context>,
     ) -> Result<(), Self::Error> {
         smart_account::do_check_auth(&e, &signature_payload, &signatures, &auth_contexts)

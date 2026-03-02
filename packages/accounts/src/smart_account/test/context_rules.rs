@@ -14,7 +14,7 @@ use crate::{
             add_context_rule, authenticate, contains_canonical_duplicate, do_check_auth,
             get_authenticated_signers, get_context_rule, get_context_rules_count,
             get_validated_context_by_id, remove_context_rule, update_context_rule_name,
-            update_context_rule_valid_until, ContextRule, ContextRuleType, Signatures, Signer,
+            update_context_rule_valid_until, AuthPayload, ContextRule, ContextRuleType, Signer,
             SmartAccountStorageKey,
         },
         MAX_EXTERNAL_KEY_SIZE,
@@ -110,12 +110,12 @@ fn get_context(contract: Address, fn_name: Symbol, args: Vec<Val>) -> Context {
     Context::Contract(ContractContext { contract, fn_name, args })
 }
 
-fn create_signatures(e: &Env, signers: &Vec<Signer>, context_rule_ids: Vec<u32>) -> Signatures {
+fn create_signatures(e: &Env, signers: &Vec<Signer>, context_rule_ids: Vec<u32>) -> AuthPayload {
     let mut signature_map = Map::new(e);
     for signer in signers.iter() {
         signature_map.set(signer, Bytes::new(e));
     }
-    Signatures { signers: signature_map, context_rule_ids }
+    AuthPayload { signers: signature_map, context_rule_ids }
 }
 
 #[test]
@@ -234,7 +234,8 @@ fn do_check_auth_authentication_fails() {
 
         let mut signature_map = Map::new(&e);
         signature_map.set(external_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
-        let signatures = Signatures { signers: signature_map, context_rule_ids: vec![&e, rule.id] };
+        let signatures =
+            AuthPayload { signers: signature_map, context_rule_ids: vec![&e, rule.id] };
         let payload = Bytes::from_array(&e, &[1u8; 32]);
 
         let _ = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
@@ -304,7 +305,8 @@ fn do_check_auth_context_rule_ids_length_mismatch_fails() {
             signature_map.set(signer, Bytes::new(&e));
         }
         // 2 auth contexts but only 1 rule ID — must fail.
-        let signatures = Signatures { signers: signature_map, context_rule_ids: vec![&e, rule.id] };
+        let signatures =
+            AuthPayload { signers: signature_map, context_rule_ids: vec![&e, rule.id] };
 
         let payload = Bytes::from_array(&e, &[1u8; 32]);
         let _ = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);

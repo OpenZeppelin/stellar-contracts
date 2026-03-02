@@ -9,8 +9,8 @@ use crate::{
     policies::Policy,
     smart_account::storage::{
         add_context_rule, add_policy, add_signer, compute_fingerprint, remove_context_rule,
-        remove_policy, remove_signer, validate_and_set_fingerprint, ContextRule, ContextRuleType,
-        Signer, SmartAccountStorageKey,
+        remove_policy, remove_signer, set_fingerprint, ContextRule, ContextRuleType, Signer,
+        SmartAccountStorageKey,
     },
 };
 
@@ -184,7 +184,7 @@ fn compute_fingerprint_duplicate_policies_fails() {
 }
 
 #[test]
-fn validate_and_set_fingerprint_success() {
+fn set_fingerprint_success() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let contract_addr = Address::generate(&e);
@@ -204,9 +204,9 @@ fn validate_and_set_fingerprint_success() {
         let policy_ids: Vec<u32> = Vec::new(&e);
 
         // Remove the fingerprint that add_context_rule set so we can re-test
-        // validate_and_set_fingerprint in isolation on a different context type
+        // set_fingerprint in isolation on a different context type
         let context_type2 = ContextRuleType::CallContract(Address::generate(&e));
-        validate_and_set_fingerprint(&e, &context_type2, &signer_ids, &policy_ids);
+        set_fingerprint(&e, &context_type2, &signer_ids, &policy_ids);
         let fp = compute_fingerprint(&e, &context_type2, &signer_ids, &policy_ids);
         assert!(e.storage().persistent().has(&SmartAccountStorageKey::Fingerprint(fp)));
     });
@@ -214,7 +214,7 @@ fn validate_and_set_fingerprint_success() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3001)")]
-fn validate_and_set_fingerprint_duplicate_fails() {
+fn set_fingerprint_duplicate_fails() {
     let e = Env::default();
     let address = e.register(MockContract, ());
     let contract_addr = Address::generate(&e);
@@ -235,9 +235,9 @@ fn validate_and_set_fingerprint_duplicate_fails() {
 
         // Use a fresh context type so we start clean
         let context_type2 = ContextRuleType::CallContract(Address::generate(&e));
-        validate_and_set_fingerprint(&e, &context_type2, &signer_ids, &policy_ids);
+        set_fingerprint(&e, &context_type2, &signer_ids, &policy_ids);
         // Second call with same parameters should fail
-        validate_and_set_fingerprint(&e, &context_type2, &signer_ids, &policy_ids);
+        set_fingerprint(&e, &context_type2, &signer_ids, &policy_ids);
     });
 }
 

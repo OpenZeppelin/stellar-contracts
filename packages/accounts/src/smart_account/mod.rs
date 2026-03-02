@@ -1,3 +1,116 @@
+//! # Smart Account Storage - Context-Centric Authorization
+//!
+//! This module implements a flexible, context-centric authorization system for
+//! smart accounts that separates concerns into three key dimensions:
+//!
+//! ## Architecture Overview
+//!
+//! ### Signers - Authentication
+//! - **Delegated**: A Soroban `Address` that uses built-in signature
+//!   verification via `require_auth_for_args`.
+//! - **External**: A public key paired with a verifier contract for custom
+//!   cryptographic verification (e.g., secp256r1, passkeys).
+//!
+//! ### Context Rules - Scope and Routing
+//! - A context rule binds a set of signers and policies to a specific operation
+//!   scope (`Default`, `CallContract(Address)`, or
+//!   `CreateContract(BytesN<32>)`).
+//! - Multiple rules can exist for the same scope with different signer sets and
+//!   policies.
+//! - Each rule must contain at least one signer or one policy, and can have an
+//!   optional expiration (`valid_until`) defined by a ledger sequence.
+//! - The caller explicitly selects which rule to validate against; no rule
+//!   iteration or auto-discovery is performed.
+//!
+//! #### `soroban_sdk::auth::Context` and `ContextRule`
+//!
+//! `soroban_sdk::auth::Context` is a Soroban SDK type representing a single
+//! authorized operation within a transaction. `__check_auth` receives
+//! `auth_contexts: Vec<Context>` — one entry per `require_auth` call. Variants:
+//! - `Contract(ContractContext)` — a contract function call (`contract`,
+//!   `fn_name`, `args`)
+//! - `CreateContractHostFn(CreateContractHostFnContext)` — contract deployment
+//!   without constructor arguments (`executable`, `salt`)
+//! - `CreateContractWithCtorHostFn(...)` — contract deployment with constructor
+//!   arguments
+//!
+//! A [`ContextRule`] is this library's stored authorization entry, bound to a
+//! [`ContextRuleType`] that narrows which `Context` variants it can authorize.
+//! A smart account can hold **multiple [`ContextRule`]s for the same context
+//! type** — for example, an admin rule and a session rule both scoped to the
+//! same contract.
+//!
+//! During authorization the caller must supply **exactly one [`ContextRule`] ID
+//! per `Context`** via [`AuthPayload::context_rule_ids`]. No iteration is
+//! performed; the caller explicitly selects which stored rule to validate
+//! against for each operation.
+//!
+//! ### Policies - Enforcement Logic
+//! - External contracts attached to context rules that enforce business
+//!   constraints (e.g., spending limits, threshold multisig).
+//! - All policies in a rule must be satisfied (all-or-nothing enforcement).
+//!
+//! ## Key Design Principles
+//!
+//! ### Context-Centric Approach
+//! The system flips traditional key-centric reasoning to focus on **what you're
+//! authorizing** rather than **which keys are signing**. This mirrors familiar
+//! web2 OAuth patterns where users primarily care about the scope/permissions
+//! being granted, not the underlying keys.
+//!
+//! ### Multiple Rules Per Context
+//! Different authorization requirements for the same context:
+//! - Admin config: 2-of-3 threshold for contract calls
+//! - User config: 3-of-5 threshold for the same contract calls
+//! - Emergency config: 1-of-1 with additional policy constraints
+//!
+//! ## Authorization Matching Algorithm
+//!
+//! The caller explicitly selects which rule to use for each context via
+//! [`AuthPayload::context_rule_ids`], a vector aligned by index with the
+//! `auth_contexts` passed to `__check_auth`. No rule iteration or
+//! auto-discovery is performed.
+//!
+//! For each (context, rule_id) pair:
+//!
+//! I. Authenticate all provided signatures (delegated and external).
+//! II. For each context, look up the rule by its explicit ID:
+//!     1. Reject if the rule is expired.
+//!     2. Reject if the rule's context type does not match the actual context
+//!        (a `Default` rule matches any context).
+//!     3. Identify authenticated signers out of all provided signers.
+//!     4.a. If the rule has no policies, all rule signers must be
+//!          authenticated — otherwise reject.
+//!     4.b. If the rule has policies, defer full signer validation to each
+//!          policy's `enforce()` call.
+//! III. Enforce all policies for every validated (rule, context) pair.
+//! IV. If any check fails, authorization fails.
+//!
+//! ## Benefits
+//!
+//! - **User-Friendly**: Focus on authorization scope rather than key management
+//! - **Extensible**: Policies allow custom business logic without core changes
+//! - **Flexible**: Multiple authorization paths for different user groups
+//!
+//! ## Example Usage
+//!
+//! ```rust,ignore
+//! // Rule 1: Admin group - 3 of 3 signers, no policies
+//! ContextRule {
+//!     context_type: CallContract(token_contract),
+//!     signers: [admin1, admin2, admin3],
+//!     policies: [],
+//! }
+
+//!
+//! // Rule 2: User group - 3 of 5 signers, with spending limit policy
+//! ContextRule {
+//!     context_type: CallContract(token_contract),
+//!     signers: [user1, user2, user3, user4, user5],
+//!     policies: [threshold_policy, spending_limit_policy],
+//! }
+//! ```
+
 mod storage;
 #[cfg(test)]
 mod test;
@@ -10,7 +123,7 @@ pub use storage::{
     contains_canonical_duplicate, do_check_auth, get_context_rule, get_context_rules_count,
     get_validated_context_by_id, remove_context_rule, remove_policy, remove_signer,
     update_context_rule_name, update_context_rule_valid_until, validate_signer_key_size,
-    ContextRule, ContextRuleEntry, ContextRuleType, Signatures, Signer, SmartAccountStorageKey,
+    AuthPayload, ContextRule, ContextRuleEntry, ContextRuleType, Signer, SmartAccountStorageKey,
 };
 
 /// Core trait for smart account functionality, extending Soroban's
@@ -19,16 +132,6 @@ pub use storage::{
 /// This trait provides methods for managing context rules, which define
 /// authorization policies for different types of operations. Context rules can
 /// contain signers and policies.
-///
-/// # Context Rules
-///
-/// Context rules are the fundamental building blocks of smart account
-/// authorization:
-/// - Each rule has a unique ID and applies to a specific context type
-/// - Rules can contain multiple signers and policies
-/// - Rules can have expiration times for temporary authorization
-/// - Rules are validated against maximum limits (MAX_SIGNERS, MAX_POLICIES)
-/// - There is no limit on the number of context rules per account
 #[contractclient(name = "SmartAccountClient")]
 pub trait SmartAccount: CustomAccountInterface {
     /// Retrieves the number of all context rules, including expired rules.
