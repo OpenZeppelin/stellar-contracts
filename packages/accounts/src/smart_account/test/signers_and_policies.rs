@@ -9,13 +9,16 @@ use soroban_sdk::{
 
 use super::super::{
     storage::{
-        add_context_rule, add_policy, add_signer, get_context_rule, remove_policy, remove_signer,
-        validate_signers_and_policies, ContextRule, ContextRuleType, Signer,
-        SmartAccountStorageKey,
+        add_context_rule, add_policy, add_signer, batch_add_signer, get_context_rule,
+        remove_policy, remove_signer, validate_signers_and_policies, ContextRule, ContextRuleType,
+        Signer, SmartAccountStorageKey,
     },
     MAX_POLICIES, MAX_SIGNERS,
 };
-use crate::policies::Policy;
+use crate::{
+    policies::Policy,
+    smart_account::storage::{PolicyEntry, SignerEntry},
+};
 
 #[contract]
 struct MockContract;
@@ -252,6 +255,50 @@ fn remove_signer_with_policy_present_success() {
     });
 }
 
+#[test]
+fn remove_signer_shared_across_rules_decrements_count() {
+    // Register the same signer in two different rules. Removing it from the
+    // first rule should decrement its reference count rather than delete it.
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let shared_signer = Signer::Delegated(Address::generate(&e));
+
+    e.as_contract(&address, || {
+        let contract_a = Address::generate(&e);
+        let contract_b = Address::generate(&e);
+
+        // rule_a has two signers so removing shared_signer leaves one remaining.
+        let extra_signer_a = Signer::Delegated(Address::generate(&e));
+        let rule_a = add_context_rule(
+            &e,
+            &ContextRuleType::CallContract(contract_a),
+            &String::from_str(&e, "rule_a"),
+            None,
+            &Vec::from_array(&e, [shared_signer.clone(), extra_signer_a]),
+            &Map::new(&e),
+        );
+
+        // Different context type so the fingerprint differs; same signer re-used.
+        let extra_signer = Signer::Delegated(Address::generate(&e));
+        let _ = add_context_rule(
+            &e,
+            &ContextRuleType::CallContract(contract_b),
+            &String::from_str(&e, "rule_b"),
+            None,
+            &Vec::from_array(&e, [shared_signer.clone(), extra_signer]),
+            &Map::new(&e),
+        );
+
+        // Remove the shared signer from rule_a (count 2 → 1, not deleted).
+        let signer_id = get_signer_id(&e, rule_a.id, &shared_signer);
+        remove_signer(&e, rule_a.id, signer_id);
+
+        let count_key = SmartAccountStorageKey::SignerData(signer_id);
+        let signer_data: SignerEntry = e.storage().persistent().get(&count_key).unwrap();
+        assert_eq!(signer_data.count, 1);
+    });
+}
+
 // ################## POLICY MANAGEMENT TESTS ##################
 
 #[test]
@@ -425,6 +472,53 @@ fn remove_policy_with_signers_present_success() {
     });
 }
 
+#[test]
+fn remove_policy_shared_across_rules_decrements_count() {
+    // Register the same policy in two different rules. Removing it from the
+    // first rule should decrement its reference count rather than delete it.
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let policy_address = e.register(MockPolicyContract, ());
+    let install_param: Val = Val::from_void().into();
+
+    e.as_contract(&address, || {
+        let contract_a = Address::generate(&e);
+        let contract_b = Address::generate(&e);
+
+        let signers_a = Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]);
+        let signers_b = Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]);
+
+        let mut policies_map = Map::new(&e);
+        policies_map.set(policy_address.clone(), install_param);
+
+        let rule_a = add_context_rule(
+            &e,
+            &ContextRuleType::CallContract(contract_a),
+            &String::from_str(&e, "pol_rule_a"),
+            None,
+            &signers_a,
+            &policies_map,
+        );
+
+        let _ = add_context_rule(
+            &e,
+            &ContextRuleType::CallContract(contract_b),
+            &String::from_str(&e, "pol_rule_b"),
+            None,
+            &signers_b,
+            &policies_map,
+        );
+
+        // Remove the policy from rule_a (count 2 → 1, not deleted).
+        let policy_id = get_policy_id(&e, rule_a.id, &policy_address);
+        remove_policy(&e, rule_a.id, policy_id);
+
+        let count_key = SmartAccountStorageKey::PolicyData(policy_id);
+        let policy_data: PolicyEntry = e.storage().persistent().get(&count_key).unwrap();
+        assert_eq!(policy_data.count, 1);
+    });
+}
+
 // ################## VALIDATION TESTS ##################
 
 #[test]
@@ -486,5 +580,56 @@ fn validate_signers_and_policies_too_many_policies_fails() {
         }
 
         validate_signers_and_policies(&e, &signer_ids, &policy_ids);
+    });
+}
+
+// ################## BATCH SIGNER MANAGEMENT TESTS ##################
+
+#[test]
+fn batch_add_signer_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    let rule = setup_test_rule(&e, &address);
+
+    e.as_contract(&address, || {
+        let new_signers = Vec::from_array(
+            &e,
+            [Signer::Delegated(Address::generate(&e)), Signer::Delegated(Address::generate(&e))],
+        );
+
+        batch_add_signer(&e, rule.id, &new_signers);
+
+        let updated_rule = get_context_rule(&e, rule.id);
+        assert_eq!(updated_rule.signers.len(), 4); // 2 original + 2 new
+        assert!(updated_rule.signers.contains(new_signers.get_unchecked(0)));
+        assert!(updated_rule.signers.contains(new_signers.get_unchecked(1)));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3000)")]
+fn batch_add_signer_nonexistent_rule_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let signers = Vec::from_array(&e, [Signer::Delegated(Address::generate(&e))]);
+        batch_add_signer(&e, 999, &signers);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3007)")]
+fn batch_add_signer_duplicate_signer_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    let rule = setup_test_rule(&e, &address);
+
+    e.as_contract(&address, || {
+        let existing_signer = rule.signers.get(0).unwrap();
+        let signers = Vec::from_array(&e, [existing_signer]);
+        batch_add_signer(&e, rule.id, &signers);
     });
 }

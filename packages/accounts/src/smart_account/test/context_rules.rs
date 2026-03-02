@@ -1,7 +1,10 @@
 extern crate std;
 
 use soroban_sdk::{
-    auth::{Context, ContractContext},
+    auth::{
+        Context, ContractContext, ContractExecutable, CreateContractHostFnContext,
+        CreateContractWithConstructorHostFnContext,
+    },
     contract, contractimpl, symbol_short,
     testutils::{Address as _, Events, Ledger},
     vec, Address, Bytes, BytesN, Env, Map, String, Symbol, TryFromVal, Val, Vec,
@@ -835,6 +838,93 @@ fn get_validated_context_by_id_with_policies_success() {
 }
 
 #[test]
+fn get_validated_context_by_id_not_yet_expired_succeeds() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr.clone());
+        e.ledger().set_sequence_number(50);
+
+        let rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "future_expiry_rule"),
+            Some(100),
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
+
+        // Sequence 50 < valid_until 100 → not expired, should succeed
+        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
+        let (validated_rule, _, _) =
+            get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
+        assert_eq!(validated_rule.id, rule.id);
+    });
+}
+
+#[test]
+fn get_validated_context_by_id_create_contract_host_fn_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let wasm_hash = BytesN::from_array(&e, &[7u8; 32]);
+        let context_type = ContextRuleType::CreateContract(wasm_hash.clone());
+
+        let rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "create_contract_rule"),
+            None,
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
+
+        let context = Context::CreateContractHostFn(CreateContractHostFnContext {
+            salt: BytesN::from_array(&e, &[1u8; 32]),
+            executable: ContractExecutable::Wasm(wasm_hash),
+        });
+
+        let (validated_rule, _, _) =
+            get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
+        assert_eq!(validated_rule.id, rule.id);
+    });
+}
+
+#[test]
+fn get_validated_context_by_id_create_contract_with_ctor_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let wasm_hash = BytesN::from_array(&e, &[8u8; 32]);
+        let context_type = ContextRuleType::CreateContract(wasm_hash.clone());
+
+        let rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "ctor_rule"),
+            None,
+            &create_test_signers(&e),
+            &Map::new(&e),
+        );
+
+        let context =
+            Context::CreateContractWithCtorHostFn(CreateContractWithConstructorHostFnContext {
+                salt: BytesN::from_array(&e, &[2u8; 32]),
+                executable: ContractExecutable::Wasm(wasm_hash),
+                constructor_args: Vec::new(&e),
+            });
+
+        let (validated_rule, _, _) =
+            get_validated_context_by_id(&e, &context, &rule.signers, rule.id);
+        assert_eq!(validated_rule.id, rule.id);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #3000)")]
 fn get_validated_context_by_id_nonexistent_rule_fails() {
     let e = Env::default();
@@ -1023,6 +1113,28 @@ fn contains_canonical_duplicate_delegated_signers() {
 
         assert!(contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_a)));
         assert!(!contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_b)));
+    });
+}
+
+#[test]
+fn contains_canonical_duplicate_external_with_delegated_existing() {
+    // When the new signer is External but the existing signer list contains a
+    // Delegated signer, the `if let Signer::External` branch does not match
+    // for the delegated entry — covering the implicit-else path.
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let verifier = e.register(MockCanonicalizingVerifier, ());
+        let delegated_signer = Signer::Delegated(Address::generate(&e));
+        let existing = Vec::from_array(&e, [delegated_signer]);
+
+        let mut key_data = Bytes::from_array(&e, &[5u8; 32]);
+        key_data.extend_from_array(&[0xCC; 8]);
+        let new_signer = Signer::External(verifier, key_data);
+
+        // No External signer with the same verifier in the list → no duplicate
+        assert!(!contains_canonical_duplicate(&e, &existing, &new_signer));
     });
 }
 
