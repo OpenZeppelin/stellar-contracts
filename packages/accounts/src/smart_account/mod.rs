@@ -268,7 +268,8 @@ pub trait SmartAccount: CustomAccountInterface {
     /// * data - `[]`
     fn remove_context_rule(e: &Env, context_rule_id: u32);
 
-    /// Adds a new signer to an existing context rule.
+    /// Adds a new signer to an existing context rule, returning the assigned
+    /// signer ID.
     ///
     /// # Arguments
     ///
@@ -289,7 +290,7 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// * topics - `["signer_added", context_rule_id: u32]`
     /// * data - `[signer_id: u32]`
-    fn add_signer(e: &Env, context_rule_id: u32, signer: Signer);
+    fn add_signer(e: &Env, context_rule_id: u32, signer: Signer) -> u32;
 
     /// Removes a signer from an existing context rule. Removing the last signer
     /// is allowed only if the rule has at least one policy.
@@ -313,8 +314,9 @@ pub trait SmartAccount: CustomAccountInterface {
     /// * data - `[signer_id: u32]`
     fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32);
 
-    /// Adds a new policy to an existing context rule and installs it. The
-    /// policy's `install` method will be called during this operation.
+    /// Adds a new policy to an existing context rule, installs it, and returns
+    /// the assigned policy ID. The policy's `install` method will be called
+    /// during this operation.
     ///
     /// # Arguments
     ///
@@ -336,7 +338,7 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// * topics - `["policy_added", context_rule_id: u32]`
     /// * data - `[policy_id: u32, install_param: Val]`
-    fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val);
+    fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val) -> u32;
 
     /// Removes a policy from an existing context rule and uninstalls it. The
     /// policy's `uninstall` method will be called during this operation.

@@ -869,7 +869,8 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 
 // ################## SIGNER MANAGEMENT ##################
 
-/// Adds a new signer to an existing context rule.
+/// Adds a new signer to an existing context rule, returning the assigned
+/// signer ID.
 ///
 /// # Arguments
 ///
@@ -906,7 +907,7 @@ pub fn remove_context_rule(e: &Env, id: u32) {
 ///
 /// * This function modifies storage without requiring authorization. Ensure
 ///   proper access control is implemented at the contract level.
-pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
+pub fn add_signer(e: &Env, id: u32, signer: &Signer) -> u32 {
     validate_signer_key_size(e, signer);
 
     // Get current entry to access existing IDs
@@ -934,6 +935,8 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) {
     e.storage().persistent().set(&data_key, &entry);
 
     emit_signer_added(e, id, new_signer_id);
+
+    new_signer_id
 }
 
 /// Removes a signer from an existing context rule.
@@ -1070,7 +1073,8 @@ pub fn batch_add_signer(e: &Env, id: u32, signers: &Vec<Signer>) {
 
 // ################## POLICY MANAGEMENT ##################
 
-/// Adds a new policy to an existing context rule and installs it.
+/// Adds a new policy to an existing context rule, installs it, and returns
+/// the assigned policy ID.
 ///
 /// # Arguments
 ///
@@ -1100,7 +1104,7 @@ pub fn batch_add_signer(e: &Env, id: u32, signers: &Vec<Signer>) {
 ///
 /// This function modifies storage without requiring authorization. Ensure
 /// proper access control is implemented at the contract level.
-pub fn add_policy(e: &Env, context_rule_id: u32, policy: &Address, install_param: Val) {
+pub fn add_policy(e: &Env, context_rule_id: u32, policy: &Address, install_param: Val) -> u32 {
     let data_key = SmartAccountStorageKey::ContextRuleData(context_rule_id);
     let mut entry: ContextRuleEntry = get_persistent_entry(e, &data_key)
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
@@ -1134,6 +1138,8 @@ pub fn add_policy(e: &Env, context_rule_id: u32, policy: &Address, install_param
     PolicyClient::new(e, policy).install(&install_param, &rule, &e.current_contract_address());
 
     emit_policy_added(e, context_rule_id, policy_id, install_param);
+
+    policy_id
 }
 
 /// Removes a policy from an existing context rule and tries to uninstall it.

@@ -141,10 +141,10 @@ impl SmartAccount for MultisigContract {
     /// Add a signer to an existing context rule.
     ///
     /// Requires smart account authorization.
-    fn add_signer(e: &Env, context_rule_id: u32, signer: Signer) {
+    fn add_signer(e: &Env, context_rule_id: u32, signer: Signer) -> u32 {
         e.current_contract_address().require_auth();
 
-        smart_account::add_signer(e, context_rule_id, &signer);
+        smart_account::add_signer(e, context_rule_id, &signer)
     }
 
     /// Remove a signer from an existing context rule.
@@ -159,10 +159,10 @@ impl SmartAccount for MultisigContract {
     /// Add a policy to an existing context rule.
     ///
     /// Requires smart account authorization.
-    fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val) {
+    fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val) -> u32 {
         e.current_contract_address().require_auth();
 
-        smart_account::add_policy(e, context_rule_id, &policy, install_param);
+        smart_account::add_policy(e, context_rule_id, &policy, install_param)
     }
 
     /// Remove a policy from an existing context rule.
