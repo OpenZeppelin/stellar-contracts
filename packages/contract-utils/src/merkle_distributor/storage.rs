@@ -179,7 +179,7 @@ where
         };
     }
 
-    /// Interanl function to mark an index as claimed and to emit an event.
+    /// Internal function to mark an index as claimed and to emit an event.
     ///
     /// # Arguments
     ///
