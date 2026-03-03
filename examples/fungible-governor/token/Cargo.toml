@@ -1,5 +1,5 @@
 [package]
-name = "fungible-governor-example"
+name = "fungible-governor-token"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -19,3 +19,4 @@ stellar-tokens = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+fungible-governor-contract = { path = "../governor", features = ["testutils"] }
