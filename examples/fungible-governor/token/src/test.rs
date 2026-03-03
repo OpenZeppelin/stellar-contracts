@@ -1,5 +1,6 @@
 extern crate std;
 
+use fungible_governor_contract::{GovernorContract, GovernorContractClient};
 use soroban_sdk::{
     contract, contractimpl, symbol_short,
     testutils::{Address as _, Ledger},
@@ -9,7 +10,7 @@ use soroban_sdk::{
 };
 use stellar_governance::governor::ProposalState;
 
-use crate::{GovernorContract, GovernorContractClient, TokenContract, TokenContractClient};
+use crate::{TokenContract, TokenContractClient};
 
 // ==================== Target Contract ====================
 

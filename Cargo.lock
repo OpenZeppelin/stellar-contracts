@@ -675,9 +675,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "fungible-governor-example"
+name = "fungible-governor-contract"
 version = "0.6.0"
 dependencies = [
+ "soroban-sdk",
+ "stellar-governance",
+]
+
+[[package]]
+name = "fungible-governor-token"
+version = "0.6.0"
+dependencies = [
+ "fungible-governor-contract",
  "soroban-sdk",
  "stellar-access",
  "stellar-governance",
