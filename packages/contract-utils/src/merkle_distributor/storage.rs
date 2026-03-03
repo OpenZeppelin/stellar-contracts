@@ -60,6 +60,15 @@ where
 
     /// Sets the Merkle root for the distribution.
     ///
+    /// This function allows the root to be updated after initial setup. When
+    /// the root changes, previously claimed indices remain marked as claimed.
+    /// This is useful for "append-only" distributions where an admin
+    /// periodically expands the set of eligible claimants while preventing
+    /// already-claimed indices from being claimed again. In such cases, the
+    /// new Merkle tree must preserve the same index-to-leaf mapping for
+    /// previously existing entries; otherwise, new claimants assigned to
+    /// already-claimed indices will be unable to claim.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to Soroban environment.
@@ -82,28 +91,6 @@ where
         emit_set_root(e, root.into());
     }
 
-    /// Marks an index as claimed.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
-    /// * `index` - The index to mark as claimed.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["set_claimed"]`
-    /// * data - `[index: u32]`
-    ///
-    /// # Security Warning
-    ///
-    /// **IMPORTANT**: This function lacks authorization checks and should only
-    /// be used in admin functions that implement their own authorization logic.
-    pub fn set_claimed(e: &Env, index: u32) {
-        let key = MerkleDistributorStorageKey::Claimed(index);
-        e.storage().persistent().set(&key, &true);
-        emit_set_claimed(e, index.into());
-    }
-
     /// Verifies a Merkle proof for a leaf and marks its index as claimed if the
     /// proof is valid. Internally using [`Verifier::verify`] which assumes that
     /// when the tree gets constructed, **commutative** hashing was used,
@@ -114,6 +101,11 @@ where
     /// * `e` - Access to Soroban environment.
     /// * `leaf` - The leaf data containing an index field.
     /// * `proof` - The Merkle proof for the leaf.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["set_claimed"]`
+    /// * data - `[index: u32]`
     ///
     /// # Errors
     ///
@@ -154,6 +146,11 @@ where
     /// * `leaf` - The leaf data containing an index field.
     /// * `proof` - The Merkle proof for the leaf.
     ///
+    /// # Events
+    ///
+    /// * topics - `["set_claimed"]`
+    /// * data - `[index: u32]`
+    ///
     /// # Errors
     ///
     /// * [`MerkleDistributorError::IndexAlreadyClaimed`] - When attempting to
@@ -180,6 +177,18 @@ where
             true => Self::set_claimed(e, index),
             false => panic_with_error!(e, MerkleDistributorError::InvalidProof),
         };
+    }
+
+    /// Internal function to mark an index as claimed and to emit an event.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to Soroban environment.
+    /// * `index` - The index to mark as claimed.
+    pub(crate) fn set_claimed(e: &Env, index: u32) {
+        let key = MerkleDistributorStorageKey::Claimed(index);
+        e.storage().persistent().set(&key, &true);
+        emit_set_claimed(e, index);
     }
 
     /// Internal helper function that returns a tuple of the root, the hashed

@@ -53,7 +53,7 @@ mod test;
 
 use core::marker::PhantomData;
 
-use soroban_sdk::{contracterror, contractevent, Bytes, Env, Val};
+use soroban_sdk::{contracterror, contractevent, Bytes, Env};
 
 use crate::crypto::hasher::Hasher;
 pub use crate::merkle_distributor::storage::MerkleDistributorStorageKey;
@@ -97,7 +97,7 @@ pub struct SetRoot {
 #[contractevent]
 #[derive(Clone, Debug)]
 pub struct SetClaimed {
-    pub index: Val,
+    pub index: u32,
 }
 
 /// Emits an event when the merkle root is set.
@@ -116,6 +116,6 @@ pub fn emit_set_root(e: &Env, root: Bytes) {
 ///
 /// * `e` - The Soroban environment.
 /// * `index` - The index that was claimed.
-pub fn emit_set_claimed(e: &Env, index: Val) {
+pub fn emit_set_claimed(e: &Env, index: u32) {
     SetClaimed { index }.publish(e);
 }
