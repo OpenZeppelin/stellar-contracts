@@ -41,6 +41,13 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * topics - `["claim_added", claim_topic: u32]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::add_claim_topic`] for the underlying storage logic after
+    /// enforcing your authorization checks on `operator`.
     fn add_claim_topic(e: &Env, claim_topic: u32, operator: Address);
 
     /// Removes a claim topic (for example: KYC=1, AML=2).
@@ -62,6 +69,13 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * topics - `["claim_removed", claim_topic: u32]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::remove_claim_topic`] for the underlying storage logic
+    /// after enforcing your authorization checks on `operator`.
     fn remove_claim_topic(e: &Env, claim_topic: u32, operator: Address);
 
     /// Returns the claim topics for the security token.
@@ -69,6 +83,13 @@ pub trait ClaimTopicsAndIssuers {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all
+    /// [`ClaimTopicsAndIssuers`] methods are left to the implementer for
+    /// consistency. Use [`storage::get_claim_topics`] for the underlying
+    /// storage logic.
     fn get_claim_topics(e: &Env) -> Vec<u32>;
 
     // ################## TRUSTED ISSUERS ##################
@@ -103,6 +124,13 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * topics - `["issuer_added", trusted_issuer: Address]`
     /// * data - `[claim_topics: Vec<u32>]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::add_trusted_issuer`] for the underlying storage logic
+    /// after enforcing your authorization checks on `operator`.
     fn add_trusted_issuer(
         e: &Env,
         trusted_issuer: Address,
@@ -131,6 +159,13 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * topics - `["issuer_removed", trusted_issuer: Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::remove_trusted_issuer`] for the underlying storage logic
+    /// after enforcing your authorization checks on `operator`.
     fn remove_trusted_issuer(e: &Env, trusted_issuer: Address, operator: Address);
 
     /// Updates the set of claim topics that a trusted issuer is allowed to
@@ -163,6 +198,13 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * topics - `["topics_updated", trusted_issuer: Address]`
     /// * data - `[claim_topics: Vec<u32>]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::update_issuer_claim_topics`] for the underlying storage
+    /// logic after enforcing your authorization checks on `operator`.
     fn update_issuer_claim_topics(
         e: &Env,
         trusted_issuer: Address,
@@ -175,6 +217,13 @@ pub trait ClaimTopicsAndIssuers {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all
+    /// [`ClaimTopicsAndIssuers`] methods are left to the implementer for
+    /// consistency. Use [`storage::get_trusted_issuers`] for the underlying
+    /// storage logic.
     fn get_trusted_issuers(e: &Env) -> Vec<Address>;
 
     /// Returns all the trusted issuers allowed for a given claim topic.
@@ -188,6 +237,13 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * [`ClaimTopicsAndIssuersError::ClaimTopicDoesNotExist`] - If the claim
     ///   topic does not exist.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all
+    /// [`ClaimTopicsAndIssuers`] methods are left to the implementer for
+    /// consistency. Use [`storage::get_claim_topic_issuers`] for the
+    /// underlying storage logic.
     fn get_claim_topic_issuers(e: &Env, claim_topic: u32) -> Vec<Address>;
 
     /// Returns all the claim topics and their corresponding trusted issuers as
@@ -196,6 +252,13 @@ pub trait ClaimTopicsAndIssuers {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all
+    /// [`ClaimTopicsAndIssuers`] methods are left to the implementer for
+    /// consistency. Use [`storage::get_claim_topics_and_issuers`] for the
+    /// underlying storage logic.
     fn get_claim_topics_and_issuers(e: &Env) -> Map<u32, Vec<Address>>;
 
     /// Checks if the claim issuer contract is trusted.
@@ -204,6 +267,13 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `issuer` - The address of the claim issuer contract.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all
+    /// [`ClaimTopicsAndIssuers`] methods are left to the implementer for
+    /// consistency. Use [`storage::is_trusted_issuer`] for the underlying
+    /// storage logic.
     fn is_trusted_issuer(e: &Env, issuer: Address) -> bool;
 
     /// Returns all the claim topics of trusted claim issuer.
@@ -217,6 +287,13 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted
     ///   issuer does not exist.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all
+    /// [`ClaimTopicsAndIssuers`] methods are left to the implementer for
+    /// consistency. Use [`storage::get_trusted_issuer_claim_topics`] for the
+    /// underlying storage logic.
     fn get_trusted_issuer_claim_topics(e: &Env, trusted_issuer: Address) -> Vec<u32>;
 
     /// Checks if the trusted claim issuer is allowed to emit a certain claim
@@ -233,6 +310,13 @@ pub trait ClaimTopicsAndIssuers {
     ///
     /// * [`ClaimTopicsAndIssuersError::IssuerDoesNotExist`] - If the trusted
     ///   issuer does not exist.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all
+    /// [`ClaimTopicsAndIssuers`] methods are left to the implementer for
+    /// consistency. Use [`storage::has_claim_topic`] for the underlying
+    /// storage logic.
     fn has_claim_topic(e: &Env, issuer: Address, claim_topic: u32) -> bool;
 }
 

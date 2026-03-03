@@ -68,6 +68,15 @@ pub trait Policy {
     /// This method must be called with proper authorization from the smart
     /// account. Typically this means `smart_account.require_auth()` should
     /// be called before or during the execution of this method.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because enforcement logic is
+    /// entirely policy-specific (e.g., threshold checks, spending limits,
+    /// time restrictions). There is no corresponding storage function — the
+    /// implementation is fully custom. See [`simple_threshold`],
+    /// [`weighted_threshold`], and [`spending_limit`] for reference
+    /// implementations.
     fn enforce(
         e: &Env,
         context: Context,
@@ -89,6 +98,15 @@ pub trait Policy {
     /// * `context_rule` - The context rule this policy is being attached to.
     /// * `smart_account` - The address of the smart account installing this
     ///   policy.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because installation logic is
+    /// policy-specific (e.g., storing threshold parameters, initializing
+    /// spending windows). There is no corresponding storage function — the
+    /// implementation is fully custom. See [`simple_threshold`],
+    /// [`weighted_threshold`], and [`spending_limit`] for reference
+    /// implementations.
     fn install(
         e: &Env,
         install_params: Self::AccountParams,
@@ -107,6 +125,15 @@ pub trait Policy {
     /// * `context_rule` - The context rule this policy is being removed from.
     /// * `smart_account` - The address of the smart account uninstalling this
     ///   policy.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because cleanup logic is
+    /// policy-specific (e.g., removing threshold parameters, clearing
+    /// spending windows). There is no corresponding storage function — the
+    /// implementation is fully custom. See [`simple_threshold`],
+    /// [`weighted_threshold`], and [`spending_limit`] for reference
+    /// implementations.
     fn uninstall(e: &Env, context_rule: ContextRule, smart_account: Address);
 }
 

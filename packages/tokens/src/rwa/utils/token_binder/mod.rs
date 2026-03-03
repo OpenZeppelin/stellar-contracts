@@ -46,6 +46,12 @@ pub trait TokenBinder {
     /// # Arguments
     ///
     /// * `e` - The Soroban environment
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all [`TokenBinder`]
+    /// methods are left to the implementer for consistency. Use
+    /// [`linked_tokens`] for the underlying storage logic.
     fn linked_tokens(e: &Env) -> Vec<Address>;
 
     /// Binds a token to this contract's periphery services.
@@ -56,10 +62,12 @@ pub trait TokenBinder {
     /// * `token` - The token address to bind
     /// * `operator` - The address authorizing this operation
     ///
-    /// # Security Note
+    /// # Notes
     ///
-    /// Implementations should include proper authorization checks to ensure
-    /// only authorized operators can bind tokens.
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use [`bind_token`]
+    /// for the underlying storage logic after enforcing your authorization
+    /// checks on `operator`.
     fn bind_token(e: &Env, token: Address, operator: Address);
 
     /// Unbinds a token from this contract's periphery services.
@@ -70,10 +78,12 @@ pub trait TokenBinder {
     /// * `token` - The token address to unbind
     /// * `operator` - The address authorizing this operation
     ///
-    /// # Security Note
+    /// # Notes
     ///
-    /// Implementations should include proper authorization checks to ensure
-    /// only authorized operators can unbind tokens.
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use [`unbind_token`]
+    /// for the underlying storage logic after enforcing your authorization
+    /// checks on `operator`.
     fn unbind_token(e: &Env, token: Address, operator: Address);
 }
 

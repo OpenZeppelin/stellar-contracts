@@ -60,6 +60,13 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * topics - `["set_default_royalty", receiver: Address]`
     /// * data - `[basis_points: u32]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::set_default_royalty`] for the underlying storage logic
+    /// after enforcing your authorization checks on `operator`.
     fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32, operator: Address);
 
     /// Sets the royalty information for a specific token.
@@ -84,6 +91,13 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * topics - `["set_token_royalty", receiver: Address]`
     /// * data - `[token_id: u32, basis_points: u32]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::set_token_royalty`] for the underlying storage logic
+    /// after enforcing your authorization checks on `operator`.
     fn set_token_royalty(
         e: &Env,
         token_id: u32,
@@ -110,6 +124,13 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * topics - `["remove_token_royalty", token_id: u32]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::remove_token_royalty`] for the underlying storage logic
+    /// after enforcing your authorization checks on `operator`.
     fn remove_token_royalty(e: &Env, token_id: u32, operator: Address);
 
     /// Returns `(Address, i128)` - A tuple containing the receiver address and
@@ -126,6 +147,13 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * [`crate::non_fungible::NonFungibleTokenError::NonExistentToken`] - If
     ///   the token does not exist.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all
+    /// [`NonFungibleRoyalties`] methods are left to the implementer for
+    /// consistency. Use [`storage::royalty_info`] for the underlying
+    /// storage logic.
     fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128);
 }
 

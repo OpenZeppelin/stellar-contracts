@@ -74,6 +74,13 @@ pub trait Compliance: TokenBinder {
     /// * `hook` - The type of hook to register the module for.
     /// * `module` - The address of the compliance module contract.
     /// * `operator` - The address of the operator that can add/remove modules.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::add_module_to`] for the underlying storage logic after
+    /// enforcing your authorization checks on `operator`.
     fn add_module_to(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Deregisters a compliance module from a specific hook type.
@@ -85,6 +92,13 @@ pub trait Compliance: TokenBinder {
     /// * `hook` - The type of hook to deregister the module from.
     /// * `module` - The address of the compliance module contract.
     /// * `operator` - The address of the operator that can add/remove modules.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::remove_module_from`] for the underlying storage logic after
+    /// enforcing your authorization checks on `operator`.
     fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Gets all modules registered for a specific hook type.
@@ -97,6 +111,12 @@ pub trait Compliance: TokenBinder {
     /// # Returns
     ///
     /// A vector of module addresses registered for the specified hook.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all [`Compliance`]
+    /// methods are left to the implementer for consistency. Use
+    /// [`storage::get_modules_for_hook`] for the underlying storage logic.
     fn get_modules_for_hook(e: &Env, hook: ComplianceHook) -> Vec<Address>;
 
     /// Checks if a module is registered for a specific hook type.
@@ -110,6 +130,12 @@ pub trait Compliance: TokenBinder {
     /// # Returns
     ///
     /// `true` if the module is registered for the hook, `false` otherwise.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all [`Compliance`]
+    /// methods are left to the implementer for consistency. Use
+    /// [`storage::is_module_registered`] for the underlying storage logic.
     fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool;
 
     /// Called whenever tokens are transferred from one wallet to another.
@@ -125,6 +151,14 @@ pub trait Compliance: TokenBinder {
     /// * `amount` - The amount of tokens involved in the transfer.
     /// * `token` - The address of the token contract that is performing the
     ///   transfer.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because the implementer may
+    /// need to enforce that only bound tokens can trigger hooks (see
+    /// [`storage::require_auth_from_bound_token`]). Use
+    /// [`storage::transferred`] for the underlying logic that dispatches
+    /// to registered modules.
     fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Address);
 
     /// Called whenever tokens are created on a wallet.
@@ -138,6 +172,14 @@ pub trait Compliance: TokenBinder {
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens involved in the minting.
     /// * `token` - The address of the contract that is performing the minting.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because the implementer may
+    /// need to enforce that only bound tokens can trigger hooks (see
+    /// [`storage::require_auth_from_bound_token`]). Use
+    /// [`storage::created`] for the underlying logic that dispatches to
+    /// registered modules.
     fn created(e: &Env, to: Address, amount: i128, token: Address);
 
     /// Called whenever tokens are destroyed from a wallet.
@@ -152,6 +194,14 @@ pub trait Compliance: TokenBinder {
     /// * `amount` - The amount of tokens involved in the burn.
     /// * `token` - The address of the token contract that is performing the
     ///   burn.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because the implementer may
+    /// need to enforce that only bound tokens can trigger hooks (see
+    /// [`storage::require_auth_from_bound_token`]). Use
+    /// [`storage::destroyed`] for the underlying logic that dispatches to
+    /// registered modules.
     fn destroyed(e: &Env, from: Address, amount: i128, token: Address);
 
     /// Checks whether the transfer is compliant.
@@ -172,6 +222,13 @@ pub trait Compliance: TokenBinder {
     /// # Returns
     ///
     /// `true` if all registered modules allow the transfer, `false` otherwise.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because the implementer may
+    /// need to enforce that only bound tokens can call validation hooks. Use
+    /// [`storage::can_transfer`] for the underlying logic that dispatches to
+    /// registered modules.
     fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool;
 
     /// Checks whether the mint operation is compliant.
@@ -191,6 +248,13 @@ pub trait Compliance: TokenBinder {
     /// # Returns
     ///
     /// `true` if all registered modules allow the transfer, `false` otherwise.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because the implementer may
+    /// need to enforce that only bound tokens can call validation hooks. Use
+    /// [`storage::can_create`] for the underlying logic that dispatches to
+    /// registered modules.
     fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool;
 }
 
@@ -344,6 +408,14 @@ pub trait ComplianceModule {
     /// ```ignore
     /// get_compliance_address(e).require_auth();
     /// ```
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because compliance modules are
+    /// entirely application-specific. Each module defines its own business
+    /// logic (e.g., updating transfer counters, enforcing holding periods).
+    /// There is no corresponding storage function — the implementation is
+    /// fully custom.
     fn on_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address);
 
     /// Called when tokens are created/minted (for Created hook).
@@ -364,6 +436,12 @@ pub trait ComplianceModule {
     /// ```ignore
     /// get_compliance_address(e).require_auth();
     /// ```
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because compliance modules are
+    /// entirely application-specific. There is no corresponding storage
+    /// function — the implementation is fully custom.
     fn on_created(e: &Env, to: Address, amount: i128, token: Address);
 
     /// Called when tokens are destroyed/burned (for Destroyed hook).
@@ -384,6 +462,12 @@ pub trait ComplianceModule {
     /// ```ignore
     /// get_compliance_address(e).require_auth();
     /// ```
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because compliance modules are
+    /// entirely application-specific. There is no corresponding storage
+    /// function — the implementation is fully custom.
     fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address);
 
     /// Called to check if a transfer should be allowed (for CanTransfer hook).
@@ -398,6 +482,13 @@ pub trait ComplianceModule {
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens to transfer.
     /// * `token` - The address of the token contract that triggered the hook.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because compliance modules are
+    /// entirely application-specific. Each module defines its own validation
+    /// logic (e.g., transfer limits, balance caps). There is no
+    /// corresponding storage function — the implementation is fully custom.
     fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool;
 
     /// Called to check if a mint operation should be allowed (for CanCreate
@@ -412,12 +503,29 @@ pub trait ComplianceModule {
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens to mint.
     /// * `token` - The address of the token contract that triggered the hook.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because compliance modules are
+    /// entirely application-specific. There is no corresponding storage
+    /// function — the implementation is fully custom.
     fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool;
 
     /// Returns the name of the module for identification purposes.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because compliance modules are
+    /// deployed as independent contracts. The name is specific to each
+    /// module implementation.
     fn name(e: &Env) -> String;
 
     /// Returns the address of the compliance contract.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because compliance modules are
+    /// deployed as independent contracts with their own storage layout.
     fn get_compliance_address(e: &Env) -> Address;
 
     /// Sets the address of the compliance contract.
@@ -426,5 +534,11 @@ pub trait ComplianceModule {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `compliance` - The address of the compliance contract.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because compliance modules are
+    /// deployed as independent contracts with their own storage layout
+    /// and access control requirements.
     fn set_compliance_address(e: &Env, compliance: Address);
 }

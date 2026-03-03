@@ -43,6 +43,13 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to check the allowed status for.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all
+    /// [`FungibleAllowList`] methods are left to the implementer for
+    /// consistency, ensuring the authorization logic is explicitly defined.
+    /// Use [`storage::allowed`] for the underlying storage logic.
     fn allowed(e: &Env, account: Address) -> bool;
 
     /// Allows a user to receive and transfer tokens.
@@ -57,6 +64,13 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * topics - `["allow", user: Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::allow_user`] for the underlying storage logic after
+    /// enforcing your authorization checks on `operator`.
     fn allow_user(e: &Env, user: Address, operator: Address);
 
     /// Disallows a user from receiving and transferring tokens.
@@ -71,6 +85,13 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * topics - `["disallow", user: Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::disallow_user`] for the underlying storage logic after
+    /// enforcing your authorization checks on `operator`.
     fn disallow_user(e: &Env, user: Address, operator: Address);
 }
 

@@ -51,6 +51,14 @@ pub trait IdentityVerifier {
     ///
     /// * [`crate::rwa::RWAError::IdentityVerificationFailed`] - When the
     ///   identity of the account cannot be verified.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because identity verification
+    /// is architecture-dependent (claim-based, merkle tree, zero-knowledge,
+    /// etc.). For the default claim-based approach, use
+    /// [`storage::verify_identity`] for the underlying logic. See the
+    /// module documentation for alternative approaches.
     fn verify_identity(e: &Env, account: &Address);
 
     /// Returns the target address for the recovery process for the old account.
@@ -61,6 +69,12 @@ pub trait IdentityVerifier {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `old_account` - The address of the old account.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because identity verification
+    /// is architecture-dependent. For the default claim-based approach, use
+    /// [`storage::recovery_target`] for the underlying logic.
     fn recovery_target(e: &Env, old_account: &Address) -> Option<Address>;
 
     /// Sets the identity registry contract of the token.
@@ -80,6 +94,13 @@ pub trait IdentityVerifier {
     /// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers:
     ///   Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Use
+    /// [`storage::set_claim_topics_and_issuers`] for the underlying storage
+    /// logic after enforcing your authorization checks on `operator`.
     fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: Address, operator: Address);
 
     /// Returns the Claim Topics and Issuers contract linked to the token.
@@ -88,5 +109,12 @@ pub trait IdentityVerifier {
     ///
     /// * [`crate::rwa::RWAError::ClaimTopicsAndIssuersNotSet`] - When the claim
     ///   topics and issuers contract is not set.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because all
+    /// [`IdentityVerifier`] methods are left to the implementer for
+    /// consistency. Use [`storage::claim_topics_and_issuers`] for the
+    /// underlying storage logic.
     fn claim_topics_and_issuers(e: &Env) -> Address;
 }
