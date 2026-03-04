@@ -5,6 +5,7 @@ use soroban_sdk::{
 use crate::rwa::utils::token_binder::TokenBinder;
 
 pub mod storage;
+pub mod modules;
 
 #[cfg(test)]
 mod test;
