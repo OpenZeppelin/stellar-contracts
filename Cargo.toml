@@ -33,6 +33,7 @@ members = [
     "packages/governance",
     "packages/macros",
     "packages/test-utils/*",
+    "packages/compliance-modules/*",
     "packages/tokens",
     "packages/zk-email",
 ]

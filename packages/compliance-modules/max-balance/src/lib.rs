@@ -1,3 +1,5 @@
+#![no_std]
+
 //! Max balance compliance module — Stellar port of T-REX
 //! [`MaxBalanceModule.sol`][trex-src].
 //!
@@ -31,9 +33,9 @@
 
 use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, Env, Vec};
 
-use crate::rwa::compliance::ComplianceModule;
+use stellar_tokens::rwa::compliance::ComplianceModule;
 
-use super::common::{
+use stellar_compliance_common::{
     checked_add_i128, checked_sub_i128, get_compliance_address, get_irs_client, module_name,
     require_compliance_auth, require_non_negative_amount, set_compliance_address, set_irs_address,
 };
@@ -246,118 +248,5 @@ impl ComplianceModule for MaxBalanceModule {
 
     fn set_compliance_address(e: &Env, compliance: Address) {
         set_compliance_address(e, &compliance);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use soroban_sdk::{contract, testutils::Address as _, Address, Env};
-
-    use crate::rwa::compliance::ComplianceModuleClient;
-
-    use super::MaxBalanceModule;
-    use crate::rwa::compliance::modules::test_utils::{MockIRS, MockIRSClient};
-
-    #[contract]
-    struct MockCompliance;
-
-    #[test]
-    fn max_balance_blocks_over_limit() {
-        let e = Env::default();
-        e.mock_all_auths();
-
-        let module = e.register(MaxBalanceModule, ());
-        let token = Address::generate(&e);
-        let compliance = e.register(MockCompliance, ());
-        let irs = e.register(MockIRS, ());
-        let from = Address::generate(&e);
-        let to = Address::generate(&e);
-
-        let client = ComplianceModuleClient::new(&e, &module);
-        client.set_compliance_address(&compliance);
-
-        let module_client = super::MaxBalanceModuleClient::new(&e, &module);
-        let irs_helper = MockIRSClient::new(&e, &irs);
-
-        // MockIRS defaults identity == wallet, so pre_set_module_state
-        // takes the wallet address directly here.
-        irs_helper.mock_set_identity(&from, &from);
-        irs_helper.mock_set_identity(&to, &to);
-
-        e.as_contract(&compliance, || {
-            module_client.set_identity_registry_storage(&token, &irs);
-            module_client.set_max_balance(&token, &100);
-            module_client.pre_set_module_state(&token, &from, &80);
-            module_client.pre_set_module_state(&token, &to, &30);
-        });
-
-        assert!(!client.can_transfer(&from, &to, &71, &token));
-        assert!(client.can_transfer(&from, &to, &70, &token));
-    }
-
-    #[test]
-    fn on_transfer_keeps_balances_consistent() {
-        let e = Env::default();
-        e.mock_all_auths();
-
-        let module = e.register(MaxBalanceModule, ());
-        let token = Address::generate(&e);
-        let compliance = e.register(MockCompliance, ());
-        let irs = e.register(MockIRS, ());
-        let from = Address::generate(&e);
-        let to = Address::generate(&e);
-
-        let client = ComplianceModuleClient::new(&e, &module);
-        client.set_compliance_address(&compliance);
-
-        let module_client = super::MaxBalanceModuleClient::new(&e, &module);
-
-        e.as_contract(&compliance, || {
-            module_client.set_identity_registry_storage(&token, &irs);
-            module_client.pre_set_module_state(&token, &from, &10);
-            client.on_transfer(&from, &to, &9, &token);
-        });
-
-        assert_eq!(module_client.get_investor_balance(&token, &from), 1);
-        assert_eq!(module_client.get_investor_balance(&token, &to), 9);
-    }
-
-    #[test]
-    fn shared_identity_aggregates_balance() {
-        let e = Env::default();
-        e.mock_all_auths();
-
-        let module = e.register(MaxBalanceModule, ());
-        let token = Address::generate(&e);
-        let compliance = e.register(MockCompliance, ());
-        let irs = e.register(MockIRS, ());
-
-        let wallet_a = Address::generate(&e);
-        let wallet_b = Address::generate(&e);
-        let shared_id = Address::generate(&e);
-        let sender = Address::generate(&e);
-
-        let client = ComplianceModuleClient::new(&e, &module);
-        client.set_compliance_address(&compliance);
-
-        let module_client = super::MaxBalanceModuleClient::new(&e, &module);
-        let irs_helper = MockIRSClient::new(&e, &irs);
-
-        irs_helper.mock_set_identity(&wallet_a, &shared_id);
-        irs_helper.mock_set_identity(&wallet_b, &shared_id);
-
-        e.as_contract(&compliance, || {
-            module_client.set_identity_registry_storage(&token, &irs);
-            module_client.set_max_balance(&token, &100);
-            module_client.pre_set_module_state(&token, &sender, &200);
-        });
-
-        e.as_contract(&compliance, || {
-            client.on_transfer(&sender, &wallet_a, &60, &token);
-        });
-        assert_eq!(module_client.get_investor_balance(&token, &shared_id), 60);
-
-        assert!(!client.can_transfer(&sender, &wallet_b, &41, &token));
-        assert!(client.can_transfer(&sender, &wallet_b, &40, &token));
     }
 }

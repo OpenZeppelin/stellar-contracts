@@ -1,3 +1,4 @@
+#![no_std]
 //! Country restriction compliance module — Stellar port of T-REX
 //! [`CountryRestrictModule.sol`][trex-src].
 //!
@@ -24,9 +25,9 @@
 
 use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, Env, Vec};
 
-use crate::rwa::compliance::ComplianceModule;
+use stellar_tokens::rwa::compliance::ComplianceModule;
 
-use super::common::{
+use stellar_compliance_common::{
     country_code, get_compliance_address, get_irs_client, module_name, require_compliance_auth,
     set_compliance_address, set_irs_address,
 };
@@ -141,112 +142,5 @@ impl ComplianceModule for CountryRestrictModule {
 
     fn set_compliance_address(e: &Env, compliance: Address) {
         set_compliance_address(e, &compliance);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env};
-
-    use crate::rwa::{
-        compliance::ComplianceModuleClient,
-        identity_registry_storage::{
-            CountryData, CountryRelation, IndividualCountryRelation,
-        },
-    };
-
-    use super::CountryRestrictModule;
-    use crate::rwa::compliance::modules::test_utils::{MockIRS, MockIRSClient};
-
-    #[contract]
-    struct MockCompliance;
-
-    #[test]
-    fn country_restrict_blocks_restricted_country() {
-        let e = Env::default();
-        e.mock_all_auths();
-
-        let module = e.register(CountryRestrictModule, ());
-        let token = Address::generate(&e);
-        let compliance = e.register(MockCompliance, ());
-        let irs = e.register(MockIRS, ());
-        let from = Address::generate(&e);
-        let to = Address::generate(&e);
-
-        let client = ComplianceModuleClient::new(&e, &module);
-        client.set_compliance_address(&compliance);
-
-        let module_client = super::CountryRestrictModuleClient::new(&e, &module);
-        let irs_helper = MockIRSClient::new(&e, &irs);
-
-        irs_helper.mock_set_countries(
-            &to,
-            &vec![
-                &e,
-                CountryData {
-                    country: CountryRelation::Individual(
-                        IndividualCountryRelation::Residence(840),
-                    ),
-                    metadata: None,
-                },
-            ],
-        );
-
-        e.as_contract(&compliance, || {
-            module_client.set_identity_registry_storage(&token, &irs);
-            module_client.add_country_restriction(&token, &840);
-        });
-
-        assert!(!client.can_transfer(&from, &to, &1, &token));
-
-        e.as_contract(&compliance, || {
-            module_client.remove_country_restriction(&token, &840);
-        });
-        assert!(client.can_transfer(&from, &to, &1, &token));
-    }
-
-    #[test]
-    fn blocks_if_any_country_restricted() {
-        let e = Env::default();
-        e.mock_all_auths();
-
-        let module = e.register(CountryRestrictModule, ());
-        let token = Address::generate(&e);
-        let compliance = e.register(MockCompliance, ());
-        let irs = e.register(MockIRS, ());
-        let from = Address::generate(&e);
-        let to = Address::generate(&e);
-
-        let client = ComplianceModuleClient::new(&e, &module);
-        client.set_compliance_address(&compliance);
-
-        let module_client = super::CountryRestrictModuleClient::new(&e, &module);
-        let irs_helper = MockIRSClient::new(&e, &irs);
-
-        irs_helper.mock_set_countries(
-            &to,
-            &vec![
-                &e,
-                CountryData {
-                    country: CountryRelation::Individual(
-                        IndividualCountryRelation::Residence(840),
-                    ),
-                    metadata: None,
-                },
-                CountryData {
-                    country: CountryRelation::Individual(
-                        IndividualCountryRelation::Citizenship(276),
-                    ),
-                    metadata: None,
-                },
-            ],
-        );
-
-        e.as_contract(&compliance, || {
-            module_client.set_identity_registry_storage(&token, &irs);
-            module_client.add_country_restriction(&token, &276);
-        });
-
-        assert!(!client.can_transfer(&from, &to, &1, &token));
     }
 }

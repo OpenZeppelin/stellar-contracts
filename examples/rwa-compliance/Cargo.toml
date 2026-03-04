@@ -19,3 +19,10 @@ stellar-tokens = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+stellar-compliance-country-allow = { path = "../../packages/compliance-modules/country-allow" }
+stellar-compliance-country-restrict = { path = "../../packages/compliance-modules/country-restrict" }
+stellar-compliance-initial-lockup-period = { path = "../../packages/compliance-modules/initial-lockup-period" }
+stellar-compliance-max-balance = { path = "../../packages/compliance-modules/max-balance" }
+stellar-compliance-supply-limit = { path = "../../packages/compliance-modules/supply-limit" }
+stellar-compliance-time-transfers-limits = { path = "../../packages/compliance-modules/time-transfers-limits" }
+stellar-compliance-transfer-restrict = { path = "../../packages/compliance-modules/transfer-restrict" }

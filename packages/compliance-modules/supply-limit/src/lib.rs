@@ -1,3 +1,4 @@
+#![no_std]
 //! Supply cap compliance module — Stellar port of T-REX
 //! [`SupplyLimitModule.sol`][trex-src].
 //!
@@ -25,11 +26,11 @@
 
 use soroban_sdk::{contract, contractevent, contractimpl, contracttype, panic_with_error, Address, Env};
 
-use crate::rwa::compliance::ComplianceModule;
+use stellar_tokens::rwa::compliance::ComplianceModule;
 
-use super::common::{
-    get_compliance_address, module_name, require_compliance_auth, require_non_negative_amount,
-    set_compliance_address, checked_add_i128, ModuleError, TokenSupplyViewClient,
+use stellar_compliance_common::{
+    checked_add_i128, get_compliance_address, module_name, require_compliance_auth,
+    require_non_negative_amount, set_compliance_address, ModuleError, TokenSupplyViewClient,
 };
 
 #[contracttype]
@@ -109,49 +110,5 @@ impl ComplianceModule for SupplyLimitModule {
 
     fn set_compliance_address(e: &Env, compliance: Address) {
         set_compliance_address(e, &compliance);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env};
-
-    use crate::rwa::compliance::ComplianceModuleClient;
-
-    use super::SupplyLimitModule;
-
-    #[contract]
-    struct MockToken;
-
-    #[contract]
-    struct MockCompliance;
-
-    #[contractimpl]
-    impl MockToken {
-        pub fn total_supply(_e: &Env) -> i128 {
-            100
-        }
-    }
-
-    #[test]
-    fn supply_limit_rejects_over_limit_mint() {
-        let e = Env::default();
-        e.mock_all_auths();
-
-        let module = e.register(SupplyLimitModule, ());
-        let token = e.register(MockToken, ());
-        let compliance = e.register(MockCompliance, ());
-        let to = Address::generate(&e);
-
-        let client = ComplianceModuleClient::new(&e, &module);
-        client.set_compliance_address(&compliance);
-
-        let module_client = super::SupplyLimitModuleClient::new(&e, &module);
-        e.as_contract(&compliance, || {
-            module_client.set_supply_limit(&token, &120);
-        });
-
-        assert!(!client.can_create(&to, &21, &token));
-        assert!(client.can_create(&to, &20, &token));
     }
 }

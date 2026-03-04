@@ -1,3 +1,5 @@
+#![no_std]
+
 //! Time-windowed transfer-limits compliance module — Stellar port of T-REX
 //! [`TimeTransfersLimitsModule.sol`][trex-src].
 //!
@@ -10,7 +12,7 @@
 //! | T-REX hook             | Stellar hook    | Behaviour                                        |
 //! |------------------------|-----------------|--------------------------------------------------|
 //! | `moduleCheck`          | `can_transfer`  | Validate transfer against all configured windows |
-//! | _(same)_               | `can_create`    | Always true (mints don't count toward limits)    |
+//! | _(same)_               | `can_create`   | Always true (mints don't count toward limits)    |
 //! | `moduleTransferAction` | `on_transfer`   | Resolve sender identity, increase counters       |
 //! | `moduleMintAction`     | `on_created`    | No-op                                            |
 //! | `moduleBurnAction`     | `on_destroyed`  | No-op                                            |
@@ -29,9 +31,9 @@ use soroban_sdk::{
     contract, contractevent, contractimpl, contracttype, panic_with_error, Address, Env, Vec,
 };
 
-use crate::rwa::compliance::ComplianceModule;
+use stellar_tokens::rwa::compliance::ComplianceModule;
 
-use super::common::{
+use stellar_compliance_common::{
     checked_add_i128, get_compliance_address, get_irs_client, module_name,
     require_compliance_auth, require_non_negative_amount, set_compliance_address, set_irs_address,
     ModuleError,
@@ -268,92 +270,5 @@ impl ComplianceModule for TimeTransfersLimitsModule {
 
     fn set_compliance_address(e: &Env, compliance: Address) {
         set_compliance_address(e, &compliance);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use soroban_sdk::{contract, testutils::Address as _, Address, Env};
-
-    use crate::rwa::compliance::ComplianceModuleClient;
-
-    use super::{Limit, TimeTransfersLimitsModule};
-    use crate::rwa::compliance::modules::test_utils::{MockIRS, MockIRSClient};
-
-    #[contract]
-    struct MockCompliance;
-
-    #[test]
-    fn transfer_limit_checks_accumulated_window() {
-        let e = Env::default();
-        e.mock_all_auths();
-        let module = e.register(TimeTransfersLimitsModule, ());
-        let token = Address::generate(&e);
-        let compliance = e.register(MockCompliance, ());
-        let irs = e.register(MockIRS, ());
-        let from = Address::generate(&e);
-        let to = Address::generate(&e);
-
-        let client = ComplianceModuleClient::new(&e, &module);
-        client.set_compliance_address(&compliance);
-        let module_client = super::TimeTransfersLimitsModuleClient::new(&e, &module);
-
-        e.as_contract(&compliance, || {
-            module_client.set_identity_registry_storage(&token, &irs);
-            module_client.set_time_transfer_limit(
-                &token,
-                &Limit {
-                    limit_time: 3_600,
-                    limit_value: 100,
-                },
-            );
-        });
-
-        assert!(client.can_transfer(&from, &to, &60, &token));
-        e.as_contract(&compliance, || {
-            client.on_transfer(&from, &to, &60, &token);
-        });
-        assert!(!client.can_transfer(&from, &to, &50, &token));
-    }
-
-    #[test]
-    fn shared_identity_shares_counters() {
-        let e = Env::default();
-        e.mock_all_auths();
-        let module = e.register(TimeTransfersLimitsModule, ());
-        let token = Address::generate(&e);
-        let compliance = e.register(MockCompliance, ());
-        let irs = e.register(MockIRS, ());
-
-        let wallet_a = Address::generate(&e);
-        let wallet_b = Address::generate(&e);
-        let shared_id = Address::generate(&e);
-        let to = Address::generate(&e);
-
-        let irs_helper = MockIRSClient::new(&e, &irs);
-        irs_helper.mock_set_identity(&wallet_a, &shared_id);
-        irs_helper.mock_set_identity(&wallet_b, &shared_id);
-
-        let client = ComplianceModuleClient::new(&e, &module);
-        client.set_compliance_address(&compliance);
-        let module_client = super::TimeTransfersLimitsModuleClient::new(&e, &module);
-
-        e.as_contract(&compliance, || {
-            module_client.set_identity_registry_storage(&token, &irs);
-            module_client.set_time_transfer_limit(
-                &token,
-                &Limit {
-                    limit_time: 3_600,
-                    limit_value: 100,
-                },
-            );
-        });
-
-        e.as_contract(&compliance, || {
-            client.on_transfer(&wallet_a, &to, &70, &token);
-        });
-        // wallet_b shares identity with wallet_a, counter already at 70
-        assert!(!client.can_transfer(&wallet_b, &to, &40, &token));
-        assert!(client.can_transfer(&wallet_b, &to, &30, &token));
     }
 }

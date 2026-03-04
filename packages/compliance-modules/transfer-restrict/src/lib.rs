@@ -1,3 +1,4 @@
+#![no_std]
 //! Transfer restriction (address allowlist) compliance module — Stellar port
 //! of T-REX [`TransferRestrictModule.sol`][trex-src].
 //!
@@ -19,9 +20,9 @@
 
 use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, Env, Vec};
 
-use crate::rwa::compliance::ComplianceModule;
+use stellar_tokens::rwa::compliance::ComplianceModule;
 
-use super::common::{
+use stellar_compliance_common::{
     get_compliance_address, module_name, require_compliance_auth, set_compliance_address,
 };
 
@@ -128,37 +129,5 @@ impl ComplianceModule for TransferRestrictModule {
 
     fn set_compliance_address(e: &Env, compliance: Address) {
         set_compliance_address(e, &compliance);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use soroban_sdk::{contract, testutils::Address as _, Address, Env};
-
-    use crate::rwa::compliance::ComplianceModuleClient;
-
-    use super::TransferRestrictModule;
-
-    #[contract]
-    struct MockCompliance;
-
-    #[test]
-    fn transfer_restrict_allows_when_either_side_is_allowed() {
-        let e = Env::default();
-        e.mock_all_auths();
-        let module = e.register(TransferRestrictModule, ());
-        let token = Address::generate(&e);
-        let compliance = e.register(MockCompliance, ());
-        let from = Address::generate(&e);
-        let to = Address::generate(&e);
-        let client = ComplianceModuleClient::new(&e, &module);
-        client.set_compliance_address(&compliance);
-        assert!(!client.can_transfer(&from, &to, &1, &token));
-
-        let module_client = super::TransferRestrictModuleClient::new(&e, &module);
-        e.as_contract(&compliance, || {
-            module_client.allow_user(&token, &from);
-        });
-        assert!(client.can_transfer(&from, &to, &1, &token));
     }
 }

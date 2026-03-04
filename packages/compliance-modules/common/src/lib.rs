@@ -1,20 +1,17 @@
+#![no_std]
+
 //! Shared helpers for compliance modules.
 //!
-//! This module intentionally centralizes:
-//! - compliance-address ownership/auth checks
-//! - safe arithmetic guards for i128 accounting
-//! - lightweight read-only client traits used by modules
-//! - identity registry storage (IRS) resolution helpers
-//!
-//! Keeping these utilities here prevents drift across module implementations
-//! and keeps each module focused on business rules only.
+//! Centralizes compliance-address ownership/auth checks, safe arithmetic
+//! guards, lightweight read-only client traits, and identity registry
+//! storage (IRS) resolution helpers.
 
 use soroban_sdk::{
     contractclient, contracterror, contracttype, panic_with_error, symbol_short, Address, Env,
     String, Symbol, Vec,
 };
 
-use crate::rwa::identity_registry_storage::{
+use stellar_tokens::rwa::identity_registry_storage::{
     CountryData, CountryRelation, IndividualCountryRelation, OrganizationCountryRelation,
 };
 

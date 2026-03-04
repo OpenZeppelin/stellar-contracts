@@ -2,21 +2,20 @@ extern crate std;
 
 use soroban_sdk::{testutils::Address as _, testutils::Ledger, vec, Address, Env, String};
 
+use stellar_compliance_country_allow::{CountryAllowModule, CountryAllowModuleClient};
+use stellar_compliance_country_restrict::{CountryRestrictModule, CountryRestrictModuleClient};
+use stellar_compliance_initial_lockup_period::{
+    InitialLockupPeriodModule, InitialLockupPeriodModuleClient,
+};
+use stellar_compliance_max_balance::{MaxBalanceModule, MaxBalanceModuleClient};
+use stellar_compliance_supply_limit::{SupplyLimitModule, SupplyLimitModuleClient};
+use stellar_compliance_time_transfers_limits::{
+    Limit, TimeTransfersLimitsModule, TimeTransfersLimitsModuleClient,
+};
+use stellar_compliance_transfer_restrict::{TransferRestrictModule, TransferRestrictModuleClient};
+
 use stellar_tokens::rwa::{
-    compliance::{
-        modules::{
-            country_allow::{CountryAllowModule, CountryAllowModuleClient},
-            country_restrict::{CountryRestrictModule, CountryRestrictModuleClient},
-            initial_lockup_period::{InitialLockupPeriodModule, InitialLockupPeriodModuleClient},
-            max_balance::{MaxBalanceModule, MaxBalanceModuleClient},
-            supply_limit::{SupplyLimitModule, SupplyLimitModuleClient},
-            time_transfers_limits::{
-                Limit, TimeTransfersLimitsModule, TimeTransfersLimitsModuleClient,
-            },
-            transfer_restrict::{TransferRestrictModule, TransferRestrictModuleClient},
-        },
-        ComplianceHook, ComplianceModuleClient,
-    },
+    compliance::{ComplianceHook, ComplianceModuleClient},
     identity_registry_storage::{CountryData, CountryRelation, IndividualCountryRelation},
 };
 
@@ -494,4 +493,74 @@ fn test_full_stack() {
         .token_client
         .try_transfer(&investor_us, &investor_de, &700);
     assert!(result.is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Reproduction: Soroban re-entry error
+//
+// These tests demonstrate the re-entry limitation. When SupplyLimitModule
+// is wired to CanCreate, or InitialLockupPeriodModule is wired to
+// CanTransfer, the module calls back to the token (total_supply / balance)
+// while the token is already on the call stack. Soroban rejects this.
+//
+// Run with: cargo test -p rwa-compliance-example --lib -- reentry
+// ---------------------------------------------------------------------------
+
+#[test]
+#[should_panic(expected = "Contract re-entry is not allowed")]
+fn reentry_supply_limit_can_create() {
+    let ts = setup();
+
+    let investor = Address::generate(&ts.env);
+    let id = Address::generate(&ts.env);
+    register_investor(&ts, &investor, &id, us_country_data());
+
+    let module = ts.env.register(SupplyLimitModule, ());
+    // Wire to CanCreate — this is the hook that calls token.total_supply()
+    wire_module(&ts, &module, &[ComplianceHook::CanCreate]);
+
+    let mod_client = SupplyLimitModuleClient::new(&ts.env, &module);
+    mod_client.set_supply_limit(&ts.token, &1000);
+
+    // This mint triggers: token.mint() → compliance.can_create() →
+    // supply_limit.can_create() → token.total_supply() → RE-ENTRY PANIC
+    ts.token_client.mint(&investor, &100, &ts.admin);
+}
+
+#[test]
+#[should_panic(expected = "Contract re-entry is not allowed")]
+fn reentry_initial_lockup_can_transfer() {
+    let ts = setup();
+
+    let investor = Address::generate(&ts.env);
+    let recipient = Address::generate(&ts.env);
+    let id_inv = Address::generate(&ts.env);
+    let id_rec = Address::generate(&ts.env);
+
+    register_investor(&ts, &investor, &id_inv, us_country_data());
+    register_investor(&ts, &recipient, &id_rec, us_country_data());
+
+    let module = ts.env.register(InitialLockupPeriodModule, ());
+    let cmp_client = ComplianceModuleClient::new(&ts.env, &module);
+    cmp_client.set_compliance_address(&ts.compliance);
+
+    let mod_client = InitialLockupPeriodModuleClient::new(&ts.env, &module);
+    mod_client.set_lockup_period(&ts.token, &1_000);
+
+    // Wire Created (no re-entry) so mint works
+    ts.compliance_client
+        .add_module_to(&ComplianceHook::Created, &module, &ts.admin);
+    // Wire CanTransfer — this is the hook that calls token.balance()
+    ts.compliance_client
+        .add_module_to(&ComplianceHook::CanTransfer, &module, &ts.admin);
+
+    // Mint works (on_created doesn't call back to token)
+    ts.token_client.mint(&investor, &500, &ts.admin);
+
+    // Advance past lockup so the module would allow the transfer
+    ts.env.ledger().with_mut(|li| li.timestamp = 1_001);
+
+    // This transfer triggers: token.transfer() → compliance.can_transfer() →
+    // lockup.can_transfer() → token.balance() → RE-ENTRY PANIC
+    ts.token_client.transfer(&investor, &recipient, &100);
 }
