@@ -43,14 +43,9 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to check the allowed status for.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all
-    /// [`FungibleAllowList`] methods are left to the implementer for
-    /// consistency, ensuring the authorization logic is explicitly defined.
-    /// Use [`storage::allowed`] for the underlying storage logic.
-    fn allowed(e: &Env, account: Address) -> bool;
+    fn allowed(e: &Env, account: Address) -> bool {
+        storage::AllowList::allowed(e, &account)
+    }
 
     /// Allows a user to receive and transfer tokens.
     ///
@@ -68,9 +63,8 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`storage::allow_user`] for the underlying storage logic after
-    /// enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`storage::allow_user`] for the implementation.
     fn allow_user(e: &Env, user: Address, operator: Address);
 
     /// Disallows a user from receiving and transferring tokens.
@@ -89,9 +83,8 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`storage::disallow_user`] for the underlying storage logic after
-    /// enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`storage::disallow_user`] for the implementation.
     fn disallow_user(e: &Env, user: Address, operator: Address);
 }
 

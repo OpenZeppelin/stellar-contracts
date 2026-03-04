@@ -154,9 +154,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`RWA::forced_transfer`] for the underlying storage logic after
-    /// enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`RWA::forced_transfer`] for the implementation.
     fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, operator: Address);
 
     /// Mints tokens to a wallet. Tokens can only be minted to verified
@@ -187,10 +186,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use [`RWA::mint`] for
-    /// the underlying storage logic (including identity verification and
-    /// compliance checks) after enforcing your authorization checks on
-    /// `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`RWA::mint`] for the implementation
+    /// (which handles identity verification and compliance checks).
     fn mint(e: &Env, to: Address, amount: i128, operator: Address);
 
     /// Burns tokens from a wallet.
@@ -217,9 +215,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use [`RWA::burn`] for
-    /// the underlying storage logic after enforcing your authorization checks
-    /// on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`RWA::burn`] for the implementation.
     fn burn(e: &Env, user_address: Address, amount: i128, operator: Address);
 
     /// Recovery function used to force transfer tokens from a old account
@@ -250,10 +247,10 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`RWA::recover_balance`] for the underlying storage logic (including
-    /// identity verification and recovery target validation) after enforcing
-    /// your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`RWA::recover_balance`] for the
+    /// implementation (which handles identity verification and recovery target
+    /// validation).
     fn recover_balance(
         e: &Env,
         old_account: Address,
@@ -282,9 +279,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`RWA::set_address_frozen`] for the underlying storage logic after
-    /// enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`RWA::set_address_frozen`] for the implementation.
     fn set_address_frozen(e: &Env, user_address: Address, freeze: bool, operator: Address);
 
     /// Freezes a specified amount of tokens for a given address.
@@ -313,9 +309,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`RWA::freeze_partial_tokens`] for the underlying storage logic after
-    /// enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`RWA::freeze_partial_tokens`] for the implementation.
     fn freeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
 
     /// Unfreezes a specified amount of tokens for a given address.
@@ -344,9 +339,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`RWA::unfreeze_partial_tokens`] for the underlying storage logic
-    /// after enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`RWA::unfreeze_partial_tokens`] for the implementation.
     fn unfreeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
 
     /// Returns the freezing status of a wallet.
@@ -355,13 +349,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - The address of the wallet to check.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all [`RWAToken`]
-    /// methods are left to the implementer for consistency. Use
-    /// [`RWA::is_frozen`] for the underlying storage logic.
-    fn is_frozen(e: &Env, user_address: Address) -> bool;
+    fn is_frozen(e: &Env, user_address: Address) -> bool {
+        RWA::is_frozen(e, &user_address)
+    }
 
     /// Returns the amount of tokens that are partially frozen on a wallet.
     ///
@@ -369,13 +359,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `user_address` - The address of the wallet to check.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all [`RWAToken`]
-    /// methods are left to the implementer for consistency. Use
-    /// [`RWA::get_frozen_tokens`] for the underlying storage logic.
-    fn get_frozen_tokens(e: &Env, user_address: Address) -> i128;
+    fn get_frozen_tokens(e: &Env, user_address: Address) -> i128 {
+        RWA::get_frozen_tokens(e, &user_address)
+    }
 
     // ################## METADATA FUNCTIONS ##################
 
@@ -384,26 +370,18 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Errors
     ///
     /// * [`RWAError::VersionNotSet`] - When the token version is not set.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all [`RWAToken`]
-    /// methods are left to the implementer for consistency. Use
-    /// [`RWA::version`] for the underlying storage logic.
-    fn version(e: &Env) -> String;
+    fn version(e: &Env) -> String {
+        RWA::version(e)
+    }
 
     /// Returns the address of the onchain ID of the token.
     ///
     /// # Errors
     ///
     /// * [`RWAError::OnchainIdNotSet`] - When the onchain ID is not set.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all [`RWAToken`]
-    /// methods are left to the implementer for consistency. Use
-    /// [`RWA::onchain_id`] for the underlying storage logic.
-    fn onchain_id(e: &Env) -> Address;
+    fn onchain_id(e: &Env) -> Address {
+        RWA::onchain_id(e)
+    }
 
     // ################## COMPLIANCE AND IDENTITY FUNCTIONS ##################
 
@@ -427,9 +405,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`RWA::set_compliance`] for the underlying storage logic after
-    /// enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`RWA::set_compliance`] for the implementation.
     fn set_compliance(e: &Env, compliance: Address, operator: Address);
 
     /// Returns the Compliance contract linked to the token.
@@ -438,13 +415,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
     ///   set.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all [`RWAToken`]
-    /// methods are left to the implementer for consistency. Use
-    /// [`RWA::compliance`] for the underlying storage logic.
-    fn compliance(e: &Env) -> Address;
+    fn compliance(e: &Env) -> Address {
+        RWA::compliance(e)
+    }
 
     /// Sets the identity verifier contract of the token.
     ///
@@ -467,9 +440,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`RWA::set_identity_verifier`] for the underlying storage logic after
-    /// enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`RWA::set_identity_verifier`] for the implementation.
     fn set_identity_verifier(e: &Env, identity_verifier: Address, operator: Address);
 
     /// Returns the Identity Verifier contract linked to the token.
@@ -478,13 +450,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// * [`RWAError::IdentityVerifierNotSet`] - When the identity verifier
     ///   contract is not set.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all [`RWAToken`]
-    /// methods are left to the implementer for consistency. Use
-    /// [`RWA::identity_verifier`] for the underlying storage logic.
-    fn identity_verifier(e: &Env) -> Address;
+    fn identity_verifier(e: &Env) -> Address {
+        RWA::identity_verifier(e)
+    }
 }
 
 // ################## ERRORS ##################

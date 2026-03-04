@@ -78,9 +78,8 @@ pub trait Compliance: TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`storage::add_module_to`] for the underlying storage logic after
-    /// enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`storage::add_module_to`] for the implementation.
     fn add_module_to(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Deregisters a compliance module from a specific hook type.
@@ -96,9 +95,8 @@ pub trait Compliance: TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`storage::remove_module_from`] for the underlying storage logic after
-    /// enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`storage::remove_module_from`] for the implementation.
     fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Gets all modules registered for a specific hook type.
@@ -111,13 +109,9 @@ pub trait Compliance: TokenBinder {
     /// # Returns
     ///
     /// A vector of module addresses registered for the specified hook.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all [`Compliance`]
-    /// methods are left to the implementer for consistency. Use
-    /// [`storage::get_modules_for_hook`] for the underlying storage logic.
-    fn get_modules_for_hook(e: &Env, hook: ComplianceHook) -> Vec<Address>;
+    fn get_modules_for_hook(e: &Env, hook: ComplianceHook) -> Vec<Address> {
+        storage::get_modules_for_hook(e, hook)
+    }
 
     /// Checks if a module is registered for a specific hook type.
     ///
@@ -130,13 +124,9 @@ pub trait Compliance: TokenBinder {
     /// # Returns
     ///
     /// `true` if the module is registered for the hook, `false` otherwise.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all [`Compliance`]
-    /// methods are left to the implementer for consistency. Use
-    /// [`storage::is_module_registered`] for the underlying storage logic.
-    fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool;
+    fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool {
+        storage::is_module_registered(e, hook, module)
+    }
 
     /// Called whenever tokens are transferred from one wallet to another.
     ///

@@ -50,8 +50,8 @@ pub trait TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because all [`TokenBinder`]
-    /// methods are left to the implementer for consistency. Use
-    /// [`linked_tokens`] for the underlying storage logic.
+    /// methods are left to the implementer for consistency. Call
+    /// [`linked_tokens`] in your implementation.
     fn linked_tokens(e: &Env) -> Vec<Address>;
 
     /// Binds a token to this contract's periphery services.
@@ -65,9 +65,8 @@ pub trait TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use [`bind_token`]
-    /// for the underlying storage logic after enforcing your authorization
-    /// checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`bind_token`] for the implementation.
     fn bind_token(e: &Env, token: Address, operator: Address);
 
     /// Unbinds a token from this contract's periphery services.
@@ -81,9 +80,8 @@ pub trait TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use [`unbind_token`]
-    /// for the underlying storage logic after enforcing your authorization
-    /// checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`unbind_token`] for the implementation.
     fn unbind_token(e: &Env, token: Address, operator: Address);
 }
 

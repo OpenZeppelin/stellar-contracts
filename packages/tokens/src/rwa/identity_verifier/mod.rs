@@ -98,9 +98,9 @@ pub trait IdentityVerifier {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`storage::set_claim_topics_and_issuers`] for the underlying storage
-    /// logic after enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call
+    /// [`storage::set_claim_topics_and_issuers`] for the implementation.
     fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: Address, operator: Address);
 
     /// Returns the Claim Topics and Issuers contract linked to the token.
@@ -109,12 +109,7 @@ pub trait IdentityVerifier {
     ///
     /// * [`crate::rwa::RWAError::ClaimTopicsAndIssuersNotSet`] - When the claim
     ///   topics and issuers contract is not set.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all
-    /// [`IdentityVerifier`] methods are left to the implementer for
-    /// consistency. Use [`storage::claim_topics_and_issuers`] for the
-    /// underlying storage logic.
-    fn claim_topics_and_issuers(e: &Env) -> Address;
+    fn claim_topics_and_issuers(e: &Env) -> Address {
+        storage::claim_topics_and_issuers(e)
+    }
 }

@@ -43,14 +43,9 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to check the blocked status for.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all
-    /// [`FungibleBlockList`] methods are left to the implementer for
-    /// consistency, ensuring the authorization logic is explicitly defined.
-    /// Use [`storage::blocked`] for the underlying storage logic.
-    fn blocked(e: &Env, account: Address) -> bool;
+    fn blocked(e: &Env, account: Address) -> bool {
+        storage::BlockList::blocked(e, &account)
+    }
 
     /// Blocks a user from receiving and transferring tokens.
     ///
@@ -68,9 +63,8 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`storage::block_user`] for the underlying storage logic after
-    /// enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`storage::block_user`] for the implementation.
     fn block_user(e: &Env, user: Address, operator: Address);
 
     /// Unblocks a user, allowing them to receive and transfer tokens.
@@ -89,9 +83,8 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Use
-    /// [`storage::unblock_user`] for the underlying storage logic after
-    /// enforcing your authorization checks on `operator`.
+    /// operation that requires custom access control. Enforce your access
+    /// control on `operator`, then call [`storage::unblock_user`] for the implementation.
     fn unblock_user(e: &Env, user: Address, operator: Address);
 }
 
