@@ -79,7 +79,8 @@ pub trait Compliance: TokenBinder {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`storage::add_module_to`] for the implementation.
+    /// control on `operator`, then call [`storage::add_module_to`] for the
+    /// implementation.
     fn add_module_to(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Deregisters a compliance module from a specific hook type.
@@ -96,7 +97,8 @@ pub trait Compliance: TokenBinder {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`storage::remove_module_from`] for the implementation.
+    /// control on `operator`, then call [`storage::remove_module_from`] for the
+    /// implementation.
     fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Gets all modules registered for a specific hook type.

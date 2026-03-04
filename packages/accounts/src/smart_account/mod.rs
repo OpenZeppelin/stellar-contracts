@@ -199,7 +199,8 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// No default implementation is provided because the smart account
     /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`add_context_rule`] for the implementation.
+    /// itself has authorized the call, then call [`add_context_rule`] for the
+    /// implementation.
     fn add_context_rule(
         e: &Env,
         context_type: ContextRuleType,
@@ -233,7 +234,8 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// No default implementation is provided because the smart account
     /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`update_context_rule_name`] for the implementation.
+    /// itself has authorized the call, then call [`update_context_rule_name`]
+    /// for the implementation.
     fn update_context_rule_name(e: &Env, context_rule_id: u32, name: String) -> ContextRule;
 
     /// Updates the expiration time of an existing context rule, returning the
@@ -294,7 +296,8 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// No default implementation is provided because the smart account
     /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`remove_context_rule`] for the implementation.
+    /// itself has authorized the call, then call [`remove_context_rule`] for
+    /// the implementation.
     fn remove_context_rule(e: &Env, context_rule_id: u32);
 
     /// Adds a new signer to an existing context rule, returning the assigned
@@ -324,7 +327,8 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// No default implementation is provided because the smart account
     /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`add_signer`] for the implementation.
+    /// itself has authorized the call, then call [`add_signer`] for the
+    /// implementation.
     fn add_signer(e: &Env, context_rule_id: u32, signer: Signer) -> u32;
 
     /// Removes a signer from an existing context rule. Removing the last signer
@@ -352,7 +356,8 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// No default implementation is provided because the smart account
     /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`remove_signer`] for the implementation.
+    /// itself has authorized the call, then call [`remove_signer`] for the
+    /// implementation.
     fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32);
 
     /// Adds a new policy to an existing context rule, installs it, and returns
@@ -384,7 +389,8 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// No default implementation is provided because the smart account
     /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`add_policy`] for the implementation.
+    /// itself has authorized the call, then call [`add_policy`] for the
+    /// implementation.
     fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val) -> u32;
 
     /// Removes a policy from an existing context rule and uninstalls it. The
@@ -414,7 +420,8 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// No default implementation is provided because the smart account
     /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`remove_policy`] for the implementation.
+    /// itself has authorized the call, then call [`remove_policy`] for the
+    /// implementation.
     fn remove_policy(e: &Env, context_rule_id: u32, policy_id: u32);
 }
 

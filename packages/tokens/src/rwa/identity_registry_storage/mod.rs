@@ -313,7 +313,8 @@ pub trait IdentityRegistryStorage: TokenBinder {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`add_identity`] for the implementation.
+    /// control on `operator`, then call [`add_identity`] for the
+    /// implementation.
     fn add_identity(
         e: &Env,
         account: Address,
@@ -344,7 +345,8 @@ pub trait IdentityRegistryStorage: TokenBinder {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`remove_identity`] for the implementation.
+    /// control on `operator`, then call [`remove_identity`] for the
+    /// implementation.
     fn remove_identity(e: &Env, account: Address, operator: Address);
 
     /// Modifies an existing identity.
@@ -366,7 +368,8 @@ pub trait IdentityRegistryStorage: TokenBinder {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`modify_identity`] for the implementation.
+    /// control on `operator`, then call [`modify_identity`] for the
+    /// implementation.
     fn modify_identity(e: &Env, account: Address, identity: Address, operator: Address);
 
     /// Recovers an identity by transferring it from an old account to a new
@@ -391,7 +394,8 @@ pub trait IdentityRegistryStorage: TokenBinder {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`recover_identity`] for the implementation.
+    /// control on `operator`, then call [`recover_identity`] for the
+    /// implementation.
     fn recover_identity(e: &Env, old_account: Address, new_account: Address, operator: Address);
 
     /// Retrieves the stored identity for a given account.
@@ -441,7 +445,8 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`add_country_data_entries`] for the implementation.
+    /// control on `operator`, then call [`add_country_data_entries`] for the
+    /// implementation.
     fn add_country_data_entries(
         e: &Env,
         account: Address,
@@ -468,7 +473,8 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`modify_country_data`] for the implementation.
+    /// control on `operator`, then call [`modify_country_data`] for the
+    /// implementation.
     fn modify_country_data(
         e: &Env,
         account: Address,
@@ -497,7 +503,8 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`delete_country_data`] for the implementation.
+    /// control on `operator`, then call [`delete_country_data`] for the
+    /// implementation.
     fn delete_country_data(e: &Env, account: Address, index: u32, operator: Address);
 
     /// Retrieves all country data entries for a given account.

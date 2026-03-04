@@ -155,7 +155,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::forced_transfer`] for the implementation.
+    /// control on `operator`, then call [`RWA::forced_transfer`] for the
+    /// implementation.
     fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, operator: Address);
 
     /// Mints tokens to a wallet. Tokens can only be minted to verified
@@ -280,7 +281,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::set_address_frozen`] for the implementation.
+    /// control on `operator`, then call [`RWA::set_address_frozen`] for the
+    /// implementation.
     fn set_address_frozen(e: &Env, user_address: Address, freeze: bool, operator: Address);
 
     /// Freezes a specified amount of tokens for a given address.
@@ -310,7 +312,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::freeze_partial_tokens`] for the implementation.
+    /// control on `operator`, then call [`RWA::freeze_partial_tokens`] for the
+    /// implementation.
     fn freeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
 
     /// Unfreezes a specified amount of tokens for a given address.
@@ -340,7 +343,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::unfreeze_partial_tokens`] for the implementation.
+    /// control on `operator`, then call [`RWA::unfreeze_partial_tokens`] for
+    /// the implementation.
     fn unfreeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
 
     /// Returns the freezing status of a wallet.
@@ -406,7 +410,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::set_compliance`] for the implementation.
+    /// control on `operator`, then call [`RWA::set_compliance`] for the
+    /// implementation.
     fn set_compliance(e: &Env, compliance: Address, operator: Address);
 
     /// Returns the Compliance contract linked to the token.
@@ -441,7 +446,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::set_identity_verifier`] for the implementation.
+    /// control on `operator`, then call [`RWA::set_identity_verifier`] for the
+    /// implementation.
     fn set_identity_verifier(e: &Env, identity_verifier: Address, operator: Address);
 
     /// Returns the Identity Verifier contract linked to the token.

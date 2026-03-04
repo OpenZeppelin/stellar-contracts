@@ -81,7 +81,8 @@ pub trait TokenBinder {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`unbind_token`] for the implementation.
+    /// control on `operator`, then call [`unbind_token`] for the
+    /// implementation.
     fn unbind_token(e: &Env, token: Address, operator: Address);
 }
 
