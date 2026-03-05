@@ -17,6 +17,15 @@
 //! | `moduleMintAction`     | `on_created`    | No-op                                            |
 //! | `moduleBurnAction`     | `on_destroyed`  | No-op                                            |
 //!
+//! ## Required hooks
+//!
+//! `CanTransfer`, `Transferred`
+//!
+//! Call `verify_hook_wiring()` after wiring to arm the module. The
+//! `can_transfer` hook panics if the module is not armed — this prevents
+//! silent misconfiguration where a missing `Transferred` hook would mean
+//! counters never increment and all rate limits are bypassed.
+//!
 //! ## Differences from T-REX
 //!
 //! - T-REX `moduleCheck` returns true for token agents (`_isTokenAgent`).
@@ -28,15 +37,15 @@
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/TimeTransfersLimitsModule.sol
 
 use soroban_sdk::{
-    contract, contractevent, contractimpl, contracttype, panic_with_error, Address, Env, Vec,
+    contract, contractevent, contractimpl, contracttype, panic_with_error, vec, Address, Env, Vec,
 };
 
-use stellar_tokens::rwa::compliance::ComplianceModule;
+use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
 use stellar_compliance_common::{
-    checked_add_i128, get_compliance_address, get_irs_client, module_name,
+    checked_add_i128, get_compliance_address, get_irs_client, hooks_verified, module_name,
     require_compliance_auth, require_non_negative_amount, set_compliance_address, set_irs_address,
-    ModuleError,
+    verify_required_hooks, ModuleError,
 };
 
 const MAX_LIMITS_PER_TOKEN: u32 = 4;
@@ -92,6 +101,7 @@ impl TimeTransfersLimitsModule {
 
     pub fn set_time_transfer_limit(e: &Env, token: Address, limit: Limit) {
         require_compliance_auth(e);
+        assert!(limit.limit_time > 0, "limit_time must be greater than zero");
         require_non_negative_amount(e, limit.limit_value);
         let mut limits: Vec<Limit> = e
             .storage()
@@ -173,6 +183,21 @@ impl TimeTransfersLimitsModule {
             .unwrap_or_else(|| Vec::new(e))
     }
 
+    /// Returns the compliance hooks this module must be registered on.
+    pub fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
+        vec![e, ComplianceHook::CanTransfer, ComplianceHook::Transferred]
+    }
+
+    /// Arms the module by verifying all required hooks are wired.
+    ///
+    /// Must be called **once after wiring** (outside the hook chain) because
+    /// it cross-calls the compliance contract. Panics with a message naming
+    /// the first missing hook. Caches the result so that subsequent `can_*`
+    /// calls only check a boolean flag.
+    pub fn verify_hook_wiring(e: &Env) {
+        verify_required_hooks(e, Self::required_hooks(e));
+    }
+
     fn is_counter_finished(e: &Env, token: &Address, identity: &Address, limit_time: u64) -> bool {
         let counter: TransferCounter = e
             .storage()
@@ -229,6 +254,10 @@ impl ComplianceModule for TimeTransfersLimitsModule {
     /// the token contract's RBAC layer before compliance hooks fire, so
     /// the bypass is not replicated here.
     fn can_transfer(e: &Env, from: Address, _to: Address, amount: i128, token: Address) -> bool {
+        assert!(
+            hooks_verified(e),
+            "TimeTransfersLimitsModule: not armed — call verify_hook_wiring() after wiring hooks [CanTransfer, Transferred]"
+        );
         if amount < 0 {
             return false;
         }

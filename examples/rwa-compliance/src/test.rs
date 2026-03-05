@@ -221,6 +221,7 @@ fn test_max_balance() {
     let mod_client = MaxBalanceModuleClient::new(&ts.env, &module);
     mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
     mod_client.set_max_balance(&ts.token, &1000);
+    mod_client.verify_hook_wiring();
 
     // Mint 800 to investor A
     ts.token_client.mint(&investor_a, &800, &ts.admin);
@@ -241,14 +242,11 @@ fn test_max_balance() {
 }
 
 // ---------------------------------------------------------------------------
-// Test: SupplyLimitModule
+// Test: SupplyLimitModule (full stack — internal supply tracking)
 //
-// SupplyLimitModule.can_create() calls token.total_supply(), which causes
-// contract re-entry when invoked through the full token→compliance→module
-// chain. Soroban forbids re-entry by design. We test the module's logic
-// directly via the ComplianceModuleClient to verify correctness, then
-// demonstrate that mint/burn still work when the module is wired only to
-// the Created hook (which does not call back to the token).
+// Uses internal supply counter instead of token.total_supply() to avoid
+// Soroban's re-entry restriction. Module must be wired to CanCreate,
+// Created, and Destroyed hooks.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -256,28 +254,85 @@ fn test_supply_limit() {
     let ts = setup();
 
     let investor = Address::generate(&ts.env);
+    let investor_b = Address::generate(&ts.env);
+    let id = Address::generate(&ts.env);
+    let id_b = Address::generate(&ts.env);
+    register_investor(&ts, &investor, &id, us_country_data());
+    register_investor(&ts, &investor_b, &id_b, us_country_data());
+
+    let module = ts.env.register(SupplyLimitModule, ());
+    wire_module(
+        &ts,
+        &module,
+        &[
+            ComplianceHook::CanCreate,
+            ComplianceHook::Created,
+            ComplianceHook::Destroyed,
+        ],
+    );
+
+    let mod_client = SupplyLimitModuleClient::new(&ts.env, &module);
+    mod_client.set_supply_limit(&ts.token, &1000);
+    mod_client.verify_hook_wiring();
+
+    // Mint 800 — internal supply tracks to 800
+    ts.token_client.mint(&investor, &800, &ts.admin);
+    assert_eq!(ts.token_client.total_supply(), 800);
+    assert_eq!(mod_client.get_internal_supply(&ts.token), 800);
+
+    // Mint 200 more — exactly at limit (1000)
+    ts.token_client.mint(&investor_b, &200, &ts.admin);
+    assert_eq!(ts.token_client.total_supply(), 1000);
+    assert_eq!(mod_client.get_internal_supply(&ts.token), 1000);
+
+    // Mint 1 more — exceeds limit, blocked by can_create
+    let result = ts.token_client.try_mint(&investor, &1, &ts.admin);
+    assert!(result.is_err());
+
+    // Transfer doesn't affect supply — always allowed
+    ts.token_client.transfer(&investor, &investor_b, &100);
+    assert_eq!(mod_client.get_internal_supply(&ts.token), 1000);
+}
+
+#[test]
+fn test_supply_limit_burn() {
+    let ts = setup();
+
+    let investor = Address::generate(&ts.env);
     let id = Address::generate(&ts.env);
     register_investor(&ts, &investor, &id, us_country_data());
 
     let module = ts.env.register(SupplyLimitModule, ());
-    let cmp_client = ComplianceModuleClient::new(&ts.env, &module);
-    cmp_client.set_compliance_address(&ts.compliance);
+    wire_module(
+        &ts,
+        &module,
+        &[
+            ComplianceHook::CanCreate,
+            ComplianceHook::Created,
+            ComplianceHook::Destroyed,
+        ],
+    );
 
     let mod_client = SupplyLimitModuleClient::new(&ts.env, &module);
     mod_client.set_supply_limit(&ts.token, &1000);
+    mod_client.verify_hook_wiring();
 
-    // Verify can_create logic directly (bypassing re-entry)
-    assert!(cmp_client.can_create(&investor, &800, &ts.token));
-    assert!(cmp_client.can_create(&investor, &1000, &ts.token));
-    assert!(!cmp_client.can_create(&investor, &1001, &ts.token));
+    // Mint to limit
+    ts.token_client.mint(&investor, &1000, &ts.admin);
+    assert_eq!(mod_client.get_internal_supply(&ts.token), 1000);
 
-    // Full integration: mint via token with supply_limit NOT on CanCreate
-    // (avoids re-entry) to prove the stack works end-to-end for other hooks.
-    ts.token_client.mint(&investor, &800, &ts.admin);
-    assert_eq!(ts.token_client.total_supply(), 800);
+    // Burn 300 — internal supply decrements
+    ts.token_client.burn(&investor, &300, &ts.admin);
+    assert_eq!(ts.token_client.total_supply(), 700);
+    assert_eq!(mod_client.get_internal_supply(&ts.token), 700);
 
-    ts.token_client.mint(&investor, &200, &ts.admin);
-    assert_eq!(ts.token_client.total_supply(), 1000);
+    // Now minting 300 more is possible again
+    ts.token_client.mint(&investor, &300, &ts.admin);
+    assert_eq!(mod_client.get_internal_supply(&ts.token), 1000);
+
+    // But 1 more still fails
+    let result = ts.token_client.try_mint(&investor, &1, &ts.admin);
+    assert!(result.is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -312,6 +367,7 @@ fn test_time_transfer_limits() {
             limit_value: 100,
         },
     );
+    mod_client.verify_hook_wiring();
 
     // Mint enough tokens for transfers
     ts.token_client.mint(&investor_a, &500, &ts.admin);
@@ -366,12 +422,11 @@ fn test_transfer_restrict() {
 }
 
 // ---------------------------------------------------------------------------
-// Test: InitialLockupPeriodModule
+// Test: InitialLockupPeriodModule (full stack — internal balance tracking)
 //
-// InitialLockupPeriodModule.can_transfer() and on_transfer() call
-// token.balance(), which causes contract re-entry through the full stack.
-// We verify the on_created hook (no re-entry — just records lock entries)
-// via the full stack, then test can_transfer/on_transfer logic directly.
+// Uses internal balance counter instead of token.balance() to avoid
+// Soroban's re-entry restriction. Module must be wired to CanTransfer,
+// Created, Transferred, and Destroyed hooks.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -387,32 +442,141 @@ fn test_initial_lockup() {
     register_investor(&ts, &recipient, &id_rec, us_country_data());
 
     let module = ts.env.register(InitialLockupPeriodModule, ());
-    let cmp_client = ComplianceModuleClient::new(&ts.env, &module);
-    cmp_client.set_compliance_address(&ts.compliance);
+    wire_module(
+        &ts,
+        &module,
+        &[
+            ComplianceHook::CanTransfer,
+            ComplianceHook::Created,
+            ComplianceHook::Transferred,
+            ComplianceHook::Destroyed,
+        ],
+    );
 
     let mod_client = InitialLockupPeriodModuleClient::new(&ts.env, &module);
     mod_client.set_lockup_period(&ts.token, &1_000);
+    mod_client.verify_hook_wiring();
 
-    // Register only Created hook through the compliance dispatcher
-    // (on_created does NOT call token.balance(), so no re-entry)
-    ts.compliance_client
-        .add_module_to(&ComplianceHook::Created, &module, &ts.admin);
-
-    // Mint 500 — creates lock entry via the full stack
+    // Mint 500 — creates lock entry, internal balance tracks to 500
     ts.token_client.mint(&investor, &500, &ts.admin);
     assert_eq!(ts.token_client.balance(&investor), 500);
     assert_eq!(mod_client.get_total_locked(&ts.token, &investor), 500);
+    assert_eq!(mod_client.get_internal_balance(&ts.token, &investor), 500);
 
-    // Verify can_transfer directly (bypasses re-entry).
-    // Before lockup expiry: all tokens locked, can't transfer.
-    assert!(!cmp_client.can_transfer(&investor, &recipient, &100, &ts.token));
+    // Before lockup expiry: all tokens locked, transfer blocked
+    let result = ts.token_client.try_transfer(&investor, &recipient, &100);
+    assert!(result.is_err());
 
     // Advance past lockup
     ts.env.ledger().with_mut(|li| li.timestamp = 1_001);
 
-    // After lockup expiry: tokens are unlocked, can_transfer returns true
-    assert!(cmp_client.can_transfer(&investor, &recipient, &100, &ts.token));
-    assert!(cmp_client.can_transfer(&investor, &recipient, &500, &ts.token));
+    // After lockup expiry: transfer succeeds through the full stack
+    ts.token_client.transfer(&investor, &recipient, &200);
+    assert_eq!(ts.token_client.balance(&investor), 300);
+    assert_eq!(ts.token_client.balance(&recipient), 200);
+    assert_eq!(mod_client.get_internal_balance(&ts.token, &investor), 300);
+    assert_eq!(mod_client.get_internal_balance(&ts.token, &recipient), 200);
+
+    // Transfer rest
+    ts.token_client.transfer(&investor, &recipient, &300);
+    assert_eq!(mod_client.get_internal_balance(&ts.token, &investor), 0);
+    assert_eq!(mod_client.get_internal_balance(&ts.token, &recipient), 500);
+}
+
+#[test]
+fn test_initial_lockup_partial_unlock() {
+    let ts = setup();
+
+    let investor = Address::generate(&ts.env);
+    let recipient = Address::generate(&ts.env);
+    let id_inv = Address::generate(&ts.env);
+    let id_rec = Address::generate(&ts.env);
+
+    register_investor(&ts, &investor, &id_inv, us_country_data());
+    register_investor(&ts, &recipient, &id_rec, us_country_data());
+
+    let module = ts.env.register(InitialLockupPeriodModule, ());
+    wire_module(
+        &ts,
+        &module,
+        &[
+            ComplianceHook::CanTransfer,
+            ComplianceHook::Created,
+            ComplianceHook::Transferred,
+            ComplianceHook::Destroyed,
+        ],
+    );
+
+    let mod_client = InitialLockupPeriodModuleClient::new(&ts.env, &module);
+    mod_client.set_lockup_period(&ts.token, &1_000);
+    mod_client.verify_hook_wiring();
+
+    // Mint 300 at t=0 (lock until t=1000)
+    ts.token_client.mint(&investor, &300, &ts.admin);
+
+    // Advance to t=500, mint 200 more (lock until t=1500)
+    ts.env.ledger().with_mut(|li| li.timestamp = 500);
+    ts.token_client.mint(&investor, &200, &ts.admin);
+    assert_eq!(mod_client.get_total_locked(&ts.token, &investor), 500);
+    assert_eq!(mod_client.get_internal_balance(&ts.token, &investor), 500);
+
+    // At t=1001: first batch unlocked, second still locked
+    ts.env.ledger().with_mut(|li| li.timestamp = 1_001);
+
+    // Can transfer up to 300 (first batch unlocked)
+    ts.token_client.transfer(&investor, &recipient, &300);
+    assert_eq!(mod_client.get_internal_balance(&ts.token, &investor), 200);
+
+    // Can't transfer remaining 200 (still locked)
+    let result = ts.token_client.try_transfer(&investor, &recipient, &200);
+    assert!(result.is_err());
+
+    // At t=1501: second batch also unlocked
+    ts.env.ledger().with_mut(|li| li.timestamp = 1_501);
+    ts.token_client.transfer(&investor, &recipient, &200);
+    assert_eq!(mod_client.get_internal_balance(&ts.token, &investor), 0);
+}
+
+#[test]
+fn test_initial_lockup_burn() {
+    let ts = setup();
+
+    let investor = Address::generate(&ts.env);
+    let id_inv = Address::generate(&ts.env);
+
+    register_investor(&ts, &investor, &id_inv, us_country_data());
+
+    let module = ts.env.register(InitialLockupPeriodModule, ());
+    wire_module(
+        &ts,
+        &module,
+        &[
+            ComplianceHook::CanTransfer,
+            ComplianceHook::Created,
+            ComplianceHook::Transferred,
+            ComplianceHook::Destroyed,
+        ],
+    );
+
+    let mod_client = InitialLockupPeriodModuleClient::new(&ts.env, &module);
+    mod_client.set_lockup_period(&ts.token, &1_000);
+    mod_client.verify_hook_wiring();
+
+    // Mint 500 (locked until t=1000)
+    ts.token_client.mint(&investor, &500, &ts.admin);
+    assert_eq!(mod_client.get_internal_balance(&ts.token, &investor), 500);
+
+    // Advance past lockup
+    ts.env.ledger().with_mut(|li| li.timestamp = 1_001);
+
+    // Burn 200 — internal balance decrements
+    ts.token_client.burn(&investor, &200, &ts.admin);
+    assert_eq!(ts.token_client.balance(&investor), 300);
+    assert_eq!(mod_client.get_internal_balance(&ts.token, &investor), 300);
+
+    // Burn remaining
+    ts.token_client.burn(&investor, &300, &ts.admin);
+    assert_eq!(mod_client.get_internal_balance(&ts.token, &investor), 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -462,6 +626,7 @@ fn test_full_stack() {
     let balance_client = MaxBalanceModuleClient::new(&ts.env, &balance_mod);
     balance_client.set_identity_registry_storage(&ts.token, &ts.irs);
     balance_client.set_max_balance(&ts.token, &1000);
+    balance_client.verify_hook_wiring();
 
     // 1) Mint 800 to US investor — passes all modules
     ts.token_client.mint(&investor_us, &800, &ts.admin);
@@ -496,19 +661,16 @@ fn test_full_stack() {
 }
 
 // ---------------------------------------------------------------------------
-// Reproduction: Soroban re-entry error
+// Tests: Hook wiring verification guards
 //
-// These tests demonstrate the re-entry limitation. When SupplyLimitModule
-// is wired to CanCreate, or InitialLockupPeriodModule is wired to
-// CanTransfer, the module calls back to the token (total_supply / balance)
-// while the token is already on the call stack. Soroban rejects this.
-//
-// Run with: cargo test -p rwa-compliance-example --lib -- reentry
+// Modules with internal state tracking require `verify_hook_wiring()` to
+// be called after deployment. Without it, `can_*` hooks panic immediately.
+// Missing hooks during `verify_hook_wiring()` also panics.
 // ---------------------------------------------------------------------------
 
 #[test]
-#[should_panic(expected = "Contract re-entry is not allowed")]
-fn reentry_supply_limit_can_create() {
+#[should_panic(expected = "not armed")]
+fn guard_supply_limit_without_verification() {
     let ts = setup();
 
     let investor = Address::generate(&ts.env);
@@ -516,20 +678,42 @@ fn reentry_supply_limit_can_create() {
     register_investor(&ts, &investor, &id, us_country_data());
 
     let module = ts.env.register(SupplyLimitModule, ());
-    // Wire to CanCreate — this is the hook that calls token.total_supply()
-    wire_module(&ts, &module, &[ComplianceHook::CanCreate]);
+    wire_module(
+        &ts,
+        &module,
+        &[
+            ComplianceHook::CanCreate,
+            ComplianceHook::Created,
+            ComplianceHook::Destroyed,
+        ],
+    );
 
     let mod_client = SupplyLimitModuleClient::new(&ts.env, &module);
     mod_client.set_supply_limit(&ts.token, &1000);
+    // Intentionally NOT calling verify_hook_wiring()
 
-    // This mint triggers: token.mint() → compliance.can_create() →
-    // supply_limit.can_create() → token.total_supply() → RE-ENTRY PANIC
     ts.token_client.mint(&investor, &100, &ts.admin);
 }
 
 #[test]
-#[should_panic(expected = "Contract re-entry is not allowed")]
-fn reentry_initial_lockup_can_transfer() {
+#[should_panic(expected = "missing required hook:")]
+fn guard_supply_limit_missing_hook() {
+    let ts = setup();
+
+    let module = ts.env.register(SupplyLimitModule, ());
+    wire_module(
+        &ts,
+        &module,
+        &[ComplianceHook::CanCreate], // missing Created and Destroyed
+    );
+
+    let mod_client = SupplyLimitModuleClient::new(&ts.env, &module);
+    mod_client.verify_hook_wiring();
+}
+
+#[test]
+#[should_panic(expected = "not armed")]
+fn guard_initial_lockup_without_verification() {
     let ts = setup();
 
     let investor = Address::generate(&ts.env);
@@ -541,26 +725,377 @@ fn reentry_initial_lockup_can_transfer() {
     register_investor(&ts, &recipient, &id_rec, us_country_data());
 
     let module = ts.env.register(InitialLockupPeriodModule, ());
-    let cmp_client = ComplianceModuleClient::new(&ts.env, &module);
-    cmp_client.set_compliance_address(&ts.compliance);
+    wire_module(
+        &ts,
+        &module,
+        &[
+            ComplianceHook::CanTransfer,
+            ComplianceHook::Created,
+            ComplianceHook::Transferred,
+            ComplianceHook::Destroyed,
+        ],
+    );
 
     let mod_client = InitialLockupPeriodModuleClient::new(&ts.env, &module);
     mod_client.set_lockup_period(&ts.token, &1_000);
+    // Intentionally NOT calling verify_hook_wiring()
 
-    // Wire Created (no re-entry) so mint works
-    ts.compliance_client
-        .add_module_to(&ComplianceHook::Created, &module, &ts.admin);
-    // Wire CanTransfer — this is the hook that calls token.balance()
-    ts.compliance_client
-        .add_module_to(&ComplianceHook::CanTransfer, &module, &ts.admin);
-
-    // Mint works (on_created doesn't call back to token)
     ts.token_client.mint(&investor, &500, &ts.admin);
-
-    // Advance past lockup so the module would allow the transfer
     ts.env.ledger().with_mut(|li| li.timestamp = 1_001);
-
-    // This transfer triggers: token.transfer() → compliance.can_transfer() →
-    // lockup.can_transfer() → token.balance() → RE-ENTRY PANIC
     ts.token_client.transfer(&investor, &recipient, &100);
 }
+
+#[test]
+#[should_panic(expected = "missing required hook:")]
+fn guard_max_balance_missing_hook() {
+    let ts = setup();
+
+    let module = ts.env.register(MaxBalanceModule, ());
+    wire_module(
+        &ts,
+        &module,
+        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate], // missing Transferred, Created, Destroyed
+    );
+
+    let mod_client = MaxBalanceModuleClient::new(&ts.env, &module);
+    mod_client.verify_hook_wiring();
+}
+
+// ---------------------------------------------------------------------------
+// Test: Burn during lockup panics (3A)
+// ---------------------------------------------------------------------------
+
+#[test]
+#[should_panic(expected = "insufficient unlocked balance for burn")]
+fn test_initial_lockup_burn_during_lockup() {
+    let ts = setup();
+
+    let investor = Address::generate(&ts.env);
+    let id_inv = Address::generate(&ts.env);
+    register_investor(&ts, &investor, &id_inv, us_country_data());
+
+    let module = ts.env.register(InitialLockupPeriodModule, ());
+    wire_module(
+        &ts,
+        &module,
+        &[
+            ComplianceHook::CanTransfer,
+            ComplianceHook::Created,
+            ComplianceHook::Transferred,
+            ComplianceHook::Destroyed,
+        ],
+    );
+
+    let mod_client = InitialLockupPeriodModuleClient::new(&ts.env, &module);
+    mod_client.set_lockup_period(&ts.token, &1_000);
+    mod_client.verify_hook_wiring();
+
+    ts.token_client.mint(&investor, &500, &ts.admin);
+    // All 500 tokens are locked (lockup until t=1000), burn should panic
+    ts.token_client.burn(&investor, &100, &ts.admin);
+}
+
+// ---------------------------------------------------------------------------
+// Test: TimeTransfersLimits window reset (3B)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_time_transfer_limits_window_reset() {
+    let ts = setup();
+
+    let investor_a = Address::generate(&ts.env);
+    let investor_b = Address::generate(&ts.env);
+    let id_a = Address::generate(&ts.env);
+    let id_b = Address::generate(&ts.env);
+
+    register_investor(&ts, &investor_a, &id_a, us_country_data());
+    register_investor(&ts, &investor_b, &id_b, us_country_data());
+
+    let module = ts.env.register(TimeTransfersLimitsModule, ());
+    wire_module(
+        &ts,
+        &module,
+        &[ComplianceHook::CanTransfer, ComplianceHook::Transferred],
+    );
+
+    let mod_client = TimeTransfersLimitsModuleClient::new(&ts.env, &module);
+    mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
+    mod_client.set_time_transfer_limit(
+        &ts.token,
+        &Limit {
+            limit_time: 3_600,
+            limit_value: 100,
+        },
+    );
+    mod_client.verify_hook_wiring();
+
+    ts.token_client.mint(&investor_a, &500, &ts.admin);
+
+    // Transfer up to the limit
+    ts.token_client.transfer(&investor_a, &investor_b, &100);
+    assert_eq!(ts.token_client.balance(&investor_b), 100);
+
+    // At the limit — next transfer should fail
+    let result = ts.token_client.try_transfer(&investor_a, &investor_b, &1);
+    assert!(result.is_err());
+
+    // Advance past the 1-hour window
+    ts.env.ledger().with_mut(|li| li.timestamp = 3_601);
+
+    // Counter reset — transfers succeed again
+    ts.token_client.transfer(&investor_a, &investor_b, &80);
+    assert_eq!(ts.token_client.balance(&investor_b), 180);
+
+    // Still within new window, push to limit again
+    ts.token_client.transfer(&investor_a, &investor_b, &20);
+
+    // Exceeds new window limit
+    let result = ts.token_client.try_transfer(&investor_a, &investor_b, &1);
+    assert!(result.is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Tests: TimeTransfersLimits wiring guards (3C)
+// ---------------------------------------------------------------------------
+
+#[test]
+#[should_panic(expected = "not armed")]
+fn guard_time_transfers_without_verification() {
+    let ts = setup();
+
+    let investor_a = Address::generate(&ts.env);
+    let investor_b = Address::generate(&ts.env);
+    let id_a = Address::generate(&ts.env);
+    let id_b = Address::generate(&ts.env);
+
+    register_investor(&ts, &investor_a, &id_a, us_country_data());
+    register_investor(&ts, &investor_b, &id_b, us_country_data());
+
+    let module = ts.env.register(TimeTransfersLimitsModule, ());
+    wire_module(
+        &ts,
+        &module,
+        &[ComplianceHook::CanTransfer, ComplianceHook::Transferred],
+    );
+
+    let mod_client = TimeTransfersLimitsModuleClient::new(&ts.env, &module);
+    mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
+    mod_client.set_time_transfer_limit(
+        &ts.token,
+        &Limit {
+            limit_time: 3_600,
+            limit_value: 100,
+        },
+    );
+    // Intentionally NOT calling verify_hook_wiring()
+
+    ts.token_client.mint(&investor_a, &500, &ts.admin);
+    ts.token_client.transfer(&investor_a, &investor_b, &50);
+}
+
+#[test]
+#[should_panic(expected = "missing required hook:")]
+fn guard_time_transfers_missing_hook() {
+    let ts = setup();
+
+    let module = ts.env.register(TimeTransfersLimitsModule, ());
+    wire_module(
+        &ts,
+        &module,
+        &[ComplianceHook::CanTransfer], // missing Transferred
+    );
+
+    let mod_client = TimeTransfersLimitsModuleClient::new(&ts.env, &module);
+    mod_client.verify_hook_wiring();
+}
+
+// ---------------------------------------------------------------------------
+// Test: CountryAllow/Restrict on can_transfer (not just can_create) (3D)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_country_allow_blocks_transfer_to_non_allowed() {
+    let ts = setup();
+
+    let investor_us = Address::generate(&ts.env);
+    let investor_de = Address::generate(&ts.env);
+    let id_us = Address::generate(&ts.env);
+    let id_de = Address::generate(&ts.env);
+
+    register_investor(&ts, &investor_us, &id_us, us_country_data());
+    register_investor(&ts, &investor_de, &id_de, de_country_data());
+
+    let module = ts.env.register(CountryAllowModule, ());
+    wire_module(
+        &ts,
+        &module,
+        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate],
+    );
+
+    let mod_client = CountryAllowModuleClient::new(&ts.env, &module);
+    mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
+    mod_client.add_allowed_country(&ts.token, &840); // US only
+
+    // Mint to US investor passes
+    ts.token_client.mint(&investor_us, &500, &ts.admin);
+
+    // Transfer to DE investor (276 not allowed) should fail on can_transfer
+    let result = ts.token_client.try_transfer(&investor_us, &investor_de, &100);
+    assert!(result.is_err());
+
+    // Allow DE, then transfer succeeds
+    mod_client.add_allowed_country(&ts.token, &276);
+    ts.token_client.transfer(&investor_us, &investor_de, &100);
+    assert_eq!(ts.token_client.balance(&investor_de), 100);
+}
+
+#[test]
+fn test_country_restrict_blocks_transfer_to_restricted() {
+    let ts = setup();
+
+    let investor_us = Address::generate(&ts.env);
+    let investor_de = Address::generate(&ts.env);
+    let id_us = Address::generate(&ts.env);
+    let id_de = Address::generate(&ts.env);
+
+    register_investor(&ts, &investor_us, &id_us, us_country_data());
+    register_investor(&ts, &investor_de, &id_de, de_country_data());
+
+    let module = ts.env.register(CountryRestrictModule, ());
+    wire_module(
+        &ts,
+        &module,
+        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate],
+    );
+
+    let mod_client = CountryRestrictModuleClient::new(&ts.env, &module);
+    mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
+    mod_client.add_country_restriction(&ts.token, &276); // Restrict DE
+
+    // Mint to US investor passes (840 not restricted)
+    ts.token_client.mint(&investor_us, &500, &ts.admin);
+
+    // Transfer to DE investor (276 restricted) should fail on can_transfer
+    let result = ts.token_client.try_transfer(&investor_us, &investor_de, &100);
+    assert!(result.is_err());
+
+    // Unrestrict DE, then transfer succeeds
+    mod_client.remove_country_restriction(&ts.token, &276);
+    ts.token_client.transfer(&investor_us, &investor_de, &100);
+    assert_eq!(ts.token_client.balance(&investor_de), 100);
+}
+
+// ---------------------------------------------------------------------------
+// Test: TransferRestrict recipient-allowed path (3E)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_transfer_restrict_recipient_allowed() {
+    let ts = setup();
+
+    let investor_a = Address::generate(&ts.env);
+    let investor_b = Address::generate(&ts.env);
+    let id_a = Address::generate(&ts.env);
+    let id_b = Address::generate(&ts.env);
+
+    register_investor(&ts, &investor_a, &id_a, us_country_data());
+    register_investor(&ts, &investor_b, &id_b, us_country_data());
+
+    let module = ts.env.register(TransferRestrictModule, ());
+    wire_module(&ts, &module, &[ComplianceHook::CanTransfer]);
+
+    let mod_client = TransferRestrictModuleClient::new(&ts.env, &module);
+
+    ts.token_client.mint(&investor_a, &500, &ts.admin);
+
+    // Neither on allowlist — transfer fails
+    let result = ts.token_client.try_transfer(&investor_a, &investor_b, &100);
+    assert!(result.is_err());
+
+    // Allow ONLY the recipient (investor_b), NOT the sender (investor_a)
+    mod_client.allow_user(&ts.token, &investor_b);
+
+    // Transfer passes because recipient is allowlisted (T-REX: sender OR recipient)
+    ts.token_client.transfer(&investor_a, &investor_b, &100);
+    assert_eq!(ts.token_client.balance(&investor_b), 100);
+}
+
+// ---------------------------------------------------------------------------
+// Test: Full stack with burn step (3F)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_full_stack_with_burn() {
+    let ts = setup();
+
+    let investor_us = Address::generate(&ts.env);
+    let id_us = Address::generate(&ts.env);
+
+    register_investor(&ts, &investor_us, &id_us, us_country_data());
+
+    // --- Wire CountryAllowModule (allow US) ---
+    let country_mod = ts.env.register(CountryAllowModule, ());
+    wire_module(
+        &ts,
+        &country_mod,
+        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate],
+    );
+    let country_client = CountryAllowModuleClient::new(&ts.env, &country_mod);
+    country_client.set_identity_registry_storage(&ts.token, &ts.irs);
+    country_client.add_allowed_country(&ts.token, &840);
+
+    // --- Wire MaxBalanceModule (max 1000) ---
+    let balance_mod = ts.env.register(MaxBalanceModule, ());
+    wire_module(
+        &ts,
+        &balance_mod,
+        &[
+            ComplianceHook::CanTransfer,
+            ComplianceHook::CanCreate,
+            ComplianceHook::Transferred,
+            ComplianceHook::Created,
+            ComplianceHook::Destroyed,
+        ],
+    );
+    let balance_client = MaxBalanceModuleClient::new(&ts.env, &balance_mod);
+    balance_client.set_identity_registry_storage(&ts.token, &ts.irs);
+    balance_client.set_max_balance(&ts.token, &1000);
+    balance_client.verify_hook_wiring();
+
+    // --- Wire SupplyLimitModule (limit 2000) ---
+    let supply_mod = ts.env.register(SupplyLimitModule, ());
+    wire_module(
+        &ts,
+        &supply_mod,
+        &[
+            ComplianceHook::CanCreate,
+            ComplianceHook::Created,
+            ComplianceHook::Destroyed,
+        ],
+    );
+    let supply_client = SupplyLimitModuleClient::new(&ts.env, &supply_mod);
+    supply_client.set_supply_limit(&ts.token, &2000);
+    supply_client.verify_hook_wiring();
+
+    // 1) Mint 800
+    ts.token_client.mint(&investor_us, &800, &ts.admin);
+    assert_eq!(ts.token_client.balance(&investor_us), 800);
+    assert_eq!(balance_client.get_investor_balance(&ts.token, &id_us), 800);
+    assert_eq!(supply_client.get_internal_supply(&ts.token), 800);
+
+    // 2) Burn 300 — all internal state decrements
+    ts.token_client.burn(&investor_us, &300, &ts.admin);
+    assert_eq!(ts.token_client.balance(&investor_us), 500);
+    assert_eq!(balance_client.get_investor_balance(&ts.token, &id_us), 500);
+    assert_eq!(supply_client.get_internal_supply(&ts.token), 500);
+
+    // 3) Mint back to 1000 (identity max) — succeeds
+    ts.token_client.mint(&investor_us, &500, &ts.admin);
+    assert_eq!(balance_client.get_investor_balance(&ts.token, &id_us), 1000);
+    assert_eq!(supply_client.get_internal_supply(&ts.token), 1000);
+
+    // 4) Mint 1 more — exceeds max balance
+    let result = ts.token_client.try_mint(&investor_us, &1, &ts.admin);
+    assert!(result.is_err());
+}
+

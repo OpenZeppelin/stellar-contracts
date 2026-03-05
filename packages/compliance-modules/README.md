@@ -38,7 +38,7 @@ testing the full RWA compliance stack on Stellar testnet.
 | `build-module.sh`    | Compiles a single module by name (e.g., `./build-module.sh country-allow`)                            |
 | `deploy.sh`          | Deploys all contracts, configures every module, then locks admin via `set_compliance_address`         |
 | `deploy-module.sh`   | Deploys and configures a single module (e.g., `./deploy-module.sh max-balance CanTransfer CanCreate`) |
-| `wire.sh`            | Registers the 5 safe modules on their compliance hooks (12 registrations total)                       |
+| `wire.sh`            | Registers all 7 modules on their compliance hooks (19 registrations, 4 verified)                      |
 | `test-happy-path.sh` | Registers an investor identity, mints tokens, and verifies balance                                    |
 
 ### Deployment ordering
@@ -92,11 +92,72 @@ Environment variables: `STELLAR_SOURCE` (default: `alice`),
 | `supply-limit`          | `SupplyLimitModule`         | Token total supply  |
 | `initial-lockup-period` | `InitialLockupPeriodModule` | Wallet-scoped       |
 
-## Known re-entry limitation
+## Hook wiring requirements
 
-`SupplyLimitModule` and `InitialLockupPeriodModule` call back to the token
-contract (`total_supply()` / `balance()`) during compliance hooks. Soroban
-forbids contract re-entry, so these modules cannot be wired to hooks that
-fire during the token's own execution (e.g., `CanCreate` for supply limit,
-`CanTransfer` for lockup). See the architecture documentation for proposed
-solutions.
+### Background — Soroban re-entry constraint
+
+On EVM, modules can call back into the token to read `totalSupply()` or
+`balanceOf()` during a compliance hook. Soroban **forbids contract re-entry**,
+so modules that need supply or balance data maintain their own internal mirrors
+updated via `on_*` hooks. This makes correct hook wiring safety-critical:
+**missing a hook causes the internal state to drift from the token's actual
+state, leading to incorrect compliance decisions.**
+
+### Required hooks per module
+
+| Module                      | Required hooks                                                    | Tracks state? |
+| --------------------------- | ----------------------------------------------------------------- | ------------- |
+| `CountryAllowModule`        | `CanTransfer`, `CanCreate`                                        | No            |
+| `CountryRestrictModule`     | `CanTransfer`, `CanCreate`                                        | No            |
+| `TransferRestrictModule`    | `CanTransfer`                                                     | No            |
+| `TimeTransfersLimitsModule` | `CanTransfer`, `Transferred`                                      | Yes (counter) |
+| `MaxBalanceModule`          | `CanTransfer`, `CanCreate`, `Transferred`, `Created`, `Destroyed` | Yes (balance) |
+| `SupplyLimitModule`         | `CanCreate`, `Created`, `Destroyed`                               | Yes (supply)  |
+| `InitialLockupPeriodModule` | `CanTransfer`, `Created`, `Transferred`, `Destroyed`              | Yes (balance) |
+
+### Runtime enforcement (stateful modules only)
+
+The four modules marked "Yes" above (`SupplyLimitModule`,
+`InitialLockupPeriodModule`, `MaxBalanceModule`, `TimeTransfersLimitsModule`)
+enforce correct wiring via an **arming** mechanism that prevents the module from
+operating until all required hooks have been verified:
+
+| Step                      | What happens                                                                                                                         | When                   |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- |
+| 1. `required_hooks()`     | Returns the list of hooks the module needs (read-only query)                                                                         | Anytime                |
+| 2. `verify_hook_wiring()` | Cross-calls the compliance contract to confirm every required hook is registered. **Arms** the module on success (result is cached). | Once, after wiring     |
+| 3. Runtime guard          | `can_*` hooks panic if the module is not armed                                                                                       | Every compliance check |
+
+#### Error messages
+
+**If `verify_hook_wiring()` is not called** (module not armed):
+
+```
+SupplyLimitModule: not armed — call verify_hook_wiring() after wiring hooks [CanCreate, Created, Destroyed]
+TimeTransfersLimitsModule: not armed — call verify_hook_wiring() after wiring hooks [CanTransfer, Transferred]
+```
+
+**If a required hook is missing** during verification:
+
+```
+missing required hook: Created
+```
+
+#### Usage in deployment scripts
+
+```bash
+# After wire.sh registers all hooks:
+stellar contract invoke --id $SUPPLY_LIMIT     ... -- verify_hook_wiring
+stellar contract invoke --id $INITIAL_LOCKUP   ... -- verify_hook_wiring
+stellar contract invoke --id $MAX_BALANCE      ... -- verify_hook_wiring
+stellar contract invoke --id $TIME_TRANSFERS   ... -- verify_hook_wiring
+```
+
+The `wire.sh` script already includes this verification step.
+
+#### Design notes
+
+This enforcement is lightweight by design — it does not introduce new traits or
+change the `ComplianceModule` interface, keeping minimal drift from the original
+T-REX module contracts. The `required_hooks()` and `verify_hook_wiring()`
+methods are module-level public functions, not part of the trait.

@@ -11,21 +11,15 @@ use soroban_sdk::{
     String, Symbol, Vec,
 };
 
-use stellar_tokens::rwa::identity_registry_storage::{
-    CountryData, CountryRelation, IndividualCountryRelation, OrganizationCountryRelation,
+use stellar_tokens::rwa::{
+    compliance::ComplianceHook,
+    identity_registry_storage::{
+        CountryData, CountryRelation, IndividualCountryRelation, OrganizationCountryRelation,
+    },
 };
 
 const COMPLIANCE_KEY: Symbol = symbol_short!("cmpaddr");
-
-#[contractclient(name = "TokenSupplyViewClient")]
-pub trait TokenSupplyView {
-    fn total_supply(e: &Env) -> i128;
-}
-
-#[contractclient(name = "TokenBalanceViewClient")]
-pub trait TokenBalanceView {
-    fn balance(e: &Env, id: Address) -> i128;
-}
+const HOOKS_VERIFIED_KEY: Symbol = symbol_short!("hkverfd");
 
 /// Read-only cross-contract client into the Identity Registry Storage.
 ///
@@ -81,6 +75,68 @@ pub fn require_compliance_auth(e: &Env) -> Address {
     compliance.require_auth();
     compliance
 }
+
+// ---------------------------------------------------------------------------
+// Hook wiring verification
+// ---------------------------------------------------------------------------
+
+/// Minimal read-only client for querying the compliance contract's
+/// hook registrations. Only exposes the `is_module_registered` view.
+#[contractclient(name = "ComplianceHookCheckClient")]
+pub trait ComplianceHookCheck {
+    fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool;
+}
+
+/// Returns `true` if the hook wiring has already been verified for this
+/// module instance (cached after the first successful check).
+pub fn hooks_verified(e: &Env) -> bool {
+    e.storage().persistent().has(&HOOKS_VERIFIED_KEY)
+}
+
+/// Cross-calls the compliance contract to verify that this module is
+/// registered on every hook in `required`. Caches the result on success
+/// so subsequent calls are a single storage read.
+///
+/// Skips verification if `set_compliance_address` has not been called
+/// yet (the module is in unconfigured mode).
+///
+/// # Panics
+///
+/// Panics if any required hook is not registered — this means the
+/// deployment is misconfigured and internal state would drift.
+pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
+    if !e.storage().persistent().has(&COMPLIANCE_KEY) {
+        return;
+    }
+
+    let compliance: Address = e
+        .storage()
+        .persistent()
+        .get(&COMPLIANCE_KEY)
+        .expect("compliance must be set");
+    let self_addr = e.current_contract_address();
+    let client = ComplianceHookCheckClient::new(e, &compliance);
+
+    for i in 0..required.len() {
+        let hook = required.get(i).unwrap();
+        if !client.is_module_registered(&hook, &self_addr) {
+            let name = match hook {
+                ComplianceHook::CanTransfer => "CanTransfer",
+                ComplianceHook::CanCreate => "CanCreate",
+                ComplianceHook::Transferred => "Transferred",
+                ComplianceHook::Created => "Created",
+                ComplianceHook::Destroyed => "Destroyed",
+            };
+            panic!("missing required hook: {}", name);
+        }
+    }
+
+    e.storage().persistent().set(&HOOKS_VERIFIED_KEY, &true);
+}
+
+// ---------------------------------------------------------------------------
+// Amount validation
+// ---------------------------------------------------------------------------
 
 pub fn require_non_negative_amount(e: &Env, amount: i128) {
     if amount < 0 {

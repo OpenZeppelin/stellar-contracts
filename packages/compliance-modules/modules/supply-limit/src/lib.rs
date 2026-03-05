@@ -5,15 +5,32 @@
 //! Caps the total number of tokens that can be minted for a given token.
 //! Regular transfers are always allowed.
 //!
+//! ## Internal state tracking
+//!
+//! Instead of calling `token.total_supply()` (which would cause a forbidden
+//! re-entrant call on Soroban), this module maintains its own internal supply
+//! counter. The counter is updated via the `on_created` and `on_destroyed`
+//! hooks, so the module **must** be wired to `Created` and `Destroyed` hooks
+//! in addition to `CanCreate`.
+//!
 //! ## Hook mapping (T-REX → Stellar)
 //!
 //! | T-REX hook             | Stellar hook    | Behaviour                                      |
 //! |------------------------|-----------------|-------------------------------------------------|
-//! | `moduleCheck`          | `can_create`    | Enforce `totalSupply + amount ≤ limit` on mint |
+//! | `moduleCheck`          | `can_create`    | Enforce `internalSupply + amount ≤ limit`      |
 //! | _(same)_               | `can_transfer`  | Always true (transfers don't affect supply)    |
 //! | `moduleTransferAction` | `on_transfer`   | No-op                                          |
-//! | `moduleMintAction`     | `on_created`    | No-op                                          |
-//! | `moduleBurnAction`     | `on_destroyed`  | No-op                                          |
+//! | `moduleMintAction`     | `on_created`    | `internalSupply += amount`                     |
+//! | `moduleBurnAction`     | `on_destroyed`  | `internalSupply -= amount`                     |
+//!
+//! ## Required hooks
+//!
+//! `CanCreate`, `Created`, `Destroyed`
+//!
+//! Call `verify_hook_wiring()` after wiring to arm the module. The `can_create`
+//! hook panics if the module is not armed — this prevents silent
+//! misconfiguration where missing hooks would cause the internal supply counter
+//! to drift.
 //!
 //! ## Differences from T-REX
 //!
@@ -21,23 +38,26 @@
 //!   mints when the limit is zero because `totalSupply + value > 0` is always
 //!   true. Our interpretation aligns with plug-and-play semantics: adding the
 //!   module without configuring a limit should not block operations.
+//! - Uses internal supply counter instead of `token.totalSupply()` to avoid
+//!   Soroban's contract re-entry restriction.
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/SupplyLimitModule.sol
 
-use soroban_sdk::{contract, contractevent, contractimpl, contracttype, panic_with_error, Address, Env};
+use soroban_sdk::{contract, contractevent, contractimpl, contracttype, panic_with_error, vec, Address, Env, Vec};
 
-use stellar_tokens::rwa::compliance::ComplianceModule;
+use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
 use stellar_compliance_common::{
-    checked_add_i128, get_compliance_address, module_name, require_compliance_auth,
-    require_non_negative_amount, set_compliance_address, ModuleError, TokenSupplyViewClient,
+    checked_add_i128, checked_sub_i128, get_compliance_address, hooks_verified, module_name,
+    require_compliance_auth, require_non_negative_amount, set_compliance_address,
+    verify_required_hooks, ModuleError,
 };
 
 #[contracttype]
 #[derive(Clone)]
 enum DataKey {
-    // Token-scoped cap to preserve multi-token compatibility.
     SupplyLimit(Address),
+    InternalSupply(Address),
 }
 
 #[contractevent]
@@ -68,21 +88,68 @@ impl SupplyLimitModule {
             .get(&DataKey::SupplyLimit(token))
             .unwrap_or_else(|| panic_with_error!(e, ModuleError::MissingLimit))
     }
+
+    pub fn get_internal_supply(e: &Env, token: Address) -> i128 {
+        e.storage()
+            .persistent()
+            .get(&DataKey::InternalSupply(token))
+            .unwrap_or_default()
+    }
+
+    /// Returns the compliance hooks this module must be registered on.
+    pub fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
+        vec![
+            e,
+            ComplianceHook::CanCreate,
+            ComplianceHook::Created,
+            ComplianceHook::Destroyed,
+        ]
+    }
+
+    /// Arms the module by verifying all required hooks are wired.
+    ///
+    /// Must be called **once after wiring** (outside the hook chain) because
+    /// it cross-calls the compliance contract. Panics with a message naming
+    /// the first missing hook. Caches the result so that subsequent `can_*`
+    /// calls only check a boolean flag.
+    pub fn verify_hook_wiring(e: &Env) {
+        verify_required_hooks(e, Self::required_hooks(e));
+    }
 }
 
 #[contractimpl]
 impl ComplianceModule for SupplyLimitModule {
     fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
 
-    fn on_created(_e: &Env, _to: Address, _amount: i128, _token: Address) {}
+    fn on_created(e: &Env, _to: Address, amount: i128, token: Address) {
+        require_compliance_auth(e);
+        require_non_negative_amount(e, amount);
+        let key = DataKey::InternalSupply(token);
+        let current: i128 = e.storage().persistent().get(&key).unwrap_or_default();
+        e.storage()
+            .persistent()
+            .set(&key, &checked_add_i128(e, current, amount));
+    }
 
-    fn on_destroyed(_e: &Env, _from: Address, _amount: i128, _token: Address) {}
+    fn on_destroyed(e: &Env, _from: Address, amount: i128, token: Address) {
+        require_compliance_auth(e);
+        require_non_negative_amount(e, amount);
+        let key = DataKey::InternalSupply(token);
+        let current: i128 = e.storage().persistent().get(&key).unwrap_or_default();
+        e.storage()
+            .persistent()
+            .set(&key, &checked_sub_i128(e, current, amount));
+    }
 
     fn can_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) -> bool {
         true
     }
 
     fn can_create(e: &Env, _to: Address, amount: i128, token: Address) -> bool {
+        assert!(
+            hooks_verified(e),
+            "SupplyLimitModule: not armed — call verify_hook_wiring() after wiring hooks [CanCreate, Created, Destroyed]"
+        );
         if amount < 0 {
             return false;
         }
@@ -92,12 +159,14 @@ impl ComplianceModule for SupplyLimitModule {
             .get(&DataKey::SupplyLimit(token.clone()))
             .unwrap_or_default();
         if limit == 0 {
-            // Match T-REX style behavior: zero means "no configured cap".
             return true;
         }
-        let total_supply = TokenSupplyViewClient::new(e, &token).total_supply();
-        // Overflow-safe sum to avoid silently wrapping total supply checks.
-        checked_add_i128(e, total_supply, amount) <= limit
+        let internal_supply: i128 = e
+            .storage()
+            .persistent()
+            .get(&DataKey::InternalSupply(token))
+            .unwrap_or_default();
+        checked_add_i128(e, internal_supply, amount) <= limit
     }
 
     fn name(e: &Env) -> soroban_sdk::String {

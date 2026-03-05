@@ -24,6 +24,15 @@
 //! Registry Storage at every hook invocation — matching the T-REX
 //! `_getIdentity(compliance, userAddress)` pattern.
 //!
+//! ## Required hooks
+//!
+//! `CanTransfer`, `CanCreate`, `Transferred`, `Created`, `Destroyed`
+//!
+//! Call `verify_hook_wiring()` after wiring to arm the module. The
+//! `can_transfer` / `can_create` hooks panic if the module is not armed —
+//! this prevents silent misconfiguration where missing hooks would cause the
+//! internal identity-balance to drift.
+//!
 //! ## Differences from T-REX
 //!
 //! - No `_compliancePresetStatus` / `presetCompleted()` lifecycle tracking.
@@ -31,13 +40,14 @@
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/MaxBalanceModule.sol
 
-use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, Env, Vec};
+use soroban_sdk::{contract, contractevent, contractimpl, contracttype, vec, Address, Env, Vec};
 
-use stellar_tokens::rwa::compliance::ComplianceModule;
+use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
 use stellar_compliance_common::{
-    checked_add_i128, checked_sub_i128, get_compliance_address, get_irs_client, module_name,
-    require_compliance_auth, require_non_negative_amount, set_compliance_address, set_irs_address,
+    checked_add_i128, checked_sub_i128, get_compliance_address, get_irs_client, hooks_verified,
+    module_name, require_compliance_auth, require_non_negative_amount, set_compliance_address,
+    set_irs_address, verify_required_hooks,
 };
 
 #[contracttype]
@@ -127,6 +137,28 @@ impl MaxBalanceModule {
             .get(&DataKey::IDBalance(token, identity))
             .unwrap_or_default()
     }
+
+    /// Returns the compliance hooks this module must be registered on.
+    pub fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
+        vec![
+            e,
+            ComplianceHook::CanTransfer,
+            ComplianceHook::CanCreate,
+            ComplianceHook::Transferred,
+            ComplianceHook::Created,
+            ComplianceHook::Destroyed,
+        ]
+    }
+
+    /// Arms the module by verifying all required hooks are wired.
+    ///
+    /// Must be called **once after wiring** (outside the hook chain) because
+    /// it cross-calls the compliance contract. Panics with a message naming
+    /// the first missing hook. Caches the result so that subsequent `can_*`
+    /// calls only check a boolean flag.
+    pub fn verify_hook_wiring(e: &Env) {
+        verify_required_hooks(e, Self::required_hooks(e));
+    }
 }
 
 #[contractimpl]
@@ -210,6 +242,10 @@ impl ComplianceModule for MaxBalanceModule {
     }
 
     fn can_transfer(e: &Env, _from: Address, to: Address, amount: i128, token: Address) -> bool {
+        assert!(
+            hooks_verified(e),
+            "MaxBalanceModule: not armed — call verify_hook_wiring() after wiring hooks [CanTransfer, CanCreate, Transferred, Created, Destroyed]"
+        );
         if amount < 0 {
             return false;
         }

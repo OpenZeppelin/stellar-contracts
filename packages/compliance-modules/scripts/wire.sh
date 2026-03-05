@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# Wire modules to compliance hooks.
+# Wire all 7 compliance modules to their required hooks.
 # Reads addresses from deploy/testnet-addresses.json (written by deploy.sh).
 #
-# Registers the 5 working modules on appropriate hooks:
-#   - CountryAllow:       CanTransfer, CanCreate
-#   - CountryRestrict:    CanTransfer, CanCreate
-#   - MaxBalance:         CanTransfer, CanCreate, Transferred, Created, Destroyed
-#   - TransferRestrict:   CanTransfer
-#   - TimeTransfersLimits: CanTransfer, Transferred
-#
-# SupplyLimit and InitialLockupPeriod are NOT wired due to the
-# Soroban re-entry limitation (see architecture docs).
+# Hook registrations per module:
+#   - CountryAllow:           CanTransfer, CanCreate
+#   - CountryRestrict:        CanTransfer, CanCreate
+#   - MaxBalance:             CanTransfer, CanCreate, Transferred, Created, Destroyed
+#   - TransferRestrict:       CanTransfer
+#   - TimeTransfersLimits:    CanTransfer, Transferred
+#   - SupplyLimit:            CanCreate, Created, Destroyed
+#   - InitialLockupPeriod:    CanTransfer, Created, Transferred, Destroyed
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -37,6 +36,8 @@ COUNTRY_RESTRICT=$(read_addr "['modules']['country_restrict']")
 MAX_BALANCE=$(read_addr "['modules']['max_balance']")
 TRANSFER_RESTRICT=$(read_addr "['modules']['transfer_restrict']")
 TIME_TRANSFERS=$(read_addr "['modules']['time_transfers_limits']")
+SUPPLY_LIMIT=$(read_addr "['modules']['supply_limit']")
+INITIAL_LOCKUP=$(read_addr "['modules']['initial_lockup_period']")
 
 register() {
   local HOOK=$1 MODULE_ADDR=$2 NAME=$3
@@ -66,7 +67,31 @@ register "CanTransfer" "$TRANSFER_RESTRICT" "TransferRestrictModule"
 register "CanTransfer"  "$TIME_TRANSFERS" "TimeTransfersLimitsModule"
 register "Transferred"  "$TIME_TRANSFERS" "TimeTransfersLimitsModule"
 
+register "CanCreate"   "$SUPPLY_LIMIT" "SupplyLimitModule"
+register "Created"     "$SUPPLY_LIMIT" "SupplyLimitModule"
+register "Destroyed"   "$SUPPLY_LIMIT" "SupplyLimitModule"
+
+register "CanTransfer"  "$INITIAL_LOCKUP" "InitialLockupPeriodModule"
+register "Created"      "$INITIAL_LOCKUP" "InitialLockupPeriodModule"
+register "Transferred"  "$INITIAL_LOCKUP" "InitialLockupPeriodModule"
+register "Destroyed"    "$INITIAL_LOCKUP" "InitialLockupPeriodModule"
+
 echo ""
-echo "=== Wiring Complete (12 hook registrations) ==="
-echo "Note: SupplyLimitModule and InitialLockupPeriodModule are NOT wired"
-echo "due to Soroban re-entry limitation. See architecture docs."
+echo "=== Verifying hook wiring for stateful modules ==="
+echo ""
+
+verify() {
+  local MODULE_ADDR=$1 NAME=$2
+  echo "  Verifying $NAME..."
+  stellar contract invoke --id "$MODULE_ADDR" \
+    --source "$SOURCE" --network "$NETWORK" \
+    -- verify_hook_wiring
+}
+
+verify "$SUPPLY_LIMIT" "SupplyLimitModule"
+verify "$INITIAL_LOCKUP" "InitialLockupPeriodModule"
+verify "$MAX_BALANCE" "MaxBalanceModule"
+verify "$TIME_TRANSFERS" "TimeTransfersLimitsModule"
+
+echo ""
+echo "=== Wiring Complete (19 hooks registered, 4 modules verified) ==="

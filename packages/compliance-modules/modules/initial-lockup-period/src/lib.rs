@@ -11,14 +11,32 @@
 //! enabling partial unlocking: if an investor receives two mints at different
 //! times, each unlocks independently.
 //!
+//! ## Internal state tracking
+//!
+//! Instead of calling `token.balance()` (which would cause a forbidden
+//! re-entrant call on Soroban), this module maintains its own internal
+//! balance counter per wallet. The counter is updated via the `on_created`,
+//! `on_transfer`, and `on_destroyed` hooks, so the module **must** be wired
+//! to `Created`, `Transferred`, and `Destroyed` hooks in addition to
+//! `CanTransfer`.
+//!
 //! ## Hook mapping (T-REX → Stellar)
 //!
 //! | T-REX hook             | Stellar hook    | Behaviour                                       |
 //! |------------------------|-----------------|-------------------------------------------------|
-//! | `moduleMintAction`     | `on_created`    | Push lock entry, increase `total_locked`        |
-//! | `moduleTransferAction` | `on_transfer`   | Consume expired entries when locked tokens move |
-//! | `moduleBurnAction`     | `on_destroyed`  | Prevent burning still-locked tokens             |
+//! | `moduleMintAction`     | `on_created`    | Push lock entry, increase `total_locked`, update internal balance |
+//! | `moduleTransferAction` | `on_transfer`   | Consume expired entries, update internal balances |
+//! | `moduleBurnAction`     | `on_destroyed`  | Prevent burning still-locked tokens, update internal balance |
 //! | `moduleCheck`          | `can_transfer`  | Allow transfer only if free balance >= amount   |
+//!
+//! ## Required hooks
+//!
+//! `CanTransfer`, `Created`, `Transferred`, `Destroyed`
+//!
+//! Call `verify_hook_wiring()` after wiring to arm the module. The
+//! `can_transfer` hook panics if the module is not armed — this prevents
+//! silent misconfiguration where missing hooks would cause the internal balance
+//! counter to drift.
 //!
 //! ## Differences from T-REX
 //!
@@ -29,16 +47,19 @@
 //!   compensates at read time via `_calculateUnlockedAmount`.
 //! - Uses `i128` (Soroban native) instead of `uint256`, naturally avoiding
 //!   underflow when `total_locked` exceeds post-transfer balance.
+//! - Uses internal balance counter instead of `token.balance()` to avoid
+//!   Soroban's contract re-entry restriction.
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/4.2.0-beta2/contracts/compliance/modular/modules/InitialLockupPeriodModule.sol
 
-use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, Env, Vec};
+use soroban_sdk::{contract, contractevent, contractimpl, contracttype, vec, Address, Env, Vec};
 
-use stellar_tokens::rwa::compliance::ComplianceModule;
+use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
 use stellar_compliance_common::{
-    checked_add_i128, get_compliance_address, module_name, require_compliance_auth,
-    require_non_negative_amount, set_compliance_address, TokenBalanceViewClient,
+    checked_add_i128, checked_sub_i128, get_compliance_address, hooks_verified, module_name,
+    require_compliance_auth, require_non_negative_amount, set_compliance_address,
+    verify_required_hooks,
 };
 
 /// A single mint-created lock entry tracking the locked amount and its
@@ -60,6 +81,9 @@ enum DataKey {
     /// Per-(token, wallet) aggregate of all locked amounts.
     /// Equivalent to T-REX `LockedDetails.totalLocked`.
     TotalLocked(Address, Address),
+    /// Per-(token, wallet) balance mirror, updated via hooks to avoid
+    /// re-entrant `token.balance()` calls.
+    InternalBalance(Address, Address),
 }
 
 #[contractevent]
@@ -109,6 +133,34 @@ impl InitialLockupPeriodModule {
             .get(&DataKey::Locks(token, wallet))
             .unwrap_or_else(|| Vec::new(e))
     }
+
+    pub fn get_internal_balance(e: &Env, token: Address, wallet: Address) -> i128 {
+        e.storage()
+            .persistent()
+            .get(&DataKey::InternalBalance(token, wallet))
+            .unwrap_or_default()
+    }
+
+    /// Returns the compliance hooks this module must be registered on.
+    pub fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
+        vec![
+            e,
+            ComplianceHook::CanTransfer,
+            ComplianceHook::Created,
+            ComplianceHook::Transferred,
+            ComplianceHook::Destroyed,
+        ]
+    }
+
+    /// Arms the module by verifying all required hooks are wired.
+    ///
+    /// Must be called **once after wiring** (outside the hook chain) because
+    /// it cross-calls the compliance contract. Panics with a message naming
+    /// the first missing hook. Caches the result so that subsequent `can_*`
+    /// calls only check a boolean flag.
+    pub fn verify_hook_wiring(e: &Env) {
+        verify_required_hooks(e, Self::required_hooks(e));
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +175,7 @@ fn calculate_unlocked_amount(e: &Env, locks: &Vec<LockedTokens>) -> i128 {
     for i in 0..locks.len() {
         let lock = locks.get(i).unwrap();
         if lock.release_timestamp <= now {
-            unlocked += lock.amount;
+            unlocked = checked_add_i128(e, unlocked, lock.amount);
         }
     }
     unlocked
@@ -177,7 +229,7 @@ fn update_locked_tokens(e: &Env, token: &Address, wallet: &Address, mut amount_t
         .unwrap_or_default();
     e.storage()
         .persistent()
-        .set(&total_key, &(total_locked - consumed_total));
+        .set(&total_key, &checked_sub_i128(e, total_locked, consumed_total));
 }
 
 // ---------------------------------------------------------------------------
@@ -188,97 +240,119 @@ fn update_locked_tokens(e: &Env, token: &Address, wallet: &Address, mut amount_t
 impl ComplianceModule for InitialLockupPeriodModule {
     /// T-REX `moduleTransferAction`: after a P2P transfer, consume expired
     /// lock entries if the transfer ate into the "locked" portion of balance.
-    fn on_transfer(e: &Env, from: Address, _to: Address, amount: i128, token: Address) {
+    /// Also updates internal balance mirrors for both sender and receiver.
+    fn on_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
 
         let total_locked = Self::get_total_locked(e, token.clone(), from.clone());
-        if total_locked == 0 {
-            return;
+
+        if total_locked > 0 {
+            let pre_balance = Self::get_internal_balance(e, token.clone(), from.clone());
+            let pre_free = pre_balance - total_locked;
+
+            if amount > pre_free.max(0) {
+                let to_consume = amount - pre_free.max(0);
+                update_locked_tokens(e, &token, &from, to_consume);
+            }
         }
 
-        // Balance is post-transfer; reconstruct pre-transfer balance.
-        let post_balance = TokenBalanceViewClient::new(e, &token).balance(&from);
-        let pre_balance = checked_add_i128(e, post_balance, amount);
-        let pre_free = pre_balance - total_locked;
+        let from_key = DataKey::InternalBalance(token.clone(), from.clone());
+        let from_bal: i128 = e.storage().persistent().get(&from_key).unwrap_or_default();
+        e.storage()
+            .persistent()
+            .set(&from_key, &checked_sub_i128(e, from_bal, amount));
 
-        if amount > pre_free.max(0) {
-            let to_consume = amount - pre_free.max(0);
-            update_locked_tokens(e, &token, &from, to_consume);
-        }
+        let to_key = DataKey::InternalBalance(token, to);
+        let to_bal: i128 = e.storage().persistent().get(&to_key).unwrap_or_default();
+        e.storage()
+            .persistent()
+            .set(&to_key, &checked_add_i128(e, to_bal, amount));
     }
 
-    /// T-REX `moduleMintAction`: push a new lock entry for the minted amount.
+    /// T-REX `moduleMintAction`: push a new lock entry for the minted amount
+    /// and update the internal balance mirror.
     fn on_created(e: &Env, to: Address, amount: i128, token: Address) {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
 
         let period = Self::get_lockup_period(e, token.clone());
-        if period == 0 {
-            return;
+        if period > 0 {
+            let locks_key = DataKey::Locks(token.clone(), to.clone());
+            let mut locks: Vec<LockedTokens> = e
+                .storage()
+                .persistent()
+                .get(&locks_key)
+                .unwrap_or_else(|| Vec::new(e));
+
+            locks.push_back(LockedTokens {
+                amount,
+                release_timestamp: e.ledger().timestamp().saturating_add(period),
+            });
+            e.storage().persistent().set(&locks_key, &locks);
+
+            let total_key = DataKey::TotalLocked(token.clone(), to.clone());
+            let total: i128 = e
+                .storage()
+                .persistent()
+                .get(&total_key)
+                .unwrap_or_default();
+            e.storage()
+                .persistent()
+                .set(&total_key, &checked_add_i128(e, total, amount));
         }
 
-        let locks_key = DataKey::Locks(token.clone(), to.clone());
-        let mut locks: Vec<LockedTokens> = e
-            .storage()
-            .persistent()
-            .get(&locks_key)
-            .unwrap_or_else(|| Vec::new(e));
-
-        locks.push_back(LockedTokens {
-            amount,
-            release_timestamp: e.ledger().timestamp().saturating_add(period),
-        });
-        e.storage().persistent().set(&locks_key, &locks);
-
-        let total_key = DataKey::TotalLocked(token, to);
-        let total: i128 = e
-            .storage()
-            .persistent()
-            .get(&total_key)
-            .unwrap_or_default();
+        let bal_key = DataKey::InternalBalance(token, to);
+        let current: i128 = e.storage().persistent().get(&bal_key).unwrap_or_default();
         e.storage()
             .persistent()
-            .set(&total_key, &checked_add_i128(e, total, amount));
+            .set(&bal_key, &checked_add_i128(e, current, amount));
     }
 
     /// T-REX `moduleBurnAction`: panics if the burn would consume
-    /// still-locked (non-expired) tokens, otherwise cleans up expired entries.
+    /// still-locked (non-expired) tokens, otherwise cleans up expired entries
+    /// and decrements the internal balance mirror.
     fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address) {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
 
         let total_locked = Self::get_total_locked(e, token.clone(), from.clone());
-        if total_locked == 0 {
-            return;
+
+        if total_locked > 0 {
+            let pre_balance = Self::get_internal_balance(e, token.clone(), from.clone());
+            let mut free_amount = pre_balance - total_locked;
+
+            if free_amount < amount {
+                let locks = Self::get_locked_tokens(e, token.clone(), from.clone());
+                free_amount += calculate_unlocked_amount(e, &locks);
+            }
+
+            assert!(
+                free_amount >= amount,
+                "InitialLockupPeriodModule: insufficient unlocked balance for burn"
+            );
+
+            let pre_free = pre_balance - total_locked;
+            if amount > pre_free.max(0) {
+                let to_consume = amount - pre_free.max(0);
+                update_locked_tokens(e, &token, &from, to_consume);
+            }
         }
 
-        // Balance is post-burn; reconstruct pre-burn balance.
-        let post_balance = TokenBalanceViewClient::new(e, &token).balance(&from);
-        let pre_balance = checked_add_i128(e, post_balance, amount);
-        let mut free_amount = pre_balance - total_locked;
-
-        if free_amount < amount {
-            let locks = Self::get_locked_tokens(e, token.clone(), from.clone());
-            free_amount += calculate_unlocked_amount(e, &locks);
-        }
-
-        assert!(
-            free_amount >= amount,
-            "InitialLockupPeriodModule: insufficient unlocked balance for burn"
-        );
-
-        // Clean up expired entries if the burn consumed some.
-        let pre_free = pre_balance - total_locked;
-        if amount > pre_free.max(0) {
-            let to_consume = amount - pre_free.max(0);
-            update_locked_tokens(e, &token, &from, to_consume);
-        }
+        let bal_key = DataKey::InternalBalance(token, from);
+        let current: i128 = e.storage().persistent().get(&bal_key).unwrap_or_default();
+        e.storage()
+            .persistent()
+            .set(&bal_key, &checked_sub_i128(e, current, amount));
     }
 
     /// T-REX `moduleCheck`: allow transfer only if free balance >= amount.
-    /// Free balance = `balance - totalLocked + sum(expired_entries)`.
+    /// Free balance = `internalBalance - totalLocked + sum(expired_entries)`.
     fn can_transfer(e: &Env, from: Address, _to: Address, amount: i128, token: Address) -> bool {
+        assert!(
+            hooks_verified(e),
+            "InitialLockupPeriodModule: not armed — call verify_hook_wiring() after wiring hooks [CanTransfer, Created, Transferred, Destroyed]"
+        );
         if amount < 0 {
             return false;
         }
@@ -288,15 +362,13 @@ impl ComplianceModule for InitialLockupPeriodModule {
             return true;
         }
 
-        let balance = TokenBalanceViewClient::new(e, &token).balance(&from);
+        let balance = Self::get_internal_balance(e, token.clone(), from.clone());
         let free = balance - total_locked;
 
-        // Fast path: enough free tokens without inspecting individual entries.
         if free >= amount {
             return true;
         }
 
-        // Accurate path: account for expired-but-not-yet-cleaned-up entries.
         let locks = Self::get_locked_tokens(e, token, from);
         let unlocked = calculate_unlocked_amount(e, &locks);
         (free + unlocked) >= amount
