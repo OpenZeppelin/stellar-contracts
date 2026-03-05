@@ -41,14 +41,12 @@
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/MaxBalanceModule.sol
 
 use soroban_sdk::{contract, contractevent, contractimpl, contracttype, vec, Address, Env, Vec};
-
-use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
-
 use stellar_compliance_common::{
     checked_add_i128, checked_sub_i128, get_compliance_address, get_irs_client, hooks_verified,
     module_name, require_compliance_auth, require_non_negative_amount, set_compliance_address,
     set_irs_address, verify_required_hooks,
 };
+use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
 #[contracttype]
 #[derive(Clone)]
@@ -198,8 +196,8 @@ impl ComplianceModule for MaxBalanceModule {
     }
 
     /// Mirrors T-REX `moduleMintAction`: updates identity balance and reverts
-    /// if the recipient identity exceeds the configured max (belt-and-suspenders
-    /// invariant matching T-REX's post-mint check).
+    /// if the recipient identity exceeds the configured max
+    /// (belt-and-suspenders invariant matching T-REX's post-mint check).
     fn on_created(e: &Env, to: Address, amount: i128, token: Address) {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
@@ -241,7 +239,8 @@ impl ComplianceModule for MaxBalanceModule {
     fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
         assert!(
             hooks_verified(e),
-            "MaxBalanceModule: not armed — call verify_hook_wiring() after wiring hooks [CanTransfer, CanCreate, Transferred, Created, Destroyed]"
+            "MaxBalanceModule: not armed — call verify_hook_wiring() after wiring hooks \
+             [CanTransfer, CanCreate, Transferred, Created, Destroyed]"
         );
         if amount < 0 {
             return false;

@@ -1,7 +1,9 @@
 extern crate std;
 
-use soroban_sdk::{testutils::Address as _, testutils::Ledger, vec, Address, Env, String};
-
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    vec, Address, Env, String,
+};
 use stellar_compliance_country_allow::{CountryAllowModule, CountryAllowModuleClient};
 use stellar_compliance_country_restrict::{CountryRestrictModule, CountryRestrictModuleClient};
 use stellar_compliance_initial_lockup_period::{
@@ -13,7 +15,6 @@ use stellar_compliance_time_transfers_limits::{
     Limit, TimeTransfersLimitsModule, TimeTransfersLimitsModuleClient,
 };
 use stellar_compliance_transfer_restrict::{TransferRestrictModule, TransferRestrictModuleClient};
-
 use stellar_tokens::rwa::{
     compliance::{ComplianceHook, ComplianceModuleClient},
     identity_registry_storage::{CountryData, CountryRelation, IndividualCountryRelation},
@@ -695,7 +696,8 @@ fn guard_max_balance_missing_hook() {
     wire_module(
         &ts,
         &module,
-        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate], // missing Transferred, Created, Destroyed
+        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate], /* missing Transferred,
+                                                                    * Created, Destroyed */
     );
 
     let mod_client = MaxBalanceModuleClient::new(&ts.env, &module);

@@ -28,9 +28,9 @@
 //!
 //! ## Differences from T-REX
 //!
-//! - T-REX `moduleCheck` returns true for token agents (`_isTokenAgent`).
-//!   In Stellar, agent permissions are handled by the token's RBAC layer
-//!   before compliance hooks fire, so the bypass is not replicated here.
+//! - T-REX `moduleCheck` returns true for token agents (`_isTokenAgent`). In
+//!   Stellar, agent permissions are handled by the token's RBAC layer before
+//!   compliance hooks fire, so the bypass is not replicated here.
 //! - Limits and counters are token-scoped. Window reset behavior is explicit
 //!   and deterministic (`timer <= now` starts a fresh bucket).
 //!
@@ -39,14 +39,12 @@
 use soroban_sdk::{
     contract, contractevent, contractimpl, contracttype, panic_with_error, vec, Address, Env, Vec,
 };
-
-use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
-
 use stellar_compliance_common::{
     checked_add_i128, get_compliance_address, get_irs_client, hooks_verified, module_name,
     require_compliance_auth, require_non_negative_amount, set_compliance_address, set_irs_address,
     verify_required_hooks, ModuleError,
 };
+use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
 /// Maximum number of distinct time-window limits per token.
 const MAX_LIMITS_PER_TOKEN: u32 = 4;
@@ -266,7 +264,8 @@ impl ComplianceModule for TimeTransfersLimitsModule {
     fn can_transfer(e: &Env, from: Address, _to: Address, amount: i128, token: Address) -> bool {
         assert!(
             hooks_verified(e),
-            "TimeTransfersLimitsModule: not armed — call verify_hook_wiring() after wiring hooks [CanTransfer, Transferred]"
+            "TimeTransfersLimitsModule: not armed — call verify_hook_wiring() after wiring hooks \
+             [CanTransfer, Transferred]"
         );
         if amount < 0 {
             return false;

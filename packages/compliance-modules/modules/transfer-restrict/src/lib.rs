@@ -19,12 +19,10 @@
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/TransferRestrictModule.sol
 
 use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, Env, Vec};
-
-use stellar_tokens::rwa::compliance::ComplianceModule;
-
 use stellar_compliance_common::{
     get_compliance_address, module_name, require_compliance_auth, set_compliance_address,
 };
+use stellar_tokens::rwa::compliance::ComplianceModule;
 
 #[contracttype]
 #[derive(Clone)]

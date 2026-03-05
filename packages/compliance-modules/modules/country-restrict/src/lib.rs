@@ -24,13 +24,11 @@
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/CountryRestrictModule.sol
 
 use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, Env, Vec};
-
-use stellar_tokens::rwa::compliance::ComplianceModule;
-
 use stellar_compliance_common::{
     country_code, get_compliance_address, get_irs_client, module_name, require_compliance_auth,
     set_compliance_address, set_irs_address,
 };
+use stellar_tokens::rwa::compliance::ComplianceModule;
 
 #[contracttype]
 #[derive(Clone)]
@@ -94,7 +92,8 @@ impl CountryRestrictModule {
         }
     }
 
-    /// Removes multiple country codes from the restriction list in a single call.
+    /// Removes multiple country codes from the restriction list in a single
+    /// call.
     pub fn batch_unrestrict_countries(e: &Env, token: Address, countries: Vec<u32>) {
         require_compliance_auth(e);
         for country in countries.iter() {

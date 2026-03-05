@@ -10,7 +10,6 @@ use soroban_sdk::{
     contractclient, contracterror, contracttype, panic_with_error, symbol_short, Address, Env,
     String, Symbol, Vec,
 };
-
 use stellar_tokens::rwa::{
     compliance::ComplianceHook,
     identity_registry_storage::{
@@ -146,12 +145,14 @@ pub fn require_non_negative_amount(e: &Env, amount: i128) {
     }
 }
 
-/// Checked `i128` addition. Panics with [`ModuleError::MathOverflow`] on overflow.
+/// Checked `i128` addition. Panics with [`ModuleError::MathOverflow`] on
+/// overflow.
 pub fn checked_add_i128(e: &Env, left: i128, right: i128) -> i128 {
     left.checked_add(right).unwrap_or_else(|| panic_with_error!(e, ModuleError::MathOverflow))
 }
 
-/// Checked `i128` subtraction. Panics with [`ModuleError::MathUnderflow`] on underflow.
+/// Checked `i128` subtraction. Panics with [`ModuleError::MathUnderflow`] on
+/// underflow.
 pub fn checked_sub_i128(e: &Env, left: i128, right: i128) -> i128 {
     left.checked_sub(right).unwrap_or_else(|| panic_with_error!(e, ModuleError::MathUnderflow))
 }

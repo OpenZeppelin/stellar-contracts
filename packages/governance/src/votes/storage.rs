@@ -409,9 +409,8 @@ fn apply_checkpoint_op(e: &Env, previous: u128, op: CheckpointOp, delta: u128) -
 fn checkpoint_storage_key(checkpoint_type: &CheckpointType, index: u32) -> VotesStorageKey {
     match checkpoint_type {
         CheckpointType::TotalSupply => VotesStorageKey::TotalSupplyCheckpoint(index),
-        CheckpointType::Account(account) => {
-            VotesStorageKey::DelegateCheckpoint(account.clone(), index)
-        }
+        CheckpointType::Account(account) =>
+            VotesStorageKey::DelegateCheckpoint(account.clone(), index),
     }
 }
 

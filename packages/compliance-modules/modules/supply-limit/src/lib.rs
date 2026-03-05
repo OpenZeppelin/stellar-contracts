@@ -34,10 +34,10 @@
 //!
 //! ## Differences from T-REX
 //!
-//! - A zero cap is treated as "not configured" (mints pass). T-REX blocks
-//!   mints when the limit is zero because `totalSupply + value > 0` is always
-//!   true. Our interpretation aligns with plug-and-play semantics: adding the
-//!   module without configuring a limit should not block operations.
+//! - A zero cap is treated as "not configured" (mints pass). T-REX blocks mints
+//!   when the limit is zero because `totalSupply + value > 0` is always true.
+//!   Our interpretation aligns with plug-and-play semantics: adding the module
+//!   without configuring a limit should not block operations.
 //! - Uses internal supply counter instead of `token.totalSupply()` to avoid
 //!   Soroban's contract re-entry restriction.
 //!
@@ -46,14 +46,12 @@
 use soroban_sdk::{
     contract, contractevent, contractimpl, contracttype, panic_with_error, vec, Address, Env, Vec,
 };
-
-use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
-
 use stellar_compliance_common::{
     checked_add_i128, checked_sub_i128, get_compliance_address, hooks_verified, module_name,
     require_compliance_auth, require_non_negative_amount, set_compliance_address,
     verify_required_hooks, ModuleError,
 };
+use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
 #[contracttype]
 #[derive(Clone)]
@@ -155,7 +153,8 @@ impl ComplianceModule for SupplyLimitModule {
     fn can_create(e: &Env, _to: Address, amount: i128, token: Address) -> bool {
         assert!(
             hooks_verified(e),
-            "SupplyLimitModule: not armed — call verify_hook_wiring() after wiring hooks [CanCreate, Created, Destroyed]"
+            "SupplyLimitModule: not armed — call verify_hook_wiring() after wiring hooks \
+             [CanCreate, Created, Destroyed]"
         );
         if amount < 0 {
             return false;

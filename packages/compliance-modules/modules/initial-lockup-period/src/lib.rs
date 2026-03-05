@@ -8,10 +8,9 @@
 //! The T-REX EVM module is called `TimeExchangeLimitsModule`, but we renamed
 //! it to `InitialLockupPeriodModule` for clarity:
 //!
-//! - The original name suggests time-based *transfer rate limiting* (similar
-//!   to `TimeTransfersLimitsModule`), but the actual behaviour is a
-//!   per-mint lockup — tokens are frozen for a fixed duration after primary
-//!   issuance.
+//! - The original name suggests time-based *transfer rate limiting* (similar to
+//!   `TimeTransfersLimitsModule`), but the actual behaviour is a per-mint
+//!   lockup — tokens are frozen for a fixed duration after primary issuance.
 //! - Keeping both `TimeExchangeLimitsModule` and `TimeTransfersLimitsModule`
 //!   would be confusing since they serve very different purposes.
 //!
@@ -59,9 +58,9 @@
 //!
 //! - Lockup period is configured in **seconds** (Soroban ledger timestamps)
 //!   rather than days (T-REX multiplies days × 86 400 internally).
-//! - `update_locked_tokens` also decrements `total_locked` to keep the
-//!   counter accurate. The T-REX version leaves `total_locked` stale and
-//!   compensates at read time via `_calculateUnlockedAmount`.
+//! - `update_locked_tokens` also decrements `total_locked` to keep the counter
+//!   accurate. The T-REX version leaves `total_locked` stale and compensates at
+//!   read time via `_calculateUnlockedAmount`.
 //! - Uses `i128` (Soroban native) instead of `uint256`, naturally avoiding
 //!   underflow when `total_locked` exceeds post-transfer balance.
 //! - Uses internal balance counter instead of `token.balance()` to avoid
@@ -70,14 +69,12 @@
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/TimeExchangeLimitsModule.sol
 
 use soroban_sdk::{contract, contractevent, contractimpl, contracttype, vec, Address, Env, Vec};
-
-use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
-
 use stellar_compliance_common::{
     checked_add_i128, checked_sub_i128, get_compliance_address, hooks_verified, module_name,
     require_compliance_auth, require_non_negative_amount, set_compliance_address,
     verify_required_hooks,
 };
+use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
 /// A single mint-created lock entry tracking the locked amount and its
 /// release time. Mirrors T-REX `LockedTokens { amount, releaseTimestamp }`.
@@ -173,7 +170,8 @@ impl InitialLockupPeriodModule {
 }
 
 // ---------------------------------------------------------------------------
-// Internal helpers (mirror T-REX _calculateUnlockedAmount / _updateLockedTokens)
+// Internal helpers (mirror T-REX _calculateUnlockedAmount /
+// _updateLockedTokens)
 // ---------------------------------------------------------------------------
 
 /// Sum of amounts from expired lock entries (`release_timestamp <= now`).
@@ -334,7 +332,8 @@ impl ComplianceModule for InitialLockupPeriodModule {
     fn can_transfer(e: &Env, from: Address, _to: Address, amount: i128, token: Address) -> bool {
         assert!(
             hooks_verified(e),
-            "InitialLockupPeriodModule: not armed — call verify_hook_wiring() after wiring hooks [CanTransfer, Created, Transferred, Destroyed]"
+            "InitialLockupPeriodModule: not armed — call verify_hook_wiring() after wiring hooks \
+             [CanTransfer, Created, Transferred, Destroyed]"
         );
         if amount < 0 {
             return false;
@@ -357,7 +356,8 @@ impl ComplianceModule for InitialLockupPeriodModule {
         (free + unlocked) >= amount
     }
 
-    /// Minting is always allowed — it creates the lock entries, not blocks them.
+    /// Minting is always allowed — it creates the lock entries, not blocks
+    /// them.
     fn can_create(_e: &Env, _to: Address, _amount: i128, _token: Address) -> bool {
         true
     }
