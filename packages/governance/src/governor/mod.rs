@@ -115,7 +115,15 @@ use soroban_sdk::{
     Symbol, Val, Vec,
 };
 
-pub use crate::governor::storage::{ProposalVoteCounts, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR};
+pub use crate::governor::storage::{
+    cancel, cast_vote, check_proposal_state, count_vote, counting_mode, execute, get_name,
+    get_proposal_core, get_proposal_deadline, get_proposal_proposer, get_proposal_snapshot,
+    get_proposal_state, get_proposal_threshold, get_proposal_vote_counts, get_quorum,
+    get_token_contract, get_version, get_voting_delay, get_voting_period, has_voted, hash_proposal,
+    propose, quorum_reached, set_name, set_proposal_threshold, set_quorum, set_token_contract,
+    set_version, set_voting_delay, set_voting_period, tally_succeeded, ProposalVoteCounts,
+    VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
+};
 
 /// The `Governor` trait defines the core functionality for on-chain governance.
 /// It provides a standard interface for creating proposals, counting,
