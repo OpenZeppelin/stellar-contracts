@@ -22,3 +22,7 @@ lcov.info
 coverage/
 
 **/test_snapshots/
+
+# Compiled WASM artifacts and testnet state
+packages/compliance-modules/deploy/wasm/
+packages/compliance-modules/deploy/testnet-addresses.json

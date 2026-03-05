@@ -33,11 +33,20 @@ members = [
     "packages/governance",
     "packages/macros",
     "packages/test-utils/*",
-    "packages/compliance-modules/*",
+    "packages/compliance-modules/common",
+    "packages/compliance-modules/modules/*",
     "packages/tokens",
     "packages/zk-email",
+    "packages/compliance-modules/deploy/irs",
+    "packages/compliance-modules/deploy/verifier",
+    "packages/compliance-modules/deploy/compliance",
+    "packages/compliance-modules/deploy/token",
 ]
-exclude = ["examples/upgradeable/testdata"]
+exclude = [
+    "examples/upgradeable/testdata",
+    "packages/compliance-modules/deploy",
+    "packages/compliance-modules/scripts",
+]
 
 [workspace.package]
 authors = ["OpenZeppelin"]

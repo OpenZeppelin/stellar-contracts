@@ -1,5 +1,5 @@
 [package]
-name = "stellar-compliance-country-restrict"
+name = "stellar-compliance-max-balance"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -12,7 +12,7 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-stellar-compliance-common = { path = "../common" }
+stellar-compliance-common = { path = "../../common" }
 stellar-tokens = { workspace = true }
 
 [dev-dependencies]

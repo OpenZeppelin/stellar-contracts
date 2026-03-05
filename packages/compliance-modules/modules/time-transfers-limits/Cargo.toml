@@ -1,5 +1,5 @@
 [package]
-name = "stellar-compliance-max-balance"
+name = "stellar-compliance-time-transfers-limits"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -12,7 +12,7 @@ doctest = false
 
 [dependencies]
 soroban-sdk = { workspace = true }
-stellar-compliance-common = { path = "../common" }
+stellar-compliance-common = { path = "../../common" }
 stellar-tokens = { workspace = true }
 
 [dev-dependencies]
