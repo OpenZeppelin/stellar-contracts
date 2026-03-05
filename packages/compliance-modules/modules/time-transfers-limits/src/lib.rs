@@ -48,8 +48,11 @@ use stellar_compliance_common::{
     verify_required_hooks, ModuleError,
 };
 
+/// Maximum number of distinct time-window limits per token.
 const MAX_LIMITS_PER_TOKEN: u32 = 4;
 
+/// A single time-window limit: `limit_value` tokens may be transferred
+/// within a rolling window of `limit_time` seconds.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Limit {
@@ -57,6 +60,7 @@ pub struct Limit {
     pub limit_value: i128,
 }
 
+/// Tracks cumulative transfer volume for one identity within one window.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferCounter {
@@ -67,11 +71,13 @@ pub struct TransferCounter {
 #[contracttype]
 #[derive(Clone)]
 enum DataKey {
+    /// Per-token list of configured time-window limits.
     Limits(Address),
     /// Counter keyed by (token, identity, window_seconds).
     Counter(Address, Address, u64),
 }
 
+/// Emitted when a time-window limit is added or updated.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TimeTransferLimitUpdated {
@@ -80,6 +86,7 @@ pub struct TimeTransferLimitUpdated {
     pub limit: Limit,
 }
 
+/// Emitted when a time-window limit is removed.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TimeTransferLimitRemoved {
@@ -88,6 +95,7 @@ pub struct TimeTransferLimitRemoved {
     pub limit_time: u64,
 }
 
+/// Rate-limits transfer volume per identity within configurable time windows.
 #[contract]
 pub struct TimeTransfersLimitsModule;
 
@@ -99,6 +107,9 @@ impl TimeTransfersLimitsModule {
         set_irs_address(e, &token, &irs);
     }
 
+    /// Adds or updates a time-window limit for `token`. Replaces an
+    /// existing entry with the same `limit_time`.
+    /// T-REX equivalent: `setTimeTransferLimit(_limit)`.
     pub fn set_time_transfer_limit(e: &Env, token: Address, limit: Limit) {
         require_compliance_auth(e);
         assert!(limit.limit_time > 0, "limit_time must be greater than zero");
@@ -132,6 +143,7 @@ impl TimeTransfersLimitsModule {
         TimeTransferLimitUpdated { token, limit }.publish(e);
     }
 
+    /// Adds or updates multiple time-window limits in a single call.
     pub fn batch_set_time_transfer_limit(e: &Env, token: Address, limits: Vec<Limit>) {
         require_compliance_auth(e);
         for limit in limits.iter() {
@@ -139,6 +151,7 @@ impl TimeTransfersLimitsModule {
         }
     }
 
+    /// Removes the limit entry matching `limit_time`. Panics if not found.
     pub fn remove_time_transfer_limit(e: &Env, token: Address, limit_time: u64) {
         require_compliance_auth(e);
         let mut limits: Vec<Limit> = e
@@ -176,6 +189,7 @@ impl TimeTransfersLimitsModule {
         }
     }
 
+    /// Returns all configured time-window limits for `token`.
     pub fn get_time_transfer_limits(e: &Env, token: Address) -> Vec<Limit> {
         e.storage()
             .persistent()
@@ -237,6 +251,7 @@ impl TimeTransfersLimitsModule {
 
 #[contractimpl]
 impl ComplianceModule for TimeTransfersLimitsModule {
+    /// Resolves sender identity and increments per-window transfer counters.
     fn on_transfer(e: &Env, from: Address, _to: Address, amount: i128, token: Address) {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
@@ -245,8 +260,10 @@ impl ComplianceModule for TimeTransfersLimitsModule {
         Self::increase_counters(e, &token, &from_id, amount);
     }
 
+    /// No-op — mints are exempt from rate limits.
     fn on_created(_e: &Env, _to: Address, _amount: i128, _token: Address) {}
 
+    /// No-op — burns are exempt from rate limits.
     fn on_destroyed(_e: &Env, _from: Address, _amount: i128, _token: Address) {}
 
     /// T-REX `moduleCheck` also bypasses limits for token agents via
@@ -285,6 +302,7 @@ impl ComplianceModule for TimeTransfersLimitsModule {
         true
     }
 
+    /// Always returns `true` — mints are exempt from rate limits.
     fn can_create(_e: &Env, _to: Address, _amount: i128, _token: Address) -> bool {
         true
     }

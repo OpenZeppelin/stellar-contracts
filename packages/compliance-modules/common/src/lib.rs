@@ -39,6 +39,7 @@ pub enum IRSKey {
     Registry(Address),
 }
 
+/// Contract error codes shared by all compliance modules.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
@@ -53,10 +54,13 @@ pub enum ModuleError {
     IdentityRegistryNotSet = 8,
 }
 
+/// Persists the compliance contract address that governs this module.
 pub fn set_compliance_address(e: &Env, compliance: &Address) {
     e.storage().persistent().set(&COMPLIANCE_KEY, compliance);
 }
 
+/// Returns the stored compliance address, falling back to the module's
+/// own address when no compliance contract has been configured yet.
 pub fn get_compliance_address(e: &Env) -> Address {
     if !e.storage().persistent().has(&COMPLIANCE_KEY) {
         return e.current_contract_address();
@@ -67,6 +71,9 @@ pub fn get_compliance_address(e: &Env) -> Address {
         .expect("compliance must be set")
 }
 
+/// Requires authorization from the compliance contract. Returns the
+/// compliance address. Falls back to self-authorization when no
+/// compliance contract is configured (useful for standalone testing).
 pub fn require_compliance_auth(e: &Env) -> Address {
     if !e.storage().persistent().has(&COMPLIANCE_KEY) {
         return e.current_contract_address();
@@ -138,22 +145,26 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
 // Amount validation
 // ---------------------------------------------------------------------------
 
+/// Panics with [`ModuleError::InvalidAmount`] if `amount` is negative.
 pub fn require_non_negative_amount(e: &Env, amount: i128) {
     if amount < 0 {
         panic_with_error!(e, ModuleError::InvalidAmount);
     }
 }
 
+/// Checked `i128` addition. Panics with [`ModuleError::MathOverflow`] on overflow.
 pub fn checked_add_i128(e: &Env, left: i128, right: i128) -> i128 {
     left.checked_add(right)
         .unwrap_or_else(|| panic_with_error!(e, ModuleError::MathOverflow))
 }
 
+/// Checked `i128` subtraction. Panics with [`ModuleError::MathUnderflow`] on underflow.
 pub fn checked_sub_i128(e: &Env, left: i128, right: i128) -> i128 {
     left.checked_sub(right)
         .unwrap_or_else(|| panic_with_error!(e, ModuleError::MathUnderflow))
 }
 
+/// Allocates a Soroban `String` from a static `&str` for use as a module name.
 pub fn module_name(e: &Env, name: &str) -> String {
     String::from_str(e, name)
 }

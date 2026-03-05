@@ -56,10 +56,13 @@ use stellar_compliance_common::{
 #[contracttype]
 #[derive(Clone)]
 enum DataKey {
+    /// Per-token supply cap.
     SupplyLimit(Address),
+    /// Per-token internal supply counter (updated via hooks).
     InternalSupply(Address),
 }
 
+/// Emitted when a token's supply cap is configured or changed.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SupplyLimitSet {
@@ -68,11 +71,14 @@ pub struct SupplyLimitSet {
     pub limit: i128,
 }
 
+/// Enforces a global supply ceiling per token.
 #[contract]
 pub struct SupplyLimitModule;
 
 #[contractimpl]
 impl SupplyLimitModule {
+    /// Configures the maximum supply cap for `token`.
+    /// T-REX equivalent: `setSupplyLimit(_newLimit)`.
     pub fn set_supply_limit(e: &Env, token: Address, limit: i128) {
         require_compliance_auth(e);
         require_non_negative_amount(e, limit);
@@ -82,6 +88,7 @@ impl SupplyLimitModule {
         SupplyLimitSet { token, limit }.publish(e);
     }
 
+    /// Returns the configured supply limit for `token`.
     pub fn get_supply_limit(e: &Env, token: Address) -> i128 {
         e.storage()
             .persistent()
@@ -89,6 +96,7 @@ impl SupplyLimitModule {
             .unwrap_or_else(|| panic_with_error!(e, ModuleError::MissingLimit))
     }
 
+    /// Returns the module's internal supply counter for `token`.
     pub fn get_internal_supply(e: &Env, token: Address) -> i128 {
         e.storage()
             .persistent()
@@ -119,8 +127,10 @@ impl SupplyLimitModule {
 
 #[contractimpl]
 impl ComplianceModule for SupplyLimitModule {
+    /// No-op — transfers don't affect total supply.
     fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
 
+    /// Increments the internal supply counter on mint.
     fn on_created(e: &Env, _to: Address, amount: i128, token: Address) {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
@@ -131,6 +141,7 @@ impl ComplianceModule for SupplyLimitModule {
             .set(&key, &checked_add_i128(e, current, amount));
     }
 
+    /// Decrements the internal supply counter on burn.
     fn on_destroyed(e: &Env, _from: Address, amount: i128, token: Address) {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
@@ -141,10 +152,12 @@ impl ComplianceModule for SupplyLimitModule {
             .set(&key, &checked_sub_i128(e, current, amount));
     }
 
+    /// Always returns `true` — supply limit only gates minting.
     fn can_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) -> bool {
         true
     }
 
+    /// Returns `true` if `internal_supply + amount` is within the cap.
     fn can_create(e: &Env, _to: Address, amount: i128, token: Address) -> bool {
         assert!(
             hooks_verified(e),

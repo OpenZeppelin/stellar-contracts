@@ -29,10 +29,11 @@ use stellar_compliance_common::{
 #[contracttype]
 #[derive(Clone)]
 enum DataKey {
-    // Address allowlist keyed by token.
+    /// Per-(token, address) allowlist flag.
     AllowedUser(Address, Address),
 }
 
+/// Emitted when an address is added to the transfer allowlist.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UserAllowed {
@@ -41,6 +42,7 @@ pub struct UserAllowed {
     pub user: Address,
 }
 
+/// Emitted when an address is removed from the transfer allowlist.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UserDisallowed {
@@ -49,11 +51,14 @@ pub struct UserDisallowed {
     pub user: Address,
 }
 
+/// Restricts transfers to a per-address allowlist. Passes if sender or
+/// recipient is on the list.
 #[contract]
 pub struct TransferRestrictModule;
 
 #[contractimpl]
 impl TransferRestrictModule {
+    /// Adds `user` to the transfer allowlist for `token`.
     pub fn allow_user(e: &Env, token: Address, user: Address) {
         require_compliance_auth(e);
         e.storage()
@@ -62,6 +67,7 @@ impl TransferRestrictModule {
         UserAllowed { token, user }.publish(e);
     }
 
+    /// Removes `user` from the transfer allowlist for `token`.
     pub fn disallow_user(e: &Env, token: Address, user: Address) {
         require_compliance_auth(e);
         e.storage()
@@ -70,6 +76,7 @@ impl TransferRestrictModule {
         UserDisallowed { token, user }.publish(e);
     }
 
+    /// Adds multiple addresses to the transfer allowlist in a single call.
     pub fn batch_allow_users(e: &Env, token: Address, users: Vec<Address>) {
         require_compliance_auth(e);
         for user in users.iter() {
@@ -80,6 +87,7 @@ impl TransferRestrictModule {
         }
     }
 
+    /// Removes multiple addresses from the transfer allowlist in a single call.
     pub fn batch_disallow_users(e: &Env, token: Address, users: Vec<Address>) {
         require_compliance_auth(e);
         for user in users.iter() {
@@ -90,6 +98,7 @@ impl TransferRestrictModule {
         }
     }
 
+    /// Returns `true` if `user` is on the allowlist for `token`.
     pub fn is_user_allowed(e: &Env, token: Address, user: Address) -> bool {
         e.storage()
             .persistent()
@@ -100,12 +109,16 @@ impl TransferRestrictModule {
 
 #[contractimpl]
 impl ComplianceModule for TransferRestrictModule {
+    /// No-op — stateless module.
     fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
 
+    /// No-op — stateless module.
     fn on_created(_e: &Env, _to: Address, _amount: i128, _token: Address) {}
 
+    /// No-op — stateless module.
     fn on_destroyed(_e: &Env, _from: Address, _amount: i128, _token: Address) {}
 
+    /// Returns `true` if sender or recipient is on the allowlist.
     fn can_transfer(e: &Env, from: Address, to: Address, _amount: i128, token: Address) -> bool {
         // T-REX semantics: if sender is allowlisted, transfer passes; otherwise
         // recipient must be allowlisted.
@@ -115,6 +128,7 @@ impl ComplianceModule for TransferRestrictModule {
         Self::is_user_allowed(e, token, to)
     }
 
+    /// Always returns `true` — mints bypass the allowlist check.
     fn can_create(_e: &Env, _to: Address, _amount: i128, _token: Address) -> bool {
         true
     }

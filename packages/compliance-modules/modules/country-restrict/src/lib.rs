@@ -35,9 +35,11 @@ use stellar_compliance_common::{
 #[contracttype]
 #[derive(Clone)]
 enum DataKey {
+    /// Per-(token, country) restriction flag.
     RestrictedCountry(Address, u32),
 }
 
+/// Emitted when a country is added to the restriction list.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CountryRestricted {
@@ -46,6 +48,7 @@ pub struct CountryRestricted {
     pub country: u32,
 }
 
+/// Emitted when a country is removed from the restriction list.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CountryUnrestricted {
@@ -54,6 +57,7 @@ pub struct CountryUnrestricted {
     pub country: u32,
 }
 
+/// Blocks token transfers to recipients from restricted countries.
 #[contract]
 pub struct CountryRestrictModule;
 
@@ -65,6 +69,7 @@ impl CountryRestrictModule {
         set_irs_address(e, &token, &irs);
     }
 
+    /// Adds a country code to the restriction list for `token`.
     pub fn add_country_restriction(e: &Env, token: Address, country: u32) {
         require_compliance_auth(e);
         e.storage()
@@ -73,6 +78,7 @@ impl CountryRestrictModule {
         CountryRestricted { token, country }.publish(e);
     }
 
+    /// Removes a country code from the restriction list for `token`.
     pub fn remove_country_restriction(e: &Env, token: Address, country: u32) {
         require_compliance_auth(e);
         e.storage()
@@ -81,6 +87,7 @@ impl CountryRestrictModule {
         CountryUnrestricted { token, country }.publish(e);
     }
 
+    /// Adds multiple country codes to the restriction list in a single call.
     pub fn batch_restrict_countries(e: &Env, token: Address, countries: Vec<u32>) {
         require_compliance_auth(e);
         for country in countries.iter() {
@@ -91,6 +98,7 @@ impl CountryRestrictModule {
         }
     }
 
+    /// Removes multiple country codes from the restriction list in a single call.
     pub fn batch_unrestrict_countries(e: &Env, token: Address, countries: Vec<u32>) {
         require_compliance_auth(e);
         for country in countries.iter() {
@@ -101,6 +109,7 @@ impl CountryRestrictModule {
         }
     }
 
+    /// Returns `true` if `country` is on the restriction list for `token`.
     pub fn is_country_restricted(e: &Env, token: Address, country: u32) -> bool {
         e.storage()
             .persistent()
@@ -111,12 +120,16 @@ impl CountryRestrictModule {
 
 #[contractimpl]
 impl ComplianceModule for CountryRestrictModule {
+    /// No-op — stateless module.
     fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
 
+    /// No-op — stateless module.
     fn on_created(_e: &Env, _to: Address, _amount: i128, _token: Address) {}
 
+    /// No-op — stateless module.
     fn on_destroyed(_e: &Env, _from: Address, _amount: i128, _token: Address) {}
 
+    /// Returns `false` if any of the recipient's country codes is restricted.
     fn can_transfer(e: &Env, _from: Address, to: Address, _amount: i128, token: Address) -> bool {
         let irs = get_irs_client(e, &token);
         let entries = irs.get_country_data_entries(&to);
@@ -128,6 +141,7 @@ impl ComplianceModule for CountryRestrictModule {
         true
     }
 
+    /// Delegates to `can_transfer` — mints are subject to the same check.
     fn can_create(e: &Env, to: Address, _amount: i128, token: Address) -> bool {
         Self::can_transfer(e, to.clone(), to, 0, token)
     }

@@ -1,7 +1,24 @@
 #![no_std]
 
 //! Initial lockup period compliance module — Stellar port of T-REX
-//! [`InitialLockupPeriodModule.sol`][trex-src].
+//! [`TimeExchangeLimitsModule.sol`][trex-src].
+//!
+//! ## Naming
+//!
+//! The T-REX EVM module is called `TimeExchangeLimitsModule`, but we renamed
+//! it to `InitialLockupPeriodModule` for clarity:
+//!
+//! - The original name suggests time-based *transfer rate limiting* (similar
+//!   to `TimeTransfersLimitsModule`), but the actual behaviour is a
+//!   per-mint lockup — tokens are frozen for a fixed duration after primary
+//!   issuance.
+//! - Keeping both `TimeExchangeLimitsModule` and `TimeTransfersLimitsModule`
+//!   would be confusing since they serve very different purposes.
+//!
+//! **Open question for reviewers:** should we revert to the original T-REX
+//! name (`TimeExchangeLimitsModule`) for stricter 1:1 naming parity?
+//!
+//! ## Purpose
 //!
 //! Enforces a lockup period for all investors whenever they receive tokens
 //! through primary emissions (mints). Tokens received via peer-to-peer
@@ -50,7 +67,7 @@
 //! - Uses internal balance counter instead of `token.balance()` to avoid
 //!   Soroban's contract re-entry restriction.
 //!
-//! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/4.2.0-beta2/contracts/compliance/modular/modules/InitialLockupPeriodModule.sol
+//! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/TimeExchangeLimitsModule.sol
 
 use soroban_sdk::{contract, contractevent, contractimpl, contracttype, vec, Address, Env, Vec};
 
@@ -86,6 +103,7 @@ enum DataKey {
     InternalBalance(Address, Address),
 }
 
+/// Emitted when a token's lockup duration is configured or changed.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LockupPeriodSet {
@@ -94,6 +112,7 @@ pub struct LockupPeriodSet {
     pub lockup_seconds: u64,
 }
 
+/// Enforces a per-mint lockup period after primary issuance.
 #[contract]
 pub struct InitialLockupPeriodModule;
 
@@ -113,6 +132,7 @@ impl InitialLockupPeriodModule {
         LockupPeriodSet { token, lockup_seconds }.publish(e);
     }
 
+    /// Returns the configured lockup duration (seconds) for `token`.
     pub fn get_lockup_period(e: &Env, token: Address) -> u64 {
         e.storage()
             .persistent()
@@ -120,6 +140,7 @@ impl InitialLockupPeriodModule {
             .unwrap_or_default()
     }
 
+    /// Returns the aggregate locked amount for a `(token, wallet)` pair.
     pub fn get_total_locked(e: &Env, token: Address, wallet: Address) -> i128 {
         e.storage()
             .persistent()
@@ -127,6 +148,7 @@ impl InitialLockupPeriodModule {
             .unwrap_or_default()
     }
 
+    /// Returns the ordered list of individual lock entries for a wallet.
     pub fn get_locked_tokens(e: &Env, token: Address, wallet: Address) -> Vec<LockedTokens> {
         e.storage()
             .persistent()
@@ -134,6 +156,7 @@ impl InitialLockupPeriodModule {
             .unwrap_or_else(|| Vec::new(e))
     }
 
+    /// Returns the module's internal balance mirror for a wallet.
     pub fn get_internal_balance(e: &Env, token: Address, wallet: Address) -> i128 {
         e.storage()
             .persistent()

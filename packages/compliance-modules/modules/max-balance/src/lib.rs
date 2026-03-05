@@ -53,11 +53,13 @@ use stellar_compliance_common::{
 #[contracttype]
 #[derive(Clone)]
 enum DataKey {
+    /// Per-token maximum allowed identity balance.
     MaxBalance(Address),
     /// Balance keyed by (token, identity) — not by wallet.
     IDBalance(Address, Address),
 }
 
+/// Emitted when a token's per-identity balance cap is configured.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MaxBalanceSet {
@@ -66,6 +68,7 @@ pub struct MaxBalanceSet {
     pub max_balance: i128,
 }
 
+/// Emitted when an identity balance is pre-seeded via `pre_set_module_state`.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IDBalancePreSet {
@@ -75,6 +78,8 @@ pub struct IDBalancePreSet {
     pub balance: i128,
 }
 
+/// Enforces a per-identity balance cap across all wallets belonging
+/// to the same on-chain identity.
 #[contract]
 pub struct MaxBalanceModule;
 
@@ -86,6 +91,8 @@ impl MaxBalanceModule {
         set_irs_address(e, &token, &irs);
     }
 
+    /// Configures the per-identity balance cap for `token`.
+    /// T-REX equivalent: `setMaxBalance(_newMaxBalance)`.
     pub fn set_max_balance(e: &Env, token: Address, max_balance: i128) {
         require_compliance_auth(e);
         require_non_negative_amount(e, max_balance);
@@ -229,6 +236,7 @@ impl ComplianceModule for MaxBalanceModule {
         e.storage().persistent().set(&key, &new_balance);
     }
 
+    /// Decrements the sender identity's tracked balance on burn.
     fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address) {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
@@ -241,6 +249,7 @@ impl ComplianceModule for MaxBalanceModule {
         e.storage().persistent().set(&key, &checked_sub_i128(e, current, amount));
     }
 
+    /// Returns `true` if recipient identity balance + amount stays within cap.
     fn can_transfer(e: &Env, _from: Address, to: Address, amount: i128, token: Address) -> bool {
         assert!(
             hooks_verified(e),
@@ -270,6 +279,7 @@ impl ComplianceModule for MaxBalanceModule {
         checked_add_i128(e, to_balance, amount) <= max
     }
 
+    /// Delegates to `can_transfer` — mints are subject to the same cap.
     fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
         Self::can_transfer(e, to.clone(), to, amount, token)
     }
