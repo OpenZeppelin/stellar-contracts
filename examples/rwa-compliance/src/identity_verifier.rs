@@ -10,7 +10,7 @@ use stellar_tokens::rwa::identity_verifier::IdentityVerifier;
 #[contracttype]
 #[derive(Clone)]
 enum DataKey {
-    IRS,
+    Irs,
     ClaimTopicsAndIssuers,
 }
 
@@ -27,14 +27,14 @@ pub struct SimpleIdentityVerifier;
 #[contractimpl]
 impl SimpleIdentityVerifier {
     pub fn __constructor(e: &Env, irs: Address) {
-        e.storage().instance().set(&DataKey::IRS, &irs);
+        e.storage().instance().set(&DataKey::Irs, &irs);
     }
 }
 
 #[contractimpl]
 impl IdentityVerifier for SimpleIdentityVerifier {
     fn verify_identity(e: &Env, account: &Address) {
-        let irs: Address = e.storage().instance().get(&DataKey::IRS).expect("IRS not set");
+        let irs: Address = e.storage().instance().get(&DataKey::Irs).expect("IRS not set");
         let client = IRSClient::new(e, &irs);
         // Panics if identity not registered — which satisfies the
         // IdentityVerifier contract: unverified accounts are rejected.
@@ -42,7 +42,7 @@ impl IdentityVerifier for SimpleIdentityVerifier {
     }
 
     fn recovery_target(e: &Env, old_account: &Address) -> Option<Address> {
-        let irs: Address = e.storage().instance().get(&DataKey::IRS).expect("IRS not set");
+        let irs: Address = e.storage().instance().get(&DataKey::Irs).expect("IRS not set");
         let client = IRSClient::new(e, &irs);
         client.get_recovered_to(old_account)
     }
