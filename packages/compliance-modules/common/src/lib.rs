@@ -65,10 +65,7 @@ pub fn get_compliance_address(e: &Env) -> Address {
     if !e.storage().persistent().has(&COMPLIANCE_KEY) {
         return e.current_contract_address();
     }
-    e.storage()
-        .persistent()
-        .get::<_, Address>(&COMPLIANCE_KEY)
-        .expect("compliance must be set")
+    e.storage().persistent().get::<_, Address>(&COMPLIANCE_KEY).expect("compliance must be set")
 }
 
 /// Requires authorization from the compliance contract. Returns the
@@ -116,11 +113,8 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
         return;
     }
 
-    let compliance: Address = e
-        .storage()
-        .persistent()
-        .get(&COMPLIANCE_KEY)
-        .expect("compliance must be set");
+    let compliance: Address =
+        e.storage().persistent().get(&COMPLIANCE_KEY).expect("compliance must be set");
     let self_addr = e.current_contract_address();
     let client = ComplianceHookCheckClient::new(e, &compliance);
 
@@ -154,14 +148,12 @@ pub fn require_non_negative_amount(e: &Env, amount: i128) {
 
 /// Checked `i128` addition. Panics with [`ModuleError::MathOverflow`] on overflow.
 pub fn checked_add_i128(e: &Env, left: i128, right: i128) -> i128 {
-    left.checked_add(right)
-        .unwrap_or_else(|| panic_with_error!(e, ModuleError::MathOverflow))
+    left.checked_add(right).unwrap_or_else(|| panic_with_error!(e, ModuleError::MathOverflow))
 }
 
 /// Checked `i128` subtraction. Panics with [`ModuleError::MathUnderflow`] on underflow.
 pub fn checked_sub_i128(e: &Env, left: i128, right: i128) -> i128 {
-    left.checked_sub(right)
-        .unwrap_or_else(|| panic_with_error!(e, ModuleError::MathUnderflow))
+    left.checked_sub(right).unwrap_or_else(|| panic_with_error!(e, ModuleError::MathUnderflow))
 }
 
 /// Allocates a Soroban `String` from a static `&str` for use as a module name.

@@ -126,42 +126,28 @@ impl InitialLockupPeriodModule {
     /// T-REX equivalent: `setLockupPeriod(_lockupPeriodInDays)`.
     pub fn set_lockup_period(e: &Env, token: Address, lockup_seconds: u64) {
         require_compliance_auth(e);
-        e.storage()
-            .persistent()
-            .set(&DataKey::LockupPeriod(token.clone()), &lockup_seconds);
+        e.storage().persistent().set(&DataKey::LockupPeriod(token.clone()), &lockup_seconds);
         LockupPeriodSet { token, lockup_seconds }.publish(e);
     }
 
     /// Returns the configured lockup duration (seconds) for `token`.
     pub fn get_lockup_period(e: &Env, token: Address) -> u64 {
-        e.storage()
-            .persistent()
-            .get(&DataKey::LockupPeriod(token))
-            .unwrap_or_default()
+        e.storage().persistent().get(&DataKey::LockupPeriod(token)).unwrap_or_default()
     }
 
     /// Returns the aggregate locked amount for a `(token, wallet)` pair.
     pub fn get_total_locked(e: &Env, token: Address, wallet: Address) -> i128 {
-        e.storage()
-            .persistent()
-            .get(&DataKey::TotalLocked(token, wallet))
-            .unwrap_or_default()
+        e.storage().persistent().get(&DataKey::TotalLocked(token, wallet)).unwrap_or_default()
     }
 
     /// Returns the ordered list of individual lock entries for a wallet.
     pub fn get_locked_tokens(e: &Env, token: Address, wallet: Address) -> Vec<LockedTokens> {
-        e.storage()
-            .persistent()
-            .get(&DataKey::Locks(token, wallet))
-            .unwrap_or_else(|| Vec::new(e))
+        e.storage().persistent().get(&DataKey::Locks(token, wallet)).unwrap_or_else(|| Vec::new(e))
     }
 
     /// Returns the module's internal balance mirror for a wallet.
     pub fn get_internal_balance(e: &Env, token: Address, wallet: Address) -> i128 {
-        e.storage()
-            .persistent()
-            .get(&DataKey::InternalBalance(token, wallet))
-            .unwrap_or_default()
+        e.storage().persistent().get(&DataKey::InternalBalance(token, wallet)).unwrap_or_default()
     }
 
     /// Returns the compliance hooks this module must be registered on.
@@ -213,11 +199,8 @@ fn calculate_unlocked_amount(e: &Env, locks: &Vec<LockedTokens>) -> i128 {
 /// compensation via `_calculateUnlockedAmount`.
 fn update_locked_tokens(e: &Env, token: &Address, wallet: &Address, mut amount_to_consume: i128) {
     let locks_key = DataKey::Locks(token.clone(), wallet.clone());
-    let locks: Vec<LockedTokens> = e
-        .storage()
-        .persistent()
-        .get(&locks_key)
-        .unwrap_or_else(|| Vec::new(e));
+    let locks: Vec<LockedTokens> =
+        e.storage().persistent().get(&locks_key).unwrap_or_else(|| Vec::new(e));
 
     let now = e.ledger().timestamp();
     let mut new_locks = Vec::new(e);
@@ -245,14 +228,8 @@ fn update_locked_tokens(e: &Env, token: &Address, wallet: &Address, mut amount_t
     e.storage().persistent().set(&locks_key, &new_locks);
 
     let total_key = DataKey::TotalLocked(token.clone(), wallet.clone());
-    let total_locked: i128 = e
-        .storage()
-        .persistent()
-        .get(&total_key)
-        .unwrap_or_default();
-    e.storage()
-        .persistent()
-        .set(&total_key, &checked_sub_i128(e, total_locked, consumed_total));
+    let total_locked: i128 = e.storage().persistent().get(&total_key).unwrap_or_default();
+    e.storage().persistent().set(&total_key, &checked_sub_i128(e, total_locked, consumed_total));
 }
 
 // ---------------------------------------------------------------------------
@@ -282,15 +259,11 @@ impl ComplianceModule for InitialLockupPeriodModule {
 
         let from_key = DataKey::InternalBalance(token.clone(), from.clone());
         let from_bal: i128 = e.storage().persistent().get(&from_key).unwrap_or_default();
-        e.storage()
-            .persistent()
-            .set(&from_key, &checked_sub_i128(e, from_bal, amount));
+        e.storage().persistent().set(&from_key, &checked_sub_i128(e, from_bal, amount));
 
         let to_key = DataKey::InternalBalance(token, to);
         let to_bal: i128 = e.storage().persistent().get(&to_key).unwrap_or_default();
-        e.storage()
-            .persistent()
-            .set(&to_key, &checked_add_i128(e, to_bal, amount));
+        e.storage().persistent().set(&to_key, &checked_add_i128(e, to_bal, amount));
     }
 
     /// T-REX `moduleMintAction`: push a new lock entry for the minted amount
@@ -302,11 +275,8 @@ impl ComplianceModule for InitialLockupPeriodModule {
         let period = Self::get_lockup_period(e, token.clone());
         if period > 0 {
             let locks_key = DataKey::Locks(token.clone(), to.clone());
-            let mut locks: Vec<LockedTokens> = e
-                .storage()
-                .persistent()
-                .get(&locks_key)
-                .unwrap_or_else(|| Vec::new(e));
+            let mut locks: Vec<LockedTokens> =
+                e.storage().persistent().get(&locks_key).unwrap_or_else(|| Vec::new(e));
 
             locks.push_back(LockedTokens {
                 amount,
@@ -315,21 +285,13 @@ impl ComplianceModule for InitialLockupPeriodModule {
             e.storage().persistent().set(&locks_key, &locks);
 
             let total_key = DataKey::TotalLocked(token.clone(), to.clone());
-            let total: i128 = e
-                .storage()
-                .persistent()
-                .get(&total_key)
-                .unwrap_or_default();
-            e.storage()
-                .persistent()
-                .set(&total_key, &checked_add_i128(e, total, amount));
+            let total: i128 = e.storage().persistent().get(&total_key).unwrap_or_default();
+            e.storage().persistent().set(&total_key, &checked_add_i128(e, total, amount));
         }
 
         let bal_key = DataKey::InternalBalance(token, to);
         let current: i128 = e.storage().persistent().get(&bal_key).unwrap_or_default();
-        e.storage()
-            .persistent()
-            .set(&bal_key, &checked_add_i128(e, current, amount));
+        e.storage().persistent().set(&bal_key, &checked_add_i128(e, current, amount));
     }
 
     /// T-REX `moduleBurnAction`: panics if the burn would consume
@@ -364,9 +326,7 @@ impl ComplianceModule for InitialLockupPeriodModule {
 
         let bal_key = DataKey::InternalBalance(token, from);
         let current: i128 = e.storage().persistent().get(&bal_key).unwrap_or_default();
-        e.storage()
-            .persistent()
-            .set(&bal_key, &checked_sub_i128(e, current, amount));
+        e.storage().persistent().set(&bal_key, &checked_sub_i128(e, current, amount));
     }
 
     /// T-REX `moduleCheck`: allow transfer only if free balance >= amount.

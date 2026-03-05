@@ -46,9 +46,7 @@ impl IdentityVerifier for SimpleIdentityVerifier {
         claim_topics_and_issuers: Address,
         _operator: Address,
     ) {
-        e.storage()
-            .instance()
-            .set(&DataKey::ClaimTopicsAndIssuers, &claim_topics_and_issuers);
+        e.storage().instance().set(&DataKey::ClaimTopicsAndIssuers, &claim_topics_and_issuers);
     }
 
     fn claim_topics_and_issuers(e: &Env) -> Address {

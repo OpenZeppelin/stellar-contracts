@@ -97,7 +97,7 @@ deploy_module() {
   local NAME=$1
   local WASM_NAME="stellar_compliance_${NAME//-/_}.wasm"
   if [ ! -f "$WASM_DIR/$WASM_NAME" ]; then
-    echo "WARNING: $WASM_NAME not found, skipping $NAME" >&2
+    echo "ERROR: $WASM_NAME not found — run build.sh first" >&2
     return 1
   fi
   local ADDR

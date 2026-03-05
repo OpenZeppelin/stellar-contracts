@@ -1,6 +1,8 @@
 #![no_std]
 
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, MuxedAddress, String, Symbol, Vec};
+use soroban_sdk::{
+    contract, contractimpl, symbol_short, Address, Env, MuxedAddress, String, Symbol, Vec,
+};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
 use stellar_macros::only_role;
@@ -27,9 +29,7 @@ impl RWATokenContract {
         access_control::grant_role_no_auth(e, &admin, &symbol_short!("admin"), &admin);
         RWA::set_compliance(e, &compliance);
         RWA::set_identity_verifier(e, &identity_verifier);
-        e.storage()
-            .instance()
-            .set(&RWAStorageKey::Version, &String::from_str(e, "1.0.0"));
+        e.storage().instance().set(&RWAStorageKey::Version, &String::from_str(e, "1.0.0"));
         RWA::set_onchain_id(e, &e.current_contract_address());
     }
 }

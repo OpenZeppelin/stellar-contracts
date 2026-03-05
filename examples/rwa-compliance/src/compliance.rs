@@ -8,10 +8,7 @@ use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Ve
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::only_role;
 use stellar_tokens::rwa::{
-    compliance::{
-        storage as compliance_storage,
-        Compliance, ComplianceHook,
-    },
+    compliance::{storage as compliance_storage, Compliance, ComplianceHook},
     utils::token_binder::{self as binder, TokenBinder},
 };
 

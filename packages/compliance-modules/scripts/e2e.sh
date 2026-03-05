@@ -128,7 +128,6 @@ echo "╚═══════════════════════�
 echo ""
 
 SUPPLY_LIMIT=$(read_addr "['modules']['supply_limit']")
-INITIAL_LOCKUP=$(read_addr "['modules']['initial_lockup_period']")
 
 assert_pass() {
   local DESC=$1; shift
@@ -207,6 +206,8 @@ echo ""
 # all 1000 tokens are locked. A transfer should be rejected by
 # InitialLockupPeriodModule.can_transfer (free balance = 0).
 # NOTE: must use `transfer` (not `forced_transfer` which bypasses can_transfer).
+# Self-transfer: can_transfer still fires with both from/to; lockup check executes.
+# A distinct recipient would require pre-allowing in TransferRestrict during deploy.
 echo "--- Test 3: Initial lockup blocks transfer ---"
 assert_fail "transfer 100 during lockup" invoke "$TOKEN" transfer \
   --from "$INVESTOR" --to "$INVESTOR" --amount 100

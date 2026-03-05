@@ -47,7 +47,11 @@ impl IdentityVerifier for SimpleIdentityVerifier {
         client.get_recovered_to(old_account)
     }
 
-    fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: Address, _operator: Address) {
+    fn set_claim_topics_and_issuers(
+        e: &Env,
+        claim_topics_and_issuers: Address,
+        _operator: Address,
+    ) {
         e.storage().instance().set(&DataKey::ClaimTopicsAndIssuers, &claim_topics_and_issuers);
     }
 

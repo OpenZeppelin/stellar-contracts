@@ -43,7 +43,9 @@
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/SupplyLimitModule.sol
 
-use soroban_sdk::{contract, contractevent, contractimpl, contracttype, panic_with_error, vec, Address, Env, Vec};
+use soroban_sdk::{
+    contract, contractevent, contractimpl, contracttype, panic_with_error, vec, Address, Env, Vec,
+};
 
 use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
@@ -82,9 +84,7 @@ impl SupplyLimitModule {
     pub fn set_supply_limit(e: &Env, token: Address, limit: i128) {
         require_compliance_auth(e);
         require_non_negative_amount(e, limit);
-        e.storage()
-            .persistent()
-            .set(&DataKey::SupplyLimit(token.clone()), &limit);
+        e.storage().persistent().set(&DataKey::SupplyLimit(token.clone()), &limit);
         SupplyLimitSet { token, limit }.publish(e);
     }
 
@@ -98,20 +98,12 @@ impl SupplyLimitModule {
 
     /// Returns the module's internal supply counter for `token`.
     pub fn get_internal_supply(e: &Env, token: Address) -> i128 {
-        e.storage()
-            .persistent()
-            .get(&DataKey::InternalSupply(token))
-            .unwrap_or_default()
+        e.storage().persistent().get(&DataKey::InternalSupply(token)).unwrap_or_default()
     }
 
     /// Returns the compliance hooks this module must be registered on.
     pub fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
-        vec![
-            e,
-            ComplianceHook::CanCreate,
-            ComplianceHook::Created,
-            ComplianceHook::Destroyed,
-        ]
+        vec![e, ComplianceHook::CanCreate, ComplianceHook::Created, ComplianceHook::Destroyed]
     }
 
     /// Arms the module by verifying all required hooks are wired.
@@ -136,9 +128,7 @@ impl ComplianceModule for SupplyLimitModule {
         require_non_negative_amount(e, amount);
         let key = DataKey::InternalSupply(token);
         let current: i128 = e.storage().persistent().get(&key).unwrap_or_default();
-        e.storage()
-            .persistent()
-            .set(&key, &checked_add_i128(e, current, amount));
+        e.storage().persistent().set(&key, &checked_add_i128(e, current, amount));
     }
 
     /// Decrements the internal supply counter on burn.
@@ -147,13 +137,17 @@ impl ComplianceModule for SupplyLimitModule {
         require_non_negative_amount(e, amount);
         let key = DataKey::InternalSupply(token);
         let current: i128 = e.storage().persistent().get(&key).unwrap_or_default();
-        e.storage()
-            .persistent()
-            .set(&key, &checked_sub_i128(e, current, amount));
+        e.storage().persistent().set(&key, &checked_sub_i128(e, current, amount));
     }
 
     /// Always returns `true` — supply limit only gates minting.
-    fn can_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) -> bool {
+    fn can_transfer(
+        _e: &Env,
+        _from: Address,
+        _to: Address,
+        _amount: i128,
+        _token: Address,
+    ) -> bool {
         true
     }
 
@@ -166,19 +160,13 @@ impl ComplianceModule for SupplyLimitModule {
         if amount < 0 {
             return false;
         }
-        let limit: i128 = e
-            .storage()
-            .persistent()
-            .get(&DataKey::SupplyLimit(token.clone()))
-            .unwrap_or_default();
+        let limit: i128 =
+            e.storage().persistent().get(&DataKey::SupplyLimit(token.clone())).unwrap_or_default();
         if limit == 0 {
             return true;
         }
-        let internal_supply: i128 = e
-            .storage()
-            .persistent()
-            .get(&DataKey::InternalSupply(token))
-            .unwrap_or_default();
+        let internal_supply: i128 =
+            e.storage().persistent().get(&DataKey::InternalSupply(token)).unwrap_or_default();
         checked_add_i128(e, internal_supply, amount) <= limit
     }
 

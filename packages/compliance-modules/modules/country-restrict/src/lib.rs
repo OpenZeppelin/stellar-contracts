@@ -72,9 +72,7 @@ impl CountryRestrictModule {
     /// Adds a country code to the restriction list for `token`.
     pub fn add_country_restriction(e: &Env, token: Address, country: u32) {
         require_compliance_auth(e);
-        e.storage()
-            .persistent()
-            .set(&DataKey::RestrictedCountry(token.clone(), country), &true);
+        e.storage().persistent().set(&DataKey::RestrictedCountry(token.clone(), country), &true);
         CountryRestricted { token, country }.publish(e);
     }
 
@@ -83,7 +81,7 @@ impl CountryRestrictModule {
         require_compliance_auth(e);
         e.storage()
             .persistent()
-            .set(&DataKey::RestrictedCountry(token.clone(), country), &false);
+            .remove(&DataKey::RestrictedCountry(token.clone(), country));
         CountryUnrestricted { token, country }.publish(e);
     }
 
@@ -104,7 +102,7 @@ impl CountryRestrictModule {
         for country in countries.iter() {
             e.storage()
                 .persistent()
-                .set(&DataKey::RestrictedCountry(token.clone(), country), &false);
+                .remove(&DataKey::RestrictedCountry(token.clone(), country));
             CountryUnrestricted { token: token.clone(), country }.publish(e);
         }
     }

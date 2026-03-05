@@ -137,9 +137,7 @@ impl TimeTransfersLimitsModule {
             limits.push_back(limit.clone());
         }
 
-        e.storage()
-            .persistent()
-            .set(&DataKey::Limits(token.clone()), &limits);
+        e.storage().persistent().set(&DataKey::Limits(token.clone()), &limits);
         TimeTransferLimitUpdated { token, limit }.publish(e);
     }
 
@@ -174,9 +172,7 @@ impl TimeTransfersLimitsModule {
             panic_with_error!(e, ModuleError::MissingLimit);
         }
 
-        e.storage()
-            .persistent()
-            .set(&DataKey::Limits(token.clone()), &limits);
+        e.storage().persistent().set(&DataKey::Limits(token.clone()), &limits);
         TimeTransferLimitRemoved { token, limit_time }.publish(e);
     }
 
@@ -191,10 +187,7 @@ impl TimeTransfersLimitsModule {
 
     /// Returns all configured time-window limits for `token`.
     pub fn get_time_transfer_limits(e: &Env, token: Address) -> Vec<Limit> {
-        e.storage()
-            .persistent()
-            .get(&DataKey::Limits(token))
-            .unwrap_or_else(|| Vec::new(e))
+        e.storage().persistent().get(&DataKey::Limits(token)).unwrap_or_else(|| Vec::new(e))
     }
 
     /// Returns the compliance hooks this module must be registered on.

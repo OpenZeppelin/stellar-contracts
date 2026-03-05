@@ -72,39 +72,17 @@ fn setup<'a>() -> TestSetup<'a> {
 
     let name = String::from_str(&env, "Compliance Token");
     let symbol = String::from_str(&env, "CRWA");
-    let token = env.register(
-        RWATokenContract,
-        (&name, &symbol, &admin, &compliance, &verifier),
-    );
+    let token = env.register(RWATokenContract, (&name, &symbol, &admin, &compliance, &verifier));
     let token_client = RWATokenContractClient::new(&env, &token);
 
     compliance_client.bind_token(&token, &admin);
     irs_client.bind_tokens(&vec![&env, token.clone()], &manager);
 
-    TestSetup {
-        env,
-        admin,
-        token,
-        token_client,
-        compliance,
-        compliance_client,
-        irs,
-        irs_client,
-    }
+    TestSetup { env, admin, token, token_client, compliance, compliance_client, irs, irs_client }
 }
 
-fn register_investor(
-    ts: &TestSetup,
-    investor: &Address,
-    identity: &Address,
-    country: CountryData,
-) {
-    ts.irs_client.add_identity(
-        investor,
-        identity,
-        &vec![&ts.env, country],
-        &ts.admin,
-    );
+fn register_investor(ts: &TestSetup, investor: &Address, identity: &Address, country: CountryData) {
+    ts.irs_client.add_identity(investor, identity, &vec![&ts.env, country], &ts.admin);
 }
 
 fn wire_module(ts: &TestSetup, module_addr: &Address, hooks: &[ComplianceHook]) {
@@ -112,8 +90,7 @@ fn wire_module(ts: &TestSetup, module_addr: &Address, hooks: &[ComplianceHook]) 
     cmp_client.set_compliance_address(&ts.compliance);
 
     for hook in hooks {
-        ts.compliance_client
-            .add_module_to(hook, module_addr, &ts.admin);
+        ts.compliance_client.add_module_to(hook, module_addr, &ts.admin);
     }
 }
 
@@ -134,11 +111,7 @@ fn test_country_allow() {
     register_investor(&ts, &investor_de, &id_de, de_country_data());
 
     let module = ts.env.register(CountryAllowModule, ());
-    wire_module(
-        &ts,
-        &module,
-        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate],
-    );
+    wire_module(&ts, &module, &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate]);
 
     let mod_client = CountryAllowModuleClient::new(&ts.env, &module);
     mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
@@ -170,11 +143,7 @@ fn test_country_restrict() {
     register_investor(&ts, &investor_de, &id_de, de_country_data());
 
     let module = ts.env.register(CountryRestrictModule, ());
-    wire_module(
-        &ts,
-        &module,
-        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate],
-    );
+    wire_module(&ts, &module, &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate]);
 
     let mod_client = CountryRestrictModuleClient::new(&ts.env, &module);
     mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
@@ -264,11 +233,7 @@ fn test_supply_limit() {
     wire_module(
         &ts,
         &module,
-        &[
-            ComplianceHook::CanCreate,
-            ComplianceHook::Created,
-            ComplianceHook::Destroyed,
-        ],
+        &[ComplianceHook::CanCreate, ComplianceHook::Created, ComplianceHook::Destroyed],
     );
 
     let mod_client = SupplyLimitModuleClient::new(&ts.env, &module);
@@ -306,11 +271,7 @@ fn test_supply_limit_burn() {
     wire_module(
         &ts,
         &module,
-        &[
-            ComplianceHook::CanCreate,
-            ComplianceHook::Created,
-            ComplianceHook::Destroyed,
-        ],
+        &[ComplianceHook::CanCreate, ComplianceHook::Created, ComplianceHook::Destroyed],
     );
 
     let mod_client = SupplyLimitModuleClient::new(&ts.env, &module);
@@ -352,21 +313,11 @@ fn test_time_transfer_limits() {
     register_investor(&ts, &investor_b, &id_b, us_country_data());
 
     let module = ts.env.register(TimeTransfersLimitsModule, ());
-    wire_module(
-        &ts,
-        &module,
-        &[ComplianceHook::CanTransfer, ComplianceHook::Transferred],
-    );
+    wire_module(&ts, &module, &[ComplianceHook::CanTransfer, ComplianceHook::Transferred]);
 
     let mod_client = TimeTransfersLimitsModuleClient::new(&ts.env, &module);
     mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
-    mod_client.set_time_transfer_limit(
-        &ts.token,
-        &Limit {
-            limit_time: 3_600,
-            limit_value: 100,
-        },
-    );
+    mod_client.set_time_transfer_limit(&ts.token, &Limit { limit_time: 3_600, limit_value: 100 });
     mod_client.verify_hook_wiring();
 
     // Mint enough tokens for transfers
@@ -601,11 +552,7 @@ fn test_full_stack() {
 
     // --- Wire CountryAllowModule (allow US only) ---
     let country_mod = ts.env.register(CountryAllowModule, ());
-    wire_module(
-        &ts,
-        &country_mod,
-        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate],
-    );
+    wire_module(&ts, &country_mod, &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate]);
     let country_client = CountryAllowModuleClient::new(&ts.env, &country_mod);
     country_client.set_identity_registry_storage(&ts.token, &ts.irs);
     country_client.add_allowed_country(&ts.token, &840);
@@ -654,9 +601,7 @@ fn test_full_stack() {
     assert_eq!(ts.token_client.balance(&investor_de), 400);
 
     // 7) Transfer 700 to DE would push DE identity to 1100 — exceeds max
-    let result = ts
-        .token_client
-        .try_transfer(&investor_us, &investor_de, &700);
+    let result = ts.token_client.try_transfer(&investor_us, &investor_de, &700);
     assert!(result.is_err());
 }
 
@@ -681,11 +626,7 @@ fn guard_supply_limit_without_verification() {
     wire_module(
         &ts,
         &module,
-        &[
-            ComplianceHook::CanCreate,
-            ComplianceHook::Created,
-            ComplianceHook::Destroyed,
-        ],
+        &[ComplianceHook::CanCreate, ComplianceHook::Created, ComplianceHook::Destroyed],
     );
 
     let mod_client = SupplyLimitModuleClient::new(&ts.env, &module);
@@ -812,21 +753,11 @@ fn test_time_transfer_limits_window_reset() {
     register_investor(&ts, &investor_b, &id_b, us_country_data());
 
     let module = ts.env.register(TimeTransfersLimitsModule, ());
-    wire_module(
-        &ts,
-        &module,
-        &[ComplianceHook::CanTransfer, ComplianceHook::Transferred],
-    );
+    wire_module(&ts, &module, &[ComplianceHook::CanTransfer, ComplianceHook::Transferred]);
 
     let mod_client = TimeTransfersLimitsModuleClient::new(&ts.env, &module);
     mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
-    mod_client.set_time_transfer_limit(
-        &ts.token,
-        &Limit {
-            limit_time: 3_600,
-            limit_value: 100,
-        },
-    );
+    mod_client.set_time_transfer_limit(&ts.token, &Limit { limit_time: 3_600, limit_value: 100 });
     mod_client.verify_hook_wiring();
 
     ts.token_client.mint(&investor_a, &500, &ts.admin);
@@ -872,21 +803,11 @@ fn guard_time_transfers_without_verification() {
     register_investor(&ts, &investor_b, &id_b, us_country_data());
 
     let module = ts.env.register(TimeTransfersLimitsModule, ());
-    wire_module(
-        &ts,
-        &module,
-        &[ComplianceHook::CanTransfer, ComplianceHook::Transferred],
-    );
+    wire_module(&ts, &module, &[ComplianceHook::CanTransfer, ComplianceHook::Transferred]);
 
     let mod_client = TimeTransfersLimitsModuleClient::new(&ts.env, &module);
     mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
-    mod_client.set_time_transfer_limit(
-        &ts.token,
-        &Limit {
-            limit_time: 3_600,
-            limit_value: 100,
-        },
-    );
+    mod_client.set_time_transfer_limit(&ts.token, &Limit { limit_time: 3_600, limit_value: 100 });
     // Intentionally NOT calling verify_hook_wiring()
 
     ts.token_client.mint(&investor_a, &500, &ts.admin);
@@ -926,11 +847,7 @@ fn test_country_allow_blocks_transfer_to_non_allowed() {
     register_investor(&ts, &investor_de, &id_de, de_country_data());
 
     let module = ts.env.register(CountryAllowModule, ());
-    wire_module(
-        &ts,
-        &module,
-        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate],
-    );
+    wire_module(&ts, &module, &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate]);
 
     let mod_client = CountryAllowModuleClient::new(&ts.env, &module);
     mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
@@ -962,11 +879,7 @@ fn test_country_restrict_blocks_transfer_to_restricted() {
     register_investor(&ts, &investor_de, &id_de, de_country_data());
 
     let module = ts.env.register(CountryRestrictModule, ());
-    wire_module(
-        &ts,
-        &module,
-        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate],
-    );
+    wire_module(&ts, &module, &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate]);
 
     let mod_client = CountryRestrictModuleClient::new(&ts.env, &module);
     mod_client.set_identity_registry_storage(&ts.token, &ts.irs);
@@ -1035,11 +948,7 @@ fn test_full_stack_with_burn() {
 
     // --- Wire CountryAllowModule (allow US) ---
     let country_mod = ts.env.register(CountryAllowModule, ());
-    wire_module(
-        &ts,
-        &country_mod,
-        &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate],
-    );
+    wire_module(&ts, &country_mod, &[ComplianceHook::CanTransfer, ComplianceHook::CanCreate]);
     let country_client = CountryAllowModuleClient::new(&ts.env, &country_mod);
     country_client.set_identity_registry_storage(&ts.token, &ts.irs);
     country_client.add_allowed_country(&ts.token, &840);
@@ -1067,11 +976,7 @@ fn test_full_stack_with_burn() {
     wire_module(
         &ts,
         &supply_mod,
-        &[
-            ComplianceHook::CanCreate,
-            ComplianceHook::Created,
-            ComplianceHook::Destroyed,
-        ],
+        &[ComplianceHook::CanCreate, ComplianceHook::Created, ComplianceHook::Destroyed],
     );
     let supply_client = SupplyLimitModuleClient::new(&ts.env, &supply_mod);
     supply_client.set_supply_limit(&ts.token, &2000);
@@ -1098,4 +1003,3 @@ fn test_full_stack_with_burn() {
     let result = ts.token_client.try_mint(&investor_us, &1, &ts.admin);
     assert!(result.is_err());
 }
-

@@ -5,7 +5,7 @@ T-REX (ERC-3643).
 
 ## Layout
 
-```
+```text
 packages/compliance-modules/
   common/                          → Shared helpers (IRS client, compliance auth, safe math)
   modules/
@@ -132,14 +132,14 @@ operating until all required hooks have been verified:
 
 **If `verify_hook_wiring()` is not called** (module not armed):
 
-```
+```text
 SupplyLimitModule: not armed — call verify_hook_wiring() after wiring hooks [CanCreate, Created, Destroyed]
 TimeTransfersLimitsModule: not armed — call verify_hook_wiring() after wiring hooks [CanTransfer, Transferred]
 ```
 
 **If a required hook is missing** during verification:
 
-```
+```text
 missing required hook: Created
 ```
 

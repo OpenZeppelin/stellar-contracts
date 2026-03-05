@@ -73,9 +73,7 @@ impl CountryAllowModule {
     /// Adds a country code to the allowlist for `token`.
     pub fn add_allowed_country(e: &Env, token: Address, country: u32) {
         require_compliance_auth(e);
-        e.storage()
-            .persistent()
-            .set(&DataKey::AllowedCountry(token.clone(), country), &true);
+        e.storage().persistent().set(&DataKey::AllowedCountry(token.clone(), country), &true);
         CountryAllowed { token, country }.publish(e);
     }
 
@@ -84,7 +82,7 @@ impl CountryAllowModule {
         require_compliance_auth(e);
         e.storage()
             .persistent()
-            .set(&DataKey::AllowedCountry(token.clone(), country), &false);
+            .remove(&DataKey::AllowedCountry(token.clone(), country));
         CountryUnallowed { token, country }.publish(e);
     }
 
@@ -92,9 +90,7 @@ impl CountryAllowModule {
     pub fn batch_allow_countries(e: &Env, token: Address, countries: Vec<u32>) {
         require_compliance_auth(e);
         for country in countries.iter() {
-            e.storage()
-                .persistent()
-                .set(&DataKey::AllowedCountry(token.clone(), country), &true);
+            e.storage().persistent().set(&DataKey::AllowedCountry(token.clone(), country), &true);
             CountryAllowed { token: token.clone(), country }.publish(e);
         }
     }
@@ -105,17 +101,14 @@ impl CountryAllowModule {
         for country in countries.iter() {
             e.storage()
                 .persistent()
-                .set(&DataKey::AllowedCountry(token.clone(), country), &false);
+                .remove(&DataKey::AllowedCountry(token.clone(), country));
             CountryUnallowed { token: token.clone(), country }.publish(e);
         }
     }
 
     /// Returns `true` if `country` is on the allowlist for `token`.
     pub fn is_country_allowed(e: &Env, token: Address, country: u32) -> bool {
-        e.storage()
-            .persistent()
-            .get(&DataKey::AllowedCountry(token, country))
-            .unwrap_or_default()
+        e.storage().persistent().get(&DataKey::AllowedCountry(token, country)).unwrap_or_default()
     }
 }
 

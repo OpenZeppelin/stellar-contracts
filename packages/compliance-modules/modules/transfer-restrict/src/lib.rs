@@ -61,9 +61,7 @@ impl TransferRestrictModule {
     /// Adds `user` to the transfer allowlist for `token`.
     pub fn allow_user(e: &Env, token: Address, user: Address) {
         require_compliance_auth(e);
-        e.storage()
-            .persistent()
-            .set(&DataKey::AllowedUser(token.clone(), user.clone()), &true);
+        e.storage().persistent().set(&DataKey::AllowedUser(token.clone(), user.clone()), &true);
         UserAllowed { token, user }.publish(e);
     }
 
@@ -72,7 +70,7 @@ impl TransferRestrictModule {
         require_compliance_auth(e);
         e.storage()
             .persistent()
-            .set(&DataKey::AllowedUser(token.clone(), user.clone()), &false);
+            .remove(&DataKey::AllowedUser(token.clone(), user.clone()));
         UserDisallowed { token, user }.publish(e);
     }
 
@@ -80,9 +78,7 @@ impl TransferRestrictModule {
     pub fn batch_allow_users(e: &Env, token: Address, users: Vec<Address>) {
         require_compliance_auth(e);
         for user in users.iter() {
-            e.storage()
-                .persistent()
-                .set(&DataKey::AllowedUser(token.clone(), user.clone()), &true);
+            e.storage().persistent().set(&DataKey::AllowedUser(token.clone(), user.clone()), &true);
             UserAllowed { token: token.clone(), user }.publish(e);
         }
     }
@@ -93,17 +89,14 @@ impl TransferRestrictModule {
         for user in users.iter() {
             e.storage()
                 .persistent()
-                .set(&DataKey::AllowedUser(token.clone(), user.clone()), &false);
+                .remove(&DataKey::AllowedUser(token.clone(), user.clone()));
             UserDisallowed { token: token.clone(), user }.publish(e);
         }
     }
 
     /// Returns `true` if `user` is on the allowlist for `token`.
     pub fn is_user_allowed(e: &Env, token: Address, user: Address) -> bool {
-        e.storage()
-            .persistent()
-            .get(&DataKey::AllowedUser(token, user))
-            .unwrap_or_default()
+        e.storage().persistent().get(&DataKey::AllowedUser(token, user)).unwrap_or_default()
     }
 }
 
