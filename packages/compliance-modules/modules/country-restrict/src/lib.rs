@@ -79,9 +79,7 @@ impl CountryRestrictModule {
     /// Removes a country code from the restriction list for `token`.
     pub fn remove_country_restriction(e: &Env, token: Address, country: u32) {
         require_compliance_auth(e);
-        e.storage()
-            .persistent()
-            .remove(&DataKey::RestrictedCountry(token.clone(), country));
+        e.storage().persistent().remove(&DataKey::RestrictedCountry(token.clone(), country));
         CountryUnrestricted { token, country }.publish(e);
     }
 
@@ -100,9 +98,7 @@ impl CountryRestrictModule {
     pub fn batch_unrestrict_countries(e: &Env, token: Address, countries: Vec<u32>) {
         require_compliance_auth(e);
         for country in countries.iter() {
-            e.storage()
-                .persistent()
-                .remove(&DataKey::RestrictedCountry(token.clone(), country));
+            e.storage().persistent().remove(&DataKey::RestrictedCountry(token.clone(), country));
             CountryUnrestricted { token: token.clone(), country }.publish(e);
         }
     }

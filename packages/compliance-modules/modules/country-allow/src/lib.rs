@@ -80,9 +80,7 @@ impl CountryAllowModule {
     /// Removes a country code from the allowlist for `token`.
     pub fn remove_allowed_country(e: &Env, token: Address, country: u32) {
         require_compliance_auth(e);
-        e.storage()
-            .persistent()
-            .remove(&DataKey::AllowedCountry(token.clone(), country));
+        e.storage().persistent().remove(&DataKey::AllowedCountry(token.clone(), country));
         CountryUnallowed { token, country }.publish(e);
     }
 
@@ -99,9 +97,7 @@ impl CountryAllowModule {
     pub fn batch_disallow_countries(e: &Env, token: Address, countries: Vec<u32>) {
         require_compliance_auth(e);
         for country in countries.iter() {
-            e.storage()
-                .persistent()
-                .remove(&DataKey::AllowedCountry(token.clone(), country));
+            e.storage().persistent().remove(&DataKey::AllowedCountry(token.clone(), country));
             CountryUnallowed { token: token.clone(), country }.publish(e);
         }
     }

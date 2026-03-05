@@ -68,9 +68,7 @@ impl TransferRestrictModule {
     /// Removes `user` from the transfer allowlist for `token`.
     pub fn disallow_user(e: &Env, token: Address, user: Address) {
         require_compliance_auth(e);
-        e.storage()
-            .persistent()
-            .remove(&DataKey::AllowedUser(token.clone(), user.clone()));
+        e.storage().persistent().remove(&DataKey::AllowedUser(token.clone(), user.clone()));
         UserDisallowed { token, user }.publish(e);
     }
 
@@ -87,9 +85,7 @@ impl TransferRestrictModule {
     pub fn batch_disallow_users(e: &Env, token: Address, users: Vec<Address>) {
         require_compliance_auth(e);
         for user in users.iter() {
-            e.storage()
-                .persistent()
-                .remove(&DataKey::AllowedUser(token.clone(), user.clone()));
+            e.storage().persistent().remove(&DataKey::AllowedUser(token.clone(), user.clone()));
             UserDisallowed { token: token.clone(), user }.publish(e);
         }
     }
