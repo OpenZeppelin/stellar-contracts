@@ -173,8 +173,7 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
         return;
     }
 
-    let compliance: Address =
-        e.storage().persistent().get(&ckey).expect("compliance must be set");
+    let compliance: Address = e.storage().persistent().get(&ckey).expect("compliance must be set");
     let self_addr = e.current_contract_address();
     let client = ComplianceHookCheckClient::new(e, &compliance);
 
@@ -284,8 +283,8 @@ pub fn set_irs_address(e: &Env, token: &Address, irs: &Address) {
 ///
 /// # Errors
 ///
-/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has
-///   been configured for this token.
+/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
+///   configured for this token.
 pub fn get_irs_client<'a>(e: &'a Env, token: &Address) -> IRSReadClient<'a> {
     let key = IRSKey::Registry(token.clone());
     let irs: Address = e
