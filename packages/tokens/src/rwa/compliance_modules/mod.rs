@@ -8,7 +8,10 @@
 pub mod common;
 pub mod country_allow;
 pub mod country_restrict;
+pub mod initial_lockup_period;
 pub mod max_balance;
 pub mod supply_limit;
+pub mod time_transfers_limits;
+pub mod transfer_restrict;
 
 pub use super::{ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD};
