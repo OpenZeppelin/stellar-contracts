@@ -24,19 +24,16 @@
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/CountryAllowModule.sol
 
-use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, Env, Vec};
+pub mod storage;
+
+use soroban_sdk::{contract, contractevent, contractimpl, Address, Env, Vec};
 use stellar_compliance_common::{
     country_code, get_compliance_address, get_irs_client, module_name, require_compliance_auth,
     set_compliance_address, set_irs_address,
 };
 use stellar_tokens::rwa::compliance::ComplianceModule;
 
-#[contracttype]
-#[derive(Clone)]
-enum DataKey {
-    /// Per-(token, country) allowlist flag.
-    AllowedCountry(Address, u32),
-}
+use storage::{is_country_allowed, remove_country_allowed, set_country_allowed};
 
 /// Emitted when a country is added to the allowlist.
 #[contractevent]
@@ -71,14 +68,14 @@ impl CountryAllowModule {
     /// Adds a country code to the allowlist for `token`.
     pub fn add_allowed_country(e: &Env, token: Address, country: u32) {
         require_compliance_auth(e);
-        e.storage().persistent().set(&DataKey::AllowedCountry(token.clone(), country), &true);
+        set_country_allowed(e, &token, country);
         CountryAllowed { token, country }.publish(e);
     }
 
     /// Removes a country code from the allowlist for `token`.
     pub fn remove_allowed_country(e: &Env, token: Address, country: u32) {
         require_compliance_auth(e);
-        e.storage().persistent().remove(&DataKey::AllowedCountry(token.clone(), country));
+        remove_country_allowed(e, &token, country);
         CountryUnallowed { token, country }.publish(e);
     }
 
@@ -86,7 +83,7 @@ impl CountryAllowModule {
     pub fn batch_allow_countries(e: &Env, token: Address, countries: Vec<u32>) {
         require_compliance_auth(e);
         for country in countries.iter() {
-            e.storage().persistent().set(&DataKey::AllowedCountry(token.clone(), country), &true);
+            set_country_allowed(e, &token, country);
             CountryAllowed { token: token.clone(), country }.publish(e);
         }
     }
@@ -95,14 +92,14 @@ impl CountryAllowModule {
     pub fn batch_disallow_countries(e: &Env, token: Address, countries: Vec<u32>) {
         require_compliance_auth(e);
         for country in countries.iter() {
-            e.storage().persistent().remove(&DataKey::AllowedCountry(token.clone(), country));
+            remove_country_allowed(e, &token, country);
             CountryUnallowed { token: token.clone(), country }.publish(e);
         }
     }
 
     /// Returns `true` if `country` is on the allowlist for `token`.
     pub fn is_country_allowed(e: &Env, token: Address, country: u32) -> bool {
-        e.storage().persistent().get(&DataKey::AllowedCountry(token, country)).unwrap_or_default()
+        is_country_allowed(e, &token, country)
     }
 }
 
@@ -122,7 +119,7 @@ impl ComplianceModule for CountryAllowModule {
         let irs = get_irs_client(e, &token);
         let entries = irs.get_country_data_entries(&to);
         for entry in entries.iter() {
-            if Self::is_country_allowed(e, token.clone(), country_code(&entry.country)) {
+            if is_country_allowed(e, &token, country_code(&entry.country)) {
                 return true;
             }
         }

@@ -18,18 +18,15 @@
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/TransferRestrictModule.sol
 
-use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, Env, Vec};
+pub mod storage;
+
+use soroban_sdk::{contract, contractevent, contractimpl, Address, Env, Vec};
 use stellar_compliance_common::{
     get_compliance_address, module_name, require_compliance_auth, set_compliance_address,
 };
 use stellar_tokens::rwa::compliance::ComplianceModule;
 
-#[contracttype]
-#[derive(Clone)]
-enum DataKey {
-    /// Per-(token, address) allowlist flag.
-    AllowedUser(Address, Address),
-}
+use storage::{is_user_allowed, remove_user_allowed, set_user_allowed};
 
 /// Emitted when an address is added to the transfer allowlist.
 #[contractevent]
@@ -59,14 +56,14 @@ impl TransferRestrictModule {
     /// Adds `user` to the transfer allowlist for `token`.
     pub fn allow_user(e: &Env, token: Address, user: Address) {
         require_compliance_auth(e);
-        e.storage().persistent().set(&DataKey::AllowedUser(token.clone(), user.clone()), &true);
+        set_user_allowed(e, &token, &user);
         UserAllowed { token, user }.publish(e);
     }
 
     /// Removes `user` from the transfer allowlist for `token`.
     pub fn disallow_user(e: &Env, token: Address, user: Address) {
         require_compliance_auth(e);
-        e.storage().persistent().remove(&DataKey::AllowedUser(token.clone(), user.clone()));
+        remove_user_allowed(e, &token, &user);
         UserDisallowed { token, user }.publish(e);
     }
 
@@ -74,7 +71,7 @@ impl TransferRestrictModule {
     pub fn batch_allow_users(e: &Env, token: Address, users: Vec<Address>) {
         require_compliance_auth(e);
         for user in users.iter() {
-            e.storage().persistent().set(&DataKey::AllowedUser(token.clone(), user.clone()), &true);
+            set_user_allowed(e, &token, &user);
             UserAllowed { token: token.clone(), user }.publish(e);
         }
     }
@@ -83,14 +80,14 @@ impl TransferRestrictModule {
     pub fn batch_disallow_users(e: &Env, token: Address, users: Vec<Address>) {
         require_compliance_auth(e);
         for user in users.iter() {
-            e.storage().persistent().remove(&DataKey::AllowedUser(token.clone(), user.clone()));
+            remove_user_allowed(e, &token, &user);
             UserDisallowed { token: token.clone(), user }.publish(e);
         }
     }
 
     /// Returns `true` if `user` is on the allowlist for `token`.
     pub fn is_user_allowed(e: &Env, token: Address, user: Address) -> bool {
-        e.storage().persistent().get(&DataKey::AllowedUser(token, user)).unwrap_or_default()
+        is_user_allowed(e, &token, &user)
     }
 }
 
@@ -107,12 +104,10 @@ impl ComplianceModule for TransferRestrictModule {
 
     /// Returns `true` if sender or recipient is on the allowlist.
     fn can_transfer(e: &Env, from: Address, to: Address, _amount: i128, token: Address) -> bool {
-        // T-REX semantics: if sender is allowlisted, transfer passes; otherwise
-        // recipient must be allowlisted.
-        if Self::is_user_allowed(e, token.clone(), from) {
+        if is_user_allowed(e, &token, &from) {
             return true;
         }
-        Self::is_user_allowed(e, token, to)
+        is_user_allowed(e, &token, &to)
     }
 
     /// Always returns `true` — mints bypass the allowlist check.

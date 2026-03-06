@@ -40,7 +40,9 @@
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/MaxBalanceModule.sol
 
-use soroban_sdk::{contract, contractevent, contractimpl, contracttype, vec, Address, Env, Vec};
+pub mod storage;
+
+use soroban_sdk::{contract, contractevent, contractimpl, vec, Address, Env, Vec};
 use stellar_compliance_common::{
     checked_add_i128, checked_sub_i128, get_compliance_address, get_irs_client, hooks_verified,
     module_name, require_compliance_auth, require_non_negative_amount, set_compliance_address,
@@ -48,14 +50,7 @@ use stellar_compliance_common::{
 };
 use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
-#[contracttype]
-#[derive(Clone)]
-enum DataKey {
-    /// Per-token maximum allowed identity balance.
-    MaxBalance(Address),
-    /// Balance keyed by (token, identity) — not by wallet.
-    IDBalance(Address, Address),
-}
+use storage::{get_id_balance, get_max_balance, set_id_balance, set_max_balance};
 
 /// Emitted when a token's per-identity balance cap is configured.
 #[contractevent]
@@ -91,11 +86,11 @@ impl MaxBalanceModule {
 
     /// Configures the per-identity balance cap for `token`.
     /// T-REX equivalent: `setMaxBalance(_newMaxBalance)`.
-    pub fn set_max_balance(e: &Env, token: Address, max_balance: i128) {
+    pub fn set_max_balance(e: &Env, token: Address, max: i128) {
         require_compliance_auth(e);
-        require_non_negative_amount(e, max_balance);
-        e.storage().persistent().set(&DataKey::MaxBalance(token.clone()), &max_balance);
-        MaxBalanceSet { token, max_balance }.publish(e);
+        require_non_negative_amount(e, max);
+        set_max_balance(e, &token, max);
+        MaxBalanceSet { token, max_balance: max }.publish(e);
     }
 
     /// Bootstrap existing investor state. Takes an **identity** address
@@ -103,9 +98,7 @@ impl MaxBalanceModule {
     pub fn pre_set_module_state(e: &Env, token: Address, identity: Address, balance: i128) {
         require_compliance_auth(e);
         require_non_negative_amount(e, balance);
-        e.storage()
-            .persistent()
-            .set(&DataKey::IDBalance(token.clone(), identity.clone()), &balance);
+        set_id_balance(e, &token, &identity, balance);
         IDBalancePreSet { token, identity, balance }.publish(e);
     }
 
@@ -126,14 +119,14 @@ impl MaxBalanceModule {
             let id = identities.get(i).unwrap();
             let bal = balances.get(i).unwrap();
             require_non_negative_amount(e, bal);
-            e.storage().persistent().set(&DataKey::IDBalance(token.clone(), id.clone()), &bal);
+            set_id_balance(e, &token, &id, bal);
             IDBalancePreSet { token: token.clone(), identity: id, balance: bal }.publish(e);
         }
     }
 
     /// Returns the module-tracked balance for an **identity**.
     pub fn get_investor_balance(e: &Env, token: Address, identity: Address) -> i128 {
-        e.storage().persistent().get(&DataKey::IDBalance(token, identity)).unwrap_or_default()
+        get_id_balance(e, &token, &identity)
     }
 
     /// Returns the compliance hooks this module must be registered on.
@@ -176,23 +169,18 @@ impl ComplianceModule for MaxBalanceModule {
             return;
         }
 
-        let from_key = DataKey::IDBalance(token.clone(), from_id);
-        let to_key = DataKey::IDBalance(token.clone(), to_id);
-
-        let from_balance: i128 = e.storage().persistent().get(&from_key).unwrap_or_default();
-        let to_balance: i128 = e.storage().persistent().get(&to_key).unwrap_or_default();
-
+        let from_balance = get_id_balance(e, &token, &from_id);
+        let to_balance = get_id_balance(e, &token, &to_id);
         let new_to_balance = checked_add_i128(e, to_balance, amount);
 
-        let max: i128 =
-            e.storage().persistent().get(&DataKey::MaxBalance(token)).unwrap_or_default();
+        let max = get_max_balance(e, &token);
         assert!(
             max == 0 || new_to_balance <= max,
             "MaxBalanceModule: recipient identity balance exceeds max"
         );
 
-        e.storage().persistent().set(&from_key, &checked_sub_i128(e, from_balance, amount));
-        e.storage().persistent().set(&to_key, &new_to_balance);
+        set_id_balance(e, &token, &from_id, checked_sub_i128(e, from_balance, amount));
+        set_id_balance(e, &token, &to_id, new_to_balance);
     }
 
     /// Mirrors T-REX `moduleMintAction`: updates identity balance and reverts
@@ -205,18 +193,16 @@ impl ComplianceModule for MaxBalanceModule {
         let irs = get_irs_client(e, &token);
         let to_id = irs.stored_identity(&to);
 
-        let key = DataKey::IDBalance(token.clone(), to_id);
-        let current: i128 = e.storage().persistent().get(&key).unwrap_or_default();
+        let current = get_id_balance(e, &token, &to_id);
         let new_balance = checked_add_i128(e, current, amount);
 
-        let max: i128 =
-            e.storage().persistent().get(&DataKey::MaxBalance(token)).unwrap_or_default();
+        let max = get_max_balance(e, &token);
         assert!(
             max == 0 || new_balance <= max,
             "MaxBalanceModule: recipient identity balance exceeds max after mint"
         );
 
-        e.storage().persistent().set(&key, &new_balance);
+        set_id_balance(e, &token, &to_id, new_balance);
     }
 
     /// Decrements the sender identity's tracked balance on burn.
@@ -227,9 +213,8 @@ impl ComplianceModule for MaxBalanceModule {
         let irs = get_irs_client(e, &token);
         let from_id = irs.stored_identity(&from);
 
-        let key = DataKey::IDBalance(token, from_id);
-        let current: i128 = e.storage().persistent().get(&key).unwrap_or_default();
-        e.storage().persistent().set(&key, &checked_sub_i128(e, current, amount));
+        let current = get_id_balance(e, &token, &from_id);
+        set_id_balance(e, &token, &from_id, checked_sub_i128(e, current, amount));
     }
 
     /// Returns `true` if recipient identity balance + amount stays within cap.
@@ -245,8 +230,7 @@ impl ComplianceModule for MaxBalanceModule {
         if amount < 0 {
             return false;
         }
-        let max: i128 =
-            e.storage().persistent().get(&DataKey::MaxBalance(token.clone())).unwrap_or_default();
+        let max = get_max_balance(e, &token);
         if max == 0 || amount > max {
             return max == 0;
         }
@@ -259,9 +243,7 @@ impl ComplianceModule for MaxBalanceModule {
             return true;
         }
 
-        let to_balance: i128 =
-            e.storage().persistent().get(&DataKey::IDBalance(token, to_id)).unwrap_or_default();
-
+        let to_balance = get_id_balance(e, &token, &to_id);
         checked_add_i128(e, to_balance, amount) <= max
     }
 

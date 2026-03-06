@@ -36,9 +36,9 @@
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/TimeTransfersLimitsModule.sol
 
-use soroban_sdk::{
-    contract, contractevent, contractimpl, contracttype, panic_with_error, vec, Address, Env, Vec,
-};
+pub mod storage;
+
+use soroban_sdk::{contract, contractevent, contractimpl, panic_with_error, vec, Address, Env, Vec};
 use stellar_compliance_common::{
     checked_add_i128, get_compliance_address, get_irs_client, hooks_verified, module_name,
     require_compliance_auth, require_non_negative_amount, set_compliance_address, set_irs_address,
@@ -46,34 +46,11 @@ use stellar_compliance_common::{
 };
 use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
+pub use storage::{Limit, TransferCounter};
+use storage::{get_counter, get_limits, set_counter, set_limits};
+
 /// Maximum number of distinct time-window limits per token.
 const MAX_LIMITS_PER_TOKEN: u32 = 4;
-
-/// A single time-window limit: `limit_value` tokens may be transferred
-/// within a rolling window of `limit_time` seconds.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Limit {
-    pub limit_time: u64,
-    pub limit_value: i128,
-}
-
-/// Tracks cumulative transfer volume for one identity within one window.
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TransferCounter {
-    pub value: i128,
-    pub timer: u64,
-}
-
-#[contracttype]
-#[derive(Clone)]
-enum DataKey {
-    /// Per-token list of configured time-window limits.
-    Limits(Address),
-    /// Counter keyed by (token, identity, window_seconds).
-    Counter(Address, Address, u64),
-}
 
 /// Emitted when a time-window limit is added or updated.
 #[contractevent]
@@ -112,11 +89,7 @@ impl TimeTransfersLimitsModule {
         require_compliance_auth(e);
         assert!(limit.limit_time > 0, "limit_time must be greater than zero");
         require_non_negative_amount(e, limit.limit_value);
-        let mut limits: Vec<Limit> = e
-            .storage()
-            .persistent()
-            .get(&DataKey::Limits(token.clone()))
-            .unwrap_or_else(|| Vec::new(e));
+        let mut limits = get_limits(e, &token);
 
         let mut replaced = false;
         for i in 0..limits.len() {
@@ -135,7 +108,7 @@ impl TimeTransfersLimitsModule {
             limits.push_back(limit.clone());
         }
 
-        e.storage().persistent().set(&DataKey::Limits(token.clone()), &limits);
+        set_limits(e, &token, &limits);
         TimeTransferLimitUpdated { token, limit }.publish(e);
     }
 
@@ -150,11 +123,7 @@ impl TimeTransfersLimitsModule {
     /// Removes the limit entry matching `limit_time`. Panics if not found.
     pub fn remove_time_transfer_limit(e: &Env, token: Address, limit_time: u64) {
         require_compliance_auth(e);
-        let mut limits: Vec<Limit> = e
-            .storage()
-            .persistent()
-            .get(&DataKey::Limits(token.clone()))
-            .unwrap_or_else(|| Vec::new(e));
+        let mut limits = get_limits(e, &token);
 
         let mut found = false;
         for i in 0..limits.len() {
@@ -170,7 +139,7 @@ impl TimeTransfersLimitsModule {
             panic_with_error!(e, ModuleError::MissingLimit);
         }
 
-        e.storage().persistent().set(&DataKey::Limits(token.clone()), &limits);
+        set_limits(e, &token, &limits);
         TimeTransferLimitRemoved { token, limit_time }.publish(e);
     }
 
@@ -185,7 +154,7 @@ impl TimeTransfersLimitsModule {
 
     /// Returns all configured time-window limits for `token`.
     pub fn get_time_transfer_limits(e: &Env, token: Address) -> Vec<Limit> {
-        e.storage().persistent().get(&DataKey::Limits(token)).unwrap_or_else(|| Vec::new(e))
+        get_limits(e, &token)
     }
 
     /// Returns the compliance hooks this module must be registered on.
@@ -204,11 +173,7 @@ impl TimeTransfersLimitsModule {
     }
 
     fn is_counter_finished(e: &Env, token: &Address, identity: &Address, limit_time: u64) -> bool {
-        let counter: TransferCounter = e
-            .storage()
-            .persistent()
-            .get(&DataKey::Counter(token.clone(), identity.clone(), limit_time))
-            .unwrap_or(TransferCounter { value: 0, timer: 0 });
+        let counter = get_counter(e, token, identity, limit_time);
         counter.timer <= e.ledger().timestamp()
     }
 
@@ -218,24 +183,17 @@ impl TimeTransfersLimitsModule {
                 value: 0,
                 timer: e.ledger().timestamp().saturating_add(limit_time),
             };
-            e.storage()
-                .persistent()
-                .set(&DataKey::Counter(token.clone(), identity.clone(), limit_time), &counter);
+            set_counter(e, token, identity, limit_time, &counter);
         }
     }
 
     fn increase_counters(e: &Env, token: &Address, identity: &Address, value: i128) {
-        let limits = Self::get_time_transfer_limits(e, token.clone());
+        let limits = get_limits(e, token);
         for limit in limits.iter() {
             Self::reset_counter_if_needed(e, token, identity, limit.limit_time);
-            let key = DataKey::Counter(token.clone(), identity.clone(), limit.limit_time);
-            let mut counter: TransferCounter = e
-                .storage()
-                .persistent()
-                .get(&key)
-                .unwrap_or(TransferCounter { value: 0, timer: 0 });
+            let mut counter = get_counter(e, token, identity, limit.limit_time);
             counter.value = checked_add_i128(e, counter.value, value);
-            e.storage().persistent().set(&key, &counter);
+            set_counter(e, token, identity, limit.limit_time, &counter);
         }
     }
 }
@@ -272,7 +230,7 @@ impl ComplianceModule for TimeTransfersLimitsModule {
         }
         let irs = get_irs_client(e, &token);
         let from_id = irs.stored_identity(&from);
-        let limits = Self::get_time_transfer_limits(e, token.clone());
+        let limits = get_limits(e, &token);
 
         for limit in limits.iter() {
             if amount > limit.limit_value {
@@ -280,11 +238,7 @@ impl ComplianceModule for TimeTransfersLimitsModule {
             }
 
             if !Self::is_counter_finished(e, &token, &from_id, limit.limit_time) {
-                let counter: TransferCounter = e
-                    .storage()
-                    .persistent()
-                    .get(&DataKey::Counter(token.clone(), from_id.clone(), limit.limit_time))
-                    .unwrap_or(TransferCounter { value: 0, timer: 0 });
+                let counter = get_counter(e, &token, &from_id, limit.limit_time);
                 if checked_add_i128(e, counter.value, amount) > limit.limit_value {
                     return false;
                 }

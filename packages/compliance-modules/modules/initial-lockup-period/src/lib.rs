@@ -68,7 +68,9 @@
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/TimeExchangeLimitsModule.sol
 
-use soroban_sdk::{contract, contractevent, contractimpl, contracttype, vec, Address, Env, Vec};
+pub mod storage;
+
+use soroban_sdk::{contract, contractevent, contractimpl, vec, Address, Env, Vec};
 use stellar_compliance_common::{
     checked_add_i128, checked_sub_i128, get_compliance_address, hooks_verified, module_name,
     require_compliance_auth, require_non_negative_amount, set_compliance_address,
@@ -76,29 +78,11 @@ use stellar_compliance_common::{
 };
 use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
-/// A single mint-created lock entry tracking the locked amount and its
-/// release time. Mirrors T-REX `LockedTokens { amount, releaseTimestamp }`.
-#[contracttype]
-#[derive(Clone)]
-pub struct LockedTokens {
-    pub amount: i128,
-    pub release_timestamp: u64,
-}
-
-#[contracttype]
-#[derive(Clone)]
-enum DataKey {
-    /// Per-token lockup duration in seconds.
-    LockupPeriod(Address),
-    /// Per-(token, wallet) ordered list of individual lock entries.
-    Locks(Address, Address),
-    /// Per-(token, wallet) aggregate of all locked amounts.
-    /// Equivalent to T-REX `LockedDetails.totalLocked`.
-    TotalLocked(Address, Address),
-    /// Per-(token, wallet) balance mirror, updated via hooks to avoid
-    /// re-entrant `token.balance()` calls.
-    InternalBalance(Address, Address),
-}
+pub use storage::LockedTokens;
+use storage::{
+    get_internal_balance, get_lockup_period, get_locks, get_total_locked, set_internal_balance,
+    set_lockup_period, set_locks, set_total_locked,
+};
 
 /// Emitted when a token's lockup duration is configured or changed.
 #[contractevent]
@@ -123,28 +107,28 @@ impl InitialLockupPeriodModule {
     /// T-REX equivalent: `setLockupPeriod(_lockupPeriodInDays)`.
     pub fn set_lockup_period(e: &Env, token: Address, lockup_seconds: u64) {
         require_compliance_auth(e);
-        e.storage().persistent().set(&DataKey::LockupPeriod(token.clone()), &lockup_seconds);
+        set_lockup_period(e, &token, lockup_seconds);
         LockupPeriodSet { token, lockup_seconds }.publish(e);
     }
 
     /// Returns the configured lockup duration (seconds) for `token`.
     pub fn get_lockup_period(e: &Env, token: Address) -> u64 {
-        e.storage().persistent().get(&DataKey::LockupPeriod(token)).unwrap_or_default()
+        get_lockup_period(e, &token)
     }
 
     /// Returns the aggregate locked amount for a `(token, wallet)` pair.
     pub fn get_total_locked(e: &Env, token: Address, wallet: Address) -> i128 {
-        e.storage().persistent().get(&DataKey::TotalLocked(token, wallet)).unwrap_or_default()
+        get_total_locked(e, &token, &wallet)
     }
 
     /// Returns the ordered list of individual lock entries for a wallet.
     pub fn get_locked_tokens(e: &Env, token: Address, wallet: Address) -> Vec<LockedTokens> {
-        e.storage().persistent().get(&DataKey::Locks(token, wallet)).unwrap_or_else(|| Vec::new(e))
+        get_locks(e, &token, &wallet)
     }
 
     /// Returns the module's internal balance mirror for a wallet.
     pub fn get_internal_balance(e: &Env, token: Address, wallet: Address) -> i128 {
-        e.storage().persistent().get(&DataKey::InternalBalance(token, wallet)).unwrap_or_default()
+        get_internal_balance(e, &token, &wallet)
     }
 
     /// Returns the compliance hooks this module must be registered on.
@@ -196,10 +180,7 @@ fn calculate_unlocked_amount(e: &Env, locks: &Vec<LockedTokens>) -> i128 {
 /// consistency — the Solidity version does not, relying on read-time
 /// compensation via `_calculateUnlockedAmount`.
 fn update_locked_tokens(e: &Env, token: &Address, wallet: &Address, mut amount_to_consume: i128) {
-    let locks_key = DataKey::Locks(token.clone(), wallet.clone());
-    let locks: Vec<LockedTokens> =
-        e.storage().persistent().get(&locks_key).unwrap_or_else(|| Vec::new(e));
-
+    let locks = get_locks(e, token, wallet);
     let now = e.ledger().timestamp();
     let mut new_locks = Vec::new(e);
     let mut consumed_total = 0i128;
@@ -223,11 +204,10 @@ fn update_locked_tokens(e: &Env, token: &Address, wallet: &Address, mut amount_t
         }
     }
 
-    e.storage().persistent().set(&locks_key, &new_locks);
+    set_locks(e, token, wallet, &new_locks);
 
-    let total_key = DataKey::TotalLocked(token.clone(), wallet.clone());
-    let total_locked: i128 = e.storage().persistent().get(&total_key).unwrap_or_default();
-    e.storage().persistent().set(&total_key, &checked_sub_i128(e, total_locked, consumed_total));
+    let total_locked = get_total_locked(e, token, wallet);
+    set_total_locked(e, token, wallet, checked_sub_i128(e, total_locked, consumed_total));
 }
 
 // ---------------------------------------------------------------------------
@@ -243,10 +223,10 @@ impl ComplianceModule for InitialLockupPeriodModule {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
 
-        let total_locked = Self::get_total_locked(e, token.clone(), from.clone());
+        let total_locked = get_total_locked(e, &token, &from);
 
         if total_locked > 0 {
-            let pre_balance = Self::get_internal_balance(e, token.clone(), from.clone());
+            let pre_balance = get_internal_balance(e, &token, &from);
             let pre_free = pre_balance - total_locked;
 
             if amount > pre_free.max(0) {
@@ -255,13 +235,11 @@ impl ComplianceModule for InitialLockupPeriodModule {
             }
         }
 
-        let from_key = DataKey::InternalBalance(token.clone(), from.clone());
-        let from_bal: i128 = e.storage().persistent().get(&from_key).unwrap_or_default();
-        e.storage().persistent().set(&from_key, &checked_sub_i128(e, from_bal, amount));
+        let from_bal = get_internal_balance(e, &token, &from);
+        set_internal_balance(e, &token, &from, checked_sub_i128(e, from_bal, amount));
 
-        let to_key = DataKey::InternalBalance(token, to);
-        let to_bal: i128 = e.storage().persistent().get(&to_key).unwrap_or_default();
-        e.storage().persistent().set(&to_key, &checked_add_i128(e, to_bal, amount));
+        let to_bal = get_internal_balance(e, &token, &to);
+        set_internal_balance(e, &token, &to, checked_add_i128(e, to_bal, amount));
     }
 
     /// T-REX `moduleMintAction`: push a new lock entry for the minted amount
@@ -270,26 +248,21 @@ impl ComplianceModule for InitialLockupPeriodModule {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
 
-        let period = Self::get_lockup_period(e, token.clone());
+        let period = get_lockup_period(e, &token);
         if period > 0 {
-            let locks_key = DataKey::Locks(token.clone(), to.clone());
-            let mut locks: Vec<LockedTokens> =
-                e.storage().persistent().get(&locks_key).unwrap_or_else(|| Vec::new(e));
-
+            let mut locks = get_locks(e, &token, &to);
             locks.push_back(LockedTokens {
                 amount,
                 release_timestamp: e.ledger().timestamp().saturating_add(period),
             });
-            e.storage().persistent().set(&locks_key, &locks);
+            set_locks(e, &token, &to, &locks);
 
-            let total_key = DataKey::TotalLocked(token.clone(), to.clone());
-            let total: i128 = e.storage().persistent().get(&total_key).unwrap_or_default();
-            e.storage().persistent().set(&total_key, &checked_add_i128(e, total, amount));
+            let total = get_total_locked(e, &token, &to);
+            set_total_locked(e, &token, &to, checked_add_i128(e, total, amount));
         }
 
-        let bal_key = DataKey::InternalBalance(token, to);
-        let current: i128 = e.storage().persistent().get(&bal_key).unwrap_or_default();
-        e.storage().persistent().set(&bal_key, &checked_add_i128(e, current, amount));
+        let current = get_internal_balance(e, &token, &to);
+        set_internal_balance(e, &token, &to, checked_add_i128(e, current, amount));
     }
 
     /// T-REX `moduleBurnAction`: panics if the burn would consume
@@ -299,14 +272,14 @@ impl ComplianceModule for InitialLockupPeriodModule {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
 
-        let total_locked = Self::get_total_locked(e, token.clone(), from.clone());
+        let total_locked = get_total_locked(e, &token, &from);
 
         if total_locked > 0 {
-            let pre_balance = Self::get_internal_balance(e, token.clone(), from.clone());
+            let pre_balance = get_internal_balance(e, &token, &from);
             let mut free_amount = pre_balance - total_locked;
 
             if free_amount < amount {
-                let locks = Self::get_locked_tokens(e, token.clone(), from.clone());
+                let locks = get_locks(e, &token, &from);
                 free_amount += calculate_unlocked_amount(e, &locks);
             }
 
@@ -322,9 +295,8 @@ impl ComplianceModule for InitialLockupPeriodModule {
             }
         }
 
-        let bal_key = DataKey::InternalBalance(token, from);
-        let current: i128 = e.storage().persistent().get(&bal_key).unwrap_or_default();
-        e.storage().persistent().set(&bal_key, &checked_sub_i128(e, current, amount));
+        let current = get_internal_balance(e, &token, &from);
+        set_internal_balance(e, &token, &from, checked_sub_i128(e, current, amount));
     }
 
     /// T-REX `moduleCheck`: allow transfer only if free balance >= amount.
@@ -339,19 +311,19 @@ impl ComplianceModule for InitialLockupPeriodModule {
             return false;
         }
 
-        let total_locked = Self::get_total_locked(e, token.clone(), from.clone());
+        let total_locked = get_total_locked(e, &token, &from);
         if total_locked == 0 {
             return true;
         }
 
-        let balance = Self::get_internal_balance(e, token.clone(), from.clone());
+        let balance = get_internal_balance(e, &token, &from);
         let free = balance - total_locked;
 
         if free >= amount {
             return true;
         }
 
-        let locks = Self::get_locked_tokens(e, token, from);
+        let locks = get_locks(e, &token, &from);
         let unlocked = calculate_unlocked_amount(e, &locks);
         (free + unlocked) >= amount
     }

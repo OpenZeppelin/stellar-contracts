@@ -43,24 +43,20 @@
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/SupplyLimitModule.sol
 
-use soroban_sdk::{
-    contract, contractevent, contractimpl, contracttype, panic_with_error, vec, Address, Env, Vec,
-};
+pub mod storage;
+
+use soroban_sdk::{contract, contractevent, contractimpl, vec, Address, Env, Vec};
 use stellar_compliance_common::{
     checked_add_i128, checked_sub_i128, get_compliance_address, hooks_verified, module_name,
     require_compliance_auth, require_non_negative_amount, set_compliance_address,
-    verify_required_hooks, ModuleError,
+    verify_required_hooks,
 };
 use stellar_tokens::rwa::compliance::{ComplianceHook, ComplianceModule};
 
-#[contracttype]
-#[derive(Clone)]
-enum DataKey {
-    /// Per-token supply cap.
-    SupplyLimit(Address),
-    /// Per-token internal supply counter (updated via hooks).
-    InternalSupply(Address),
-}
+use storage::{
+    get_internal_supply, get_supply_limit, get_supply_limit_or_panic, set_internal_supply,
+    set_supply_limit,
+};
 
 /// Emitted when a token's supply cap is configured or changed.
 #[contractevent]
@@ -82,21 +78,18 @@ impl SupplyLimitModule {
     pub fn set_supply_limit(e: &Env, token: Address, limit: i128) {
         require_compliance_auth(e);
         require_non_negative_amount(e, limit);
-        e.storage().persistent().set(&DataKey::SupplyLimit(token.clone()), &limit);
+        set_supply_limit(e, &token, limit);
         SupplyLimitSet { token, limit }.publish(e);
     }
 
     /// Returns the configured supply limit for `token`.
     pub fn get_supply_limit(e: &Env, token: Address) -> i128 {
-        e.storage()
-            .persistent()
-            .get(&DataKey::SupplyLimit(token))
-            .unwrap_or_else(|| panic_with_error!(e, ModuleError::MissingLimit))
+        get_supply_limit_or_panic(e, &token)
     }
 
     /// Returns the module's internal supply counter for `token`.
     pub fn get_internal_supply(e: &Env, token: Address) -> i128 {
-        e.storage().persistent().get(&DataKey::InternalSupply(token)).unwrap_or_default()
+        get_internal_supply(e, &token)
     }
 
     /// Returns the compliance hooks this module must be registered on.
@@ -124,18 +117,16 @@ impl ComplianceModule for SupplyLimitModule {
     fn on_created(e: &Env, _to: Address, amount: i128, token: Address) {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
-        let key = DataKey::InternalSupply(token);
-        let current: i128 = e.storage().persistent().get(&key).unwrap_or_default();
-        e.storage().persistent().set(&key, &checked_add_i128(e, current, amount));
+        let current = get_internal_supply(e, &token);
+        set_internal_supply(e, &token, checked_add_i128(e, current, amount));
     }
 
     /// Decrements the internal supply counter on burn.
     fn on_destroyed(e: &Env, _from: Address, amount: i128, token: Address) {
         require_compliance_auth(e);
         require_non_negative_amount(e, amount);
-        let key = DataKey::InternalSupply(token);
-        let current: i128 = e.storage().persistent().get(&key).unwrap_or_default();
-        e.storage().persistent().set(&key, &checked_sub_i128(e, current, amount));
+        let current = get_internal_supply(e, &token);
+        set_internal_supply(e, &token, checked_sub_i128(e, current, amount));
     }
 
     /// Always returns `true` — supply limit only gates minting.
@@ -159,14 +150,12 @@ impl ComplianceModule for SupplyLimitModule {
         if amount < 0 {
             return false;
         }
-        let limit: i128 =
-            e.storage().persistent().get(&DataKey::SupplyLimit(token.clone())).unwrap_or_default();
+        let limit = get_supply_limit(e, &token);
         if limit == 0 {
             return true;
         }
-        let internal_supply: i128 =
-            e.storage().persistent().get(&DataKey::InternalSupply(token)).unwrap_or_default();
-        checked_add_i128(e, internal_supply, amount) <= limit
+        let supply = get_internal_supply(e, &token);
+        checked_add_i128(e, supply, amount) <= limit
     }
 
     fn name(e: &Env) -> soroban_sdk::String {
