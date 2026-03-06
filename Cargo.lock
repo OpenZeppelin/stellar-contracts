@@ -1445,6 +1445,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "rwa-compliance-example"
+version = "0.6.0"
+dependencies = [
+ "rwa-country-allow",
+ "rwa-country-restrict",
+ "rwa-initial-lockup-period",
+ "rwa-max-balance",
+ "rwa-supply-limit",
+ "rwa-time-transfers-limits",
+ "rwa-transfer-restrict",
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "rwa-country-allow"
 version = "0.6.0"
 dependencies = [
