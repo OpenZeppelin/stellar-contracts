@@ -39,8 +39,8 @@ pub fn get_supply_limit(e: &Env, token: &Address) -> i128 {
 ///
 /// # Errors
 ///
-/// * [`ComplianceModuleError::MissingLimit`] - When no supply limit has
-///   been configured for this token.
+/// * [`ComplianceModuleError::MissingLimit`] - When no supply limit has been
+///   configured for this token.
 pub fn get_supply_limit_or_panic(e: &Env, token: &Address) -> i128 {
     let key = SupplyLimitStorageKey::SupplyLimit(token.clone());
     let limit: i128 = e

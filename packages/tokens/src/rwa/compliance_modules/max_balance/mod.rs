@@ -9,6 +9,7 @@
 pub mod storage;
 
 use soroban_sdk::{contractevent, contracttrait, vec, Address, Env, String, Vec};
+use storage::{get_id_balance, get_max_balance, set_id_balance, set_max_balance};
 
 use super::common::{
     checked_add_i128, checked_sub_i128, get_compliance_address, get_irs_client, hooks_verified,
@@ -16,7 +17,6 @@ use super::common::{
     set_irs_address, verify_required_hooks,
 };
 use crate::rwa::compliance::ComplianceHook;
-use storage::{get_id_balance, get_max_balance, set_id_balance, set_max_balance};
 
 /// Emitted when a token's per-identity balance cap is configured.
 #[contractevent]

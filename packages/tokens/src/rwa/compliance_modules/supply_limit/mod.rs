@@ -8,6 +8,10 @@
 pub mod storage;
 
 use soroban_sdk::{contractevent, contracttrait, vec, Address, Env, String, Vec};
+use storage::{
+    get_internal_supply, get_supply_limit, get_supply_limit_or_panic, set_internal_supply,
+    set_supply_limit,
+};
 
 use super::common::{
     checked_add_i128, checked_sub_i128, get_compliance_address, hooks_verified, module_name,
@@ -15,10 +19,6 @@ use super::common::{
     verify_required_hooks,
 };
 use crate::rwa::compliance::ComplianceHook;
-use storage::{
-    get_internal_supply, get_supply_limit, get_supply_limit_or_panic, set_internal_supply,
-    set_supply_limit,
-};
 
 /// Emitted when a token's supply cap is configured or changed.
 #[contractevent]
