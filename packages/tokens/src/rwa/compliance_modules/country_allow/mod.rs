@@ -9,12 +9,12 @@
 pub mod storage;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env, String, Vec};
+use storage::{is_country_allowed, remove_country_allowed, set_country_allowed};
 
 use super::common::{
     country_code, get_compliance_address, get_irs_client, module_name, require_compliance_auth,
     set_compliance_address, set_irs_address,
 };
-use storage::{is_country_allowed, remove_country_allowed, set_country_allowed};
 
 /// Emitted when a country is added to the allowlist.
 #[contractevent]
