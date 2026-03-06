@@ -1445,6 +1445,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "rwa-country-allow"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-country-restrict"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"

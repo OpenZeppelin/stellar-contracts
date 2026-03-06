@@ -6,5 +6,7 @@
 //! these traits via `#[contractimpl(contracttrait)]` in the examples.
 
 pub mod common;
+pub mod country_allow;
+pub mod country_restrict;
 
 pub use super::{ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD};
