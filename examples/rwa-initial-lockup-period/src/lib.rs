@@ -1,9 +1,9 @@
 #![no_std]
 
 use soroban_sdk::{contract, contractimpl, Address, String, Vec};
-use stellar_tokens::rwa::compliance::ComplianceHook;
-use stellar_tokens::rwa::compliance_modules::initial_lockup_period::{
-    InitialLockupPeriod, LockedTokens,
+use stellar_tokens::rwa::{
+    compliance::ComplianceHook,
+    compliance_modules::initial_lockup_period::{InitialLockupPeriod, LockedTokens},
 };
 
 #[contract]

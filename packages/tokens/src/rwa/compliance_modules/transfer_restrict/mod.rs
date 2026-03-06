@@ -9,11 +9,11 @@
 pub mod storage;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env, String, Vec};
+use storage::{is_user_allowed, remove_user_allowed, set_user_allowed};
 
 use super::common::{
     get_compliance_address, module_name, require_compliance_auth, set_compliance_address,
 };
-use storage::{is_user_allowed, remove_user_allowed, set_user_allowed};
 
 /// Emitted when an address is added to the transfer allowlist.
 #[contractevent]

@@ -10,6 +10,11 @@
 pub mod storage;
 
 use soroban_sdk::{contractevent, contracttrait, vec, Address, Env, String, Vec};
+pub use storage::LockedTokens;
+use storage::{
+    get_internal_balance, get_locks, get_lockup_period, get_total_locked, set_internal_balance,
+    set_locks, set_lockup_period, set_total_locked,
+};
 
 use super::common::{
     checked_add_i128, checked_sub_i128, get_compliance_address, hooks_verified, module_name,
@@ -17,11 +22,6 @@ use super::common::{
     verify_required_hooks,
 };
 use crate::rwa::compliance::ComplianceHook;
-pub use storage::LockedTokens;
-use storage::{
-    get_internal_balance, get_lockup_period, get_locks, get_total_locked, set_internal_balance,
-    set_lockup_period, set_locks, set_total_locked,
-};
 
 /// Emitted when a token's lockup duration is configured or changed.
 #[contractevent]
