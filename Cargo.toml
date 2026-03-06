@@ -22,6 +22,8 @@ members = [
     #"examples/rwa",
     "examples/rwa-country-allow",
     "examples/rwa-country-restrict",
+    "examples/rwa-max-balance",
+    "examples/rwa-supply-limit",
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
     "examples/multisig-smart-account/*",

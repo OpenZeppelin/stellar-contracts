@@ -8,5 +8,7 @@
 pub mod common;
 pub mod country_allow;
 pub mod country_restrict;
+pub mod max_balance;
+pub mod supply_limit;
 
 pub use super::{ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD};
