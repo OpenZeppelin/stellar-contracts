@@ -20,14 +20,14 @@ members = [
     "examples/ownable",
     "examples/pausable",
     #"examples/rwa",
+    "examples/rwa-compliance",
     "examples/rwa-country-allow",
     "examples/rwa-country-restrict",
+    "examples/rwa-initial-lockup-period",
     "examples/rwa-max-balance",
     "examples/rwa-supply-limit",
     "examples/rwa-time-transfers-limits",
     "examples/rwa-transfer-restrict",
-    "examples/rwa-initial-lockup-period",
-    "examples/rwa-compliance",
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
     "examples/multisig-smart-account/*",
@@ -42,8 +42,14 @@ members = [
     "packages/test-utils/*",
     "packages/tokens",
     "packages/zk-email",
+    "examples/rwa-deploy/irs",
+    "examples/rwa-deploy/verifier",
+    "examples/rwa-deploy/compliance",
+    "examples/rwa-deploy/token",
 ]
-exclude = ["examples/upgradeable/testdata"]
+exclude = [
+    "examples/upgradeable/testdata",
+]
 
 [workspace.package]
 authors = ["OpenZeppelin"]
