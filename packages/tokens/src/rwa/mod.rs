@@ -523,6 +523,8 @@ pub enum ComplianceModuleError {
     MissingCountry = 396,
     /// The identity registry storage address has not been configured.
     IdentityRegistryNotSet = 397,
+    /// A module is not registered on a required compliance hook.
+    MissingRequiredHook = 398,
 }
 
 // ################## CONSTANTS ##################
