@@ -165,8 +165,9 @@ pub fn hooks_verified(e: &Env) -> bool {
 ///
 /// # Panics
 ///
-/// Panics if any required hook is not registered — this means the
-/// deployment is misconfigured and internal state would drift.
+/// Panics with [`ComplianceModuleError::MissingRequiredHook`] if any
+/// required hook is not registered — this means the deployment is
+/// misconfigured and internal state would drift.
 pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
     let ckey = compliance_key(e);
     if !e.storage().persistent().has(&ckey) {
@@ -180,14 +181,7 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
     for i in 0..required.len() {
         let hook = required.get(i).unwrap();
         if !client.is_module_registered(&hook, &self_addr) {
-            let name = match hook {
-                ComplianceHook::CanTransfer => "CanTransfer",
-                ComplianceHook::CanCreate => "CanCreate",
-                ComplianceHook::Transferred => "Transferred",
-                ComplianceHook::Created => "Created",
-                ComplianceHook::Destroyed => "Destroyed",
-            };
-            panic!("missing required hook: {}", name);
+            panic_with_error!(e, ComplianceModuleError::MissingRequiredHook);
         }
     }
 
@@ -318,5 +312,153 @@ pub fn country_code(relation: &CountryRelation) -> u32 {
             | OrganizationCountryRelation::SourceOfFunds(c) => *c,
             OrganizationCountryRelation::Custom(_, c) => *c,
         },
+    }
+}
+
+#[cfg(test)]
+mod test {
+    extern crate std;
+
+    use soroban_sdk::{contract, contractimpl, testutils::Address as _, vec, Address, Env, Vec};
+
+    use super::*;
+
+    #[contract]
+    struct MockModuleContract;
+
+    #[contract]
+    struct MockComplianceContract;
+
+    #[contracttype]
+    #[derive(Clone)]
+    enum MockComplianceStorageKey {
+        Registered(ComplianceHook, Address),
+    }
+
+    #[contractimpl]
+    impl ComplianceHookCheck for MockComplianceContract {
+        fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool {
+            let key = MockComplianceStorageKey::Registered(hook, module);
+            e.storage().persistent().has(&key)
+        }
+    }
+
+    #[contractimpl]
+    impl MockComplianceContract {
+        pub fn register_hook(e: &Env, hook: ComplianceHook, module: Address) {
+            let key = MockComplianceStorageKey::Registered(hook, module);
+            e.storage().persistent().set(&key, &true);
+        }
+    }
+
+    #[contract]
+    struct MockIRSContract;
+
+    #[contractimpl]
+    impl IRSRead for MockIRSContract {
+        fn stored_identity(_e: &Env, account: Address) -> Address {
+            account
+        }
+
+        fn get_country_data_entries(e: &Env, _account: Address) -> Vec<CountryData> {
+            Vec::new(e)
+        }
+    }
+
+    #[test]
+    fn verify_required_hooks_skips_when_unconfigured() {
+        let e = Env::default();
+        let module_id = e.register(MockModuleContract, ());
+
+        e.as_contract(&module_id, || {
+            verify_required_hooks(&e, vec![&e, ComplianceHook::CanTransfer]);
+
+            assert!(!hooks_verified(&e));
+        });
+    }
+
+    #[test]
+    fn verify_required_hooks_sets_cache_when_registered() {
+        let e = Env::default();
+        let module_id = e.register(MockModuleContract, ());
+        let compliance_id = e.register(MockComplianceContract, ());
+        let compliance = MockComplianceContractClient::new(&e, &compliance_id);
+
+        compliance.register_hook(&ComplianceHook::CanTransfer, &module_id);
+
+        e.as_contract(&module_id, || {
+            set_compliance_address(&e, &compliance_id);
+
+            verify_required_hooks(&e, vec![&e, ComplianceHook::CanTransfer]);
+
+            assert!(hooks_verified(&e));
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #398)")]
+    fn verify_required_hooks_missing_required_hook_panics_with_contract_error() {
+        let e = Env::default();
+        let module_id = e.register(MockModuleContract, ());
+        let compliance_id = e.register(MockComplianceContract, ());
+
+        e.as_contract(&module_id, || {
+            set_compliance_address(&e, &compliance_id);
+
+            verify_required_hooks(&e, vec![&e, ComplianceHook::CanTransfer]);
+        });
+    }
+
+    #[test]
+    fn get_irs_client_returns_working_client_for_configured_token() {
+        let e = Env::default();
+        let module_id = e.register(MockModuleContract, ());
+        let irs_id = e.register(MockIRSContract, ());
+        let token = Address::generate(&e);
+        let account = Address::generate(&e);
+
+        e.as_contract(&module_id, || {
+            set_irs_address(&e, &token, &irs_id);
+
+            let client = get_irs_client(&e, &token);
+            assert_eq!(client.stored_identity(&account), account);
+            assert_eq!(client.get_country_data_entries(&account).len(), 0);
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #397)")]
+    fn get_irs_client_panics_when_not_configured() {
+        let e = Env::default();
+        let module_id = e.register(MockModuleContract, ());
+        let token = Address::generate(&e);
+
+        e.as_contract(&module_id, || {
+            let _ = get_irs_client(&e, &token);
+        });
+    }
+
+    #[test]
+    fn checked_math_helpers_return_expected_values() {
+        let e = Env::default();
+
+        assert_eq!(checked_add_i128(&e, 2, 3), 5);
+        assert_eq!(checked_sub_i128(&e, 7, 4), 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #392)")]
+    fn checked_add_i128_panics_on_overflow() {
+        let e = Env::default();
+
+        let _ = checked_add_i128(&e, i128::MAX, 1);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #393)")]
+    fn checked_sub_i128_panics_on_underflow() {
+        let e = Env::default();
+
+        let _ = checked_sub_i128(&e, i128::MIN, 1);
     }
 }
