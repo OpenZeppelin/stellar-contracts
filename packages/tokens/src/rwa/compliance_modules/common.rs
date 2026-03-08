@@ -269,7 +269,16 @@ pub fn module_name(e: &Env, name: &str) -> String {
 // Identity Registry Storage helpers
 // ---------------------------------------------------------------------------
 
-/// Stores the IRS contract address for a given token.
+/// Low-level helper that stores the IRS contract address for a given token.
+///
+/// This function **does not perform any authorization checks**. It directly
+/// updates the per-token Identity Registry Storage pointer in persistent
+/// storage.
+///
+/// SAFETY: This must only be called from initialization logic or from
+/// admin-gated entrypoints that have already enforced the appropriate
+/// ownership and authorization checks. Do **not** expose this helper directly
+/// as a public contract method.
 ///
 /// # Arguments
 ///
