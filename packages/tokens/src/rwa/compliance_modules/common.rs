@@ -61,6 +61,14 @@ pub enum IRSKey {
 /// This is a **one-time** operation. Once set, the compliance address cannot
 /// be changed. This prevents unauthorized rebinding after initial deployment.
 ///
+/// # Security Warning
+///
+/// This helper performs **no authorization checks**. It must only be called
+/// during contract initialization or from entrypoints that are strictly
+/// restricted to an admin or token owner. Exposing this as, or calling it
+/// from, a publicly accessible module entrypoint would allow unauthorized
+/// parties to bind the compliance contract for this module.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
