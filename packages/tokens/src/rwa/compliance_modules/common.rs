@@ -17,7 +17,9 @@ use crate::rwa::{
 };
 
 // ---------------------------------------------------------------------------
-// Storage key helpers — use Symbol::new() with full names per repo convention
+// Storage key helpers — singleton keys use Symbol::new() with descriptive names
+// (structured storage elsewhere in RWA typically uses #[contracttype] enums,
+// like `IRSKey` below; here we keep these singleton entries as Symbols)
 // ---------------------------------------------------------------------------
 
 fn compliance_key(e: &Env) -> Symbol {
@@ -70,7 +72,7 @@ pub enum IRSKey {
 pub fn set_compliance_address(e: &Env, compliance: &Address) {
     let key = compliance_key(e);
     if e.storage().persistent().has(&key) {
-        panic!("compliance address already set");
+        panic_with_error!(e, ComplianceModuleError::ComplianceAlreadySet);
     }
     e.storage().persistent().set(&key, compliance);
     e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
@@ -169,17 +171,21 @@ pub fn hooks_verified(e: &Env) -> bool {
 /// required hook is not registered — this means the deployment is
 /// misconfigured and internal state would drift.
 pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
+    if hooks_verified(e) {
+        return;
+    }
+
     let ckey = compliance_key(e);
     if !e.storage().persistent().has(&ckey) {
         return;
     }
 
     let compliance: Address = e.storage().persistent().get(&ckey).expect("compliance must be set");
+    e.storage().persistent().extend_ttl(&ckey, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
     let self_addr = e.current_contract_address();
     let client = ComplianceHookCheckClient::new(e, &compliance);
 
-    for i in 0..required.len() {
-        let hook = required.get(i).unwrap();
+    for hook in required.iter() {
         if !client.is_module_registered(&hook, &self_addr) {
             panic_with_error!(e, ComplianceModuleError::MissingRequiredHook);
         }
@@ -396,6 +402,22 @@ mod test {
     }
 
     #[test]
+    fn verify_required_hooks_returns_early_when_cached() {
+        let e = Env::default();
+        let module_id = e.register(MockModuleContract, ());
+        let compliance_id = e.register(MockComplianceContract, ());
+
+        e.as_contract(&module_id, || {
+            set_compliance_address(&e, &compliance_id);
+            e.storage().persistent().set(&hooks_verified_key(&e), &true);
+
+            verify_required_hooks(&e, vec![&e, ComplianceHook::CanTransfer]);
+
+            assert!(hooks_verified(&e));
+        });
+    }
+
+    #[test]
     #[should_panic(expected = "Error(Contract, #398)")]
     fn verify_required_hooks_missing_required_hook_panics_with_contract_error() {
         let e = Env::default();
@@ -435,6 +457,19 @@ mod test {
 
         e.as_contract(&module_id, || {
             let _ = get_irs_client(&e, &token);
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #399)")]
+    fn set_compliance_address_panics_with_contract_error_when_already_set() {
+        let e = Env::default();
+        let module_id = e.register(MockModuleContract, ());
+        let compliance_id = e.register(MockComplianceContract, ());
+
+        e.as_contract(&module_id, || {
+            set_compliance_address(&e, &compliance_id);
+            set_compliance_address(&e, &compliance_id);
         });
     }
 

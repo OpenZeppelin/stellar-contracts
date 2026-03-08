@@ -525,6 +525,8 @@ pub enum ComplianceModuleError {
     IdentityRegistryNotSet = 397,
     /// A module is not registered on a required compliance hook.
     MissingRequiredHook = 398,
+    /// The compliance contract address has already been set.
+    ComplianceAlreadySet = 399,
 }
 
 // ################## CONSTANTS ##################
