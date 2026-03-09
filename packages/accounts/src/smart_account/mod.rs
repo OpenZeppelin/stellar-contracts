@@ -115,7 +115,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 use soroban_sdk::{
-    auth::CustomAccountInterface, contractclient, contracterror, contractevent, Address, Env, Map,
+    auth::CustomAccountInterface, contracterror, contractevent, contracttrait, Address, Env, Map,
     String, Symbol, Val, Vec,
 };
 pub use storage::{
@@ -132,7 +132,7 @@ pub use storage::{
 /// This trait provides methods for managing context rules, which define
 /// authorization policies for different types of operations. Context rules can
 /// contain signers and policies.
-#[contractclient(name = "SmartAccountClient")]
+#[contracttrait]
 pub trait SmartAccount: CustomAccountInterface {
     /// Retrieves the number of all context rules, including expired rules.
     /// Defaults to 0.

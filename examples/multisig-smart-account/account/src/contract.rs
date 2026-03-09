@@ -79,7 +79,7 @@ impl CustomAccountInterface for MultisigContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl SmartAccount for MultisigContract {
     /// Add a new context rule to the smart account.
     ///

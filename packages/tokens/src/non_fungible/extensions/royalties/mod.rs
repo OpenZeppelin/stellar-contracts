@@ -4,7 +4,7 @@ use crate::non_fungible::{Base, NonFungibleToken};
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractevent, Address, Env};
+use soroban_sdk::{contractevent, contracttrait, Address, Env};
 
 /// Royalties Trait for Non-Fungible Token (ERC2981)
 ///
@@ -31,6 +31,7 @@ use soroban_sdk::{contractevent, Address, Env};
 /// 1000 USDC goes to the creator. To preserve compatibility across
 /// Non-Fungible and Fungible tokens, `i128` is used instead of `u128` for the
 /// `sale_price`, due to SEP-41.
+#[contracttrait]
 pub trait NonFungibleRoyalties: NonFungibleToken {
     /// Sets the global default royalty information for the entire collection.
     /// This will be used for all tokens that don't have specific royalty

@@ -49,10 +49,6 @@ impl ExampleContract {
 
         token_id
     }
-
-    pub fn get_royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
-        Base::royalty_info(e, token_id, sale_price)
-    }
 }
 
 #[contractimpl(contracttrait)]
@@ -60,7 +56,7 @@ impl NonFungibleToken for ExampleContract {
     type ContractType = Base;
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl NonFungibleRoyalties for ExampleContract {
     #[only_role(operator, "manager")]
     fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32, operator: Address) {

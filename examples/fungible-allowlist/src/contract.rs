@@ -48,7 +48,8 @@ impl ExampleContract {
 impl FungibleToken for ExampleContract {
     type ContractType = AllowList;
 }
-#[contractimpl]
+
+#[contractimpl(contracttrait)]
 impl FungibleAllowList for ExampleContract {
     #[only_role(operator, "manager")]
     fn allow_user(e: &Env, user: Address, operator: Address) {
