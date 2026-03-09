@@ -143,15 +143,9 @@ pub trait Compliance: TokenBinder {
     /// * `amount` - The amount of tokens involved in the transfer.
     /// * `token` - The address of the token contract that is performing the
     ///   transfer.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because the implementer may
-    /// need to enforce that only bound tokens can trigger hooks (see
-    /// [`storage::require_auth_from_bound_token`]). Use
-    /// [`storage::transferred`] for the underlying logic that dispatches
-    /// to registered modules.
-    fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Address);
+    fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Address) {
+        storage::transferred(e, from, to, amount, token)
+    }
 
     /// Called whenever tokens are created on a wallet.
     ///
@@ -164,15 +158,9 @@ pub trait Compliance: TokenBinder {
     /// * `to` - The address of the receiver.
     /// * `amount` - The amount of tokens involved in the minting.
     /// * `token` - The address of the contract that is performing the minting.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because the implementer may
-    /// need to enforce that only bound tokens can trigger hooks (see
-    /// [`storage::require_auth_from_bound_token`]). Use
-    /// [`storage::created`] for the underlying logic that dispatches to
-    /// registered modules.
-    fn created(e: &Env, to: Address, amount: i128, token: Address);
+    fn created(e: &Env, to: Address, amount: i128, token: Address) {
+        storage::created(e, to, amount, token)
+    }
 
     /// Called whenever tokens are destroyed from a wallet.
     ///
@@ -186,15 +174,9 @@ pub trait Compliance: TokenBinder {
     /// * `amount` - The amount of tokens involved in the burn.
     /// * `token` - The address of the token contract that is performing the
     ///   burn.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because the implementer may
-    /// need to enforce that only bound tokens can trigger hooks (see
-    /// [`storage::require_auth_from_bound_token`]). Use
-    /// [`storage::destroyed`] for the underlying logic that dispatches to
-    /// registered modules.
-    fn destroyed(e: &Env, from: Address, amount: i128, token: Address);
+    fn destroyed(e: &Env, from: Address, amount: i128, token: Address) {
+        storage::destroyed(e, from, amount, token)
+    }
 
     /// Checks whether the transfer is compliant.
     ///
@@ -214,14 +196,9 @@ pub trait Compliance: TokenBinder {
     /// # Returns
     ///
     /// `true` if all registered modules allow the transfer, `false` otherwise.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because the implementer may
-    /// need to enforce that only bound tokens can call validation hooks. Use
-    /// [`storage::can_transfer`] for the underlying logic that dispatches to
-    /// registered modules.
-    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool;
+    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
+        storage::can_transfer(e, from, to, amount, token)
+    }
 
     /// Checks whether the mint operation is compliant.
     ///
@@ -240,14 +217,9 @@ pub trait Compliance: TokenBinder {
     /// # Returns
     ///
     /// `true` if all registered modules allow the transfer, `false` otherwise.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because the implementer may
-    /// need to enforce that only bound tokens can call validation hooks. Use
-    /// [`storage::can_create`] for the underlying logic that dispatches to
-    /// registered modules.
-    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool;
+    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
+        storage::can_create(e, to, amount, token)
+    }
 }
 
 // ################## ERRORS ##################
