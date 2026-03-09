@@ -137,12 +137,12 @@ pub trait Policy {
     fn uninstall(e: &Env, context_rule: ContextRule, smart_account: Address);
 }
 
-// We need to declare a `PolicyClientInterface` here, instead of using the
-// public trait above, because traits with associated types are not supported
-// by the `#[contractclient]` macro. While this may appear redundant, it's a
-// necessary workaround: we declare an identical internal trait with the macro
-// to generate the required client implementation. Users should only interact
-// with the public `Policy` trait above for their implementations.
+// A `PolicyClientInterface` must be declared here instead of using the public
+// trait above, because traits with associated types are not supported by the
+// `#[contractclient]` macro. While this may appear redundant, it is a
+// necessary workaround: an identical internal trait is declared with the macro
+// to generate the required client implementation. Interaction should occur
+// through the public `Policy` trait above.
 #[allow(unused)]
 #[contractclient(name = "PolicyClient")]
 trait PolicyClientInterface {

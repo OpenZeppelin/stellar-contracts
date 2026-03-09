@@ -31,7 +31,7 @@
 //! - Authorized signatories
 //! - Board members and directors
 //!
-//! For example, a US-incorporated company might need to track:
+//! For example, a US-incorporated company may need to track:
 //! - `Incorporation(840)` - Company incorporated in USA
 //! - `Residence(276)` - CEO resides in Germany
 //! - `Citizenship(756)` - CFO is a Swiss citizen
@@ -312,8 +312,8 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`add_identity`] for the
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`add_identity`] for the
     /// implementation.
     fn add_identity(
         e: &Env,
@@ -344,8 +344,8 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`remove_identity`] for the
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`remove_identity`] for the
     /// implementation.
     fn remove_identity(e: &Env, account: Address, operator: Address);
 
@@ -367,8 +367,8 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`modify_identity`] for the
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`modify_identity`] for the
     /// implementation.
     fn modify_identity(e: &Env, account: Address, identity: Address, operator: Address);
 
@@ -393,8 +393,8 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`recover_identity`] for the
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`recover_identity`] for the
     /// implementation.
     fn recover_identity(e: &Env, old_account: Address, new_account: Address, operator: Address);
 
@@ -444,9 +444,9 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`add_country_data_entries`] for the
-    /// implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`add_country_data_entries`] for the implementation.
     fn add_country_data_entries(
         e: &Env,
         account: Address,
@@ -472,8 +472,8 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`modify_country_data`] for the
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`modify_country_data`] for the
     /// implementation.
     fn modify_country_data(
         e: &Env,
@@ -502,8 +502,8 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`delete_country_data`] for the
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`delete_country_data`] for the
     /// implementation.
     fn delete_country_data(e: &Env, account: Address, index: u32, operator: Address);
 
@@ -518,7 +518,7 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// No default implementation is provided because all
     /// [`CountryDataManager`] methods are left to the implementer for
-    /// consistency. Call [`get_country_data_entries`] in your
+    /// consistency. [`get_country_data_entries`] should be called in the
     /// implementation.
     fn get_country_data_entries(e: &Env, account: Address) -> Vec<Self::CountryData>;
 
@@ -534,7 +534,8 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// No default implementation is provided because all
     /// [`CountryDataManager`] methods are left to the implementer for
-    /// consistency. Call [`get_country_data`] in your implementation.
+    /// consistency. [`get_country_data`] should be called in the
+    /// implementation.
     fn get_country_data(e: &Env, account: Address, index: u32) -> Self::CountryData;
 }
 

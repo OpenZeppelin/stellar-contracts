@@ -479,9 +479,9 @@ pub trait Governor {
     ///   `executor` against the allowed role and call `executor.require_auth()`
     ///   explicitly if needed.
     ///
-    /// [`storage::execute`] is suggested to perform the actual state transition
-    /// and cross-contract calls after your access control and authorization
-    /// logic.
+    /// [`storage::execute`] is suggested to perform the actual state
+    /// transition and cross-contract calls after access control and
+    /// authorization logic has been applied.
     ///
     /// # Examples
     ///
@@ -549,7 +549,7 @@ pub trait Governor {
     ///   and call `operator.require_auth()` explicitly if needed.
     ///
     /// [`storage::cancel`] is suggested to perform the actual state transition
-    /// after your access control and authorization logic.
+    /// after access control and authorization logic has been applied.
     ///
     /// # Example
     ///

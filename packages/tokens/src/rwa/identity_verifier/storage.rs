@@ -17,12 +17,12 @@ pub enum IdentityVerifierStorageKey {
     IdentityRegistryStorage,
 }
 
-// We need to declare an `IdentityRegistryStorageClient` here, instead of
-// importing one from the dedicated module, as the trait there can't be used
-// with `#[contractclient]` macro, because it has an associated type, which is
-// not supported by the `#[contractclient]` macro.
-// Another option would have been to use `e.invoke_contract`, but we stick with
-// the above choice for consistency reasons.
+// An `IdentityRegistryStorageClient` must be declared here instead of being
+// imported from the dedicated module, because the trait there cannot be used
+// with the `#[contractclient]` macro due to its associated type, which is not
+// supported by the macro.
+// Another option would be `e.invoke_contract`, but the client approach is kept
+// for consistency.
 #[allow(unused)]
 #[contractclient(name = "IdentityRegistryStorageClient")]
 trait IdentityRegistryStorage {

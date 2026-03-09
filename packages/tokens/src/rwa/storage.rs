@@ -252,7 +252,8 @@ impl RWA {
     /// minting operations. Failure to implement proper authorization could
     /// lead to security vulnerabilities and unauthorized token creation.
     ///
-    /// You probably want to do something like this (pseudo-code):
+    /// The implementation will typically look similar to the following
+    /// (pseudo-code):
     ///
     /// ```ignore
     /// let admin = read_administrator(e);

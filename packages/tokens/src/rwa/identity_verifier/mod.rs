@@ -21,13 +21,13 @@ pub mod storage;
 /// - **Merkle Tree**: Efficient verification using merkle proofs (minimal
 ///   storage)
 /// - **Zero-Knowledge**: Privacy-preserving verification (custom ZK circuits)
-/// - **Claim-based**: Cryptographic claims from trusted issuers (our default
+/// - **Claim-based**: Cryptographic claims from trusted issuers (the default
 ///   approach)
 /// - and other custom approaches
 ///
 /// ## Default Implementation
 ///
-/// Our suggested claim-based implementation uses two external contracts:
+/// The suggested claim-based implementation uses two external contracts:
 /// 1. **Claim Topics and Issuers**: Manages trusted issuers and claim types
 /// 2. **Identity Registry Storage**: Maps wallet addresses to onchain
 ///    identities
@@ -98,8 +98,8 @@ pub trait IdentityVerifier {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
     /// [`storage::set_claim_topics_and_issuers`] for the implementation.
     fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: Address, operator: Address);
 

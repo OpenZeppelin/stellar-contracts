@@ -7,22 +7,21 @@
 //!
 //! ## Design Overview
 //!
-//! This module is structured to provide flexibility to developers by splitting
+//! This module is structured to provide flexibility by splitting
 //! functionalities into higher-level and lower-level operations:
 //!
 //! - **High-Level Functions**: These include all necessary checks,
 //!   verifications, authorizations, state-changing logic, and event emissions.
-//!   They simplify usage by handling core logic securely. Users can directly
-//!   call these functions for typical token operations without worrying about
+//!   They simplify usage by handling core logic securely. These functions can
+//!   be called directly for typical token operations without exposing
 //!   implementation details.
 //!
-//! - **Low-Level Functions**: These offer granular control for developers who
-//!   need to compose their own workflows. Such functions expose internal
-//!   mechanisms and require the caller to handle verifications and
-//!   authorizations manually.
+//! - **Low-Level Functions**: These offer granular control when custom
+//!   workflows must be composed. Such functions expose internal mechanisms and
+//!   require the caller to handle verifications and authorizations manually.
 //!
-//! By offering this dual-layered approach, developers can choose between
-//! convenience and customization, depending on their project requirements.
+//! This dual-layered approach provides a choice between convenience and
+//! customization, depending on project requirements.
 //!
 //! ## Structure
 //!
@@ -45,11 +44,11 @@
 //! closely mirrors the Ethereum ERC-20 standard, facilitating cross-ecosystem
 //! familiarity and ease of use.
 //!
-//! Developers aiming to create SEP-41-compliant tokens can leverage the
+//! SEP-41-compliant tokens can be built by leveraging the
 //! `soroban_sdk::token::TokenInterface` trait available in the "soroban-sdk"
 //! crate. By implementing `TokenInterface` using the helper functions provided
-//! in this library, they can ensure a secure and standardized implementation.
-//! Alternatively, developers can combine the implementation of both the
+//! in this library, a secure and standardized implementation can be achieved.
+//! Alternatively, the implementation of both the
 //! [`FungibleToken`] and [`burnable::FungibleBurnable`] traits to create tokens
 //! that adhere to SEP-41 while providing greater control and extensibility.
 //!
@@ -99,7 +98,7 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 /// as a method in this trait because it is not a part of the SEP-41 standard,
 /// the function signature may change depending on the implementation.
 ///
-/// We do provide a function [`crate::fungible::Base::mint`] for minting to
+/// A function, [`crate::fungible::Base::mint`], is provided for minting to
 /// cover the general use case.
 ///
 /// This trait is implemented for the following Contract Types:
@@ -118,19 +117,19 @@ pub use utils::{sac_admin_generic, sac_admin_wrapper};
 ///   [`crate::fungible::allowlist::AllowList`] trait and
 ///   [`crate::fungible::blocklist::BlockList`] trait.
 ///
-/// You can find the default implementations of this trait for `Base`,
-/// `Allowlist`, `Blocklist` and `RWA` by navigating to:
+/// The default implementations of this trait for `Base`, `Allowlist`,
+/// `Blocklist` and `RWA` can be found by navigating to:
 /// `ContractType::{method_name}`.
 ///
-/// For example, if you want to find how
-/// [`FungibleToken::transfer`] is implemented for the `Allowlist` contract
-/// type, you can find it using
+/// For example, the implementation of [`FungibleToken::transfer`] for the
+/// `Allowlist` contract type can be found at
 /// [`crate::fungible::allowlist::AllowList::transfer`].
 #[contracttrait]
 pub trait FungibleToken {
-    /// Helper type that allows us to override some of the functionality of the
-    /// base trait based on the extensions implemented. You should use
-    /// [`crate::fungible::Base`] as the type if you are not using
+    /// Helper type that allows some of the functionality of the base trait to
+    /// be overridden based on the extensions implemented.
+    /// [`crate::fungible::Base`] should be used as the type when
+    /// not using
     /// [`crate::fungible::allowlist::AllowList`] or
     /// [`crate::fungible::blocklist::BlockList`] extensions.
     type ContractType: ContractOverrides;

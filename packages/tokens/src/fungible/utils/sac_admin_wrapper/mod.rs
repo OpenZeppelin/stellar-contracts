@@ -93,10 +93,10 @@ pub trait SACAdminWrapper {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::fungible::sac_admin_wrapper::set_admin`]
-    /// when implementing this function in conjunction with
-    /// `stellar_ownable` or `stellar_access_control` crates. Otherwise,
-    /// authorizations MUST be diligently checked.
+    /// [`crate::fungible::sac_admin_wrapper::set_admin`] is recommended when
+    /// implementing this function in conjunction with `stellar_ownable` or
+    /// `stellar_access_control` crates. Otherwise, authorizations MUST be
+    /// diligently checked.
     fn set_admin(e: Env, new_admin: Address, operator: Address);
 
     /// Sets whether the account is authorized to use its balance. If
@@ -111,10 +111,9 @@ pub trait SACAdminWrapper {
     ///
     /// # Notes
     ///
-    /// We recommend using
-    /// [`crate::fungible::sac_admin_wrapper::set_authorized`] when
-    /// implementing this function in conjunction with `stellar_ownable` or
-    /// `stellar_access_control` crates. Otherwise, authorizations MUST be
+    /// [`crate::fungible::sac_admin_wrapper::set_authorized`] is recommended
+    /// when implementing this function in conjunction with `stellar_ownable`
+    /// or `stellar_access_control` crates. Otherwise, authorizations MUST be
     /// diligently checked.
     fn set_authorized(e: Env, id: Address, authorize: bool, operator: Address);
 
@@ -129,7 +128,7 @@ pub trait SACAdminWrapper {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::fungible::sac_admin_wrapper::mint`] when
+    /// [`crate::fungible::sac_admin_wrapper::mint`] is recommended when
     /// implementing this function in conjunction with `stellar_ownable` or
     /// `stellar_access_control` crates. Otherwise, authorizations MUST be
     /// diligently checked.
@@ -148,9 +147,9 @@ pub trait SACAdminWrapper {
     ///
     /// # Notes
     ///
-    /// We recommend using [`crate::fungible::sac_admin_wrapper::clawback`]
-    /// when implementing this function in conjunction with
-    /// `stellar_ownable` or `stellar_access_control` crates. Otherwise,
-    /// authorizations MUST be diligently checked.
+    /// [`crate::fungible::sac_admin_wrapper::clawback`] is recommended when
+    /// implementing this function in conjunction with `stellar_ownable` or
+    /// `stellar_access_control` crates. Otherwise, authorizations MUST be
+    /// diligently checked.
     fn clawback(e: Env, from: Address, amount: i128, operator: Address);
 }

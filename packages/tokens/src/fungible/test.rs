@@ -682,8 +682,8 @@ fn mint_works() {
 /// a security flaw but rather a design decision to give implementers
 /// flexibility in how they implement authorization.
 ///
-/// When using this function in your contracts, you MUST add your own
-/// authorization controls to ensure only designated accounts can mint tokens.
+/// When this function is used in contracts, authorization controls MUST be
+/// added to ensure that only designated accounts can mint tokens.
 #[test]
 fn mint_base_implementation_has_no_auth() {
     let e = Env::default();

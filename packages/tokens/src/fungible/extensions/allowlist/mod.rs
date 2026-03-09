@@ -56,8 +56,8 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`storage::allow_user`] for the
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`storage::allow_user`] for the
     /// implementation.
     fn allow_user(e: &Env, user: Address, operator: Address);
 
@@ -77,9 +77,9 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`storage::disallow_user`] for the
-    /// implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::disallow_user`] for the implementation.
     fn disallow_user(e: &Env, user: Address, operator: Address);
 }
 

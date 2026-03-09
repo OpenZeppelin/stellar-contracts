@@ -174,12 +174,12 @@ pub trait Verifier {
     fn batch_canonicalize_key(e: &Env, key_data: Vec<Self::KeyData>) -> Vec<Bytes>;
 }
 
-// We need to declare a `VerifierClientInterface` here, instead of using the
+// A `VerifierClientInterface` must be declared here instead of using the
 // public trait above, because traits with associated types are not supported
-// by the `#[contractclient]` macro. While this may appear redundant, it's a
-// necessary workaround: we declare an identical internal trait with the macro
-// to generate the required client implementation. Users should only interact
-// with the public `Verifier` trait above for their implementations.
+// by the `#[contractclient]` macro. While this may appear redundant, it is a
+// necessary workaround: an identical internal trait is declared with the macro
+// to generate the required client implementation. Interaction should occur
+// through the public `Verifier` trait above.
 #[allow(unused)]
 #[contractclient(name = "VerifierClient")]
 trait VerifierClientInterface {

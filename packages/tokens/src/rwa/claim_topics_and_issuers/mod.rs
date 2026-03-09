@@ -45,9 +45,9 @@ pub trait ClaimTopicsAndIssuers {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`storage::add_claim_topic`] for the
-    /// implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::add_claim_topic`] for the implementation.
     fn add_claim_topic(e: &Env, claim_topic: u32, operator: Address);
 
     /// Removes a claim topic (for example: KYC=1, AML=2).
@@ -73,9 +73,9 @@ pub trait ClaimTopicsAndIssuers {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`storage::remove_claim_topic`] for the
-    /// implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::remove_claim_topic`] for the implementation.
     fn remove_claim_topic(e: &Env, claim_topic: u32, operator: Address);
 
     /// Returns the claim topics for the security token.
@@ -123,9 +123,9 @@ pub trait ClaimTopicsAndIssuers {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`storage::add_trusted_issuer`] for the
-    /// implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::add_trusted_issuer`] for the implementation.
     fn add_trusted_issuer(
         e: &Env,
         trusted_issuer: Address,
@@ -158,9 +158,9 @@ pub trait ClaimTopicsAndIssuers {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`storage::remove_trusted_issuer`] for
-    /// the implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::remove_trusted_issuer`] for the implementation.
     fn remove_trusted_issuer(e: &Env, trusted_issuer: Address, operator: Address);
 
     /// Updates the set of claim topics that a trusted issuer is allowed to
@@ -197,9 +197,9 @@ pub trait ClaimTopicsAndIssuers {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`storage::update_issuer_claim_topics`]
-    /// for the implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::update_issuer_claim_topics`] for the implementation.
     fn update_issuer_claim_topics(
         e: &Env,
         trusted_issuer: Address,

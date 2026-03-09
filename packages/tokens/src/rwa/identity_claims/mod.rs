@@ -43,8 +43,8 @@ pub trait IdentityClaims {
     ///
     /// No default implementation is provided because claim management may
     /// require custom access control (e.g., only the identity owner or
-    /// authorized issuers can add claims). Enforce your access control, then
-    /// call [`add_claim`] for the implementation.
+    /// authorized issuers can add claims). Access control should be enforced
+    /// before calling [`add_claim`] for the implementation.
     fn add_claim(
         e: &Env,
         topic: u32,

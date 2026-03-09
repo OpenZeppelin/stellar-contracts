@@ -12,7 +12,7 @@
 //! ## Usage
 //!
 //! Extensions are designed to be optional and can be implemented selectively
-//! based on the specific requirements of your RWA token contract.
+//! based on the specific requirements of the RWA token contract.
 //!
 //! ```rust
 //! use crate::{rwa::extensions::doc_manager::DocumentManager, token::Token};

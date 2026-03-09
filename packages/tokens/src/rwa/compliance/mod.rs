@@ -78,9 +78,9 @@ pub trait Compliance: TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`storage::add_module_to`] for the
-    /// implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`storage::add_module_to`] for
+    /// the implementation.
     fn add_module_to(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Deregisters a compliance module from a specific hook type.
@@ -96,9 +96,9 @@ pub trait Compliance: TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`storage::remove_module_from`] for the
-    /// implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::remove_module_from`] for the implementation.
     fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address, operator: Address);
 
     /// Gets all modules registered for a specific hook type.
@@ -395,7 +395,7 @@ pub trait ComplianceModule {
     ///
     /// If this function modifies state, it should be called only by the
     /// compliance contract. To enforce this, add the following at the start of
-    /// your implementation:
+    /// the implementation:
     ///
     /// ```ignore
     /// get_compliance_address(e).require_auth();
@@ -423,7 +423,7 @@ pub trait ComplianceModule {
     ///
     /// If this function modifies state, it should be called only by the
     /// compliance contract. To enforce this, add the following at the start of
-    /// your implementation:
+    /// the implementation:
     ///
     /// ```ignore
     /// get_compliance_address(e).require_auth();
@@ -449,7 +449,7 @@ pub trait ComplianceModule {
     ///
     /// If this function modifies state, it should be called only by the
     /// compliance contract. To enforce this, add the following at the start of
-    /// your implementation:
+    /// the implementation:
     ///
     /// ```ignore
     /// get_compliance_address(e).require_auth();

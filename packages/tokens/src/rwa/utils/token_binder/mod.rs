@@ -37,7 +37,7 @@ pub use storage::{
 ///   10,000 tokens bound to a single contract.
 /// - With Protocol 23, reading live Soroban state is inexpensive and read-entry
 ///   limits per transaction have been removed. Lookups are therefore cheap, and
-///   we keep storage simple with no reverse mapping; functions like
+///   storage remains simple with no reverse mapping; functions like
 ///   `get_token_index()` linearly scan buckets.
 #[contractclient(name = "TokenBinderClient")]
 pub trait TokenBinder {
@@ -46,13 +46,9 @@ pub trait TokenBinder {
     /// # Arguments
     ///
     /// * `e` - The Soroban environment
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because all [`TokenBinder`]
-    /// methods are left to the implementer for consistency. Call
-    /// [`linked_tokens`] in your implementation.
-    fn linked_tokens(e: &Env) -> Vec<Address>;
+    fn linked_tokens(e: &Env) -> Vec<Address> {
+        storage::linked_tokens(e)
+    }
 
     /// Binds a token to this contract's periphery services.
     ///
@@ -65,8 +61,9 @@ pub trait TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`bind_token`] for the implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`bind_token`] for the
+    /// implementation.
     fn bind_token(e: &Env, token: Address, operator: Address);
 
     /// Unbinds a token from this contract's periphery services.
@@ -80,8 +77,8 @@ pub trait TokenBinder {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`unbind_token`] for the
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`unbind_token`] for the
     /// implementation.
     fn unbind_token(e: &Env, token: Address, operator: Address);
 }

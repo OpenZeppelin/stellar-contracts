@@ -31,7 +31,7 @@
 //!     delegate, get_votes, get_votes_at_checkpoint, transfer_voting_units,
 //! };
 //!
-//! // Override your token contract's transfer to update voting units:
+//! // Override the token contract's transfer to update voting units:
 //! pub fn transfer(e: &Env, from: Address, to: Address, amount: i128) {
 //!     // ... perform transfer logic ...
 //!     transfer_voting_units(e, Some(&from), Some(&to), amount as u128);

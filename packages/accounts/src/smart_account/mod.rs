@@ -53,10 +53,10 @@
 //! ## Key Design Principles
 //!
 //! ### Context-Centric Approach
-//! The system flips traditional key-centric reasoning to focus on **what you're
-//! authorizing** rather than **which keys are signing**. This mirrors familiar
-//! web2 OAuth patterns where users primarily care about the scope/permissions
-//! being granted, not the underlying keys.
+//! The system flips traditional key-centric reasoning to focus on **what is
+//! being authorized** rather than **which keys are signing**. This mirrors
+//! familiar web2 OAuth patterns where the primary focus is on the
+//! scope/permissions being granted, not the underlying keys.
 //!
 //! ### Multiple Rules Per Context
 //! Different authorization requirements for the same context:
@@ -436,7 +436,7 @@ pub trait SmartAccount: CustomAccountInterface {
 ///
 /// # Usage
 ///
-/// Implement this trait to enable your smart account to execute arbitrary
+/// Implement this trait to enable a smart account to execute arbitrary
 /// contract calls. This is particularly useful for:
 /// - Calling owned policy contracts
 /// - Interacting with external protocols on behalf of the smart account

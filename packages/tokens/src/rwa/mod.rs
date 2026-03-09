@@ -154,8 +154,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::forced_transfer`] for the
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`RWA::forced_transfer`] for the
     /// implementation.
     fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, operator: Address);
 
@@ -187,9 +187,10 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::mint`] for the implementation
-    /// (which handles identity verification and compliance checks).
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`RWA::mint`] for the
+    /// implementation (which handles identity verification and compliance
+    /// checks).
     fn mint(e: &Env, to: Address, amount: i128, operator: Address);
 
     /// Burns tokens from a wallet.
@@ -216,8 +217,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::burn`] for the implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`RWA::burn`] for the
+    /// implementation.
     fn burn(e: &Env, user_address: Address, amount: i128, operator: Address);
 
     /// Recovery function used to force transfer tokens from a old account
@@ -248,8 +250,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::recover_balance`] for the
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`RWA::recover_balance`] for the
     /// implementation (which handles identity verification and recovery target
     /// validation).
     fn recover_balance(
@@ -280,9 +282,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::set_address_frozen`] for the
-    /// implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`RWA::set_address_frozen`] for
+    /// the implementation.
     fn set_address_frozen(e: &Env, user_address: Address, freeze: bool, operator: Address);
 
     /// Freezes a specified amount of tokens for a given address.
@@ -311,9 +313,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::freeze_partial_tokens`] for the
-    /// implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`RWA::freeze_partial_tokens`]
+    /// for the implementation.
     fn freeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
 
     /// Unfreezes a specified amount of tokens for a given address.
@@ -342,9 +344,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::unfreeze_partial_tokens`] for
-    /// the implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`RWA::unfreeze_partial_tokens`]
+    /// for the implementation.
     fn unfreeze_partial_tokens(e: &Env, user_address: Address, amount: i128, operator: Address);
 
     /// Returns the freezing status of a wallet.
@@ -409,8 +411,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::set_compliance`] for the
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`RWA::set_compliance`] for the
     /// implementation.
     fn set_compliance(e: &Env, compliance: Address, operator: Address);
 
@@ -445,9 +447,9 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Enforce your access
-    /// control on `operator`, then call [`RWA::set_identity_verifier`] for the
-    /// implementation.
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`RWA::set_identity_verifier`] for the implementation.
     fn set_identity_verifier(e: &Env, identity_verifier: Address, operator: Address);
 
     /// Returns the Identity Verifier contract linked to the token.

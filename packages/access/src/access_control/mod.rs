@@ -8,8 +8,8 @@
 //! There is a single overarching admin, and the admin has enough privileges to
 //! call any function given in the [`AccessControl`] trait.
 //!
-//! This `admin` must be set in the constructor of the contract. Else, none of
-//! the methods exposed by this module will work. You can follow the
+//! This `admin` must be set in the constructor of the contract. Otherwise,
+//! none of the methods exposed by this module will work. See the
 //! `nft-access-control` example.
 //!
 //! ## Admin Transfers
@@ -34,17 +34,18 @@
 //!
 //! ## Role Hierarchy
 //!
-//! Each role can have an "admin role" specified for it. For example, if you
-//! create two roles: `minter` and `minter_admin`, you can assign
+//! Each role can have an "admin role" specified for it. For example, if two
+//! roles are created, `minter` and `minter_admin`, `minter_admin` can be
+//! assigned
 //! `minter_admin` as the admin role for the `minter` role. This will allow
 //! to accounts with `minter_admin` role to grant/revoke the `minter` role
 //! to other accounts.
 //!
-//! One can create up to 256 roles simultaneously, and create a chain of command
-//! structure if they want to go with this approach.
+//! Up to 256 roles can be created simultaneously, allowing a chain-of-command
+//! structure to be established when desired.
 //!
-//! If you need even more granular control over which roles can do what, you can
-//! introduce your own business logic, and annotate it with our macro:
+//! If even more granular control over role capabilities is required, custom
+//! business logic can be introduced and annotated with the provided macro:
 //!
 //! ```rust
 //! #[has_role(caller, "minter_admin")]
@@ -55,9 +56,9 @@
 //!
 //! ### ⚠️ Warning: Circular Admin Relationships
 //!
-//! When designing your role hierarchy, be careful to avoid creating circular
-//! admin relationships. For example, it's possible but not recommended to
-//! assign `MINT_ADMIN` as the admin of `MINT_ROLE` while also making
+//! When designing the role hierarchy, care should be taken to avoid creating
+//! circular admin relationships. For example, it's possible but not recommended
+//! to assign `MINT_ADMIN` as the admin of `MINT_ROLE` while also making
 //! `MINT_ROLE` the admin of `MINT_ADMIN`. Such circular relationships can lead
 //! to unintended consequences, including:
 //!
@@ -146,11 +147,10 @@ pub trait AccessControl {
 
     /// Returns the account at the specified index for a given role.
     ///
-    /// We do not provide a function to get all the members of a role,
-    /// since that would be unbounded. If you need to enumerate all the
-    /// members of a role, you can use
-    /// [`AccessControl::get_role_member_count()`] to get the total number
-    /// of members and then use [`AccessControl::get_role_member()`] to get
+    /// A function to get all members of a role is not provided because that
+    /// would be unbounded. To enumerate all members of a role, use
+    /// [`AccessControl::get_role_member_count()`] to get the total number of
+    /// members and then use [`AccessControl::get_role_member()`] to retrieve
     /// each member one by one.
     ///
     /// # Arguments
@@ -213,8 +213,8 @@ pub trait AccessControl {
     }
 
     /// Revokes a role from an account.
-    /// To revoke your own role, please use [`AccessControl::renounce_role()`]
-    /// instead.
+    /// To revoke the caller's own role, use
+    /// [`AccessControl::renounce_role()`] instead.
     ///
     /// # Arguments
     ///
