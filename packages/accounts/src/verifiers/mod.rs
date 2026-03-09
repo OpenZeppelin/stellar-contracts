@@ -107,8 +107,7 @@ pub trait Verifier {
     /// # Notes
     ///
     /// No default implementation is provided because cryptographic
-    /// verification is entirely scheme-specific. There is no corresponding
-    /// storage function — the implementation is fully custom. See the
+    /// verification is entirely scheme-specific. See the
     /// [`ed25519`] and [`webauthn`] sub-modules for reference
     /// implementations.
     fn verify(e: &Env, hash: Bytes, key_data: Self::KeyData, sig_data: Self::SigData) -> bool;
@@ -146,8 +145,7 @@ pub trait Verifier {
     ///
     /// No default implementation is provided because canonicalization logic
     /// is specific to each key format (e.g., compressed vs. uncompressed
-    /// public keys). There is no corresponding storage function — the
-    /// implementation is fully custom. See the [`ed25519`] and [`webauthn`]
+    /// public keys). See the [`ed25519`] and [`webauthn`]
     /// sub-modules for reference implementations.
     fn canonicalize_key(e: &Env, key_data: Self::KeyData) -> Bytes;
 

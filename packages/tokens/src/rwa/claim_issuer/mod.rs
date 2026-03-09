@@ -215,8 +215,7 @@ pub trait SignatureVerifier {
     /// # Notes
     ///
     /// No default implementation is provided because each signature scheme
-    /// has a unique data layout. There is no corresponding storage function
-    /// — the implementation is fully custom. See [`Ed25519Verifier`],
+    /// has a unique data layout. See [`Ed25519Verifier`],
     /// [`Secp256k1Verifier`], and [`Secp256r1Verifier`] in the [`storage`]
     /// module for reference implementations.
     fn extract_signature_data(e: &Env, sig_data: &Bytes) -> Self::SignatureData;
@@ -236,8 +235,7 @@ pub trait SignatureVerifier {
     /// # Notes
     ///
     /// No default implementation is provided because the message format may
-    /// vary between signature schemes. There is no corresponding storage
-    /// function — the implementation is fully custom. See the built-in
+    /// vary between signature schemes. See the built-in
     /// verifiers in the [`storage`] module for reference implementations.
     fn build_message(e: &Env, identity: &Address, claim_topic: u32, claim_data: &Bytes) -> Bytes;
 
@@ -253,8 +251,7 @@ pub trait SignatureVerifier {
     /// # Notes
     ///
     /// No default implementation is provided because cryptographic
-    /// verification is scheme-specific. There is no corresponding storage
-    /// function — the implementation is fully custom. See the built-in
+    /// verification is scheme-specific. See the built-in
     /// verifiers in the [`storage`] module for reference implementations.
     fn verify(e: &Env, message: &Bytes, signature_data: &Self::SignatureData);
 

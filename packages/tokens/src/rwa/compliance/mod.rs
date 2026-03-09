@@ -406,8 +406,6 @@ pub trait ComplianceModule {
     /// No default implementation is provided because compliance modules are
     /// entirely application-specific. Each module defines its own business
     /// logic (e.g., updating transfer counters, enforcing holding periods).
-    /// There is no corresponding storage function — the implementation is
-    /// fully custom.
     fn on_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address);
 
     /// Called when tokens are created/minted (for Created hook).
@@ -432,8 +430,7 @@ pub trait ComplianceModule {
     /// # Notes
     ///
     /// No default implementation is provided because compliance modules are
-    /// entirely application-specific. There is no corresponding storage
-    /// function — the implementation is fully custom.
+    /// entirely application-specific.
     fn on_created(e: &Env, to: Address, amount: i128, token: Address);
 
     /// Called when tokens are destroyed/burned (for Destroyed hook).
@@ -458,8 +455,7 @@ pub trait ComplianceModule {
     /// # Notes
     ///
     /// No default implementation is provided because compliance modules are
-    /// entirely application-specific. There is no corresponding storage
-    /// function — the implementation is fully custom.
+    /// entirely application-specific.
     fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address);
 
     /// Called to check if a transfer should be allowed (for CanTransfer hook).
@@ -499,8 +495,7 @@ pub trait ComplianceModule {
     /// # Notes
     ///
     /// No default implementation is provided because compliance modules are
-    /// entirely application-specific. There is no corresponding storage
-    /// function — the implementation is fully custom.
+    /// entirely application-specific.
     fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool;
 
     /// Returns the name of the module for identification purposes.

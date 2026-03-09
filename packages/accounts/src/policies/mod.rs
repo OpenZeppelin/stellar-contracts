@@ -73,8 +73,7 @@ pub trait Policy {
     ///
     /// No default implementation is provided because enforcement logic is
     /// entirely policy-specific (e.g., threshold checks, spending limits,
-    /// time restrictions). There is no corresponding storage function — the
-    /// implementation is fully custom. See [`simple_threshold`],
+    /// time restrictions). See [`simple_threshold`],
     /// [`weighted_threshold`], and [`spending_limit`] for reference
     /// implementations.
     fn enforce(
@@ -103,8 +102,7 @@ pub trait Policy {
     ///
     /// No default implementation is provided because installation logic is
     /// policy-specific (e.g., storing threshold parameters, initializing
-    /// spending windows). There is no corresponding storage function — the
-    /// implementation is fully custom. See [`simple_threshold`],
+    /// spending windows). See [`simple_threshold`],
     /// [`weighted_threshold`], and [`spending_limit`] for reference
     /// implementations.
     fn install(
@@ -130,8 +128,7 @@ pub trait Policy {
     ///
     /// No default implementation is provided because cleanup logic is
     /// policy-specific (e.g., removing threshold parameters, clearing
-    /// spending windows). There is no corresponding storage function — the
-    /// implementation is fully custom. See [`simple_threshold`],
+    /// spending windows). See [`simple_threshold`],
     /// [`weighted_threshold`], and [`spending_limit`] for reference
     /// implementations.
     fn uninstall(e: &Env, context_rule: ContextRule, smart_account: Address);
