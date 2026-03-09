@@ -82,10 +82,6 @@ impl NonFungibleRoyalties for ExampleContract {
     fn remove_token_royalty(e: &Env, token_id: u32, operator: Address) {
         Base::remove_token_royalty(e, token_id);
     }
-
-    fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
-        Base::royalty_info(e, token_id, sale_price)
-    }
 }
 
 #[contractimpl(contracttrait)]

@@ -50,10 +50,6 @@ impl FungibleToken for ExampleContract {
 }
 #[contractimpl]
 impl FungibleAllowList for ExampleContract {
-    fn allowed(e: &Env, account: Address) -> bool {
-        AllowList::allowed(e, &account)
-    }
-
     #[only_role(operator, "manager")]
     fn allow_user(e: &Env, user: Address, operator: Address) {
         AllowList::allow_user(e, &user)

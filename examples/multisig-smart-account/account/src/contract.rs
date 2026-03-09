@@ -81,16 +81,6 @@ impl CustomAccountInterface for MultisigContract {
 
 #[contractimpl]
 impl SmartAccount for MultisigContract {
-    /// Retrieve a specific context rule by its ID.
-    fn get_context_rule(e: &Env, context_rule_id: u32) -> ContextRule {
-        smart_account::get_context_rule(e, context_rule_id)
-    }
-
-    /// Retrieve the number of all context rules, including the expired ones.
-    fn get_context_rules_count(e: &Env) -> u32 {
-        smart_account::get_context_rules_count(e)
-    }
-
     /// Add a new context rule to the smart account.
     ///
     /// Requires smart account authorization.
