@@ -109,12 +109,13 @@ pub fn get_compliance_address(e: &Env) -> Address {
     }
 }
 
-/// Requires authorization from the compliance contract and returns its
-/// address.
+/// Requires authorization from the configured compliance contract and returns
+/// its address.
 ///
-/// Before `set_compliance_address` is called, falls back to self-auth
-/// (returns the module's own address without requiring external auth).
-/// This allows admin operations during initial configuration.
+/// This helper is intentionally fail-closed: callers must bind the module to a
+/// compliance contract before exposing entrypoints that rely on compliance
+/// auth. Bootstrap configuration should be handled by separate admin-gated
+/// entrypoints, not by falling back to unauthenticated pre-bind access.
 ///
 /// # Arguments
 ///
@@ -122,7 +123,12 @@ pub fn get_compliance_address(e: &Env) -> Address {
 ///
 /// # Returns
 ///
-/// The compliance contract [`Address`].
+/// The configured compliance contract [`Address`].
+///
+/// # Panics
+///
+/// Panics with [`ComplianceModuleError::ComplianceNotSet`] when no compliance
+/// contract has been configured yet.
 pub fn require_compliance_auth(e: &Env) -> Address {
     let key = compliance_key(e);
     if let Some(compliance) = e.storage().persistent().get::<_, Address>(&key) {
@@ -130,7 +136,7 @@ pub fn require_compliance_auth(e: &Env) -> Address {
         compliance.require_auth();
         compliance
     } else {
-        e.current_contract_address()
+        panic_with_error!(e, ComplianceModuleError::ComplianceNotSet)
     }
 }
 
@@ -487,6 +493,31 @@ mod test {
         e.as_contract(&module_id, || {
             set_compliance_address(&e, &compliance_id);
             set_compliance_address(&e, &compliance_id);
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #390)")]
+    fn require_compliance_auth_panics_when_not_configured() {
+        let e = Env::default();
+        let module_id = e.register(MockModuleContract, ());
+
+        e.as_contract(&module_id, || {
+            let _ = require_compliance_auth(&e);
+        });
+    }
+
+    #[test]
+    fn require_compliance_auth_returns_configured_address() {
+        let e = Env::default();
+        e.mock_all_auths();
+        let module_id = e.register(MockModuleContract, ());
+        let compliance_id = e.register(MockComplianceContract, ());
+
+        e.as_contract(&module_id, || {
+            set_compliance_address(&e, &compliance_id);
+
+            assert_eq!(require_compliance_auth(&e), compliance_id);
         });
     }
 
