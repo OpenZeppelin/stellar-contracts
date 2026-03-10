@@ -221,7 +221,7 @@ pub fn require_non_negative_amount(e: &Env, amount: i128) {
     }
 }
 
-/// Checked `i128` addition.
+/// Adds two `i128` values, panicking on overflow.
 ///
 /// # Arguments
 ///
@@ -232,12 +232,12 @@ pub fn require_non_negative_amount(e: &Env, amount: i128) {
 /// # Errors
 ///
 /// * [`ComplianceModuleError::MathOverflow`] - When the addition overflows.
-pub fn checked_add_i128(e: &Env, left: i128, right: i128) -> i128 {
+pub fn add_i128_or_panic(e: &Env, left: i128, right: i128) -> i128 {
     left.checked_add(right)
         .unwrap_or_else(|| panic_with_error!(e, ComplianceModuleError::MathOverflow))
 }
 
-/// Checked `i128` subtraction.
+/// Subtracts two `i128` values, panicking on underflow.
 ///
 /// # Arguments
 ///
@@ -249,7 +249,7 @@ pub fn checked_add_i128(e: &Env, left: i128, right: i128) -> i128 {
 ///
 /// * [`ComplianceModuleError::MathUnderflow`] - When the subtraction
 ///   underflows.
-pub fn checked_sub_i128(e: &Env, left: i128, right: i128) -> i128 {
+pub fn sub_i128_or_panic(e: &Env, left: i128, right: i128) -> i128 {
     left.checked_sub(right)
         .unwrap_or_else(|| panic_with_error!(e, ComplianceModuleError::MathUnderflow))
 }
@@ -516,26 +516,26 @@ mod test {
     }
 
     #[test]
-    fn checked_math_helpers_return_expected_values() {
+    fn panicking_math_helpers_return_expected_values() {
         let e = Env::default();
 
-        assert_eq!(checked_add_i128(&e, 2, 3), 5);
-        assert_eq!(checked_sub_i128(&e, 7, 4), 3);
+        assert_eq!(add_i128_or_panic(&e, 2, 3), 5);
+        assert_eq!(sub_i128_or_panic(&e, 7, 4), 3);
     }
 
     #[test]
     #[should_panic(expected = "Error(Contract, #392)")]
-    fn checked_add_i128_panics_on_overflow() {
+    fn add_i128_or_panic_panics_on_overflow() {
         let e = Env::default();
 
-        let _ = checked_add_i128(&e, i128::MAX, 1);
+        let _ = add_i128_or_panic(&e, i128::MAX, 1);
     }
 
     #[test]
     #[should_panic(expected = "Error(Contract, #393)")]
-    fn checked_sub_i128_panics_on_underflow() {
+    fn sub_i128_or_panic_panics_on_underflow() {
         let e = Env::default();
 
-        let _ = checked_sub_i128(&e, i128::MIN, 1);
+        let _ = sub_i128_or_panic(&e, i128::MIN, 1);
     }
 }
