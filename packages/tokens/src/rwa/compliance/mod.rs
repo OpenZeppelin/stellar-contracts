@@ -238,6 +238,38 @@ pub enum ComplianceError {
     TokenNotBound = 363,
 }
 
+/// Error codes shared by all compliance modules.
+///
+/// Compliance module errors occupy the 390–400 range, following the RWA
+/// error numbering convention.
+#[contracterror]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
+#[repr(u32)]
+pub enum ComplianceModuleError {
+    /// The compliance contract address has not been set.
+    ComplianceNotSet = 390,
+    /// An amount argument is negative when it must be non-negative.
+    InvalidAmount = 391,
+    /// Arithmetic overflow in a checked addition.
+    MathOverflow = 392,
+    /// Arithmetic underflow in a checked subtraction.
+    MathUnderflow = 393,
+    /// A required limit entry is missing for the given token.
+    MissingLimit = 394,
+    /// A required transfer counter entry is missing.
+    MissingCounter = 395,
+    /// A required country data entry is missing.
+    MissingCountry = 396,
+    /// The identity registry storage address has not been configured.
+    IdentityRegistryNotSet = 397,
+    /// A module is not registered on a required compliance hook.
+    MissingRequiredHook = 398,
+    /// The compliance contract address has already been set.
+    ComplianceAlreadySet = 399,
+    /// A token has reached the maximum number of configured limit entries.
+    TooManyLimits = 400,
+}
+
 // ################## CONSTANTS ##################
 
 const DAY_IN_LEDGERS: u32 = 17280;
