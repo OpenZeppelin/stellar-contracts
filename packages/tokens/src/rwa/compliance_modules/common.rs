@@ -74,9 +74,10 @@ pub enum IRSKey {
 /// * `e` - Access to the Soroban environment.
 /// * `compliance` - The address of the compliance contract.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if the compliance address has already been set.
+/// * [`ComplianceModuleError::ComplianceAlreadySet`] - When the compliance
+///   address has already been set.
 pub fn set_compliance_address(e: &Env, compliance: &Address) {
     let key = compliance_key(e);
     if e.storage().persistent().has(&key) {
@@ -94,11 +95,6 @@ pub fn set_compliance_address(e: &Env, compliance: &Address) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-///
-/// # Returns
-///
-/// The compliance contract [`Address`], or the module's own address if not
-/// yet configured.
 pub fn get_compliance_address(e: &Env) -> Address {
     let key = compliance_key(e);
     if let Some(addr) = e.storage().persistent().get::<_, Address>(&key) {
@@ -116,19 +112,16 @@ pub fn get_compliance_address(e: &Env) -> Address {
 /// compliance contract before exposing entrypoints that rely on compliance
 /// auth. Bootstrap configuration should be handled by separate admin-gated
 /// entrypoints, not by falling back to unauthenticated pre-bind access.
+/// Returns the configured compliance contract [`Address`].
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 ///
-/// # Returns
+/// # Errors
 ///
-/// The configured compliance contract [`Address`].
-///
-/// # Panics
-///
-/// Panics with [`ComplianceModuleError::ComplianceNotSet`] when no compliance
-/// contract has been configured yet.
+/// * [`ComplianceModuleError::ComplianceNotSet`] - When no compliance contract
+///   has been configured yet.
 pub fn require_compliance_auth(e: &Env) -> Address {
     let key = compliance_key(e);
     if let Some(compliance) = e.storage().persistent().get::<_, Address>(&key) {
@@ -179,11 +172,11 @@ pub fn hooks_verified(e: &Env) -> bool {
 /// * `e` - Access to the Soroban environment.
 /// * `required` - The list of hooks this module requires to be registered.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics with [`ComplianceModuleError::MissingRequiredHook`] if any
-/// required hook is not registered — this means the deployment is
-/// misconfigured and internal state would drift.
+/// * [`ComplianceModuleError::MissingRequiredHook`] - When any required hook
+///   is not registered, which means the deployment is misconfigured and
+///   internal state would drift.
 pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
     if hooks_verified(e) {
         return;
