@@ -7,4 +7,4 @@
 
 pub mod common;
 
-pub use super::{ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD};
+pub use super::{compliance::ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD};
