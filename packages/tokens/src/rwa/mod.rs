@@ -105,7 +105,6 @@ pub mod utils;
 #[cfg(test)]
 mod test;
 
-pub use compliance::ComplianceModuleError;
 use soroban_sdk::{contracterror, contractevent, Address, Env, String};
 use stellar_contract_utils::pausable::Pausable;
 pub use storage::{RWAStorageKey, RWA};
