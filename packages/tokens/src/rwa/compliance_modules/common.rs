@@ -174,9 +174,9 @@ pub fn hooks_verified(e: &Env) -> bool {
 ///
 /// # Errors
 ///
-/// * [`ComplianceModuleError::MissingRequiredHook`] - When any required hook
-///   is not registered, which means the deployment is misconfigured and
-///   internal state would drift.
+/// * [`ComplianceModuleError::MissingRequiredHook`] - When any required hook is
+///   not registered, which means the deployment is misconfigured and internal
+///   state would drift.
 pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
     if hooks_verified(e) {
         return;
