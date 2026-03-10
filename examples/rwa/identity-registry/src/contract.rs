@@ -1,4 +1,4 @@
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Vec};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Vec};
 use stellar_access::access_control::{self as access_control};
 use stellar_macros::only_role;
 use stellar_tokens::rwa::{
@@ -9,6 +9,8 @@ use stellar_tokens::rwa::{
     utils::token_binder::{self as binder, TokenBinder},
 };
 
+const MANAGER_ROLE: Symbol = symbol_short!("manager");
+
 #[contract]
 pub struct IdentityRegistryContract;
 
@@ -16,7 +18,7 @@ pub struct IdentityRegistryContract;
 impl IdentityRegistryContract {
     pub fn __constructor(e: &Env, admin: Address, manager: Address) {
         access_control::set_admin(e, &admin);
-        access_control::grant_role_no_auth(e, &admin, &manager, &symbol_short!("manager"));
+        access_control::grant_role_no_auth(e, &manager, &MANAGER_ROLE, &admin);
     }
 
     #[only_role(operator, "manager")]
