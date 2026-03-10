@@ -9,8 +9,9 @@ use soroban_sdk::{
 };
 
 use crate::rwa::{
-    compliance::{ComplianceHook, ComplianceModuleError},
-    compliance_modules::{MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD},
+    compliance::{
+        ComplianceHook, ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+    },
     identity_registry_storage::{
         CountryData, CountryRelation, IndividualCountryRelation, OrganizationCountryRelation,
     },

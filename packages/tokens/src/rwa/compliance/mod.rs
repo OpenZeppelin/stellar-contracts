@@ -275,6 +275,10 @@ pub enum ComplianceModuleError {
 const DAY_IN_LEDGERS: u32 = 17280;
 pub const COMPLIANCE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const COMPLIANCE_TTL_THRESHOLD: u32 = COMPLIANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
+/// TTL extension amount for compliance module storage entries (30 days).
+pub const MODULE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+/// TTL threshold below which compliance module entries are extended (29 days).
+pub const MODULE_TTL_THRESHOLD: u32 = MODULE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 pub const MAX_MODULES: u32 = 20;
 
 // ################## EVENTS ##################

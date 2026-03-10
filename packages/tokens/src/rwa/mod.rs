@@ -506,11 +506,6 @@ const DAY_IN_LEDGERS: u32 = 17280;
 pub const FROZEN_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
 pub const FROZEN_TTL_THRESHOLD: u32 = FROZEN_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
-/// TTL extension amount for compliance module storage entries (30 days).
-pub const MODULE_EXTEND_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
-/// TTL threshold below which compliance module entries are extended (29 days).
-pub const MODULE_TTL_THRESHOLD: u32 = MODULE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
-
 // ################## EVENTS ##################
 
 /// Event emitted when token onchain ID is updated.
