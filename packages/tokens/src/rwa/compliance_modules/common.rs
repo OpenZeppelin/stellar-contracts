@@ -116,11 +116,7 @@ pub fn get_compliance_address(e: &Env) -> Address {
 /// * `e` - Access to the Soroban environment.
 pub fn hooks_verified(e: &Env) -> bool {
     let key = ComplianceModuleStorageKey::HooksVerified;
-    let verified = e.storage().persistent().has(&key);
-    if verified {
-        e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
-    }
-    verified
+    e.storage().instance().has(&key)
 }
 
 /// Cross-calls the compliance contract to verify that this module is
@@ -161,8 +157,7 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
     }
 
     let vkey = ComplianceModuleStorageKey::HooksVerified;
-    e.storage().persistent().set(&vkey, &true);
-    e.storage().persistent().extend_ttl(&vkey, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
+    e.storage().instance().set(&vkey, &true);
 }
 
 // ---------------------------------------------------------------------------
@@ -446,7 +441,7 @@ mod test {
 
         e.as_contract(&module_id, || {
             set_compliance_address(&e, &compliance_id);
-            e.storage().persistent().set(&ComplianceModuleStorageKey::HooksVerified, &true);
+            e.storage().instance().set(&ComplianceModuleStorageKey::HooksVerified, &true);
 
             verify_required_hooks(&e, vec![&e, ComplianceHook::CanTransfer]);
 
