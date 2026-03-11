@@ -197,10 +197,9 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because the smart account
-    /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`add_context_rule`] for the
-    /// implementation.
+    /// Defaults to requiring authorization from the smart account itself
+    /// (`e.current_contract_address().require_auth()`) and then delegating to
+    /// [`storage::add_context_rule`].
     fn add_context_rule(
         e: &Env,
         context_type: ContextRuleType,
@@ -208,7 +207,10 @@ pub trait SmartAccount: CustomAccountInterface {
         valid_until: Option<u32>,
         signers: Vec<Signer>,
         policies: Map<Address, Val>,
-    ) -> ContextRule;
+    ) -> ContextRule {
+        e.current_contract_address().require_auth();
+        storage::add_context_rule(e, &context_type, &name, valid_until, &signers, &policies)
+    }
 
     /// Updates the name of an existing context rule, returning the updated
     /// `ContextRule` with the new name.
@@ -232,11 +234,13 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because the smart account
-    /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`update_context_rule_name`]
-    /// for the implementation.
-    fn update_context_rule_name(e: &Env, context_rule_id: u32, name: String) -> ContextRule;
+    /// Defaults to requiring authorization from the smart account itself
+    /// (`e.current_contract_address().require_auth()`) and then delegating to
+    /// [`storage::update_context_rule_name`].
+    fn update_context_rule_name(e: &Env, context_rule_id: u32, name: String) -> ContextRule {
+        e.current_contract_address().require_auth();
+        storage::update_context_rule_name(e, context_rule_id, &name)
+    }
 
     /// Updates the expiration time of an existing context rule, returning the
     /// updated `ContextRule` with the new expiration time.
@@ -263,15 +267,17 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because the smart account
-    /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call
-    /// [`update_context_rule_valid_until`] for the implementation.
+    /// Defaults to requiring authorization from the smart account itself
+    /// (`e.current_contract_address().require_auth()`) and then delegating to
+    /// [`storage::update_context_rule_valid_until`].
     fn update_context_rule_valid_until(
         e: &Env,
         context_rule_id: u32,
         valid_until: Option<u32>,
-    ) -> ContextRule;
+    ) -> ContextRule {
+        e.current_contract_address().require_auth();
+        storage::update_context_rule_valid_until(e, context_rule_id, valid_until)
+    }
 
     /// Removes a context rule and cleans up all associated data. This function
     /// uninstalls all policies associated with the rule and removes all stored
@@ -294,11 +300,13 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because the smart account
-    /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`remove_context_rule`] for
-    /// the implementation.
-    fn remove_context_rule(e: &Env, context_rule_id: u32);
+    /// Defaults to requiring authorization from the smart account itself
+    /// (`e.current_contract_address().require_auth()`) and then delegating to
+    /// [`storage::remove_context_rule`].
+    fn remove_context_rule(e: &Env, context_rule_id: u32) {
+        e.current_contract_address().require_auth();
+        storage::remove_context_rule(e, context_rule_id);
+    }
 
     /// Adds a new signer to an existing context rule, returning the assigned
     /// signer ID.
@@ -325,11 +333,13 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because the smart account
-    /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`add_signer`] for the
-    /// implementation.
-    fn add_signer(e: &Env, context_rule_id: u32, signer: Signer) -> u32;
+    /// Defaults to requiring authorization from the smart account itself
+    /// (`e.current_contract_address().require_auth()`) and then delegating to
+    /// [`storage::add_signer`].
+    fn add_signer(e: &Env, context_rule_id: u32, signer: Signer) -> u32 {
+        e.current_contract_address().require_auth();
+        storage::add_signer(e, context_rule_id, &signer)
+    }
 
     /// Removes a signer from an existing context rule. Removing the last signer
     /// is allowed only if the rule has at least one policy.
@@ -354,11 +364,13 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because the smart account
-    /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`remove_signer`] for the
-    /// implementation.
-    fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32);
+    /// Defaults to requiring authorization from the smart account itself
+    /// (`e.current_contract_address().require_auth()`) and then delegating to
+    /// [`storage::remove_signer`].
+    fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32) {
+        e.current_contract_address().require_auth();
+        storage::remove_signer(e, context_rule_id, signer_id);
+    }
 
     /// Adds a new policy to an existing context rule, installs it, and returns
     /// the assigned policy ID. The policy's `install` method will be called
@@ -387,11 +399,13 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because the smart account
-    /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`add_policy`] for the
-    /// implementation.
-    fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val) -> u32;
+    /// Defaults to requiring authorization from the smart account itself
+    /// (`e.current_contract_address().require_auth()`) and then delegating to
+    /// [`storage::add_policy`].
+    fn add_policy(e: &Env, context_rule_id: u32, policy: Address, install_param: Val) -> u32 {
+        e.current_contract_address().require_auth();
+        storage::add_policy(e, context_rule_id, &policy, install_param)
+    }
 
     /// Removes a policy from an existing context rule and uninstalls it. The
     /// policy's `uninstall` method will be called during this operation.
@@ -418,11 +432,13 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because the smart account
-    /// contract must authorize all rule mutations. Ensure the smart account
-    /// itself has authorized the call, then call [`remove_policy`] for the
-    /// implementation.
-    fn remove_policy(e: &Env, context_rule_id: u32, policy_id: u32);
+    /// Defaults to requiring authorization from the smart account itself
+    /// (`e.current_contract_address().require_auth()`) and then delegating to
+    /// [`storage::remove_policy`].
+    fn remove_policy(e: &Env, context_rule_id: u32, policy_id: u32) {
+        e.current_contract_address().require_auth();
+        storage::remove_policy(e, context_rule_id, policy_id);
+    }
 }
 
 /// Simple execution entry-point to call arbitrary contracts from within a smart
@@ -440,6 +456,7 @@ pub trait SmartAccount: CustomAccountInterface {
 /// contract calls. This is particularly useful for:
 /// - Calling owned policy contracts
 /// - Interacting with external protocols on behalf of the smart account
+#[contracttrait]
 pub trait ExecutionEntryPoint {
     /// Executes a function call on a target contract from within the smart
     /// account context.
@@ -453,11 +470,13 @@ pub trait ExecutionEntryPoint {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because the smart account
-    /// contract must authorize all outbound calls. There is no
-    /// corresponding storage function — the implementer should call
-    /// `e.invoke_contract()` after verifying authorization.
-    fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>);
+    /// Defaults to requiring authorization from the smart account itself
+    /// (`e.current_contract_address().require_auth()`) and then calling
+    /// `e.invoke_contract()`.
+    fn execute(e: &Env, target: Address, target_fn: Symbol, target_args: Vec<Val>) {
+        e.current_contract_address().require_auth();
+        e.invoke_contract::<Val>(&target, &target_fn, target_args);
+    }
 }
 
 // ################## CONSTANTS ##################
