@@ -27,6 +27,8 @@ pub enum ComplianceModuleStorageKey {
     Compliance,
     /// Caches successful required-hook verification for this module instance.
     HooksVerified,
+    /// The IRS contract address for a specific token.
+    Registry(Address),
 }
 
 /// Read-only cross-contract client into the Identity Registry Storage.
@@ -43,14 +45,6 @@ pub trait IRSRead {
     fn get_country_data_entries(e: &Env, account: Address) -> Vec<CountryData>;
 }
 
-/// Storage key for identity registry storage address, scoped per token.
-#[contracttype]
-#[derive(Clone)]
-pub enum IRSKey {
-    /// The IRS contract address for a specific token.
-    Registry(Address),
-}
-
 // ---------------------------------------------------------------------------
 // Compliance address management
 // ---------------------------------------------------------------------------
@@ -59,14 +53,6 @@ pub enum IRSKey {
 ///
 /// This is a **one-time** operation. Once set, the compliance address cannot
 /// be changed. This prevents unauthorized rebinding after initial deployment.
-///
-/// # Security Warning
-///
-/// This helper performs **no authorization checks**. It must only be called
-/// during contract initialization or from entrypoints that are strictly
-/// restricted to an admin or token owner. Exposing this as, or calling it
-/// from, a publicly accessible module entrypoint would allow unauthorized
-/// parties to bind the compliance contract for this module.
 ///
 /// # Arguments
 ///
@@ -77,6 +63,14 @@ pub enum IRSKey {
 ///
 /// * [`ComplianceModuleError::ComplianceAlreadySet`] - When the compliance
 ///   address has already been set.
+///
+/// # Security Warning
+///
+/// This helper performs **no authorization checks**. It must only be called
+/// during contract initialization or from entrypoints that are strictly
+/// restricted to an admin or token owner. Exposing this as, or calling it
+/// from, a publicly accessible module entrypoint would allow unauthorized
+/// parties to bind the compliance contract for this module.
 pub fn set_compliance_address(e: &Env, compliance: &Address) {
     let key = ComplianceModuleStorageKey::Compliance;
     if e.storage().instance().has(&key) {
@@ -242,9 +236,8 @@ pub fn module_name(e: &Env, name: &str) -> String {
 /// * `token` - The token whose IRS is being configured.
 /// * `irs` - The IRS contract address.
 pub fn set_irs_address(e: &Env, token: &Address, irs: &Address) {
-    let key = IRSKey::Registry(token.clone());
+    let key = ComplianceModuleStorageKey::Registry(token.clone());
     e.storage().persistent().set(&key, irs);
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
 }
 
 /// Returns an IRS cross-contract client for the given token.
@@ -259,7 +252,7 @@ pub fn set_irs_address(e: &Env, token: &Address, irs: &Address) {
 /// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
 ///   configured for this token.
 pub fn get_irs_client<'a>(e: &'a Env, token: &Address) -> IRSReadClient<'a> {
-    let key = IRSKey::Registry(token.clone());
+    let key = ComplianceModuleStorageKey::Registry(token.clone());
     let irs: Address = e
         .storage()
         .persistent()
