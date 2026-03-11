@@ -350,7 +350,13 @@ pub fn emit_module_removed(e: &Env, hook: ComplianceHook, module: Address) {
 /// they can be called by any contract/caller. In this case,
 /// `set_compliance_address` and `get_compliance_address` will probably not
 /// used, and one can provide dummy implementations for them.
-
+///
+/// # Default Implementations
+///
+/// No default implementations are provided for the methods of this trait.
+/// [`ComplianceModule`] is designed to be implemented by multiple independent
+/// contracts, each with its own storage layout, access control, and business
+/// logic. A meaningful default is therefore not possible.
 #[contractclient(name = "ComplianceModuleClient")]
 pub trait ComplianceModule {
     /// Called when tokens are transferred (for Transfer hook).
@@ -375,9 +381,8 @@ pub trait ComplianceModule {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because compliance modules are
-    /// entirely application-specific. Each module defines its own business
-    /// logic (e.g., updating transfer counters, enforcing holding periods).
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn on_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address);
 
     /// Called when tokens are created/minted (for Created hook).
@@ -401,8 +406,8 @@ pub trait ComplianceModule {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because compliance modules are
-    /// entirely application-specific.
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn on_created(e: &Env, to: Address, amount: i128, token: Address);
 
     /// Called when tokens are destroyed/burned (for Destroyed hook).
@@ -426,8 +431,8 @@ pub trait ComplianceModule {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because compliance modules are
-    /// entirely application-specific.
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address);
 
     /// Called to check if a transfer should be allowed (for CanTransfer hook).
@@ -445,10 +450,8 @@ pub trait ComplianceModule {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because compliance modules are
-    /// entirely application-specific. Each module defines its own validation
-    /// logic (e.g., transfer limits, balance caps). There is no
-    /// corresponding storage function — the implementation is fully custom.
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool;
 
     /// Called to check if a mint operation should be allowed (for CanCreate
@@ -466,25 +469,23 @@ pub trait ComplianceModule {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because compliance modules are
-    /// entirely application-specific.
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool;
 
     /// Returns the name of the module for identification purposes.
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because compliance modules are
-    /// deployed as independent contracts. The name is specific to each
-    /// module implementation.
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn name(e: &Env) -> String;
 
     /// Returns the address of the compliance contract.
     ///
-    /// # Notes
+    /// # Arguments
     ///
-    /// No default implementation is provided because compliance modules are
-    /// deployed as independent contracts with their own storage layout.
+    /// * `e` - Access to the Soroban environment.
     fn get_compliance_address(e: &Env) -> Address;
 
     /// Sets the address of the compliance contract.
@@ -493,11 +494,5 @@ pub trait ComplianceModule {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `compliance` - The address of the compliance contract.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because compliance modules are
-    /// deployed as independent contracts with their own storage layout
-    /// and access control requirements.
     fn set_compliance_address(e: &Env, compliance: Address);
 }
