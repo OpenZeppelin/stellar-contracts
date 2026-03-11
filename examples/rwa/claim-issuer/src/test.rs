@@ -8,7 +8,9 @@ use soroban_sdk::{
 };
 use stellar_tokens::rwa::{
     claim_issuer::{encode_claim_data_expiration, Ed25519Verifier, SignatureVerifier},
-    claim_topics_and_issuers::{storage as cti, ClaimTopicsAndIssuers, ClaimTopicsAndIssuersClient},
+    claim_topics_and_issuers::{
+        storage as cti, ClaimTopicsAndIssuers, ClaimTopicsAndIssuersClient,
+    },
 };
 
 use crate::contract::{ClaimIssuerContract, ClaimIssuerContractClient, ED25519_SCHEME};
@@ -115,10 +117,7 @@ fn make_sig_data(e: &Env, public_key: &Bytes, signature: &BytesN<64>) -> Bytes {
 /// Registers a `ClaimIssuerContract` and a `MockRegistry`. Adds `claim_topic`
 /// to the registry and registers the issuer contract as a trusted issuer for
 /// that topic. Returns `(client, registry_address, manager_address)`.
-fn setup<'a>(
-    e: &Env,
-    claim_topic: u32,
-) -> (ClaimIssuerContractClient<'a>, Address, Address) {
+fn setup<'a>(e: &Env, claim_topic: u32) -> (ClaimIssuerContractClient<'a>, Address, Address) {
     let admin = Address::generate(e);
     let manager = Address::generate(e);
     let issuer_addr = e.register(ClaimIssuerContract, (&admin, &manager));

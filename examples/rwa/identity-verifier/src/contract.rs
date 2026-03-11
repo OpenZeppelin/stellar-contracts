@@ -2,7 +2,7 @@
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::only_role;
+use stellar_macros::only_admin;
 use stellar_tokens::rwa::identity_verifier::{storage as identity_verifier, IdentityVerifier};
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -12,17 +12,26 @@ pub struct IdentityVerifierContract;
 
 #[contractimpl]
 impl IdentityVerifierContract {
-    pub fn __constructor(e: &Env, admin: Address, manager: Address) {
+    pub fn __constructor(
+        e: &Env,
+        admin: Address,
+        manager: Address,
+        identity_registry_storage: Address,
+        claim_topics_and_issuers: Address,
+    ) {
         access_control::set_admin(e, &admin);
         access_control::grant_role_no_auth(e, &manager, &MANAGER_ROLE, &admin);
+
+        identity_verifier::set_identity_registry_storage(e, &identity_registry_storage);
+        identity_verifier::set_claim_topics_and_issuers(e, &claim_topics_and_issuers);
     }
 
     /// Returns the address of the identity registry storage contract.
     ///
     /// # Errors
     ///
-    /// * [`stellar_tokens::rwa::RWAError::IdentityRegistryStorageNotSet`] - When
-    ///   the identity registry storage contract is not set.
+    /// * [`stellar_tokens::rwa::RWAError::IdentityRegistryStorageNotSet`] -
+    ///   When the identity registry storage contract is not set.
     pub fn identity_registry_storage(e: &Env) -> Address {
         identity_verifier::identity_registry_storage(e)
     }
@@ -35,11 +44,11 @@ impl IdentityVerifierContract {
     /// * `identity_registry_storage` - The address of the identity registry
     ///   storage contract.
     /// * `operator` - The address of the operator.
-    #[only_role(operator, "manager")]
+    #[only_admin]
     pub fn set_identity_registry_storage(
         e: &Env,
         identity_registry_storage: Address,
-        operator: Address,
+        _operator: Address,
     ) {
         identity_verifier::set_identity_registry_storage(e, &identity_registry_storage);
     }
@@ -55,11 +64,11 @@ impl IdentityVerifier for IdentityVerifierContract {
         identity_verifier::recovery_target(e, old_account)
     }
 
-    #[only_role(operator, "manager")]
+    #[only_admin]
     fn set_claim_topics_and_issuers(
         e: &Env,
         claim_topics_and_issuers: Address,
-        operator: Address,
+        _operator: Address,
     ) {
         identity_verifier::set_claim_topics_and_issuers(e, &claim_topics_and_issuers);
     }

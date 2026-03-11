@@ -1,9 +1,11 @@
 //! RWA Token Example Contract.
 
-use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, MuxedAddress, String, Symbol, Vec};
+use soroban_sdk::{
+    contract, contractimpl, symbol_short, Address, Env, MuxedAddress, String, Symbol, Vec,
+};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_contract_utils::pausable::{self as pausable, Pausable};
-use stellar_macros::only_role;
+use stellar_macros::{only_admin, only_role};
 use stellar_tokens::{
     fungible::{Base, FungibleToken},
     rwa::{RWAToken, RWA},
@@ -22,17 +24,18 @@ impl RWATokenContract {
         symbol: String,
         admin: Address,
         manager: Address,
-        initial_supply: i128,
+        compliance: Address,
+        identity_verifier: Address,
     ) {
-        Base::set_metadata(e, 18, name, symbol);
+        Base::set_metadata(e, 7, name, symbol);
 
         access_control::set_admin(e, &admin);
 
         // create a role "manager" and grant it to `manager`
         access_control::grant_role_no_auth(e, &manager, &MANAGER_ROLE, &admin);
 
-        // Mint initial supply to the admin
-        RWA::mint(e, &admin, initial_supply);
+        RWA::set_compliance(e, &compliance);
+        RWA::set_identity_verifier(e, &identity_verifier);
     }
 }
 
@@ -42,13 +45,13 @@ impl Pausable for RWATokenContract {
         pausable::paused(e)
     }
 
-    #[only_role(caller, "manager")]
-    fn pause(e: &Env, caller: Address) {
+    #[only_admin]
+    fn pause(e: &Env, _caller: Address) {
         pausable::pause(e);
     }
 
-    #[only_role(caller, "manager")]
-    fn unpause(e: &Env, caller: Address) {
+    #[only_admin]
+    fn unpause(e: &Env, _caller: Address) {
         pausable::unpause(e);
     }
 }

@@ -1,15 +1,11 @@
 extern crate std;
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env};
-
-use crate::contract::{ComplianceContract, ComplianceContractClient};
 use stellar_tokens::rwa::compliance::ComplianceHook;
 
-fn create_client<'a>(
-    e: &Env,
-    admin: &Address,
-    manager: &Address,
-) -> ComplianceContractClient<'a> {
+use crate::contract::{ComplianceContract, ComplianceContractClient};
+
+fn create_client<'a>(e: &Env, admin: &Address, manager: &Address) -> ComplianceContractClient<'a> {
     let address = e.register(ComplianceContract, (admin, manager));
     ComplianceContractClient::new(e, &address)
 }
@@ -135,12 +131,8 @@ fn bind_tokens_batch_works() {
     let manager = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    let tokens: soroban_sdk::Vec<Address> = soroban_sdk::vec![
-        &e,
-        Address::generate(&e),
-        Address::generate(&e),
-        Address::generate(&e),
-    ];
+    let tokens: soroban_sdk::Vec<Address> =
+        soroban_sdk::vec![&e, Address::generate(&e), Address::generate(&e), Address::generate(&e),];
 
     client.bind_tokens(&tokens, &manager);
     assert_eq!(client.linked_tokens().len(), 3);

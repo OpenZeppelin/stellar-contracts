@@ -30,8 +30,8 @@ fn add_and_get_claim_topics_works() {
 
     let topics = client.get_claim_topics();
     assert_eq!(topics.len(), 2);
-    assert!(topics.contains(&1u32));
-    assert!(topics.contains(&2u32));
+    assert!(topics.contains(1u32));
+    assert!(topics.contains(2u32));
 }
 
 #[test]
@@ -49,8 +49,8 @@ fn remove_claim_topic_works() {
 
     let topics = client.get_claim_topics();
     assert_eq!(topics.len(), 1);
-    assert!(!topics.contains(&1u32));
-    assert!(topics.contains(&2u32));
+    assert!(!topics.contains(1u32));
+    assert!(topics.contains(2u32));
 }
 
 #[test]
@@ -249,6 +249,6 @@ fn remove_claim_topic_cleans_up_issuer_mappings() {
     // The issuer should now only have topic 2
     let issuer_topics = client.get_trusted_issuer_claim_topics(&issuer);
     assert_eq!(issuer_topics.len(), 1);
-    assert!(issuer_topics.contains(&2u32));
-    assert!(!issuer_topics.contains(&1u32));
+    assert!(issuer_topics.contains(2u32));
+    assert!(!issuer_topics.contains(1u32));
 }

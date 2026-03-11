@@ -10,12 +10,15 @@
 //! 4. The claim has not been individually revoked.
 //! 5. The Ed25519 signature over the canonical claim message is valid.
 
-use soroban_sdk::{contract, contractimpl, panic_with_error, symbol_short, Address, Bytes, Env, Symbol, Vec};
+use soroban_sdk::{
+    contract, contractimpl, panic_with_error, symbol_short, Address, Bytes, Env, Symbol, Vec,
+};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::only_role;
 use stellar_tokens::rwa::claim_issuer::{
-    allow_key, is_claim_expired, is_claim_revoked, is_key_allowed_for_topic, remove_key,
-    ClaimIssuer, ClaimIssuerError, Ed25519Verifier, SignatureVerifier,
+    allow_key, is_claim_expired, is_claim_revoked, is_key_allowed_for_registry,
+    is_key_allowed_for_topic, remove_key, ClaimIssuer, ClaimIssuerError, Ed25519Verifier,
+    SignatureVerifier,
 };
 
 /// Scheme identifier for Ed25519 signatures.
@@ -31,6 +34,11 @@ impl ClaimIssuerContract {
     pub fn __constructor(e: &Env, admin: Address, manager: Address) {
         access_control::set_admin(e, &admin);
         access_control::grant_role_no_auth(e, &manager, &MANAGER_ROLE, &admin);
+    }
+
+    pub fn is_key_allowed(e: &Env, public_key: Bytes, registry: Address, claim_topic: u32) -> bool {
+        is_key_allowed_for_topic(e, &public_key, ED25519_SCHEME, claim_topic)
+            && is_key_allowed_for_registry(e, &public_key, ED25519_SCHEME, &registry)
     }
 
     /// Authorizes an Ed25519 public key to sign claims for a specific topic

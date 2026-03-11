@@ -14,9 +14,9 @@ use crate::contract::{IdentityContract, IdentityContractClient};
 
 mod mock_claim_issuer {
     use soroban_sdk::panic_with_error;
+    use stellar_tokens::rwa::identity_claims::ClaimsError;
 
     use super::*;
-    use stellar_tokens::rwa::identity_claims::ClaimsError;
 
     #[contract]
     pub struct Contract;
@@ -76,8 +76,7 @@ fn add_claim_by_owner_works() {
     let setup = setup();
     let (topic, scheme, signature, data, uri) = test_claim_data(&setup.env);
 
-    let claim_id =
-        setup.client.add_claim(&topic, &scheme, &setup.issuer, &signature, &data, &uri);
+    let claim_id = setup.client.add_claim(&topic, &scheme, &setup.issuer, &signature, &data, &uri);
 
     let claim = setup.client.get_claim(&claim_id);
     assert_eq!(claim.topic, topic);
@@ -137,8 +136,7 @@ fn get_claim_works() {
     let setup = setup();
     let (topic, scheme, signature, data, uri) = test_claim_data(&setup.env);
 
-    let claim_id =
-        setup.client.add_claim(&topic, &scheme, &setup.issuer, &signature, &data, &uri);
+    let claim_id = setup.client.add_claim(&topic, &scheme, &setup.issuer, &signature, &data, &uri);
 
     let claim = setup.client.get_claim(&claim_id);
     assert_eq!(claim.topic, topic);
@@ -150,8 +148,7 @@ fn get_claim_ids_by_topic_works() {
     let setup = setup();
     let (topic, scheme, signature, data, uri) = test_claim_data(&setup.env);
 
-    let claim_id =
-        setup.client.add_claim(&topic, &scheme, &setup.issuer, &signature, &data, &uri);
+    let claim_id = setup.client.add_claim(&topic, &scheme, &setup.issuer, &signature, &data, &uri);
 
     let ids = setup.client.get_claim_ids_by_topic(&topic);
     assert_eq!(ids.len(), 1);
@@ -175,8 +172,7 @@ fn remove_claim_by_owner_works() {
     let setup = setup();
     let (topic, scheme, signature, data, uri) = test_claim_data(&setup.env);
 
-    let claim_id =
-        setup.client.add_claim(&topic, &scheme, &setup.issuer, &signature, &data, &uri);
+    let claim_id = setup.client.add_claim(&topic, &scheme, &setup.issuer, &signature, &data, &uri);
 
     // Verify it exists
     let ids = setup.client.get_claim_ids_by_topic(&topic);
@@ -196,8 +192,7 @@ fn remove_claim_by_non_owner_panics() {
     let env = &setup.env;
     let (topic, scheme, signature, data, uri) = test_claim_data(env);
 
-    let claim_id =
-        setup.client.add_claim(&topic, &scheme, &setup.issuer, &signature, &data, &uri);
+    let claim_id = setup.client.add_claim(&topic, &scheme, &setup.issuer, &signature, &data, &uri);
 
     // Only authenticate as non_owner — should fail ownership check
     env.mock_auths(&[soroban_sdk::testutils::MockAuth {

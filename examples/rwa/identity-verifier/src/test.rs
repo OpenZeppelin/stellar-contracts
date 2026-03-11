@@ -10,11 +10,12 @@ const ISSUERS: Symbol = symbol_short!("issuers");
 const CLAIM_IDS: Symbol = symbol_short!("claim_ids");
 const CLAIM_OK: Symbol = symbol_short!("claim_ok");
 
-use crate::contract::{IdentityVerifierContract, IdentityVerifierContractClient};
 use stellar_tokens::rwa::{
     claim_issuer::ClaimIssuer,
     identity_claims::{generate_claim_id, Claim},
 };
+
+use crate::contract::{IdentityVerifierContract, IdentityVerifierContractClient};
 
 // ################## CLIENT FACTORY ##################
 
@@ -22,8 +23,13 @@ fn create_client<'a>(
     e: &Env,
     admin: &Address,
     manager: &Address,
+    identity_registry_storage: &Address,
+    claim_topics_and_issuers: &Address,
 ) -> IdentityVerifierContractClient<'a> {
-    let address = e.register(IdentityVerifierContract, (admin, manager));
+    let address = e.register(
+        IdentityVerifierContract,
+        (admin, manager, identity_registry_storage, claim_topics_and_issuers),
+    );
     IdentityVerifierContractClient::new(e, &address)
 }
 
@@ -52,8 +58,7 @@ pub struct MockClaimTopicsAndIssuers;
 impl MockClaimTopicsAndIssuers {
     /// Returns a map of claim topic → list of trusted issuers.
     pub fn get_claim_topics_and_issuers(e: &Env) -> Map<u32, Vec<Address>> {
-        let issuers: Vec<Address> =
-            e.storage().persistent().get(&ISSUERS).unwrap();
+        let issuers: Vec<Address> = e.storage().persistent().get(&ISSUERS).unwrap();
         map![e, (1u32, issuers)]
     }
 }
@@ -135,9 +140,7 @@ fn setup_identity_stack(e: &Env) -> (Address, Address, Address, Address) {
         let claim = make_claim(e, &issuer, 1);
         let claim_id = generate_claim_id(e, &issuer, 1);
         e.storage().persistent().set(&IdentityClaimsMockKey::Claim(claim_id.clone()), &claim);
-        e.storage()
-            .persistent()
-            .set(&CLAIM_IDS, &Vec::from_array(e, [claim_id]));
+        e.storage().persistent().set(&CLAIM_IDS, &Vec::from_array(e, [claim_id]));
     });
 
     // CTI: topic 1 → [issuer]
@@ -156,23 +159,13 @@ fn set_and_get_claim_topics_and_issuers_works() {
     e.mock_all_auths();
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
-    let cti = Address::generate(&e);
+    let initial_irs = Address::generate(&e);
+    let initial_cti = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager, &initial_irs, &initial_cti);
+    let new_cti = Address::generate(&e);
 
-    client.set_claim_topics_and_issuers(&cti, &manager);
-    assert_eq!(client.claim_topics_and_issuers(), cti);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #310)")]
-fn get_unset_claim_topics_and_issuers_panics() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let admin = Address::generate(&e);
-    let manager = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
-
-    client.claim_topics_and_issuers();
+    client.set_claim_topics_and_issuers(&new_cti, &manager);
+    assert_eq!(client.claim_topics_and_issuers(), new_cti);
 }
 
 #[test]
@@ -181,23 +174,13 @@ fn set_and_get_identity_registry_storage_works() {
     e.mock_all_auths();
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
-    let irs = Address::generate(&e);
+    let initial_irs = Address::generate(&e);
+    let initial_cti = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager, &initial_irs, &initial_cti);
+    let new_irs = Address::generate(&e);
 
-    client.set_identity_registry_storage(&irs, &manager);
-    assert_eq!(client.identity_registry_storage(), irs);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #311)")]
-fn get_unset_identity_registry_storage_panics() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let admin = Address::generate(&e);
-    let manager = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
-
-    client.identity_registry_storage();
+    client.set_identity_registry_storage(&new_irs, &manager);
+    assert_eq!(client.identity_registry_storage(), new_irs);
 }
 
 // ################## VERIFY IDENTITY ##################
@@ -208,7 +191,6 @@ fn verify_identity_succeeds_with_valid_claim() {
     e.mock_all_auths();
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
     let account = Address::generate(&e);
 
     let (_identity, issuer, irs, cti) = setup_identity_stack(&e);
@@ -217,8 +199,7 @@ fn verify_identity_succeeds_with_valid_claim() {
         e.storage().persistent().set(&CLAIM_OK, &true);
     });
 
-    client.set_identity_registry_storage(&irs, &manager);
-    client.set_claim_topics_and_issuers(&cti, &manager);
+    let client = create_client(&e, &admin, &manager, &irs, &cti);
 
     // Must not panic
     client.verify_identity(&account);
@@ -231,7 +212,6 @@ fn verify_identity_fails_with_invalid_claim() {
     e.mock_all_auths();
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
     let account = Address::generate(&e);
 
     let (_identity, issuer, irs, cti) = setup_identity_stack(&e);
@@ -241,8 +221,7 @@ fn verify_identity_fails_with_invalid_claim() {
         e.storage().persistent().set(&CLAIM_OK, &false);
     });
 
-    client.set_identity_registry_storage(&irs, &manager);
-    client.set_claim_topics_and_issuers(&cti, &manager);
+    let client = create_client(&e, &admin, &manager, &irs, &cti);
 
     client.verify_identity(&account);
 }
@@ -253,7 +232,6 @@ fn verify_identity_succeeds_with_second_valid_issuer() {
     e.mock_all_auths();
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
     let account = Address::generate(&e);
 
     let (identity, issuer1, irs, cti) = setup_identity_stack(&e);
@@ -271,28 +249,21 @@ fn verify_identity_succeeds_with_second_valid_issuer() {
     e.as_contract(&identity, || {
         let id1 = generate_claim_id(&e, &issuer1, 1);
         let id2 = generate_claim_id(&e, &issuer2, 1);
-        e.storage().persistent().set(
-            &IdentityClaimsMockKey::Claim(id1.clone()),
-            &make_claim(&e, &issuer1, 1),
-        );
-        e.storage().persistent().set(
-            &IdentityClaimsMockKey::Claim(id2.clone()),
-            &make_claim(&e, &issuer2, 1),
-        );
         e.storage()
             .persistent()
-            .set(&CLAIM_IDS, &Vec::from_array(&e, [id1, id2]));
+            .set(&IdentityClaimsMockKey::Claim(id1.clone()), &make_claim(&e, &issuer1, 1));
+        e.storage()
+            .persistent()
+            .set(&IdentityClaimsMockKey::Claim(id2.clone()), &make_claim(&e, &issuer2, 1));
+        e.storage().persistent().set(&CLAIM_IDS, &Vec::from_array(&e, [id1, id2]));
     });
 
     // Register both issuers in CTI
     e.as_contract(&cti, || {
-        e.storage()
-            .persistent()
-            .set(&ISSUERS, &vec![&e, issuer1.clone(), issuer2.clone()]);
+        e.storage().persistent().set(&ISSUERS, &vec![&e, issuer1.clone(), issuer2.clone()]);
     });
 
-    client.set_identity_registry_storage(&irs, &manager);
-    client.set_claim_topics_and_issuers(&cti, &manager);
+    let client = create_client(&e, &admin, &manager, &irs, &cti);
 
     client.verify_identity(&account);
 }
@@ -305,12 +276,10 @@ fn recovery_target_returns_none_when_not_set() {
     e.mock_all_auths();
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
     let old_account = Address::generate(&e);
 
     let (_identity, _issuer, irs, cti) = setup_identity_stack(&e);
-    client.set_identity_registry_storage(&irs, &manager);
-    client.set_claim_topics_and_issuers(&cti, &manager);
+    let client = create_client(&e, &admin, &manager, &irs, &cti);
 
     assert!(client.recovery_target(&old_account).is_none());
 }
@@ -321,7 +290,6 @@ fn recovery_target_returns_new_account_when_set() {
     e.mock_all_auths();
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
     let old_account = Address::generate(&e);
     let new_account = Address::generate(&e);
 
@@ -332,8 +300,7 @@ fn recovery_target_returns_new_account_when_set() {
         e.storage().persistent().set(&old_account, &new_account);
     });
 
-    client.set_identity_registry_storage(&irs, &manager);
-    client.set_claim_topics_and_issuers(&cti, &manager);
+    let client = create_client(&e, &admin, &manager, &irs, &cti);
 
     assert_eq!(client.recovery_target(&old_account), Some(new_account));
 }
