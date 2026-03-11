@@ -87,18 +87,20 @@ pub fn set_compliance_address(e: &Env, compliance: &Address) {
 
 /// Returns the stored compliance address.
 ///
-/// Falls back to the module's own address when no compliance contract has
-/// been configured yet — this allows admin configuration before locking.
-///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::ComplianceNotSet`] - When no compliance contract
+///   has been configured yet.
 pub fn get_compliance_address(e: &Env) -> Address {
     let key = ComplianceModuleStorageKey::Compliance;
     if let Some(addr) = e.storage().instance().get::<_, Address>(&key) {
         addr
     } else {
-        e.current_contract_address()
+        panic_with_error!(e, ComplianceModuleError::ComplianceNotSet)
     }
 }
 
@@ -543,6 +545,30 @@ mod test {
 
         e.as_contract(&module_id, || {
             let _ = require_compliance_auth(&e);
+        });
+    }
+
+    #[test]
+    #[should_panic(expected = "Error(Contract, #390)")]
+    fn get_compliance_address_panics_when_not_configured() {
+        let e = Env::default();
+        let module_id = e.register(MockModuleContract, ());
+
+        e.as_contract(&module_id, || {
+            let _ = get_compliance_address(&e);
+        });
+    }
+
+    #[test]
+    fn get_compliance_address_returns_configured_address() {
+        let e = Env::default();
+        let module_id = e.register(MockModuleContract, ());
+        let compliance_id = e.register(MockComplianceContract, ());
+
+        e.as_contract(&module_id, || {
+            set_compliance_address(&e, &compliance_id);
+
+            assert_eq!(get_compliance_address(&e), compliance_id);
         });
     }
 

@@ -412,7 +412,7 @@ pub trait ComplianceModule {
     /// the implementation:
     ///
     /// ```ignore
-    /// get_compliance_address(e).require_auth();
+    /// require_compliance_auth(e);
     /// ```
     ///
     /// # Notes
@@ -437,7 +437,7 @@ pub trait ComplianceModule {
     /// the implementation:
     ///
     /// ```ignore
-    /// get_compliance_address(e).require_auth();
+    /// require_compliance_auth(e);
     /// ```
     ///
     /// # Notes
@@ -462,7 +462,7 @@ pub trait ComplianceModule {
     /// the implementation:
     ///
     /// ```ignore
-    /// get_compliance_address(e).require_auth();
+    /// require_compliance_auth(e);
     /// ```
     ///
     /// # Notes
