@@ -79,11 +79,10 @@ pub enum IRSKey {
 ///   address has already been set.
 pub fn set_compliance_address(e: &Env, compliance: &Address) {
     let key = ComplianceModuleStorageKey::Compliance;
-    if e.storage().persistent().has(&key) {
+    if e.storage().instance().has(&key) {
         panic_with_error!(e, ComplianceModuleError::ComplianceAlreadySet);
     }
-    e.storage().persistent().set(&key, compliance);
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
+    e.storage().instance().set(&key, compliance);
 }
 
 /// Returns the stored compliance address.
@@ -96,8 +95,7 @@ pub fn set_compliance_address(e: &Env, compliance: &Address) {
 /// * `e` - Access to the Soroban environment.
 pub fn get_compliance_address(e: &Env) -> Address {
     let key = ComplianceModuleStorageKey::Compliance;
-    if let Some(addr) = e.storage().persistent().get::<_, Address>(&key) {
-        e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
+    if let Some(addr) = e.storage().instance().get::<_, Address>(&key) {
         addr
     } else {
         e.current_contract_address()
@@ -123,8 +121,7 @@ pub fn get_compliance_address(e: &Env) -> Address {
 ///   has been configured yet.
 pub fn require_compliance_auth(e: &Env) -> Address {
     let key = ComplianceModuleStorageKey::Compliance;
-    if let Some(compliance) = e.storage().persistent().get::<_, Address>(&key) {
-        e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
+    if let Some(compliance) = e.storage().instance().get::<_, Address>(&key) {
         compliance.require_auth();
         compliance
     } else {
@@ -174,12 +171,11 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
     }
 
     let ckey = ComplianceModuleStorageKey::Compliance;
-    if !e.storage().persistent().has(&ckey) {
+    if !e.storage().instance().has(&ckey) {
         return;
     }
 
-    let compliance: Address = e.storage().persistent().get(&ckey).expect("compliance must be set");
-    e.storage().persistent().extend_ttl(&ckey, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
+    let compliance: Address = e.storage().instance().get(&ckey).expect("compliance must be set");
     let self_addr = e.current_contract_address();
     let client = ComplianceClient::new(e, &compliance);
 
