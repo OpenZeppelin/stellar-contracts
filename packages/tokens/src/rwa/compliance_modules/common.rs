@@ -4,9 +4,7 @@
 //! guards, lightweight read-only client traits, and identity registry
 //! storage (IRS) resolution helpers.
 
-use soroban_sdk::{
-    contractclient, contracttype, panic_with_error, Address, Env, String, Symbol, Vec,
-};
+use soroban_sdk::{contractclient, contracttype, panic_with_error, Address, Env, String, Vec};
 
 use crate::rwa::{
     compliance::{
@@ -19,17 +17,16 @@ use crate::rwa::{
 };
 
 // ---------------------------------------------------------------------------
-// Storage key helpers — singleton keys use Symbol::new() with descriptive names
-// (structured storage elsewhere in RWA typically uses #[contracttype] enums,
-// like `IRSKey` below; here we keep these singleton entries as Symbols)
+// Storage keys
 // ---------------------------------------------------------------------------
 
-fn compliance_key(e: &Env) -> Symbol {
-    Symbol::new(e, "compliance_address")
-}
-
-fn hooks_verified_key(e: &Env) -> Symbol {
-    Symbol::new(e, "hooks_verified")
+#[contracttype]
+#[derive(Clone)]
+pub enum ComplianceModuleStorageKey {
+    /// Maps to the compliance contract address for this module instance.
+    Compliance,
+    /// Caches successful required-hook verification for this module instance.
+    HooksVerified,
 }
 
 /// Read-only cross-contract client into the Identity Registry Storage.
@@ -81,7 +78,7 @@ pub enum IRSKey {
 /// * [`ComplianceModuleError::ComplianceAlreadySet`] - When the compliance
 ///   address has already been set.
 pub fn set_compliance_address(e: &Env, compliance: &Address) {
-    let key = compliance_key(e);
+    let key = ComplianceModuleStorageKey::Compliance;
     if e.storage().persistent().has(&key) {
         panic_with_error!(e, ComplianceModuleError::ComplianceAlreadySet);
     }
@@ -98,7 +95,7 @@ pub fn set_compliance_address(e: &Env, compliance: &Address) {
 ///
 /// * `e` - Access to the Soroban environment.
 pub fn get_compliance_address(e: &Env) -> Address {
-    let key = compliance_key(e);
+    let key = ComplianceModuleStorageKey::Compliance;
     if let Some(addr) = e.storage().persistent().get::<_, Address>(&key) {
         e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
         addr
@@ -125,7 +122,7 @@ pub fn get_compliance_address(e: &Env) -> Address {
 /// * [`ComplianceModuleError::ComplianceNotSet`] - When no compliance contract
 ///   has been configured yet.
 pub fn require_compliance_auth(e: &Env) -> Address {
-    let key = compliance_key(e);
+    let key = ComplianceModuleStorageKey::Compliance;
     if let Some(compliance) = e.storage().persistent().get::<_, Address>(&key) {
         e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
         compliance.require_auth();
@@ -146,7 +143,7 @@ pub fn require_compliance_auth(e: &Env) -> Address {
 ///
 /// * `e` - Access to the Soroban environment.
 pub fn hooks_verified(e: &Env) -> bool {
-    let key = hooks_verified_key(e);
+    let key = ComplianceModuleStorageKey::HooksVerified;
     let verified = e.storage().persistent().has(&key);
     if verified {
         e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
@@ -176,7 +173,7 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
         return;
     }
 
-    let ckey = compliance_key(e);
+    let ckey = ComplianceModuleStorageKey::Compliance;
     if !e.storage().persistent().has(&ckey) {
         return;
     }
@@ -192,7 +189,7 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
         }
     }
 
-    let vkey = hooks_verified_key(e);
+    let vkey = ComplianceModuleStorageKey::HooksVerified;
     e.storage().persistent().set(&vkey, &true);
     e.storage().persistent().extend_ttl(&vkey, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
 }
@@ -478,7 +475,7 @@ mod test {
 
         e.as_contract(&module_id, || {
             set_compliance_address(&e, &compliance_id);
-            e.storage().persistent().set(&hooks_verified_key(&e), &true);
+            e.storage().persistent().set(&ComplianceModuleStorageKey::HooksVerified, &true);
 
             verify_required_hooks(&e, vec![&e, ComplianceHook::CanTransfer]);
 
