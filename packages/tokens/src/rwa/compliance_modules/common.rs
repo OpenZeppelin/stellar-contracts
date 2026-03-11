@@ -10,7 +10,8 @@ use soroban_sdk::{
 
 use crate::rwa::{
     compliance::{
-        ComplianceHook, ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+        ComplianceClient, ComplianceHook, ComplianceModuleError, MODULE_EXTEND_AMOUNT,
+        MODULE_TTL_THRESHOLD,
     },
     identity_registry_storage::{
         CountryData, CountryRelation, IndividualCountryRelation, OrganizationCountryRelation,
@@ -138,14 +139,6 @@ pub fn require_compliance_auth(e: &Env) -> Address {
 // Hook wiring verification
 // ---------------------------------------------------------------------------
 
-/// Minimal read-only client for querying the compliance contract's
-/// hook registrations. Only exposes the `is_module_registered` view.
-#[contractclient(name = "ComplianceHookCheckClient")]
-pub trait ComplianceHookCheck {
-    /// Checks if `module` is registered for `hook` on the compliance contract.
-    fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool;
-}
-
 /// Returns `true` if the hook wiring has already been verified for this
 /// module instance (cached after the first successful check).
 ///
@@ -191,7 +184,7 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
     let compliance: Address = e.storage().persistent().get(&ckey).expect("compliance must be set");
     e.storage().persistent().extend_ttl(&ckey, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
     let self_addr = e.current_contract_address();
-    let client = ComplianceHookCheckClient::new(e, &compliance);
+    let client = ComplianceClient::new(e, &compliance);
 
     for hook in required.iter() {
         if !client.is_module_registered(&hook, &self_addr) {
@@ -345,6 +338,7 @@ mod test {
     use soroban_sdk::{contract, contractimpl, testutils::Address as _, vec, Address, Env, Vec};
 
     use super::*;
+    use crate::rwa::{compliance::Compliance, utils::token_binder::TokenBinder};
 
     #[contract]
     struct MockModuleContract;
@@ -359,10 +353,68 @@ mod test {
     }
 
     #[contractimpl]
-    impl ComplianceHookCheck for MockComplianceContract {
+    impl Compliance for MockComplianceContract {
+        fn add_module_to(_e: &Env, _hook: ComplianceHook, _module: Address, _operator: Address) {
+            unreachable!("add_module_to is not used in these tests");
+        }
+
+        fn remove_module_from(
+            _e: &Env,
+            _hook: ComplianceHook,
+            _module: Address,
+            _operator: Address,
+        ) {
+            unreachable!("remove_module_from is not used in these tests");
+        }
+
+        fn get_modules_for_hook(_e: &Env, _hook: ComplianceHook) -> Vec<Address> {
+            unreachable!("get_modules_for_hook is not used in these tests");
+        }
+
         fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool {
             let key = MockComplianceStorageKey::Registered(hook, module);
             e.storage().persistent().has(&key)
+        }
+
+        fn transferred(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {
+            unreachable!("transferred is not used in these tests");
+        }
+
+        fn created(_e: &Env, _to: Address, _amount: i128, _token: Address) {
+            unreachable!("created is not used in these tests");
+        }
+
+        fn destroyed(_e: &Env, _from: Address, _amount: i128, _token: Address) {
+            unreachable!("destroyed is not used in these tests");
+        }
+
+        fn can_transfer(
+            _e: &Env,
+            _from: Address,
+            _to: Address,
+            _amount: i128,
+            _token: Address,
+        ) -> bool {
+            unreachable!("can_transfer is not used in these tests");
+        }
+
+        fn can_create(_e: &Env, _to: Address, _amount: i128, _token: Address) -> bool {
+            unreachable!("can_create is not used in these tests");
+        }
+    }
+
+    #[contractimpl]
+    impl TokenBinder for MockComplianceContract {
+        fn linked_tokens(e: &Env) -> Vec<Address> {
+            Vec::new(e)
+        }
+
+        fn bind_token(_e: &Env, _token: Address, _operator: Address) {
+            unreachable!("bind_token is not used in these tests");
+        }
+
+        fn unbind_token(_e: &Env, _token: Address, _operator: Address) {
+            unreachable!("unbind_token is not used in these tests");
         }
     }
 
