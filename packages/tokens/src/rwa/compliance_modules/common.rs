@@ -117,9 +117,6 @@ pub fn hooks_verified(e: &Env) -> bool {
 /// registered on every hook in `required`. Caches the result on success
 /// so subsequent calls are a single storage read.
 ///
-/// Skips verification if `set_compliance_address` has not been called
-/// yet (the module is in unconfigured mode).
-///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
@@ -127,6 +124,8 @@ pub fn hooks_verified(e: &Env) -> bool {
 ///
 /// # Errors
 ///
+/// * [`ComplianceModuleError::ComplianceNotSet`] - When the compliance contract
+///   has not been configured yet.
 /// * [`ComplianceModuleError::MissingRequiredHook`] - When any required hook is
 ///   not registered, which means the deployment is misconfigured and internal
 ///   state would drift.
@@ -136,11 +135,11 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
     }
 
     let ckey = ComplianceModuleStorageKey::Compliance;
-    if !e.storage().instance().has(&ckey) {
-        return;
-    }
-
-    let compliance: Address = e.storage().instance().get(&ckey).expect("compliance must be set");
+    let compliance: Address = e
+        .storage()
+        .instance()
+        .get(&ckey)
+        .unwrap_or_else(|| panic_with_error!(e, ComplianceModuleError::ComplianceNotSet));
     let self_addr = e.current_contract_address();
     let client = ComplianceClient::new(e, &compliance);
 
@@ -397,14 +396,13 @@ mod test {
     }
 
     #[test]
-    fn verify_required_hooks_skips_when_unconfigured() {
+    #[should_panic(expected = "Error(Contract, #390)")]
+    fn verify_required_hooks_panics_when_unconfigured() {
         let e = Env::default();
         let module_id = e.register(MockModuleContract, ());
 
         e.as_contract(&module_id, || {
             verify_required_hooks(&e, vec![&e, ComplianceHook::CanTransfer]);
-
-            assert!(!hooks_verified(&e));
         });
     }
 
