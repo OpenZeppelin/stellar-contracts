@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractevent, Address, Env};
+use soroban_sdk::{contractevent, contracttrait, Address, Env};
 pub use storage::AllowList;
 
 use crate::fungible::FungibleToken;
@@ -28,14 +28,8 @@ use crate::fungible::FungibleToken;
 ///
 /// However, this parameter is omitted from the module functions, defined in
 /// "storage.rs", because the authorizations are to be handled in the access
-/// control helpers or directly implemented.
-///
-/// There is no default implementation for this trait on purpose.
-///
-/// Because, there are no default implementation to enforce how the
-/// authorization should be configured. Not providing a default implementation
-/// for this trait is a reminder for the implementor to provide the
-/// authorization logic for this trait.
+/// control helpers or directly implemented
+#[contracttrait]
 pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     /// Returns the allowed status of an account.
     ///
@@ -43,7 +37,9 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to check the allowed status for.
-    fn allowed(e: &Env, account: Address) -> bool;
+    fn allowed(e: &Env, account: Address) -> bool {
+        storage::AllowList::allowed(e, &account)
+    }
 
     /// Allows a user to receive and transfer tokens.
     ///
@@ -57,6 +53,13 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * topics - `["allow", user: Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`storage::allow_user`] for the
+    /// implementation.
     fn allow_user(e: &Env, user: Address, operator: Address);
 
     /// Disallows a user from receiving and transferring tokens.
@@ -71,6 +74,13 @@ pub trait FungibleAllowList: FungibleToken<ContractType = AllowList> {
     ///
     /// * topics - `["disallow", user: Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::disallow_user`] for the implementation.
     fn disallow_user(e: &Env, user: Address, operator: Address);
 }
 

@@ -1,22 +1,21 @@
 //! Pausable Contract Module.
 //!
-//! This contract module allows implementing a configurable stop mechanism for
-//! your contract.
+//! This contract module allows a configurable stop mechanism to be implemented
+//! for a contract.
 //!
-//! By implementing the trait [`Pausable`] for your contract, you can safely
-//! integrate the Pausable functionality. The trait [`Pausable`] has the
+//! By implementing the trait [`Pausable`] for a contract, the Pausable
+//! functionality can be integrated safely. The trait [`Pausable`] has the
 //! following methods:
 //! - [`paused()`]
 //! - [`pause()`]
 //! - [`unpause()`]
 //!
-//! The trait ensures all the required methods are implemented for your
-//! contract, and nothing is forgotten. Additionally, if you are to implement
-//! multiple extensions or utilities for your contract, the code will be better
-//! organized.
+//! The trait ensures that all required methods are implemented for the
+//! contract. Additionally, when multiple extensions or utilities are
+//! implemented, the code remains better organized.
 //!
-//! We also provide two macros `when_paused` and `when_not_paused`. These macros
-//! act as guards for your functions. For example:
+//! Two macros, `when_paused` and `when_not_paused`, are also provided. These
+//! macros act as guards for functions. For example:
 //!
 //! ```ignore
 //! #[when_not_paused]
@@ -25,22 +24,22 @@
 //! }
 //! ```
 //!
-//! For a safe pause/unpause implementation, we expose the underlying functions
-//! required for the pausing. These functions work with the Soroban environment
+//! For a safe pause/unpause implementation, the underlying functions required
+//! for pausing are exposed. These functions work with the Soroban environment
 //! required for the Smart Contracts `e: &Env`, and take advantage of the
 //! storage by storing a flag for the pause mechanism.
 //!
-//! We expect you to utilize these functions (`storage::*`) for implementing the
-//! methods of the `Pausable` trait, along with your custom business logic
+//! These functions (`storage::*`) are intended to be used when implementing
+//! the methods of the `Pausable` trait, together with custom business logic
 //! (authentication, etc.)
 //!
-//! You can opt-out of [`Pausable`] trait, and use `storage::*` functions
-//! directly in your contract if you want more customizability. But we encourage
-//! the use of [`Pausable`] trait instead, due to the following reasons:
+//! The [`Pausable`] trait can be omitted and `storage::*` functions can be
+//! used directly in the contract if more customizability is required. The use
+//! of [`Pausable`] is still encouraged for the following reasons:
 //! - there is no additional cost
 //! - standardization
-//! - you cannot mistakenly forget one of the methods
-//! - your code will be better organized, especially if you implement multiple
+//! - one of the methods cannot be forgotten accidentally
+//! - the code remains better organized, especially when multiple
 //!   extensions/utils
 //!
 //! TL;DR
@@ -85,14 +84,13 @@ pub trait Pausable {
     ///
     /// # Notes
     ///
-    /// We recommend using [`pause`] when implementing this function.
+    /// [`pause`] is recommended when implementing this function.
     ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: The base implementation of [`pause`]
-    /// intentionally lacks authorization controls. If you want to restrict
-    /// who can `pause` the contract, you MUST implement proper
-    /// authorization in your contract.
+    /// intentionally lacks authorization controls. If `pause` access is to be
+    /// restricted, proper authorization MUST be implemented in the contract.
     fn pause(e: &Env, caller: Address);
 
     /// Triggers `Unpaused` state.
@@ -114,14 +112,14 @@ pub trait Pausable {
     ///
     /// # Notes
     ///
-    /// We recommend using [`unpause`] when implementing this function.
+    /// [`unpause`] is recommended when implementing this function.
     ///
     /// # Security Warning
     ///
     /// **IMPORTANT**: The base implementation of [`unpause`]
-    /// intentionally lacks authorization controls. If you want to restrict
-    /// who can `unpause` the contract, you MUST implement proper
-    /// authorization in your contract.
+    /// intentionally lacks authorization controls. If `unpause` access is to
+    /// be restricted, proper authorization MUST be implemented in the
+    /// contract.
     fn unpause(e: &Env, caller: Address);
 }
 

@@ -2,23 +2,22 @@ use soroban_sdk::{Address, Env, String};
 
 /// Based on the extension, some default behavior of
 /// [`crate::non_fungible::NonFungibleToken`] might have to be overridden. This
-/// is a helper trait that allows us this override mechanism that favors the
-/// DevX.
+/// is a helper trait that provides this override mechanism in a
+/// developer-friendly way.
 ///
-/// One can also override the `NonFungibleToken` trait directly, but the reason
-/// we have another helper trait for the same methods, is to provide the default
-/// implementations in an easier way for the developers.
+/// The `NonFungibleToken` trait can also be overridden directly, but this
+/// helper trait exists to provide the default implementations in a simpler way.
 ///
 /// The way to provide different default implementations for different
 /// extensions is by implementing the trait for different types (unit structs).
 /// The problem is, `NonFungibleToken` trait has to be implemented for the smart
-/// contract (which is another struct) by the developers. So, we need a level
-/// of abstraction by introducing an associated type, which will grant
+/// contract (which is another struct). Therefore, a level of abstraction is
+/// needed by introducing an associated type, which grants
 /// `NonFungibleToken` trait the ability to switch between different default
 /// implementations by calling the methods on this associated type.
 ///
-/// By introducing this abstraction, we allow the developers to implement
-/// every method of the `NonFungibleToken` trait using
+/// This abstraction allows every method of the `NonFungibleToken` trait to be
+/// implemented using
 /// `Self::ContractType::{function_name}`, which will in turn use either the
 /// overridden or the base variant according to the extension, provided by the
 /// `ContractOverrides` trait implementation for the respective `ContractType`.

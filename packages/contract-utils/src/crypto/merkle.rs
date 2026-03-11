@@ -33,7 +33,7 @@ where
     ///
     /// The tree and the proofs by using keccak256 can be generated with
     /// `OpenZeppelin`'s [merkle tree library](https://github.com/OpenZeppelin/merkle-tree).
-    /// WARNING: You should avoid using leaf values that are 64 bytes long
+    /// WARNING: Leaf values that are 64 bytes long should be avoided
     /// prior to hashing. This is because the concatenation of a sorted pair
     /// of internal nodes in the Merkle tree could be reinterpreted as a
     /// leaf value. `OpenZeppelin`'s JavaScript library generates Merkle trees

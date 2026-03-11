@@ -18,9 +18,9 @@ pub fn paused(e: &Env) -> bool {
     // if not paused, consider default false (unpaused)
     e.storage().instance().get(&PausableStorageKey::Paused).unwrap_or(false)
 
-    // NOTE: We don't extend the TTL here. We don’t think utilities should
-    // have any opinion on the TTLs, contracts usually manage TTL's themselves.
-    // Extending the TTL in the utilities would be redundant in the most cases.
+    // NOTE: The TTL is not extended here. Utilities should not have an opinion
+    // on TTL management because contracts usually manage TTLs themselves.
+    // Extending the TTL in utilities would be redundant in most cases.
 }
 
 /// Triggers paused state.

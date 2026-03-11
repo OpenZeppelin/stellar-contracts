@@ -21,13 +21,13 @@ pub mod storage;
 /// - **Merkle Tree**: Efficient verification using merkle proofs (minimal
 ///   storage)
 /// - **Zero-Knowledge**: Privacy-preserving verification (custom ZK circuits)
-/// - **Claim-based**: Cryptographic claims from trusted issuers (our default
+/// - **Claim-based**: Cryptographic claims from trusted issuers (the default
 ///   approach)
 /// - and other custom approaches
 ///
 /// ## Default Implementation
 ///
-/// Our suggested claim-based implementation uses two external contracts:
+/// The suggested claim-based implementation uses two external contracts:
 /// 1. **Claim Topics and Issuers**: Manages trusted issuers and claim types
 /// 2. **Identity Registry Storage**: Maps wallet addresses to onchain
 ///    identities
@@ -51,6 +51,14 @@ pub trait IdentityVerifier {
     ///
     /// * [`crate::rwa::RWAError::IdentityVerificationFailed`] - When the
     ///   identity of the account cannot be verified.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because identity verification
+    /// is architecture-dependent (claim-based, merkle tree, zero-knowledge,
+    /// etc.). For the default claim-based approach, use
+    /// [`storage::verify_identity`] for the underlying logic. See the
+    /// module documentation for alternative approaches.
     fn verify_identity(e: &Env, account: &Address);
 
     /// Returns the target address for the recovery process for the old account.
@@ -61,6 +69,12 @@ pub trait IdentityVerifier {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `old_account` - The address of the old account.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because identity verification
+    /// is architecture-dependent. For the default claim-based approach, use
+    /// [`storage::recovery_target`] for the underlying logic.
     fn recovery_target(e: &Env, old_account: &Address) -> Option<Address>;
 
     /// Sets the identity registry contract of the token.
@@ -80,6 +94,13 @@ pub trait IdentityVerifier {
     /// * topics - `["claim_topics_issuers_set", claim_topics_and_issuers:
     ///   Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::set_claim_topics_and_issuers`] for the implementation.
     fn set_claim_topics_and_issuers(e: &Env, claim_topics_and_issuers: Address, operator: Address);
 
     /// Returns the Claim Topics and Issuers contract linked to the token.
@@ -88,5 +109,7 @@ pub trait IdentityVerifier {
     ///
     /// * [`crate::rwa::RWAError::ClaimTopicsAndIssuersNotSet`] - When the claim
     ///   topics and issuers contract is not set.
-    fn claim_topics_and_issuers(e: &Env) -> Address;
+    fn claim_topics_and_issuers(e: &Env) -> Address {
+        storage::claim_topics_and_issuers(e)
+    }
 }

@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractevent, Address, Env};
+use soroban_sdk::{contractevent, contracttrait, Address, Env};
 pub use storage::BlockList;
 
 use crate::fungible::FungibleToken;
@@ -29,13 +29,7 @@ use crate::fungible::FungibleToken;
 /// However, this parameter is omitted from the module functions, defined in
 /// "storage.rs", because the authorizations are to be handled in the access
 /// control helpers or directly implemented.
-///
-/// There is no default implementation for this trait on purpose.
-///
-/// Because, there are no default implementation to enforce how the
-/// authorization should be configured. Not providing a default implementation
-/// for this trait is a reminder for the implementor to provide the
-/// authorization logic for this trait.
+#[contracttrait]
 pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     /// Returns the blocked status of an account.
     ///
@@ -43,7 +37,9 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to check the blocked status for.
-    fn blocked(e: &Env, account: Address) -> bool;
+    fn blocked(e: &Env, account: Address) -> bool {
+        storage::BlockList::blocked(e, &account)
+    }
 
     /// Blocks a user from receiving and transferring tokens.
     ///
@@ -57,6 +53,13 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     ///
     /// * topics - `["block", user: Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`storage::block_user`] for the
+    /// implementation.
     fn block_user(e: &Env, user: Address, operator: Address);
 
     /// Unblocks a user, allowing them to receive and transfer tokens.
@@ -71,6 +74,13 @@ pub trait FungibleBlockList: FungibleToken<ContractType = BlockList> {
     ///
     /// * topics - `["unblock", user: Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`storage::unblock_user`] for the
+    /// implementation.
     fn unblock_user(e: &Env, user: Address, operator: Address);
 }
 

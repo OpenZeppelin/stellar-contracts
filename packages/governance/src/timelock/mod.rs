@@ -31,7 +31,7 @@
 //!     schedule_operation, execute_operation, get_operation_state, OperationState
 //! };
 //!
-//! // In your contract:
+//! // In the contract:
 //! pub fn schedule(e: &Env, operation: Operation, delay: u32) {
 //!     // Add authorization checks here
 //!     let id = schedule_operation(e, &operation, delay);

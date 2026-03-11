@@ -43,9 +43,9 @@ impl Base {
     ///
     /// # Notes
     ///
-    /// **IMPORTANT**: This function lacks authorization controls. Most likely,
-    /// you want to invoke it from a constructor or from another function
-    /// with admin-only authorization.
+    /// **IMPORTANT**: This function lacks authorization controls. It should
+    /// generally be invoked from a constructor or from another function with
+    /// admin-only authorization.
     pub fn set_default_royalty(e: &Env, receiver: &Address, basis_points: u32) {
         // check if basis points is valid
         if basis_points > 10000 {
@@ -85,9 +85,9 @@ impl Base {
     ///
     /// # Notes
     ///
-    /// **IMPORTANT**: This function lacks authorization controls. Most likely,
-    /// you want to invoke it from a constructor or from another function
-    /// with admin-only authorization.
+    /// **IMPORTANT**: This function lacks authorization controls. It should
+    /// generally be invoked from a constructor or from another function with
+    /// admin-only authorization.
     pub fn set_token_royalty(e: &Env, token_id: u32, receiver: &Address, basis_points: u32) {
         // check if basis points is valid
         if basis_points > 10000 {
@@ -125,8 +125,8 @@ impl Base {
     ///
     /// # Notes
     ///
-    /// **IMPORTANT**: This function lacks authorization controls. Most likely,
-    /// you want to invoke it from a function with admin-only authorization.
+    /// **IMPORTANT**: This function lacks authorization controls. It should
+    /// generally be invoked from a function with admin-only authorization.
     pub fn remove_token_royalty(e: &Env, token_id: u32) {
         // Verify token exists by checking owner
         let _ = Base::owner_of(e, token_id);

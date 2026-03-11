@@ -38,6 +38,13 @@ pub trait IdentityClaims {
     ///
     /// * topics - `["claim_changed", claim_id: BytesN<32>, topic: u32]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because claim management may
+    /// require custom access control (e.g., only the identity owner or
+    /// authorized issuers can add claims). Access control should be enforced
+    /// before calling [`add_claim`] for the implementation.
     fn add_claim(
         e: &Env,
         topic: u32,
@@ -58,7 +65,9 @@ pub trait IdentityClaims {
     /// # Errors
     ///
     /// * [`ClaimsError::ClaimNotFound`] - If the claim ID does not exist.
-    fn get_claim(e: &Env, claim_id: BytesN<32>) -> Claim;
+    fn get_claim(e: &Env, claim_id: BytesN<32>) -> Claim {
+        storage::get_claim(e, &claim_id)
+    }
 
     /// Retrieves all claim IDs for a specific topic.
     ///
@@ -66,7 +75,9 @@ pub trait IdentityClaims {
     ///
     /// * `e` - The Soroban environment.
     /// * `topic` - The claim topic to filter by.
-    fn get_claim_ids_by_topic(e: &Env, topic: u32) -> Vec<BytesN<32>>;
+    fn get_claim_ids_by_topic(e: &Env, topic: u32) -> Vec<BytesN<32>> {
+        storage::get_claim_ids_by_topic(e, topic)
+    }
 }
 
 // ################## ERRORS ##################

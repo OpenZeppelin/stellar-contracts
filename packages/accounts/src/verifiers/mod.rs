@@ -103,6 +103,13 @@ pub trait Verifier {
     ///     // Signature is valid, proceed with authorization
     /// }
     /// ```
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because cryptographic
+    /// verification is entirely scheme-specific. See the
+    /// [`ed25519`] and [`webauthn`] sub-modules for reference
+    /// implementations.
     fn verify(e: &Env, hash: Bytes, key_data: Self::KeyData, sig_data: Self::SigData) -> bool;
 
     /// Returns the canonical byte representation of the given key data.
@@ -133,6 +140,13 @@ pub trait Verifier {
     ///   `b` represent the same cryptographic identity
     /// - All valid representations of a given key must map to the same
     ///   canonical output
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because canonicalization logic
+    /// is specific to each key format (e.g., compressed vs. uncompressed
+    /// public keys). See the [`ed25519`] and [`webauthn`]
+    /// sub-modules for reference implementations.
     fn canonicalize_key(e: &Env, key_data: Self::KeyData) -> Bytes;
 
     /// Canonicalizes a batch of keys in one call. Returns a vector of canonical
@@ -147,15 +161,23 @@ pub trait Verifier {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `key_data` - A vector of key values to canonicalize.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because it delegates to the
+    /// scheme-specific [`Verifier::canonicalize_key`]. There is no
+    /// corresponding storage function — implementations typically iterate
+    /// over `key_data` and call [`Verifier::canonicalize_key`] for each
+    /// entry.
     fn batch_canonicalize_key(e: &Env, key_data: Vec<Self::KeyData>) -> Vec<Bytes>;
 }
 
-// We need to declare a `VerifierClientInterface` here, instead of using the
+// A `VerifierClientInterface` must be declared here instead of using the
 // public trait above, because traits with associated types are not supported
-// by the `#[contractclient]` macro. While this may appear redundant, it's a
-// necessary workaround: we declare an identical internal trait with the macro
-// to generate the required client implementation. Users should only interact
-// with the public `Verifier` trait above for their implementations.
+// by the `#[contractclient]` macro. While this may appear redundant, it is a
+// necessary workaround: an identical internal trait is declared with the macro
+// to generate the required client implementation. Interaction should occur
+// through the public `Verifier` trait above.
 #[allow(unused)]
 #[contractclient(name = "VerifierClient")]
 trait VerifierClientInterface {

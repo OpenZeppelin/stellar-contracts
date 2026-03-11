@@ -84,9 +84,9 @@ pub enum ClaimsStorageKey {
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function should include authorization checks in
-/// production. The current implementation allows any caller to add claims. In a
-/// real deployment, you should verify that the caller is authorized to add
-/// claims for this identity.
+/// production. The current implementation allows any caller to add claims. In
+/// a real deployment, verification should be performed to ensure that the
+/// caller is authorized to add claims for this identity.
 pub fn add_claim(
     e: &Env,
     topic: u32,

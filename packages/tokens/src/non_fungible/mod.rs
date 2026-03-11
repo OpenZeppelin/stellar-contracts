@@ -7,22 +7,21 @@
 //!
 //! ## Design Overview
 //!
-//! This module is structured to provide flexibility to developers by splitting
+//! This module is structured to provide flexibility by splitting
 //! functionalities into higher-level and lower-level operations:
 //!
 //! - **High-Level Functions**: These include all necessary checks,
 //!   verifications, authorizations, state-changing logic, and event emissions.
-//!   They simplify usage by handling core logic securely. Users can directly
-//!   call these functions for typical token operations without worrying about
+//!   They simplify usage by handling core logic securely. These functions can
+//!   be called directly for typical token operations without exposing
 //!   implementation details.
 //!
-//! - **Low-Level Functions**: These offer granular control for developers who
-//!   need to compose their own workflows. Such functions expose internal
-//!   mechanisms and require the caller to handle verifications and
-//!   authorizations manually.
+//! - **Low-Level Functions**: These offer granular control when custom
+//!   workflows must be composed. Such functions expose internal mechanisms and
+//!   require the caller to handle verifications and authorizations manually.
 //!
-//! By offering this dual-layered approach, developers can choose between
-//! convenience and customization, depending on their project requirements.
+//! This dual-layered approach provides a choice between convenience and
+//! customization, depending on project requirements.
 //!
 //! ## Structure
 //!
@@ -89,9 +88,9 @@ pub use utils::sequential;
 /// as a method in this trait because it is not a part of the standard,
 /// the function signature may change depending on the implementation.
 ///
-/// We do provide a function [`crate::non_fungible::Base::sequential_mint`] for
-/// sequential minting, and [`crate::non_fungible::Base::mint`] for
-/// non-sequential minting strategies.
+/// Functions are provided for both sequential minting
+/// ([`crate::non_fungible::Base::sequential_mint`]) and non-sequential
+/// minting strategies ([`crate::non_fungible::Base::mint`]).
 ///
 /// This trait is implemented for the following Contract Types:
 /// * [`crate::non_fungible::Base`] (covering the vanilla case, and compatible
@@ -112,17 +111,17 @@ pub use utils::sequential;
 ///   [`crate::non_fungible::extensions::enumerable::NonFungibleEnumerable`]
 ///   trait.
 ///
-/// You can find the default implementations of this trait for `Base`,
-/// `Enumerable`, and `Consecutive`, by navigating to:
-/// `ContractType::{method_name}`. For example, if you want to find how
-/// [`NonFungibleToken::transfer`] is implemented for the `Enumerable` contract
-/// type, you can find it using
+/// The default implementations of this trait for `Base`, `Enumerable`, and
+/// `Consecutive` can be found by navigating to `ContractType::{method_name}`.
+/// For example, the implementation of [`NonFungibleToken::transfer`] for the
+/// `Enumerable` contract type can be found at
 /// [`crate::non_fungible::extensions::enumerable::Enumerable::transfer`].
 #[contracttrait]
 pub trait NonFungibleToken {
-    /// Helper type that allows us to override some of the functionality of the
-    /// base trait based on the extensions implemented. You should use
-    /// [`crate::non_fungible::Base`] as the type if you are not using
+    /// Helper type that allows some of the functionality of the base trait to
+    /// be overridden based on the extensions implemented.
+    /// [`crate::non_fungible::Base`] should be used as the type when
+    /// not using
     /// [`crate::non_fungible::extensions::enumerable::Enumerable`] or
     /// [`crate::non_fungible::extensions::consecutive::Consecutive`]
     /// extensions.
@@ -155,9 +154,9 @@ pub trait NonFungibleToken {
 
     /// Transfers the token with `token_id` from `from` to `to`.
     ///
-    /// WARNING: Note that the caller is responsible to confirm that the
-    /// recipient is capable of receiving the `Non-Fungible` or else the NFT
-    /// may be permanently lost.
+    /// WARNING: Confirmation that the recipient is capable of receiving the
+    /// `Non-Fungible` is the caller's responsibility; otherwise the NFT may be
+    /// permanently lost.
     ///
     /// # Arguments
     ///
@@ -189,9 +188,9 @@ pub trait NonFungibleToken {
     /// (`spender`) to transfer the token on behalf of the owner. This
     /// function verifies that `spender` has the necessary approval.
     ///
-    /// WARNING: Note that the caller is responsible to confirm that the
-    /// recipient is capable of receiving the `Non-Fungible` or else the NFT
-    /// may be permanently lost.
+    /// WARNING: Confirmation that the recipient is capable of receiving the
+    /// `Non-Fungible` is the caller's responsibility; otherwise the NFT may be
+    /// permanently lost.
     ///
     /// # Arguments
     ///

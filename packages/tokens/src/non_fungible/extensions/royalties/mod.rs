@@ -1,10 +1,10 @@
 mod storage;
-use crate::non_fungible::NonFungibleToken;
+use crate::non_fungible::{Base, NonFungibleToken};
 
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractevent, Address, Env};
+use soroban_sdk::{contractevent, contracttrait, Address, Env};
 
 /// Royalties Trait for Non-Fungible Token (ERC2981)
 ///
@@ -28,16 +28,10 @@ use soroban_sdk::{contractevent, Address, Env};
 ///
 /// In most marketplaces, royalty calculations are done in amounts of fungible
 /// tokens. For example, if an NFT is sold for 10000 USDC and royalty is 10%,
-/// 1000 USDC goes to the creator. To preserve the compatibility across
-/// Non-Fungible and Fungible tokens, we are using `i128` instead of `u128` for
-/// the `sale_price`, due to SEP-41.
-///
-/// There is no default implementation for this trait on purpose.
-///
-/// Because, there are no default implementation to enforce how the
-/// authorization should be configured. Not providing a default implementation
-/// for this trait is a reminder for the implementor to provide the
-/// authorization logic for this trait.
+/// 1000 USDC goes to the creator. To preserve compatibility across
+/// Non-Fungible and Fungible tokens, `i128` is used instead of `u128` for the
+/// `sale_price`, due to SEP-41.
+#[contracttrait]
 pub trait NonFungibleRoyalties: NonFungibleToken {
     /// Sets the global default royalty information for the entire collection.
     /// This will be used for all tokens that don't have specific royalty
@@ -60,6 +54,13 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * topics - `["set_default_royalty", receiver: Address]`
     /// * data - `[basis_points: u32]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::set_default_royalty`] for the implementation.
     fn set_default_royalty(e: &Env, receiver: Address, basis_points: u32, operator: Address);
 
     /// Sets the royalty information for a specific token.
@@ -84,6 +85,13 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * topics - `["set_token_royalty", receiver: Address]`
     /// * data - `[token_id: u32, basis_points: u32]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::set_token_royalty`] for the implementation.
     fn set_token_royalty(
         e: &Env,
         token_id: u32,
@@ -110,6 +118,13 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * topics - `["remove_token_royalty", token_id: u32]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::remove_token_royalty`] for the implementation.
     fn remove_token_royalty(e: &Env, token_id: u32, operator: Address);
 
     /// Returns `(Address, i128)` - A tuple containing the receiver address and
@@ -126,7 +141,9 @@ pub trait NonFungibleRoyalties: NonFungibleToken {
     ///
     /// * [`crate::non_fungible::NonFungibleTokenError::NonExistentToken`] - If
     ///   the token does not exist.
-    fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128);
+    fn royalty_info(e: &Env, token_id: u32, sale_price: i128) -> (Address, i128) {
+        Base::royalty_info(e, token_id, sale_price)
+    }
 }
 
 // ################## EVENTS ##################

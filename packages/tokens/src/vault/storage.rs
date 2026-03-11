@@ -538,9 +538,8 @@ impl Vault {
     ///
     /// It is the responsibility of the implementer to establish appropriate
     /// access controls to ensure that only authorized accounts can set the
-    /// asset address. We recommend using this function in the constructor of
-    /// your smart contract or combining with the Ownable or Access Control
-    /// pattern.
+    /// asset address. This function is best used in the constructor of the
+    /// smart contract or combined with the Ownable or Access Control pattern.
     pub fn set_asset(e: &Env, asset: Address) {
         // Check if asset is already set
         if e.storage().instance().has(&VaultStorageKey::AssetAddress) {
@@ -557,16 +556,16 @@ impl Vault {
     /// share-to-asset conversions. This should typically be set once during
     /// contract initialization and remain immutable thereafter.
     ///
-    /// To enforce a reasonable value that maximizes the security and UX at the
-    /// same time, we bound this value to a maximum of 10.
+    /// To enforce a reasonable value that maximizes security and UX at the
+    /// same time, this value is bounded to a maximum of 10.
     ///
     /// Any value higher than 10 is not recommended as it provides
     /// almost no practical benefits, and any value close to 30 may
     /// cause overflow errors depending on the base asset decimals, and
     /// amount of assets in the vault.
     ///
-    /// If a value higher than 10 needed, one should consider writing
-    /// their custom copy of this function.
+    /// If a value higher than 10 is needed, a custom copy of this function
+    /// should be considered.
     ///
     /// # Arguments
     ///
@@ -587,9 +586,8 @@ impl Vault {
     ///
     /// It is the responsibility of the implementer to establish appropriate
     /// access controls to ensure that only authorized accounts can set the
-    /// decimals offset. We recommend using this function in the constructor
-    /// of your smart contract or combining with the Ownable or Access Control
-    /// pattern.
+    /// decimals offset. This function is best used in the constructor of the
+    /// smart contract or combined with the Ownable or Access Control pattern.
     pub fn set_decimals_offset(e: &Env, offset: u32) {
         if offset > MAX_DECIMALS_OFFSET {
             panic_with_error!(e, VaultTokenError::VaultMaxDecimalsOffsetExceeded);
