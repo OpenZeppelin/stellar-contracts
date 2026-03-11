@@ -8,7 +8,7 @@ The implementation follows the [T-REX (Token for Regulated Exchanges)](https://d
 
 The RWA system consists of 7 contracts that work together:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                        RWA Token                                │
 │  (Fungible token with freezing, recovery, and compliance)       │
@@ -139,8 +139,7 @@ The claim issuer validates identity claims using Ed25519 signatures. Each claim 
 stellar contract deploy --alias claim-issuer \
     --wasm target/wasm32v1-none/release/rwa_claim_issuer_example.wasm \
     -- \
-    --admin admin \
-    --manager admin
+    --owner admin
 ```
 
 ```bash
@@ -176,8 +175,7 @@ stellar contract invoke --source admin --id claim-issuer \
     -- allow_key \
     --public_key 3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29 \
     --registry $CTI_ADDRESS \
-    --claim_topic 1 \
-    --operator admin
+    --claim_topic 1
 ```
 
 Repeat for each topic the key should be authorized for.
@@ -245,7 +243,7 @@ stellar contract invoke --id identity-alice --source alice \
     --issuer $CLAIM_ISSUER_ADDRESS \
     --signature <paste --signature value> \
     --data <paste --data value> \
-    --uri "https://example.com/claim/alice-kyc"
+    --uri "https://example.com/claim/alice-aml"
 ```
 
 
