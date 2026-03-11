@@ -99,7 +99,7 @@ stellar keys generate bob
 stellar keys fund bob
 ```
 
-> **Note:** In this guide, the same address is used as both `admin` and `manager` for simplicity. In production, these should be separate addresses with distinct privileges. Futhermore, the same `admin` is used across all contracts, while in production distinct admins and managers might be set for the different contracts.
+> **Note:** In this guide, the same address is used as both `admin` and `manager` for simplicity. In production, these should be separate addresses with distinct privileges. Furthermore, the same `admin` is used across all contracts, while in production distinct admins and managers might be set for the different contracts.
 
 ### 2. Deploy Claim Topics and Issuers Contract
 
