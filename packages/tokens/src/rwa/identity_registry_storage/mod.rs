@@ -516,10 +516,10 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because all
-    /// [`CountryDataManager`] methods are left to the implementer for
-    /// consistency. [`get_country_data_entries`] should be called in the
-    /// implementation.
+    /// No default implementation is provided because the associate
+    /// `Self::ContryData` type needs to be defined.
+    /// [`storage::get_country_data_entries`] can be used if the implementer
+    /// sticks with the reference implementation.
     fn get_country_data_entries(e: &Env, account: Address) -> Vec<Self::CountryData>;
 
     /// Retrieves a specific country data entry by its index.
@@ -532,10 +532,10 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// # Notes
     ///
-    /// No default implementation is provided because all
-    /// [`CountryDataManager`] methods are left to the implementer for
-    /// consistency. [`get_country_data`] should be called in the
-    /// implementation.
+    /// No default implementation is provided because the associate
+    /// `Self::ContryData` type needs to be defined.
+    /// [`storage::get_country_data`] can be used if the implementer
+    /// sticks with the reference implementation.
     fn get_country_data(e: &Env, account: Address, index: u32) -> Self::CountryData;
 }
 
