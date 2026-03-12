@@ -508,8 +508,8 @@ pub fn renounce_admin(e: &Env) {
 /// - Potential security vulnerabilities in role management
 /// - Confusing governance structures that are difficult to reason about
 ///
-/// When designing your role hierarchy, carefully consider the relationships
-/// between roles and avoid creating circular dependencies.
+/// When designing the role hierarchy, the relationships between roles should
+/// be considered carefully to avoid circular dependencies.
 pub fn set_role_admin_no_auth(e: &Env, role: &Symbol, admin_role: &Symbol) {
     let key = AccessControlStorageKey::RoleAdmin(role.clone());
 

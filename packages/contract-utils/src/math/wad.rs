@@ -584,14 +584,15 @@ impl Div<i128> for Wad {
 //    0.000000000000000005)
 //
 // Both interpretations are valid and useful in different contexts. Without
-// explicit context, it's impossible to determine which one the user intends.
+// explicit context, it's impossible to determine which interpretation is
+// intended.
 // This ambiguity can lead to critical bugs in financial calculations.
 //
 // Instead, we require explicit method calls:
-// - Use `Wad::from_integer(n)` when you mean "the number n" (will WAD scale the
-//   input)
-// - Use `Wad::from_raw(n)` when you mean "n raw units" (will NOT WAD scale the
-//   input)
+// - Use `Wad::from_integer(n)` for the interpretation "the number n" (the input
+//   will be WAD-scaled)
+// - Use `Wad::from_raw(n)` for the interpretation "n raw units" (the input will
+//   NOT be WAD-scaled)
 //
 // This design follows Rust API guidelines: conversions should be obvious and
 // unambiguous. When multiple reasonable interpretations exist, use named

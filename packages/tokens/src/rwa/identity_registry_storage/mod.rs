@@ -31,7 +31,7 @@
 //! - Authorized signatories
 //! - Board members and directors
 //!
-//! For example, a US-incorporated company might need to track:
+//! For example, a US-incorporated company may need to track:
 //! - `Incorporation(840)` - Company incorporated in USA
 //! - `Residence(276)` - CEO resides in Germany
 //! - `Citizenship(756)` - CFO is a Swiss citizen
@@ -308,6 +308,13 @@ pub trait IdentityRegistryStorage: TokenBinder {
     ///
     /// * topics - `["identity_stored", account: Address, identity: Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`add_identity`] for the
+    /// implementation.
     fn add_identity(
         e: &Env,
         account: Address,
@@ -333,6 +340,13 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// * topics - `["country_removed", account: Address, country_data:
     ///   CountryData]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`remove_identity`] for the
+    /// implementation.
     fn remove_identity(e: &Env, account: Address, operator: Address);
 
     /// Modifies an existing identity.
@@ -349,6 +363,13 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// * topics - `["identity_modified", old_identity: Address, new_identity:
     ///   Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`modify_identity`] for the
+    /// implementation.
     fn modify_identity(e: &Env, account: Address, identity: Address, operator: Address);
 
     /// Recovers an identity by transferring it from an old account to a new
@@ -368,6 +389,13 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// * topics - `["identity_recovered", old_account: Address, new_account:
     ///   Address]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`recover_identity`] for the
+    /// implementation.
     fn recover_identity(e: &Env, old_account: Address, new_account: Address, operator: Address);
 
     /// Retrieves the stored identity for a given account.
@@ -376,7 +404,9 @@ pub trait IdentityRegistryStorage: TokenBinder {
     ///
     /// * `e` - The Soroban environment.
     /// * `account` - The account address to query.
-    fn stored_identity(e: &Env, account: Address) -> Address;
+    fn stored_identity(e: &Env, account: Address) -> Address {
+        storage::stored_identity(e, &account)
+    }
 
     /// Retrieves the recovery target address for a recovered account.
     ///
@@ -387,7 +417,9 @@ pub trait IdentityRegistryStorage: TokenBinder {
     ///
     /// * `e` - The Soroban environment.
     /// * `old_account` - The old account address to check.
-    fn get_recovered_to(e: &Env, old_account: Address) -> Option<Address>;
+    fn get_recovered_to(e: &Env, old_account: Address) -> Option<Address> {
+        storage::get_recovered_to(e, &old_account)
+    }
 }
 
 /// Trait for managing multiple country data entries associated with an
@@ -408,6 +440,13 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     /// * topics - `["country_added", account: Address, country_data:
     ///   CountryData]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`add_country_data_entries`] for the implementation.
     fn add_country_data_entries(
         e: &Env,
         account: Address,
@@ -429,6 +468,13 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     /// * topics - `["country_modified", account: Address, country_data:
     ///   CountryData]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`modify_country_data`] for the
+    /// implementation.
     fn modify_country_data(
         e: &Env,
         account: Address,
@@ -452,6 +498,13 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     /// * topics - `["country_removed", account: Address, country_data:
     ///   CountryData]`
     /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling [`delete_country_data`] for the
+    /// implementation.
     fn delete_country_data(e: &Env, account: Address, index: u32, operator: Address);
 
     /// Retrieves all country data entries for a given account.
@@ -460,6 +513,13 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// * `e` - The Soroban environment.
     /// * `account` - The account address to query.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because the associate
+    /// `Self::CountryData` type needs to be defined.
+    /// [`storage::get_country_data_entries`] can be used if the implementer
+    /// sticks with the reference implementation.
     fn get_country_data_entries(e: &Env, account: Address) -> Vec<Self::CountryData>;
 
     /// Retrieves a specific country data entry by its index.
@@ -469,6 +529,13 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     /// * `e` - The Soroban environment.
     /// * `account` - The account address to query.
     /// * `index` - The index of the country data to retrieve.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because the associate
+    /// `Self::CountryData` type needs to be defined.
+    /// [`storage::get_country_data`] can be used if the implementer
+    /// sticks with the reference implementation.
     fn get_country_data(e: &Env, account: Address, index: u32) -> Self::CountryData;
 }
 

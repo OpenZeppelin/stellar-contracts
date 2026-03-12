@@ -468,7 +468,8 @@ impl Base {
     /// minting operations. Failure to implement proper authorization could
     /// lead to security vulnerabilities and unauthorized token creation.
     ///
-    /// You probably want to do something like this (pseudo-code):
+    /// The implementation will typically look similar to the following
+    /// (pseudo-code):
     ///
     /// ```ignore
     /// let admin = read_administrator(e);
@@ -490,8 +491,8 @@ impl Base {
     ///
     /// # Notes
     ///
-    /// **IMPORTANT**: This function lacks authorization controls. You want to
-    /// invoke it most likely from a constructor or from another function with
+    /// **IMPORTANT**: This function lacks authorization controls. It should
+    /// generally be invoked from a constructor or from another function with
     /// admin-only authorization.
     pub fn set_metadata(e: &Env, decimals: u32, name: String, symbol: String) {
         let metadata = Metadata { decimals, name, symbol };

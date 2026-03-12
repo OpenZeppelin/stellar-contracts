@@ -576,9 +576,9 @@ impl Base {
     ///
     /// # Notes
     ///
-    /// **IMPORTANT**: This function lacks authorization controls. Most likely,
-    /// you want to invoke it from a constructor or from another function
-    /// with admin-only authorization.
+    /// **IMPORTANT**: This function lacks authorization controls. It should
+    /// generally be invoked from a constructor or from another function with
+    /// admin-only authorization.
     pub fn set_metadata(e: &Env, base_uri: String, name: String, symbol: String) {
         if base_uri.len() as usize > MAX_BASE_URI_LEN {
             panic_with_error!(e, NonFungibleTokenError::BaseUriMaxLenExceeded)
@@ -654,7 +654,8 @@ impl Base {
     /// minting operations. Failure to implement proper authorization could
     /// lead to security vulnerabilities and unauthorized token creation.
     ///
-    /// You probably want to do something like this (pseudo-code):
+    /// The implementation will typically look similar to the following
+    /// (pseudo-code):
     ///
     /// ```ignore
     /// let admin = read_administrator(e);
@@ -663,9 +664,8 @@ impl Base {
     ///
     /// **IMPORTANT**: This function utilizes [`increment_token_id()`] to
     /// determine the next `token_id`, but it does NOT check if that
-    /// `token_id` is already in use. If the developer has other means of
-    /// minting tokens and generating `token_id`s, they should ensure that
-    /// the `token_id` is unique and not already in use.
+    /// `token_id` is already in use. If other minting paths or `token_id`
+    /// generation strategies exist, uniqueness should be enforced before use.
     pub fn sequential_mint(e: &Env, to: &Address) -> u32 {
         let token_id = increment_token_id(e, 1);
         Base::update(e, None, Some(to), token_id);
@@ -701,7 +701,8 @@ impl Base {
     /// minting operations. Failure to implement proper authorization could
     /// lead to security vulnerabilities and unauthorized token creation.
     ///
-    /// You probably want to do something like this (pseudo-code):
+    /// The implementation will typically look similar to the following
+    /// (pseudo-code):
     ///
     /// ```ignore
     /// let admin = read_administrator(e);
@@ -709,10 +710,9 @@ impl Base {
     /// ```
     ///
     /// **IMPORTANT**: This function does NOT verify whether the provided
-    /// `token_id` already exists. It is the developer's responsibility to
-    /// ensure `token_id` uniqueness before passing it to this function. The
-    /// strategy for generating `token_id`s varies by project and must be
-    /// implemented accordingly.
+    /// `token_id` already exists. `token_id` uniqueness should be ensured
+    /// before passing it to this function. The strategy for generating
+    /// `token_id`s varies by project and must be implemented accordingly.
     pub fn mint(e: &Env, to: &Address, token_id: u32) {
         Base::update(e, None, Some(to), token_id);
         emit_mint(e, to, token_id);

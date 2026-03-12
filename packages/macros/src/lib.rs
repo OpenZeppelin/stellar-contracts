@@ -52,10 +52,10 @@ pub fn only_admin(attrs: TokenStream, input: TokenStream) -> TokenStream {
 /// authorization. This design prevents duplicate `require_auth()` calls which
 /// would cause panics in Stellar contracts. Use this macro when:
 ///
-/// 1. Your function already contains a `require_auth()` call
-/// 2. You need additional role-based access control
+/// 1. The function already contains a `require_auth()` call
+/// 2. Additional role-based access control is needed
 ///
-/// If you need both role checking AND authorization, use `#[only_role]`
+/// If both role checking AND authorization are needed, use `#[only_role]`
 /// instead.
 ///
 /// # Usage
@@ -89,7 +89,7 @@ pub fn has_role(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// **IMPORTANT**: This macro both checks role membership AND enforces
 /// authorization. Be aware that in Stellar contracts, duplicate
-/// `require_auth()` calls for the same account will cause panics. If your
+/// `require_auth()` calls for the same account will cause panics. If the
 /// function already contains a `require_auth()` call for the same account, use
 /// `#[has_role]` instead to avoid duplicate authorization checks.
 ///
@@ -129,10 +129,11 @@ pub fn only_role(args: TokenStream, input: TokenStream) -> TokenStream {
 /// authorization. This design prevents duplicate `require_auth()` calls which
 /// would cause panics in Stellar contracts. Use this macro when:
 ///
-/// 1. Your function already contains a `require_auth()` call
-/// 2. You need additional role-based access control
+/// 1. The function already contains a `require_auth()` call
+/// 2. Additional role-based access control is needed
 ///
-/// If you need both role checking AND authorization, use `#[only_any_role]`
+/// If both role checking AND authorization are needed, use
+/// `#[only_any_role]`
 /// instead.
 ///
 /// # Usage
@@ -156,7 +157,7 @@ pub fn has_any_role(args: TokenStream, input: TokenStream) -> TokenStream {
 ///
 /// **IMPORTANT**: This macro both checks role membership AND enforces
 /// authorization. Be aware that in Stellar contracts, duplicate
-/// `require_auth()` calls for the same account will cause panics. If your
+/// `require_auth()` calls for the same account will cause panics. If the
 /// function already contains a `require_auth()` call for the same account, use
 /// `#[has_any_role]` instead to avoid duplicate authorization checks.
 ///

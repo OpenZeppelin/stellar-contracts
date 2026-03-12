@@ -195,8 +195,8 @@ impl Consecutive {
     /// # Security Warning
     ///
     /// **IMPORTANT**: The function intentionally lacks authorization controls.
-    /// You MUST invoke it only from the constructor or implement proper
-    /// authorization in the calling function. For example:
+    /// It MUST be invoked only from the constructor, or proper authorization
+    /// must be implemented in the calling function. For example:
     ///
     /// ```ignore,rust
     /// fn mint_batch(e: &Env, to: &Address, amount: u32) {
@@ -209,7 +209,7 @@ impl Consecutive {
     /// }
     /// ```
     ///
-    /// Failing to add proper authorization could allow anyone to mint tokens!
+    /// Failure to add proper authorization could allow anyone to mint tokens.
     pub fn batch_mint(e: &Env, to: &Address, amount: u32) -> u32 {
         if amount == 0 || amount > MAX_TOKENS_IN_BATCH as u32 {
             panic_with_error!(&e, NonFungibleTokenError::InvalidAmount);

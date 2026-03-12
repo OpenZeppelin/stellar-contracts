@@ -21,8 +21,7 @@ pub enum CapStorageKey {
 ///
 /// # Notes
 ///
-/// * We recommend using this function in the constructor of your smart
-///   contract.
+/// * This function is best used in the constructor of the smart contract.
 /// * Cap functionality is designed to be used in the `mint` function
 ///   definition.
 /// * This function DOES NOT enforce that the cap must be greater than or equal

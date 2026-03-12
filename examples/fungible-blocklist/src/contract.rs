@@ -54,12 +54,8 @@ impl FungibleToken for ExampleContract {
     type ContractType = BlockList;
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl FungibleBlockList for ExampleContract {
-    fn blocked(e: &Env, account: Address) -> bool {
-        BlockList::blocked(e, &account)
-    }
-
     #[only_role(operator, "manager")]
     fn block_user(e: &Env, user: Address, operator: Address) {
         BlockList::block_user(e, &user)
