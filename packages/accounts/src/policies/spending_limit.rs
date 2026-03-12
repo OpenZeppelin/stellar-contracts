@@ -52,6 +52,26 @@ pub struct SpendingLimitPolicyEnforced {
     pub total_spent_in_period: i128,
 }
 
+/// Event emitted when a spending limit policy is installed.
+#[contractevent]
+#[derive(Clone, Debug)]
+pub struct SpendingLimitInstalled {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+    pub spending_limit: i128,
+    pub period_ledgers: u32,
+}
+
+/// Event emitted when a spending limit policy is uninstalled.
+#[contractevent]
+#[derive(Clone, Debug)]
+pub struct SpendingLimitUninstalled {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+}
+
 /// Installation parameters for the spending limit policy.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
@@ -302,6 +322,11 @@ pub fn set_spending_limit(
 ///   positive or period_ledgers is zero.
 /// * [`SpendingLimitError::AlreadyInstalled`] - When policy was already
 ///   installed for a given smart account and context rule.
+///
+/// # Events
+///
+/// * topics - `["spending_limit_installed", smart_account: Address]`
+/// * data - `[context_rule_id: u32, spending_limit: i128, period_ledgers: u32]`
 pub fn install(
     e: &Env,
     params: &SpendingLimitAccountParams,
@@ -328,6 +353,14 @@ pub fn install(
     };
 
     e.storage().persistent().set(&key, &data);
+
+    SpendingLimitInstalled {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+        spending_limit: params.spending_limit,
+        period_ledgers: params.period_ledgers,
+    }
+    .publish(e);
 }
 
 /// Uninstalls the spending limit policy from a smart account.
@@ -339,6 +372,11 @@ pub fn install(
 /// * `e` - Access to the Soroban environment.
 /// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
+///
+/// # Events
+///
+/// * topics - `["spending_limit_uninstalled", smart_account: Address]`
+/// * data - `[context_rule_id: u32]`
 pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
@@ -346,6 +384,12 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     e.storage()
         .persistent()
         .remove(&SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id));
+
+    SpendingLimitUninstalled {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+    }
+    .publish(e);
 }
 
 // ################## HELPER FUNCTIONS ##################

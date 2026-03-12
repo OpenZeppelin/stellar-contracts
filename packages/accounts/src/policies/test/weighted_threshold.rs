@@ -60,6 +60,9 @@ fn install_success() {
         assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 75);
         let stored_weights = get_signer_weights(&e, &context_rule, &smart_account);
         assert_eq!(stored_weights.len(), 2);
+
+        // Verify install event was emitted
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -439,6 +442,9 @@ fn uninstall_success() {
     e.as_contract(&address, || {
         let context_rule = create_test_context_rule(&e);
         uninstall(&e, &context_rule, &smart_account);
+
+        // Verify uninstall event
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 

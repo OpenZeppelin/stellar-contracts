@@ -56,6 +56,9 @@ fn install_success() {
         install(&e, &params, &context_rule, &smart_account);
 
         assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 2);
+
+        // Verify install event was emitted
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -216,6 +219,9 @@ fn uninstall_success() {
     e.as_contract(&address, || {
         let context_rule = create_test_context_rule(&e);
         uninstall(&e, &context_rule, &smart_account);
+
+        // Verify uninstall event
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 

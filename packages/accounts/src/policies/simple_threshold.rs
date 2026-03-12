@@ -64,6 +64,25 @@ pub struct SimplePolicyEnforced {
     pub authenticated_signers: Vec<Signer>,
 }
 
+/// Event emitted when a simple threshold policy is installed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SimplePolicyInstalled {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+    pub threshold: u32,
+}
+
+/// Event emitted when a simple threshold policy is uninstalled.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SimplePolicyUninstalled {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+}
+
 /// Installation parameters for the simple threshold policy.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
@@ -229,6 +248,11 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
 ///   exceeds the total number of signers in the context rule.
 /// * [`SimpleThresholdError::AlreadyInstalled`] - When policy was already
 ///   installed for a given smart account and context rule.
+///
+/// # Events
+///
+/// * topics - `["simple_policy_installed", smart_account: Address]`
+/// * data - `[context_rule_id: u32, threshold: u32]`
 pub fn install(
     e: &Env,
     params: &SimpleThresholdAccountParams,
@@ -246,6 +270,13 @@ pub fn install(
     }
 
     validate_and_set_threshold(e, params.threshold, context_rule, smart_account);
+
+    SimplePolicyInstalled {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+        threshold: params.threshold,
+    }
+    .publish(e);
 }
 
 /// Uninstalls the simple threshold policy from a smart account.
@@ -257,6 +288,11 @@ pub fn install(
 /// * `e` - Access to the Soroban environment.
 /// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
+///
+/// # Events
+///
+/// * topics - `["simple_policy_uninstalled", smart_account: Address]`
+/// * data - `[context_rule_id: u32]`
 pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
@@ -264,6 +300,12 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     e.storage()
         .persistent()
         .remove(&SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id));
+
+    SimplePolicyUninstalled {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+    }
+    .publish(e);
 }
 
 /// Internal function that validates and sets the threshold.

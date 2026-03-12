@@ -76,6 +76,9 @@ fn install_success() {
         assert_eq!(data.period_ledgers, 100);
         assert_eq!(data.spending_history.len(), 0);
         assert_eq!(data.cached_total_spent, 0);
+
+        // Verify install event was emitted
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -439,6 +442,9 @@ fn uninstall_success() {
     e.as_contract(&address, || {
         // Uninstall
         uninstall(&e, &context_rule, &smart_account);
+
+        // Verify uninstall event
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
