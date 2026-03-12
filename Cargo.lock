@@ -1445,6 +1445,78 @@ dependencies = [
 ]
 
 [[package]]
+name = "rwa-claim-issuer-example"
+version = "0.6.0"
+dependencies = [
+ "ed25519-dalek",
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-claim-topics-and-issuers-example"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-compliance-example"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-identity-example"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-identity-registry-example"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-identity-verifier-example"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-token-example"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "ryu"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1737,9 +1809,9 @@ dependencies = [
 
 [[package]]
 name = "soroban-ledger-snapshot"
-version = "25.0.2"
+version = "25.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab9d1bfa6f7d57307bf8241789b13d3703438e7afa0527aa098a357ef757d3a2"
+checksum = "760124fb65a2acdea7d241b8efdfab9a39287ae8dc5bf8feb6fd9dfb664c1ad5"
 dependencies = [
  "serde",
  "serde_json",
@@ -1751,9 +1823,9 @@ dependencies = [
 
 [[package]]
 name = "soroban-sdk"
-version = "25.0.2"
+version = "25.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9953e782d6da30974eea520c2b5f624c28bbc518c3bb926ec581242dd3f9d2a2"
+checksum = "5fb27e93f8d3fc3a815d24c60ec11e893c408a36693ec9c823322f954fa096ae"
 dependencies = [
  "arbitrary",
  "bytes-lit",
@@ -1775,9 +1847,9 @@ dependencies = [
 
 [[package]]
 name = "soroban-sdk-macros"
-version = "25.0.2"
+version = "25.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a8cecb6acc735670dad3303c6a9d2b47e51adfb11224ad5a8ced55fd7b0a600"
+checksum = "dec603a62a90abdef898f8402471a24d8b58a0043b9a998ed6a607a19a5dabe1"
 dependencies = [
  "darling",
  "heck",
@@ -1795,11 +1867,12 @@ dependencies = [
 
 [[package]]
 name = "soroban-spec"
-version = "25.0.2"
+version = "25.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c79501d0636f86fe2c9b1dd7e88b9397415b3493a59b34f466abd7758c84b92b"
+checksum = "24718fac3af127fc6910eb6b1d3ccd8403201b6ef0aca73b5acabe4bc3dd42ed"
 dependencies = [
  "base64",
+ "sha2",
  "stellar-xdr",
  "thiserror",
  "wasmparser",
@@ -1807,9 +1880,9 @@ dependencies = [
 
 [[package]]
 name = "soroban-spec-rust"
-version = "25.0.2"
+version = "25.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b520b5fb013fde70796d9a6057591f53817aa0c38f8bad460126f97f59394af9"
+checksum = "93c558bca7a693ec8ed67d2d8c8f5b300f3772141d619a4a694ad5dd48461256"
 dependencies = [
  "prettyplease",
  "proc-macro2",

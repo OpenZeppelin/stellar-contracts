@@ -3,7 +3,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractclient, contracterror, contractevent, Address, Env, Vec};
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, Vec};
 pub use storage::{
     bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound, linked_tokens,
     unbind_token,
@@ -39,7 +39,7 @@ pub use storage::{
 ///   limits per transaction have been removed. Lookups are therefore cheap, and
 ///   storage remains simple with no reverse mapping; functions like
 ///   `get_token_index()` linearly scan buckets.
-#[contractclient(name = "TokenBinderClient")]
+#[contracttrait]
 pub trait TokenBinder {
     /// Returns all currently bound token addresses.
     ///
