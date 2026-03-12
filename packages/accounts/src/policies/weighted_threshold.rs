@@ -72,7 +72,7 @@ use crate::smart_account::{ContextRule, Signer};
 /// Event emitted when a weighted threshold policy is enforced.
 #[contractevent]
 #[derive(Clone)]
-pub struct WeightedPolicyEnforced {
+pub struct WeightedEnforced {
     #[topic]
     pub smart_account: Address,
     pub context: Context,
@@ -83,7 +83,7 @@ pub struct WeightedPolicyEnforced {
 /// Event emitted when a weighted threshold policy is installed.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct WeightedPolicyInstalled {
+pub struct WeightedInstalled {
     #[topic]
     pub smart_account: Address,
     pub context_rule_id: u32,
@@ -116,7 +116,7 @@ pub struct WeightedSignerWeightChanged {
 /// Event emitted when a weighted threshold policy is uninstalled.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct WeightedPolicyUninstalled {
+pub struct WeightedUninstalled {
     #[topic]
     pub smart_account: Address,
     pub context_rule_id: u32,
@@ -287,7 +287,7 @@ pub fn calculate_weight(
 ///
 /// # Events
 ///
-/// * topics - `["policy_enforced", smart_account: Address]`
+/// * topics - `["weighted_enforced", smart_account: Address]`
 /// * data - `[context: Context, context_rule_id: u32, authenticated_signers:
 ///   Vec<Signer>]`
 pub fn enforce(
@@ -310,7 +310,7 @@ pub fn enforce(
 
     if total_weight >= params.threshold {
         // emit event
-        WeightedPolicyEnforced {
+        WeightedEnforced {
             smart_account: smart_account.clone(),
             context: context.clone(),
             context_rule_id: context_rule.id,
@@ -476,7 +476,7 @@ pub fn set_signer_weight(
 ///
 /// # Events
 ///
-/// * topics - `["weighted_policy_installed", smart_account: Address]`
+/// * topics - `["weighted_installed", smart_account: Address]`
 /// * data - `[context_rule_id: u32, threshold: u32, signer_weights: Map<Signer,
 ///   u32>]`
 pub fn install(
@@ -502,7 +502,7 @@ pub fn install(
 
     e.storage().persistent().set(&key, params);
 
-    WeightedPolicyInstalled {
+    WeightedInstalled {
         smart_account: smart_account.clone(),
         context_rule_id: context_rule.id,
         threshold: params.threshold,
@@ -527,7 +527,7 @@ pub fn install(
 ///
 /// # Events
 ///
-/// * topics - `["weighted_policy_uninstalled", smart_account: Address]`
+/// * topics - `["weighted_uninstalled", smart_account: Address]`
 /// * data - `[context_rule_id: u32]`
 pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
@@ -541,11 +541,8 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
 
     e.storage().persistent().remove(&key);
 
-    WeightedPolicyUninstalled {
-        smart_account: smart_account.clone(),
-        context_rule_id: context_rule.id,
-    }
-    .publish(e);
+    WeightedUninstalled { smart_account: smart_account.clone(), context_rule_id: context_rule.id }
+        .publish(e);
 }
 
 /// Helper to calculate the total weight from a map of signer weights.

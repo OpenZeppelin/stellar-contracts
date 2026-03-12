@@ -134,11 +134,9 @@ pub trait Policy {
     /// # Events
     ///
     /// Implementations should emit a policy-specific uninstalled event
-    /// containing the smart account address and context rule ID. This
-    /// follows the `{Name}PolicyUninstalled` naming convention (e.g.,
-    /// `SimplePolicyUninstalled`, `WeightedPolicyUninstalled`). See
-    /// [`simple_threshold`], [`weighted_threshold`], and
-    /// [`spending_limit`] for reference implementations.
+    /// containing the smart account address and context rule ID. See
+    /// [`simple_threshold`], [`weighted_threshold`], and [`spending_limit`] for
+    /// reference implementations.
     ///
     /// Note that the smart account calls `uninstall` via `try_uninstall`,
     /// so if uninstall panics, the policy's uninstalled event is rolled

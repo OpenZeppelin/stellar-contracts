@@ -43,7 +43,7 @@ use crate::smart_account::{ContextRule, Signer};
 /// Event emitted when a spending limit policy is enforced.
 #[contractevent]
 #[derive(Clone)]
-pub struct SpendingLimitPolicyEnforced {
+pub struct SpendingLimitEnforced {
     #[topic]
     pub smart_account: Address,
     pub context: Context,
@@ -210,7 +210,7 @@ pub fn get_spending_limit_data(
 ///
 /// # Events
 ///
-/// * topics - `["spending_limit_policy_enforced", smart_account: Address]`
+/// * topics - `["spending_limit_enforced", smart_account: Address]`
 /// * data - `[context: Context, context_rule_id: u32, amount: i128,
 ///   total_spent_in_period: i128]`
 pub fn enforce(
@@ -261,7 +261,7 @@ pub fn enforce(
 
                         e.storage().persistent().set(&key, &data);
 
-                        SpendingLimitPolicyEnforced {
+                        SpendingLimitEnforced {
                             smart_account: smart_account.clone(),
                             context: context.clone(),
                             context_rule_id: context_rule.id,

@@ -56,7 +56,7 @@ pub use crate::smart_account::Signer;
 /// Event emitted when a simple threshold policy is enforced.
 #[contractevent]
 #[derive(Clone)]
-pub struct SimplePolicyEnforced {
+pub struct SimpleEnforced {
     #[topic]
     pub smart_account: Address,
     pub context: Context,
@@ -64,10 +64,10 @@ pub struct SimplePolicyEnforced {
     pub authenticated_signers: Vec<Signer>,
 }
 
-/// Even emitted when a simple threshold policy is installed.
+/// Event emitted when a simple threshold policy is installed.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SimplePolicyInstalled {
+pub struct SimpleInstalled {
     #[topic]
     pub smart_account: Address,
     pub context_rule_id: u32,
@@ -87,7 +87,7 @@ pub struct SimpleThresholdChanged {
 /// Event emitted when a simple threshold policy is uninstalled.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SimplePolicyUninstalled {
+pub struct SimpleUninstalled {
     #[topic]
     pub smart_account: Address,
     pub context_rule_id: u32,
@@ -178,7 +178,7 @@ pub fn get_threshold(e: &Env, context_rule_id: u32, smart_account: &Address) -> 
 ///
 /// # Events
 ///
-/// * topics - `["simple_policy_enforced", smart_account: Address]`
+/// * topics - `["simple_enforced", smart_account: Address]`
 /// * data - `[context: Context, context_rule_id: u32 authenticated_signers:
 ///   Vec<Signer>]`
 pub fn enforce(
@@ -195,7 +195,7 @@ pub fn enforce(
 
     if authenticated_signers.len() >= threshold {
         // emit event
-        SimplePolicyEnforced {
+        SimpleEnforced {
             smart_account: smart_account.clone(),
             context: context.clone(),
             context_rule_id: context_rule.id,
@@ -273,7 +273,7 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
 ///
 /// # Events
 ///
-/// * topics - `["simple_policy_installed", smart_account: Address]`
+/// * topics - `["simple_installed", smart_account: Address]`
 /// * data - `[context_rule_id: u32, threshold: u32]`
 pub fn install(
     e: &Env,
@@ -293,7 +293,7 @@ pub fn install(
 
     validate_and_set_threshold(e, params.threshold, context_rule, smart_account);
 
-    SimplePolicyInstalled {
+    SimpleInstalled {
         smart_account: smart_account.clone(),
         context_rule_id: context_rule.id,
         threshold: params.threshold,
@@ -318,7 +318,7 @@ pub fn install(
 ///
 /// # Events
 ///
-/// * topics - `["simple_policy_uninstalled", smart_account: Address]`
+/// * topics - `["simple_uninstalled", smart_account: Address]`
 /// * data - `[context_rule_id: u32]`
 pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
@@ -332,11 +332,8 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
 
     e.storage().persistent().remove(&key);
 
-    SimplePolicyUninstalled {
-        smart_account: smart_account.clone(),
-        context_rule_id: context_rule.id,
-    }
-    .publish(e);
+    SimpleUninstalled { smart_account: smart_account.clone(), context_rule_id: context_rule.id }
+        .publish(e);
 }
 
 /// Internal function that validates and sets the threshold.
