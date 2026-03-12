@@ -1,6 +1,6 @@
 extern crate std;
 
-use std::{format, vec, vec::Vec};
+use std::{vec, vec::Vec};
 
 use proptest::prelude::*;
 use soroban_sdk::{Bytes, Env};
