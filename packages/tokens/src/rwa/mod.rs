@@ -104,7 +104,7 @@ pub mod utils;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env, String};
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, String};
 use stellar_contract_utils::pausable::Pausable;
 pub use storage::{RWAStorageKey, RWA};
 
@@ -124,6 +124,7 @@ use crate::fungible::FungibleToken;
 /// - Freezing mechanisms for regulatory enforcement
 /// - Recovery system for lost/old account scenarios
 /// - Administrative controls for token management
+#[contracttrait]
 pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     // ################## CORE TOKEN FUNCTIONS ##################
 

@@ -1,4 +1,4 @@
-use soroban_sdk::{contractclient, Address, Env};
+use soroban_sdk::{contracttrait, Address, Env};
 
 #[cfg(test)]
 mod test;
@@ -37,7 +37,7 @@ pub mod storage;
 /// trait interface. However, `storage.rs` provides the necessary functions for
 /// `IdentityRegistryStorage` integration. Examples are available in the RWA
 /// examples folder.
-#[contractclient(name = "IdentityVerifierClient")]
+#[contracttrait]
 pub trait IdentityVerifier {
     /// Verifies that the identity of an user address has the required valid
     /// claims.

@@ -3,7 +3,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractclient, contracterror, contractevent, Address, Env, Map, Vec};
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, Map, Vec};
 
 /// Trait for managing claim topics and trusted issuers for RWA tokens.
 ///
@@ -16,7 +16,7 @@ use soroban_sdk::{contractclient, contracterror, contractevent, Address, Env, Ma
 /// pub trait ClaimTopicsAndIssuers       // ✅
 /// pub trait ClaimTopicsAndIssuers: RWA  // ❌
 /// ```
-#[contractclient(name = "ClaimTopicsAndIssuersClient")]
+#[contracttrait]
 pub trait ClaimTopicsAndIssuers {
     // ################## CLAIM TOPICS ##################
 

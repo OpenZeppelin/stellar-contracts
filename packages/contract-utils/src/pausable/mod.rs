@@ -51,10 +51,11 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env};
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env};
 
 pub use crate::pausable::storage::{pause, paused, unpause, when_not_paused, when_paused};
 
+#[contracttrait]
 pub trait Pausable {
     /// Returns true if the contract is paused, and false otherwise.
     ///
