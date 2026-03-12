@@ -520,6 +520,11 @@ pub fn install(
 /// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
 ///
+/// # Errors
+///
+/// * [`WeightedThresholdError::SmartAccountNotInstalled`] - When the policy is
+///   not installed for the given smart account and context rule.
+///
 /// # Events
 ///
 /// * topics - `["weighted_policy_uninstalled", smart_account: Address]`
@@ -529,6 +534,11 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     smart_account.require_auth();
 
     let key = WeightedThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
+
+    if !e.storage().persistent().has(&key) {
+        panic_with_error!(e, WeightedThresholdError::SmartAccountNotInstalled)
+    }
+
     e.storage().persistent().remove(&key);
 
     WeightedPolicyUninstalled {

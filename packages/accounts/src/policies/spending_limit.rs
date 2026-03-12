@@ -206,6 +206,7 @@ pub fn get_spending_limit_data(
 ///   amount is not within the spending limit for the rolling period.
 /// * [`SpendingLimitError::NotAllowed`] - When there are no authenticated
 ///   signers, the context is not a transfer with well-formatted amount.
+/// * refer to [`get_spending_limit_data`] errors.
 ///
 /// # Events
 ///
@@ -395,6 +396,11 @@ pub fn install(
 /// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
 ///
+/// # Errors
+///
+/// * [`SpendingLimitError::SmartAccountNotInstalled`] - When the policy is not
+///   installed for the given smart account and context rule.
+///
 /// # Events
 ///
 /// * topics - `["spending_limit_uninstalled", smart_account: Address]`
@@ -403,9 +409,13 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    e.storage()
-        .persistent()
-        .remove(&SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id));
+    let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id);
+
+    if !e.storage().persistent().has(&key) {
+        panic_with_error!(e, SpendingLimitError::SmartAccountNotInstalled)
+    }
+
+    e.storage().persistent().remove(&key);
 
     SpendingLimitUninstalled {
         smart_account: smart_account.clone(),

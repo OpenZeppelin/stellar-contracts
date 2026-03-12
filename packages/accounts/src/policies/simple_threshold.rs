@@ -311,6 +311,11 @@ pub fn install(
 /// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
 ///
+/// # Errors
+///
+/// * [`SimpleThresholdError::SmartAccountNotInstalled`] - When the policy is
+///   not installed for the given smart account and context rule.
+///
 /// # Events
 ///
 /// * topics - `["simple_policy_uninstalled", smart_account: Address]`
@@ -319,9 +324,13 @@ pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    e.storage()
-        .persistent()
-        .remove(&SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id));
+    let key = SimpleThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
+
+    if !e.storage().persistent().has(&key) {
+        panic_with_error!(e, SimpleThresholdError::SmartAccountNotInstalled)
+    }
+
+    e.storage().persistent().remove(&key);
 
     SimplePolicyUninstalled {
         smart_account: smart_account.clone(),

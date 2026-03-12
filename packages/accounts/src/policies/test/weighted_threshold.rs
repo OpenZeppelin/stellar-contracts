@@ -451,6 +451,21 @@ fn uninstall_success() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3210)")]
+fn uninstall_not_installed_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let context_rule = create_test_context_rule(&e);
+        uninstall(&e, &context_rule, &smart_account);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #3211)")]
 fn set_threshold_unreachable_fails() {
     let e = Env::default();

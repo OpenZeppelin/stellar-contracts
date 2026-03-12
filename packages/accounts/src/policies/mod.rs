@@ -102,11 +102,8 @@ pub trait Policy {
     ///
     /// Implementations should emit a policy-specific installed event
     /// containing the installation parameters, smart account address, and
-    /// context rule ID. This follows the `{Name}PolicyInstalled` naming
-    /// convention (e.g., `SimplePolicyInstalled`,
-    /// `WeightedPolicyInstalled`). See [`simple_threshold`],
-    /// [`weighted_threshold`], and [`spending_limit`] for reference
-    /// implementations.
+    /// context rule ID. See [`simple_threshold`], [`weighted_threshold`], and
+    /// [`spending_limit`] for reference implementations.
     ///
     /// # Notes
     ///
@@ -123,7 +120,9 @@ pub trait Policy {
     /// Uninstalls the policy from a context rule and cleans up associated data.
     ///
     /// This method is called when a policy is removed from a context rule. It
-    /// should clean up any storage, and prepare for the policy's removal.
+    /// should verify the policy is installed, clean up any storage, and prepare
+    /// for the policy's removal. Implementations must panic if the policy is
+    /// not installed.
     ///
     /// # Arguments
     ///
