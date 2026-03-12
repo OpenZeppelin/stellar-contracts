@@ -134,12 +134,7 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
         return;
     }
 
-    let ckey = ComplianceModuleStorageKey::Compliance;
-    let compliance: Address = e
-        .storage()
-        .instance()
-        .get(&ckey)
-        .unwrap_or_else(|| panic_with_error!(e, ComplianceModuleError::ComplianceNotSet));
+    let compliance = get_compliance_address(e);
     let self_addr = e.current_contract_address();
     let client = ComplianceClient::new(e, &compliance);
 
