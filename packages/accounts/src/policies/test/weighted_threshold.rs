@@ -311,6 +311,7 @@ fn set_threshold_success() {
         let context_rule = create_test_context_rule(&e);
         set_threshold(&e, 100, &context_rule, &smart_account);
         assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 100);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -382,6 +383,7 @@ fn set_signer_weight_success() {
 
         let updated_weights = get_signer_weights(&e, &context_rule, &smart_account);
         assert_eq!(updated_weights.get(new_signer).unwrap(), 25);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 

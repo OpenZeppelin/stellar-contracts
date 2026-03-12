@@ -395,6 +395,7 @@ fn set_spending_limit_success() {
         assert_eq!(data.spending_limit, 2_000_000);
         assert_eq!(data.period_ledgers, 100); // Should remain unchanged
         assert_eq!(data.cached_total_spent, 0); // Should remain unchanged
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 

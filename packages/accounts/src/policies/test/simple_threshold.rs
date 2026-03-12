@@ -171,6 +171,7 @@ fn set_threshold_success() {
         let context_rule = create_test_context_rule(&e);
         set_threshold(&e, 3, &context_rule, &smart_account);
         assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 3);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
