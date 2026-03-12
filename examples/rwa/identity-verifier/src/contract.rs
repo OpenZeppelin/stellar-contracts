@@ -26,24 +26,10 @@ impl IdentityVerifierContract {
         identity_verifier::set_claim_topics_and_issuers(e, &claim_topics_and_issuers);
     }
 
-    /// Returns the address of the identity registry storage contract.
-    ///
-    /// # Errors
-    ///
-    /// * [`stellar_tokens::rwa::RWAError::IdentityRegistryStorageNotSet`] -
-    ///   When the identity registry storage contract is not set.
     pub fn identity_registry_storage(e: &Env) -> Address {
         identity_verifier::identity_registry_storage(e)
     }
 
-    /// Sets the identity registry storage contract.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `identity_registry_storage` - The address of the identity registry
-    ///   storage contract.
-    /// * `operator` - The address of the operator.
     #[only_admin]
     pub fn set_identity_registry_storage(
         e: &Env,

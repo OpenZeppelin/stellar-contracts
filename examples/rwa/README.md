@@ -1,58 +1,10 @@
 # RWA (Real World Asset) Token Examples
 
-This guide demonstrates how to deploy a complete RWA token system on Stellar testnet. RWA tokens are security tokens representing real-world assets (real estate, commodities, financial instruments) that require identity verification and compliance checks for all operations.
-
-The implementation follows the [T-REX (Token for Regulated Exchanges)](https://docs.openzeppelin.com/stellar-contracts/tokens/rwa/rwa) standard, providing a modular framework where identity, compliance, and token contracts are loosely coupled and independently deployable.
+This guide demonstrates how to deploy a complete RWA token system on Stellar testnet. More information about RWAs can be found in the dedicated [library module](../../packages/tokens/src/rwa) and in the official OpenZeppelin [docs](https://docs.openzeppelin.com/stellar-contracts/tokens/rwa/rwa). 
 
 ## Architecture Overview
 
 The RWA system consists of 7 contracts that work together:
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                        RWA Token                                │
-│  (Fungible token with freezing, recovery, and compliance)       │
-│                                                                 │
-│   set_compliance(...)          set_identity_verifier(...)       │
-│         │                                │                      │
-└─────────┼────────────────────────────────┼──────────────────────┘
-          │                                │
-          ▼                                ▼
-┌──────────────────────┐     ┌───────────────────────────────┐
-│    Compliance        │     │    Identity Verifier          │
-│  (Modular hook-based │     │  (Orchestrates verification)  │
-│   rule enforcement)  │     │                               │
-└──────────────────────┘     │  set_claim_topics_and_issuers │
-                             │  set_identity_registry_storage│
-                             └───────┬──────────┬────────────┘
-                                     │          │
-                    ┌────────────────┘          └──────────────┐
-                    ▼                                          ▼
-     ┌──────────────────────────┐            ┌──────────────────────────┐
-     │ Claim Topics and Issuers │            │ Identity Registry Storage│
-     │ (Trusted issuer registry)│            │ (Account → Identity map) │
-     └──────────┬───────────────┘            └──────────┬───────────────┘
-                │                                       │
-                ▼                                       ▼
-     ┌──────────────────────────┐            ┌──────────────────────────┐
-     │     Claim Issuer(s)      │            │     Identity Contract(s) │
-     │ (Ed25519 claim signing   │            │ (Per-user claim storage) │
-     │  and validation)         │            │                          │
-     └──────────────────────────┘            └──────────────────────────┘
-```
-
-**How a transfer works end-to-end:**
-
-1. User calls `transfer(from, to, amount)` on the RWA Token
-2. Token checks the contract is not paused, neither address is frozen, and sufficient free (unfrozen) tokens exist
-3. Token calls Identity Verifier to verify both `from` and `to`
-4. Identity Verifier looks up each account's Identity contract in the Identity Registry Storage
-5. Identity Verifier checks claims on the Identity contract against trusted issuers from Claim Topics and Issuers
-6. Each Claim Issuer validates its claims (signature, expiration, revocation)
-7. Token calls Compliance to check `can_transfer(from, to, amount, token)`
-8. If all checks pass, the transfer executes
-
-## Example Contracts
 
 | Directory                   | Contract                        | Description                                                         |
 | --------------------------- | ------------------------------- | ------------------------------------------------------------------- |
@@ -73,7 +25,7 @@ The RWA system consists of 7 contracts that work together:
 ```bash
 git clone https://github.com/OpenZeppelin/stellar-contracts.git
 cd stellar-contracts
-cargo build --target wasm32v1-none --release
+stellar contract build
 ```
 
 #### Configure Network
