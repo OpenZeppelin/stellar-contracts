@@ -91,6 +91,28 @@ pub struct WeightedPolicyInstalled {
     pub signer_weights: Map<Signer, u32>,
 }
 
+/// Event emitted when the threshold of a weighted threshold policy is changed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WeightedThresholdChanged {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+    pub threshold: u32,
+}
+
+/// Event emitted when a signer weight is changed in a weighted threshold
+/// policy.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WeightedSignerWeightChanged {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+    pub signer: Signer,
+    pub weight: u32,
+}
+
 /// Event emitted when a weighted threshold policy is uninstalled.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -322,6 +344,11 @@ pub fn enforce(
 /// * [`WeightedThresholdError::InvalidThreshold`] - When threshold is 0.
 /// * [`WeightedThresholdError::SmartAccountNotInstalled`] - When the policy is
 ///   not installed.
+///
+/// # Events
+///
+/// * topics - `["weighted_threshold_changed", smart_account: Address]`
+/// * data - `[context_rule_id: u32, threshold: u32]`
 pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
@@ -346,6 +373,13 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
     }
 
     e.storage().persistent().set(&key, &params);
+
+    WeightedThresholdChanged {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+        threshold,
+    }
+    .publish(e);
 }
 
 /// Sets the weight for a specific signer in the weighted threshold policy.
@@ -371,6 +405,11 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
 ///   account does not have a weighted threshold policy installed.
 /// * [`WeightedThresholdError::InvalidThreshold`] - When the threshold would
 ///   exceed the new total weight.
+///
+/// # Events
+///
+/// * topics - `["weighted_signer_weight_changed", smart_account: Address]`
+/// * data - `[context_rule_id: u32, signer: Signer, weight: u32]`
 pub fn set_signer_weight(
     e: &Env,
     signer: &Signer,
@@ -397,6 +436,14 @@ pub fn set_signer_weight(
     }
 
     e.storage().persistent().set(&key, &params);
+
+    WeightedSignerWeightChanged {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+        signer: signer.clone(),
+        weight,
+    }
+    .publish(e);
 }
 
 /// Installs the weighted threshold policy on a smart account.

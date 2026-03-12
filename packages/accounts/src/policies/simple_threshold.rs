@@ -64,10 +64,20 @@ pub struct SimplePolicyEnforced {
     pub authenticated_signers: Vec<Signer>,
 }
 
-/// Event emitted when a simple threshold policy is installed.
+/// Even emitted when a simple threshold policy is installed.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SimplePolicyInstalled {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+    pub threshold: u32,
+}
+
+/// Event emitted when the threshold of a simple threshold policy is changed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SimpleThresholdChanged {
     #[topic]
     pub smart_account: Address,
     pub context_rule_id: u32,
@@ -217,11 +227,23 @@ pub fn enforce(
 ///
 /// * [`SimpleThresholdError::InvalidThreshold`] - When threshold is 0 or
 ///   exceeds the total number of signers.
+///
+/// # Events
+///
+/// * topics - `["simple_threshold_changed", smart_account: Address]`
+/// * data - `[context_rule_id: u32, threshold: u32]`
 pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
 
     validate_and_set_threshold(e, threshold, context_rule, smart_account);
+
+    SimpleThresholdChanged {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+        threshold,
+    }
+    .publish(e);
 }
 
 /// Installs the simple threshold policy on a smart account.

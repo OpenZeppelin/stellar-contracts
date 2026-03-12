@@ -63,6 +63,16 @@ pub struct SpendingLimitInstalled {
     pub period_ledgers: u32,
 }
 
+/// Event emitted when the spending limit value is changed.
+#[contractevent]
+#[derive(Clone, Debug)]
+pub struct SpendingLimitChanged {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+    pub spending_limit: i128,
+}
+
 /// Event emitted when a spending limit policy is uninstalled.
 #[contractevent]
 #[derive(Clone, Debug)]
@@ -285,6 +295,11 @@ pub fn enforce(
 ///
 /// * [`SpendingLimitError::InvalidLimitOrPeriod`] - When spending_limit is not
 ///   positive.
+///
+/// # Events
+///
+/// * topics - `["spending_limit_changed", smart_account: Address]`
+/// * data - `[context_rule_id: u32, spending_limit: i128]`
 pub fn set_spending_limit(
     e: &Env,
     spending_limit: i128,
@@ -303,6 +318,13 @@ pub fn set_spending_limit(
     data.spending_limit = spending_limit;
 
     e.storage().persistent().set(&key, &data);
+
+    SpendingLimitChanged {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+        spending_limit,
+    }
+    .publish(e);
 }
 
 /// Installs the spending limit policy on a smart account.
