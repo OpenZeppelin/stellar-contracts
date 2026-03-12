@@ -38,12 +38,14 @@ Stellar smart contracts are programs written in Rust leveraging the [Soroban SDK
 ## How To Test/Play With Example Contracts
 The below section is based on [Official Stellar Docs](https://developers.stellar.org/docs/build/smart-contracts/getting-started/hello-world). If you are stuck on any of the steps below, or want to dive in deeper, please refer to the official documentation.
 
+Before starting, make sure you have Stellar CLI installed by following the [official installation guide](https://developers.stellar.org/docs/tools/cli/install-cli).
+
 We provide a set of example contracts that demonstrate how to use the library. You can find them in the `examples/` directory. If you want to deploy the example contracts to the testnet and play with them, you can follow the instructions below:
 1. `git clone https://github.com/OpenZeppelin/stellar-contracts.git`
 2. `cd stellar-contracts/examples`
 3. Take a look at the current folder, and select an example contract you are interested in. We will go with the `fungible-pausable` in this guide.
 4. `cd fungible-pausable`
-5. `cargo build --target wasm32v1-none --release`
+5. `stellar contract build`
 6. Now, the `target/wasm32v1-none/release/` directory will contain the compiled contracts. In this case, `target/wasm32v1-none/release/fungible_pausable_example.wasm` is the compiled wasm file.
 7. Deploying to the testnet is no different than any other contract. You can follow the instructions in the [Stellar documentation](https://developers.stellar.org/docs/build/smart-contracts/getting-started/deploy-to-testnet).
 
