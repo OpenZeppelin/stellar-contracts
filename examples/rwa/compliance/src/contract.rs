@@ -30,12 +30,8 @@ impl ComplianceContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl TokenBinder for ComplianceContract {
-    fn linked_tokens(e: &Env) -> Vec<Address> {
-        binder::linked_tokens(e)
-    }
-
     #[only_role(operator, "manager")]
     fn bind_token(e: &Env, token: Address, operator: Address) {
         binder::bind_token(e, &token);
@@ -47,7 +43,7 @@ impl TokenBinder for ComplianceContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl Compliance for ComplianceContract {
     #[only_role(operator, "manager")]
     fn add_module_to(e: &Env, hook: ComplianceHook, module: Address, operator: Address) {
@@ -57,34 +53,6 @@ impl Compliance for ComplianceContract {
     #[only_role(operator, "manager")]
     fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address, operator: Address) {
         compliance::storage::remove_module_from(e, hook, module);
-    }
-
-    fn get_modules_for_hook(e: &Env, hook: ComplianceHook) -> Vec<Address> {
-        compliance::storage::get_modules_for_hook(e, hook)
-    }
-
-    fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool {
-        compliance::storage::is_module_registered(e, hook, module)
-    }
-
-    fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Address) {
-        compliance::storage::transferred(e, from, to, amount, token);
-    }
-
-    fn created(e: &Env, to: Address, amount: i128, token: Address) {
-        compliance::storage::created(e, to, amount, token);
-    }
-
-    fn destroyed(e: &Env, from: Address, amount: i128, token: Address) {
-        compliance::storage::destroyed(e, from, amount, token);
-    }
-
-    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
-        compliance::storage::can_transfer(e, from, to, amount, token)
-    }
-
-    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
-        compliance::storage::can_create(e, to, amount, token)
     }
 }
 

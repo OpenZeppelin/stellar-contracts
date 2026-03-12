@@ -39,12 +39,8 @@ impl RWATokenContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl Pausable for RWATokenContract {
-    fn paused(e: &Env) -> bool {
-        pausable::paused(e)
-    }
-
     #[only_admin]
     fn pause(e: &Env, _caller: Address) {
         pausable::pause(e);
@@ -61,7 +57,7 @@ impl FungibleToken for RWATokenContract {
     type ContractType = RWA;
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl RWAToken for RWATokenContract {
     #[only_role(operator, "manager")]
     fn forced_transfer(e: &Env, from: Address, to: Address, amount: i128, operator: Address) {
@@ -103,38 +99,14 @@ impl RWAToken for RWATokenContract {
         RWA::unfreeze_partial_tokens(e, &user_address, amount);
     }
 
-    fn is_frozen(e: &Env, user_address: Address) -> bool {
-        RWA::is_frozen(e, &user_address)
-    }
-
-    fn get_frozen_tokens(e: &Env, user_address: Address) -> i128 {
-        RWA::get_frozen_tokens(e, &user_address)
-    }
-
-    fn version(e: &Env) -> String {
-        RWA::version(e)
-    }
-
-    fn onchain_id(e: &Env) -> Address {
-        RWA::onchain_id(e)
-    }
-
     #[only_role(operator, "manager")]
     fn set_compliance(e: &Env, compliance: Address, operator: Address) {
         RWA::set_compliance(e, &compliance);
     }
 
-    fn compliance(e: &Env) -> Address {
-        RWA::compliance(e)
-    }
-
     #[only_role(operator, "manager")]
     fn set_identity_verifier(e: &Env, identity_verifier: Address, operator: Address) {
         RWA::set_identity_verifier(e, &identity_verifier);
-    }
-
-    fn identity_verifier(e: &Env) -> Address {
-        RWA::identity_verifier(e)
     }
 }
 

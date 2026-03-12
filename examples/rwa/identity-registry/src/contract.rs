@@ -31,12 +31,8 @@ impl IdentityRegistryContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl TokenBinder for IdentityRegistryContract {
-    fn linked_tokens(e: &Env) -> Vec<Address> {
-        binder::linked_tokens(e)
-    }
-
     #[only_role(operator, "manager")]
     fn bind_token(e: &Env, token: Address, operator: Address) {
         binder::bind_token(e, &token);

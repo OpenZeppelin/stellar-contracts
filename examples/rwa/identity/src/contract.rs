@@ -23,7 +23,7 @@ impl IdentityContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl IdentityClaims for IdentityContract {
     #[only_owner]
     fn add_claim(
@@ -36,14 +36,6 @@ impl IdentityClaims for IdentityContract {
         uri: String,
     ) -> BytesN<32> {
         claims::add_claim(e, topic, scheme, &issuer, &signature, &data, &uri)
-    }
-
-    fn get_claim(e: &Env, claim_id: BytesN<32>) -> Claim {
-        claims::get_claim(e, &claim_id)
-    }
-
-    fn get_claim_ids_by_topic(e: &Env, topic: u32) -> Vec<BytesN<32>> {
-        claims::get_claim_ids_by_topic(e, topic)
     }
 }
 

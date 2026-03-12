@@ -54,7 +54,7 @@ impl IdentityVerifierContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl IdentityVerifier for IdentityVerifierContract {
     fn verify_identity(e: &Env, account: &Address) {
         identity_verifier::verify_identity(e, account);
@@ -71,10 +71,6 @@ impl IdentityVerifier for IdentityVerifierContract {
         _operator: Address,
     ) {
         identity_verifier::set_claim_topics_and_issuers(e, &claim_topics_and_issuers);
-    }
-
-    fn claim_topics_and_issuers(e: &Env) -> Address {
-        identity_verifier::claim_topics_and_issuers(e)
     }
 }
 

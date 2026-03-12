@@ -18,7 +18,7 @@ impl ClaimTopicsAndIssuersContract {
     }
 }
 
-#[contractimpl]
+#[contractimpl(contracttrait)]
 impl ClaimTopicsAndIssuers for ClaimTopicsAndIssuersContract {
     #[only_role(operator, "manager")]
     fn add_claim_topic(e: &Env, claim_topic: u32, operator: Address) {
@@ -28,10 +28,6 @@ impl ClaimTopicsAndIssuers for ClaimTopicsAndIssuersContract {
     #[only_role(operator, "manager")]
     fn remove_claim_topic(e: &Env, claim_topic: u32, operator: Address) {
         cti::remove_claim_topic(e, claim_topic);
-    }
-
-    fn get_claim_topics(e: &Env) -> Vec<u32> {
-        cti::get_claim_topics(e)
     }
 
     #[only_role(operator, "manager")]
@@ -57,30 +53,6 @@ impl ClaimTopicsAndIssuers for ClaimTopicsAndIssuersContract {
         operator: Address,
     ) {
         cti::update_issuer_claim_topics(e, &trusted_issuer, &claim_topics);
-    }
-
-    fn get_trusted_issuers(e: &Env) -> Vec<Address> {
-        cti::get_trusted_issuers(e)
-    }
-
-    fn get_claim_topic_issuers(e: &Env, claim_topic: u32) -> Vec<Address> {
-        cti::get_claim_topic_issuers(e, claim_topic)
-    }
-
-    fn get_claim_topics_and_issuers(e: &Env) -> Map<u32, Vec<Address>> {
-        cti::get_claim_topics_and_issuers(e)
-    }
-
-    fn is_trusted_issuer(e: &Env, issuer: Address) -> bool {
-        cti::is_trusted_issuer(e, &issuer)
-    }
-
-    fn get_trusted_issuer_claim_topics(e: &Env, trusted_issuer: Address) -> Vec<u32> {
-        cti::get_trusted_issuer_claim_topics(e, &trusted_issuer)
-    }
-
-    fn has_claim_topic(e: &Env, issuer: Address, claim_topic: u32) -> bool {
-        cti::has_claim_topic(e, &issuer, claim_topic)
     }
 }
 
