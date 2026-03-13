@@ -80,9 +80,8 @@
 //!
 //! ## Modules
 //!
-//! - **Identity Verification**: Claim issuers, claim topic registries,
-//!   identity claims, identity registry storage, and the identity verifier
-//!   contract
+//! - **Identity Verification**: Claim issuers, claim topic registries, identity
+//!   claims, identity registry storage, and the identity verifier contract
 //! - **Compliance**: Core compliance contract and its pluggable compliance
 //!   modules
 //! - **Extensions**: Optional extensions providing additional functionality

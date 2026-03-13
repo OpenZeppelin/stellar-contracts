@@ -59,26 +59,139 @@ use soroban_sdk::{contractclient, Address, Env, String};
 #[contractclient(name = "ComplianceModuleClient")]
 pub trait ComplianceModule {
     /// Called when tokens are transferred (for Transfer hook).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The address of the sender.
+    /// * `to` - The address of the receiver.
+    /// * `amount` - The amount of tokens transferred.
+    /// * `token` - The address of the token contract that triggered the hook.
+    ///
+    /// # Security Note
+    ///
+    /// If this function modifies state, it should be called only by the
+    /// compliance contract. To enforce this, add the following at the start of
+    /// the implementation:
+    ///
+    /// ```ignore
+    /// get_compliance_address(e).require_auth();
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn on_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address);
 
-    /// Called when tokens are created or minted (for Created hook).
+    /// Called when tokens are created/minted (for Created hook).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to` - The address receiving the tokens.
+    /// * `amount` - The amount of tokens created.
+    /// * `token` - The address of the token contract that triggered the hook.
+    ///
+    /// # Security Note
+    ///
+    /// If this function modifies state, it should be called only by the
+    /// compliance contract. To enforce this, add the following at the start of
+    /// the implementation:
+    ///
+    /// ```ignore
+    /// get_compliance_address(e).require_auth();
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn on_created(e: &Env, to: Address, amount: i128, token: Address);
 
-    /// Called when tokens are destroyed or burned (for Destroyed hook).
+    /// Called when tokens are destroyed/burned (for Destroyed hook).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The address from which tokens are burned.
+    /// * `amount` - The amount of tokens destroyed.
+    /// * `token` - The address of the token contract that triggered the hook.
+    ///
+    /// # Security Note
+    ///
+    /// If this function modifies state, it should be called only by the
+    /// compliance contract. To enforce this, add the following at the start of
+    /// the implementation:
+    ///
+    /// ```ignore
+    /// get_compliance_address(e).require_auth();
+    /// ```
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address);
 
-    /// Called to check whether a transfer should be allowed.
+    /// Called to check if a transfer should be allowed (for CanTransfer hook).
+    /// Returns `true` if the transfer should be allowed, `false` otherwise.
+    ///
+    /// This is a read-only function and should not modify state.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `from` - The address of the sender.
+    /// * `to` - The address of the receiver.
+    /// * `amount` - The amount of tokens to transfer.
+    /// * `token` - The address of the token contract that triggered the hook.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool;
 
-    /// Called to check whether a mint operation should be allowed.
+    /// Called to check if a mint operation should be allowed (for CanCreate
+    /// hook). Returns `true` if the mint operation should be allowed,
+    /// `false` otherwise.
+    ///
+    /// This is a read-only function and should not modify state.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `to` - The address of the receiver.
+    /// * `amount` - The amount of tokens to mint.
+    /// * `token` - The address of the token contract that triggered the hook.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool;
 
-    /// Returns the module name for identification purposes.
+    /// Returns the name of the module for identification purposes.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided; see the trait-level
+    /// documentation.
     fn name(e: &Env) -> String;
 
     /// Returns the address of the compliance contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
     fn get_compliance_address(e: &Env) -> Address;
 
     /// Sets the address of the compliance contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `compliance` - The address of the compliance contract.
     fn set_compliance_address(e: &Env, compliance: Address);
 }
