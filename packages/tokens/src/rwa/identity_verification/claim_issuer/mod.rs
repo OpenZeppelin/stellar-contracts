@@ -72,7 +72,7 @@
 //!
 //! ```rust
 //! use soroban_sdk::{contract, contractimpl, Address, Bytes, Env};
-//! use stellar_tokens::rwa::claim_issuer::{
+//! use stellar_tokens::rwa::identity_verification::claim_issuer::{
 //!     storage::{
 //!         allow_key, decode_claim_data_expiration, is_claim_expired, is_claim_revoked,
 //!         is_key_allowed_for_topic,

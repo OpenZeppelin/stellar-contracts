@@ -2,11 +2,14 @@ extern crate std;
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Bytes, BytesN, Env, String, Vec};
 
-use crate::rwa::{
+use crate::rwa::identity_verification::{
     claim_issuer::ClaimIssuer,
-    identity_claims::storage::{
-        add_claim, get_claim, get_claim_ids_by_topic, remove_claim, remove_claim_from_topic_index,
-        ClaimsStorageKey,
+    identity_claims::{
+        storage::{
+            add_claim, get_claim, get_claim_ids_by_topic, remove_claim,
+            remove_claim_from_topic_index, ClaimsStorageKey,
+        },
+        ClaimsError,
     },
 };
 
@@ -14,7 +17,6 @@ pub mod mock_claim_issuer {
     use soroban_sdk::{panic_with_error, symbol_short};
 
     use super::*;
-    use crate::rwa::identity_claims::ClaimsError;
 
     #[contract]
     pub struct Contract;

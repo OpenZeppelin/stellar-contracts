@@ -7,8 +7,7 @@ use crate::{
         compliance::ComplianceClient, emit_address_frozen, emit_burn, emit_compliance_set,
         emit_identity_verifier_set, emit_mint, emit_recovery_success,
         emit_token_onchain_id_updated, emit_tokens_frozen, emit_tokens_unfrozen,
-        identity_verifier::IdentityVerifierClient, RWAError, FROZEN_EXTEND_AMOUNT,
-        FROZEN_TTL_THRESHOLD,
+        IdentityVerifierClient, RWAError, FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
 };
 

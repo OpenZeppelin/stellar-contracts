@@ -2,7 +2,7 @@ extern crate std;
 
 use soroban_sdk::{contract, testutils::Address as _, Address, Env, Vec};
 
-use crate::rwa::claim_topics_and_issuers::storage::{
+use crate::rwa::identity_verification::claim_topics_and_issuers::storage::{
     add_claim_topic, add_trusted_issuer, get_claim_topic_issuers, get_claim_topics,
     get_claim_topics_and_issuers, get_trusted_issuer_claim_topics, get_trusted_issuers,
     has_claim_topic, is_trusted_issuer, remove_claim_topic, remove_trusted_issuer,

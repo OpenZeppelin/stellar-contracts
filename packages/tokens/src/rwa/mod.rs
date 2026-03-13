@@ -80,26 +80,25 @@
 //!
 //! ## Modules
 //!
-//! - **Claim Topics and Issuers**: Management of trusted claim issuers and
-//!   topics
-//! - **Compliance**: Modular compliance rules and validation framework
-//! - **Identity Claims**: Integration with identity registries for KYC/AML
-//! - **Identity Registry Storage**: Registry for storing all the information
-//!   necessary for identities
-//! - **Identity Verifier**: Interface for the identity verification process,
-//!   connects the RWA token to the identity stack
+//! - **Identity Verification**: Claim issuers, claim topic registries,
+//!   identity claims, identity registry storage, and the identity verifier
+//!   contract
+//! - **Compliance**: Core compliance contract and its pluggable compliance
+//!   modules
 //! - **Extensions**: Optional extensions providing additional functionality
 //!   like document management
 
-pub mod claim_issuer;
-pub mod claim_topics_and_issuers;
 pub mod compliance;
 pub mod extensions;
-pub mod identity_claims;
-pub mod identity_registry_storage;
-pub mod identity_verifier;
+pub mod identity_verification;
 pub mod storage;
 pub mod utils;
+
+pub use identity_verification as identity_verifier;
+pub use identity_verification::{
+    claim_issuer, claim_topics_and_issuers, identity_claims, identity_registry_storage,
+    IdentityVerifier, IdentityVerifierClient,
+};
 
 #[cfg(test)]
 mod test;

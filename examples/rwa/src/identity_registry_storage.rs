@@ -2,7 +2,7 @@ use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Vec};
 use stellar_access::access_control::{self as access_control};
 use stellar_macros::only_role;
 use stellar_tokens::rwa::{
-    identity_registry_storage::{
+    identity_verification::identity_registry_storage::{
         self as identity_storage, CountryData, CountryDataManager, IdentityRegistryStorage,
         IdentityType,
     },

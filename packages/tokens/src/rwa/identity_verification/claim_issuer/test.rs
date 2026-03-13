@@ -17,7 +17,7 @@ use soroban_sdk::{
     Address, Bytes, BytesN, Env, Map, Vec,
 };
 
-use crate::rwa::{
+use crate::rwa::identity_verification::{
     claim_issuer::{
         build_claim_identifier,
         storage::{

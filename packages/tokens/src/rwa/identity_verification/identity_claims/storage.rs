@@ -30,7 +30,7 @@ use soroban_sdk::{
 use super::{
     emit_claim_event, ClaimEvent, ClaimsError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
 };
-use crate::rwa::claim_issuer::ClaimIssuerClient;
+use crate::rwa::identity_verification::claim_issuer::ClaimIssuerClient;
 
 /// Represents a claim stored on-chain.
 #[contracttype]
