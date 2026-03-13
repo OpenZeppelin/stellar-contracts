@@ -27,10 +27,12 @@ use soroban_sdk::{
     contracttype, panic_with_error, vec, xdr::ToXdr, Address, Bytes, BytesN, Env, String, Vec,
 };
 
-use super::{
-    emit_claim_event, ClaimEvent, ClaimsError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
+use crate::rwa::identity_verification::{
+    claim_issuer::ClaimIssuerClient,
+    identity_claims::{
+        emit_claim_event, ClaimEvent, ClaimsError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
+    },
 };
-use crate::rwa::identity_verification::claim_issuer::ClaimIssuerClient;
 
 /// Represents a claim stored on-chain.
 #[contracttype]

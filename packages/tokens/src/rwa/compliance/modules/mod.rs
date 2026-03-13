@@ -56,6 +56,12 @@ use soroban_sdk::{contractclient, Address, Env, String};
 ///
 /// If a hook is read-only, it can be safely exposed more broadly and those
 /// methods can use simple or dummy implementations.
+///
+///
+/// No default implementations are provided for the methods of this trait.
+/// [`ComplianceModule`] is designed to be implemented by multiple independent
+/// contracts, each with its own storage layout, access control, and business
+/// logic. A meaningful default is therefore not possible.
 #[contractclient(name = "ComplianceModuleClient")]
 pub trait ComplianceModule {
     /// Called when tokens are transferred (for Transfer hook).

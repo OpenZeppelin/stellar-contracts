@@ -7,17 +7,16 @@ use soroban_sdk::{
     Address, Bytes, Env, Map, String, Val, Vec,
 };
 
-use super::super::{
-    storage::{
-        add_context_rule, add_policy, add_signer, batch_add_signer, get_context_rule,
-        remove_policy, remove_signer, validate_signers_and_policies, ContextRule, ContextRuleType,
-        Signer, SmartAccountStorageKey,
-    },
-    MAX_POLICIES, MAX_SIGNERS,
-};
 use crate::{
     policies::Policy,
-    smart_account::storage::{PolicyEntry, SignerEntry},
+    smart_account::{
+        storage::{
+            add_context_rule, add_policy, add_signer, batch_add_signer, get_context_rule,
+            remove_policy, remove_signer, validate_signers_and_policies, ContextRule,
+            ContextRuleType, PolicyEntry, Signer, SignerEntry, SmartAccountStorageKey,
+        },
+        MAX_POLICIES, MAX_SIGNERS,
+    },
 };
 
 #[contract]

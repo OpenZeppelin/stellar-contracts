@@ -1,10 +1,9 @@
 use soroban_sdk::{contract, testutils::Address as _, Address, Env, Vec};
 
-use super::storage::TokenBinderStorageKey;
 use crate::rwa::utils::token_binder::{
     storage::{
         bind_token, bind_tokens, get_token_by_index, get_token_index, is_token_bound,
-        linked_token_count, linked_tokens, unbind_token,
+        linked_token_count, linked_tokens, unbind_token, TokenBinderStorageKey,
     },
     BUCKET_SIZE, MAX_TOKENS,
 };
