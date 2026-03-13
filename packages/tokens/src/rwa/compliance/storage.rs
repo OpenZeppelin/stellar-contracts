@@ -2,8 +2,8 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 
 use crate::rwa::{
     compliance::{
-        emit_module_added, emit_module_removed, ComplianceError, ComplianceHook,
-        ComplianceModuleClient, COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
+        emit_module_added, emit_module_removed, modules::ComplianceModuleClient, ComplianceError,
+        ComplianceHook, COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
     },
     utils::token_binder::is_token_bound,
 };

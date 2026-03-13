@@ -1,10 +1,12 @@
 use soroban_sdk::{contractclient, contracttype, panic_with_error, Address, Env};
 
 use crate::rwa::{
-    claim_issuer::ClaimIssuerClient,
-    claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
     emit_claim_topics_and_issuers_set,
-    identity_claims::{generate_claim_id, Claim, IdentityClaimsClient},
+    identity_verification::{
+        claim_issuer::ClaimIssuerClient,
+        claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
+        identity_claims::{generate_claim_id, Claim, IdentityClaimsClient},
+    },
     RWAError,
 };
 

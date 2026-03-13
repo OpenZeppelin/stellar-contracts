@@ -101,7 +101,11 @@
 ///         }
 ///
 ///         // If no duplicates found, add all entries
-///         identity_registry_storage::add_country_data_entries(e, &account, &country_entries);
+///         rwa::identity_verification::identity_registry_storage::add_country_data_entries(
+///             e,
+///             &account,
+///             &country_entries,
+///         );
 ///     }
 ///     // other methods
 /// }
@@ -124,7 +128,7 @@ use soroban_sdk::{
     contracttype, panic_with_error, Address, Env, Map, String, Symbol, TryFromVal, Val, Vec,
 };
 
-use crate::rwa::identity_registry_storage::{
+use crate::rwa::identity_verification::identity_registry_storage::{
     emit_country_data_event, emit_identity_modified, emit_identity_recovered, emit_identity_stored,
     emit_identity_unstored, CountryDataEvent, IRSError, IDENTITY_EXTEND_AMOUNT,
     IDENTITY_TTL_THRESHOLD, MAX_COUNTRY_ENTRIES, MAX_METADATA_ENTRIES, MAX_METADATA_STRING_LEN,

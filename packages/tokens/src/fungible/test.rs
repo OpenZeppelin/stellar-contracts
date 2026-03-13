@@ -152,7 +152,7 @@ fn spend_allowance_expired_ledger_fails_edge_case() {
     e.as_contract(&address, || {
         Base::approve(&e, &owner, &spender, 10, 1000);
 
-        let key = crate::fungible::FungibleStorageKey::Allowance(super::AllowanceKey {
+        let key = crate::fungible::FungibleStorageKey::Allowance(crate::fungible::AllowanceKey {
             owner: owner.clone(),
             spender: spender.clone(),
         });

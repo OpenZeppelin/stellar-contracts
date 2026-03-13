@@ -73,7 +73,7 @@ use core::ops::RangeBounds;
 
 use soroban_sdk::{contracttype, panic_with_error, xdr::ToXdr, Address, Bytes, BytesN, Env, Vec};
 
-use crate::rwa::{
+use crate::rwa::identity_verification::{
     claim_issuer::{
         emit_key_allowed, emit_key_removed, emit_revocation_event, emit_signatures_invalidated,
         ClaimIssuerError, SignatureVerifier, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD,
