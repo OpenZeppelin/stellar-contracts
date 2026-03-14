@@ -76,6 +76,9 @@ fn install_success() {
         assert_eq!(data.period_ledgers, 100);
         assert_eq!(data.spending_history.len(), 0);
         assert_eq!(data.cached_total_spent, 0);
+
+        // Verify install event was emitted
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -392,6 +395,7 @@ fn set_spending_limit_success() {
         assert_eq!(data.spending_limit, 2_000_000);
         assert_eq!(data.period_ledgers, 100); // Should remain unchanged
         assert_eq!(data.cached_total_spent, 0); // Should remain unchanged
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -438,6 +442,24 @@ fn uninstall_success() {
 
     e.as_contract(&address, || {
         // Uninstall
+        uninstall(&e, &context_rule, &smart_account);
+
+        // Verify uninstall event
+        assert_eq!(e.events().all().events().len(), 1);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3220)")]
+fn uninstall_not_installed_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
         uninstall(&e, &context_rule, &smart_account);
     });
 }

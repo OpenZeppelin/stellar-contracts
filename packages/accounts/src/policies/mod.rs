@@ -98,13 +98,18 @@ pub trait Policy {
     /// * `smart_account` - The address of the smart account installing this
     ///   policy.
     ///
+    /// # Events
+    ///
+    /// Implementations should emit a policy-specific installed event
+    /// containing the installation parameters, smart account address, and
+    /// context rule ID. See [`simple_threshold`], [`weighted_threshold`], and
+    /// [`spending_limit`] for reference implementations.
+    ///
     /// # Notes
     ///
     /// No default implementation is provided because installation logic is
     /// policy-specific (e.g., storing threshold parameters, initializing
-    /// spending windows). See [`simple_threshold`],
-    /// [`weighted_threshold`], and [`spending_limit`] for reference
-    /// implementations.
+    /// spending windows).
     fn install(
         e: &Env,
         install_params: Self::AccountParams,
@@ -115,7 +120,9 @@ pub trait Policy {
     /// Uninstalls the policy from a context rule and cleans up associated data.
     ///
     /// This method is called when a policy is removed from a context rule. It
-    /// should clean up any storage, and prepare for the policy's removal.
+    /// should verify the policy is installed, clean up any storage, and prepare
+    /// for the policy's removal. Implementations must panic if the policy is
+    /// not installed.
     ///
     /// # Arguments
     ///
@@ -124,13 +131,24 @@ pub trait Policy {
     /// * `smart_account` - The address of the smart account uninstalling this
     ///   policy.
     ///
+    /// # Events
+    ///
+    /// Implementations should emit a policy-specific uninstalled event
+    /// containing the smart account address and context rule ID. See
+    /// [`simple_threshold`], [`weighted_threshold`], and [`spending_limit`] for
+    /// reference implementations.
+    ///
+    /// Note that the smart account calls `uninstall` via `try_uninstall`,
+    /// so if uninstall panics, the policy's uninstalled event is rolled
+    /// back while the smart account's `PolicyRemoved` event still fires.
+    /// This is correct behavior — the absent policy event signals that
+    /// cleanup did not complete cleanly.
+    ///
     /// # Notes
     ///
     /// No default implementation is provided because cleanup logic is
     /// policy-specific (e.g., removing threshold parameters, clearing
-    /// spending windows). See [`simple_threshold`],
-    /// [`weighted_threshold`], and [`spending_limit`] for reference
-    /// implementations.
+    /// spending windows).
     fn uninstall(e: &Env, context_rule: ContextRule, smart_account: Address);
 }
 

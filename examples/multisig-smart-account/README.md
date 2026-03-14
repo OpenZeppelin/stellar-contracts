@@ -20,7 +20,7 @@ cd stellar-contracts
 Build all the WASM binaries (we'll be using only a few of them):
 
 ```bash
-cargo build --target wasm32v1-none --release
+stellar contract build
 ```
 
 ### Configure Network
