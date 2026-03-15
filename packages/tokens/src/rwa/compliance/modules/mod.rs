@@ -1,5 +1,7 @@
 use soroban_sdk::{contracttrait, Address, Env, String};
 
+pub mod common;
+
 /// Trait for compliance modules that can be registered with the modular
 /// compliance system.
 ///

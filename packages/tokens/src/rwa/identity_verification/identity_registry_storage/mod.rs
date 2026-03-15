@@ -738,26 +738,17 @@ pub fn emit_country_data_event(
     country_data: &Val,
 ) {
     match event_type {
-<<<<<<< HEAD
         CountryDataEvent::Added => {
-            CountryDataAdded { account: account.clone(), country_data: *country_data }.publish(e)
+            CountryDataAdded { account: account.clone(), country_data: country_data.clone() }
+                .publish(e)
         }
         CountryDataEvent::Removed => {
-            CountryDataRemoved { account: account.clone(), country_data: *country_data }.publish(e)
+            CountryDataRemoved { account: account.clone(), country_data: country_data.clone() }
+                .publish(e)
         }
         CountryDataEvent::Modified => {
-            CountryDataModified { account: account.clone(), country_data: *country_data }.publish(e)
-        }
-=======
-        CountryDataEvent::Added =>
-            CountryDataAdded { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
-        CountryDataEvent::Removed =>
-            CountryDataRemoved { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
-        CountryDataEvent::Modified =>
             CountryDataModified { account: account.clone(), country_data: country_data.clone() }
-                .publish(e),
->>>>>>> 040d38b9 (style(repo): align nightly rustfmt output)
+                .publish(e)
+        }
     }
 }

@@ -88,7 +88,6 @@
 //!   like document management
 
 pub mod compliance;
-pub mod compliance_modules;
 pub mod extensions;
 pub mod identity_verification;
 pub mod storage;
