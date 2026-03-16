@@ -13,6 +13,7 @@ use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::only_role;
 use stellar_tokens::fungible::{
     blocklist::{BlockList, FungibleBlockList},
+    burnable::FungibleBurnable,
     Base, FungibleToken,
 };
 
@@ -69,3 +70,6 @@ impl FungibleBlockList for ExampleContract {
 
 #[contractimpl(contracttrait)]
 impl AccessControl for ExampleContract {}
+
+#[contractimpl(contracttrait)]
+impl FungibleBurnable for ExampleContract {}

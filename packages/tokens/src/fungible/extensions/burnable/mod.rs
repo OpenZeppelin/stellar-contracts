@@ -5,7 +5,7 @@ mod test;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env};
 
-use crate::fungible::{Base, FungibleToken};
+use crate::fungible::{overrides::BurnableOverrides, FungibleToken};
 
 /// Burnable Trait for Fungible Token
 ///
@@ -21,7 +21,7 @@ use crate::fungible::{Base, FungibleToken};
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
 #[contracttrait]
-pub trait FungibleBurnable: FungibleToken {
+pub trait FungibleBurnable: FungibleToken<ContractType: BurnableOverrides> {
     /// Destroys `amount` of tokens from `from`. Updates the total
     /// supply accordingly.
     ///
@@ -43,7 +43,7 @@ pub trait FungibleBurnable: FungibleToken {
     /// * topics - `["burn", from: Address]`
     /// * data - `[amount: i128]`
     fn burn(e: &Env, from: Address, amount: i128) {
-        Base::burn(e, &from, amount);
+        Self::ContractType::burn(e, &from, amount);
     }
 
     /// Destroys `amount` of tokens from `from`. Updates the total
@@ -70,7 +70,7 @@ pub trait FungibleBurnable: FungibleToken {
     /// * topics - `["burn", from: Address]`
     /// * data - `[amount: i128]`
     fn burn_from(e: &Env, spender: Address, from: Address, amount: i128) {
-        Base::burn_from(e, &spender, &from, amount);
+        Self::ContractType::burn_from(e, &spender, &from, amount);
     }
 }
 
