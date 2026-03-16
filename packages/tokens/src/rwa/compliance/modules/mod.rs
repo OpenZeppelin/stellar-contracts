@@ -1,4 +1,4 @@
-use soroban_sdk::{contractclient, Address, Env, String};
+use soroban_sdk::{contracttrait, Address, Env, String};
 
 /// Trait for compliance modules that can be registered with the modular
 /// compliance system.
@@ -62,7 +62,7 @@ use soroban_sdk::{contractclient, Address, Env, String};
 /// [`ComplianceModule`] is designed to be implemented by multiple independent
 /// contracts, each with its own storage layout, access control, and business
 /// logic. A meaningful default is therefore not possible.
-#[contractclient(name = "ComplianceModuleClient")]
+#[contracttrait]
 pub trait ComplianceModule {
     /// Called when tokens are transferred (for Transfer hook).
     ///
