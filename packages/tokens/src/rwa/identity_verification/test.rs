@@ -5,10 +5,10 @@ use soroban_sdk::{
     testutils::Address as _, vec, Address, Bytes, BytesN, Env, Map, Vec,
 };
 
-use crate::rwa::{
+use crate::rwa::identity_verification::{
     claim_issuer::ClaimIssuer,
     identity_claims::{generate_claim_id, Claim},
-    identity_verifier::storage::{
+    storage::{
         claim_topics_and_issuers, identity_registry_storage, set_claim_topics_and_issuers,
         set_identity_registry_storage, validate_claim, verify_identity,
     },

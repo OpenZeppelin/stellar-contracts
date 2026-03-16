@@ -8,23 +8,30 @@ use stellar_contract_utils::pausable;
 
 use crate::{
     fungible::ContractOverrides,
-    rwa::{storage::RWAStorageKey, RWAError, RWA},
+    rwa::{storage::RWAStorageKey, IdentityVerifier, RWAError, RWA},
 };
 
 #[contract]
 pub struct MockIdentityVerifier;
 
 #[contractimpl]
-impl MockIdentityVerifier {
-    pub fn verify_identity(e: &Env, _account: Address) {
+impl IdentityVerifier for MockIdentityVerifier {
+    fn verify_identity(e: &Env, _account: &Address) {
         let result = e.storage().persistent().get(&symbol_short!("id_ok")).unwrap_or(true);
         if !result {
             panic_with_error!(e, RWAError::IdentityVerificationFailed)
         }
     }
 
-    pub fn recovery_target(e: &Env, _account: Address) -> Option<Address> {
+    fn recovery_target(e: &Env, _account: &Address) -> Option<Address> {
         e.storage().persistent().get(&symbol_short!("recovery"))
+    }
+
+    fn set_claim_topics_and_issuers(
+        _e: &Env,
+        _claim_topics_and_issuers: Address,
+        _operator: Address,
+    ) {
     }
 }
 

@@ -1,12 +1,10 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Map, Vec};
 
-use super::{
+use crate::rwa::identity_verification::claim_topics_and_issuers::{
     emit_claim_topic_added, emit_claim_topic_removed, emit_issuer_topics_updated,
-    emit_trusted_issuer_added, emit_trusted_issuer_removed,
-};
-use crate::rwa::claim_topics_and_issuers::{
-    ClaimTopicsAndIssuersError, CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD, ISSUERS_EXTEND_AMOUNT,
-    ISSUERS_TTL_THRESHOLD, MAX_CLAIM_TOPICS, MAX_ISSUERS,
+    emit_trusted_issuer_added, emit_trusted_issuer_removed, ClaimTopicsAndIssuersError,
+    CLAIMS_EXTEND_AMOUNT, CLAIMS_TTL_THRESHOLD, ISSUERS_EXTEND_AMOUNT, ISSUERS_TTL_THRESHOLD,
+    MAX_CLAIM_TOPICS, MAX_ISSUERS,
 };
 
 /// Storage keys for the data associated with the claim topics and issuers

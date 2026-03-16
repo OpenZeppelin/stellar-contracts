@@ -3,10 +3,12 @@ extern crate std;
 use soroban_sdk::{contract, testutils::Address as _, vec, Address, Env, String, Vec};
 use stellar_event_assertion::EventAssertion;
 
-use super::storage::{find_bit_in_bucket, find_bit_in_item, IDS_IN_BUCKET, MAX_TOKENS_IN_BATCH};
 use crate::non_fungible::{
     extensions::consecutive::{
-        storage::{NFTConsecutiveStorageKey, IDS_IN_ITEM},
+        storage::{
+            find_bit_in_bucket, find_bit_in_item, NFTConsecutiveStorageKey, IDS_IN_BUCKET,
+            IDS_IN_ITEM, MAX_TOKENS_IN_BATCH,
+        },
         Consecutive,
     },
     sequential, Base,

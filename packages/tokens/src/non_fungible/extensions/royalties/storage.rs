@@ -135,7 +135,7 @@ impl Base {
         let key = NFTRoyaltiesStorageKey::TokenRoyalty(token_id);
         e.storage().persistent().remove(&key);
 
-        super::emit_remove_token_royalty(e, token_id);
+        crate::non_fungible::extensions::royalties::emit_remove_token_royalty(e, token_id);
     }
 
     /// Returns `(Address, u32)` - A tuple containing the receiver address and

@@ -17,7 +17,7 @@ use soroban_sdk::{
     Address, Bytes, BytesN, Env, Map, Vec,
 };
 
-use crate::rwa::{
+use crate::rwa::identity_verification::{
     claim_issuer::{
         build_claim_identifier,
         storage::{
@@ -326,7 +326,7 @@ fn secp256k1_verify_success() {
 
         let sig_slice = signature.to_bytes();
         let mut sig = [0u8; 64];
-        sig.copy_from_slice(sig_slice.as_slice());
+        sig.copy_from_slice(&sig_slice);
 
         let signature_data = Secp256k1SignatureData {
             public_key,
@@ -375,7 +375,7 @@ fn secp256k1_verify_fails() {
 
         let sig_slice = signature.to_bytes();
         let mut sig = [0u8; 64];
-        sig.copy_from_slice(sig_slice.as_slice());
+        sig.copy_from_slice(&sig_slice);
 
         let signature_data = Secp256k1SignatureData {
             public_key,

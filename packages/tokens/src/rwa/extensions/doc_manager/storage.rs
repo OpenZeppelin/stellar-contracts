@@ -27,7 +27,7 @@
 /// ensures O(1) removal operations.
 use soroban_sdk::{contracttype, panic_with_error, BytesN, Env, String, TryFromVal, Val, Vec};
 
-use super::{
+use crate::rwa::extensions::doc_manager::{
     emit_document_removed, emit_document_updated, DocumentError, BUCKET_SIZE,
     DOCUMENT_EXTEND_AMOUNT, DOCUMENT_TTL_THRESHOLD, MAX_DOCUMENTS, MAX_URI_LEN,
 };

@@ -1,42 +1,54 @@
+//! # Identity Verification Module
+//!
+//! This module groups the contracts involved in investor identity
+//! verification:
+//!
+//! - `claim_issuer`: trusted attestors that sign and validate claims
+//! - `claim_topics_and_issuers`: registry of required claim topics and the
+//!   issuers allowed to attest them
+//! - `identity_claims`: on-chain identity contract that stores claims
+//! - `identity_registry_storage`: storage contract that links wallets to
+//!   identities and jurisdiction data
+//!
+//! It also provides the `IdentityVerifier` trait for the contract that ties
+//! the full stack together for token checks.
+//!
+//! ## Architecture & Implementation Approaches
+//!
+//! Identity verification systems can be implemented in various ways depending
+//! on regulatory and business requirements:
+//!
+//! - **Merkle Tree**: Efficient verification using merkle proofs (minimal
+//!   storage)
+//! - **Zero-Knowledge**: Privacy-preserving verification (custom ZK circuits)
+//! - **Claim-based**: Cryptographic claims from trusted issuers (the default
+//!   approach)
+//! - and other custom approaches
+//!
+//! ## Default Implementation
+//!
+//! The suggested claim-based implementation uses two external contracts:
+//! 1. **Claim Topics and Issuers**: Manages trusted issuers and claim types
+//! 2. **Identity Registry Storage**: Maps wallet addresses to onchain
+//!    identities
+//!
+//! Since `IdentityRegistryStorage` may not be required for all approaches
+//! (e.g., merkle tree or zero-knowledge implementations), it's not part of the
+//! trait interface. However, [`storage`] provides the necessary functions for
+//! `IdentityRegistryStorage` integration. Examples are available in the RWA
+//! examples folder.
+
 use soroban_sdk::{contracttrait, Address, Env};
+
+pub mod claim_issuer;
+pub mod claim_topics_and_issuers;
+pub mod identity_claims;
+pub mod identity_registry_storage;
+pub mod storage;
 
 #[cfg(test)]
 mod test;
 
-pub mod storage;
-
-/// # Identity Verifier Module
-///
-/// This module provides the `IdentityVerifier` trait for verifying user
-/// identities in Real World Asset (RWA) tokens. Identity verification is
-/// critical for regulatory compliance, ensuring only verified users can
-/// participate in token operations by validating addresses against
-/// cryptographic claims from trusted authorities.
-///
-/// ## Architecture & Implementation Approaches
-///
-/// Identity verification systems can be implemented in various ways depending
-/// on regulatory and business requirements:
-///
-/// - **Merkle Tree**: Efficient verification using merkle proofs (minimal
-///   storage)
-/// - **Zero-Knowledge**: Privacy-preserving verification (custom ZK circuits)
-/// - **Claim-based**: Cryptographic claims from trusted issuers (the default
-///   approach)
-/// - and other custom approaches
-///
-/// ## Default Implementation
-///
-/// The suggested claim-based implementation uses two external contracts:
-/// 1. **Claim Topics and Issuers**: Manages trusted issuers and claim types
-/// 2. **Identity Registry Storage**: Maps wallet addresses to onchain
-///    identities
-///
-/// Since `IdentityRegistryStorage` may not be required for all approaches
-/// (e.g., merkle tree or zero-knowledge implementations), it's not part of the
-/// trait interface. However, `storage.rs` provides the necessary functions for
-/// `IdentityRegistryStorage` integration. Examples are available in the RWA
-/// examples folder.
 #[contracttrait]
 pub trait IdentityVerifier {
     /// Verifies that the identity of an user address has the required valid
@@ -57,8 +69,7 @@ pub trait IdentityVerifier {
     /// No default implementation is provided because identity verification
     /// is architecture-dependent (claim-based, merkle tree, zero-knowledge,
     /// etc.). For the default claim-based approach, use
-    /// [`storage::verify_identity`] for the underlying logic. See the
-    /// module documentation for alternative approaches.
+    /// [`storage::verify_identity`] for the underlying logic.
     fn verify_identity(e: &Env, account: &Address);
 
     /// Returns the target address for the recovery process for the old account.

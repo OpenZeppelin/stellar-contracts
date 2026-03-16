@@ -262,8 +262,9 @@ pub fn get_validated_context_by_id(
     // The rule's context type must match the actual context, or be Default
     // (which applies to any context).
     let required_type = match context.clone() {
-        Context::Contract(ContractContext { contract, .. }) =>
-            ContextRuleType::CallContract(contract),
+        Context::Contract(ContractContext { contract, .. }) => {
+            ContextRuleType::CallContract(contract)
+        }
         Context::CreateContractHostFn(CreateContractHostFnContext {
             executable: ContractExecutable::Wasm(wasm),
             ..

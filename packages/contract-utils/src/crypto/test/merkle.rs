@@ -3,8 +3,6 @@
 
 extern crate std;
 
-use std::format;
-
 use hex_literal::hex;
 use proptest::{prelude::*, prop_compose};
 use soroban_sdk::Env;

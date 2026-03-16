@@ -5,7 +5,7 @@ use soroban_sdk::{
     Val, Vec,
 };
 
-use super::{
+use crate::rwa::identity_verification::identity_registry_storage::{
     storage::{
         add_country_data_entries, add_identity, delete_country_data, get_country_data,
         get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
