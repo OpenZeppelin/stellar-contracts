@@ -433,6 +433,9 @@ pub fn set_token_contract(e: &Env, token_contract: &Address) {
 /// * `args` - The arguments for each function call.
 /// * `description` - A description of the proposal.
 /// * `proposer` - The address creating the proposal.
+/// * `quorum` - The quorum value to snapshot for this proposal. Callers should
+///   pass the result of `Governor::quorum()` so that dynamic quorum overrides
+///   propagate into the proposal lifecycle.
 ///
 /// # Errors
 ///
@@ -463,6 +466,7 @@ pub fn propose(
     args: Vec<Vec<Val>>,
     description: String,
     proposer: &Address,
+    quorum: u128,
 ) -> BytesN<32> {
     // Validate proposal length
     let targets_len = targets.len();
@@ -510,7 +514,6 @@ pub fn propose(
     };
 
     // Store proposal
-    let quorum = get_quorum(e);
     let proposal = ProposalCore {
         proposer: proposer.clone(),
         vote_start,

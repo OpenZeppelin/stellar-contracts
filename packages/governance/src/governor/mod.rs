@@ -406,7 +406,8 @@ pub trait Governor {
         proposer: Address,
     ) -> BytesN<32> {
         proposer.require_auth();
-        storage::propose(e, targets, functions, args, description, &proposer)
+        let quorum = Self::quorum(e, e.ledger().sequence());
+        storage::propose(e, targets, functions, args, description, &proposer, quorum)
     }
 
     /// Casts a vote on a proposal and returns the voter's voting power.
