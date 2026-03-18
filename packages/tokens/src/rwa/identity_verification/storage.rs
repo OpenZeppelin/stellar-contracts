@@ -1,7 +1,8 @@
-use soroban_sdk::{contractclient, contracttype, panic_with_error, Address, Env};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::rwa::{
     emit_claim_topics_and_issuers_set,
+    identity_registry_storage::IdentityRegistryStorageClient,
     identity_verification::{
         claim_issuer::ClaimIssuerClient,
         claim_topics_and_issuers::ClaimTopicsAndIssuersClient,
@@ -17,20 +18,6 @@ pub enum IdentityVerifierStorageKey {
     ClaimTopicsAndIssuers,
     /// Identity Registry Storage contract address
     IdentityRegistryStorage,
-}
-
-// An `IdentityRegistryStorageClient` must be declared here instead of being
-// imported from the dedicated module, because the trait there cannot be used
-// with the `#[contractclient]` macro due to its associated type, which is not
-// supported by the macro.
-// Another option would be `e.invoke_contract`, but the client approach is kept
-// for consistency.
-#[allow(unused)]
-#[contractclient(name = "IdentityRegistryStorageClient")]
-trait IdentityRegistryStorage {
-    fn stored_identity(e: &Env, account: Address) -> Address;
-
-    fn get_recovered_to(e: &Env, old_account: Address) -> Option<Address>;
 }
 
 /// Returns the Claim Topics and Issuers contract linked to the token.

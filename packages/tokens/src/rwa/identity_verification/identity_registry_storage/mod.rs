@@ -172,98 +172,14 @@
 //!
 //! For applications requiring stronger privacy guarantees, consider
 //! implementing a commitment-based architecture where only cryptographic
-//! proofs are stored on-chain.
+//! proofs are stored on-chain. Examples include:
 //!
-//! Examples:
-//!
-//! #### 1. Hash-Based Commitments
-//!
-//! Store only cryptographic hashes of compliance data as `CountryData`:
-//!
-//! ```rust
-//! use soroban_sdk::{contracttype, BytesN};
-//!
-//! // Use hash commitment as CountryData
-//! #[contracttype]
-//! pub struct HashCommitment {
-//!     pub commitment: BytesN<32>, // SHA-256 hash of compliance data
-//!     pub timestamp: u64,
-//! }
-//!
-//! // Implementation with hash-based CountryData
-//! impl IdentityRegistryStorage for MyContract {
-//!     type CountryData = HashCommitment;
-//!
-//!     // ... trait methods
-//! }
-//! ```
-//!
-//! #### 2. Merkle Tree Commitments
-//!
-//! Store a Merkle root for selective disclosure as `CountryData`:
-//!
-//! ```rust
-//! use soroban_sdk::{contracttype, BytesN};
-//!
-//! // Use Merkle root as CountryData
-//! #[contracttype]
-//! pub struct MerkleCommitment {
-//!     pub merkle_root: BytesN<32>,
-//!     pub attribute_type: Symbol, // e.g., "citizenship", "residence"
-//! }
-//!
-//! // Implementation with Merkle-based CountryData
-//! impl IdentityRegistryStorage for MyContract {
-//!     type CountryData = MerkleCommitment;
-//!
-//!     // ... trait methods
-//! }
-//! ```
-//!
-//! #### 3. Zero-Knowledge Proofs
-//!
-//! Store verification keys for ZK proofs as `CountryData`:
-//!
-//! ```rust
-//! use soroban_sdk::{contracttype, BytesN, Symbol};
-//!
-//! // Use ZK verification key as CountryData
-//! #[contracttype]
-//! pub struct ZKCommitment {
-//!     pub verification_key: BytesN<32>,
-//!     pub proof_type: Symbol, // e.g., "citizenship", "age_over_18"
-//! }
-//!
-//! // Implementation with ZK-based CountryData
-//! impl IdentityRegistryStorage for MyContract {
-//!     type CountryData = ZKCommitment;
-//!
-//!     // ... trait methods
-//! }
-//! ```
-//!
-//! #### 4. Off-Chain Storage with On-Chain Attestations
-//!
-//! Store attestation metadata as `CountryData`:
-//!
-//! ```rust
-//! use soroban_sdk::{contracttype, Address, BytesN, Symbol};
-//!
-//! // Use attestation as CountryData
-//! #[contracttype]
-//! pub struct ComplianceAttestation {
-//!     pub attestor: Address,      // Trusted verifier
-//!     pub data_hash: BytesN<32>,  // Hash of off-chain data
-//!     pub attribute_type: Symbol, // e.g., "citizenship", "residence"
-//! }
-//!
-//! // Implementation with attestation-based CountryData
-//! impl IdentityRegistryStorage for MyContract {
-//!     type CountryData = ComplianceAttestation;
-//!
-//!     // ... trait methods
-//! }
-//! ```
+//! - **Hash-Based Commitments**: Store SHA-256 hashes of compliance data
+//!   instead of plaintext
+//! - **Merkle Tree Commitments**: Store a Merkle root for selective disclosure
+//! - **Zero-Knowledge Proofs**: Store verification keys for ZK proofs
+//! - **Off-Chain Storage with On-Chain Attestations**: Store attestation
+//!   metadata from trusted verifiers
 //!
 //! ### Recommendation
 //!
@@ -276,7 +192,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, Env, FromVal, Val, Vec};
+use soroban_sdk::{contracterror, contractevent, contracttrait, Address, Env, IntoVal, Val, Vec};
 pub use storage::{
     add_country_data_entries, add_identity, delete_country_data, get_country_data,
     get_country_data_entries, get_identity_profile, get_recovered_to, modify_country_data,
@@ -287,13 +203,9 @@ pub use storage::{
 
 use crate::rwa::utils::token_binder::TokenBinder;
 
-/// The core trait for managing basic identities. It is generic over a
-/// `CountryData` type, allowing implementers to define what constitutes a
-/// country data entry.
+/// The core trait for managing basic identities.
+#[contracttrait]
 pub trait IdentityRegistryStorage: TokenBinder {
-    /// The specific type used for country data in this implementation.
-    type CountryData: FromVal<Env, Val>;
-
     /// Stores a new identity with a set of country data entries.
     ///
     /// # Arguments
@@ -319,7 +231,7 @@ pub trait IdentityRegistryStorage: TokenBinder {
         e: &Env,
         account: Address,
         identity: Address,
-        country_data_list: Vec<Self::CountryData>,
+        country_data_list: Vec<Val>,
         operator: Address,
     );
 
@@ -337,8 +249,7 @@ pub trait IdentityRegistryStorage: TokenBinder {
     /// * data - `[]`
     ///
     /// Emits for each country data removed:
-    /// * topics - `["country_removed", account: Address, country_data:
-    ///   CountryData]`
+    /// * topics - `["country_removed", account: Address, country_data: Val]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -424,6 +335,7 @@ pub trait IdentityRegistryStorage: TokenBinder {
 
 /// Trait for managing multiple country data entries associated with an
 /// identity.
+#[contracttrait]
 pub trait CountryDataManager: IdentityRegistryStorage {
     /// Adds multiple country data entries to an existing identity.
     ///
@@ -437,8 +349,7 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     /// # Events
     ///
     /// Emits for each country data entry added:
-    /// * topics - `["country_added", account: Address, country_data:
-    ///   CountryData]`
+    /// * topics - `["country_added", account: Address, country_data: Val]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -450,7 +361,7 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     fn add_country_data_entries(
         e: &Env,
         account: Address,
-        country_data_list: Vec<Self::CountryData>,
+        country_data_list: Vec<Val>,
         operator: Address,
     );
 
@@ -465,8 +376,7 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// # Events
     ///
-    /// * topics - `["country_modified", account: Address, country_data:
-    ///   CountryData]`
+    /// * topics - `["country_modified", account: Address, country_data: Val]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -479,7 +389,7 @@ pub trait CountryDataManager: IdentityRegistryStorage {
         e: &Env,
         account: Address,
         index: u32,
-        country_data: Self::CountryData,
+        country_data: Val,
         operator: Address,
     );
 
@@ -495,8 +405,7 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// # Events
     ///
-    /// * topics - `["country_removed", account: Address, country_data:
-    ///   CountryData]`
+    /// * topics - `["country_removed", account: Address, country_data: Val]`
     /// * data - `[]`
     ///
     /// # Notes
@@ -513,14 +422,12 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     ///
     /// * `e` - The Soroban environment.
     /// * `account` - The account address to query.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because the associate
-    /// `Self::CountryData` type needs to be defined.
-    /// [`storage::get_country_data_entries`] can be used if the implementer
-    /// sticks with the reference implementation.
-    fn get_country_data_entries(e: &Env, account: Address) -> Vec<Self::CountryData>;
+    fn get_country_data_entries(e: &Env, account: Address) -> Vec<Val> {
+        Vec::from_iter(
+            e,
+            get_country_data_entries(e, &account).iter().map(|entry| entry.into_val(e)),
+        )
+    }
 
     /// Retrieves a specific country data entry by its index.
     ///
@@ -529,14 +436,9 @@ pub trait CountryDataManager: IdentityRegistryStorage {
     /// * `e` - The Soroban environment.
     /// * `account` - The account address to query.
     /// * `index` - The index of the country data to retrieve.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided because the associate
-    /// `Self::CountryData` type needs to be defined.
-    /// [`storage::get_country_data`] can be used if the implementer
-    /// sticks with the reference implementation.
-    fn get_country_data(e: &Env, account: Address, index: u32) -> Self::CountryData;
+    fn get_country_data(e: &Env, account: Address, index: u32) -> Val {
+        storage::get_country_data(e, &account, index).into_val(e)
+    }
 }
 
 // ################## ERRORS ##################
@@ -676,30 +578,30 @@ pub fn emit_identity_recovered(e: &Env, old_account: &Address, new_account: &Add
 
 /// Event emitted for country data operations.
 #[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct CountryDataAdded {
     #[topic]
     pub account: Address,
     #[topic]
-    pub country_data: CountryData,
+    pub country_data: Val,
 }
 
 #[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct CountryDataRemoved {
     #[topic]
     pub account: Address,
     #[topic]
-    pub country_data: CountryData,
+    pub country_data: Val,
 }
 
 #[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct CountryDataModified {
     #[topic]
     pub account: Address,
     #[topic]
-    pub country_data: CountryData,
+    pub country_data: Val,
 }
 
 /// Emits an event for country data operations (add, remove, modify).
@@ -714,7 +616,7 @@ pub fn emit_country_data_event(
     e: &Env,
     event_type: CountryDataEvent,
     account: &Address,
-    country_data: &CountryData,
+    country_data: &Val,
 ) {
     match event_type {
         CountryDataEvent::Added => {
