@@ -664,7 +664,6 @@ pub fn emit_identity_recovered(e: &Env, old_account: &Address, new_account: &Add
 pub struct CountryDataAdded {
     #[topic]
     pub account: Address,
-    #[topic]
     pub country_data: Val,
 }
 
@@ -673,7 +672,6 @@ pub struct CountryDataAdded {
 pub struct CountryDataRemoved {
     #[topic]
     pub account: Address,
-    #[topic]
     pub country_data: Val,
 }
 
@@ -682,7 +680,6 @@ pub struct CountryDataRemoved {
 pub struct CountryDataModified {
     #[topic]
     pub account: Address,
-    #[topic]
     pub country_data: Val,
 }
 
