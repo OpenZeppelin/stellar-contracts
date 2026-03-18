@@ -140,19 +140,39 @@
 //! - Metadata can be used to provide additional context for mixed relation
 //!   types
 //!
+//! ## Flexible Country Data Interface
+//!
+//! The trait interface uses [`Val`] for country data parameters instead of the
+//! concrete [`CountryData`] type. This allows implementors to define their own
+//! country data structure while preserving the same contract interface. The
+//! library provides [`CountryData`] as a reference implementation with rich
+//! jurisdictional modeling (see [Data Model](#data-model)), but contracts are
+//! free to use any `#[contracttype]` that suits their compliance requirements.
+//!
+//! Implementors that use a custom country data type handle serialization and
+//! deserialization between `Val` and their type internally, while the public
+//! interface remains uniform across all implementations.
+//!
+//! An alternative design would use an associated type on the trait (e.g.,
+//! `type CountryData: FromVal<Env, Val>`), but the Soroban SDK does not
+//! support deriving `#[contractclient]` for traits with associated types,
+//! which would prevent generating cross-contract clients from the trait
+//! definition. Using `Val` directly avoids this limitation.
+//!
 //! ## ⚠️ Privacy and Security Considerations
 //!
-//! **IMPORTANT: This implementation stores compliance data in plaintext on the
-//! blockchain, making it publicly accessible to all network participants.**
+//! **IMPORTANT: The reference [`CountryData`] implementation stores compliance
+//! data in plaintext on the blockchain, making it publicly accessible to all
+//! network participants.**
 //!
 //! ### Public Data Exposure
 //!
-//! All data stored through this module, including:
+//! All data stored through the reference implementation, including:
 //! - Identity types (Individual/Organization)
 //! - Country relationships (citizenship, residence, incorporation, etc.)
 //! - Associated metadata (names, roles, entity types)
 //!
-//! is **public and accessible* to anyone with access to the blockchain.
+//! is **public and accessible** to anyone with access to the blockchain.
 //!
 //! ### Risks
 //!
@@ -170,23 +190,76 @@
 //!
 //! ### Privacy-Preserving Alternatives
 //!
-//! For applications requiring stronger privacy guarantees, consider
-//! implementing a commitment-based architecture where only cryptographic
-//! proofs are stored on-chain. Examples include:
+//! Because the trait accepts `Val` for country data, implementors can define
+//! their own privacy-preserving types while keeping the same contract
+//! interface. Below are examples of alternative country data types:
 //!
-//! - **Hash-Based Commitments**: Store SHA-256 hashes of compliance data
-//!   instead of plaintext
-//! - **Merkle Tree Commitments**: Store a Merkle root for selective disclosure
-//! - **Zero-Knowledge Proofs**: Store verification keys for ZK proofs
-//! - **Off-Chain Storage with On-Chain Attestations**: Store attestation
-//!   metadata from trusted verifiers
+//! #### 1. Hash-Based Commitments
+//!
+//! Store only cryptographic hashes of compliance data:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, BytesN};
+//!
+//! #[contracttype]
+//! pub struct HashCommitment {
+//!     pub commitment: BytesN<32>, // SHA-256 hash of compliance data
+//!     pub timestamp: u64,
+//! }
+//! ```
+//!
+//! #### 2. Merkle Tree Commitments
+//!
+//! Store a Merkle root for selective disclosure:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, BytesN, Symbol};
+//!
+//! #[contracttype]
+//! pub struct MerkleCommitment {
+//!     pub merkle_root: BytesN<32>,
+//!     pub attribute_type: Symbol, // e.g., "citizenship", "residence"
+//! }
+//! ```
+//!
+//! #### 3. Zero-Knowledge Proofs
+//!
+//! Store verification keys for ZK proofs:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, BytesN, Symbol};
+//!
+//! #[contracttype]
+//! pub struct ZKCommitment {
+//!     pub verification_key: BytesN<32>,
+//!     pub proof_type: Symbol, // e.g., "citizenship", "age_over_18"
+//! }
+//! ```
+//!
+//! #### 4. Off-Chain Storage with On-Chain Attestations
+//!
+//! Store attestation metadata from trusted verifiers:
+//!
+//! ```rust
+//! use soroban_sdk::{contracttype, Address, BytesN, Symbol};
+//!
+//! #[contracttype]
+//! pub struct ComplianceAttestation {
+//!     pub attestor: Address,      // Trusted verifier
+//!     pub data_hash: BytesN<32>,  // Hash of off-chain data
+//!     pub attribute_type: Symbol, // e.g., "citizenship", "residence"
+//! }
+//! ```
 //!
 //! ### Recommendation
 //!
-//! This implementation is suitable for:
+//! The reference [`CountryData`] implementation is suitable for:
 //! - Non-sensitive jurisdictional data
 //! - Public compliance frameworks where transparency is required
 //! - Testing and development environments
+//!
+//! For production deployments with sensitive data, define a custom country
+//! data type using one of the privacy-preserving approaches above.
 mod storage;
 
 #[cfg(test)]
@@ -204,6 +277,11 @@ pub use storage::{
 use crate::rwa::utils::token_binder::TokenBinder;
 
 /// The core trait for managing basic identities.
+///
+/// Country data parameters use [`Val`] to allow implementors to define their
+/// own country data structure. The library provides [`CountryData`] as a
+/// reference implementation, but any `#[contracttype]` can be used by
+/// converting to/from `Val` internally.
 #[contracttrait]
 pub trait IdentityRegistryStorage: TokenBinder {
     /// Stores a new identity with a set of country data entries.
@@ -335,6 +413,10 @@ pub trait IdentityRegistryStorage: TokenBinder {
 
 /// Trait for managing multiple country data entries associated with an
 /// identity.
+///
+/// Like [`IdentityRegistryStorage`], country data parameters use [`Val`]
+/// for flexibility. Default implementations convert between the reference
+/// [`CountryData`] type and `Val`.
 #[contracttrait]
 pub trait CountryDataManager: IdentityRegistryStorage {
     /// Adds multiple country data entries to an existing identity.
@@ -620,16 +702,13 @@ pub fn emit_country_data_event(
 ) {
     match event_type {
         CountryDataEvent::Added => {
-            CountryDataAdded { account: account.clone(), country_data: country_data.clone() }
-                .publish(e)
+            CountryDataAdded { account: account.clone(), country_data: *country_data }.publish(e)
         }
         CountryDataEvent::Removed => {
-            CountryDataRemoved { account: account.clone(), country_data: country_data.clone() }
-                .publish(e)
+            CountryDataRemoved { account: account.clone(), country_data: *country_data }.publish(e)
         }
         CountryDataEvent::Modified => {
-            CountryDataModified { account: account.clone(), country_data: country_data.clone() }
-                .publish(e)
+            CountryDataModified { account: account.clone(), country_data: *country_data }.publish(e)
         }
     }
 }
