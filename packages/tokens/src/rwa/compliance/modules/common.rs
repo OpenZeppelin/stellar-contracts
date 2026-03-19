@@ -263,17 +263,16 @@ pub fn get_irs_client<'a>(e: &'a Env, token: &Address) -> IdentityRegistryStorag
 ///
 /// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
 ///   configured for this token.
-pub fn get_irs_country_data_entries(e: &Env, token: &Address, account: &Address) -> Vec<CountryData> {
+pub fn get_irs_country_data_entries(
+    e: &Env,
+    token: &Address,
+    account: &Address,
+) -> Vec<CountryData> {
     let irs = get_irs_address(e, token);
     let client = CountryDataManagerClient::new(e, &irs);
     let raw_entries = client.get_country_data_entries(account);
 
-    Vec::from_iter(
-        e,
-        raw_entries
-            .iter()
-            .map(|entry| CountryData::from_val(e, &entry)),
-    )
+    Vec::from_iter(e, raw_entries.iter().map(|entry| CountryData::from_val(e, &entry)))
 }
 
 /// Extracts the numeric ISO 3166-1 country code from any

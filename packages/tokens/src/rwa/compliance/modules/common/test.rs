@@ -1,8 +1,8 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, testutils::Address as _, vec, Address, Env, IntoVal,
-    Val, Vec,
+    contract, contractimpl, contracttype, testutils::Address as _, vec, Address, Env, IntoVal, Val,
+    Vec,
 };
 
 use super::*;
@@ -287,9 +287,7 @@ fn get_irs_country_data_entries_returns_typed_entries() {
     let entries = vec![&e, sample_country_entry()];
 
     e.as_contract(&irs_id, || {
-        e.storage()
-            .persistent()
-            .set(&MockIRSStorageKey::CountryEntries(account.clone()), &entries);
+        e.storage().persistent().set(&MockIRSStorageKey::CountryEntries(account.clone()), &entries);
     });
 
     e.as_contract(&module_id, || {
