@@ -199,12 +199,27 @@
 //! Store only cryptographic hashes of compliance data:
 //!
 //! ```rust
-//! use soroban_sdk::{contracttype, BytesN};
+//! use soroban_sdk::{contracttype, BytesN, Env, FromVal, IntoVal, Val};
 //!
 //! #[contracttype]
 //! pub struct HashCommitment {
-//!     pub commitment: BytesN<32>, // SHA-256 hash of compliance data
+//!     pub commitment: BytesN<32>,
 //!     pub timestamp: u64,
+//! }
+//!
+//! // Inside the trait implementation, convert between Val and the
+//! // custom type:
+//! fn add_identity(
+//!     e: &Env,
+//!     account: Address,
+//!     identity: Address,
+//!     country_data_list: Vec<Val>,
+//!     operator: Address,
+//! ) {
+//!     // Convert each Val entry to the custom type
+//!     let commitments: Vec<HashCommitment> =
+//!         country_data_list.iter().map(|v| HashCommitment::from_val(e, &v)).collect();
+//!     // ... store commitments, emit events using val.into_val(e), etc.
 //! }
 //! ```
 //!
@@ -213,12 +228,18 @@
 //! Store a Merkle root for selective disclosure:
 //!
 //! ```rust
-//! use soroban_sdk::{contracttype, BytesN, Symbol};
+//! use soroban_sdk::{contracttype, BytesN, Env, FromVal, IntoVal, Symbol, Val};
 //!
 //! #[contracttype]
 //! pub struct MerkleCommitment {
 //!     pub merkle_root: BytesN<32>,
-//!     pub attribute_type: Symbol, // e.g., "citizenship", "residence"
+//!     pub attribute_type: Symbol,
+//! }
+//!
+//! // Inside the trait implementation:
+//! fn get_country_data(e: &Env, account: Address, index: u32) -> Val {
+//!     let commitment: MerkleCommitment = /* load from storage */;
+//!     commitment.into_val(e)
 //! }
 //! ```
 //!
@@ -227,12 +248,18 @@
 //! Store verification keys for ZK proofs:
 //!
 //! ```rust
-//! use soroban_sdk::{contracttype, BytesN, Symbol};
+//! use soroban_sdk::{contracttype, BytesN, Env, FromVal, IntoVal, Symbol, Val};
 //!
 //! #[contracttype]
 //! pub struct ZKCommitment {
 //!     pub verification_key: BytesN<32>,
-//!     pub proof_type: Symbol, // e.g., "citizenship", "age_over_18"
+//!     pub proof_type: Symbol,
+//! }
+//!
+//! // Inside the trait implementation:
+//! fn get_country_data_entries(e: &Env, account: Address) -> Vec<Val> {
+//!     let entries: Vec<ZKCommitment> = /* load from storage */;
+//!     Vec::from_iter(e, entries.iter().map(|c| c.into_val(e)))
 //! }
 //! ```
 //!
@@ -241,13 +268,26 @@
 //! Store attestation metadata from trusted verifiers:
 //!
 //! ```rust
-//! use soroban_sdk::{contracttype, Address, BytesN, Symbol};
+//! use soroban_sdk::{contracttype, Address, BytesN, Env, FromVal, IntoVal, Symbol, Val};
 //!
 //! #[contracttype]
 //! pub struct ComplianceAttestation {
-//!     pub attestor: Address,      // Trusted verifier
-//!     pub data_hash: BytesN<32>,  // Hash of off-chain data
-//!     pub attribute_type: Symbol, // e.g., "citizenship", "residence"
+//!     pub attestor: Address,
+//!     pub data_hash: BytesN<32>,
+//!     pub attribute_type: Symbol,
+//! }
+//!
+//! // Inside the trait implementation:
+//! fn modify_country_data(
+//!     e: &Env,
+//!     account: Address,
+//!     index: u32,
+//!     country_data: Val,
+//!     operator: Address,
+//! ) {
+//!     let attestation = ComplianceAttestation::from_val(e, &country_data);
+//!     // ... validate and store, then emit event:
+//!     emit_country_data_event(e, CountryDataEvent::Modified, &account, &attestation.into_val(e));
 //! }
 //! ```
 //!
