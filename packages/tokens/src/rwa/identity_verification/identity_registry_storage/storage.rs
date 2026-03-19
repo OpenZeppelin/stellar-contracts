@@ -85,7 +85,7 @@
 ///     fn add_country_data_entries(
 ///         e: &Env,
 ///         account: Address,
-///         country_entries: Vec<Self::CountryData>,
+///         country_entries: Vec<CountryData>,
 ///         operator: Address,
 ///     ) {
 ///         let existing = get_country_data_entries(e, &account);
@@ -125,7 +125,8 @@
 ///   sequence: `recover_identity` must be called before `recovery_balance` to
 ///   ensure identity verification precedes asset transfer.
 use soroban_sdk::{
-    contracttype, panic_with_error, Address, Env, Map, String, Symbol, TryFromVal, Val, Vec,
+    contracttype, panic_with_error, Address, Env, IntoVal, Map, String, Symbol, TryFromVal, Val,
+    Vec,
 };
 
 use crate::rwa::identity_verification::identity_registry_storage::{
@@ -331,8 +332,8 @@ pub fn get_recovered_to(e: &Env, old_account: &Address) -> Option<Address> {
 /// * data - `[]`
 ///
 /// Emits for each country data added:
-/// * topics - `["country_added", account: Address, country_data: CountryData]`
-/// * data - `[]`
+/// * topics - `["country_added", account: Address]`
+/// * data - `[country_data: Val]`
 ///
 /// # Security Warning
 ///
@@ -379,7 +380,7 @@ pub fn add_identity(
     e.storage().persistent().set(&IRSStorageKey::IdentityProfile(account.clone()), &profile);
 
     for country_data in initial_countries.iter() {
-        emit_country_data_event(e, CountryDataEvent::Added, account, &country_data);
+        emit_country_data_event(e, CountryDataEvent::Added, account, &country_data.into_val(e));
     }
 }
 
@@ -440,9 +441,8 @@ pub fn modify_identity(e: &Env, account: &Address, new_identity: &Address) {
 /// * data - `[]`
 ///
 /// Emits for each country data removed:
-/// * topics - `["country_removed", account: Address, country_relation:
-///   CountryRelation]`
-/// * data - `[]`
+/// * topics - `["country_removed", account: Address]`
+/// * data - `[country_data: Val]`
 ///
 /// # Security Warning
 ///
@@ -472,7 +472,7 @@ pub fn remove_identity(e: &Env, account: &Address) {
     e.storage().persistent().remove(&profile_key);
 
     for country_data in profile.countries {
-        emit_country_data_event(e, CountryDataEvent::Removed, account, &country_data);
+        emit_country_data_event(e, CountryDataEvent::Removed, account, &country_data.into_val(e));
     }
 }
 
@@ -575,9 +575,8 @@ pub fn recover_identity(e: &Env, old_account: &Address, new_account: &Address) {
 /// # Events
 ///
 /// Emits for each country data added:
-/// * topics - `["country_added", account: Address, country_relation:
-///   CountryRelation]`
-/// * data - `[]`
+/// * topics - `["country_added", account: Address]`
+/// * data - `[country_data: Val]`
 ///
 /// # Security Warning
 ///
@@ -610,7 +609,7 @@ pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &
     e.storage().persistent().set(&key, &profile);
 
     for country_data in country_data_list.iter() {
-        emit_country_data_event(e, CountryDataEvent::Added, account, &country_data);
+        emit_country_data_event(e, CountryDataEvent::Added, account, &country_data.into_val(e));
     }
 }
 
@@ -630,9 +629,8 @@ pub fn add_country_data_entries(e: &Env, account: &Address, country_data_list: &
 ///
 /// # Events
 ///
-/// * topics - `["country_modified", account: Address, country_relation:
-///   CountryRelation]`
-/// * data - `[]`
+/// * topics - `["country_modified", account: Address]`
+/// * data - `[country_data: Val]`
 ///
 /// # Security Warning
 ///
@@ -656,7 +654,7 @@ pub fn modify_country_data(e: &Env, account: &Address, index: u32, country_data:
     let key = IRSStorageKey::IdentityProfile(account.clone());
     e.storage().persistent().set(&key, &profile);
 
-    emit_country_data_event(e, CountryDataEvent::Modified, account, country_data);
+    emit_country_data_event(e, CountryDataEvent::Modified, account, &country_data.into_val(e));
 }
 
 /// Deletes a country data entry by its index.
@@ -675,9 +673,8 @@ pub fn modify_country_data(e: &Env, account: &Address, index: u32, country_data:
 ///
 /// # Events
 ///
-/// * topics - `["country_removed", account: Address, country_relation:
-///   CountryRelation]`
-/// * data - `[]`
+/// * topics - `["country_removed", account: Address]`
+/// * data - `[country_data: Val]`
 ///
 /// # Security Warning
 ///
@@ -705,7 +702,12 @@ pub fn delete_country_data(e: &Env, account: &Address, index: u32) {
     let key = IRSStorageKey::IdentityProfile(account.clone());
     e.storage().persistent().set(&key, &profile);
 
-    emit_country_data_event(e, CountryDataEvent::Removed, account, &country_data_to_remove);
+    emit_country_data_event(
+        e,
+        CountryDataEvent::Removed,
+        account,
+        &country_data_to_remove.into_val(e),
+    );
 }
 
 // ################## HELPERS ##################
