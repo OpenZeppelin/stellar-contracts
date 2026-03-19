@@ -1,0 +1,17 @@
+[package]
+name = "rwa-sign-claim"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/OpenZeppelin/stellar-contracts"
+publish = false
+version = "0.6.0"
+
+[[bin]]
+name = "rwa-sign-claim"
+path = "src/main.rs"
+
+[dependencies]
+ed25519-dalek  = "2.1.1"
+stellar-strkey = "0.0.16"
+sha2           = "0.10"
+clap           = { version = "4", features = ["derive"] }
