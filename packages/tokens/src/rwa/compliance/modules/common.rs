@@ -34,9 +34,80 @@ pub enum ComplianceModuleStorageKey {
     Registry(Address),
 }
 
-// ---------------------------------------------------------------------------
-// Compliance address management
-// ---------------------------------------------------------------------------
+// ################## QUERY STATE ##################
+
+/// Returns the stored compliance address.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::ComplianceNotSet`] - When no compliance contract
+///   has been configured yet.
+pub fn get_compliance_address(e: &Env) -> Address {
+    let key = ComplianceModuleStorageKey::Compliance;
+    if let Some(addr) = e.storage().instance().get::<_, Address>(&key) {
+        addr
+    } else {
+        panic_with_error!(e, ComplianceModuleError::ComplianceNotSet)
+    }
+}
+
+/// Returns `true` if the hook wiring has already been verified for this
+/// module instance (cached after the first successful check).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+pub fn hooks_verified(e: &Env) -> bool {
+    let key = ComplianceModuleStorageKey::HooksVerified;
+    e.storage().instance().has(&key)
+}
+
+/// Returns an IRS cross-contract client for the given token.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose IRS client is requested.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
+///   configured for this token.
+pub fn get_irs_client<'a>(e: &'a Env, token: &Address) -> IdentityRegistryStorageClient<'a> {
+    let irs = get_irs_address(e, token);
+    IdentityRegistryStorageClient::new(e, &irs)
+}
+
+/// Returns the typed country data entries for `account` resolved via the
+/// token's configured IRS.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose IRS client is requested.
+/// * `account` - The account whose country data should be read.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
+///   configured for this token.
+pub fn get_irs_country_data_entries(
+    e: &Env,
+    token: &Address,
+    account: &Address,
+) -> Vec<CountryData> {
+    let irs = get_irs_address(e, token);
+    let client = CountryDataManagerClient::new(e, &irs);
+    let raw_entries = client.get_country_data_entries(account);
+
+    Vec::from_iter(e, raw_entries.iter().map(|entry| CountryData::from_val(e, &entry)))
+}
+
+// ################## CHANGE STATE ##################
 
 /// Persists the compliance contract address that governs this module.
 ///
@@ -66,40 +137,6 @@ pub fn set_compliance_address(e: &Env, compliance: &Address) {
         panic_with_error!(e, ComplianceModuleError::ComplianceAlreadySet);
     }
     e.storage().instance().set(&key, compliance);
-}
-
-/// Returns the stored compliance address.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-///
-/// # Errors
-///
-/// * [`ComplianceModuleError::ComplianceNotSet`] - When no compliance contract
-///   has been configured yet.
-pub fn get_compliance_address(e: &Env) -> Address {
-    let key = ComplianceModuleStorageKey::Compliance;
-    if let Some(addr) = e.storage().instance().get::<_, Address>(&key) {
-        addr
-    } else {
-        panic_with_error!(e, ComplianceModuleError::ComplianceNotSet)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Hook wiring verification
-// ---------------------------------------------------------------------------
-
-/// Returns `true` if the hook wiring has already been verified for this
-/// module instance (cached after the first successful check).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-pub fn hooks_verified(e: &Env) -> bool {
-    let key = ComplianceModuleStorageKey::HooksVerified;
-    e.storage().instance().has(&key)
 }
 
 /// Cross-calls the compliance contract to verify that this module is
@@ -137,9 +174,28 @@ pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
     e.storage().instance().set(&vkey, &true);
 }
 
-// ---------------------------------------------------------------------------
-// Amount validation
-// ---------------------------------------------------------------------------
+/// Low-level helper that stores the IRS contract address for a given token.
+///
+/// This function **does not perform any authorization checks**. It directly
+/// updates the per-token Identity Registry Storage pointer in persistent
+/// storage.
+///
+/// SAFETY: This must only be called from initialization logic or from
+/// admin-gated entrypoints that have already enforced the appropriate
+/// ownership and authorization checks. Do **not** expose this helper directly
+/// as a public contract method.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose IRS is being configured.
+/// * `irs` - The IRS contract address.
+pub fn set_irs_address(e: &Env, token: &Address, irs: &Address) {
+    let key = ComplianceModuleStorageKey::Registry(token.clone());
+    e.storage().persistent().set(&key, irs);
+}
+
+// ################## HELPERS ##################
 
 /// Panics with [`ComplianceModuleError::InvalidAmount`] if `amount` is
 /// negative.
@@ -198,31 +254,6 @@ pub fn module_name(e: &Env, name: &str) -> String {
     String::from_str(e, name)
 }
 
-// ---------------------------------------------------------------------------
-// Identity Registry Storage helpers
-// ---------------------------------------------------------------------------
-
-/// Low-level helper that stores the IRS contract address for a given token.
-///
-/// This function **does not perform any authorization checks**. It directly
-/// updates the per-token Identity Registry Storage pointer in persistent
-/// storage.
-///
-/// SAFETY: This must only be called from initialization logic or from
-/// admin-gated entrypoints that have already enforced the appropriate
-/// ownership and authorization checks. Do **not** expose this helper directly
-/// as a public contract method.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token whose IRS is being configured.
-/// * `irs` - The IRS contract address.
-pub fn set_irs_address(e: &Env, token: &Address, irs: &Address) {
-    let key = ComplianceModuleStorageKey::Registry(token.clone());
-    e.storage().persistent().set(&key, irs);
-}
-
 fn get_irs_address(e: &Env, token: &Address) -> Address {
     let key = ComplianceModuleStorageKey::Registry(token.clone());
     let irs: Address = e
@@ -232,47 +263,6 @@ fn get_irs_address(e: &Env, token: &Address) -> Address {
         .unwrap_or_else(|| panic_with_error!(e, ComplianceModuleError::IdentityRegistryNotSet));
     e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
     irs
-}
-
-/// Returns an IRS cross-contract client for the given token.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token whose IRS client is requested.
-///
-/// # Errors
-///
-/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
-///   configured for this token.
-pub fn get_irs_client<'a>(e: &'a Env, token: &Address) -> IdentityRegistryStorageClient<'a> {
-    let irs = get_irs_address(e, token);
-    IdentityRegistryStorageClient::new(e, &irs)
-}
-
-/// Returns the typed country data entries for `account` resolved via the
-/// token's configured IRS.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token whose IRS client is requested.
-/// * `account` - The account whose country data should be read.
-///
-/// # Errors
-///
-/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
-///   configured for this token.
-pub fn get_irs_country_data_entries(
-    e: &Env,
-    token: &Address,
-    account: &Address,
-) -> Vec<CountryData> {
-    let irs = get_irs_address(e, token);
-    let client = CountryDataManagerClient::new(e, &irs);
-    let raw_entries = client.get_country_data_entries(account);
-
-    Vec::from_iter(e, raw_entries.iter().map(|entry| CountryData::from_val(e, &entry)))
 }
 
 /// Extracts the numeric ISO 3166-1 country code from any
