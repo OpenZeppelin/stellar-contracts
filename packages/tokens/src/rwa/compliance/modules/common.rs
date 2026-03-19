@@ -1,10 +1,9 @@
 //! Shared helpers for compliance modules.
 //!
 //! Centralizes compliance-address ownership/auth checks, safe arithmetic
-//! guards, lightweight read-only client traits, and identity registry
-//! storage (IRS) resolution helpers.
+//! guards, and identity registry storage (IRS) resolution helpers.
 
-use soroban_sdk::{contractclient, contracttype, panic_with_error, Address, Env, String, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, FromVal, String, Vec};
 
 use crate::rwa::{
     compliance::{
@@ -12,7 +11,8 @@ use crate::rwa::{
         MODULE_TTL_THRESHOLD,
     },
     identity_registry_storage::{
-        CountryData, CountryRelation, IndividualCountryRelation, OrganizationCountryRelation,
+        CountryData, CountryDataManagerClient, CountryRelation, IdentityRegistryStorageClient,
+        IndividualCountryRelation, OrganizationCountryRelation,
     },
 };
 
@@ -32,20 +32,6 @@ pub enum ComplianceModuleStorageKey {
     HooksVerified,
     /// The IRS contract address for a specific token.
     Registry(Address),
-}
-
-/// Read-only cross-contract client into the Identity Registry Storage.
-///
-/// Modules that need identity or country resolution store the IRS address
-/// per token and call through this client at check time — mirroring the
-/// T-REX pattern where modules resolve identity via the token's registry.
-#[contractclient(name = "IRSReadClient")]
-pub trait IRSRead {
-    /// Returns the on-chain identity address associated with `account`.
-    fn stored_identity(e: &Env, account: Address) -> Address;
-
-    /// Returns all country data entries for `account`.
-    fn get_country_data_entries(e: &Env, account: Address) -> Vec<CountryData>;
 }
 
 // ---------------------------------------------------------------------------
@@ -237,6 +223,17 @@ pub fn set_irs_address(e: &Env, token: &Address, irs: &Address) {
     e.storage().persistent().set(&key, irs);
 }
 
+fn get_irs_address(e: &Env, token: &Address) -> Address {
+    let key = ComplianceModuleStorageKey::Registry(token.clone());
+    let irs: Address = e
+        .storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| panic_with_error!(e, ComplianceModuleError::IdentityRegistryNotSet));
+    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
+    irs
+}
+
 /// Returns an IRS cross-contract client for the given token.
 ///
 /// # Arguments
@@ -248,15 +245,35 @@ pub fn set_irs_address(e: &Env, token: &Address, irs: &Address) {
 ///
 /// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
 ///   configured for this token.
-pub fn get_irs_client<'a>(e: &'a Env, token: &Address) -> IRSReadClient<'a> {
-    let key = ComplianceModuleStorageKey::Registry(token.clone());
-    let irs: Address = e
-        .storage()
-        .persistent()
-        .get(&key)
-        .unwrap_or_else(|| panic_with_error!(e, ComplianceModuleError::IdentityRegistryNotSet));
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
-    IRSReadClient::new(e, &irs)
+pub fn get_irs_client<'a>(e: &'a Env, token: &Address) -> IdentityRegistryStorageClient<'a> {
+    let irs = get_irs_address(e, token);
+    IdentityRegistryStorageClient::new(e, &irs)
+}
+
+/// Returns the typed country data entries for `account` resolved via the
+/// token's configured IRS.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose IRS client is requested.
+/// * `account` - The account whose country data should be read.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
+///   configured for this token.
+pub fn get_irs_country_data_entries(e: &Env, token: &Address, account: &Address) -> Vec<CountryData> {
+    let irs = get_irs_address(e, token);
+    let client = CountryDataManagerClient::new(e, &irs);
+    let raw_entries = client.get_country_data_entries(account);
+
+    Vec::from_iter(
+        e,
+        raw_entries
+            .iter()
+            .map(|entry| CountryData::from_val(e, &entry)),
+    )
 }
 
 /// Extracts the numeric ISO 3166-1 country code from any
