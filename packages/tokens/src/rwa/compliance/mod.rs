@@ -4,7 +4,6 @@ use crate::rwa::utils::token_binder::TokenBinder;
 
 pub mod modules;
 pub mod storage;
-pub use modules::{ComplianceModule, ComplianceModuleClient};
 
 #[cfg(test)]
 mod test;
