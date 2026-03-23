@@ -1587,6 +1587,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "rwa-max-balance"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-supply-limit"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "rwa-token-example"
 version = "0.6.0"
 dependencies = [

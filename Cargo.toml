@@ -20,6 +20,8 @@ members = [
     "examples/ownable",
     "examples/pausable",
     "examples/rwa/*",
+    "examples/rwa-max-balance",
+    "examples/rwa-supply-limit",
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
     "examples/multisig-smart-account/*",
