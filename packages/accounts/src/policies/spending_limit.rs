@@ -104,6 +104,8 @@ pub enum SpendingLimitError {
     HistoryCapacityExceeded = 3224,
     /// The context rule for the smart account has been already installed.
     AlreadyInstalled = 3225,
+    /// The transfer amount is negative.
+    LessThanZero = 3226,
 }
 
 /// Storage keys for spending limit policy data.
@@ -174,6 +176,8 @@ pub fn get_spending_limit_data(
 ///
 /// * [`SpendingLimitError::SpendingLimitExceeded`] - When the transaction
 ///   amount is not within the spending limit for the rolling period.
+/// * [`SpendingLimitError::LessThanZero`] - When the transfer amount is
+///   negative.
 /// * [`SpendingLimitError::NotAllowed`] - When there are no authenticated
 ///   signers, the context is not a transfer with well-formatted amount.
 ///
@@ -205,6 +209,10 @@ pub fn enforce(
             if fn_name == &symbol_short!("transfer") {
                 if let Some(amount_val) = args.get(2) {
                     if let Ok(amount) = i128::try_from_val(e, &amount_val) {
+                        if amount < 0 {
+                            panic_with_error!(e, SpendingLimitError::LessThanZero)
+                        }
+
                         // Clean up old entries outside the rolling window BEFORE checking limit
                         let removed_amount = cleanup_old_entries(
                             &mut data.spending_history,

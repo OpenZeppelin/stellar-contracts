@@ -583,6 +583,28 @@ fn enforce_missing_amount_arg_errors() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3226)")]
+fn enforce_negative_amount_errors() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        // A negative amount must be rejected regardless of the cached total
+        let context = create_transfer_context(&e, -1);
+        enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #3224)")]
 fn enforce_history_capacity_exceeded() {
     let e = Env::default();
