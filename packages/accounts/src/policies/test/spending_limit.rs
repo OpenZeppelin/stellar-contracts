@@ -4,7 +4,7 @@ use soroban_sdk::{
     auth::{Context, ContractContext, ContractExecutable, CreateContractHostFnContext},
     contract, symbol_short,
     testutils::{Address as _, Events, Ledger},
-    Address, Bytes, BytesN, Env, IntoVal, Vec,
+    Address, BytesN, Env, IntoVal, Vec,
 };
 
 use crate::{
