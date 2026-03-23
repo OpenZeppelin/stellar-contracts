@@ -109,7 +109,32 @@ mod implementation {
             None
         }
 
-        pub fn assert_fungible_transfer(
+        /// Asserts a SEP-41 transfer event with a bare `i128` data field
+        /// (no muxed ID). This is the standard shape for `transfer` to a
+        /// non-muxed address, `transfer_from`, and RWA transfers.
+        pub fn assert_fungible_transfer(&mut self, from: &Address, to: &Address, amount: i128) {
+            let event = self.expect_event("transfer", "Transfer event not found in event log");
+            self.assert_event_contract(&event);
+
+            let (topics, data) = self.event_topics_data(&event);
+            assert_eq!(topics.len(), 3, "Transfer event should have 3 topics");
+
+            self.assert_topic_symbol(topics, 0, symbol_short!("transfer"));
+
+            let event_from: Address = self.topic_as(topics, 1);
+            let event_to: Address = self.topic_as(topics, 2);
+
+            let val = Val::try_from_val(self.env, data).unwrap();
+            let event_amount: i128 = i128::from_val(self.env, &val);
+
+            assert_eq!(&event_from, from, "Transfer event has wrong from address");
+            assert_eq!(&event_to, to, "Transfer event has wrong to address");
+            assert_eq!(event_amount, amount, "Transfer event has wrong amount");
+        }
+
+        /// Asserts a SEP-41 muxed transfer event whose data field is
+        /// `{to_muxed_id: Option<u64>, amount: i128}`.
+        pub fn assert_fungible_muxed_transfer(
             &mut self,
             from: &Address,
             to: &Address,
