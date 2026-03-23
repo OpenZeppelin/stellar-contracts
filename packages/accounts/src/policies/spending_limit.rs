@@ -38,7 +38,7 @@ use soroban_sdk::{
     TryFromVal, Vec,
 };
 
-use crate::smart_account::{ContextRule, Signer};
+use crate::smart_account::{ContextRule, ContextRuleType, Signer};
 
 /// Event emitted when a spending limit policy is enforced.
 #[contractevent]
@@ -106,6 +106,8 @@ pub enum SpendingLimitError {
     AlreadyInstalled = 3225,
     /// The transfer amount is negative.
     LessThanZero = 3226,
+    /// Only the `CallContract` context rule type is allowed.
+    OnlyCallContractAllowed = 3227,
 }
 
 /// Storage keys for spending limit policy data.
@@ -293,7 +295,9 @@ pub fn set_spending_limit(
     e.storage().persistent().set(&key, &data);
 }
 
-/// Installs the spending limit policy on a smart account.
+/// Installs the spending limit policy on a smart account. Only `CallContract`
+/// context type is allowed as it pins the policy to a specific token contract,
+/// ensuring all tracked transfers are denominated in the same token.
 /// Requires authorization from the smart account.
 ///
 /// # Arguments
@@ -306,6 +310,8 @@ pub fn set_spending_limit(
 ///
 /// # Errors
 ///
+/// * [`SpendingLimitError::OnlyCallContractAllowed`] - When the context rule
+///   type is not `CallContract`.
 /// * [`SpendingLimitError::InvalidLimitOrPeriod`] - When spending_limit is not
 ///   positive or period_ledgers is zero.
 /// * [`SpendingLimitError::AlreadyInstalled`] - When policy was already
@@ -318,6 +324,10 @@ pub fn install(
 ) {
     // Require authorization from the smart_account
     smart_account.require_auth();
+
+    if !matches!(context_rule.context_type, ContextRuleType::CallContract(_)) {
+        panic_with_error!(e, SpendingLimitError::OnlyCallContractAllowed)
+    }
 
     if params.spending_limit <= 0 || params.period_ledgers == 0 {
         panic_with_error!(e, SpendingLimitError::InvalidLimitOrPeriod)

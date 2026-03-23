@@ -4,7 +4,7 @@ use soroban_sdk::{
     auth::{Context, ContractContext, ContractExecutable, CreateContractHostFnContext},
     contract, symbol_short,
     testutils::{Address as _, Events, Ledger},
-    Address, BytesN, Env, IntoVal, Vec,
+    Address, Bytes, BytesN, Env, IntoVal, Vec,
 };
 
 use crate::{
@@ -32,7 +32,7 @@ fn create_context_rule(e: &Env) -> ContextRule {
     let policies = Vec::new(e);
     ContextRule {
         id: 1,
-        context_type: ContextRuleType::Default,
+        context_type: ContextRuleType::CallContract(Address::generate(e)),
         name: soroban_sdk::String::from_str(e, "rule"),
         signers,
         policies,
@@ -96,6 +96,43 @@ fn install_already_installed_fails() {
     });
 
     e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3227)")]
+fn install_default_rule_not_allowed() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let mut context_rule = create_context_rule(&e);
+        context_rule.context_type = ContextRuleType::Default;
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+
+        install(&e, &params, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3227)")]
+fn install_create_contract_rule_not_allowed() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let mut context_rule = create_context_rule(&e);
+        context_rule.context_type =
+            ContextRuleType::CreateContract(BytesN::from_array(&e, &[0u8; 32]));
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+
         install(&e, &params, &context_rule, &smart_account);
     });
 }
