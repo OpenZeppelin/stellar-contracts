@@ -78,7 +78,7 @@ invoke_with_retry() {
       return "$status"
     fi
 
-    echo "Retrying deploy invoke after transient Stellar CLI failure..." >&2
+    echo "Retrying invoke after transient Stellar CLI failure..." >&2
     sleep $((delay * attempt))
   done
 }

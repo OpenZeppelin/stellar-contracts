@@ -33,33 +33,6 @@ require_contract_id "irs" "$IRS"
 
 INVESTOR="$ADMIN"
 
-invoke_with_retry() {
-  local attempts=${STELLAR_INVOKE_RETRIES:-4}
-  local delay=${STELLAR_INVOKE_RETRY_DELAY_SECONDS:-3}
-  local attempt output status
-
-  for attempt in $(seq 1 "$attempts"); do
-    if output=$(invoke "$@" 2>&1); then
-      printf '%s\n' "$output"
-      return 0
-    fi
-    status=$?
-
-    if ! retryable_invoke_error "$output"; then
-      printf '%s\n' "$output" >&2
-      return "$status"
-    fi
-
-    if [ "$attempt" -eq "$attempts" ]; then
-      printf '%s\n' "$output" >&2
-      return "$status"
-    fi
-
-    echo "  Retrying after transient Stellar CLI failure..." >&2
-    sleep $((delay * attempt))
-  done
-}
-
 echo "=== Happy Path Test ==="
 echo "Token:    $TOKEN"
 echo "Investor: $INVESTOR"
