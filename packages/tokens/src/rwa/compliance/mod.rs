@@ -1,4 +1,4 @@
-use soroban_sdk::{contractclient, contracterror, contractevent, contracttype, Address, Env, Vec};
+use soroban_sdk::{contracterror, contractevent, contracttrait, contracttype, Address, Env, Vec};
 
 use crate::rwa::utils::token_binder::TokenBinder;
 
@@ -63,7 +63,7 @@ pub enum ComplianceHook {
 /// token contract. This allows compliance modules to maintain separate state
 /// and apply different business logic per token (e.g., token-specific transfer
 /// limits, per-token balance tracking).
-#[contractclient(name = "ComplianceClient")]
+#[contracttrait]
 pub trait Compliance: TokenBinder {
     /// Registers a compliance module for a specific hook type.
     /// Only the operator can register modules.

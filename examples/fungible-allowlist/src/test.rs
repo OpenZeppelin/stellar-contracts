@@ -154,3 +154,96 @@ fn allowlist_approve_override_works() {
     client.approve(&user1, &user2, &transfer_amount, &1000);
     assert_eq!(client.allowance(&user1, &user2), transfer_amount);
 }
+
+#[test]
+fn burn_allowed_account_works() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &manager, &initial_supply);
+    let burn_amount = 500;
+
+    e.mock_all_auths();
+
+    // Allow user1 and transfer some tokens to them
+    client.allow_user(&user1, &manager);
+    client.transfer(&admin, &user1, &1000);
+    assert_eq!(client.balance(&user1), 1000);
+
+    // Allowed user can burn their own tokens
+    client.burn(&user1, &burn_amount);
+    assert_eq!(client.balance(&user1), 500);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #113)")]
+fn cannot_burn_disallowed_account() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &manager, &initial_supply);
+
+    e.mock_all_auths();
+
+    // Allow user1, transfer tokens, then disallow
+    client.allow_user(&user1, &manager);
+    client.transfer(&admin, &user1, &1000);
+    client.disallow_user(&user1, &manager);
+    assert!(!client.allowed(&user1));
+
+    // Disallowed user cannot burn
+    client.burn(&user1, &500);
+}
+
+#[test]
+fn burn_from_allowed_account_works() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &manager, &initial_supply);
+    let burn_amount = 500;
+
+    e.mock_all_auths();
+
+    // Allow user1 and transfer tokens to them
+    client.allow_user(&user1, &manager);
+    client.transfer(&admin, &user1, &1000);
+
+    // User1 approves user2 to spend tokens
+    client.approve(&user1, &user2, &burn_amount, &1000);
+
+    // User2 can burn from allowed user1's account
+    client.burn_from(&user2, &user1, &burn_amount);
+    assert_eq!(client.balance(&user1), 500);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #113)")]
+fn cannot_burn_from_disallowed_account() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &manager, &initial_supply);
+
+    e.mock_all_auths();
+
+    // Allow user1, transfer tokens, approve user2, then disallow user1
+    client.allow_user(&user1, &manager);
+    client.transfer(&admin, &user1, &1000);
+    client.approve(&user1, &user2, &500, &1000);
+    client.disallow_user(&user1, &manager);
+    assert!(!client.allowed(&user1));
+
+    // User2 cannot burn from disallowed user1's account
+    client.burn_from(&user2, &user1, &500);
+}

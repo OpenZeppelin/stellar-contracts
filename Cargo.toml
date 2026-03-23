@@ -19,7 +19,7 @@ members = [
     "examples/nft-sequential-minting",
     "examples/ownable",
     "examples/pausable",
-    #"examples/rwa",
+    "examples/rwa/*",
     "examples/sac-admin-generic",
     "examples/sac-admin-wrapper",
     "examples/multisig-smart-account/*",
@@ -35,7 +35,10 @@ members = [
     "packages/tokens",
     "packages/zk-email",
 ]
-exclude = ["examples/upgradeable/testdata"]
+exclude = [
+    "examples/upgradeable/testdata",
+    "examples/rwa/sign-claim",   # native CLI tool, not a WASM contract
+]
 
 [workspace.package]
 authors = ["OpenZeppelin"]

@@ -151,6 +151,7 @@ See the following examples in the repository:
 - [`examples/fungible-pausable/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-pausable) - Pausable fungible token
 - [`examples/nft-sequential-minting/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/nft-sequential-minting) - Basic non-fungible token
 - [`examples/fungible-merkle-airdrop/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-merkle-airdrop) - Airdrop with merkle proofs
+- [`examples/rwa/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/rwa) - A complete RWA contract suite and a step-by-step deployment guide.
 
 ## License
 

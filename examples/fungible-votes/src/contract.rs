@@ -2,7 +2,9 @@ use soroban_sdk::{contract, contractimpl, Address, Env, MuxedAddress, String};
 use stellar_access::ownable::{set_owner, Ownable};
 use stellar_governance::votes::Votes;
 use stellar_macros::only_owner;
-use stellar_tokens::fungible::{votes::FungibleVotes, Base, FungibleToken};
+use stellar_tokens::fungible::{
+    burnable::FungibleBurnable, votes::FungibleVotes, Base, FungibleToken,
+};
 
 #[contract]
 pub struct ExampleContract;
@@ -30,3 +32,6 @@ impl Votes for ExampleContract {}
 
 #[contractimpl(contracttrait)]
 impl Ownable for ExampleContract {}
+
+#[contractimpl(contracttrait)]
+impl FungibleBurnable for ExampleContract {}

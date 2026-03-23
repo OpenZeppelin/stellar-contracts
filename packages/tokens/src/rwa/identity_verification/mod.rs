@@ -38,7 +38,7 @@
 //! `IdentityRegistryStorage` integration. Examples are available in the RWA
 //! examples folder.
 
-use soroban_sdk::{contractclient, Address, Env};
+use soroban_sdk::{contracttrait, Address, Env};
 
 pub mod claim_issuer;
 pub mod claim_topics_and_issuers;
@@ -49,7 +49,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-#[contractclient(name = "IdentityVerifierClient")]
+#[contracttrait]
 pub trait IdentityVerifier {
     /// Verifies that the identity of an user address has the required valid
     /// claims.
