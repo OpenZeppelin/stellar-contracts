@@ -383,6 +383,8 @@ pub trait Governor {
     ///   been set.
     /// * [`GovernorError::MathOverflow`] - If voting schedule calculation
     ///   overflows.
+    /// * [`GovernorError::ProposerRestricted`] - If the description contains a
+    ///   `#proposer=` suffix that does not match the actual proposer.
     ///
     /// # Events
     ///
@@ -390,6 +392,16 @@ pub trait Governor {
     ///   Address]`
     /// * data - `[targets: Vec<Address>, functions: Vec<Symbol>, args:
     ///   Vec<Vec<Val>>, vote_start: u32, vote_end: u32, description: String]`
+    ///
+    /// # Proposer restriction (front-running protection)
+    ///
+    /// To prevent front-running, proposers can append `#proposer=<strkey_address>`
+    /// to the description. When this suffix is present, the proposal will only
+    /// be accepted if the `proposer` argument matches the address in the suffix.
+    /// Since the description is part of the proposal ID hash, a front-runner
+    /// cannot reuse the same description without matching the embedded address.
+    /// If no `#proposer=` suffix is present, any proposer with sufficient
+    /// voting power can submit the proposal (existing behavior).
     ///
     /// # Notes
     ///
@@ -713,6 +725,9 @@ pub enum GovernorError {
     TokenContractNotSet = 5020,
     /// The proposal description exceeds the maximum allowed length.
     DescriptionTooLong = 5021,
+    /// The proposal description contains a `#proposer=` suffix that does not
+    /// match the actual proposer.
+    ProposerRestricted = 5022,
 }
 
 // ################## CONSTANTS ##################

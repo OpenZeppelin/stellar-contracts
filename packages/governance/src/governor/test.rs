@@ -1,3 +1,5 @@
+extern crate std;
+
 use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, Events, Ledger},
@@ -1201,6 +1203,66 @@ fn propose_fails_on_voting_schedule_overflow() {
         storage::set_voting_period(&e, 100);
 
         propose(&e, targets, functions, args, description, &proposer);
+    });
+}
+
+// ################## PROPOSER RESTRICTION TESTS ##################
+
+#[test]
+fn propose_with_proposer_restriction_succeeds_for_matching_proposer() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, _) = simple_proposal(&e);
+
+    // Build description with #proposer= suffix matching the actual proposer.
+    let desc_str = std::format!("My proposal #proposer={}", proposer.to_string());
+    let description = String::from_str(&e, &desc_str);
+
+    e.as_contract(&contract_address, || {
+        let pid = propose(&e, targets, functions, args, description, &proposer);
+        let state = storage::get_proposal_state(&e, &pid);
+        assert_eq!(state, ProposalState::Pending);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #5022)")]
+fn propose_with_proposer_restriction_fails_for_different_proposer() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let actual_proposer = Address::generate(&e);
+    let restricted_proposer = Address::generate(&e);
+    let (targets, functions, args, _) = simple_proposal(&e);
+
+    // Build description with #proposer= suffix for a DIFFERENT address.
+    let desc_str = std::format!("My proposal #proposer={}", restricted_proposer.to_string());
+    let description = String::from_str(&e, &desc_str);
+
+    e.as_contract(&contract_address, || {
+        // actual_proposer tries to submit, but description restricts to restricted_proposer.
+        propose(&e, targets, functions, args, description, &actual_proposer);
+    });
+}
+
+#[test]
+fn propose_without_proposer_restriction_allows_any_proposer() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+    // description = "Test proposal" — no #proposer= suffix
+
+    e.as_contract(&contract_address, || {
+        let pid = propose(&e, targets, functions, args, description, &proposer);
+        let state = storage::get_proposal_state(&e, &pid);
+        assert_eq!(state, ProposalState::Pending);
     });
 }
 

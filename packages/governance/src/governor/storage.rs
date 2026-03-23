@@ -446,6 +446,8 @@ pub fn set_token_contract(e: &Env, token_contract: &Address) {
 ///   lacks sufficient voting power.
 /// * [`GovernorError::MathOverflow`] - Occurs if voting schedule calculation
 ///   overflows.
+/// * [`GovernorError::ProposerRestricted`] - Occurs if the description contains
+///   a `#proposer=` suffix that does not match the actual proposer.
 /// * refer to [`get_proposal_threshold()`] errors.
 /// * refer to [`get_voting_delay()`] errors.
 /// * refer to [`get_voting_period()`] errors.
@@ -477,6 +479,9 @@ pub fn propose(
     if description.len() > MAX_DESCRIPTION_LENGTH {
         panic_with_error!(e, GovernorError::DescriptionTooLong);
     }
+
+    // Validate optional proposer restriction (front-running protection).
+    validate_proposer_restriction(e, &description, proposer);
 
     // Use previous ledger to prevent flash loan based proposals
     let snapshot = e.ledger().sequence() - 1;
@@ -664,6 +669,54 @@ pub fn cancel(
 }
 
 // ################## HELPERS ##################
+
+/// The suffix that, when present at the end of a proposal description,
+/// restricts the proposal to be submitted only by the address encoded in the
+/// suffix. Format: `#proposer=<strkey_address>`.
+const PROPOSER_RESTRICTION_PREFIX: &[u8] = b"#proposer=";
+
+/// Validates the optional proposer restriction embedded in the description.
+///
+/// If the description ends with `#proposer=<strkey_address>`, verifies that
+/// the given `proposer` matches the embedded address. If no such suffix is
+/// present, this function is a no-op (any proposer is allowed).
+///
+/// This mechanism prevents front-running: a proposer includes their address in
+/// the description, which becomes part of the proposal ID hash. A front-runner
+/// cannot reuse the same description (wrong address check) or change it (different
+/// proposal ID).
+///
+/// # Errors
+///
+/// * [`GovernorError::ProposerRestricted`] - If the suffix is present but does
+///   not match the proposer.
+fn validate_proposer_restriction(e: &Env, description: &String, proposer: &Address) {
+    let prefix = Bytes::from_slice(e, PROPOSER_RESTRICTION_PREFIX);
+    let proposer_strkey: Bytes = proposer.to_string().to_bytes();
+
+    let suffix_len = prefix.len() + proposer_strkey.len();
+    let desc_len = description.len();
+
+    // If description is shorter than the suffix, no restriction applies.
+    if desc_len < suffix_len {
+        return;
+    }
+
+    let desc_bytes: Bytes = description.to_bytes();
+    let tail = desc_bytes.slice((desc_len - suffix_len)..desc_len);
+    let tail_prefix = tail.slice(0..prefix.len());
+
+    // If the tail doesn't start with "#proposer=", no restriction applies.
+    if tail_prefix != prefix {
+        return;
+    }
+
+    // Restriction is present — the embedded address must match the proposer.
+    let tail_address = tail.slice(prefix.len()..suffix_len);
+    if tail_address != proposer_strkey {
+        panic_with_error!(e, GovernorError::ProposerRestricted);
+    }
+}
 
 /// Computes and returns the proposal ID from the proposal parameters.
 ///
