@@ -1,23 +1,18 @@
-//! Shared helpers for compliance modules.
+//! Shared storage and helper utilities for compliance modules.
 //!
 //! Centralizes compliance-address ownership/auth checks, safe arithmetic
 //! guards, and identity registry storage (IRS) resolution helpers.
 
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, FromVal, String, Vec};
 
+use super::{ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD};
 use crate::rwa::{
-    compliance::{
-        ComplianceClient, ComplianceHook, ComplianceModuleError, MODULE_EXTEND_AMOUNT,
-        MODULE_TTL_THRESHOLD,
-    },
+    compliance::{ComplianceClient, ComplianceHook},
     identity_registry_storage::{
         CountryData, CountryDataManagerClient, CountryRelation, IdentityRegistryStorageClient,
         IndividualCountryRelation, OrganizationCountryRelation,
     },
 };
-
-#[cfg(test)]
-mod test;
 
 // ---------------------------------------------------------------------------
 // Storage keys

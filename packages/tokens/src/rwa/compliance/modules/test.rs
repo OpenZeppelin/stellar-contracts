@@ -5,9 +5,9 @@ use soroban_sdk::{
     Vec,
 };
 
-use super::*;
+use super::storage::*;
 use crate::rwa::{
-    compliance::Compliance,
+    compliance::{Compliance, ComplianceHook},
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
         IndividualCountryRelation,
