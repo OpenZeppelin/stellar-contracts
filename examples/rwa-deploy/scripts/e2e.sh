@@ -233,7 +233,7 @@ EOF
 
 run_supply_limit_tests() {
   test_header "Test 1: Mint 1000 tokens"
-  assert_pass "mint 1000" invoke "$TOKEN" mint --to "$INVESTOR" --amount 1000 --operator "$ADMIN"
+  assert_pass "mint 1000" invoke_with_retry "$TOKEN" mint --to "$INVESTOR" --amount 1000 --operator "$ADMIN"
 
   BAL=$(get_balance "$INVESTOR")
   assert_eq "balance = 1000" "1000" "$BAL"
@@ -278,7 +278,7 @@ run_lockup_tests() {
 run_balance_tests() {
   # Supply is 1000 from Test 1. Mint 1000 more -> internal supply = 2000.
   test_header "Test 5: Mint more (supply counter tracks)"
-  assert_pass "mint 1000 more" invoke "$TOKEN" mint --to "$INVESTOR" --amount 1000 --operator "$ADMIN"
+  assert_pass "mint 1000 more" invoke_with_retry "$TOKEN" mint --to "$INVESTOR" --amount 1000 --operator "$ADMIN"
 
   BAL=$(get_balance "$INVESTOR")
   assert_eq "balance = 2000" "2000" "$BAL"
@@ -290,7 +290,7 @@ run_balance_tests() {
   # MaxBalance is 1,000,000 per identity. Investor has 2000 already.
   # Mint 998,000 more to hit the identity cap exactly.
   test_header "Test 6: Mint to max-balance ceiling"
-  assert_pass "mint 998000 (fill to 1M)" invoke "$TOKEN" mint --to "$INVESTOR" --amount 998000 --operator "$ADMIN"
+  assert_pass "mint 998000 (fill to 1M)" invoke_with_retry "$TOKEN" mint --to "$INVESTOR" --amount 998000 --operator "$ADMIN"
 
   BAL=$(get_balance "$INVESTOR")
   assert_eq "balance = 1000000" "1000000" "$BAL"

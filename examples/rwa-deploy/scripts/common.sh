@@ -56,6 +56,33 @@ invoke_readonly() {
     -- "${@:2}"
 }
 
+invoke_with_retry() {
+  local attempts=${STELLAR_INVOKE_RETRIES:-4}
+  local delay=${STELLAR_INVOKE_RETRY_DELAY_SECONDS:-3}
+  local attempt output status
+
+  for attempt in $(seq 1 "$attempts"); do
+    if output=$(invoke "$@" 2>&1); then
+      printf '%s\n' "$output"
+      return 0
+    fi
+    status=$?
+
+    if ! retryable_invoke_error "$output"; then
+      printf '%s\n' "$output" >&2
+      return "$status"
+    fi
+
+    if [ "$attempt" -eq "$attempts" ]; then
+      printf '%s\n' "$output" >&2
+      return "$status"
+    fi
+
+    echo "Retrying deploy invoke after transient Stellar CLI failure..." >&2
+    sleep $((delay * attempt))
+  done
+}
+
 read_addr() {
   python3 -c "import json; d=json.load(open('$ADDR_FILE')); print(d$1)"
 }
@@ -184,14 +211,61 @@ sys.exit(0 if payload == expected else 1)
 ' <<<"$output"
 }
 
+country_profiles_to_scval_json() {
+  python3 - "$1" <<'PY'
+import json
+import sys
+
+profiles = json.loads(sys.argv[1])
+
+def sc_symbol(value):
+    return {"symbol": value}
+
+def sc_string(value):
+    return {"string": value}
+
+def sc_u32(value):
+    return {"u32": value}
+
+def metadata_to_scval(metadata):
+    if metadata is None:
+        return "void"
+
+    return {
+        "map": [
+            {"key": sc_string(key), "val": sc_string(value)}
+            for key, value in sorted(metadata.items())
+        ]
+    }
+
+def enum_to_scval(enum_value):
+    [(outer_name, outer_payload)] = enum_value.items()
+    [(inner_name, inner_payload)] = outer_payload.items()
+    return {"vec": [sc_symbol(outer_name), {"vec": [sc_symbol(inner_name), sc_u32(inner_payload)]}]}
+
+def country_data_to_scval(profile):
+    return {
+        "map": [
+            {"key": sc_symbol("country"), "val": enum_to_scval(profile["country"])},
+            {"key": sc_symbol("metadata"), "val": metadata_to_scval(profile.get("metadata"))},
+        ]
+    }
+
+print(json.dumps([country_data_to_scval(profile) for profile in profiles], separators=(",", ":")))
+PY
+}
+
 ensure_identity_registered() {
   local contract_addr=$1
   local account=$2
   local identity=$3
   local profiles_json=$4
+  local profiles_scval_json
   local attempts=${STELLAR_INVOKE_RETRIES:-4}
   local delay=${STELLAR_INVOKE_RETRY_DELAY_SECONDS:-3}
   local attempt output status
+
+  profiles_scval_json=$(country_profiles_to_scval_json "$profiles_json")
 
   if identity_matches "$contract_addr" "$account" "$identity"; then
     echo "  Identity already registered for $account."
@@ -202,7 +276,7 @@ ensure_identity_registered() {
     if output=$(invoke "$contract_addr" add_identity \
       --account "$account" \
       --identity "$identity" \
-      --initial_profiles "$profiles_json" \
+      --initial_profiles "$profiles_scval_json" \
       --operator "$ADMIN" 2>&1); then
       printf '%s\n' "$output"
       return 0
