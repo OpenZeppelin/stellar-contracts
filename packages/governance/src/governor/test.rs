@@ -1197,6 +1197,7 @@ fn propose_fails_on_voting_schedule_overflow() {
         storage::set_name(&e, String::from_str(&e, "TestGov"));
         storage::set_version(&e, String::from_str(&e, "1.0.0"));
         storage::set_proposal_threshold(&e, 0);
+        storage::set_quorum(&e, 100);
         // Use max values to trigger overflow
         storage::set_voting_delay(&e, u32::MAX);
         storage::set_voting_period(&e, 100);
