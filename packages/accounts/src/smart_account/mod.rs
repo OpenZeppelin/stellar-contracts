@@ -395,7 +395,7 @@ pub trait SmartAccount: CustomAccountInterface {
     /// # Events
     ///
     /// * topics - `["policy_added", context_rule_id: u32]`
-    /// * data - `[policy_id: u32, install_param: Val]`
+    /// * data - `[policy_id: u32]`
     ///
     /// # Notes
     ///
@@ -692,12 +692,11 @@ pub fn emit_signer_removed(e: &Env, context_rule_id: u32, signer_id: u32) {
 
 /// Event emitted when a policy is added to a context rule.
 #[contractevent]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PolicyAdded {
     #[topic]
     pub context_rule_id: u32,
     pub policy_id: u32,
-    pub install_param: Val,
 }
 
 /// Emits an event indicating a policy has been added to a context rule.
@@ -707,14 +706,13 @@ pub struct PolicyAdded {
 /// * `e` - Access to the Soroban environment.
 /// * `context_rule_id` - The ID of the context rule.
 /// * `policy_id` - The policy ID that was added.
-/// * `install_param` - The installation parameter for the policy.
 ///
 /// # Events
 ///
 /// * topics - `["policy_added", context_rule_id: u32]`
-/// * data - `[policy_id: u32, install_param: Val]`
-pub fn emit_policy_added(e: &Env, context_rule_id: u32, policy_id: u32, install_param: Val) {
-    PolicyAdded { context_rule_id, policy_id, install_param }.publish(e);
+/// * data - `[policy_id: u32]`
+pub fn emit_policy_added(e: &Env, context_rule_id: u32, policy_id: u32) {
+    PolicyAdded { context_rule_id, policy_id }.publish(e);
 }
 
 /// Event emitted when a policy is removed from a context rule.

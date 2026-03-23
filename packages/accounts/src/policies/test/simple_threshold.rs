@@ -56,6 +56,9 @@ fn install_success() {
         install(&e, &params, &context_rule, &smart_account);
 
         assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 2);
+
+        // Verify install event was emitted
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -168,6 +171,7 @@ fn set_threshold_success() {
         let context_rule = create_test_context_rule(&e);
         set_threshold(&e, 3, &context_rule, &smart_account);
         assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 3);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -212,6 +216,24 @@ fn uninstall_success() {
         // Verify it's installed
         assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 2);
     });
+
+    e.as_contract(&address, || {
+        let context_rule = create_test_context_rule(&e);
+        uninstall(&e, &context_rule, &smart_account);
+
+        // Verify uninstall event
+        assert_eq!(e.events().all().events().len(), 1);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3200)")]
+fn uninstall_not_installed_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
 
     e.as_contract(&address, || {
         let context_rule = create_test_context_rule(&e);

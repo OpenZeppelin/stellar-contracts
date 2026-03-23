@@ -60,6 +60,9 @@ fn install_success() {
         assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 75);
         let stored_weights = get_signer_weights(&e, &context_rule, &smart_account);
         assert_eq!(stored_weights.len(), 2);
+
+        // Verify install event was emitted
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -308,6 +311,7 @@ fn set_threshold_success() {
         let context_rule = create_test_context_rule(&e);
         set_threshold(&e, 100, &context_rule, &smart_account);
         assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 100);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -379,6 +383,7 @@ fn set_signer_weight_success() {
 
         let updated_weights = get_signer_weights(&e, &context_rule, &smart_account);
         assert_eq!(updated_weights.get(new_signer).unwrap(), 25);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -435,6 +440,24 @@ fn uninstall_success() {
         // Verify it's installed
         assert_eq!(get_threshold(&e, context_rule.id, &smart_account), 75);
     });
+
+    e.as_contract(&address, || {
+        let context_rule = create_test_context_rule(&e);
+        uninstall(&e, &context_rule, &smart_account);
+
+        // Verify uninstall event
+        assert_eq!(e.events().all().events().len(), 1);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3210)")]
+fn uninstall_not_installed_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
 
     e.as_contract(&address, || {
         let context_rule = create_test_context_rule(&e);

@@ -1095,7 +1095,7 @@ pub fn batch_add_signer(e: &Env, id: u32, signers: &Vec<Signer>) {
 /// # Events
 ///
 /// * topics - `["policy_added", context_rule_id: u32]`
-/// * data - `[policy_id: u32, install_param: Val]`
+/// * data - `[policy_id: u32]`
 ///
 /// If the policy is not previously registered in the global registry:
 /// * topics - `["policy_registered", policy_id: u32]`
@@ -1138,7 +1138,7 @@ pub fn add_policy(e: &Env, context_rule_id: u32, policy: &Address, install_param
     };
     PolicyClient::new(e, policy).install(&install_param, &rule, &e.current_contract_address());
 
-    emit_policy_added(e, context_rule_id, policy_id, install_param);
+    emit_policy_added(e, context_rule_id, policy_id);
 
     policy_id
 }

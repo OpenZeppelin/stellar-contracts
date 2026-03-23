@@ -72,12 +72,54 @@ use crate::smart_account::{ContextRule, Signer};
 /// Event emitted when a weighted threshold policy is enforced.
 #[contractevent]
 #[derive(Clone)]
-pub struct WeightedPolicyEnforced {
+pub struct WeightedEnforced {
     #[topic]
     pub smart_account: Address,
     pub context: Context,
     pub context_rule_id: u32,
     pub authenticated_signers: Vec<Signer>,
+}
+
+/// Event emitted when a weighted threshold policy is installed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WeightedInstalled {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+    pub threshold: u32,
+    pub signer_weights: Map<Signer, u32>,
+}
+
+/// Event emitted when the threshold of a weighted threshold policy is changed.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WeightedThresholdChanged {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+    pub threshold: u32,
+}
+
+/// Event emitted when a signer weight is changed in a weighted threshold
+/// policy.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WeightedSignerWeightChanged {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+    pub signer: Signer,
+    pub weight: u32,
+}
+
+/// Event emitted when a weighted threshold policy is uninstalled.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WeightedUninstalled {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
 }
 
 /// Installation parameters for the weighted threshold policy.
@@ -245,7 +287,7 @@ pub fn calculate_weight(
 ///
 /// # Events
 ///
-/// * topics - `["policy_enforced", smart_account: Address]`
+/// * topics - `["weighted_enforced", smart_account: Address]`
 /// * data - `[context: Context, context_rule_id: u32, authenticated_signers:
 ///   Vec<Signer>]`
 pub fn enforce(
@@ -268,7 +310,7 @@ pub fn enforce(
 
     if total_weight >= params.threshold {
         // emit event
-        WeightedPolicyEnforced {
+        WeightedEnforced {
             smart_account: smart_account.clone(),
             context: context.clone(),
             context_rule_id: context_rule.id,
@@ -302,6 +344,11 @@ pub fn enforce(
 /// * [`WeightedThresholdError::InvalidThreshold`] - When threshold is 0.
 /// * [`WeightedThresholdError::SmartAccountNotInstalled`] - When the policy is
 ///   not installed.
+///
+/// # Events
+///
+/// * topics - `["weighted_threshold_changed", smart_account: Address]`
+/// * data - `[context_rule_id: u32, threshold: u32]`
 pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
@@ -326,6 +373,13 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
     }
 
     e.storage().persistent().set(&key, &params);
+
+    WeightedThresholdChanged {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+        threshold,
+    }
+    .publish(e);
 }
 
 /// Sets the weight for a specific signer in the weighted threshold policy.
@@ -351,6 +405,11 @@ pub fn set_threshold(e: &Env, threshold: u32, context_rule: &ContextRule, smart_
 ///   account does not have a weighted threshold policy installed.
 /// * [`WeightedThresholdError::InvalidThreshold`] - When the threshold would
 ///   exceed the new total weight.
+///
+/// # Events
+///
+/// * topics - `["weighted_signer_weight_changed", smart_account: Address]`
+/// * data - `[context_rule_id: u32, signer: Signer, weight: u32]`
 pub fn set_signer_weight(
     e: &Env,
     signer: &Signer,
@@ -377,6 +436,14 @@ pub fn set_signer_weight(
     }
 
     e.storage().persistent().set(&key, &params);
+
+    WeightedSignerWeightChanged {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+        signer: signer.clone(),
+        weight,
+    }
+    .publish(e);
 }
 
 /// Installs the weighted threshold policy on a smart account.
@@ -406,6 +473,12 @@ pub fn set_signer_weight(
 ///   calculation would overflow.
 /// * [`WeightedThresholdError::AlreadyInstalled`] - When policy was already
 ///   installed for a given smart account and context rule.
+///
+/// # Events
+///
+/// * topics - `["weighted_installed", smart_account: Address]`
+/// * data - `[context_rule_id: u32, threshold: u32, signer_weights: Map<Signer,
+///   u32>]`
 pub fn install(
     e: &Env,
     params: &WeightedThresholdAccountParams,
@@ -428,6 +501,14 @@ pub fn install(
     }
 
     e.storage().persistent().set(&key, params);
+
+    WeightedInstalled {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+        threshold: params.threshold,
+        signer_weights: params.signer_weights.clone(),
+    }
+    .publish(e);
 }
 
 /// Uninstalls the weighted threshold policy from a smart account.
@@ -438,12 +519,30 @@ pub fn install(
 /// * `e` - Access to the Soroban environment.
 /// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
+///
+/// # Errors
+///
+/// * [`WeightedThresholdError::SmartAccountNotInstalled`] - When the policy is
+///   not installed for the given smart account and context rule.
+///
+/// # Events
+///
+/// * topics - `["weighted_uninstalled", smart_account: Address]`
+/// * data - `[context_rule_id: u32]`
 pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
 
     let key = WeightedThresholdStorageKey::AccountContext(smart_account.clone(), context_rule.id);
+
+    if !e.storage().persistent().has(&key) {
+        panic_with_error!(e, WeightedThresholdError::SmartAccountNotInstalled)
+    }
+
     e.storage().persistent().remove(&key);
+
+    WeightedUninstalled { smart_account: smart_account.clone(), context_rule_id: context_rule.id }
+        .publish(e);
 }
 
 /// Helper to calculate the total weight from a map of signer weights.

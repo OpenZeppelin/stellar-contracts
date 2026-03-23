@@ -43,13 +43,43 @@ use crate::smart_account::{ContextRule, Signer};
 /// Event emitted when a spending limit policy is enforced.
 #[contractevent]
 #[derive(Clone)]
-pub struct SpendingLimitPolicyEnforced {
+pub struct SpendingLimitEnforced {
     #[topic]
     pub smart_account: Address,
     pub context: Context,
     pub context_rule_id: u32,
     pub amount: i128,
     pub total_spent_in_period: i128,
+}
+
+/// Event emitted when a spending limit policy is installed.
+#[contractevent]
+#[derive(Clone, Debug)]
+pub struct SpendingLimitInstalled {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+    pub spending_limit: i128,
+    pub period_ledgers: u32,
+}
+
+/// Event emitted when the spending limit value is changed.
+#[contractevent]
+#[derive(Clone, Debug)]
+pub struct SpendingLimitChanged {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
+    pub spending_limit: i128,
+}
+
+/// Event emitted when a spending limit policy is uninstalled.
+#[contractevent]
+#[derive(Clone, Debug)]
+pub struct SpendingLimitUninstalled {
+    #[topic]
+    pub smart_account: Address,
+    pub context_rule_id: u32,
 }
 
 /// Installation parameters for the spending limit policy.
@@ -176,10 +206,11 @@ pub fn get_spending_limit_data(
 ///   amount is not within the spending limit for the rolling period.
 /// * [`SpendingLimitError::NotAllowed`] - When there are no authenticated
 ///   signers, the context is not a transfer with well-formatted amount.
+/// * refer to [`get_spending_limit_data`] errors.
 ///
 /// # Events
 ///
-/// * topics - `["spending_limit_policy_enforced", smart_account: Address]`
+/// * topics - `["spending_limit_enforced", smart_account: Address]`
 /// * data - `[context: Context, context_rule_id: u32, amount: i128,
 ///   total_spent_in_period: i128]`
 pub fn enforce(
@@ -230,7 +261,7 @@ pub fn enforce(
 
                         e.storage().persistent().set(&key, &data);
 
-                        SpendingLimitPolicyEnforced {
+                        SpendingLimitEnforced {
                             smart_account: smart_account.clone(),
                             context: context.clone(),
                             context_rule_id: context_rule.id,
@@ -265,6 +296,11 @@ pub fn enforce(
 ///
 /// * [`SpendingLimitError::InvalidLimitOrPeriod`] - When spending_limit is not
 ///   positive.
+///
+/// # Events
+///
+/// * topics - `["spending_limit_changed", smart_account: Address]`
+/// * data - `[context_rule_id: u32, spending_limit: i128]`
 pub fn set_spending_limit(
     e: &Env,
     spending_limit: i128,
@@ -283,6 +319,13 @@ pub fn set_spending_limit(
     data.spending_limit = spending_limit;
 
     e.storage().persistent().set(&key, &data);
+
+    SpendingLimitChanged {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+        spending_limit,
+    }
+    .publish(e);
 }
 
 /// Installs the spending limit policy on a smart account.
@@ -302,6 +345,11 @@ pub fn set_spending_limit(
 ///   positive or period_ledgers is zero.
 /// * [`SpendingLimitError::AlreadyInstalled`] - When policy was already
 ///   installed for a given smart account and context rule.
+///
+/// # Events
+///
+/// * topics - `["spending_limit_installed", smart_account: Address]`
+/// * data - `[context_rule_id: u32, spending_limit: i128, period_ledgers: u32]`
 pub fn install(
     e: &Env,
     params: &SpendingLimitAccountParams,
@@ -328,6 +376,14 @@ pub fn install(
     };
 
     e.storage().persistent().set(&key, &data);
+
+    SpendingLimitInstalled {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+        spending_limit: params.spending_limit,
+        period_ledgers: params.period_ledgers,
+    }
+    .publish(e);
 }
 
 /// Uninstalls the spending limit policy from a smart account.
@@ -339,13 +395,33 @@ pub fn install(
 /// * `e` - Access to the Soroban environment.
 /// * `context_rule` - The context rule for this policy.
 /// * `smart_account` - The address of the smart account.
+///
+/// # Errors
+///
+/// * [`SpendingLimitError::SmartAccountNotInstalled`] - When the policy is not
+///   installed for the given smart account and context rule.
+///
+/// # Events
+///
+/// * topics - `["spending_limit_uninstalled", smart_account: Address]`
+/// * data - `[context_rule_id: u32]`
 pub fn uninstall(e: &Env, context_rule: &ContextRule, smart_account: &Address) {
     // Require authorization from the smart_account
     smart_account.require_auth();
 
-    e.storage()
-        .persistent()
-        .remove(&SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id));
+    let key = SpendingLimitStorageKey::AccountContext(smart_account.clone(), context_rule.id);
+
+    if !e.storage().persistent().has(&key) {
+        panic_with_error!(e, SpendingLimitError::SmartAccountNotInstalled)
+    }
+
+    e.storage().persistent().remove(&key);
+
+    SpendingLimitUninstalled {
+        smart_account: smart_account.clone(),
+        context_rule_id: context_rule.id,
+    }
+    .publish(e);
 }
 
 // ################## HELPER FUNCTIONS ##################
