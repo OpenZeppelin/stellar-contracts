@@ -1,7 +1,7 @@
 use soroban_sdk::{Address, Env, MuxedAddress};
 use stellar_governance::votes::transfer_voting_units;
 
-use crate::fungible::{Base, ContractOverrides};
+use crate::fungible::{overrides::BurnableOverrides, Base, ContractOverrides};
 
 pub struct FungibleVotes;
 
@@ -12,6 +12,16 @@ impl ContractOverrides for FungibleVotes {
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         FungibleVotes::transfer_from(e, spender, from, to, amount);
+    }
+}
+
+impl BurnableOverrides for FungibleVotes {
+    fn burn(e: &Env, from: &Address, amount: i128) {
+        FungibleVotes::burn(e, from, amount);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        FungibleVotes::burn_from(e, spender, from, amount);
     }
 }
 

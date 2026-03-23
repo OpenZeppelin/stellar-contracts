@@ -2,7 +2,7 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, MuxedAddress};
 
 use crate::fungible::{
     extensions::allowlist::{emit_user_allowed, emit_user_disallowed},
-    overrides::{Base, ContractOverrides},
+    overrides::{Base, BurnableOverrides, ContractOverrides},
     FungibleTokenError, ALLOW_BLOCK_EXTEND_AMOUNT, ALLOW_BLOCK_TTL_THRESHOLD,
 };
 
@@ -19,6 +19,16 @@ impl ContractOverrides for AllowList {
 
     fn approve(e: &Env, owner: &Address, spender: &Address, amount: i128, live_until_ledger: u32) {
         AllowList::approve(e, owner, spender, amount, live_until_ledger);
+    }
+}
+
+impl BurnableOverrides for AllowList {
+    fn burn(e: &Env, from: &Address, amount: i128) {
+        AllowList::burn(e, from, amount);
+    }
+
+    fn burn_from(e: &Env, spender: &Address, from: &Address, amount: i128) {
+        AllowList::burn_from(e, spender, from, amount);
     }
 }
 

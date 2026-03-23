@@ -193,3 +193,92 @@ fn blocklist_transfer_from_override_works() {
     assert_eq!(client.balance(&user3), transfer_amount);
     assert_eq!(client.balance(&user1), 0);
 }
+
+#[test]
+fn burn_non_blocked_account_works() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &manager, &initial_supply);
+    let burn_amount = 500;
+
+    e.mock_all_auths();
+
+    // Transfer some tokens to user1
+    client.transfer(&admin, &user1, &1000);
+    assert_eq!(client.balance(&user1), 1000);
+
+    // Non-blocked user can burn their own tokens
+    client.burn(&user1, &burn_amount);
+    assert_eq!(client.balance(&user1), 500);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn blocked_user_cannot_burn() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &manager, &initial_supply);
+
+    e.mock_all_auths();
+
+    // Transfer some tokens to user1, then block them
+    client.transfer(&admin, &user1, &1000);
+    client.block_user(&user1, &manager);
+    assert!(client.blocked(&user1));
+
+    // Blocked user cannot burn
+    client.burn(&user1, &500);
+}
+
+#[test]
+fn burn_from_non_blocked_account_works() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &manager, &initial_supply);
+    let burn_amount = 500;
+
+    e.mock_all_auths();
+
+    // Transfer some tokens to user1
+    client.transfer(&admin, &user1, &1000);
+
+    // User1 approves user2 to spend tokens
+    client.approve(&user1, &user2, &burn_amount, &1000);
+
+    // User2 can burn from non-blocked user1's account
+    client.burn_from(&user2, &user1, &burn_amount);
+    assert_eq!(client.balance(&user1), 500);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #114)")]
+fn cannot_burn_from_blocked_account() {
+    let e = Env::default();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let user1 = Address::generate(&e);
+    let user2 = Address::generate(&e);
+    let initial_supply = 1_000_000;
+    let client = create_client(&e, &admin, &manager, &initial_supply);
+
+    e.mock_all_auths();
+
+    // Transfer some tokens to user1, approve user2, then block user1
+    client.transfer(&admin, &user1, &1000);
+    client.approve(&user1, &user2, &500, &1000);
+    client.block_user(&user1, &manager);
+    assert!(client.blocked(&user1));
+
+    // User2 cannot burn from blocked user1's account
+    client.burn_from(&user2, &user1, &500);
+}
