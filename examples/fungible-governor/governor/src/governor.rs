@@ -26,6 +26,27 @@ impl GovernorContract {
 
 #[contractimpl(contracttrait)]
 impl Governor for GovernorContract {
+    fn queue(
+        e: &Env,
+        targets: Vec<Address>,
+        functions: Vec<Symbol>,
+        args: Vec<Vec<Val>>,
+        description_hash: BytesN<32>,
+        eta: u32,
+        _operator: Address,
+    ) -> BytesN<32> {
+        // Open queueing: any account can queue a succeeded proposal.
+        governor::queue(
+            e,
+            targets,
+            functions,
+            args,
+            &description_hash,
+            eta,
+            Self::proposals_need_queuing(e),
+        )
+    }
+
     fn execute(
         e: &Env,
         targets: Vec<Address>,
@@ -43,7 +64,7 @@ impl Governor for GovernorContract {
             functions,
             args,
             &description_hash,
-            Self::proposal_needs_queuing(e),
+            Self::proposals_need_queuing(e),
         )
     }
 
