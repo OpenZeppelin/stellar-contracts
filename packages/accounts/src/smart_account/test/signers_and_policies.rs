@@ -381,7 +381,7 @@ fn remove_policy_success() {
         assert!(!updated_rule.policies.contains(&policy_address));
     });
 
-    // case when `unistall` of the policy panics
+    // case when `uninstall` of the policy panics
     e.as_contract(&policy_address, || {
         e.storage().persistent().set(&symbol_short!("veto"), &true);
     });

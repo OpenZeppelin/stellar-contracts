@@ -124,6 +124,12 @@ pub enum Signer {
 /// The length of `context_rule_ids` must equal the number of auth contexts;
 /// a mismatch is rejected with
 /// [`SmartAccountError::ContextRuleIdsLengthMismatch`].
+///
+/// **Important:** `context_rule_ids` are bound into the digest that signers
+/// authenticate against: `auth_digest = sha256(signature_payload ||
+/// context_rule_ids.to_xdr())`. Signers must sign `auth_digest`, not the
+/// raw `signature_payload` from the host. This prevents rule-selection
+/// downgrade attacks.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct AuthPayload {
@@ -412,6 +418,12 @@ pub fn validate_context_rule_name(e: &Env, name: &String) {
 /// validate against for the corresponding auth context (by index). Its length
 /// must equal `auth_contexts.len()`.
 ///
+/// To prevent rule-selection downgrade attacks, `context_rule_ids` are bound
+/// into the digest that signers authenticate against:
+/// `auth_digest = sha256(signature_payload || context_rule_ids.to_xdr())`.
+/// Altering `context_rule_ids` after signature collection therefore
+/// invalidates all signatures.
+///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
@@ -435,7 +447,12 @@ pub fn do_check_auth(
         panic_with_error!(e, SmartAccountError::ContextRuleIdsLengthMismatch);
     }
 
-    authenticate(e, signature_payload, &signatures.signers);
+    // Bind context_rule_ids into the signed digest.
+    let mut preimage = signature_payload.to_bytes().to_bytes();
+    preimage.append(&signatures.context_rule_ids.clone().to_xdr(e));
+    let auth_digest = e.crypto().sha256(&preimage);
+
+    authenticate(e, &auth_digest, &signatures.signers);
 
     // Validate all contexts against their specified rules.
     let validated_contexts = Vec::from_iter(

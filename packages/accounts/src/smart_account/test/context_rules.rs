@@ -7,7 +7,9 @@ use soroban_sdk::{
     },
     contract, contractimpl, symbol_short,
     testutils::{Address as _, Events, Ledger},
-    vec, Address, Bytes, BytesN, Env, Map, String, Symbol, TryFromVal, Val, Vec,
+    vec,
+    xdr::ToXdr,
+    Address, Bytes, BytesN, Env, Map, String, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::{
@@ -626,7 +628,7 @@ fn remove_context_rule_success() {
         )
     });
 
-    // `unistall` of the first policy panics
+    // `uninstall` of the first policy panics
     e.as_contract(&rule.policies.get_unchecked(0), || {
         e.storage().persistent().set(&symbol_short!("veto"), &true);
     });
@@ -1135,6 +1137,145 @@ fn contains_canonical_duplicate_external_with_delegated_existing() {
 
         // No External signer with the same verifier in the list → no duplicate
         assert!(!contains_canonical_duplicate(&e, &existing, &new_signer));
+    });
+}
+
+// ################## RULE-SELECTION DOWNGRADE TESTS ##################
+
+#[contract]
+struct HashCheckingVerifier;
+
+#[contractimpl]
+impl HashCheckingVerifier {
+    pub fn verify(e: &Env, hash: Bytes, _key_data: Val, _sig_data: Val) -> bool {
+        let expected: Bytes = e.storage().persistent().get(&symbol_short!("exp_hash")).unwrap();
+        hash == expected
+    }
+
+    pub fn canonicalize_key(e: &Env, key_data: Val) -> Bytes {
+        Bytes::try_from_val(e, &key_data).unwrap()
+    }
+
+    pub fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes> {
+        Vec::from_iter(e, key_data.iter().map(|key| Bytes::try_from_val(e, &key).unwrap()))
+    }
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3003)")]
+fn do_check_auth_rule_selection_downgrade_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let verifier_addr = e.register(HashCheckingVerifier, ());
+
+    e.as_contract(&address, || {
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr.clone());
+
+        let key_data = Bytes::from_array(&e, &[1, 2, 3, 4]);
+        let external_signer = Signer::External(verifier_addr.clone(), key_data.clone());
+
+        // Create a strict rule (id 0) with our external signer
+        let strict_rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "strict_rule"),
+            None,
+            &Vec::from_array(&e, [external_signer.clone()]),
+            &create_test_policies_map(&e),
+        );
+
+        // Create a weak rule (id 1) with the same signer but no policies
+        let weak_rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "weak_rule"),
+            None,
+            &Vec::from_array(&e, [external_signer.clone()]),
+            &Map::new(&e),
+        );
+
+        let payload = Bytes::from_array(&e, &[1u8; 32]);
+        let signature_payload = e.crypto().sha256(&payload);
+
+        // Signer signs expecting the STRICT rule (id 0).
+        // auth_digest = sha256(signature_payload || [strict_rule.id].to_xdr())
+        let intended_rule_ids = vec![&e, strict_rule.id];
+        let mut intended_preimage = signature_payload.to_bytes().to_bytes();
+        intended_preimage.append(&intended_rule_ids.to_xdr(&e));
+        let intended_digest = e.crypto().sha256(&intended_preimage);
+
+        // Store the expected hash in the verifier so it accepts this digest
+        e.as_contract(&verifier_addr, || {
+            e.storage()
+                .persistent()
+                .set(&symbol_short!("exp_hash"), &intended_digest.to_bytes().to_bytes());
+        });
+
+        // Attacker swaps context_rule_ids to the WEAK rule after signatures
+        // were collected for the STRICT rule.
+        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
+        let auth_contexts = Vec::from_array(&e, [context]);
+
+        let mut signature_map = Map::new(&e);
+        signature_map.set(external_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
+        let tampered_signatures =
+            AuthPayload { signers: signature_map, context_rule_ids: vec![&e, weak_rule.id] };
+
+        // This must fail: the auth_digest computed inside do_check_auth will
+        // use weak_rule.id, which differs from the digest the signer signed.
+        let _ = do_check_auth(&e, &signature_payload, &tampered_signatures, &auth_contexts);
+    });
+}
+
+#[test]
+fn do_check_auth_rule_selection_matching_succeeds() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let verifier_addr = e.register(HashCheckingVerifier, ());
+
+    e.as_contract(&address, || {
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr.clone());
+
+        let key_data = Bytes::from_array(&e, &[1, 2, 3, 4]);
+        let external_signer = Signer::External(verifier_addr.clone(), key_data.clone());
+
+        // Create a rule with our external signer (no policies for simplicity)
+        let rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "target_rule"),
+            None,
+            &Vec::from_array(&e, [external_signer.clone()]),
+            &Map::new(&e),
+        );
+
+        let payload = Bytes::from_array(&e, &[1u8; 32]);
+        let signature_payload = e.crypto().sha256(&payload);
+
+        // Signer signs with the correct rule id.
+        let rule_ids = vec![&e, rule.id];
+        let mut preimage = signature_payload.to_bytes().to_bytes();
+        preimage.append(&rule_ids.clone().to_xdr(&e));
+        let expected_digest = e.crypto().sha256(&preimage);
+
+        e.as_contract(&verifier_addr, || {
+            e.storage()
+                .persistent()
+                .set(&symbol_short!("exp_hash"), &expected_digest.to_bytes().to_bytes());
+        });
+
+        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
+        let auth_contexts = Vec::from_array(&e, [context]);
+
+        let mut signature_map = Map::new(&e);
+        signature_map.set(external_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
+        let signatures = AuthPayload { signers: signature_map, context_rule_ids: rule_ids };
+
+        // This must succeed: rule_ids match what was signed.
+        let result = do_check_auth(&e, &signature_payload, &signatures, &auth_contexts);
+        assert!(result.is_ok());
     });
 }
 
