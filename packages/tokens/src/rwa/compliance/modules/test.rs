@@ -374,7 +374,10 @@ fn require_non_negative_amount_panics_on_negative() {
 fn module_name_returns_soroban_string() {
     let e = Env::default();
 
-    assert_eq!(module_name(&e, "ExampleModule"), soroban_sdk::String::from_str(&e, "ExampleModule"));
+    assert_eq!(
+        module_name(&e, "ExampleModule"),
+        soroban_sdk::String::from_str(&e, "ExampleModule")
+    );
 }
 
 #[test]
@@ -434,9 +437,9 @@ fn country_code_extracts_all_relation_variants() {
         756
     );
     assert_eq!(
-        country_code(&CountryRelation::Organization(
-            OrganizationCountryRelation::TaxJurisdiction(208)
-        )),
+        country_code(&CountryRelation::Organization(OrganizationCountryRelation::TaxJurisdiction(
+            208
+        ))),
         208
     );
     assert_eq!(
