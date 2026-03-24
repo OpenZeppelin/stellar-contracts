@@ -435,6 +435,8 @@ pub fn validate_context_rule_name(e: &Env, name: &String) {
 ///
 /// * [`SmartAccountError::ContextRuleIdsLengthMismatch`] - When
 ///   `context_rule_ids` has a different length than `auth_contexts`.
+/// * [`SmartAccountError::UnauthorizedSigner`] - When a signer in `AuthPayload`
+///   is not part of any selected context rule.
 /// * refer to [`authenticate`] errors.
 /// * refer to [`get_validated_context_by_id`] errors.
 pub fn do_check_auth(
@@ -465,8 +467,15 @@ pub fn do_check_auth(
         }),
     );
 
-    // Enforce all policies.
+    let mut allowed_signers = Map::new(e);
     for (rule, context, authenticated_signers) in validated_contexts.iter() {
+        // Collect all signers from the validated rules to check below for signers that
+        // do not belong to any rule.
+        for signer in rule.signers.iter() {
+            allowed_signers.set(signer, ());
+        }
+
+        // Enforce all policies.
         for policy in rule.policies.iter() {
             PolicyClient::new(e, &policy).enforce(
                 &context,
@@ -474,6 +483,15 @@ pub fn do_check_auth(
                 &rule,
                 &e.current_contract_address(),
             );
+        }
+    }
+
+    // Reject any signer in AuthPayload that is not part of any selected
+    // rule, preventing arbitrary external calls via attacker-controlled
+    // verifier contracts.
+    for signer in signatures.signers.keys().iter() {
+        if !allowed_signers.contains_key(signer) {
+            panic_with_error!(e, SmartAccountError::UnauthorizedSigner);
         }
     }
 

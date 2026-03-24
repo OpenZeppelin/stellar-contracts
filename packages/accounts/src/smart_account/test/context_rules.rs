@@ -319,6 +319,48 @@ fn do_check_auth_context_rule_ids_length_mismatch_fails() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3016)")]
+fn do_check_auth_unauthorized_external_signer_rejected() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let verifier_addr = e.register(MockVerifierContract, ());
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr.clone());
+
+        // Create a rule with only delegated signers
+        let signers = create_test_signers(&e);
+        let rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "legit_rule"),
+            None,
+            &signers,
+            &Map::new(&e),
+        );
+
+        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
+        let auth_contexts = Vec::from_array(&e, [context]);
+
+        // Attacker appends an external signer with an attacker-controlled
+        // verifier that is NOT part of any selected rule.
+        let rogue_key = Bytes::from_array(&e, &[0xAA; 4]);
+        let rogue_signer = Signer::External(verifier_addr.clone(), rogue_key);
+
+        let mut all = signers.clone();
+        all.push_back(rogue_signer);
+
+        let signatures = create_signatures(&e, &all, vec![&e, rule.id]);
+        let payload = Bytes::from_array(&e, &[1u8; 32]);
+
+        let _ = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
+    });
+}
+
+#[test]
 fn add_context_rule_multiple_rules() {
     let e = Env::default();
     let address = e.register(MockContract, ());
