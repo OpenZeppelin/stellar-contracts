@@ -1,7 +1,7 @@
-//! # Smart Account Storage - Context-Centric Authorization
+//! # Smart Account
 //!
 //! This module implements a flexible, context-centric authorization system for
-//! smart accounts that separates concerns into three key dimensions:
+//! smart accounts.
 //!
 //! ## Architecture Overview
 //!
@@ -556,7 +556,12 @@ pub struct ContextRuleAdded {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `context_rule` - The newly created context rule.
+/// * `context_rule_id` - The ID assigned to the new context rule.
+/// * `name` - The name of the context rule.
+/// * `context_type` - The type of context this rule applies to.
+/// * `valid_until` - Optional ledger number at which the rule expires.
+/// * `signer_ids` - The IDs of the signers associated with this rule.
+/// * `policy_ids` - The IDs of the policies associated with this rule.
 ///
 /// # Events
 ///
