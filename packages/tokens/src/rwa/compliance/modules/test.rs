@@ -1,8 +1,8 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, testutils::Address as _, vec, Address, Env, IntoVal, Val,
-    Vec,
+    contract, contractimpl, contracttype, testutils::Address as _, vec, Address, Env, IntoVal,
+    Symbol, Val, Vec,
 };
 
 use super::storage::*;
@@ -10,7 +10,7 @@ use crate::rwa::{
     compliance::{Compliance, ComplianceHook},
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
-        IndividualCountryRelation,
+        IndividualCountryRelation, OrganizationCountryRelation,
     },
     utils::token_binder::TokenBinder,
 };
@@ -355,6 +355,29 @@ fn panicking_math_helpers_return_expected_values() {
 }
 
 #[test]
+fn require_non_negative_amount_accepts_zero_and_positive_values() {
+    let e = Env::default();
+
+    require_non_negative_amount(&e, 0);
+    require_non_negative_amount(&e, 42);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #391)")]
+fn require_non_negative_amount_panics_on_negative() {
+    let e = Env::default();
+
+    require_non_negative_amount(&e, -1);
+}
+
+#[test]
+fn module_name_returns_soroban_string() {
+    let e = Env::default();
+
+    assert_eq!(module_name(&e, "ExampleModule"), soroban_sdk::String::from_str(&e, "ExampleModule"));
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #392)")]
 fn add_i128_or_panic_panics_on_overflow() {
     let e = Env::default();
@@ -368,4 +391,65 @@ fn sub_i128_or_panic_panics_on_underflow() {
     let e = Env::default();
 
     let _ = sub_i128_or_panic(&e, i128::MIN, 1);
+}
+
+#[test]
+fn country_code_extracts_all_relation_variants() {
+    let e = Env::default();
+
+    assert_eq!(
+        country_code(&CountryRelation::Individual(IndividualCountryRelation::Residence(276))),
+        276
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Individual(IndividualCountryRelation::Citizenship(724))),
+        724
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Individual(IndividualCountryRelation::SourceOfFunds(840))),
+        840
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Individual(IndividualCountryRelation::TaxResidency(250))),
+        250
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Individual(IndividualCountryRelation::Custom(
+            Symbol::new(&e, "custom"),
+            826,
+        ))),
+        826
+    );
+
+    assert_eq!(
+        country_code(&CountryRelation::Organization(OrganizationCountryRelation::Incorporation(
+            528
+        ))),
+        528
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Organization(
+            OrganizationCountryRelation::OperatingJurisdiction(756)
+        )),
+        756
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Organization(
+            OrganizationCountryRelation::TaxJurisdiction(208)
+        )),
+        208
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Organization(OrganizationCountryRelation::SourceOfFunds(
+            484
+        ))),
+        484
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Organization(OrganizationCountryRelation::Custom(
+            Symbol::new(&e, "branch"),
+            392,
+        ))),
+        392
+    );
 }
