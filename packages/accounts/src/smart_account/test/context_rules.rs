@@ -14,10 +14,10 @@ use crate::{
     policies::Policy,
     smart_account::{
         storage::{
-            add_context_rule, authenticate, contains_canonical_duplicate, do_check_auth,
-            get_authenticated_signers, get_context_rule, get_context_rules_count,
-            get_validated_context_by_id, remove_context_rule, update_context_rule_name,
-            update_context_rule_valid_until, AuthPayload, ContextRule, ContextRuleType, Signer,
+            add_context_rule, authenticate, do_check_auth, get_authenticated_signers,
+            get_context_rule, get_context_rules_count, get_validated_context_by_id,
+            remove_context_rule, update_context_rule_name, update_context_rule_valid_until,
+            validate_no_canonical_duplicates, AuthPayload, ContextRule, ContextRuleType, Signer,
             SmartAccountStorageKey,
         },
         MAX_EXTERNAL_KEY_SIZE,
@@ -1040,48 +1040,56 @@ impl MockCanonicalizingVerifier {
     }
 }
 
+// ################## VALIDATE NO CANONICAL DUPLICATES TESTS ##################
+
 #[test]
-fn contains_canonical_duplicate_same_canonical_keys() {
+fn validate_no_canonical_duplicates_no_duplicates() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
         let verifier = e.register(MockCanonicalizingVerifier, ());
 
-        let mut existing = Bytes::from_array(&e, &[1u8; 32]);
-        existing.extend_from_array(&[0xAA; 8]);
-        let signers = Vec::from_array(&e, [Signer::External(verifier.clone(), existing)]);
+        let mut key1 = Bytes::from_array(&e, &[1u8; 32]);
+        key1.extend_from_array(&[0xAA; 8]);
+        let mut key2 = Bytes::from_array(&e, &[2u8; 32]);
+        key2.extend_from_array(&[0xBB; 8]);
 
-        let mut candidate = Bytes::from_array(&e, &[1u8; 32]);
-        candidate.extend_from_array(&[0xBB; 8]);
-        let new_signer = Signer::External(verifier.clone(), candidate);
+        let signers = Vec::from_array(
+            &e,
+            [Signer::External(verifier.clone(), key1), Signer::External(verifier.clone(), key2)],
+        );
 
-        assert!(contains_canonical_duplicate(&e, &signers, &new_signer));
+        validate_no_canonical_duplicates(&e, &signers);
     });
 }
 
 #[test]
-fn contains_canonical_duplicate_different_canonical_keys() {
+#[should_panic(expected = "Error(Contract, #3007)")]
+fn validate_no_canonical_duplicates_same_canonical_keys() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
         let verifier = e.register(MockCanonicalizingVerifier, ());
 
-        let mut existing = Bytes::from_array(&e, &[1u8; 32]);
-        existing.extend_from_array(&[0xAA; 8]);
-        let signers = Vec::from_array(&e, [Signer::External(verifier.clone(), existing)]);
+        // Same first 32 bytes → same canonical form.
+        let mut key1 = Bytes::from_array(&e, &[1u8; 32]);
+        key1.extend_from_array(&[0xAA; 8]);
+        let mut key2 = Bytes::from_array(&e, &[1u8; 32]);
+        key2.extend_from_array(&[0xBB; 8]);
 
-        let mut candidate = Bytes::from_array(&e, &[2u8; 32]);
-        candidate.extend_from_array(&[0xBB; 8]);
-        let new_signer = Signer::External(verifier.clone(), candidate);
+        let signers = Vec::from_array(
+            &e,
+            [Signer::External(verifier.clone(), key1), Signer::External(verifier.clone(), key2)],
+        );
 
-        assert!(!contains_canonical_duplicate(&e, &signers, &new_signer));
+        validate_no_canonical_duplicates(&e, &signers);
     });
 }
 
 #[test]
-fn contains_canonical_duplicate_no_matching_verifier() {
+fn validate_no_canonical_duplicates_different_verifiers_same_key() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
@@ -1089,52 +1097,33 @@ fn contains_canonical_duplicate_no_matching_verifier() {
         let verifier1 = e.register(MockCanonicalizingVerifier, ());
         let verifier2 = e.register(MockCanonicalizingVerifier, ());
 
-        let mut existing = Bytes::from_array(&e, &[3u8; 32]);
-        existing.extend_from_array(&[0xAA; 8]);
-        let signers = Vec::from_array(&e, [Signer::External(verifier1, existing)]);
+        let mut key = Bytes::from_array(&e, &[1u8; 32]);
+        key.extend_from_array(&[0xAA; 8]);
 
-        let mut candidate = Bytes::from_array(&e, &[3u8; 32]);
-        candidate.extend_from_array(&[0xBB; 8]);
-        let new_signer = Signer::External(verifier2, candidate);
+        // Same canonical key but different verifiers → not duplicates.
+        let signers = Vec::from_array(
+            &e,
+            [Signer::External(verifier1, key.clone()), Signer::External(verifier2, key)],
+        );
 
-        assert!(!contains_canonical_duplicate(&e, &signers, &new_signer));
+        validate_no_canonical_duplicates(&e, &signers);
     });
 }
 
 #[test]
-fn contains_canonical_duplicate_delegated_signers() {
+#[should_panic(expected = "Error(Contract, #3007)")]
+fn validate_no_canonical_duplicates_delegated_duplicates() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let delegated_a = Address::generate(&e);
-        let delegated_b = Address::generate(&e);
-        let signers = Vec::from_array(&e, [Signer::Delegated(delegated_a.clone())]);
+        let delegated = Address::generate(&e);
+        let signers = Vec::from_array(
+            &e,
+            [Signer::Delegated(delegated.clone()), Signer::Delegated(delegated)],
+        );
 
-        assert!(contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_a)));
-        assert!(!contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_b)));
-    });
-}
-
-#[test]
-fn contains_canonical_duplicate_external_with_delegated_existing() {
-    // When the new signer is External but the existing signer list contains a
-    // Delegated signer, the `if let Signer::External` branch does not match
-    // for the delegated entry — covering the implicit-else path.
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        let verifier = e.register(MockCanonicalizingVerifier, ());
-        let delegated_signer = Signer::Delegated(Address::generate(&e));
-        let existing = Vec::from_array(&e, [delegated_signer]);
-
-        let mut key_data = Bytes::from_array(&e, &[5u8; 32]);
-        key_data.extend_from_array(&[0xCC; 8]);
-        let new_signer = Signer::External(verifier, key_data);
-
-        // No External signer with the same verifier in the list → no duplicate
-        assert!(!contains_canonical_duplicate(&e, &existing, &new_signer));
+        validate_no_canonical_duplicates(&e, &signers);
     });
 }
 
