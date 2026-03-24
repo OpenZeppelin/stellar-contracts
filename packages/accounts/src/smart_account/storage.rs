@@ -553,12 +553,13 @@ pub fn validate_no_canonical_duplicates(e: &Env, signers: &Vec<Signer>) {
 
     // One canonicalize call per verifier, then check for dups in each group.
     for (verifier, key_batch) in verifier_groups.iter() {
+        let client = VerifierClient::new(e, &verifier);
+        // Check canonicalization even for a single key in a batch.
+        let canonical = client.batch_canonicalize_key(&key_batch);
+
         if key_batch.len() <= 1 {
             continue;
         }
-
-        let client = VerifierClient::new(e, &verifier);
-        let canonical = client.batch_canonicalize_key(&key_batch);
 
         let mut seen_external: Vec<Bytes> = Vec::new(e);
         for canonical_key in canonical.iter() {
