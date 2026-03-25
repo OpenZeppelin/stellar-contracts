@@ -559,6 +559,14 @@ pub trait Governor {
     /// [`storage::cancel`] is suggested to perform the actual state transition
     /// after access control and authorization logic has been applied.
     ///
+    /// # Note
+    ///
+    /// [`storage::cancel`] only updates the governor-level proposal state. If
+    /// the proposal has already been queued in an external timelock, the
+    /// implementer must also cancel the corresponding timelock operation
+    /// (e.g. via [`crate::timelock::cancel_operation`])
+    /// to prevent it from remaining executable through the timelock directly.
+    ///
     /// # Example
     ///
     /// ```ignore

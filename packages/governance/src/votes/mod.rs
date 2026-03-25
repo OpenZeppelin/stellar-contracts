@@ -147,10 +147,10 @@ pub trait Votes {
     ///
     /// # Returns
     ///
-    /// * `Some(Address)` - The delegate address (may be the account itself
-    ///   if self-delegated).
-    /// * `None` - If the account has never delegated. An account whose
-    ///   delegate is `None` has **no active voting power**; it must call
+    /// * `Some(Address)` - The delegate address (may be the account itself if
+    ///   self-delegated).
+    /// * `None` - If the account has never delegated. An account whose delegate
+    ///   is `None` has **no active voting power**; it must call
     ///   [`Votes::delegate`] (even to itself) before its votes are counted.
     fn get_delegate(e: &Env, account: Address) -> Option<Address> {
         storage::get_delegate(e, &account)

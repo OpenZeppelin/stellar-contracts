@@ -631,6 +631,14 @@ pub fn execute(
 /// It is the responsibility of the implementer to establish appropriate
 /// access controls to ensure that only authorized accounts can call this
 /// function.
+///
+/// # Note
+///
+/// This function only updates the governor-level proposal state. If the
+/// proposal has already been queued in an external timelock, the
+/// corresponding timelock operation must be cancelled separately (e.g. via
+/// [`crate::timelock::cancel_operation`])
+/// to prevent it from remaining executable through the timelock directly.
 pub fn cancel(
     e: &Env,
     targets: Vec<Address>,

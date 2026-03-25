@@ -185,9 +185,9 @@ pub fn get_total_supply_at_checkpoint(e: &Env, ledger: u32) -> u128 {
 ///
 /// * `Some(Address)` - The delegate address (may be the account itself if
 ///   self-delegated).
-/// * `None` - If the account has never delegated. An account whose delegate
-///   is `None` has no active voting power; it must call [`delegate`] (even
-///   to itself) before its votes are counted.
+/// * `None` - If the account has never delegated. An account whose delegate is
+///   `None` has no active voting power; it must call [`delegate`] (even to
+///   itself) before its votes are counted.
 pub fn get_delegate(e: &Env, account: &Address) -> Option<Address> {
     let key = VotesStorageKey::Delegatee(account.clone());
     if let Some(delegatee) = e.storage().persistent().get::<_, Address>(&key) {
