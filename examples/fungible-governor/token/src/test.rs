@@ -142,7 +142,7 @@ fn propose_and_query_state() {
     assert_eq!(s.governor.proposal_state(&proposal_id), ProposalState::Pending);
 
     // Verify snapshot and deadline
-    // vote_start = 200 + VOTING_DELAY = 210
+    // vote_snapshot = 200 + VOTING_DELAY = 210
     // vote_end = 210 + VOTING_PERIOD = 310
     assert_eq!(s.governor.proposal_snapshot(&proposal_id), 210);
     assert_eq!(s.governor.proposal_deadline(&proposal_id), 310);
@@ -171,7 +171,7 @@ fn full_governance_lifecycle() {
     // State: Pending
     assert_eq!(s.governor.proposal_state(&proposal_id), ProposalState::Pending);
 
-    // Advance past vote_start (210) -> Active
+    // Advance past vote_snapshot (210) -> Active
     s.e.ledger().set_sequence_number(211);
     assert_eq!(s.governor.proposal_state(&proposal_id), ProposalState::Active);
 
@@ -449,15 +449,15 @@ fn voting_power_snapshot_at_proposal_creation() {
     let (targets, functions, args, description) = build_proposal(&s.e, &s.target.address, 42);
     let proposal_id = s.governor.propose(&targets, &functions, &args, &description, &proposer);
 
-    // Advance to Active (past vote_start 210)
+    // Advance to Active (past vote_snapshot 210)
     s.e.ledger().set_sequence_number(211);
 
-    // Mint MORE tokens to voter AFTER vote_start (at ledger 211)
+    // Mint MORE tokens to voter AFTER vote_snapshot (at ledger 211)
     // This should NOT affect their voting power for this proposal
-    // because the snapshot is at vote_start (ledger 210)
+    // because the snapshot is at vote_snapshot (ledger 210)
     s.token.mint(&voter, &10000);
 
-    // voter's weight should be based on snapshot at vote_start (210), which was 600
+    // voter's weight should be based on snapshot at vote_snapshot (210), which was 600
     let weight = s.governor.cast_vote(&proposal_id, &1, &String::from_str(&s.e, ""), &voter);
     assert_eq!(weight, 600);
 }
