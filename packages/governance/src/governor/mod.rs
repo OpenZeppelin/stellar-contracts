@@ -337,13 +337,20 @@ pub trait Governor {
     /// functions, args, and description hash. This allows anyone to compute
     /// the ID without storing the full proposal data.
     ///
+    /// The `description_hash` is computed as
+    /// `keccak256(description.to_bytes())`, i.e., a keccak256 hash of the
+    /// raw UTF-8 bytes of the description string. Off-chain clients can
+    /// reproduce this by hashing the raw string bytes directly — no XDR
+    /// encoding is required.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `targets` - The addresses of contracts to call.
     /// * `functions` - The function names to invoke on each target.
     /// * `args` - The arguments for each function call.
-    /// * `description_hash` - The hash of the proposal description.
+    /// * `description_hash` - The keccak256 hash of the description's raw
+    ///   bytes.
     fn get_proposal_id(
         e: &Env,
         targets: Vec<Address>,
