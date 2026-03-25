@@ -1,9 +1,7 @@
 use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, Events, Ledger},
-    vec,
-    xdr::ToXdr,
-    Address, BytesN, Env, IntoVal, String, Symbol, Val, Vec,
+    vec, Address, BytesN, Env, IntoVal, String, Symbol, Val, Vec,
 };
 
 use crate::governor::{
@@ -973,7 +971,7 @@ fn set_token_contract_fails_on_same_address() {
 fn hash_proposal_is_deterministic() {
     let (e, _) = setup_env();
     let (targets, functions, args, description) = simple_proposal(&e);
-    let desc_hash = e.crypto().keccak256(&description.clone().to_xdr(&e)).to_bytes();
+    let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     let hash1 = hash_proposal(&e, &targets, &functions, &args, &desc_hash);
     let hash2 = hash_proposal(&e, &targets, &functions, &args, &desc_hash);
@@ -988,8 +986,8 @@ fn hash_proposal_differs_with_different_description() {
 
     let desc1 = String::from_str(&e, "Proposal A");
     let desc2 = String::from_str(&e, "Proposal B");
-    let hash1_bytes = e.crypto().keccak256(&desc1.clone().to_xdr(&e)).to_bytes();
-    let hash2_bytes = e.crypto().keccak256(&desc2.clone().to_xdr(&e)).to_bytes();
+    let hash1_bytes = e.crypto().keccak256(&desc1.to_bytes()).to_bytes();
+    let hash2_bytes = e.crypto().keccak256(&desc2.to_bytes()).to_bytes();
 
     let id1 = hash_proposal(&e, &targets, &functions, &args, &hash1_bytes);
     let id2 = hash_proposal(&e, &targets, &functions, &args, &hash2_bytes);
@@ -1001,7 +999,7 @@ fn hash_proposal_differs_with_different_description() {
 fn hash_proposal_differs_with_different_targets() {
     let (e, _) = setup_env();
     let description = String::from_str(&e, "Test");
-    let desc_hash = e.crypto().keccak256(&description.clone().to_xdr(&e)).to_bytes();
+    let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
     let functions = vec![&e, Symbol::new(&e, "do_something")];
     let args: Vec<Vec<Val>> = vec![&e, vec![&e, 1u32.into_val(&e)]];
 
@@ -1526,7 +1524,7 @@ fn cancel_pending_proposal() {
 
     let proposer = Address::generate(&e);
     let (targets, functions, args, description) = simple_proposal(&e);
-    let desc_hash = e.crypto().keccak256(&description.clone().to_xdr(&e)).to_bytes();
+    let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     e.as_contract(&contract_address, || {
         let pid =
@@ -1547,7 +1545,7 @@ fn cancel_active_proposal() {
 
     let proposer = Address::generate(&e);
     let (targets, functions, args, description) = simple_proposal(&e);
-    let desc_hash = e.crypto().keccak256(&description.clone().to_xdr(&e)).to_bytes();
+    let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     let pid = e.as_contract(&contract_address, || {
         propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer)
@@ -1572,7 +1570,7 @@ fn cancel_defeated_proposal() {
 
     let proposer = Address::generate(&e);
     let (targets, functions, args, description) = simple_proposal(&e);
-    let desc_hash = e.crypto().keccak256(&description.clone().to_xdr(&e)).to_bytes();
+    let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     let pid = e.as_contract(&contract_address, || {
         propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer)
@@ -1598,7 +1596,7 @@ fn cancel_fails_when_already_canceled() {
 
     let proposer = Address::generate(&e);
     let (targets, functions, args, description) = simple_proposal(&e);
-    let desc_hash = e.crypto().keccak256(&description.clone().to_xdr(&e)).to_bytes();
+    let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     e.as_contract(&contract_address, || {
         propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer);
@@ -1630,7 +1628,7 @@ fn cancel_emits_event() {
 
     let proposer = Address::generate(&e);
     let (targets, functions, args, description) = simple_proposal(&e);
-    let desc_hash = e.crypto().keccak256(&description.clone().to_xdr(&e)).to_bytes();
+    let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     e.as_contract(&contract_address, || {
         propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer);
@@ -1662,7 +1660,7 @@ fn create_executable_proposal(
     let functions = vec![e, Symbol::new(e, "do_something")];
     let args: Vec<Vec<Val>> = vec![e, vec![e, 42u32.into_val(e)]];
     let description = String::from_str(e, "Executable proposal");
-    let desc_hash = e.crypto().keccak256(&description.clone().to_xdr(e)).to_bytes();
+    let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     let proposer = Address::generate(e);
 
@@ -1707,7 +1705,7 @@ fn execute_fails_when_not_succeeded() {
 
     let proposer = Address::generate(&e);
     let (targets, functions, args, description) = simple_proposal(&e);
-    let desc_hash = e.crypto().keccak256(&description.clone().to_xdr(&e)).to_bytes();
+    let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     e.as_contract(&contract_address, || {
         propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer);
@@ -1846,7 +1844,7 @@ fn full_proposal_lifecycle_to_canceled() {
 
     let proposer = Address::generate(&e);
     let (targets, functions, args, description) = simple_proposal(&e);
-    let desc_hash = e.crypto().keccak256(&description.clone().to_xdr(&e)).to_bytes();
+    let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     let pid = e.as_contract(&contract_address, || {
         propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer)
