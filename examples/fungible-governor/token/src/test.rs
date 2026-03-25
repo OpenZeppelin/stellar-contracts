@@ -457,7 +457,8 @@ fn voting_power_snapshot_at_proposal_creation() {
     // because the snapshot is at vote_snapshot (ledger 210)
     s.token.mint(&voter, &10000);
 
-    // voter's weight should be based on snapshot at vote_snapshot (210), which was 600
+    // voter's weight should be based on snapshot at vote_snapshot (210), which was
+    // 600
     let weight = s.governor.cast_vote(&proposal_id, &1, &String::from_str(&s.e, ""), &voter);
     assert_eq!(weight, 600);
 }
