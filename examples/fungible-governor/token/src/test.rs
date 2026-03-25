@@ -4,9 +4,7 @@ use fungible_governor_contract::{GovernorContract, GovernorContractClient};
 use soroban_sdk::{
     contract, contractimpl, symbol_short,
     testutils::{Address as _, Ledger},
-    vec,
-    xdr::ToXdr,
-    Address, BytesN, Env, IntoVal, String, Symbol, Val, Vec,
+    vec, Address, BytesN, Env, IntoVal, String, Symbol, Val, Vec,
 };
 use stellar_governance::governor::ProposalState;
 
@@ -92,7 +90,7 @@ fn build_proposal(
 /// Hashes the description to produce the description_hash used for
 /// execute/cancel.
 fn description_hash(e: &Env, description: &String) -> BytesN<32> {
-    e.crypto().keccak256(&description.clone().to_xdr(e)).to_bytes()
+    e.crypto().keccak256(&description.to_bytes()).to_bytes()
 }
 
 // ==================== Tests ====================

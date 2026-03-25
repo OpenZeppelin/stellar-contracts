@@ -492,7 +492,7 @@ pub fn propose(
     let current_ledger = e.ledger().sequence();
 
     // Compute proposal ID
-    let description_hash = e.crypto().keccak256(&description.clone().to_xdr(e)).to_bytes();
+    let description_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
 
     // Check proposal doesn't already exist
@@ -672,13 +672,18 @@ pub fn cancel(
 /// args, and description hash. This allows anyone to compute the ID
 /// without storing the full proposal data.
 ///
+/// The `description_hash` is computed as `keccak256(description.to_bytes())`,
+/// i.e., a keccak256 hash of the raw UTF-8 bytes of the description string.
+/// Off-chain clients can reproduce this by hashing the raw string bytes
+/// directly — no XDR encoding is required.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `targets` - The addresses of contracts to call.
 /// * `functions` - The function names to invoke on each target.
 /// * `args` - The arguments for each function call.
-/// * `description_hash` - The hash of the proposal description.
+/// * `description_hash` - The keccak256 hash of the description's raw bytes.
 pub fn hash_proposal(
     e: &Env,
     targets: &Vec<Address>,
