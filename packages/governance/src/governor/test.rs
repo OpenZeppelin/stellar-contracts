@@ -433,8 +433,13 @@ fn tally_succeeded_ignores_abstain() {
 /// can look it up.
 fn store_proposal_with_quorum(e: &Env, proposal_id: &BytesN<32>, quorum: u128) {
     let proposer = Address::generate(e);
-    let core =
-        ProposalCore { proposer, vote_start: 0, vote_end: 0, quorum, state: ProposalState::Active };
+    let core = ProposalCore {
+        proposer,
+        vote_snapshot: 0,
+        vote_end: 0,
+        quorum,
+        state: ProposalState::Active,
+    };
     e.storage().persistent().set(&GovernorStorageKey::Proposal(proposal_id.clone()), &core);
 }
 
@@ -1265,7 +1270,7 @@ fn proposal_transitions_to_active() {
         propose(&e, targets, functions, args, description, &proposer, get_quorum(&e))
     });
 
-    // Advance past voting delay (vote_start). Voting opens after snapshot.
+    // Advance past voting delay (vote_snapshot). Voting opens after snapshot.
     let snapshot = e.as_contract(&contract_address, || storage::get_proposal_snapshot(&e, &pid));
     e.ledger().set_sequence_number(snapshot + 1);
 

@@ -54,9 +54,10 @@ pub enum GovernorStorageKey {
 pub struct ProposalCore {
     /// The address that created the proposal.
     pub proposer: Address,
-    /// The ledger number when voting starts.
-    pub vote_start: u32,
-    /// The ledger number when voting ends.
+    /// The ledger at which voting power is snapshotted. Voting opens on
+    /// the next ledger (`vote_snapshot + 1`).
+    pub vote_snapshot: u32,
+    /// The last ledger where voting is active (inclusive).
     pub vote_end: u32,
     /// The quorum required for this proposal, snapshotted at creation time.
     pub quorum: u128,
@@ -225,7 +226,7 @@ pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState {
 ///   exist.
 pub fn get_proposal_snapshot(e: &Env, proposal_id: &BytesN<32>) -> u32 {
     let core = get_proposal_core(e, proposal_id);
-    core.vote_start
+    core.vote_snapshot
 }
 
 /// Returns the deadline ledger for a proposal.
@@ -506,17 +507,17 @@ pub fn propose(
     // Calculate voting schedule
     let voting_delay = get_voting_delay(e);
     let voting_period = get_voting_period(e);
-    let Some(vote_start) = current_ledger.checked_add(voting_delay) else {
+    let Some(vote_snapshot) = current_ledger.checked_add(voting_delay) else {
         panic_with_error!(e, GovernorError::MathOverflow);
     };
-    let Some(vote_end) = vote_start.checked_add(voting_period) else {
+    let Some(vote_end) = vote_snapshot.checked_add(voting_period) else {
         panic_with_error!(e, GovernorError::MathOverflow);
     };
 
     // Store proposal
     let proposal = ProposalCore {
         proposer: proposer.clone(),
-        vote_start,
+        vote_snapshot,
         vote_end,
         quorum,
         state: ProposalState::Pending,
@@ -531,7 +532,7 @@ pub fn propose(
         &targets,
         &functions,
         &args,
-        vote_start,
+        vote_snapshot,
         vote_end,
         &description,
     );
@@ -724,7 +725,7 @@ pub fn check_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> u32 {
         panic_with_error!(e, GovernorError::ProposalNotActive);
     }
 
-    core.vote_start
+    core.vote_snapshot
 }
 
 fn derive_proposal_state(e: &Env, proposal_id: &BytesN<32>, core: &ProposalCore) -> ProposalState {
@@ -744,8 +745,8 @@ fn derive_proposal_state(e: &Env, proposal_id: &BytesN<32>, core: &ProposalCore)
 
     let current_ledger = e.ledger().sequence();
 
-    // `vote_start` is the snapshot ledger, so voting opens on the next ledger.
-    if current_ledger <= core.vote_start {
+    // `vote_snapshot` is the snapshot ledger; voting opens on the next ledger.
+    if current_ledger <= core.vote_snapshot {
         return ProposalState::Pending;
     }
 
