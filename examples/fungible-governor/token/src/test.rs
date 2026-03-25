@@ -477,7 +477,7 @@ fn cannot_vote_before_voting_starts() {
     let (targets, functions, args, description) = build_proposal(&s.e, &s.target.address, 42);
     let proposal_id = s.governor.propose(&targets, &functions, &args, &description, &proposer);
 
-    // Try to vote while still Pending (ledger 200 <= vote_start 210)
+    // Try to vote while still Pending (ledger 200 <= vote_snapshot 210)
     // Should panic with ProposalNotActive = 5005
     s.governor.cast_vote(&proposal_id, &1, &String::from_str(&s.e, ""), &voter);
 }
