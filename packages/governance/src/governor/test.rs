@@ -1,8 +1,6 @@
 use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, Events, Ledger},
-    vec,
-    Address, BytesN, Env, IntoVal, String, Symbol, TryFromVal, Val, Vec,
     vec, Address, BytesN, Env, IntoVal, String, Symbol, TryFromVal, Val, Vec,
 };
 
@@ -1993,11 +1991,19 @@ fn queue_fails_when_not_succeeded() {
 
     let proposer = Address::generate(&e);
     let (targets, functions, args, description) = simple_proposal(&e);
-    let desc_hash = e.crypto().keccak256(&description.clone().to_xdr(&e)).to_bytes();
+    let desc_hash = e.crypto().keccak256(&description.clone().to_bytes()).to_bytes();
 
     // Create proposal (stays Pending)
     e.as_contract(&contract_address, || {
-        propose(&e, targets.clone(), functions.clone(), args.clone(), description, &proposer);
+        propose(
+            &e,
+            targets.clone(),
+            functions.clone(),
+            args.clone(),
+            description,
+            &proposer,
+            get_quorum(&e),
+        );
     });
 
     // Trying to queue a Pending proposal should fail with ProposalNotSuccessful
