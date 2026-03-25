@@ -503,8 +503,6 @@ pub const MAX_EXTERNAL_KEY_SIZE: u32 = 256;
 pub enum SmartAccountError {
     /// The specified context rule does not exist.
     ContextRuleNotFound = 3000,
-    /// A duplicate context rule already exists.
-    DuplicateContextRule = 3001,
     /// The provided context cannot be validated against any rule.
     UnvalidatedContext = 3002,
     /// External signature verification failed.
