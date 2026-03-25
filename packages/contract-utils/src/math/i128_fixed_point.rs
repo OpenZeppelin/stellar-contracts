@@ -27,9 +27,9 @@ use crate::math::{
 ///
 /// # Errors
 ///
-/// * refer to the errors of [`mul_div_floor_i128`]
-/// * refer to the errors of [`mul_div_ceil_i128`]
-/// * refer to the errors of [`mul_div_i128`]
+/// * refer to the errors of [`mul_div_floor`]
+/// * refer to the errors of [`mul_div_ceil`]
+/// * refer to the errors of [`mul_div`]
 ///
 /// # Notes
 ///
@@ -48,7 +48,7 @@ pub fn mul_div_with_rounding(
     }
 }
 
-/// Checked version of [`mul_div_with_rounding_i128`].
+/// Checked version of [`mul_div_with_rounding`].
 ///
 /// Calculates `x * y / denominator` with full precision, returning `None`
 /// instead of panicking on error.
@@ -84,7 +84,8 @@ pub fn checked_mul_div_with_rounding(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `y` - The multiplicand.
+/// * `x` - The multiplicand.
+/// * `y` - The multiplier.
 /// * `denominator` - The divisor.
 ///
 /// # Errors
@@ -112,8 +113,9 @@ pub fn mul_div_floor(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
 ///
 /// # Arguments
 ///
-/// * `env` - Access to the Soroban environment.
-/// * `y` - The multiplicand.
+/// * `e` - Access to the Soroban environment.
+/// * `x` - The multiplicand.
+/// * `y` - The multiplier.
 /// * `denominator` - The divisor.
 ///
 /// # Errors
@@ -141,8 +143,9 @@ pub fn mul_div_ceil(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
 ///
 /// # Arguments
 ///
-/// * `env` - Access to the Soroban environment.
-/// * `y` - The multiplicand.
+/// * `e` - Access to the Soroban environment.
+/// * `x` - The multiplicand.
+/// * `y` - The multiplier.
 /// * `denominator` - The divisor.
 ///
 /// # Errors
@@ -165,14 +168,15 @@ pub fn mul_div(e: &Env, x: &i128, y: &i128, denominator: &i128) -> i128 {
     }
 }
 
-/// Checked version of floor(x * y / denominator).
+/// Checked version of [`mul_div_floor`].
 ///
 /// Returns `None` if the result overflows or if `denominator` is zero.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `y` - The multiplicand.
+/// * `x` - The multiplicand.
+/// * `y` - The multiplier.
 /// * `denominator` - The divisor.
 pub fn checked_mul_div_floor(e: &Env, x: &i128, y: &i128, denominator: &i128) -> Option<i128> {
     match x.checked_mul(*y) {
@@ -190,14 +194,15 @@ pub fn checked_mul_div_floor(e: &Env, x: &i128, y: &i128, denominator: &i128) ->
     }
 }
 
-/// Checked version of ceil(x * y / denominator).
+/// Checked version of [`mul_div_ceil`].
 ///
 /// Returns `None` if the result overflows or if `denominator` is zero.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `y` - The multiplicand.
+/// * `x` - The multiplicand.
+/// * `y` - The multiplier.
 /// * `denominator` - The divisor.
 pub fn checked_mul_div_ceil(e: &Env, x: &i128, y: &i128, denominator: &i128) -> Option<i128> {
     match x.checked_mul(*y) {
@@ -215,14 +220,15 @@ pub fn checked_mul_div_ceil(e: &Env, x: &i128, y: &i128, denominator: &i128) -> 
     }
 }
 
-/// Checked version of (x * y / denominator).
+/// Checked version of [`mul_div`].
 ///
 /// Returns `None` if the result overflows or if `denominator` is zero.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `y` - The multiplicand.
+/// * `x` - The multiplicand.
+/// * `y` - The multiplier.
 /// * `denominator` - The divisor.
 pub fn checked_mul_div(e: &Env, x: &i128, y: &i128, denominator: &i128) -> Option<i128> {
     match x.checked_mul(*y) {

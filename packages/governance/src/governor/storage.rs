@@ -546,7 +546,8 @@ pub fn propose(
 /// * `functions` - The function names to invoke on each target.
 /// * `args` - The arguments for each function call.
 /// * `description_hash` - The hash of the proposal description.
-/// * `executor` - The address executing the proposal.
+/// * `queue_enabled` - Whether queueing is enabled (i.e., whether the proposal
+///   must be in the `Queued` state to execute).
 ///
 /// # Errors
 ///
@@ -618,7 +619,6 @@ pub fn execute(
 /// * `functions` - The function names to invoke on each target.
 /// * `args` - The arguments for each function call.
 /// * `description_hash` - The hash of the proposal description.
-/// * `operator` - The address cancelling the proposal.
 ///
 /// # Errors
 ///
@@ -675,9 +675,9 @@ pub fn cancel(
 
 /// Computes and returns the proposal ID from the proposal parameters.
 ///
-/// The proposal ID is a deterministic keccak256 hash of the targets, functions,
-/// args, and description hash. This allows anyone to compute the ID
-/// without storing the full proposal data.
+/// The proposal ID is a deterministic keccak256 hash of the XDR-serialized
+/// targets, functions, args, and description hash. This allows anyone to
+/// compute the ID without storing the full proposal data.
 ///
 /// # Arguments
 ///
@@ -685,7 +685,9 @@ pub fn cancel(
 /// * `targets` - The addresses of contracts to call.
 /// * `functions` - The function names to invoke on each target.
 /// * `args` - The arguments for each function call.
-/// * `description_hash` - The hash of the proposal description.
+/// * `description_hash` - The keccak256 hash of the XDR-serialized proposal
+///   description (i.e. `keccak256(description.to_xdr(e))`). Off-chain clients
+///   must apply the same XDR encoding before hashing to produce a matching ID.
 pub fn hash_proposal(
     e: &Env,
     targets: &Vec<Address>,
@@ -709,7 +711,6 @@ pub fn hash_proposal(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `voter` - The address casting the vote.
 /// * `proposal_id` - The unique identifier of the proposal.
 ///
 /// # Errors

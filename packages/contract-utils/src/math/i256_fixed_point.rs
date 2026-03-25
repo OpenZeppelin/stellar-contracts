@@ -30,7 +30,7 @@ pub fn mul_div_with_rounding(x: I256, y: I256, denominator: I256, rounding: Roun
     }
 }
 
-/// Checked version of [`mul_div_with_rounding_i256`].
+/// Checked version of [`mul_div_with_rounding`].
 ///
 /// Calculates `x * y / denominator`, returning `None` on division by zero or
 /// division overflow instead of panicking.
