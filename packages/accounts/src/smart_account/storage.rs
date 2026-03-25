@@ -515,6 +515,9 @@ pub fn contains_canonical_duplicate(e: &Env, signers: &Vec<Signer>, new_signer: 
 /// created context rule with a unique ID. Installs all specified policies
 /// during creation.
 ///
+/// Multiple rules with identical authorization requirements can coexist. It is
+/// the caller's responsibility to avoid creating redundant rules.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
