@@ -5,7 +5,7 @@ use crate::{
         emit_ownership_renounced, emit_ownership_transfer, emit_ownership_transfer_completed,
         OwnableError,
     },
-    role_transfer::{accept_transfer, transfer_role, PendingTransfer},
+    role_transfer::{accept_transfer, has_active_pending_transfer, transfer_role},
 };
 
 /// Storage keys for `Ownable` utility.
@@ -134,7 +134,7 @@ pub fn renounce_ownership(e: &Env) {
     let owner = enforce_owner_auth(e);
     let key = OwnableStorageKey::PendingOwner;
 
-    if e.storage().temporary().get::<_, PendingTransfer>(&key).is_some() {
+    if has_active_pending_transfer(e, &key) {
         panic_with_error!(e, OwnableError::TransferInProgress);
     }
 
