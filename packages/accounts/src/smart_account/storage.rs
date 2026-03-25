@@ -201,6 +201,42 @@ pub fn get_context_rules_count(e: &Env) -> u32 {
     e.storage().instance().get(&SmartAccountStorageKey::Count).unwrap_or(0u32)
 }
 
+/// Retrieves the global registry ID for a signer.
+///
+/// Computes `sha256(XDR(signer))` and looks up the corresponding
+/// `SignerLookup` entry.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer` - The signer to look up.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::SignerNotFound`] - When the signer is not registered
+///   in the global registry.
+pub fn get_signer_id(e: &Env, signer: &Signer) -> u32 {
+    let hash = e.crypto().sha256(&signer.to_xdr(e)).to_bytes();
+    get_persistent_entry::<u32>(e, &SmartAccountStorageKey::SignerLookup(hash))
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::SignerNotFound))
+}
+
+/// Retrieves the global registry ID for a policy.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `policy` - The policy address to look up.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::PolicyNotFound`] - When the policy is not registered
+///   in the global registry.
+pub fn get_policy_id(e: &Env, policy: &Address) -> u32 {
+    get_persistent_entry::<u32>(e, &SmartAccountStorageKey::PolicyLookup(policy.clone()))
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::PolicyNotFound))
+}
+
 /// Filters rule signers to find which ones are present in the provided signer
 /// list. Returns a vector of signers that exist in both the rule and the
 /// provided signer list.
