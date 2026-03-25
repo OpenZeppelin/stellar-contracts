@@ -35,7 +35,10 @@ impl Governor for GovernorContract {
         eta: u32,
         _operator: Address,
     ) -> BytesN<32> {
-        // Open queueing: any account can queue a succeeded proposal.
+        // Queuing is not enabled in this example (`proposals_need_queuing`
+        // returns `false` by default), so this will revert with
+        // `QueueNotEnabled`. To enable queuing, override
+        // `proposals_need_queuing` to return `true`.
         governor::queue(
             e,
             targets,

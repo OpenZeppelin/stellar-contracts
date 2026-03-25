@@ -457,13 +457,55 @@ pub trait Governor {
     /// Queues a succeeded proposal for execution and returns its unique
     /// identifier.
     ///
+    /// This function is only relevant when queuing is enabled, i.e., when
+    /// [`Self::proposals_need_queuing`] is overridden to return `true`. If
+    /// queuing is not enabled, calling this function will revert with
+    /// [`GovernorError::QueueNotEnabled`].
+    ///
+    /// When queuing is enabled, this function transitions a proposal from
+    /// the `Succeeded` state to the `Queued` state. The `execute` function
+    /// will then require the proposal to be in the `Queued` state (and past
+    /// its `eta`) before allowing execution.
+    ///
+    /// To enable the full queuing flow, implementers must override both
+    /// [`Self::proposals_need_queuing`] and this method in their
+    /// [`Governor`] implementation:
+    ///
+    /// ```ignore
+    /// #[contractimpl(contracttrait)]
+    /// impl Governor for MyGovernor {
+    ///     // Step 1: enable queueing.
+    ///     fn proposals_need_queuing(_e: &Env) -> bool {
+    ///         true
+    ///     }
+    ///
+    ///     // Step 2: implement queue with the desired access control.
+    ///     fn queue(
+    ///         e: &Env,
+    ///         targets: Vec<Address>,
+    ///         functions: Vec<Symbol>,
+    ///         args: Vec<Vec<Val>>,
+    ///         description_hash: BytesN<32>,
+    ///         eta: u32,
+    ///         _operator: Address,
+    ///     ) -> BytesN<32> {
+    ///         storage::queue(e, targets, functions, args, &description_hash, eta, Self::proposals_need_queuing(e))
+    ///     }
+    ///
+    ///     // ... other required methods (execute, cancel) ...
+    /// }
+    /// ```
+    ///
+    /// See the access control examples below for alternative patterns.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `targets` - The addresses of contracts to call.
     /// * `functions` - The function names to invoke on each target.
     /// * `args` - The arguments for each function call.
-    /// * `description_hash` - The hash of the proposal description.
+    /// * `description_hash` - The keccak256 hash of the description's raw
+    ///   bytes.
     /// * `eta` - The ledger sequence number at which the proposal becomes
     ///   executable. Typically computed as `current_ledger + timelock_delay`.
     /// * `operator` - The address queuing the proposal.
@@ -484,17 +526,18 @@ pub trait Governor {
     /// # IMPLEMENTATION REQUIRED — ACCESS CONTROL
     ///
     /// **This function has no default implementation.** The implementer MUST
-    /// define who is authorized to queue proposals. Consider the following:
+    /// define who is authorized to queue proposals. Consider the following
+    /// patterns:
     ///
-    /// - **Open queueing**: Allow anyone to queue a succeeded proposal. In this
-    ///   case, `operator.require_auth()` is unnecessary since the `operator`
-    ///   parameter serves no access-control purpose.
+    /// - **Open queueing**: Allow anyone to queue a succeeded proposal. No
+    ///   `require_auth()` is needed since the `operator` parameter serves no
+    ///   access-control purpose.
     /// - **Restricted queueing**: Restrict queueing to a specific role (e.g., a
     ///   timelock contract or an admin). Validate `operator` against the
-    ///   allowed role and call `operator.require_auth()` explicitly if needed.
+    ///   allowed role and call `operator.require_auth()`.
     ///
-    /// [`storage::queue`] is suggested to perform the actual state transition
-    /// after access control and authorization logic has been applied.
+    /// [`storage::queue`] performs the actual state transition and should be
+    /// called after access control logic has been applied.
     ///
     /// # Examples
     ///
@@ -668,8 +711,13 @@ pub trait Governor {
 
     /// Returns whether proposals need to be queued before execution.
     ///
-    /// Defaults to `false`. Override to return `true` when using a queuing
-    /// extension. See the module-level docs for details.
+    /// When this returns `false` (the default), [`Governor::execute`] expects
+    /// proposals in the `Succeeded` state and [`Governor::queue`] will revert
+    /// with [`GovernorError::QueueNotEnabled`].
+    ///
+    /// When overridden to return `true`, [`Governor::execute`] expects
+    /// proposals in the `Queued` state, meaning [`Governor::queue`] must be
+    /// called first to transition from `Succeeded` to `Queued`.
     ///
     /// # Arguments
     ///
