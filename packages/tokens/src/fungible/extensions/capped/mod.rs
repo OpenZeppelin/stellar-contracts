@@ -7,8 +7,9 @@
 /// This module provides the following helper functions:
 /// - `set_cap`: Sets the maximum token supply.
 /// - `query_cap`: Returns the maximum token supply.
-/// - `check_cap`: Panics if minting a specified `amount` would exceed the cap.
-///   Should be used before calling `mint()`.
+/// - `check_cap`: Panics if minting a specified `amount` added to the given
+///   `total_supply` would exceed the cap. Should be used before calling
+///   `mint()`.
 mod storage;
 pub use self::storage::{check_cap, query_cap, set_cap, CapStorageKey};
 #[cfg(test)]
