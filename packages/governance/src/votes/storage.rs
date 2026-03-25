@@ -183,8 +183,11 @@ pub fn get_total_supply_at_checkpoint(e: &Env, ledger: u32) -> u128 {
 ///
 /// # Returns
 ///
-/// * `Some(Address)` - The delegate address if delegation is set.
-/// * `None` - If the account has not delegated.
+/// * `Some(Address)` - The delegate address (may be the account itself if
+///   self-delegated).
+/// * `None` - If the account has never delegated. An account whose delegate
+///   is `None` has no active voting power; it must call [`delegate`] (even
+///   to itself) before its votes are counted.
 pub fn get_delegate(e: &Env, account: &Address) -> Option<Address> {
     let key = VotesStorageKey::Delegatee(account.clone());
     if let Some(delegatee) = e.storage().persistent().get::<_, Address>(&key) {
@@ -227,6 +230,10 @@ pub fn get_voting_units(e: &Env, account: &Address) -> u128 {
 // ################## CHANGE STATE ##################
 
 /// Delegates voting power from `account` to `delegatee`.
+///
+/// To reclaim voting power (i.e. "undelegate"), call this with `delegatee`
+/// set to `account` (self-delegation). There is no separate undelegate
+/// operation.
 ///
 /// # Arguments
 ///
