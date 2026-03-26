@@ -6,7 +6,7 @@ members = [
     "examples/fungible-capped",
     "examples/fungible-merkle-airdrop",
     "examples/fungible-governor/*",
-    "examples/governor-timelock/*",
+    "examples/fungible-governor-timelock/*",
     "examples/fungible-votes",
     "examples/fee-forwarder-permissioned",
     "examples/fee-forwarder-permissionless",
@@ -38,7 +38,7 @@ members = [
 ]
 exclude = [
     "examples/upgradeable/testdata",
-    "examples/rwa/sign-claim",   # native CLI tool, not a WASM contract
+    "examples/rwa/sign-claim",       # native CLI tool, not a WASM contract
 ]
 
 [workspace.package]
