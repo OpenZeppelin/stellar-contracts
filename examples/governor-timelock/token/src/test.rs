@@ -120,16 +120,10 @@ fn description_hash(e: &Env, description: &String) -> BytesN<32> {
 
 /// Creates a proposal, votes it through to Succeeded, and returns everything
 /// needed for queue/execute/cancel.
+#[allow(clippy::type_complexity)]
 fn create_succeeded_proposal(
     s: &TestSetup,
-) -> (
-    BytesN<32>,
-    BytesN<32>,
-    Vec<Address>,
-    Vec<Symbol>,
-    Vec<Vec<Val>>,
-    Address,
-) {
+) -> (BytesN<32>, BytesN<32>, Vec<Address>, Vec<Symbol>, Vec<Vec<Val>>, Address) {
     let proposer = Address::generate(&s.e);
     let voter1 = Address::generate(&s.e);
     let voter2 = Address::generate(&s.e);
@@ -140,11 +134,9 @@ fn create_succeeded_proposal(
 
     // Propose at ledger 200.
     s.e.ledger().set_sequence_number(200);
-    let (targets, functions, args, description) =
-        build_proposal(&s.e, &s.target.address, 42);
+    let (targets, functions, args, description) = build_proposal(&s.e, &s.target.address, 42);
     let desc_hash = description_hash(&s.e, &description);
-    let proposal_id =
-        s.governor.propose(&targets, &functions, &args, &description, &proposer);
+    let proposal_id = s.governor.propose(&targets, &functions, &args, &description, &proposer);
 
     // Advance past vote_snapshot (210) -> Active.
     s.e.ledger().set_sequence_number(211);
@@ -169,8 +161,7 @@ fn create_succeeded_proposal(
 fn full_governance_lifecycle_with_timelock() {
     let s = setup();
 
-    let (proposal_id, desc_hash, targets, functions, args, _) =
-        create_succeeded_proposal(&s);
+    let (proposal_id, desc_hash, targets, functions, args, _) = create_succeeded_proposal(&s);
 
     // Queue: transitions governor to Queued, schedules governor.execute()
     // in the timelock.
@@ -223,14 +214,8 @@ fn execute_fails_before_timelock_delay() {
     s.governor.queue(&targets, &functions, &args, &desc_hash, &eta, &operator);
 
     // Try to execute immediately (311 < eta 361) — timelock rejects.
-    let execute_args: Vec<Val> = (
-        targets,
-        functions,
-        args,
-        desc_hash.clone(),
-        s.timelock.address.clone(),
-    )
-        .into_val(&s.e);
+    let execute_args: Vec<Val> =
+        (targets, functions, args, desc_hash.clone(), s.timelock.address.clone()).into_val(&s.e);
 
     s.timelock.execute_op(
         &s.governor.address,
@@ -284,8 +269,7 @@ fn queue_fails_when_not_succeeded() {
 
     // Propose at ledger 200 — stays Pending.
     s.e.ledger().set_sequence_number(200);
-    let (targets, functions, args, description) =
-        build_proposal(&s.e, &s.target.address, 42);
+    let (targets, functions, args, description) = build_proposal(&s.e, &s.target.address, 42);
     let desc_hash = description_hash(&s.e, &description);
     s.governor.propose(&targets, &functions, &args, &description, &proposer);
 

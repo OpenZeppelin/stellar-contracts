@@ -91,14 +91,8 @@ impl Governor for GovernorTimelockContract {
 
         // The timelock operation will call: governor.execute(targets,
         // functions, args, description_hash, timelock_address)
-        let execute_args: Vec<Val> = (
-            targets,
-            functions,
-            args,
-            description_hash.clone(),
-            timelock.clone(),
-        )
-            .into_val(e);
+        let execute_args: Vec<Val> =
+            (targets, functions, args, description_hash.clone(), timelock.clone()).into_val(e);
 
         e.invoke_contract::<BytesN<32>>(
             &timelock,
