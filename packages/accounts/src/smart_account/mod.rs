@@ -537,6 +537,8 @@ pub enum SmartAccountError {
     ContextRuleIdsLengthMismatch = 3014,
     /// Context rule name exceeds the maximum allowed length.
     NameTooLong = 3015,
+    /// A signer in `AuthPayload` is not part of any selected context rule.
+    UnauthorizedSigner = 3016,
 }
 
 // ################## EVENTS ##################

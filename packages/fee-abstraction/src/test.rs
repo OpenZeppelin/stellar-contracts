@@ -71,7 +71,7 @@ fn collect_fee_with_eager_approval_overwrites_allowance() {
     });
 
     let events = e.events().all();
-    // approval, trnasfer and collect fee
+    // approval, transfer and collect fee
     assert_eq!(events.events().len(), 3);
 
     let allowance = token_client.allowance(&user, &contract_address);
@@ -111,7 +111,7 @@ fn collect_fee_with_lazy_approval_no_previous() {
     });
 
     let events = e.events().all();
-    // approval, trnasfer and collect fee
+    // approval, transfer and collect fee
     assert_eq!(events.events().len(), 3);
 
     let allowance = token_client.allowance(&user, &contract_address);

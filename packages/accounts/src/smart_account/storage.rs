@@ -122,6 +122,12 @@ pub enum Signer {
 /// The length of `context_rule_ids` must equal the number of auth contexts;
 /// a mismatch is rejected with
 /// [`SmartAccountError::ContextRuleIdsLengthMismatch`].
+///
+/// **Important:** `context_rule_ids` are bound into the digest that signers
+/// authenticate against: `auth_digest = sha256(signature_payload ||
+/// context_rule_ids.to_xdr())`. Signers must sign `auth_digest`, not the
+/// raw `signature_payload` from the host. This prevents rule-selection
+/// downgrade attacks.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct AuthPayload {
@@ -410,6 +416,12 @@ pub fn validate_context_rule_name(e: &Env, name: &String) {
 /// validate against for the corresponding auth context (by index). Its length
 /// must equal `auth_contexts.len()`.
 ///
+/// To prevent rule-selection downgrade attacks, `context_rule_ids` are bound
+/// into the digest that signers authenticate against:
+/// `auth_digest = sha256(signature_payload || context_rule_ids.to_xdr())`.
+/// Altering `context_rule_ids` after signature collection therefore
+/// invalidates all signatures.
+///
 /// # Arguments
 ///
 /// * `e` - The Soroban environment.
@@ -421,6 +433,8 @@ pub fn validate_context_rule_name(e: &Env, name: &String) {
 ///
 /// * [`SmartAccountError::ContextRuleIdsLengthMismatch`] - When
 ///   `context_rule_ids` has a different length than `auth_contexts`.
+/// * [`SmartAccountError::UnauthorizedSigner`] - When a signer in `AuthPayload`
+///   is not part of any selected context rule.
 /// * refer to [`authenticate`] errors.
 /// * refer to [`get_validated_context_by_id`] errors.
 pub fn do_check_auth(
@@ -433,7 +447,12 @@ pub fn do_check_auth(
         panic_with_error!(e, SmartAccountError::ContextRuleIdsLengthMismatch);
     }
 
-    authenticate(e, signature_payload, &signatures.signers);
+    // Bind context_rule_ids into the signed digest.
+    let mut preimage = signature_payload.to_bytes().to_bytes();
+    preimage.append(&signatures.context_rule_ids.clone().to_xdr(e));
+    let auth_digest = e.crypto().sha256(&preimage);
+
+    authenticate(e, &auth_digest, &signatures.signers);
 
     // Validate all contexts against their specified rules.
     let validated_contexts = Vec::from_iter(
@@ -446,8 +465,15 @@ pub fn do_check_auth(
         }),
     );
 
-    // Enforce all policies.
+    let mut allowed_signers = Map::new(e);
     for (rule, context, authenticated_signers) in validated_contexts.iter() {
+        // Collect all signers from the validated rules to check below for signers that
+        // do not belong to any rule.
+        for signer in rule.signers.iter() {
+            allowed_signers.set(signer, ());
+        }
+
+        // Enforce all policies.
         for policy in rule.policies.iter() {
             PolicyClient::new(e, &policy).enforce(
                 &context,
@@ -455,6 +481,15 @@ pub fn do_check_auth(
                 &rule,
                 &e.current_contract_address(),
             );
+        }
+    }
+
+    // Reject any signer in AuthPayload that is not part of any selected
+    // rule, preventing arbitrary external calls via attacker-controlled
+    // verifier contracts.
+    for signer in signatures.signers.keys().iter() {
+        if !allowed_signers.contains_key(signer) {
+            panic_with_error!(e, SmartAccountError::UnauthorizedSigner);
         }
     }
 
