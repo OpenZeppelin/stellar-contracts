@@ -197,6 +197,11 @@ pub trait SmartAccount: CustomAccountInterface {
     ///
     /// # Notes
     ///
+    /// No uniqueness constraint is enforced on the combination of context
+    /// type, signers, and policies. Multiple rules with identical
+    /// authorization requirements can coexist. It is the caller's
+    /// responsibility to avoid creating redundant rules.
+    ///
     /// Defaults to requiring authorization from the smart account itself
     /// (`e.current_contract_address().require_auth()`) and then delegating to
     /// [`storage::add_context_rule`].
@@ -503,8 +508,6 @@ pub const MAX_EXTERNAL_KEY_SIZE: u32 = 256;
 pub enum SmartAccountError {
     /// The specified context rule does not exist.
     ContextRuleNotFound = 3000,
-    /// A duplicate context rule already exists.
-    DuplicateContextRule = 3001,
     /// The provided context cannot be validated against any rule.
     UnvalidatedContext = 3002,
     /// External signature verification failed.
