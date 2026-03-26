@@ -68,21 +68,41 @@
 //!
 //! ### Vulnerability Overview
 //!
-//! Governance systems are vulnerable to flash loan attacks where an attacker
-//! borrows a large amount of voting tokens, votes on a proposal, and returns
-//! the tokens within the same transaction.
+//! A flash loan attack is one where an attacker borrows a large amount of
+//! voting tokens, votes on a proposal, and returns the tokens — all within
+//! the **same transaction**. Without protection, the attacker would
+//! temporarily hold massive voting power at zero cost.
 //!
 //! ### Mitigation
 //!
-//! This implementation uses **snapshot-based voting power**. When a proposal
-//! is created, the current ledger number is recorded as the "snapshot". All
-//! voting power calculations use
-//! [`crate::votes::Votes::get_votes_at_checkpoint()`] which queries the voting
-//! power at the snapshot ledger, not the current ledger.
+//! This implementation uses **snapshot-based voting power** with two
+//! separate snapshots:
 //!
-//! This means an attacker must hold tokens *before* a proposal is created
-//! to have voting power on that proposal, making flash loan attacks
-//! ineffective.
+//! **1. Proposer snapshot (`current_ledger - 1`):**
+//! When a proposal is created, the proposer's voting power is checked
+//! against the **previous** ledger. This prevents an attacker from
+//! flash-loaning tokens and creating a proposal in the same transaction.
+//!
+//! **2. Voter snapshot (`vote_start`):**
+//! When a proposal is created, `vote_start` (`current_ledger +
+//! voting_delay`) is recorded as the voting power snapshot. When voters
+//! cast their votes (at any ledger after `vote_start`), their voting
+//! power is looked up at the `vote_start` ledger using
+//! [`crate::votes::Votes::get_votes_at_checkpoint()`]. Because
+//! checkpoints record the state **after** all transactions in a ledger
+//! are finalized, a flash loan that borrows and returns tokens within
+//! the same ledger at `vote_start` would show a net-zero balance in the
+//! checkpoint — the attack fails.
+//!
+//! ### Scope and Limitations
+//!
+//! Snapshot-based voting specifically prevents **same-transaction** (flash
+//! loan) attacks. It does **not** prevent an attacker from borrowing tokens
+//! across multiple ledgers (e.g., borrowing at ledger N and returning at
+//! ledger N+1). Such multi-ledger borrowing carries real economic cost
+//! (interest, collateral requirements) and is not considered a flash loan
+//! attack. The `voting_delay` parameter gives legitimate token holders time
+//! to position themselves after seeing a proposal, which is by design.
 //!
 //! ## Proposal Spam Attack
 //!
@@ -339,9 +359,9 @@ pub trait Governor {
 
     /// Returns the proposal ID computed from the proposal details.
     ///
-    /// The proposal ID is a deterministic keccak256 hash of the targets,
-    /// functions, args, and description hash. This allows anyone to compute
-    /// the ID without storing the full proposal data.
+    /// The proposal ID is a deterministic keccak256 hash of the XDR-serialized
+    /// targets, functions, args, and description hash. This allows anyone to
+    /// compute the ID without storing the full proposal data.
     ///
     /// The `description_hash` is computed as
     /// `keccak256(description.to_bytes())`, i.e., a keccak256 hash of the
@@ -685,6 +705,14 @@ pub trait Governor {
     ///
     /// [`storage::cancel`] is suggested to perform the actual state transition
     /// after access control and authorization logic has been applied.
+    ///
+    /// # Note
+    ///
+    /// [`storage::cancel`] only updates the governor-level proposal state. If
+    /// the proposal has already been queued in an external timelock, the
+    /// implementer must also cancel the corresponding timelock operation
+    /// (e.g. via [`crate::timelock::cancel_operation`])
+    /// to prevent it from remaining executable through the timelock directly.
     ///
     /// # Example
     ///

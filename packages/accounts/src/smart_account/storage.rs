@@ -308,7 +308,7 @@ pub fn get_validated_context_by_id(
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `signature_payload` - The hash of the data that was signed.
-/// * `signatures` - The signatures mapped to their signers.
+/// * `signers` - The signers mapped to their signature data.
 ///
 /// # Errors
 ///
@@ -831,9 +831,11 @@ pub fn remove_context_rule(e: &Env, id: u32) {
     };
 
     for (policy, policy_id) in policies.iter().zip(&entry.policy_ids) {
-        // `try_uninstall` so that if the policy panics, context rule removal can be
-        // completed. This prevents a malicious or misconfigured policy from blocking a
-        // context rule removal.
+        // `try_uninstall` so that if the policy panics (recoverable failure),
+        // context rule removal can still be completed. Note: this is best-effort
+        // — a malicious policy can still cause non-recoverable failures (e.g.,
+        // resource exhaustion) that revert the entire transaction. Policy
+        // contracts are considered a trust dependency.
         let _ = PolicyClient::new(e, &policy)
             .try_uninstall(&context_rule, &e.current_contract_address());
 

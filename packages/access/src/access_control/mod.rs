@@ -45,10 +45,13 @@
 //! structure to be established when desired.
 //!
 //! If even more granular control over role capabilities is required, custom
-//! business logic can be introduced and annotated with the provided macro:
+//! business logic can be introduced and annotated with the provided macros.
+//! Use `#[only_role]` when the function needs both a role check **and**
+//! authorization of the address. Use `#[has_role]` only when the function
+//! already calls `require_auth()` on the address separately:
 //!
 //! ```rust
-//! #[has_role(caller, "minter_admin")]
+//! #[only_role(caller, "minter_admin")]
 //! pub fn custom_sensitive_logic(e: &Env, caller: Address) {
 //!     ...
 //! }
@@ -298,8 +301,8 @@ pub trait AccessControl {
     /// # Notes
     ///
     /// * Authorization for the current admin is required.
-    fn accept_admin_transfer(e: &Env) {
-        storage::accept_admin_transfer(e);
+    fn transfer_admin_role(e: &Env, new_admin: Address, live_until_ledger: u32) {
+        storage::transfer_admin_role(e, &new_admin, live_until_ledger);
     }
 
     /// Completes the 2-step admin transfer.
@@ -318,8 +321,8 @@ pub trait AccessControl {
     /// * [`crate::role_transfer::RoleTransferError::NoPendingTransfer`] - If
     ///   there is no pending transfer to accept.
     /// * [`AccessControlError::AdminNotSet`] - If admin account is not set.
-    fn transfer_admin_role(e: &Env, new_admin: Address, live_until_ledger: u32) {
-        storage::transfer_admin_role(e, &new_admin, live_until_ledger);
+    fn accept_admin_transfer(e: &Env) {
+        storage::accept_admin_transfer(e);
     }
 
     /// Sets `admin_role` as the admin role of `role`.

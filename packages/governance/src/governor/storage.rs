@@ -550,7 +550,8 @@ pub fn propose(
 /// * `functions` - The function names to invoke on each target.
 /// * `args` - The arguments for each function call.
 /// * `description_hash` - The hash of the proposal description.
-/// * `executor` - The address executing the proposal.
+/// * `queue_enabled` - Whether queueing is enabled (i.e., whether the proposal
+///   must be in the `Queued` state to execute).
 ///
 /// # Errors
 ///
@@ -687,7 +688,6 @@ pub fn queue(
 /// * `functions` - The function names to invoke on each target.
 /// * `args` - The arguments for each function call.
 /// * `description_hash` - The hash of the proposal description.
-/// * `operator` - The address cancelling the proposal.
 ///
 /// # Errors
 ///
@@ -700,6 +700,14 @@ pub fn queue(
 /// It is the responsibility of the implementer to establish appropriate
 /// access controls to ensure that only authorized accounts can call this
 /// function.
+///
+/// # Note
+///
+/// This function only updates the governor-level proposal state. If the
+/// proposal has already been queued in an external timelock, the
+/// corresponding timelock operation must be cancelled separately (e.g. via
+/// [`crate::timelock::cancel_operation`])
+/// to prevent it from remaining executable through the timelock directly.
 pub fn cancel(
     e: &Env,
     targets: Vec<Address>,
@@ -736,9 +744,9 @@ pub fn cancel(
 
 /// Computes and returns the proposal ID from the proposal parameters.
 ///
-/// The proposal ID is a deterministic keccak256 hash of the targets, functions,
-/// args, and description hash. This allows anyone to compute the ID
-/// without storing the full proposal data.
+/// The proposal ID is a deterministic keccak256 hash of the XDR-serialized
+/// targets, functions, args, and description hash. This allows anyone to
+/// compute the ID without storing the full proposal data.
 ///
 /// The `description_hash` is computed as `keccak256(description.to_bytes())`,
 /// i.e., a keccak256 hash of the raw UTF-8 bytes of the description string.
@@ -775,7 +783,6 @@ pub fn hash_proposal(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `voter` - The address casting the vote.
 /// * `proposal_id` - The unique identifier of the proposal.
 ///
 /// # Errors

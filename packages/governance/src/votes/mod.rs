@@ -12,7 +12,8 @@
 //! - **Delegation**: Accounts can delegate their voting power to another
 //!   account (delegatee). **Only delegated voting power counts as votes** while
 //!   undelegated voting units are not counted. Self-delegation is required for
-//!   an account to use its own voting power.
+//!   an account to use its own voting power. There is no explicit "undelegate"
+//!   operation — to reclaim voting power, an account delegates to itself.
 //! - **Checkpoints**: Historical snapshots of voting power at specific ledger
 //!   sequence numbers
 //!
@@ -146,13 +147,20 @@ pub trait Votes {
     ///
     /// # Returns
     ///
-    /// * `Some(Address)` - The delegate address if delegation is set.
-    /// * `None` - If the account has not delegated.
+    /// * `Some(Address)` - The delegate address (may be the account itself if
+    ///   self-delegated).
+    /// * `None` - If the account has never delegated. An account whose delegate
+    ///   is `None` has **no active voting power**; it must call
+    ///   [`Votes::delegate`] (even to itself) before its votes are counted.
     fn get_delegate(e: &Env, account: Address) -> Option<Address> {
         storage::get_delegate(e, &account)
     }
 
     /// Delegates voting power from `account` to `delegatee`.
+    ///
+    /// To reclaim voting power (i.e. "undelegate"), call this with
+    /// `delegatee` set to `account` (self-delegation). There is no
+    /// separate undelegate operation.
     ///
     /// # Arguments
     ///
