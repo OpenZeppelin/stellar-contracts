@@ -834,6 +834,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "governor-timelock-contract"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-governance",
+]
+
+[[package]]
+name = "governor-timelock-token"
+version = "0.6.0"
+dependencies = [
+ "governor-timelock-contract",
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-governance",
+ "stellar-macros",
+ "stellar-tokens",
+ "timelock-controller-example",
+]
+
+[[package]]
 name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
