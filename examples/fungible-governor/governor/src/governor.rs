@@ -26,29 +26,8 @@ impl GovernorContract {
 
 #[contractimpl(contracttrait)]
 impl Governor for GovernorContract {
-    fn queue(
-        e: &Env,
-        targets: Vec<Address>,
-        functions: Vec<Symbol>,
-        args: Vec<Vec<Val>>,
-        description_hash: BytesN<32>,
-        eta: u32,
-        _operator: Address,
-    ) -> BytesN<32> {
-        // Queuing is not enabled in this example (`proposals_need_queuing`
-        // returns `false` by default), so this will revert with
-        // `QueueNotEnabled`. To enable queuing, override
-        // `proposals_need_queuing` to return `true`.
-        governor::queue(
-            e,
-            targets,
-            functions,
-            args,
-            &description_hash,
-            eta,
-            Self::proposals_need_queuing(e),
-        )
-    }
+    // `queue` uses the default open-queueing implementation.
+    // To enable queueing, override `proposals_need_queuing` to return `true`.
 
     fn execute(
         e: &Env,

@@ -476,19 +476,40 @@ pub trait Governor {
     /// will then require the proposal to be in the `Queued` state (and past
     /// its `eta`) before allowing execution.
     ///
-    /// To enable the full queuing flow, implementers must override both
-    /// [`Self::proposals_need_queuing`] and this method in their
-    /// [`Governor`] implementation:
+    /// # Enabling Queueing
+    ///
+    /// The default implementation uses **open queueing**: any account can
+    /// queue a succeeded proposal without authentication. To enable it,
+    /// override [`Self::proposals_need_queuing`] to return `true`:
     ///
     /// ```ignore
     /// #[contractimpl(contracttrait)]
     /// impl Governor for MyGovernor {
-    ///     // Step 1: enable queueing.
     ///     fn proposals_need_queuing(_e: &Env) -> bool {
     ///         true
     ///     }
     ///
-    ///     // Step 2: implement queue with the desired access control.
+    ///     // ... other required methods (propose, execute, cancel) ...
+    /// }
+    /// ```
+    ///
+    /// This is sufficient for the common case — no override of `queue`
+    /// itself is needed.
+    ///
+    /// # Restricting Access
+    ///
+    /// If you need to restrict who can queue proposals, override this
+    /// method with custom access control logic. Call [`storage::queue`]
+    /// after your checks:
+    ///
+    /// ```ignore
+    /// #[contractimpl(contracttrait)]
+    /// impl Governor for MyGovernor {
+    ///     fn proposals_need_queuing(_e: &Env) -> bool {
+    ///         true
+    ///     }
+    ///
+    ///     // Restricted — only a timelock contract can queue:
     ///     fn queue(
     ///         e: &Env,
     ///         targets: Vec<Address>,
@@ -496,16 +517,18 @@ pub trait Governor {
     ///         args: Vec<Vec<Val>>,
     ///         description_hash: BytesN<32>,
     ///         eta: u32,
-    ///         _operator: Address,
+    ///         operator: Address,
     ///     ) -> BytesN<32> {
-    ///         storage::queue(e, targets, functions, args, &description_hash, eta, Self::proposals_need_queuing(e))
+    ///         let timelock = storage::get_timelock(e);
+    ///         assert!(operator == timelock);
+    ///         operator.require_auth();
+    ///         storage::queue(
+    ///             e, targets, functions, args, &description_hash, eta,
+    ///             Self::proposals_need_queuing(e),
+    ///         )
     ///     }
-    ///
-    ///     // ... other required methods (execute, cancel) ...
     /// }
     /// ```
-    ///
-    /// See the access control examples below for alternative patterns.
     ///
     /// # Arguments
     ///
@@ -517,7 +540,9 @@ pub trait Governor {
     ///   bytes.
     /// * `eta` - The ledger sequence number at which the proposal becomes
     ///   executable. Typically computed as `current_ledger + timelock_delay`.
-    /// * `operator` - The address queuing the proposal.
+    /// * `operator` - The address queuing the proposal. Unused in the
+    ///   default (open) implementation, but available for access-control
+    ///   overrides.
     ///
     /// # Errors
     ///
@@ -531,45 +556,6 @@ pub trait Governor {
     ///
     /// * topics - `["proposal_queued", proposal_id: BytesN<32>]`
     /// * data - `[eta: u32]`
-    ///
-    /// # IMPLEMENTATION REQUIRED — ACCESS CONTROL
-    ///
-    /// **This function has no default implementation.** The implementer MUST
-    /// define who is authorized to queue proposals. Consider the following
-    /// patterns:
-    ///
-    /// - **Open queueing**: Allow anyone to queue a succeeded proposal. No
-    ///   `require_auth()` is needed since the `operator` parameter serves no
-    ///   access-control purpose.
-    /// - **Restricted queueing**: Restrict queueing to a specific role (e.g., a
-    ///   timelock contract or an admin). Validate `operator` against the
-    ///   allowed role and call `operator.require_auth()`.
-    ///
-    /// [`storage::queue`] performs the actual state transition and should be
-    /// called after access control logic has been applied.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// // Open queueing — anyone can queue a succeeded proposal:
-    /// fn queue(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
-    ///     storage::queue(e, targets, functions, args, &description_hash, eta, Self::proposals_need_queuing(e))
-    /// }
-    ///
-    /// // Restricted — only a timelock contract can queue:
-    /// fn queue(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
-    ///     let timelock = storage::get_timelock(e);
-    ///     assert!(operator == timelock);
-    ///     operator.require_auth();
-    ///     storage::queue(e, targets, functions, args, &description_hash, eta, Self::proposals_need_queuing(e))
-    /// }
-    ///
-    /// // Role-based — using the `stellar-macros` access control macro:
-    /// #[only_role(operator, "queuer")]
-    /// fn queue(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
-    ///     storage::queue(e, targets, functions, args, &description_hash, eta, Self::proposals_need_queuing(e))
-    /// }
-    /// ```
     fn queue(
         e: &Env,
         targets: Vec<Address>,
@@ -577,8 +563,18 @@ pub trait Governor {
         args: Vec<Vec<Val>>,
         description_hash: BytesN<32>,
         eta: u32,
-        operator: Address,
-    ) -> BytesN<32>;
+        _operator: Address,
+    ) -> BytesN<32> {
+        storage::queue(
+            e,
+            targets,
+            functions,
+            args,
+            &description_hash,
+            eta,
+            Self::proposals_need_queuing(e),
+        )
+    }
 
     /// Executes a proposal and returns its unique identifier.
     ///
