@@ -461,8 +461,8 @@ pub fn do_check_auth(
     Ok(())
 }
 
-/// Checks if any signer in `signers` has the same canonical key identity as
-/// `new_signer`.
+/// Validates that there are no canonical duplicates among the provided
+/// signers.
 ///
 /// For [`Signer::External`] signers, this calls the verifier's
 /// `batch_canonicalize_key` to compare cryptographic identities rather than raw
@@ -476,36 +476,51 @@ pub fn do_check_auth(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `signers` - The existing list of signers to check against.
-/// * `new_signer` - The signer to check for duplicates.
-pub fn contains_canonical_duplicate(e: &Env, signers: &Vec<Signer>, new_signer: &Signer) -> bool {
-    match new_signer {
-        Signer::External(verifier, key_data) => {
-            let client = VerifierClient::new(e, verifier);
+/// * `signers` - The full list of signers to check for duplicates.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::DuplicateSigner`] - When two signers share the same
+///   canonical key identity.
+pub fn validate_no_canonical_duplicates(e: &Env, signers: &Vec<Signer>) {
+    // Group external signer keys by verifier address.
+    let mut verifier_groups: Map<Address, Vec<Val>> = Map::new(e);
 
-            let mut key_batch = Vec::new(e);
-
-            // Filter signers with the same verifier
-            for existing in signers.iter() {
-                if let Signer::External(existing_verifier, existing_key_data) = existing {
-                    if existing_verifier == *verifier {
-                        key_batch.push_back(existing_key_data.into_val(e));
-                    }
+    let mut seen_delegated: Vec<Address> = Vec::new(e);
+    for signer in signers.iter() {
+        match &signer {
+            Signer::External(verifier, key_data) => {
+                let mut group = verifier_groups.get(verifier.clone()).unwrap_or(Vec::new(e));
+                group.push_back(key_data.into_val(e));
+                verifier_groups.set(verifier.clone(), group);
+            }
+            Signer::Delegated(signer) => {
+                // Check delegated duplicates.
+                if seen_delegated.contains(signer) {
+                    panic_with_error!(e, SmartAccountError::DuplicateSigner);
                 }
+                seen_delegated.push_back(signer.clone());
             }
-
-            if key_batch.is_empty() {
-                return false;
-            }
-
-            key_batch.push_back(key_data.into_val(e));
-
-            let canonical_batch = client.batch_canonicalize_key(&key_batch);
-            let new_canonical = canonical_batch.last().expect("new canonical key to be present");
-
-            canonical_batch.iter().rev().skip(1).any(|canonical| canonical == new_canonical)
         }
-        Signer::Delegated(_) => signers.contains(new_signer),
+    }
+
+    // One canonicalize call per verifier, then check for dups in each group.
+    for (verifier, key_batch) in verifier_groups.iter() {
+        let client = VerifierClient::new(e, &verifier);
+        // Check canonicalization even for a single key in a batch.
+        let canonical = client.batch_canonicalize_key(&key_batch);
+
+        if key_batch.len() <= 1 {
+            continue;
+        }
+
+        let mut seen_external: Vec<Bytes> = Vec::new(e);
+        for canonical_key in canonical.iter() {
+            if seen_external.contains(&canonical_key) {
+                panic_with_error!(e, SmartAccountError::DuplicateSigner);
+            }
+            seen_external.push_back(canonical_key);
+        }
     }
 }
 
@@ -570,15 +585,8 @@ pub fn add_context_rule(
 
     let count = get_context_rules_count(e);
 
-    // Check for duplicate signers using canonical key comparison
-    let mut unique_signers = Vec::new(e);
-    for signer in signers.iter() {
-        validate_signer_key_size(e, &signer);
-        if contains_canonical_duplicate(e, &unique_signers, &signer) {
-            panic_with_error!(e, SmartAccountError::DuplicateSigner);
-        }
-        unique_signers.push_back(signer);
-    }
+    signers.iter().for_each(|signer| validate_signer_key_size(e, &signer));
+    validate_no_canonical_duplicates(e, signers);
 
     // Check valid_until
     if let Some(valid_until) = valid_until {
@@ -590,8 +598,7 @@ pub fn add_context_rule(
     let policies_vec = Vec::from_iter(e, policies.keys());
 
     // Register signers in global registry and collect their IDs
-    let signer_ids: Vec<u32> =
-        Vec::from_iter(e, unique_signers.iter().map(|s| register_signer(e, &s)));
+    let signer_ids: Vec<u32> = Vec::from_iter(e, signers.iter().map(|s| register_signer(e, &s)));
 
     // Register policies in global registry and collect their IDs
     let policy_ids: Vec<u32> =
@@ -615,7 +622,7 @@ pub fn add_context_rule(
         id,
         context_type: context_type.clone(),
         name: name.clone(),
-        signers: unique_signers,
+        signers: signers.clone(),
         policies: policies_vec,
         valid_until,
     };
@@ -861,12 +868,10 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) -> u32 {
     let mut entry: ContextRuleEntry = get_persistent_entry(e, &data_key)
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
-    // Check if signer already exists using canonical key comparison (against
-    // resolved signers)
-    let signers = get_signers(e, &entry.signer_ids);
-    if contains_canonical_duplicate(e, &signers, signer) {
-        panic_with_error!(e, SmartAccountError::DuplicateSigner)
-    }
+    // Check if signer already exists using canonical key comparison.
+    let mut all_signers = get_signers(e, &entry.signer_ids);
+    all_signers.push_back(signer.clone());
+    validate_no_canonical_duplicates(e, &all_signers);
 
     let new_signer_id = register_signer(e, signer);
 
@@ -982,21 +987,17 @@ pub fn batch_add_signer(e: &Env, id: u32, signers: &Vec<Signer>) {
     let mut entry: ContextRuleEntry = get_persistent_entry(e, &data_key)
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
-    // Resolve existing signers once for all duplicate checks.
-    let mut existing_signers = get_signers(e, &entry.signer_ids);
+    // Validate key sizes for all new signers.
+    signers.iter().for_each(|signer| validate_signer_key_size(e, &signer));
+
+    // Check for duplicates across existing + new signers in one batch.
+    let mut all_signers = get_signers(e, &entry.signer_ids);
+    all_signers.append(signers);
+    validate_no_canonical_duplicates(e, &all_signers);
 
     for signer in signers.iter() {
-        validate_signer_key_size(e, &signer);
-
-        if contains_canonical_duplicate(e, &existing_signers, &signer) {
-            panic_with_error!(e, SmartAccountError::DuplicateSigner);
-        }
-
         let new_signer_id = register_signer(e, &signer);
-
         entry.signer_ids.push_back(new_signer_id);
-        existing_signers.push_back(signer);
-
         emit_signer_added(e, id, new_signer_id);
     }
 
