@@ -14,10 +14,11 @@ use soroban_sdk::{contract, crypto::Hash, Bytes, BytesN, Env};
 use crate::verifiers::{
     utils::base64_url_encode,
     webauthn::{
-        canonicalize_key, validate_backup_eligibility_and_state, validate_challenge,
-        validate_expected_type, validate_user_present_bit_set, validate_user_verified_bit_set,
-        verify, ClientDataJson, WebAuthnSigData, AUTH_DATA_FLAGS_BE, AUTH_DATA_FLAGS_BS,
-        AUTH_DATA_FLAGS_UP, AUTH_DATA_FLAGS_UV, CLIENT_DATA_MAX_LEN,
+        batch_canonicalize_key, canonicalize_key, validate_backup_eligibility_and_state,
+        validate_challenge, validate_expected_type, validate_user_present_bit_set,
+        validate_user_verified_bit_set, verify, ClientDataJson, WebAuthnSigData,
+        AUTH_DATA_FLAGS_BE, AUTH_DATA_FLAGS_BS, AUTH_DATA_FLAGS_UP, AUTH_DATA_FLAGS_UV,
+        CLIENT_DATA_MAX_LEN,
     },
 };
 
@@ -379,6 +380,34 @@ fn canonicalize_key_short_input_fails() {
     e.as_contract(&address, || {
         let short_key_data = Bytes::from_array(&e, &[1u8; 64]);
         canonicalize_key(&e, &short_key_data);
+    });
+}
+
+#[test]
+fn webauthn_batch_canonicalize_key_preserves_order() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        // Three keys with different 65-byte public keys and credential ID suffixes.
+        let pub1 = Bytes::from_array(&e, &[1u8; 65]);
+        let mut key1 = pub1.clone();
+        key1.extend_from_array(&[0xAA; 10]);
+
+        let pub2 = Bytes::from_array(&e, &[2u8; 65]);
+        let mut key2 = pub2.clone();
+        key2.extend_from_array(&[0xBB; 20]);
+
+        let pub3 = Bytes::from_array(&e, &[3u8; 65]);
+        let key3 = pub3.clone();
+
+        let keys = soroban_sdk::Vec::from_array(&e, [key1, key2, key3]);
+        let canonical = batch_canonicalize_key(&e, &keys);
+
+        assert_eq!(canonical.len(), 3);
+        assert_eq!(canonical.get(0).unwrap(), pub1);
+        assert_eq!(canonical.get(1).unwrap(), pub2);
+        assert_eq!(canonical.get(2).unwrap(), pub3);
     });
 }
 

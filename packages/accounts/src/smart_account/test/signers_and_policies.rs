@@ -258,7 +258,7 @@ fn remove_signer_shared_across_rules_decrements_count() {
             &Map::new(&e),
         );
 
-        // Different context type so the fingerprint differs; same signer re-used.
+        // Different context type; same signer re-used.
         let extra_signer = Signer::Delegated(Address::generate(&e));
         let _ = add_context_rule(
             &e,
@@ -362,7 +362,7 @@ fn remove_policy_success() {
         assert!(!updated_rule.policies.contains(&policy_address));
     });
 
-    // case when `unistall` of the policy panics
+    // case when `uninstall` of the policy panics
     e.as_contract(&policy_address, || {
         e.storage().persistent().set(&symbol_short!("veto"), &true);
     });

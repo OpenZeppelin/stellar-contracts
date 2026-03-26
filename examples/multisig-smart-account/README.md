@@ -168,6 +168,50 @@ stellar contract deploy \
 
 This setup demonstrates the flexibility of smart accounts, combining different signature types while sharing verification logic through reusable verifier contracts.
 
+## 6. Constructing the Signature Payload
+
+When authorizing transactions with a smart account, signers do **not** sign the raw `signature_payload` provided by the Soroban host. Instead, the smart account binds the selected `context_rule_ids` into the digest to prevent rule-selection downgrade attacks.
+
+### How the Auth Digest Is Computed
+
+The Soroban host computes a `signature_payload` (`Hash<32>`) from the transaction's network ID, nonce, expiration ledger, and authorized invocation tree. The smart account then derives the **auth digest** that signers must actually sign:
+
+```
+auth_digest = sha256(signature_payload || context_rule_ids.to_xdr())
+```
+
+Where:
+- `signature_payload` is the 32-byte hash provided by the host to `__check_auth`
+- `context_rule_ids` is the `Vec<u32>` of rule IDs (one per auth context), serialized to XDR
+- `||` denotes byte concatenation
+
+### Why This Matters
+
+Without this binding, a malicious sponsor could collect signatures under a strict rule (e.g., one requiring a threshold policy) and then swap the `context_rule_ids` in the `AuthPayload` to reference a weaker rule — bypassing spending limits or threshold policies that signers expected to apply. By including rule IDs in the signed digest, any alteration of `context_rule_ids` after signature collection invalidates all signatures.
+
+### Example: Computing the Auth Digest Off-Chain
+
+Using the Soroban Rust SDK:
+
+```rust
+use soroban_sdk::xdr::ToXdr;
+
+// signature_payload: Hash<32> from the host (via __check_auth)
+// context_rule_ids: Vec<u32> — the rule IDs the signer agrees to
+
+let mut preimage = signature_payload.to_bytes().to_bytes();
+preimage.append(&context_rule_ids.to_xdr(e));
+let auth_digest = e.crypto().sha256(&preimage);
+
+// Signers sign `auth_digest`, NOT `signature_payload` directly.
+```
+
+For off-chain clients (e.g., JS SDK), replicate the same concatenation:
+1. Take the raw 32 bytes of `signature_payload`
+2. XDR-encode the `Vec<u32>` of rule IDs (as `ScVal::Vec` of `ScVal::U32` entries)
+3. Concatenate them and compute SHA-256
+4. Sign the resulting 32-byte digest
+
 ## Next Steps
 
 1. Review the [Smart Accounts documentation](https://docs.openzeppelin.com/stellar-contracts/accounts/smart-account) to learn more about:

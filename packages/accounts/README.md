@@ -480,6 +480,32 @@ creds.signature = ScVal::Map(Some(ScMap::sorted_from([
 ])?));
 ```
 
+### Auth digest now binds `context_rule_ids` (breaking change)
+
+Signers no longer sign the raw `signature_payload` from the host. Instead, the smart account computes an **auth digest** that includes the selected rule IDs:
+
+```
+auth_digest = sha256(signature_payload || context_rule_ids.to_xdr())
+```
+
+This prevents rule-selection downgrade attacks where a sponsor swaps `context_rule_ids` to a weaker rule after collecting signatures. Off-chain signing flows must replicate this digest computation:
+
+1. Take the 32-byte `signature_payload` from the host
+2. XDR-encode the `Vec<u32>` of rule IDs (one per auth context)
+3. Concatenate and SHA-256 hash the result
+4. Sign the resulting auth digest
+
+In Rust (Soroban SDK):
+
+```rust
+use soroban_sdk::xdr::ToXdr;
+
+let mut preimage = signature_payload.to_bytes().to_bytes();
+preimage.append(&context_rule_ids.to_xdr(e));
+let auth_digest = e.crypto().sha256(&preimage);
+// Sign auth_digest, not signature_payload
+```
+
 ### `Policy` trait (breaking change)
 
 The `can_enforce()` method has been removed. The `enforce()` method is now responsible for both validation and state changes:

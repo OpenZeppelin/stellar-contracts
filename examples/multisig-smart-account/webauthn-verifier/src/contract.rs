@@ -84,6 +84,6 @@ impl Verifier for WebauthnVerifierContract {
     /// * `keys_data` - A vector with bytes containing the 65-byte public key
     ///   followed by an optional credential ID.
     fn batch_canonicalize_key(e: &Env, keys_data: Vec<Bytes>) -> Vec<Bytes> {
-        Vec::from_iter(e, keys_data.iter().map(|key| webauthn::canonicalize_key(e, &key)))
+        webauthn::batch_canonicalize_key(e, &keys_data)
     }
 }
