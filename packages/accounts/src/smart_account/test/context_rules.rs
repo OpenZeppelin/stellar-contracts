@@ -7,17 +7,19 @@ use soroban_sdk::{
     },
     contract, contractimpl, symbol_short,
     testutils::{Address as _, Events, Ledger},
-    vec, Address, Bytes, BytesN, Env, Map, String, Symbol, TryFromVal, Val, Vec,
+    vec,
+    xdr::ToXdr,
+    Address, Bytes, BytesN, Env, Map, String, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::{
     policies::Policy,
     smart_account::{
         storage::{
-            add_context_rule, authenticate, contains_canonical_duplicate, do_check_auth,
-            get_authenticated_signers, get_context_rule, get_context_rules_count,
-            get_validated_context_by_id, remove_context_rule, update_context_rule_name,
-            update_context_rule_valid_until, AuthPayload, ContextRule, ContextRuleType, Signer,
+            add_context_rule, authenticate, do_check_auth, get_authenticated_signers,
+            get_context_rule, get_context_rules_count, get_validated_context_by_id,
+            remove_context_rule, update_context_rule_name, update_context_rule_valid_until,
+            validate_no_canonical_duplicates, AuthPayload, ContextRule, ContextRuleType, Signer,
             SmartAccountStorageKey,
         },
         MAX_EXTERNAL_KEY_SIZE,
@@ -312,6 +314,48 @@ fn do_check_auth_context_rule_ids_length_mismatch_fails() {
             AuthPayload { signers: signature_map, context_rule_ids: vec![&e, rule.id] };
 
         let payload = Bytes::from_array(&e, &[1u8; 32]);
+        let _ = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3016)")]
+fn do_check_auth_unauthorized_external_signer_rejected() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let verifier_addr = e.register(MockVerifierContract, ());
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr.clone());
+
+        // Create a rule with only delegated signers
+        let signers = create_test_signers(&e);
+        let rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "legit_rule"),
+            None,
+            &signers,
+            &Map::new(&e),
+        );
+
+        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
+        let auth_contexts = Vec::from_array(&e, [context]);
+
+        // Attacker appends an external signer with an attacker-controlled
+        // verifier that is NOT part of any selected rule.
+        let rogue_key = Bytes::from_array(&e, &[0xAA; 4]);
+        let rogue_signer = Signer::External(verifier_addr.clone(), rogue_key);
+
+        let mut all = signers.clone();
+        all.push_back(rogue_signer);
+
+        let signatures = create_signatures(&e, &all, vec![&e, rule.id]);
+        let payload = Bytes::from_array(&e, &[1u8; 32]);
+
         let _ = do_check_auth(&e, &e.crypto().sha256(&payload), &signatures, &auth_contexts);
     });
 }
@@ -626,7 +670,7 @@ fn remove_context_rule_success() {
         )
     });
 
-    // `unistall` of the first policy panics
+    // `uninstall` of the first policy panics
     e.as_contract(&rule.policies.get_unchecked(0), || {
         e.storage().persistent().set(&symbol_short!("veto"), &true);
     });
@@ -1040,48 +1084,56 @@ impl MockCanonicalizingVerifier {
     }
 }
 
+// ################## VALIDATE NO CANONICAL DUPLICATES TESTS ##################
+
 #[test]
-fn contains_canonical_duplicate_same_canonical_keys() {
+fn validate_no_canonical_duplicates_no_duplicates() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
         let verifier = e.register(MockCanonicalizingVerifier, ());
 
-        let mut existing = Bytes::from_array(&e, &[1u8; 32]);
-        existing.extend_from_array(&[0xAA; 8]);
-        let signers = Vec::from_array(&e, [Signer::External(verifier.clone(), existing)]);
+        let mut key1 = Bytes::from_array(&e, &[1u8; 32]);
+        key1.extend_from_array(&[0xAA; 8]);
+        let mut key2 = Bytes::from_array(&e, &[2u8; 32]);
+        key2.extend_from_array(&[0xBB; 8]);
 
-        let mut candidate = Bytes::from_array(&e, &[1u8; 32]);
-        candidate.extend_from_array(&[0xBB; 8]);
-        let new_signer = Signer::External(verifier.clone(), candidate);
+        let signers = Vec::from_array(
+            &e,
+            [Signer::External(verifier.clone(), key1), Signer::External(verifier.clone(), key2)],
+        );
 
-        assert!(contains_canonical_duplicate(&e, &signers, &new_signer));
+        validate_no_canonical_duplicates(&e, &signers);
     });
 }
 
 #[test]
-fn contains_canonical_duplicate_different_canonical_keys() {
+#[should_panic(expected = "Error(Contract, #3007)")]
+fn validate_no_canonical_duplicates_same_canonical_keys() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
         let verifier = e.register(MockCanonicalizingVerifier, ());
 
-        let mut existing = Bytes::from_array(&e, &[1u8; 32]);
-        existing.extend_from_array(&[0xAA; 8]);
-        let signers = Vec::from_array(&e, [Signer::External(verifier.clone(), existing)]);
+        // Same first 32 bytes → same canonical form.
+        let mut key1 = Bytes::from_array(&e, &[1u8; 32]);
+        key1.extend_from_array(&[0xAA; 8]);
+        let mut key2 = Bytes::from_array(&e, &[1u8; 32]);
+        key2.extend_from_array(&[0xBB; 8]);
 
-        let mut candidate = Bytes::from_array(&e, &[2u8; 32]);
-        candidate.extend_from_array(&[0xBB; 8]);
-        let new_signer = Signer::External(verifier.clone(), candidate);
+        let signers = Vec::from_array(
+            &e,
+            [Signer::External(verifier.clone(), key1), Signer::External(verifier.clone(), key2)],
+        );
 
-        assert!(!contains_canonical_duplicate(&e, &signers, &new_signer));
+        validate_no_canonical_duplicates(&e, &signers);
     });
 }
 
 #[test]
-fn contains_canonical_duplicate_no_matching_verifier() {
+fn validate_no_canonical_duplicates_different_verifiers_same_key() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
@@ -1089,52 +1141,172 @@ fn contains_canonical_duplicate_no_matching_verifier() {
         let verifier1 = e.register(MockCanonicalizingVerifier, ());
         let verifier2 = e.register(MockCanonicalizingVerifier, ());
 
-        let mut existing = Bytes::from_array(&e, &[3u8; 32]);
-        existing.extend_from_array(&[0xAA; 8]);
-        let signers = Vec::from_array(&e, [Signer::External(verifier1, existing)]);
+        let mut key = Bytes::from_array(&e, &[1u8; 32]);
+        key.extend_from_array(&[0xAA; 8]);
 
-        let mut candidate = Bytes::from_array(&e, &[3u8; 32]);
-        candidate.extend_from_array(&[0xBB; 8]);
-        let new_signer = Signer::External(verifier2, candidate);
+        // Same canonical key but different verifiers → not duplicates.
+        let signers = Vec::from_array(
+            &e,
+            [Signer::External(verifier1, key.clone()), Signer::External(verifier2, key)],
+        );
 
-        assert!(!contains_canonical_duplicate(&e, &signers, &new_signer));
+        validate_no_canonical_duplicates(&e, &signers);
     });
 }
 
 #[test]
-fn contains_canonical_duplicate_delegated_signers() {
+#[should_panic(expected = "Error(Contract, #3007)")]
+fn validate_no_canonical_duplicates_delegated_duplicates() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let delegated_a = Address::generate(&e);
-        let delegated_b = Address::generate(&e);
-        let signers = Vec::from_array(&e, [Signer::Delegated(delegated_a.clone())]);
+        let delegated = Address::generate(&e);
+        let signers = Vec::from_array(
+            &e,
+            [Signer::Delegated(delegated.clone()), Signer::Delegated(delegated)],
+        );
 
-        assert!(contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_a)));
-        assert!(!contains_canonical_duplicate(&e, &signers, &Signer::Delegated(delegated_b)));
+        validate_no_canonical_duplicates(&e, &signers);
+    });
+}
+
+// ################## RULE-SELECTION DOWNGRADE TESTS ##################
+
+#[contract]
+struct HashCheckingVerifier;
+
+#[contractimpl]
+impl HashCheckingVerifier {
+    pub fn verify(e: &Env, hash: Bytes, _key_data: Val, _sig_data: Val) -> bool {
+        let expected: Bytes = e.storage().persistent().get(&symbol_short!("exp_hash")).unwrap();
+        hash == expected
+    }
+
+    pub fn canonicalize_key(e: &Env, key_data: Val) -> Bytes {
+        Bytes::try_from_val(e, &key_data).unwrap()
+    }
+
+    pub fn batch_canonicalize_key(e: &Env, key_data: Vec<Val>) -> Vec<Bytes> {
+        Vec::from_iter(e, key_data.iter().map(|key| Bytes::try_from_val(e, &key).unwrap()))
+    }
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3003)")]
+fn do_check_auth_rule_selection_downgrade_fails() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let verifier_addr = e.register(HashCheckingVerifier, ());
+
+    e.as_contract(&address, || {
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr.clone());
+
+        let key_data = Bytes::from_array(&e, &[1, 2, 3, 4]);
+        let external_signer = Signer::External(verifier_addr.clone(), key_data.clone());
+
+        // Create a strict rule (id 0) with our external signer
+        let strict_rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "strict_rule"),
+            None,
+            &Vec::from_array(&e, [external_signer.clone()]),
+            &create_test_policies_map(&e),
+        );
+
+        // Create a weak rule (id 1) with the same signer but no policies
+        let weak_rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "weak_rule"),
+            None,
+            &Vec::from_array(&e, [external_signer.clone()]),
+            &Map::new(&e),
+        );
+
+        let payload = Bytes::from_array(&e, &[1u8; 32]);
+        let signature_payload = e.crypto().sha256(&payload);
+
+        // Signer signs expecting the STRICT rule (id 0).
+        // auth_digest = sha256(signature_payload || [strict_rule.id].to_xdr())
+        let intended_rule_ids = vec![&e, strict_rule.id];
+        let mut intended_preimage = signature_payload.to_bytes().to_bytes();
+        intended_preimage.append(&intended_rule_ids.to_xdr(&e));
+        let intended_digest = e.crypto().sha256(&intended_preimage);
+
+        // Store the expected hash in the verifier so it accepts this digest
+        e.as_contract(&verifier_addr, || {
+            e.storage()
+                .persistent()
+                .set(&symbol_short!("exp_hash"), &intended_digest.to_bytes().to_bytes());
+        });
+
+        // Attacker swaps context_rule_ids to the WEAK rule after signatures
+        // were collected for the STRICT rule.
+        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
+        let auth_contexts = Vec::from_array(&e, [context]);
+
+        let mut signature_map = Map::new(&e);
+        signature_map.set(external_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
+        let tampered_signatures =
+            AuthPayload { signers: signature_map, context_rule_ids: vec![&e, weak_rule.id] };
+
+        // This must fail: the auth_digest computed inside do_check_auth will
+        // use weak_rule.id, which differs from the digest the signer signed.
+        let _ = do_check_auth(&e, &signature_payload, &tampered_signatures, &auth_contexts);
     });
 }
 
 #[test]
-fn contains_canonical_duplicate_external_with_delegated_existing() {
-    // When the new signer is External but the existing signer list contains a
-    // Delegated signer, the `if let Signer::External` branch does not match
-    // for the delegated entry — covering the implicit-else path.
+fn do_check_auth_rule_selection_matching_succeeds() {
     let e = Env::default();
     let address = e.register(MockContract, ());
+    let verifier_addr = e.register(HashCheckingVerifier, ());
 
     e.as_contract(&address, || {
-        let verifier = e.register(MockCanonicalizingVerifier, ());
-        let delegated_signer = Signer::Delegated(Address::generate(&e));
-        let existing = Vec::from_array(&e, [delegated_signer]);
+        let contract_addr = Address::generate(&e);
+        let context_type = ContextRuleType::CallContract(contract_addr.clone());
 
-        let mut key_data = Bytes::from_array(&e, &[5u8; 32]);
-        key_data.extend_from_array(&[0xCC; 8]);
-        let new_signer = Signer::External(verifier, key_data);
+        let key_data = Bytes::from_array(&e, &[1, 2, 3, 4]);
+        let external_signer = Signer::External(verifier_addr.clone(), key_data.clone());
 
-        // No External signer with the same verifier in the list → no duplicate
-        assert!(!contains_canonical_duplicate(&e, &existing, &new_signer));
+        // Create a rule with our external signer (no policies for simplicity)
+        let rule = add_context_rule(
+            &e,
+            &context_type,
+            &String::from_str(&e, "target_rule"),
+            None,
+            &Vec::from_array(&e, [external_signer.clone()]),
+            &Map::new(&e),
+        );
+
+        let payload = Bytes::from_array(&e, &[1u8; 32]);
+        let signature_payload = e.crypto().sha256(&payload);
+
+        // Signer signs with the correct rule id.
+        let rule_ids = vec![&e, rule.id];
+        let mut preimage = signature_payload.to_bytes().to_bytes();
+        preimage.append(&rule_ids.clone().to_xdr(&e));
+        let expected_digest = e.crypto().sha256(&preimage);
+
+        e.as_contract(&verifier_addr, || {
+            e.storage()
+                .persistent()
+                .set(&symbol_short!("exp_hash"), &expected_digest.to_bytes().to_bytes());
+        });
+
+        let context = get_context(contract_addr, symbol_short!("test"), vec![&e]);
+        let auth_contexts = Vec::from_array(&e, [context]);
+
+        let mut signature_map = Map::new(&e);
+        signature_map.set(external_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
+        let signatures = AuthPayload { signers: signature_map, context_rule_ids: rule_ids };
+
+        // This must succeed: rule_ids match what was signed.
+        let result = do_check_auth(&e, &signature_payload, &signatures, &auth_contexts);
+        assert!(result.is_ok());
     });
 }
 

@@ -164,6 +164,12 @@ pub fn checked_mul_div(x: &I256, y: &I256, denominator: &I256) -> Option<I256> {
     }
 
     let r = x.mul(y);
+
+    // TODO: remove this check when `checked_div` is available: https://github.com/stellar/rs-soroban-sdk/issues/1659
+    if check_div_overflow(&r, denominator) {
+        return None;
+    }
+
     Some(r.div(denominator))
 }
 
@@ -187,6 +193,8 @@ fn checked_div_floor(r: &I256, z: &I256) -> Option<I256> {
         Some(r.div(z).sub(if remainder > *zero { &one } else { zero }))
     } else {
         // floor is taken by default for a positive or zero result
+
+        // TODO: remove this check when `checked_div` is available: https://github.com/stellar/rs-soroban-sdk/issues/1659
         if check_div_overflow(r, z) {
             return None;
         }
@@ -224,6 +232,8 @@ fn checked_div_ceil(r: &I256, z: &I256) -> Option<I256> {
         Some(r.div(z))
     } else {
         // floor is taken by default for a positive result
+
+        // TODO: remove this check when `checked_div` is available: https://github.com/stellar/rs-soroban-sdk/issues/1659
         if check_div_overflow(r, z) {
             return None;
         }

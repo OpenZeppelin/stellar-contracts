@@ -6,7 +6,7 @@ use crate::{
         emit_role_admin_changed, emit_role_granted, emit_role_revoked, AccessControlError,
         MAX_ROLES, ROLE_EXTEND_AMOUNT, ROLE_TTL_THRESHOLD,
     },
-    role_transfer::{accept_transfer, transfer_role, PendingTransfer},
+    role_transfer::{accept_transfer, has_active_pending_transfer, transfer_role},
 };
 
 /// Storage key for enumeration of accounts per role.
@@ -463,7 +463,7 @@ pub fn renounce_admin(e: &Env) {
     let admin = enforce_admin_auth(e);
     let key = AccessControlStorageKey::PendingAdmin;
 
-    if e.storage().temporary().get::<_, PendingTransfer>(&key).is_some() {
+    if has_active_pending_transfer(e, &key) {
         panic_with_error!(e, AccessControlError::TransferInProgress);
     }
 

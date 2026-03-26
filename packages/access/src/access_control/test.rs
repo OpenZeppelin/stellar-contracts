@@ -1,6 +1,10 @@
 extern crate std;
 
-use soroban_sdk::{contract, symbol_short, testutils::Address as _, Address, Env, Symbol};
+use soroban_sdk::{
+    contract, symbol_short,
+    testutils::{Address as _, Ledger},
+    Address, Env, Symbol,
+};
 use stellar_event_assertion::EventAssertion;
 
 use crate::access_control::{
@@ -683,6 +687,32 @@ fn renounce_admin_fails_when_transfer_in_progress() {
         // Try to renounce admin while transfer is in progress
         // This should panic with TransferInProgress error
         renounce_admin(&e);
+    });
+}
+
+/// Renouncing admin should succeed when a pending transfer exists but has
+/// expired.
+#[test]
+fn renounce_admin_succeeds_when_pending_transfer_expired() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let admin = Address::generate(&e);
+    let new_admin = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        set_admin(&e, &admin);
+        // Start a transfer that expires at ledger 1000.
+        transfer_admin_role(&e, &new_admin, 1000);
+    });
+
+    // Advance ledger past the expiry.
+    e.ledger().set_sequence_number(1001);
+
+    e.as_contract(&address, || {
+        // Should succeed — expired pending transfer is treated as absent.
+        renounce_admin(&e);
+        assert_eq!(get_admin(&e), None);
     });
 }
 

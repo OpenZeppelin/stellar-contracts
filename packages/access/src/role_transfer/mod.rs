@@ -5,7 +5,7 @@ use soroban_sdk::contracterror;
 
 mod storage;
 
-pub use storage::{accept_transfer, transfer_role, PendingTransfer};
+pub use storage::{accept_transfer, has_active_pending_transfer, transfer_role, PendingTransfer};
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
