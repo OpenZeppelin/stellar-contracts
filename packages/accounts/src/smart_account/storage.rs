@@ -161,8 +161,14 @@ pub struct ContextRule {
     pub name: String,
     /// List of signers authorized by this rule.
     pub signers: Vec<Signer>,
+    /// Global registry IDs for each signer, positionally aligned with
+    /// `signers`.
+    pub signer_ids: Vec<u32>,
     /// List of policy contracts that must be satisfied.
     pub policies: Vec<Address>,
+    /// Global registry IDs for each policy, positionally aligned with
+    /// `policies`.
+    pub policy_ids: Vec<u32>,
     /// Optional expiration ledger sequence for the rule.
     pub valid_until: Option<u32>,
 }
@@ -190,7 +196,9 @@ pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
         context_type: entry.context_type,
         name: entry.name,
         signers: get_signers(e, &entry.signer_ids),
+        signer_ids: entry.signer_ids,
         policies: get_policies(e, &entry.policy_ids),
+        policy_ids: entry.policy_ids,
         valid_until: entry.valid_until,
     }
 }
@@ -203,6 +211,42 @@ pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
 /// * `e` - Access to the Soroban environment.
 pub fn get_context_rules_count(e: &Env) -> u32 {
     e.storage().instance().get(&SmartAccountStorageKey::Count).unwrap_or(0u32)
+}
+
+/// Retrieves the global registry ID for a signer.
+///
+/// Computes `sha256(XDR(signer))` and looks up the corresponding
+/// `SignerLookup` entry.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `signer` - The signer to look up.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::SignerNotFound`] - When the signer is not registered
+///   in the global registry.
+pub fn get_signer_id(e: &Env, signer: &Signer) -> u32 {
+    let hash = e.crypto().sha256(&signer.to_xdr(e)).to_bytes();
+    get_persistent_entry::<u32>(e, &SmartAccountStorageKey::SignerLookup(hash))
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::SignerNotFound))
+}
+
+/// Retrieves the global registry ID for a policy.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `policy` - The policy address to look up.
+///
+/// # Errors
+///
+/// * [`SmartAccountError::PolicyNotFound`] - When the policy is not registered
+///   in the global registry.
+pub fn get_policy_id(e: &Env, policy: &Address) -> u32 {
+    get_persistent_entry::<u32>(e, &SmartAccountStorageKey::PolicyLookup(policy.clone()))
+        .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::PolicyNotFound))
 }
 
 /// Filters rule signers to find which ones are present in the provided signer
@@ -658,7 +702,9 @@ pub fn add_context_rule(
         context_type: context_type.clone(),
         name: name.clone(),
         signers: signers.clone(),
+        signer_ids: signer_ids.clone(),
         policies: policies_vec,
+        policy_ids: policy_ids.clone(),
         valid_until,
     };
 
@@ -724,9 +770,11 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: &String) -> ContextRule 
         id,
         context_type: entry.context_type,
         name: name.clone(),
-        valid_until: entry.valid_until,
         signers: get_signers(e, &entry.signer_ids),
+        signer_ids: entry.signer_ids,
         policies: get_policies(e, &entry.policy_ids),
+        policy_ids: entry.policy_ids,
+        valid_until: entry.valid_until,
     }
 }
 
@@ -777,9 +825,11 @@ pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32
         id,
         context_type: entry.context_type,
         name: entry.name,
-        valid_until,
         signers: get_signers(e, &entry.signer_ids),
+        signer_ids: entry.signer_ids,
         policies: get_policies(e, &entry.policy_ids),
+        policy_ids: entry.policy_ids,
+        valid_until,
     }
 }
 
@@ -826,7 +876,9 @@ pub fn remove_context_rule(e: &Env, id: u32) {
         context_type: entry.context_type.clone(),
         name: entry.name,
         signers: get_signers(e, &entry.signer_ids),
+        signer_ids: entry.signer_ids.clone(),
         policies: policies.clone(),
+        policy_ids: entry.policy_ids.clone(),
         valid_until: entry.valid_until,
     };
 
@@ -1100,7 +1152,9 @@ pub fn add_policy(e: &Env, context_rule_id: u32, policy: &Address, install_param
         context_type: entry.context_type,
         name: entry.name,
         signers: get_signers(e, &entry.signer_ids),
+        signer_ids: entry.signer_ids,
         policies: get_policies(e, &entry.policy_ids),
+        policy_ids: entry.policy_ids,
         valid_until: entry.valid_until,
     };
     PolicyClient::new(e, policy).install(&install_param, &rule, &e.current_contract_address());
@@ -1153,7 +1207,9 @@ pub fn remove_policy(e: &Env, context_rule_id: u32, policy_id: u32) {
             context_type: entry.context_type.clone(),
             name: entry.name.clone(),
             signers: get_signers(e, &entry.signer_ids),
+            signer_ids: entry.signer_ids.clone(),
             policies: policies.clone(),
+            policy_ids: entry.policy_ids.clone(),
             valid_until: entry.valid_until,
         };
         let policy = policies.get_unchecked(pos as u32);

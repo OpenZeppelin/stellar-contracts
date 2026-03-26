@@ -161,6 +161,36 @@ pub trait SmartAccount: CustomAccountInterface {
         storage::get_context_rule(e, context_rule_id)
     }
 
+    /// Retrieves the global registry ID for a signer.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `signer` - The signer to look up.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::SignerNotFound`] - When the signer is not
+    ///   registered in the global registry.
+    fn get_signer_id(e: &Env, signer: Signer) -> u32 {
+        storage::get_signer_id(e, &signer)
+    }
+
+    /// Retrieves the global registry ID for a policy.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `policy` - The policy address to look up.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::PolicyNotFound`] - When the policy is not
+    ///   registered in the global registry.
+    fn get_policy_id(e: &Env, policy: Address) -> u32 {
+        storage::get_policy_id(e, &policy)
+    }
+
     /// Creates a new context rule with the specified configuration, returning
     /// the newly created `ContextRule` with a unique ID assigned. Installs
     /// all specified policies during creation.

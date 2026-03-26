@@ -35,7 +35,9 @@ fn create_context_rule(e: &Env) -> ContextRule {
         context_type: ContextRuleType::CallContract(Address::generate(e)),
         name: soroban_sdk::String::from_str(e, "rule"),
         signers,
+        signer_ids: Vec::new(e),
         policies,
+        policy_ids: Vec::new(e),
         valid_until: None,
     }
 }
