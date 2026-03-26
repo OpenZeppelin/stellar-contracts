@@ -277,7 +277,7 @@ fn remove_signer_shared_across_rules_decrements_count() {
             &Map::new(&e),
         );
 
-        // Different context type so the fingerprint differs; same signer re-used.
+        // Different context type; same signer re-used.
         let extra_signer = Signer::Delegated(Address::generate(&e));
         let _ = add_context_rule(
             &e,

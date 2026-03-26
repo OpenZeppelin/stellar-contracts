@@ -54,9 +54,10 @@ pub enum GovernorStorageKey {
 pub struct ProposalCore {
     /// The address that created the proposal.
     pub proposer: Address,
-    /// The ledger number when voting starts.
-    pub vote_start: u32,
-    /// The ledger number when voting ends.
+    /// The ledger at which voting power is snapshotted. Voting opens on
+    /// the next ledger (`vote_snapshot + 1`).
+    pub vote_snapshot: u32,
+    /// The last ledger where voting is active (inclusive).
     pub vote_end: u32,
     /// The quorum required for this proposal, snapshotted at creation time.
     pub quorum: u128,
@@ -225,7 +226,7 @@ pub fn get_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> ProposalState {
 ///   exist.
 pub fn get_proposal_snapshot(e: &Env, proposal_id: &BytesN<32>) -> u32 {
     let core = get_proposal_core(e, proposal_id);
-    core.vote_start
+    core.vote_snapshot
 }
 
 /// Returns the deadline ledger for a proposal.
@@ -433,6 +434,9 @@ pub fn set_token_contract(e: &Env, token_contract: &Address) {
 /// * `args` - The arguments for each function call.
 /// * `description` - A description of the proposal.
 /// * `proposer` - The address creating the proposal.
+/// * `quorum` - The quorum value to snapshot for this proposal. Callers should
+///   pass the result of `Governor::quorum()` so that dynamic quorum overrides
+///   propagate into the proposal lifecycle.
 ///
 /// # Errors
 ///
@@ -463,6 +467,7 @@ pub fn propose(
     args: Vec<Vec<Val>>,
     description: String,
     proposer: &Address,
+    quorum: u128,
 ) -> BytesN<32> {
     // Validate proposal length
     let targets_len = targets.len();
@@ -491,7 +496,7 @@ pub fn propose(
     let current_ledger = e.ledger().sequence();
 
     // Compute proposal ID
-    let description_hash = e.crypto().keccak256(&description.clone().to_xdr(e)).to_bytes();
+    let description_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
 
     // Check proposal doesn't already exist
@@ -502,18 +507,17 @@ pub fn propose(
     // Calculate voting schedule
     let voting_delay = get_voting_delay(e);
     let voting_period = get_voting_period(e);
-    let Some(vote_start) = current_ledger.checked_add(voting_delay) else {
+    let Some(vote_snapshot) = current_ledger.checked_add(voting_delay) else {
         panic_with_error!(e, GovernorError::MathOverflow);
     };
-    let Some(vote_end) = vote_start.checked_add(voting_period) else {
+    let Some(vote_end) = vote_snapshot.checked_add(voting_period) else {
         panic_with_error!(e, GovernorError::MathOverflow);
     };
 
     // Store proposal
-    let quorum = get_quorum(e);
     let proposal = ProposalCore {
         proposer: proposer.clone(),
-        vote_start,
+        vote_snapshot,
         vote_end,
         quorum,
         state: ProposalState::Pending,
@@ -528,7 +532,7 @@ pub fn propose(
         &targets,
         &functions,
         &args,
-        vote_start,
+        vote_snapshot,
         vote_end,
         &description,
     );
@@ -671,13 +675,18 @@ pub fn cancel(
 /// args, and description hash. This allows anyone to compute the ID
 /// without storing the full proposal data.
 ///
+/// The `description_hash` is computed as `keccak256(description.to_bytes())`,
+/// i.e., a keccak256 hash of the raw UTF-8 bytes of the description string.
+/// Off-chain clients can reproduce this by hashing the raw string bytes
+/// directly — no XDR encoding is required.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `targets` - The addresses of contracts to call.
 /// * `functions` - The function names to invoke on each target.
 /// * `args` - The arguments for each function call.
-/// * `description_hash` - The hash of the proposal description.
+/// * `description_hash` - The keccak256 hash of the description's raw bytes.
 pub fn hash_proposal(
     e: &Env,
     targets: &Vec<Address>,
@@ -716,7 +725,7 @@ pub fn check_proposal_state(e: &Env, proposal_id: &BytesN<32>) -> u32 {
         panic_with_error!(e, GovernorError::ProposalNotActive);
     }
 
-    core.vote_start
+    core.vote_snapshot
 }
 
 fn derive_proposal_state(e: &Env, proposal_id: &BytesN<32>, core: &ProposalCore) -> ProposalState {
@@ -736,8 +745,8 @@ fn derive_proposal_state(e: &Env, proposal_id: &BytesN<32>, core: &ProposalCore)
 
     let current_ledger = e.ledger().sequence();
 
-    // `vote_start` is the snapshot ledger, so voting opens on the next ledger.
-    if current_ledger <= core.vote_start {
+    // `vote_snapshot` is the snapshot ledger; voting opens on the next ledger.
+    if current_ledger <= core.vote_snapshot {
         return ProposalState::Pending;
     }
 

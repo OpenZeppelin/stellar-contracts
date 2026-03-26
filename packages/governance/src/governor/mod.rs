@@ -337,13 +337,20 @@ pub trait Governor {
     /// functions, args, and description hash. This allows anyone to compute
     /// the ID without storing the full proposal data.
     ///
+    /// The `description_hash` is computed as
+    /// `keccak256(description.to_bytes())`, i.e., a keccak256 hash of the
+    /// raw UTF-8 bytes of the description string. Off-chain clients can
+    /// reproduce this by hashing the raw string bytes directly — no XDR
+    /// encoding is required.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `targets` - The addresses of contracts to call.
     /// * `functions` - The function names to invoke on each target.
     /// * `args` - The arguments for each function call.
-    /// * `description_hash` - The hash of the proposal description.
+    /// * `description_hash` - The keccak256 hash of the description's raw
+    ///   bytes.
     fn get_proposal_id(
         e: &Env,
         targets: Vec<Address>,
@@ -389,7 +396,8 @@ pub trait Governor {
     /// * topics - `["proposal_created", proposal_id: BytesN<32>, proposer:
     ///   Address]`
     /// * data - `[targets: Vec<Address>, functions: Vec<Symbol>, args:
-    ///   Vec<Vec<Val>>, vote_start: u32, vote_end: u32, description: String]`
+    ///   Vec<Vec<Val>>, vote_snapshot: u32, vote_end: u32, description:
+    ///   String]`
     ///
     /// # Notes
     ///
@@ -406,7 +414,8 @@ pub trait Governor {
         proposer: Address,
     ) -> BytesN<32> {
         proposer.require_auth();
-        storage::propose(e, targets, functions, args, description, &proposer)
+        let quorum = Self::quorum(e, e.ledger().sequence());
+        storage::propose(e, targets, functions, args, description, &proposer, quorum)
     }
 
     /// Casts a vote on a proposal and returns the voter's voting power.
@@ -741,7 +750,7 @@ pub struct ProposalCreated {
     pub targets: Vec<Address>,
     pub functions: Vec<Symbol>,
     pub args: Vec<Vec<Val>>,
-    pub vote_start: u32,
+    pub vote_snapshot: u32,
     pub vote_end: u32,
     pub description: String,
 }
@@ -756,8 +765,9 @@ pub struct ProposalCreated {
 /// * `targets` - The addresses of contracts to call.
 /// * `functions` - The function names to invoke on each target.
 /// * `args` - The arguments for each function call.
-/// * `vote_start` - The ledger number when voting starts.
-/// * `vote_end` - The ledger number when voting ends.
+/// * `vote_snapshot` - The ledger at which voting power is snapshotted. Voting
+///   opens on the next ledger (`vote_snapshot + 1`).
+/// * `vote_end` - The last ledger where voting is active (inclusive).
 /// * `description` - The proposal description.
 #[allow(clippy::too_many_arguments)]
 pub fn emit_proposal_created(
@@ -767,7 +777,7 @@ pub fn emit_proposal_created(
     targets: &Vec<Address>,
     functions: &Vec<Symbol>,
     args: &Vec<Vec<Val>>,
-    vote_start: u32,
+    vote_snapshot: u32,
     vote_end: u32,
     description: &String,
 ) {
@@ -777,7 +787,7 @@ pub fn emit_proposal_created(
         targets: targets.clone(),
         functions: functions.clone(),
         args: args.clone(),
-        vote_start,
+        vote_snapshot,
         vote_end,
         description: description.clone(),
     }

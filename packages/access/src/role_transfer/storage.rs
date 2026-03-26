@@ -75,6 +75,31 @@ where
     e.storage().temporary().extend_ttl(pending_key, live_for, live_for);
 }
 
+/// Returns `true` if the given pending-transfer key holds an **active**
+/// (non-expired) [`PendingTransfer`].
+///
+/// An entry whose `live_until_ledger` is less than the current ledger
+/// sequence is treated as absent and removed from storage as cleanup.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `pending_key` - Storage key for the pending role holder.
+pub fn has_active_pending_transfer<T>(e: &Env, pending_key: &T) -> bool
+where
+    T: IntoVal<Env, Val>,
+{
+    match e.storage().temporary().get::<T, PendingTransfer>(pending_key) {
+        Some(pending) if e.ledger().sequence() <= pending.live_until_ledger => true,
+        Some(_) => {
+            // Expired entry — clean it up.
+            e.storage().temporary().remove(pending_key);
+            false
+        }
+        None => false,
+    }
+}
+
 /// Completes the role transfer if authorization is provided by the pending role
 /// holder. Pending role holder is retrieved from the storage.
 ///

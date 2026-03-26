@@ -31,8 +31,6 @@ pub enum SmartAccountStorageKey {
     ContextRuleData(u32),
     /// Storage key for the next available context rule ID.
     NextId,
-    /// Storage key defining the fingerprint each context rule.
-    Fingerprint(BytesN<32>),
     /// Storage key for the count of active context rules.
     Count,
     /// Storage key for global signer data.
@@ -463,62 +461,17 @@ pub fn do_check_auth(
     Ok(())
 }
 
-/// Computes a unique fingerprint for a context rule based on its type, signer
-/// IDs, and policy IDs. The fingerprint is used to prevent duplicate rules with
-/// identical authorization requirements.
-///
-/// The fingerprint is computed by:
-/// 1. Sorting signer IDs and policy IDs to ensure consistent ordering
-/// 2. Serializing the context type, sorted signer IDs, and sorted policy IDs to
-///    XDR
-/// 3. Hashing the combined data with SHA-256
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `context_type` - The type of context this rule applies to.
-/// * `signer_ids` - The signer IDs for the context rule.
-/// * `policy_ids` - The policy IDs for the context rule.
-///
-/// # Errors
-///
-/// * [`SmartAccountError::DuplicateSigner`] - When duplicate signer IDs are
-///   found during sorting.
-/// * [`SmartAccountError::DuplicatePolicy`] - When duplicate policy IDs are
-///   found during sorting.
-pub fn compute_fingerprint(
-    e: &Env,
-    context_type: &ContextRuleType,
-    signer_ids: &Vec<u32>,
-    policy_ids: &Vec<u32>,
-) -> BytesN<32> {
-    let mut sorted_signer_ids = Vec::new(e);
-    for id in signer_ids.iter() {
-        match sorted_signer_ids.binary_search(id) {
-            Ok(_) => panic_with_error!(e, SmartAccountError::DuplicateSigner),
-            Err(pos) => sorted_signer_ids.insert(pos, id),
-        }
-    }
-
-    let mut sorted_policy_ids = Vec::new(e);
-    for id in policy_ids.iter() {
-        match sorted_policy_ids.binary_search(id) {
-            Ok(_) => panic_with_error!(e, SmartAccountError::DuplicatePolicy),
-            Err(pos) => sorted_policy_ids.insert(pos, id),
-        }
-    }
-
-    let mut rule_data = context_type.to_xdr(e);
-    rule_data.append(&sorted_signer_ids.to_xdr(e));
-    rule_data.append(&sorted_policy_ids.to_xdr(e));
-
-    e.crypto().sha256(&rule_data).to_bytes()
-}
-
 /// Validates that there are no canonical duplicates among the provided
-/// signers. Groups external signers by verifier and makes a single
-/// [`batch_canonicalize_key`](crate::verifiers::Verifier::batch_canonicalize_key)
-/// call per verifier.
+/// signers.
+///
+/// For [`Signer::External`] signers, this calls the verifier's
+/// `batch_canonicalize_key` to compare cryptographic identities rather than raw
+/// bytes. Two external signers with the same verifier are considered
+/// duplicates if their canonical key representations match, even if their
+/// raw key bytes differ.
+///
+/// For [`Signer::Delegated`] signers, this falls back to direct byte
+/// equality since `Address` values are already canonical.
 ///
 /// # Arguments
 ///
@@ -576,6 +529,9 @@ pub fn validate_no_canonical_duplicates(e: &Env, signers: &Vec<Signer>) {
 /// Creates a new context rule with the specified configuration. Returns the
 /// created context rule with a unique ID. Installs all specified policies
 /// during creation.
+///
+/// Multiple rules with identical authorization requirements can coexist. It is
+/// the caller's responsibility to avoid creating redundant rules.
 ///
 /// # Arguments
 ///
@@ -649,8 +605,6 @@ pub fn add_context_rule(
         Vec::from_iter(e, policies_vec.iter().map(|p| register_policy(e, &p)));
 
     validate_signers_and_policies(e, &signer_ids, &policy_ids);
-
-    set_fingerprint(e, context_type, &signer_ids, &policy_ids);
 
     // Store all context rule data in a single entry
     e.storage().persistent().set(
@@ -856,8 +810,6 @@ pub fn remove_context_rule(e: &Env, id: u32) {
         deregister_signer(e, signer_id);
     }
 
-    remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
-
     e.storage().persistent().remove(&SmartAccountStorageKey::ContextRuleData(id));
 
     // Decrement count
@@ -921,15 +873,11 @@ pub fn add_signer(e: &Env, id: u32, signer: &Signer) -> u32 {
     all_signers.push_back(signer.clone());
     validate_no_canonical_duplicates(e, &all_signers);
 
-    remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
-
     let new_signer_id = register_signer(e, signer);
 
     entry.signer_ids.push_back(new_signer_id);
 
     validate_signers_and_policies(e, &entry.signer_ids, &entry.policy_ids);
-
-    set_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
 
     e.storage().persistent().set(&data_key, &entry);
 
@@ -979,13 +927,9 @@ pub fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32) {
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::ContextRuleNotFound));
 
     if let Some(pos) = entry.signer_ids.iter().rposition(|s| s == signer_id) {
-        remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
-
         entry.signer_ids.remove(pos as u32);
 
         validate_signers_and_policies(e, &entry.signer_ids, &entry.policy_ids);
-
-        set_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
 
         e.storage().persistent().set(&data_key, &entry);
         deregister_signer(e, signer_id);
@@ -999,8 +943,8 @@ pub fn remove_signer(e: &Env, context_rule_id: u32, signer_id: u32) {
 /// Adds multiple signers to an existing context rule in a single operation.
 ///
 /// More efficient than calling [`add_signer`] in a loop because it resolves
-/// existing signers once, removes and resets the fingerprint once, and writes
-/// the [`ContextRuleEntry`] once regardless of how many signers are added.
+/// existing signers once and writes the [`ContextRuleEntry`] once regardless
+/// of how many signers are added.
 ///
 /// # Arguments
 ///
@@ -1051,8 +995,6 @@ pub fn batch_add_signer(e: &Env, id: u32, signers: &Vec<Signer>) {
     all_signers.append(signers);
     validate_no_canonical_duplicates(e, &all_signers);
 
-    remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
-
     for signer in signers.iter() {
         let new_signer_id = register_signer(e, &signer);
         entry.signer_ids.push_back(new_signer_id);
@@ -1060,8 +1002,6 @@ pub fn batch_add_signer(e: &Env, id: u32, signers: &Vec<Signer>) {
     }
 
     validate_signers_and_policies(e, &entry.signer_ids, &entry.policy_ids);
-
-    set_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
 
     e.storage().persistent().set(&data_key, &entry);
 }
@@ -1112,13 +1052,9 @@ pub fn add_policy(e: &Env, context_rule_id: u32, policy: &Address, install_param
         panic_with_error!(e, SmartAccountError::DuplicatePolicy)
     }
 
-    remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
-
     entry.policy_ids.push_back(policy_id);
 
     validate_signers_and_policies(e, &entry.signer_ids, &entry.policy_ids);
-
-    set_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
 
     e.storage().persistent().set(&data_key, &entry);
 
@@ -1186,13 +1122,9 @@ pub fn remove_policy(e: &Env, context_rule_id: u32, policy_id: u32) {
         let policy = policies.get_unchecked(pos as u32);
         let _ = PolicyClient::new(e, &policy).try_uninstall(&rule, &e.current_contract_address());
 
-        remove_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
-
         entry.policy_ids.remove(pos as u32);
 
         validate_signers_and_policies(e, &entry.signer_ids, &entry.policy_ids);
-
-        set_fingerprint(e, &entry.context_type, &entry.signer_ids, &entry.policy_ids);
 
         e.storage().persistent().set(&data_key, &entry);
         deregister_policy(e, policy_id);
@@ -1374,56 +1306,6 @@ fn deregister_policy(e: &Env, policy_id: u32) {
             .persistent()
             .set(&data_key, &PolicyEntry { policy: entry.policy, count: entry.count - 1 });
     }
-}
-
-/// Validates that a context rule with the given authorization requirements
-/// doesn't already exist, then stores its fingerprint. This prevents creating
-/// duplicate rules with identical signers, policies, and context types.
-///
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `context_type` - The type of context this rule applies to.
-/// * `signers` - The signers for the context rule.
-/// * `policies` - The policies for the context rule.
-///
-/// # Errors
-///
-/// * [`SmartAccountError::DuplicateContextRule`] - When a rule with identical
-///   authorization requirements already exists.
-pub(crate) fn set_fingerprint(
-    e: &Env,
-    context_type: &ContextRuleType,
-    signer_ids: &Vec<u32>,
-    policy_ids: &Vec<u32>,
-) {
-    let fingerprint = compute_fingerprint(e, context_type, signer_ids, policy_ids);
-    let fingerprint_key = SmartAccountStorageKey::Fingerprint(fingerprint);
-
-    if e.storage().persistent().has(&fingerprint_key) {
-        panic_with_error!(e, SmartAccountError::DuplicateContextRule)
-    } else {
-        e.storage().persistent().set(&fingerprint_key, &true);
-    }
-}
-
-/// Removes a context rule's fingerprint from storage.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `context_type` - The type of context this rule applies to.
-/// * `signer_ids` - The signer IDs for the context rule.
-/// * `policy_ids` - The policy IDs for the context rule.
-fn remove_fingerprint(
-    e: &Env,
-    context_type: &ContextRuleType,
-    signer_ids: &Vec<u32>,
-    policy_ids: &Vec<u32>,
-) {
-    let fingerprint = compute_fingerprint(e, context_type, signer_ids, policy_ids);
-    e.storage().persistent().remove(&SmartAccountStorageKey::Fingerprint(fingerprint));
 }
 
 /// Returns a list of signer IDs to their full [`Signer`] objects by
