@@ -1,5 +1,5 @@
 [package]
-name = "timelock-controller-example"
+name = "governor-timelock-token"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -7,17 +7,17 @@ publish = false
 version.workspace = true
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 doctest = false
-
-[features]
-testutils = ["soroban-sdk/testutils"]
 
 [dependencies]
 soroban-sdk = { workspace = true }
 stellar-access = { workspace = true }
 stellar-governance = { workspace = true }
 stellar-macros = { workspace = true }
+stellar-tokens = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+governor-timelock-contract = { path = "../governor", features = ["testutils"] }
+timelock-controller-example = { path = "../../timelock-controller", features = ["testutils"] }

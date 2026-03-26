@@ -1,5 +1,5 @@
 [package]
-name = "timelock-controller-example"
+name = "governor-timelock-contract"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -15,9 +15,7 @@ testutils = ["soroban-sdk/testutils"]
 
 [dependencies]
 soroban-sdk = { workspace = true }
-stellar-access = { workspace = true }
 stellar-governance = { workspace = true }
-stellar-macros = { workspace = true }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
