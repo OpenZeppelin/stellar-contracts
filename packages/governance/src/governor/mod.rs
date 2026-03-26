@@ -540,9 +540,8 @@ pub trait Governor {
     ///   bytes.
     /// * `eta` - The ledger sequence number at which the proposal becomes
     ///   executable. Typically computed as `current_ledger + timelock_delay`.
-    /// * `operator` - The address queuing the proposal. Unused in the
-    ///   default (open) implementation, but available for access-control
-    ///   overrides.
+    /// * `operator` - The address queuing the proposal. Unused in the default
+    ///   (open) implementation, but available for access-control overrides.
     ///
     /// # Errors
     ///
