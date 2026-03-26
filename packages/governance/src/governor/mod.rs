@@ -50,11 +50,17 @@
 //!
 //! 1. **Propose** → 2. **Vote** → 3. **Queue** → 4. **Execute**
 //!
-//! To enable queuing, override [`Governor::proposal_needs_queuing`] to return
-//! `true`. That single change is sufficient to wire up the full queuing flow:
-//! [`storage::execute`] will then require the proposal to be in the `Queued`
-//! state instead of `Succeeded` before executing. For further customization
-//! (e.g. custom delay enforcement), override [`Governor::execute`] as well.
+//! To enable queuing, override [`Governor::proposals_need_queuing`] to return
+//! `true`. This wires up the full queuing flow:
+//!
+//! - [`Governor::queue`] validates that the  proposal is in the `Succeeded`
+//!   state, transitions it to `Queued`, and emits a [`ProposalQueued`] event
+//!   with the `eta` (estimated execution ledger).
+//! - [`storage::execute`] will then require the proposal to be in the `Queued`
+//!   state instead of `Succeeded` before executing.
+//!
+//! For further customization (e.g. custom delay enforcement), override
+//! [`Governor::queue`] and/or [`Governor::execute`] as well.
 //!
 //! # Security Considerations
 //!
@@ -120,9 +126,9 @@ pub use crate::governor::storage::{
     get_proposal_core, get_proposal_deadline, get_proposal_proposer, get_proposal_snapshot,
     get_proposal_state, get_proposal_threshold, get_proposal_vote_counts, get_quorum,
     get_token_contract, get_version, get_voting_delay, get_voting_period, has_voted, hash_proposal,
-    propose, quorum_reached, set_name, set_proposal_threshold, set_quorum, set_token_contract,
-    set_version, set_voting_delay, set_voting_period, tally_succeeded, ProposalVoteCounts,
-    VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
+    propose, queue, quorum_reached, set_name, set_proposal_threshold, set_quorum,
+    set_token_contract, set_version, set_voting_delay, set_voting_period, tally_succeeded,
+    ProposalVoteCounts, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
 };
 
 /// The `Governor` trait defines the core functionality for on-chain governance.
@@ -457,6 +463,118 @@ pub trait Governor {
         storage::cast_vote(e, &proposal_id, vote_type, &reason, &voter)
     }
 
+    /// Queues a succeeded proposal for execution and returns its unique
+    /// identifier.
+    ///
+    /// This function is only relevant when queuing is enabled, i.e., when
+    /// [`Self::proposals_need_queuing`] is overridden to return `true`. If
+    /// queuing is not enabled, calling this function will revert with
+    /// [`GovernorError::QueueNotEnabled`].
+    ///
+    /// When queuing is enabled, this function transitions a proposal from
+    /// the `Succeeded` state to the `Queued` state. The `execute` function
+    /// will then require the proposal to be in the `Queued` state (and past
+    /// its `eta`) before allowing execution.
+    ///
+    /// # Enabling Queueing
+    ///
+    /// The default implementation uses **open queueing**: any account can
+    /// queue a succeeded proposal without authentication. To enable it,
+    /// override [`Self::proposals_need_queuing`] to return `true`:
+    ///
+    /// ```ignore
+    /// #[contractimpl(contracttrait)]
+    /// impl Governor for MyGovernor {
+    ///     fn proposals_need_queuing(_e: &Env) -> bool {
+    ///         true
+    ///     }
+    ///
+    ///     // ... other required methods (propose, execute, cancel) ...
+    /// }
+    /// ```
+    ///
+    /// This is sufficient for the common case — no override of `queue`
+    /// itself is needed.
+    ///
+    /// # Restricting Access
+    ///
+    /// If you need to restrict who can queue proposals, override this
+    /// method with custom access control logic. Call [`storage::queue`]
+    /// after your checks:
+    ///
+    /// ```ignore
+    /// #[contractimpl(contracttrait)]
+    /// impl Governor for MyGovernor {
+    ///     fn proposals_need_queuing(_e: &Env) -> bool {
+    ///         true
+    ///     }
+    ///
+    ///     // Restricted — only a timelock contract can queue:
+    ///     fn queue(
+    ///         e: &Env,
+    ///         targets: Vec<Address>,
+    ///         functions: Vec<Symbol>,
+    ///         args: Vec<Vec<Val>>,
+    ///         description_hash: BytesN<32>,
+    ///         eta: u32,
+    ///         operator: Address,
+    ///     ) -> BytesN<32> {
+    ///         let timelock = storage::get_timelock(e);
+    ///         assert!(operator == timelock);
+    ///         operator.require_auth();
+    ///         storage::queue(
+    ///             e, targets, functions, args, &description_hash, eta,
+    ///             Self::proposals_need_queuing(e),
+    ///         )
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `targets` - The addresses of contracts to call.
+    /// * `functions` - The function names to invoke on each target.
+    /// * `args` - The arguments for each function call.
+    /// * `description_hash` - The keccak256 hash of the description's raw
+    ///   bytes.
+    /// * `eta` - The ledger sequence number at which the proposal becomes
+    ///   executable. Typically computed as `current_ledger + timelock_delay`.
+    /// * `operator` - The address queuing the proposal. Unused in the default
+    ///   (open) implementation, but available for access-control overrides.
+    ///
+    /// # Errors
+    ///
+    /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
+    /// * [`GovernorError::QueueNotEnabled`] - If queuing is not enabled (i.e.,
+    ///   [`Governor::proposals_need_queuing`] returns `false`).
+    /// * [`GovernorError::ProposalNotSuccessful`] - If the proposal has not
+    ///   succeeded.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["proposal_queued", proposal_id: BytesN<32>]`
+    /// * data - `[eta: u32]`
+    fn queue(
+        e: &Env,
+        targets: Vec<Address>,
+        functions: Vec<Symbol>,
+        args: Vec<Vec<Val>>,
+        description_hash: BytesN<32>,
+        eta: u32,
+        _operator: Address,
+    ) -> BytesN<32> {
+        storage::queue(
+            e,
+            targets,
+            functions,
+            args,
+            &description_hash,
+            eta,
+            Self::proposals_need_queuing(e),
+        )
+    }
+
     /// Executes a proposal and returns its unique identifier.
     ///
     /// # Arguments
@@ -505,7 +623,7 @@ pub trait Governor {
     /// ```ignore
     /// // Open execution — anyone can trigger a succeeded proposal:
     /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposal_needs_queuing(e))
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e))
     /// }
     ///
     /// // Restricted — only a timelock contract can execute:
@@ -513,13 +631,13 @@ pub trait Governor {
     ///     let timelock = storage::get_timelock(e);
     ///     assert!(executor == timelock);
     ///     executor.require_auth();
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposal_needs_queuing(e))
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e))
     /// }
     ///
     /// // Role-based — using the `stellar-macros` access control macro:
     /// #[only_role(executor, "executor")]
     /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposal_needs_queuing(e))
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e))
     /// }
     /// ```
     fn execute(
@@ -597,13 +715,18 @@ pub trait Governor {
 
     /// Returns whether proposals need to be queued before execution.
     ///
-    /// Defaults to `false`. Override to return `true` when using a queuing
-    /// extension. See the module-level docs for details.
+    /// When this returns `false` (the default), [`Governor::execute`] expects
+    /// proposals in the `Succeeded` state and [`Governor::queue`] will revert
+    /// with [`GovernorError::QueueNotEnabled`].
+    ///
+    /// When overridden to return `true`, [`Governor::execute`] expects
+    /// proposals in the `Queued` state, meaning [`Governor::queue`] must be
+    /// called first to transition from `Succeeded` to `Queued`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn proposal_needs_queuing(_e: &Env) -> bool {
+    fn proposals_need_queuing(_e: &Env) -> bool {
         false
     }
 }
@@ -722,6 +845,8 @@ pub enum GovernorError {
     TokenContractNotSet = 5020,
     /// The proposal description exceeds the maximum allowed length.
     DescriptionTooLong = 5021,
+    /// Queuing is not enabled for this governor.
+    QueueNotEnabled = 5022,
 }
 
 // ################## CONSTANTS ##################

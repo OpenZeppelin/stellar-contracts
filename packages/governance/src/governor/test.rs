@@ -1,13 +1,13 @@
 use soroban_sdk::{
     contract, contractimpl,
     testutils::{Address as _, Events, Ledger},
-    vec, Address, BytesN, Env, IntoVal, String, Symbol, Val, Vec,
+    vec, Address, BytesN, Env, IntoVal, String, Symbol, TryFromVal, Val, Vec,
 };
 
 use crate::governor::{
     storage::{
         self, cancel, cast_vote, count_vote, counting_mode, execute, get_proposal_vote_counts,
-        get_quorum, get_token_contract, has_voted, hash_proposal, propose, quorum_reached,
+        get_quorum, get_token_contract, has_voted, hash_proposal, propose, queue, quorum_reached,
         set_quorum, set_token_contract, tally_succeeded, GovernorStorageKey, ProposalCore,
     },
     ProposalState, VOTE_ABSTAIN, VOTE_AGAINST, VOTE_FOR,
@@ -1697,6 +1697,11 @@ impl TargetContract {
     pub fn do_something(_e: &Env, _val: u32) {}
 }
 
+/// Creates a proposal that reaches `Succeeded` through the normal lifecycle:
+/// propose → advance to voting → cast a passing vote → advance past voting end.
+///
+/// Requires `setup_governor_config` (voting_delay=10, voting_period=100,
+/// quorum=50) and `set_mock_voting_power` (≥ quorum) to have been called.
 fn create_executable_proposal(
     e: &Env,
     contract_address: &Address,
@@ -1709,7 +1714,9 @@ fn create_executable_proposal(
     let desc_hash = e.crypto().keccak256(&description.to_bytes()).to_bytes();
 
     let proposer = Address::generate(e);
+    let voter = Address::generate(e);
 
+    // Propose (at ledger 100 → vote_start=110, vote_end=210)
     let pid = e.as_contract(contract_address, || {
         propose(
             e,
@@ -1722,14 +1729,14 @@ fn create_executable_proposal(
         )
     });
 
-    // Manually set to Succeeded by writing directly to storage
+    // Advance into the voting window and cast a passing vote
+    e.ledger().set_sequence_number(111);
     e.as_contract(contract_address, || {
-        let core = storage::get_proposal_core(e, &pid);
-        let succeeded_core = storage::ProposalCore { state: ProposalState::Succeeded, ..core };
-        e.storage()
-            .persistent()
-            .set(&storage::GovernorStorageKey::Proposal(pid.clone()), &succeeded_core);
+        cast_vote(e, &pid, VOTE_FOR, &String::from_str(e, ""), &voter);
     });
+
+    // Advance past vote_end so the proposal derives as Succeeded
+    e.ledger().set_sequence_number(211);
 
     (pid, desc_hash, targets, functions, args)
 }
@@ -1802,13 +1809,21 @@ fn execute_emits_event() {
     let (_pid, desc_hash, targets, functions, args) =
         create_executable_proposal(&e, &contract_address);
 
-    let events_before = e.events().all().events().len();
-
     e.as_contract(&contract_address, || {
         execute(&e, targets, functions, args, &desc_hash, false);
     });
 
-    assert!(e.events().all().events().len() > events_before);
+    // Verify that a ProposalExecuted event was emitted for our proposal.
+    let events = e.events().all();
+    let has_executed_event = events.events().iter().any(|event| {
+        let soroban_sdk::xdr::ContractEventBody::V0(ref body) = event.body;
+        body.topics.iter().any(|t| {
+            Symbol::try_from_val(&e, t)
+                .map(|s| s == Symbol::new(&e, "proposal_executed"))
+                .unwrap_or(false)
+        })
+    });
+    assert!(has_executed_event, "Expected a ProposalExecuted event after execute");
 }
 
 #[test]
@@ -1921,6 +1936,120 @@ fn full_proposal_lifecycle_to_canceled() {
     });
 
     // Cancel while pending
+    e.as_contract(&contract_address, || {
+        cancel(&e, targets, functions, args, &desc_hash);
+        assert_eq!(storage::get_proposal_state(&e, &pid), ProposalState::Canceled);
+    });
+}
+
+// ################## QUEUE TESTS ##################
+
+#[test]
+fn queue_succeeded_proposal() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let (pid, desc_hash, targets, functions, args) =
+        create_executable_proposal(&e, &contract_address);
+
+    // Verify it's Succeeded first
+    e.as_contract(&contract_address, || {
+        assert_eq!(storage::get_proposal_state(&e, &pid), ProposalState::Succeeded);
+    });
+
+    // Queue with queue_enabled = true
+    e.as_contract(&contract_address, || {
+        let queued_pid = queue(&e, targets, functions, args, &desc_hash, 500, true);
+        assert_eq!(queued_pid, pid);
+        assert_eq!(storage::get_proposal_state(&e, &pid), ProposalState::Queued);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #5022)")]
+fn queue_fails_when_not_enabled() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let (_pid, desc_hash, targets, functions, args) =
+        create_executable_proposal(&e, &contract_address);
+
+    // queue_enabled = false should panic with QueueNotEnabled
+    e.as_contract(&contract_address, || {
+        queue(&e, targets, functions, args, &desc_hash, 500, false);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #5006)")]
+fn queue_fails_when_not_succeeded() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let proposer = Address::generate(&e);
+    let (targets, functions, args, description) = simple_proposal(&e);
+    let desc_hash = e.crypto().keccak256(&description.clone().to_bytes()).to_bytes();
+
+    // Create proposal (stays Pending)
+    e.as_contract(&contract_address, || {
+        propose(
+            &e,
+            targets.clone(),
+            functions.clone(),
+            args.clone(),
+            description,
+            &proposer,
+            get_quorum(&e),
+        );
+    });
+
+    // Trying to queue a Pending proposal should fail with ProposalNotSuccessful
+    e.as_contract(&contract_address, || {
+        queue(&e, targets, functions, args, &desc_hash, 500, true);
+    });
+}
+
+#[test]
+fn full_proposal_lifecycle_with_queue() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let (pid, desc_hash, targets, functions, args) =
+        create_executable_proposal(&e, &contract_address);
+
+    // Queue
+    e.as_contract(&contract_address, || {
+        queue(&e, targets.clone(), functions.clone(), args.clone(), &desc_hash, 500, true);
+        assert_eq!(storage::get_proposal_state(&e, &pid), ProposalState::Queued);
+    });
+
+    // Execute with queue_enabled = true (requires Queued state)
+    e.as_contract(&contract_address, || {
+        execute(&e, targets, functions, args, &desc_hash, true);
+        assert_eq!(storage::get_proposal_state(&e, &pid), ProposalState::Executed);
+    });
+}
+
+#[test]
+fn cancel_queued_proposal() {
+    let (e, contract_address, token_address) = setup_env_with_token();
+    setup_governor_config(&e, &contract_address);
+    set_mock_voting_power(&e, &token_address, 1000);
+
+    let (pid, desc_hash, targets, functions, args) =
+        create_executable_proposal(&e, &contract_address);
+
+    // Queue
+    e.as_contract(&contract_address, || {
+        queue(&e, targets.clone(), functions.clone(), args.clone(), &desc_hash, 500, true);
+        assert_eq!(storage::get_proposal_state(&e, &pid), ProposalState::Queued);
+    });
+
+    // Cancel a queued proposal should work
     e.as_contract(&contract_address, || {
         cancel(&e, targets, functions, args, &desc_hash);
         assert_eq!(storage::get_proposal_state(&e, &pid), ProposalState::Canceled);
