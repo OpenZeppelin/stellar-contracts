@@ -157,8 +157,14 @@ pub struct ContextRule {
     pub name: String,
     /// List of signers authorized by this rule.
     pub signers: Vec<Signer>,
+    /// Global registry IDs for each signer, positionally aligned with
+    /// `signers`.
+    pub signer_ids: Vec<u32>,
     /// List of policy contracts that must be satisfied.
     pub policies: Vec<Address>,
+    /// Global registry IDs for each policy, positionally aligned with
+    /// `policies`.
+    pub policy_ids: Vec<u32>,
     /// Optional expiration ledger sequence for the rule.
     pub valid_until: Option<u32>,
 }
@@ -186,7 +192,9 @@ pub fn get_context_rule(e: &Env, id: u32) -> ContextRule {
         context_type: entry.context_type,
         name: entry.name,
         signers: get_signers(e, &entry.signer_ids),
+        signer_ids: entry.signer_ids,
         policies: get_policies(e, &entry.policy_ids),
+        policy_ids: entry.policy_ids,
         valid_until: entry.valid_until,
     }
 }
@@ -705,7 +713,9 @@ pub fn add_context_rule(
         context_type: context_type.clone(),
         name: name.clone(),
         signers: unique_signers,
+        signer_ids: signer_ids.clone(),
         policies: policies_vec,
+        policy_ids: policy_ids.clone(),
         valid_until,
     };
 
@@ -771,9 +781,11 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: &String) -> ContextRule 
         id,
         context_type: entry.context_type,
         name: name.clone(),
-        valid_until: entry.valid_until,
         signers: get_signers(e, &entry.signer_ids),
+        signer_ids: entry.signer_ids,
         policies: get_policies(e, &entry.policy_ids),
+        policy_ids: entry.policy_ids,
+        valid_until: entry.valid_until,
     }
 }
 
@@ -824,9 +836,11 @@ pub fn update_context_rule_valid_until(e: &Env, id: u32, valid_until: Option<u32
         id,
         context_type: entry.context_type,
         name: entry.name,
-        valid_until,
         signers: get_signers(e, &entry.signer_ids),
+        signer_ids: entry.signer_ids,
         policies: get_policies(e, &entry.policy_ids),
+        policy_ids: entry.policy_ids,
+        valid_until,
     }
 }
 
@@ -873,7 +887,9 @@ pub fn remove_context_rule(e: &Env, id: u32) {
         context_type: entry.context_type.clone(),
         name: entry.name,
         signers: get_signers(e, &entry.signer_ids),
+        signer_ids: entry.signer_ids.clone(),
         policies: policies.clone(),
+        policy_ids: entry.policy_ids.clone(),
         valid_until: entry.valid_until,
     };
 
@@ -1169,7 +1185,9 @@ pub fn add_policy(e: &Env, context_rule_id: u32, policy: &Address, install_param
         context_type: entry.context_type,
         name: entry.name,
         signers: get_signers(e, &entry.signer_ids),
+        signer_ids: entry.signer_ids,
         policies: get_policies(e, &entry.policy_ids),
+        policy_ids: entry.policy_ids,
         valid_until: entry.valid_until,
     };
     PolicyClient::new(e, policy).install(&install_param, &rule, &e.current_contract_address());
@@ -1222,7 +1240,9 @@ pub fn remove_policy(e: &Env, context_rule_id: u32, policy_id: u32) {
             context_type: entry.context_type.clone(),
             name: entry.name.clone(),
             signers: get_signers(e, &entry.signer_ids),
+            signer_ids: entry.signer_ids.clone(),
             policies: policies.clone(),
+            policy_ids: entry.policy_ids.clone(),
             valid_until: entry.valid_until,
         };
         let policy = policies.get_unchecked(pos as u32);
