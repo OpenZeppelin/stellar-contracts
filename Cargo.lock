@@ -1162,6 +1162,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "multisig-weighted-threshold-policy-example"
+version = "0.6.0"
+dependencies = [
+ "soroban-sdk",
+ "stellar-accounts",
+]
+
+[[package]]
 name = "nft-access-control-example"
 version = "0.6.0"
 dependencies = [
