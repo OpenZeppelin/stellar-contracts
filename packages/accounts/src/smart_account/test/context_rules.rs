@@ -16,9 +16,9 @@ use crate::{
     policies::Policy,
     smart_account::{
         storage::{
-            add_context_rule, authenticate, do_check_auth, get_authenticated_signers,
-            get_context_rule, get_context_rules_count, get_validated_context_by_id,
-            remove_context_rule, update_context_rule_name, update_context_rule_valid_until,
+            add_context_rule, authenticate, do_check_auth, get_context_rule,
+            get_context_rules_count, get_validated_context_by_id, remove_context_rule,
+            update_context_rule_name, update_context_rule_valid_until,
             validate_no_canonical_duplicates, AuthPayload, ContextRule, ContextRuleType, Signer,
             SmartAccountStorageKey,
         },
@@ -713,12 +713,9 @@ fn authenticate_external_signer_verification_fails() {
             e.storage().persistent().set(&symbol_short!("verify"), &false);
         });
 
-        let mut signature_map = Map::new(&e);
-        signature_map.set(signer, sig_data);
+        let payload = e.crypto().sha256(&Bytes::from_array(&e, &[1u8; 32]));
 
-        let payload = Bytes::from_array(&e, &[1u8; 32]);
-
-        authenticate(&e, &e.crypto().sha256(&payload), &signature_map);
+        authenticate(&e, &payload, &signer, &sig_data);
     });
 }
 
@@ -742,62 +739,10 @@ fn authenticate_mixed_signers_success() {
             e.storage().persistent().set(&symbol_short!("verify"), &true);
         });
 
-        let mut signature_map = Map::new(&e);
-        signature_map.set(native_signer, Bytes::new(&e));
-        signature_map.set(external_signer, Bytes::from_array(&e, &[5, 6, 7, 8]));
+        let payload = e.crypto().sha256(&Bytes::from_array(&e, &[1u8; 32]));
 
-        let payload = Bytes::from_array(&e, &[1u8; 32]);
-
-        authenticate(&e, &e.crypto().sha256(&payload), &signature_map);
-    });
-}
-
-#[test]
-fn get_authenticated_signers_combos() {
-    let e = Env::default();
-    let address = e.register(MockContract, ());
-
-    e.as_contract(&address, || {
-        // all match
-        let rule_signers = create_test_signers(&e);
-        let all_signers = rule_signers.clone();
-        let authenticated = get_authenticated_signers(&e, &rule_signers, &all_signers);
-        assert_eq!(authenticated.len(), 2);
-        assert_eq!(authenticated, rule_signers);
-
-        // empty all_signers
-        let authenticated = get_authenticated_signers(&e, &rule_signers, &Vec::new(&e));
-        assert_eq!(authenticated.len(), 0);
-
-        // empty rule_signers
-        let authenticated = get_authenticated_signers(&e, &Vec::new(&e), &create_test_signers(&e));
-        assert_eq!(authenticated.len(), 0);
-
-        // partial match
-        let addr1 = Address::generate(&e);
-        let addr2 = Address::generate(&e);
-        let addr3 = Address::generate(&e);
-        let rule_signers = Vec::from_array(
-            &e,
-            [Signer::Delegated(addr1.clone()), Signer::Delegated(addr2.clone())],
-        );
-        let all_signers = Vec::from_array(
-            &e,
-            [
-                Signer::Delegated(addr1.clone()),
-                Signer::Delegated(addr3.clone()), // addr2 is missing, addr3 is extra
-            ],
-        );
-        let authenticated = get_authenticated_signers(&e, &rule_signers, &all_signers);
-        assert_eq!(authenticated.len(), 1); // Only addr1 matches
-        assert_eq!(authenticated.get(0).unwrap(), Signer::Delegated(addr1.clone()));
-
-        // no match
-        let rule_signers =
-            Vec::from_array(&e, [Signer::Delegated(addr1), Signer::Delegated(addr2)]);
-        let all_signers = Vec::from_array(&e, [Signer::Delegated(addr3)]);
-        let authenticated = get_authenticated_signers(&e, &rule_signers, &all_signers);
-        assert_eq!(authenticated.len(), 0);
+        authenticate(&e, &payload, &native_signer, &Bytes::new(&e));
+        authenticate(&e, &payload, &external_signer, &Bytes::from_array(&e, &[5, 6, 7, 8]));
     });
 }
 

@@ -249,29 +249,6 @@ pub fn get_policy_id(e: &Env, policy: &Address) -> u32 {
         .unwrap_or_else(|| panic_with_error!(e, SmartAccountError::PolicyNotFound))
 }
 
-/// Filters rule signers to find which ones are present in the provided signer
-/// list. Returns a vector of signers that exist in both the rule and the
-/// provided signer list.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `rule_signers` - The signers required by a context rule.
-/// * `all_signers` - The signers provided for authentication.
-pub fn get_authenticated_signers(
-    e: &Env,
-    rule_signers: &Vec<Signer>,
-    all_signers: &Vec<Signer>,
-) -> Vec<Signer> {
-    let mut authenticated = Vec::new(e);
-    for rule_signer in rule_signers.iter() {
-        if all_signers.contains(&rule_signer) {
-            authenticated.push_back(rule_signer);
-        }
-    }
-    authenticated
-}
-
 /// Validates a context against a specific rule identified by `id`. Checks
 /// expiration, context type compatibility, and signer requirements.
 ///
@@ -331,50 +308,51 @@ pub fn get_validated_context_by_id(
     }
 
     let ContextRule { signers: ref rule_signers, ref policies, .. } = context_rule;
-    let authenticated_signers = get_authenticated_signers(e, rule_signers, all_signers);
+    // Filters rule signers to find which ones are present in the provided signer
+    // list.
+    let matched_signers =
+        Vec::from_iter(e, rule_signers.iter().filter(|s| all_signers.contains(s)));
 
     if policies.is_empty() {
-        // Without policies, all rule signers must be authenticated.
-        if rule_signers.len() != authenticated_signers.len() {
+        // Without policies, all rule signers must be matched.
+        if rule_signers.len() != matched_signers.len() {
             panic_with_error!(e, SmartAccountError::UnvalidatedContext);
         }
     }
     // With policies, defer full validation to enforce().
 
-    (context_rule, context.clone(), authenticated_signers)
+    (context_rule, context.clone(), matched_signers)
 }
 
-/// Authenticates all provided signatures against their respective signers.
-/// Verifies both `Address` authorizations and delegated signatures through
-/// external verifier contracts.
+/// Verifies an `Address` authorization or a cryptographic signature through an
+/// external verifier contract.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `signature_payload` - The hash of the data that was signed.
-/// * `signers` - The signers mapped to their signature data.
+/// * `auth_digest` - The hash of the data that was signed.
+/// * `signer` - The signer who signed the payload.
+/// * `sig_data` - The signature to verify for an external signer.
 ///
 /// # Errors
 ///
 /// * [`SmartAccountError::ExternalVerificationFailed`] - When an external
 ///   signature fails verification through its verifier contract.
-pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signers: &Map<Signer, Bytes>) {
-    for (signer, sig_data) in signers.iter() {
-        match signer {
-            Signer::External(verifier, key_data) => {
-                let sig_payload = Bytes::from_array(e, &signature_payload.to_bytes().to_array());
-                if !VerifierClient::new(e, &verifier).verify(
-                    &sig_payload,
-                    &key_data.into_val(e),
-                    &sig_data.into_val(e),
-                ) {
-                    panic_with_error!(e, SmartAccountError::ExternalVerificationFailed)
-                }
+pub fn authenticate(e: &Env, auth_digest: &Hash<32>, signer: &Signer, sig_data: &Bytes) {
+    match signer {
+        Signer::External(verifier, key_data) => {
+            let sig_payload = auth_digest.to_bytes().to_bytes();
+            if !VerifierClient::new(e, verifier).verify(
+                &sig_payload,
+                &key_data.into_val(e),
+                &sig_data.into_val(e),
+            ) {
+                panic_with_error!(e, SmartAccountError::ExternalVerificationFailed)
             }
-            Signer::Delegated(addr) => {
-                let args = (signature_payload.clone(),).into_val(e);
-                addr.require_auth_for_args(args)
-            }
+        }
+        Signer::Delegated(addr) => {
+            let args = (auth_digest.clone(),).into_val(e);
+            addr.require_auth_for_args(args)
         }
     }
 }
@@ -491,13 +469,6 @@ pub fn do_check_auth(
         panic_with_error!(e, SmartAccountError::ContextRuleIdsLengthMismatch);
     }
 
-    // Bind context_rule_ids into the signed digest.
-    let mut preimage = signature_payload.to_bytes().to_bytes();
-    preimage.append(&signatures.context_rule_ids.clone().to_xdr(e));
-    let auth_digest = e.crypto().sha256(&preimage);
-
-    authenticate(e, &auth_digest, &signatures.signers);
-
     // Validate all contexts against their specified rules.
     let validated_contexts = Vec::from_iter(
         e,
@@ -510,30 +481,38 @@ pub fn do_check_auth(
     );
 
     let mut allowed_signers = Map::new(e);
-    for (rule, context, authenticated_signers) in validated_contexts.iter() {
+    for (rule, _, _) in validated_contexts.iter() {
         // Collect all signers from the validated rules to check below for signers that
         // do not belong to any rule.
         for signer in rule.signers.iter() {
             allowed_signers.set(signer, ());
         }
+    }
 
-        // Enforce all policies.
+    // Bind context_rule_ids into the signed digest.
+    let mut preimage = signature_payload.to_bytes().to_bytes();
+    preimage.append(&signatures.context_rule_ids.clone().to_xdr(e));
+    let auth_digest = e.crypto().sha256(&preimage);
+
+    // Authenticate and reject any signer that is not part of any
+    // selected rule, preventing arbitrary external calls via
+    // attacker-controlled verifier contracts.
+    for (signer, sig_data) in signatures.signers.iter() {
+        if !allowed_signers.contains_key(signer.clone()) {
+            panic_with_error!(e, SmartAccountError::UnauthorizedSigner);
+        }
+        authenticate(e, &auth_digest, &signer, &sig_data);
+    }
+
+    // Enforce all policies.
+    for (rule, context, matched_signers) in validated_contexts.iter() {
         for policy in rule.policies.iter() {
             PolicyClient::new(e, &policy).enforce(
                 &context,
-                &authenticated_signers,
+                &matched_signers,
                 &rule,
                 &e.current_contract_address(),
             );
-        }
-    }
-
-    // Reject any signer in AuthPayload that is not part of any selected
-    // rule, preventing arbitrary external calls via attacker-controlled
-    // verifier contracts.
-    for signer in signatures.signers.keys().iter() {
-        if !allowed_signers.contains_key(signer) {
-            panic_with_error!(e, SmartAccountError::UnauthorizedSigner);
         }
     }
 
