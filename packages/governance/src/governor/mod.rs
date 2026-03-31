@@ -561,8 +561,9 @@ pub trait Governor {
     /// * `args` - The arguments for each function call.
     /// * `description_hash` - The keccak256 hash of the description's raw
     ///   bytes.
-    /// * `eta` - The ledger sequence number at which the proposal becomes
-    ///   executable. Typically computed as `current_ledger + timelock_delay`.
+    /// * `eta` - The estimated ledger sequence for execution. Emitted in the
+    ///   event only; not stored or enforced by the governor. Typically computed
+    ///   as `current_ledger + timelock_delay`.
     /// * `operator` - The address queuing the proposal. Unused in the default
     ///   (open) implementation, but available for access-control overrides.
     ///
@@ -1009,8 +1010,8 @@ pub struct ProposalQueued {
 ///
 /// * `e` - Access to Soroban environment.
 /// * `proposal_id` - The unique identifier of the proposal.
-/// * `eta` - The ledger sequence number at which the proposal becomes
-///   executable.
+/// * `eta` - The estimated ledger sequence for execution. Informational only;
+///   not enforced by the governor.
 pub fn emit_proposal_queued(e: &Env, proposal_id: &BytesN<32>, eta: u32) {
     ProposalQueued { proposal_id: proposal_id.clone(), eta }.publish(e);
 }
