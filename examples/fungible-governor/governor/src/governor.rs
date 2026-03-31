@@ -40,6 +40,10 @@ impl Governor for GovernorContract {
         // Open execution: any account can trigger a succeeded proposal,
         // as long as they authenticate themselves as `executor`.
         executor.require_auth();
+        let proposal_id =
+            governor::hash_proposal(e, &targets, &functions, &args, &description_hash);
+        let snapshot = governor::get_proposal_snapshot(e, &proposal_id);
+        let quorum = Self::quorum(e, snapshot);
         governor::execute(
             e,
             targets,
@@ -47,6 +51,7 @@ impl Governor for GovernorContract {
             args,
             &description_hash,
             Self::proposals_need_queuing(e),
+            quorum,
         )
     }
 

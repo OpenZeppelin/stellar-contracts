@@ -74,6 +74,10 @@ impl Governor for GovernorTimelockContract {
         eta: u32,
         _operator: Address,
     ) -> BytesN<32> {
+        let proposal_id =
+            governor::hash_proposal(e, &targets, &functions, &args, &description_hash);
+        let snapshot = governor::get_proposal_snapshot(e, &proposal_id);
+        let quorum = Self::quorum(e, snapshot);
         let proposal_id = governor::queue(
             e,
             targets.clone(),
@@ -81,7 +85,7 @@ impl Governor for GovernorTimelockContract {
             args.clone(),
             &description_hash,
             eta,
-            Self::proposals_need_queuing(e),
+            quorum,
         );
 
         // Schedule a timelock operation that calls governor.execute() after
@@ -129,6 +133,10 @@ impl Governor for GovernorTimelockContract {
         assert!(executor == timelock);
         executor.require_auth();
 
+        let proposal_id =
+            governor::hash_proposal(e, &targets, &functions, &args, &description_hash);
+        let snapshot = governor::get_proposal_snapshot(e, &proposal_id);
+        let quorum = Self::quorum(e, snapshot);
         governor::execute(
             e,
             targets,
@@ -136,6 +144,7 @@ impl Governor for GovernorTimelockContract {
             args,
             &description_hash,
             Self::proposals_need_queuing(e),
+            quorum,
         )
     }
 
