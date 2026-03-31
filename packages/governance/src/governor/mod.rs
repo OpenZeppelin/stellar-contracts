@@ -493,8 +493,11 @@ pub trait Governor {
     ///
     /// When queuing is enabled, this function transitions a proposal from
     /// the `Succeeded` state to the `Queued` state. The `execute` function
-    /// will then require the proposal to be in the `Queued` state (and past
-    /// its `eta`) before allowing execution.
+    /// will then require the proposal to be in the `Queued` state before
+    /// allowing execution. Note that `eta` enforcement is **not** handled
+    /// by the governor itself — it must be enforced by the integration
+    /// layer (e.g., a timelock contract that gates execution until the
+    /// delay has elapsed).
     ///
     /// # Enabling Queueing
     ///
