@@ -330,7 +330,7 @@ pub fn get_validated_context_by_id(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `signature_payload` - The hash of the data that was signed.
+/// * `auth_digest` - The hash of the data that was signed.
 /// * `signer` - The signer who signed the payload.
 /// * `sig_data` - The signature to verify for an external signer.
 ///
@@ -338,10 +338,10 @@ pub fn get_validated_context_by_id(
 ///
 /// * [`SmartAccountError::ExternalVerificationFailed`] - When an external
 ///   signature fails verification through its verifier contract.
-pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signer: &Signer, sig_data: &Bytes) {
+pub fn authenticate(e: &Env, auth_digest: &Hash<32>, signer: &Signer, sig_data: &Bytes) {
     match signer {
         Signer::External(verifier, key_data) => {
-            let sig_payload = signature_payload.to_bytes().to_bytes();
+            let sig_payload = auth_digest.to_bytes().to_bytes();
             if !VerifierClient::new(e, verifier).verify(
                 &sig_payload,
                 &key_data.into_val(e),
@@ -351,7 +351,7 @@ pub fn authenticate(e: &Env, signature_payload: &Hash<32>, signer: &Signer, sig_
             }
         }
         Signer::Delegated(addr) => {
-            let args = (signature_payload.clone(),).into_val(e);
+            let args = (auth_digest.clone(),).into_val(e);
             addr.require_auth_for_args(args)
         }
     }
