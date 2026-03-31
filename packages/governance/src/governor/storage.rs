@@ -618,9 +618,12 @@ pub fn execute(
 /// (proposal ID).
 ///
 /// Transitions the proposal from [`ProposalState::Succeeded`] to
-/// [`ProposalState::Queued`]. The `eta` (estimated time of arrival) is the
-/// ledger sequence number at which the proposal becomes executable — this is
-/// typically computed by the caller (e.g., `current_ledger + timelock_delay`).
+/// [`ProposalState::Queued`]. The `eta` (estimated time of arrival) is
+/// emitted in the event for off-chain consumers but is **not enforced** by
+/// this function or by [`execute`]. Enforcement of the execution delay is
+/// the responsibility of the integration layer (e.g., a timelock contract).
+/// The `eta` is typically computed by the caller as
+/// `current_ledger + timelock_delay`.
 ///
 /// # Arguments
 ///
@@ -629,8 +632,8 @@ pub fn execute(
 /// * `functions` - The function names to invoke on each target.
 /// * `args` - The arguments for each function call.
 /// * `description_hash` - The hash of the proposal description.
-/// * `eta` - The ledger sequence number at which the proposal becomes
-///   executable.
+/// * `eta` - The estimated ledger sequence for execution. Emitted in the event
+///   only; not stored or enforced by the governor.
 /// * `queue_enabled` - Whether queuing is enabled for this governor. Typically
 ///   provided by [`Governor::proposals_need_queuing`].
 ///
