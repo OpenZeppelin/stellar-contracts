@@ -923,6 +923,12 @@ pub fn has_voted(e: &Env, proposal_id: &BytesN<32>, account: &Address) -> bool {
 /// participate for a proposal to be valid. A single quorum value is shared
 /// across all proposal tallies.
 ///
+/// This is the default implementation used by [`Governor::quorum`]. If you
+/// override [`Governor::quorum`] with a dynamic quorum (e.g.,
+/// supply-relative), note that it may be called with a future ledger
+/// during the `Pending` state. See [`Governor::quorum`] for guidance on
+/// handling future ledger values safely.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.

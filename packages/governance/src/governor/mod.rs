@@ -287,6 +287,18 @@ pub trait Governor {
     /// fractional quorum based on total supply) may use the `ledger`
     /// parameter to compute a dynamic quorum.
     ///
+    /// # Dynamic Quorum Overrides
+    ///
+    /// When overriding this method with a dynamic quorum (e.g.,
+    /// supply-relative), note that it is called with the proposal's
+    /// `vote_snapshot` ledger, which may be in the future during the
+    /// `Pending` state. The override **must not panic** on future ledger
+    /// values — if a checkpoint does not yet exist, return `u128::MAX` so
+    /// that quorum is unreachable until the real value becomes available.
+    /// Quorum is only meaningful after voting ends; during `Pending` and
+    /// `Active` states the returned value is unused, so the `u128::MAX`
+    /// fallback has no effect on normal operation.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
