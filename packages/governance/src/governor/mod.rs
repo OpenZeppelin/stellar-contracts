@@ -17,10 +17,10 @@
 //!
 //! - **Vote types**: Against (0), For (1), Abstain (2)
 //! - **Vote success**: `for` votes strictly exceed `against` votes
-//! - **Quorum**: Sum of `for` and `abstain` votes meets or exceeds the
-//!   quorum value in effect at the proposal's `vote_snapshot` ledger.
-//!   Quorum values are stored as checkpoints, so updates do not
-//!   retroactively affect existing proposals
+//! - **Quorum**: Sum of `for` and `abstain` votes meets or exceeds the quorum
+//!   value in effect at the proposal's `vote_snapshot` ledger. Quorum values
+//!   are stored as checkpoints, so updates do not retroactively affect existing
+//!   proposals
 //!
 //! The [`Governor`] trait does not define how to store, manage, and access
 //! votes. But Governor trait needs to be able to access the voting power of
