@@ -282,10 +282,10 @@ pub trait Governor {
 
     /// Returns the quorum required at the given ledger.
     ///
-    /// For simple counting, this returns the configured fixed quorum value
-    /// and the `ledger` parameter is ignored. Custom implementations (e.g.,
-    /// fractional quorum based on total supply) may use the `ledger`
-    /// parameter to compute a dynamic quorum.
+    /// The default implementation uses checkpoint-based storage, returning
+    /// the quorum value that was in effect at the requested `ledger`.
+    /// Custom implementations (e.g., fractional quorum based on total
+    /// supply) may override this to compute a dynamic quorum.
     ///
     /// # Dynamic Quorum Overrides
     ///
@@ -308,8 +308,7 @@ pub trait Governor {
     ///
     /// * [`GovernorError::QuorumNotSet`] - If the quorum has not been set.
     fn quorum(e: &Env, ledger: u32) -> u128 {
-        let _ = ledger;
-        storage::get_quorum(e)
+        storage::get_quorum(e, ledger)
     }
 
     /// Returns the current state of a proposal.

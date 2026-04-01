@@ -104,7 +104,7 @@ fn initialization() {
     assert_eq!(s.governor.voting_delay(), VOTING_DELAY);
     assert_eq!(s.governor.voting_period(), VOTING_PERIOD);
     assert_eq!(s.governor.proposal_threshold(), PROPOSAL_THRESHOLD);
-    assert_eq!(s.governor.quorum(&0), QUORUM);
+    assert_eq!(s.governor.quorum(&s.e.ledger().sequence()), QUORUM);
     assert_eq!(s.governor.get_token_contract(), s.token.address);
 }
 
