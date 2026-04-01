@@ -946,14 +946,11 @@ pub fn has_voted(e: &Env, proposal_id: &BytesN<32>, account: &Address) -> bool {
 ///
 /// # Errors
 ///
-/// * [`GovernorError::QuorumNotSet`] - Occurs if no quorum checkpoint
-///   exists at or before the requested ledger.
+/// * [`GovernorError::QuorumNotSet`] - Occurs if no quorum checkpoint exists at
+///   or before the requested ledger.
 pub fn get_quorum(e: &Env, ledger: u32) -> u128 {
-    let num: u32 = e
-        .storage()
-        .instance()
-        .get(&GovernorStorageKey::NumQuorumCheckpoints)
-        .unwrap_or(0);
+    let num: u32 =
+        e.storage().instance().get(&GovernorStorageKey::NumQuorumCheckpoints).unwrap_or(0);
 
     if num == 0 {
         panic_with_error!(e, GovernorError::QuorumNotSet);
@@ -1085,11 +1082,8 @@ pub fn get_proposal_vote_counts(e: &Env, proposal_id: &BytesN<32>) -> ProposalVo
 /// access controls to ensure that only authorized accounts can call this
 /// function.
 pub fn set_quorum(e: &Env, quorum: u128) {
-    let num: u32 = e
-        .storage()
-        .instance()
-        .get(&GovernorStorageKey::NumQuorumCheckpoints)
-        .unwrap_or(0);
+    let num: u32 =
+        e.storage().instance().get(&GovernorStorageKey::NumQuorumCheckpoints).unwrap_or(0);
     let ledger = e.ledger().sequence();
 
     let old_quorum = if num > 0 {
@@ -1109,10 +1103,9 @@ pub fn set_quorum(e: &Env, quorum: u128) {
     };
 
     // Append a new checkpoint.
-    e.storage().instance().set(
-        &GovernorStorageKey::QuorumCheckpoint(num),
-        &QuorumCheckpoint { ledger, quorum },
-    );
+    e.storage()
+        .instance()
+        .set(&GovernorStorageKey::QuorumCheckpoint(num), &QuorumCheckpoint { ledger, quorum });
     e.storage().instance().set(&GovernorStorageKey::NumQuorumCheckpoints, &(num + 1));
 
     emit_quorum_changed(e, old_quorum, quorum);
