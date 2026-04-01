@@ -987,10 +987,14 @@ pub fn get_quorum(e: &Env, ledger: u32) -> u128 {
 
 /// Returns the quorum checkpoint at the given index.
 fn get_quorum_checkpoint(e: &Env, index: u32) -> QuorumCheckpoint {
-    e.storage()
-        .instance()
-        .get(&GovernorStorageKey::QuorumCheckpoint(index))
-        .unwrap_or_else(|| panic_with_error!(e, GovernorError::QuorumNotSet))
+    let key = GovernorStorageKey::QuorumCheckpoint(index);
+    let cp: QuorumCheckpoint = e
+        .storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| panic_with_error!(e, GovernorError::QuorumNotSet));
+    e.storage().persistent().extend_ttl(&key, GOVERNOR_TTL_THRESHOLD, GOVERNOR_EXTEND_AMOUNT);
+    cp
 }
 
 /// Returns whether the quorum has been reached for a proposal.
@@ -1090,7 +1094,7 @@ pub fn set_quorum(e: &Env, quorum: u128) {
         let last = get_quorum_checkpoint(e, num - 1);
         // If the last checkpoint is at the same ledger, update it in place.
         if last.ledger == ledger {
-            e.storage().instance().set(
+            e.storage().persistent().set(
                 &GovernorStorageKey::QuorumCheckpoint(num - 1),
                 &QuorumCheckpoint { ledger, quorum },
             );
@@ -1104,7 +1108,7 @@ pub fn set_quorum(e: &Env, quorum: u128) {
 
     // Append a new checkpoint.
     e.storage()
-        .instance()
+        .persistent()
         .set(&GovernorStorageKey::QuorumCheckpoint(num), &QuorumCheckpoint { ledger, quorum });
     e.storage().instance().set(&GovernorStorageKey::NumQuorumCheckpoints, &(num + 1));
 

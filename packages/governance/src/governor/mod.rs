@@ -17,8 +17,10 @@
 //!
 //! - **Vote types**: Against (0), For (1), Abstain (2)
 //! - **Vote success**: `for` votes strictly exceed `against` votes
-//! - **Quorum**: Sum of `for` and `abstain` votes meets or exceeds the single
-//!   configured quorum value (shared across all proposal tallies)
+//! - **Quorum**: Sum of `for` and `abstain` votes meets or exceeds the
+//!   quorum value in effect at the proposal's `vote_snapshot` ledger.
+//!   Quorum values are stored as checkpoints, so updates do not
+//!   retroactively affect existing proposals
 //!
 //! The [`Governor`] trait does not define how to store, manage, and access
 //! votes. But Governor trait needs to be able to access the voting power of
@@ -437,6 +439,16 @@ pub trait Governor {
     /// * data - `[targets: Vec<Address>, functions: Vec<Symbol>, args:
     ///   Vec<Vec<Val>>, vote_snapshot: u32, vote_end: u32, description:
     ///   String]`
+    ///
+    /// # Quorum Initialization
+    ///
+    /// `propose` does not verify quorum configuration. In the default
+    /// checkpoint-based quorum implementation, if [`set_quorum`] has never
+    /// been called, quorum lookups revert with [`GovernorError::QuorumNotSet`].
+    /// This means a proposal can be created but subsequent
+    /// [`Governor::proposal_state`] / [`Governor::cast_vote`] calls will
+    /// revert if no quorum checkpoint exists at or before `vote_snapshot`.
+    /// Ensure [`set_quorum`] is called during contract initialization.
     ///
     /// # Notes
     ///
