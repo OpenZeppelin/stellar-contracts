@@ -104,7 +104,10 @@
 //! actions have proper oversight and transparency.
 
 use soroban_sdk::{
-    auth::{Context, ContractContext, CustomAccountInterface}, contract, contracterror, contractimpl, contracttype, crypto::Hash, panic_with_error, symbol_short, Address, BytesN, Env, IntoVal, Symbol, Val, Vec
+    auth::{Context, ContractContext, CustomAccountInterface},
+    contract, contracterror, contractimpl, contracttype,
+    crypto::Hash,
+    panic_with_error, symbol_short, Address, BytesN, Env, IntoVal, Symbol, Val, Vec,
 };
 use stellar_access::access_control::{
     ensure_role, get_role_member_count, grant_role_no_auth, set_admin, AccessControl,
