@@ -30,14 +30,6 @@
 //! [`crate::votes::Votes`] trait methods on the token contract to access the
 //! voting power of an account.
 //!
-//! The following optional extensions are available:
-//!
-//! - *GovernorSettings* provides configurable parameters like voting delay,
-//!   voting period, and proposal threshold.
-//! - *TimelockControl* enables the optional `Queue` step in execution. It
-//!   integrates the Governor Contract with the Timelock Contract for delayed
-//!   execution (queue step before execute).
-//!
 //! ## Governance Flow
 //!
 //! 1. **Propose**: A user with sufficient voting power creates a proposal
