@@ -17,8 +17,10 @@
 //!
 //! - **Vote types**: Against (0), For (1), Abstain (2)
 //! - **Vote success**: `for` votes strictly exceed `against` votes
-//! - **Quorum**: Sum of `for` and `abstain` votes meets or exceeds the single
-//!   configured quorum value (shared across all proposal tallies)
+//! - **Quorum**: Sum of `for` and `abstain` votes meets or exceeds the quorum
+//!   value in effect at the proposal's `vote_snapshot` ledger. Quorum values
+//!   are stored as checkpoints, so updates do not retroactively affect existing
+//!   proposals
 //!
 //! The [`Governor`] trait does not define how to store, manage, and access
 //! votes. But Governor trait needs to be able to access the voting power of
@@ -158,8 +160,8 @@ pub use crate::governor::storage::{
 /// # Default Counting Implementation
 ///
 /// The default implementation provides simple counting with three vote
-/// types (Against, For, Abstain), simple majority for success, and a
-/// fixed quorum value.
+/// types (Against, For, Abstain), simple majority for success, and
+/// checkpoint-based quorum.
 ///
 /// Implementers can override the counting-related trait methods to provide
 /// custom counting strategies (e.g., fractional voting, weighted quorum
@@ -282,10 +284,32 @@ pub trait Governor {
 
     /// Returns the quorum required at the given ledger.
     ///
-    /// For simple counting, this returns the configured fixed quorum value
-    /// and the `ledger` parameter is ignored. Custom implementations (e.g.,
-    /// fractional quorum based on total supply) may use the `ledger`
-    /// parameter to compute a dynamic quorum.
+    /// The default implementation uses checkpoint-based storage, returning
+    /// the quorum value that was in effect at the requested `ledger`.
+    /// Custom implementations (e.g., fractional quorum based on total
+    /// supply) may override this to compute a dynamic quorum.
+    ///
+    /// # Dynamic Quorum Overrides
+    ///
+    /// Dynamic quorum implementations (e.g., supply-relative) should
+    /// typically **not** use [`set_quorum`] / [`storage::get_quorum`], as
+    /// those are designed for the default checkpoint-based fixed quorum.
+    /// Instead, compute the quorum from on-chain state at the requested
+    /// `ledger`.
+    ///
+    /// If the dynamic quorum depends on configurable parameters (e.g., a
+    /// quorum percentage), those parameters must themselves be queried at
+    /// the historical `ledger` — otherwise, later parameter updates would
+    /// retroactively change the outcome of existing proposals.
+    ///
+    /// This method is called with the proposal's `vote_snapshot` ledger,
+    /// which may be in the future during the `Pending` state. The override
+    /// **must not panic** on future ledger values — if a checkpoint does
+    /// not yet exist, return `u128::MAX` so that quorum is unreachable
+    /// until the real value becomes available. Quorum is only meaningful
+    /// after voting ends; during `Pending` and `Active` states the returned
+    /// value is unused, so the `u128::MAX` fallback has no effect on normal
+    /// operation.
     ///
     /// # Arguments
     ///
@@ -294,10 +318,10 @@ pub trait Governor {
     ///
     /// # Errors
     ///
-    /// * [`GovernorError::QuorumNotSet`] - If the quorum has not been set.
+    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
+    ///   before the requested ledger.
     fn quorum(e: &Env, ledger: u32) -> u128 {
-        let _ = ledger;
-        storage::get_quorum(e)
+        storage::get_quorum(e, ledger)
     }
 
     /// Returns the current state of a proposal.
@@ -310,8 +334,12 @@ pub trait Governor {
     /// # Errors
     ///
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
+    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
+    ///   before the proposal's `vote_snapshot` ledger.
     fn proposal_state(e: &Env, proposal_id: BytesN<32>) -> ProposalState {
-        storage::get_proposal_state(e, &proposal_id)
+        let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
+        let quorum = Self::quorum(e, snapshot);
+        storage::get_proposal_state(e, &proposal_id, quorum)
     }
 
     /// Returns the ledger number at which voting power is retrieved for a
@@ -440,8 +468,7 @@ pub trait Governor {
         proposer: Address,
     ) -> BytesN<32> {
         proposer.require_auth();
-        let quorum = Self::quorum(e, e.ledger().sequence());
-        storage::propose(e, targets, functions, args, description, &proposer, quorum)
+        storage::propose(e, targets, functions, args, description, &proposer)
     }
 
     /// Casts a vote on a proposal and returns the voter's voting power.
@@ -460,6 +487,8 @@ pub trait Governor {
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
     /// * [`GovernorError::ProposalNotActive`] - If voting is not currently
     ///   open.
+    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
+    ///   before the proposal's `vote_snapshot` ledger.
     ///
     /// # Events
     ///
@@ -480,7 +509,9 @@ pub trait Governor {
         voter: Address,
     ) -> u128 {
         voter.require_auth();
-        storage::cast_vote(e, &proposal_id, vote_type, &reason, &voter)
+        let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
+        let quorum = Self::quorum(e, snapshot);
+        storage::cast_vote(e, &proposal_id, vote_type, &reason, &voter, quorum)
     }
 
     /// Queues a succeeded proposal for execution and returns its unique
@@ -545,10 +576,9 @@ pub trait Governor {
     ///         let timelock = storage::get_timelock(e);
     ///         assert!(operator == timelock);
     ///         operator.require_auth();
-    ///         storage::queue(
-    ///             e, targets, functions, args, &description_hash, eta,
-    ///             Self::proposals_need_queuing(e),
-    ///         )
+    ///         let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
+    ///         let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
+    ///         storage::queue(e, targets, functions, args, &description_hash, eta, quorum)
     ///     }
     /// }
     /// ```
@@ -574,6 +604,8 @@ pub trait Governor {
     ///   [`Governor::proposals_need_queuing`] returns `false`).
     /// * [`GovernorError::ProposalNotSuccessful`] - If the proposal has not
     ///   succeeded.
+    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
+    ///   before the proposal's `vote_snapshot` ledger.
     ///
     /// # Events
     ///
@@ -588,15 +620,13 @@ pub trait Governor {
         eta: u32,
         _operator: Address,
     ) -> BytesN<32> {
-        storage::queue(
-            e,
-            targets,
-            functions,
-            args,
-            &description_hash,
-            eta,
-            Self::proposals_need_queuing(e),
-        )
+        if !Self::proposals_need_queuing(e) {
+            soroban_sdk::panic_with_error!(e, GovernorError::QueueNotEnabled);
+        }
+        let proposal_id = storage::hash_proposal(e, &targets, &functions, &args, &description_hash);
+        let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
+        let quorum = Self::quorum(e, snapshot);
+        storage::queue(e, targets, functions, args, &description_hash, eta, quorum)
     }
 
     /// Executes a proposal and returns its unique identifier.
@@ -647,7 +677,9 @@ pub trait Governor {
     /// ```ignore
     /// // Open execution — anyone can trigger a succeeded proposal:
     /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e))
+    ///     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
+    ///     let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), quorum)
     /// }
     ///
     /// // Restricted — only a timelock contract can execute:
@@ -655,13 +687,17 @@ pub trait Governor {
     ///     let timelock = storage::get_timelock(e);
     ///     assert!(executor == timelock);
     ///     executor.require_auth();
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e))
+    ///     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
+    ///     let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), quorum)
     /// }
     ///
     /// // Role-based — using the `stellar-macros` access control macro:
     /// #[only_role(executor, "executor")]
     /// fn execute(e: &Env, targets: Vec<Address>, /* ... */) -> BytesN<32> {
-    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e))
+    ///     let proposal_id = hash_proposal(e, &targets, &functions, &args, &description_hash);
+    ///     let quorum = Self::quorum(e, get_proposal_snapshot(e, &proposal_id));
+    ///     storage::execute(e, targets, functions, args, &description_hash, Self::proposals_need_queuing(e), quorum)
     /// }
     /// ```
     fn execute(
