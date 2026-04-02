@@ -160,8 +160,8 @@ pub use crate::governor::storage::{
 /// # Default Counting Implementation
 ///
 /// The default implementation provides simple counting with three vote
-/// types (Against, For, Abstain), simple majority for success, and a
-/// fixed quorum value.
+/// types (Against, For, Abstain), simple majority for success, and
+/// checkpoint-based quorum.
 ///
 /// Implementers can override the counting-related trait methods to provide
 /// custom counting strategies (e.g., fractional voting, weighted quorum
@@ -291,15 +291,25 @@ pub trait Governor {
     ///
     /// # Dynamic Quorum Overrides
     ///
-    /// When overriding this method with a dynamic quorum (e.g.,
-    /// supply-relative), note that it is called with the proposal's
-    /// `vote_snapshot` ledger, which may be in the future during the
-    /// `Pending` state. The override **must not panic** on future ledger
-    /// values — if a checkpoint does not yet exist, return `u128::MAX` so
-    /// that quorum is unreachable until the real value becomes available.
-    /// Quorum is only meaningful after voting ends; during `Pending` and
-    /// `Active` states the returned value is unused, so the `u128::MAX`
-    /// fallback has no effect on normal operation.
+    /// Dynamic quorum implementations (e.g., supply-relative) should
+    /// typically **not** use [`set_quorum`] / [`storage::get_quorum`], as
+    /// those are designed for the default checkpoint-based fixed quorum.
+    /// Instead, compute the quorum from on-chain state at the requested
+    /// `ledger`.
+    ///
+    /// If the dynamic quorum depends on configurable parameters (e.g., a
+    /// quorum percentage), those parameters must themselves be queried at
+    /// the historical `ledger` — otherwise, later parameter updates would
+    /// retroactively change the outcome of existing proposals.
+    ///
+    /// This method is called with the proposal's `vote_snapshot` ledger,
+    /// which may be in the future during the `Pending` state. The override
+    /// **must not panic** on future ledger values — if a checkpoint does
+    /// not yet exist, return `u128::MAX` so that quorum is unreachable
+    /// until the real value becomes available. Quorum is only meaningful
+    /// after voting ends; during `Pending` and `Active` states the returned
+    /// value is unused, so the `u128::MAX` fallback has no effect on normal
+    /// operation.
     ///
     /// # Arguments
     ///
@@ -308,7 +318,8 @@ pub trait Governor {
     ///
     /// # Errors
     ///
-    /// * [`GovernorError::QuorumNotSet`] - If the quorum has not been set.
+    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
+    ///   before the requested ledger.
     fn quorum(e: &Env, ledger: u32) -> u128 {
         storage::get_quorum(e, ledger)
     }
@@ -323,6 +334,8 @@ pub trait Governor {
     /// # Errors
     ///
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
+    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
+    ///   before the proposal's `vote_snapshot` ledger.
     fn proposal_state(e: &Env, proposal_id: BytesN<32>) -> ProposalState {
         let snapshot = storage::get_proposal_snapshot(e, &proposal_id);
         let quorum = Self::quorum(e, snapshot);
@@ -440,16 +453,6 @@ pub trait Governor {
     ///   Vec<Vec<Val>>, vote_snapshot: u32, vote_end: u32, description:
     ///   String]`
     ///
-    /// # Quorum Initialization
-    ///
-    /// `propose` does not verify quorum configuration. In the default
-    /// checkpoint-based quorum implementation, if [`set_quorum`] has never
-    /// been called, quorum lookups revert with [`GovernorError::QuorumNotSet`].
-    /// This means a proposal can be created but subsequent
-    /// [`Governor::proposal_state`] / [`Governor::cast_vote`] calls will
-    /// revert if no quorum checkpoint exists at or before `vote_snapshot`.
-    /// Ensure [`set_quorum`] is called during contract initialization.
-    ///
     /// # Notes
     ///
     /// * Authorization for `proposer` is required.
@@ -484,6 +487,8 @@ pub trait Governor {
     /// * [`GovernorError::ProposalNotFound`] - If the proposal does not exist.
     /// * [`GovernorError::ProposalNotActive`] - If voting is not currently
     ///   open.
+    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
+    ///   before the proposal's `vote_snapshot` ledger.
     ///
     /// # Events
     ///
@@ -599,6 +604,8 @@ pub trait Governor {
     ///   [`Governor::proposals_need_queuing`] returns `false`).
     /// * [`GovernorError::ProposalNotSuccessful`] - If the proposal has not
     ///   succeeded.
+    /// * [`GovernorError::QuorumNotSet`] - If no quorum checkpoint exists at or
+    ///   before the proposal's `vote_snapshot` ledger.
     ///
     /// # Events
     ///
