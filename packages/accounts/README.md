@@ -303,7 +303,7 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-accounts = "=0.6.0"
+stellar-accounts = "=0.7.0"
 ```
 
 ### 2. Implement the Smart Account Trait

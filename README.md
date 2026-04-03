@@ -18,10 +18,11 @@ OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stel
   - [`accounts/`](packages/accounts): Smart accounts with custom authentication and authorization
   - [`contract-utils/`](packages/contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
   - [`fee-abstraction/`](packages/fee-abstraction): Utilities for covering transaction fees with fungible tokens instead of XLM
-  - [`governance/`](packages/governance): Governance utilities such as timelock
+  - [`governance/`](packages/governance): Governance utilities (governor, votes, timelock)
   - [`macros/`](packages/macros): Proc macros for some of the modules (`#[only_owner]`, `#[when_not_paused]`, etc.)
   - [`test-utils/`](packages/test-utils): Utilities for testing
   - [`tokens/`](packages/tokens): Various token types (fungible, non-fungible, real-world assets, vaults)
+  - [`zk-email/`](packages/zk-email): On-chain DKIM registry for zkEmail verification
 - `examples/`: Example contracts
 - `audits/`: Audit reports
 
@@ -58,9 +59,14 @@ We recommend pinning to a specific version, because rapid iterations are expecte
 
 ```toml
 [dependencies]
-stellar-tokens = "=0.6.0"
-stellar-access = "=0.6.0"
-stellar-contract-utils = "=0.6.0"
+stellar-tokens = "=0.7.0"
+stellar-access = "=0.7.0"
+stellar-contract-utils = "=0.7.0"
+stellar-governance = "=0.7.0"
+stellar-accounts = "=0.7.0"
+stellar-fee-abstraction = "=0.7.0"
+stellar-zk-email = "=0.7.0"
+stellar-macros = "=0.7.0"
 ```
 
 ## Notes

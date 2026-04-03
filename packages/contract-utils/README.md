@@ -141,9 +141,9 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-contract-utils = "=0.6.0"
+stellar-contract-utils = "=0.7.0"
 # Add this if you want to use macros
-stellar-macros = "=0.6.0"
+stellar-macros = "=0.7.0"
 ```
 
 ## Examples

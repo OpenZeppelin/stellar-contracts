@@ -64,6 +64,7 @@ impl FungibleBurnable for MyContract {}
 - **Capped**: Set maximum supply limits
 - **Allowlist**: Restrict transfers to approved addresses
 - **Blocklist**: Prevent transfers from/to blocked addresses
+- **Votes**: Track voting power for governance integration
 - **Vault**: Enable deposit/withdrawal of underlying assets in exchange for vault shares
 
 ### Non-Fungible
@@ -122,6 +123,7 @@ impl NonFungibleBurnable for MyNFTContract {}
 - **Enumerable**: Enable iteration over all tokens and owner tokens
 - **Consecutive**: Efficiently mint multiple tokens in batches
 - **Royalties**: Support for creator royalties on secondary sales
+- **Votes**: Track voting power for governance integration
 
 ## Design Philosophy
 
@@ -140,9 +142,9 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-tokens = "=0.6.0"
+stellar-tokens = "=0.7.0"
 # Add this if you want to use macros
-stellar-macros = "=0.6.0"
+stellar-macros = "=0.7.0"
 ```
 
 ## Examples

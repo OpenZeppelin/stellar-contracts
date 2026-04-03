@@ -6,10 +6,31 @@ Stellar governance functionalities
 
 This package provides governance modules for Soroban smart contracts:
 
+- **Governor**: On-chain governance with proposals, voting, counting, and execution
 - **Votes**: Vote tracking with delegation and historical checkpointing
 - **Timelock**: Time-delayed execution of operations
 
 ## Modules
+
+### Governor
+
+The `governor` module implements on-chain governance for Soroban contracts. It provides the core governance primitives for decentralized decision-making.
+
+#### Core Concepts
+
+- **Proposals**: Bundles of on-chain calls (targets, functions, arguments) paired with a description
+- **Voting**: Token holders vote during a voting period using snapshot-based voting power
+- **Counting**: Default simple counting (Against/For/Abstain) with pluggable alternatives
+- **Execution**: Successful proposals can be executed, triggering on-chain calls
+- **Queuing**: Optional queue step for integration with a timelock (disabled by default, enabled with a single override)
+
+#### Key Features
+
+- Snapshot-based voting power prevents flash loan attacks
+- Proposal threshold prevents governance spam
+- Dynamic quorum support (override `quorum()` for supply-relative quorum)
+- Queue logic is built into the base trait but disabled by default — a single `proposals_need_queuing()` override activates the full flow
+- `execute` and `cancel` have no default implementation, requiring explicit access control decisions
 
 ### Votes
 
@@ -113,10 +134,13 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-governance = "=0.6.0"
+stellar-governance = "=0.7.0"
 ```
 
 ## Examples
 
 See the following examples in the repository:
+- [`examples/fungible-governor/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-governor) - Governor with fungible token voting
+- [`examples/fungible-governor-timelock/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-governor-timelock) - Governor with timelock queue
+- [`examples/fungible-votes/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/fungible-votes) - Fungible token with voting extension
 - [`examples/timelock-controller/`](https://github.com/OpenZeppelin/stellar-contracts/tree/main/examples/timelock-controller) - Timelock controller with role-based access control
