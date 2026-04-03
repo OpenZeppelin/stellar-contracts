@@ -1,14 +1,19 @@
 name: Publish on crates.io
+
 # This workflow publishes all crates on crates.io.
 on:
   push:
     tags:
       - v*
+  workflow_dispatch:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
+
 jobs:
   dry-run:
     name: Dry run
