@@ -33,6 +33,11 @@ jobs:
       - name: Build with Stellar CLI
         run: stellar contract build
 
+      # Dry-run checks validate packaging metadata against crates.io.
+      # Crates with versioned workspace dependencies (including dev-deps)
+      # cannot be dry-run checked because those versions don't exist on
+      # crates.io yet. Their build is already verified by `stellar contract build`.
+
       - name: Check stellar-access
         run: cargo publish -p stellar-access --dry-run --no-verify
 
@@ -42,16 +47,15 @@ jobs:
       - name: Check stellar-contract-utils
         run: cargo publish -p stellar-contract-utils --dry-run --no-verify
 
-      - name: Check stellar-fee-abstraction
-        run: cargo publish -p stellar-fee-abstraction --dry-run --no-verify
-
       - name: Check stellar-governance
         run: cargo publish -p stellar-governance --dry-run --no-verify
 
       - name: Check stellar-macros
         run: cargo publish -p stellar-macros --dry-run --no-verify
 
-        # Intentionally skipping "stellar-tokens" because dependant on "stellar-contract-utils"
+      # Skipped: stellar-fee-abstraction (dev-deps on stellar-tokens, stellar-macros)
+      # Skipped: stellar-tokens (depends on stellar-contract-utils, stellar-governance)
+      # Skipped: stellar-zk-email (not published to crates.io yet)
 
   publish:
     name: Publish
@@ -74,6 +78,10 @@ jobs:
       - name: Build with Stellar CLI
         run: stellar contract build
 
+      # Publish order matters: leaf crates first, then dependents.
+      # crates.io may have indexing latency, so dependents are published last.
+
+      # Leaf crates (no workspace dependencies)
       - name: Publish stellar-access
         run: cargo publish -p stellar-access --no-verify --token $CRATES_IO_TOKEN
 
@@ -83,16 +91,17 @@ jobs:
       - name: Publish stellar-contract-utils
         run: cargo publish -p stellar-contract-utils --no-verify --token $CRATES_IO_TOKEN
 
-      - name: Publish stellar-fee-abstraction
-        run: cargo publish -p stellar-fee-abstraction --no-verify --token $CRATES_IO_TOKEN
-
       - name: Publish stellar-governance
         run: cargo publish -p stellar-governance --no-verify --token $CRATES_IO_TOKEN
 
       - name: Publish stellar-macros
         run: cargo publish -p stellar-macros --no-verify --token $CRATES_IO_TOKEN
 
-      # "stellar-tokens" is dependant on "stellar-contract-utils" and if there's some latency from crates.io, it might be useful to add a sleep step e.g. `sleep 300`
-
+      # Dependent crates (published after their dependencies are available)
+      # stellar-tokens depends on stellar-contract-utils, stellar-governance
       - name: Publish stellar-tokens
         run: cargo publish -p stellar-tokens --no-verify --token $CRATES_IO_TOKEN
+
+      # stellar-fee-abstraction dev-depends on stellar-tokens, stellar-macros
+      - name: Publish stellar-fee-abstraction
+        run: cargo publish -p stellar-fee-abstraction --no-verify --token $CRATES_IO_TOKEN
