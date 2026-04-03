@@ -1,45 +1,12 @@
 # Stellar Macros
 
-Macros for Stellar contracts.
+Procedural attribute macros for Stellar contracts, providing compile-time checks for access control and pausable patterns.
 
-## Modules
-
-### Default Implementation
-
-The `#[contractimpl(contracttrait)]` macro generates missing default implementations for traits provided by this library.
-
-#### Usage Examples
-
-```rust
-use soroban_sdk::{contract, contractimpl, Address, Env};
-use stellar_tokens::fungible::{Base, FungibleToken};
-
-#[contract]
-pub struct MyContract;
-
-#[contractimpl(contracttrait)]
-impl FungibleToken for MyContract {
-    type ContractType = Base;
-
-    // Only provide overrides here, default implementations are auto-generated
-}
-```
-
-#### Supported Traits
-
-- `FungibleToken`
-- `FungibleBurnable`
-- `NonFungibleToken`
-- `NonFungibleBurnable`
-- `NonFungibleEnumerable`
-- `AccessControl`
-- `Ownable`
-
-### Access Control Macros
+## Access Control Macros
 
 Macros for role-based and ownership-based access control.
 
-#### Usage Examples
+### Usage Examples
 
 ```rust
 use soroban_sdk::{contract, contractimpl, Address, Env};
@@ -74,7 +41,7 @@ impl MyContract {
 }
 ```
 
-#### Available Macros
+### Available Macros
 
 - `#[only_admin]`: Restricts access to admin only
 - `#[only_role(account, "role")]`: Role check with authorization
@@ -90,11 +57,11 @@ impl MyContract {
 
 Use role-only macros when your function already contains `require_auth()` calls to avoid duplicate authorization panics.
 
-### Pausable Macros
+## Pausable Macros
 
 Macros for implementing pausable functionality in contracts.
 
-#### Usage Examples
+### Usage Examples
 
 ```rust
 use soroban_sdk::{contract, contractimpl, Env};
@@ -117,7 +84,7 @@ impl MyContract {
 }
 ```
 
-#### Available Macros
+### Available Macros
 
 - `#[when_not_paused]`: Function executes only when contract is not paused
 - `#[when_paused]`: Function executes only when contract is paused
