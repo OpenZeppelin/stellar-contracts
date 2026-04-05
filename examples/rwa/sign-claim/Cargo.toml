@@ -10,6 +10,9 @@ version = "0.7.0"
 name = "rwa-sign-claim"
 path = "src/main.rs"
 
+[package.metadata.stellar]
+cargo_inherit = true
+
 [dependencies]
 ed25519-dalek  = "2.1.1"
 stellar-strkey = "0.0.16"

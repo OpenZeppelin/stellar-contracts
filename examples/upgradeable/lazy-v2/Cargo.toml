@@ -6,6 +6,9 @@ repository.workspace = true
 publish = false
 version = "2.0.0"
 
+[package.metadata.stellar]
+cargo_inherit = true
+
 [lib]
 crate-type = ["cdylib"]
 doctest = false

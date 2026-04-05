@@ -8,6 +8,9 @@ publish = true
 description = "Access Control, Ownable, and Role Transfer utilities for Stellar contracts."
 
 
+[package.metadata.stellar]
+cargo_inherit = true
+
 [lib]
 crate-type = ["lib", "cdylib"]
 doctest = false
