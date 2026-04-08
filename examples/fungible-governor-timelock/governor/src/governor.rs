@@ -7,6 +7,7 @@ use stellar_governance::governor::{self as governor, Governor, ProposalState};
 #[contracttype]
 enum GovernorTimelockKey {
     Timelock,
+    OperationID(BytesN<32>),
 }
 
 #[contract]
@@ -98,7 +99,7 @@ impl Governor for GovernorTimelockContract {
         let execute_args: Vec<Val> =
             (targets, functions, args, description_hash.clone(), timelock.clone()).into_val(e);
 
-        e.invoke_contract::<BytesN<32>>(
+        let op_id = e.invoke_contract::<BytesN<32>>(
             &timelock,
             &Symbol::new(e, "schedule_op"),
             (
@@ -112,6 +113,9 @@ impl Governor for GovernorTimelockContract {
             )
                 .into_val(e),
         );
+        e.storage()
+            .persistent()
+            .set(&GovernorTimelockKey::OperationID(proposal_id.clone()), &op_id);
 
         proposal_id
     }
@@ -166,6 +170,21 @@ impl Governor for GovernorTimelockContract {
         let proposer = governor::get_proposal_proposer(e, &proposal_id);
         assert!(operator == proposer);
         operator.require_auth();
+
+        // Cancel in timelock if it's been already queued.
+        if let Some(op_id) = e
+            .storage()
+            .persistent()
+            .get::<_, BytesN<32>>(&GovernorTimelockKey::OperationID(proposal_id))
+        {
+            let timelock = get_timelock(e);
+            e.invoke_contract::<BytesN<32>>(
+                &timelock,
+                &Symbol::new(e, "cancel_op"),
+                (op_id, operator).into_val(e),
+            );
+        }
+
         governor::cancel(e, targets, functions, args, &description_hash)
     }
 }
