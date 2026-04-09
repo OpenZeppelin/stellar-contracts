@@ -192,7 +192,7 @@ pub trait Timelock {
     /// * `function` - The function name to invoke on the target.
     /// * `args` - The arguments to pass to the function.
     /// * `predecessor` - The predecessor operation ID. Use
-    ///   `BytesN::<32>::from_array(&[0u8; 32])` for no predecessor.
+    ///   `BytesN::<32>::from_array(e, &[0u8; 32])` for no predecessor.
     /// * `salt` - A salt value for uniqueness. Allows scheduling the same
     ///   operation multiple times with different IDs.
     /// * `delay` - The delay in ledgers before the operation can be executed.
