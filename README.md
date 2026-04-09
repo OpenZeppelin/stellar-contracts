@@ -80,7 +80,6 @@ stellar-contract-utils = "=0.7.0"
 stellar-governance = "=0.7.0"
 stellar-accounts = "=0.7.0"
 stellar-fee-abstraction = "=0.7.0"
-stellar-zk-email = "=0.7.0"
 stellar-macros = "=0.7.0"
 ```
 
