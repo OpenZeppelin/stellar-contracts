@@ -84,8 +84,9 @@ fn setup() -> TestSetup<'static> {
     );
     let governor = GovernorTimelockContractClient::new(&e, &governor_address);
 
-    // Grant the governor PROPOSER_ROLE on the timelock so it can schedule.
+    // Grant the governor PROPOSER_ROLE and CANCELLER_ROLE on the timelock.
     timelock.grant_role(&governor_address, &Symbol::new(&e, "proposer"), &admin);
+    timelock.grant_role(&governor_address, &Symbol::new(&e, "canceller"), &admin);
 
     // Target
     let target_address = e.register(TargetContract, ());

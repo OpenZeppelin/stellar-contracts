@@ -171,7 +171,7 @@ impl Governor for GovernorTimelockContract {
         {
             let timelock = Self::timelock(e);
             let timelock_client = TimelockClient::new(e, &timelock);
-            timelock_client.cancel_op(&op_id, &operator);
+            timelock_client.cancel_op(&op_id, &e.current_contract_address());
         }
 
         governor::cancel(e, targets, functions, args, &description_hash)
