@@ -2,6 +2,18 @@
 
 This package provides a comprehensive smart account framework for Soroban, enabling flexible, programmable authorization. Instead of hard‑coding signature checks, smart accounts organize authorization as a composition of context rules, signers, and policies. The result is a system that reads naturally, scales to complex requirements, and remains auditable.
 
+This crate is part of the [OpenZeppelin Stellar Contracts](https://github.com/OpenZeppelin/stellar-contracts) library, which is published as separate crates on [crates.io](https://crates.io):
+
+- [stellar-access](https://crates.io/crates/stellar-access): Role-based access controls and ownable
+- **[stellar-accounts](https://crates.io/crates/stellar-accounts)**: Smart accounts with custom authentication and authorization
+- [stellar-contract-utils](https://crates.io/crates/stellar-contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
+- [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
+- [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
+- [stellar-macros](https://crates.io/crates/stellar-macros): Proc macros (`#[only_owner]`, `#[when_not_paused]`, etc.)
+- [stellar-tokens](https://crates.io/crates/stellar-tokens): Token types (fungible, non-fungible, real-world assets, vaults)
+
+Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/stellar-contracts) page for additional information.
+
 ## Overview
 
 Smart accounts in Soroban implement `CustomAccountInterface` and define authorization as data and behavior that can be evolved over time. The framework is context‑centric:
