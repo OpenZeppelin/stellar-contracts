@@ -19,8 +19,11 @@
 //!
 //! # Usage
 //!
-//! This module provides storage functions that can be integrated into a
-//! contract. The contract is responsible for:
+//! Implement the [`Timelock`] trait on a contract to expose a standard
+//! timelock interface. The trait generates a `TimelockClient` that other
+//! contracts can use for type-safe cross-contract calls.
+//!
+//! The contract is responsible for:
 //! - Authorization checks (who can schedule/execute/cancel)
 //! - Initialization of minimum delay
 //!
@@ -28,20 +31,23 @@
 //!
 //! ```ignore
 //! use stellar_governance::timelock::{
-//!     schedule_operation, execute_operation, get_operation_state, OperationState
+//!     Timelock, schedule_operation, execute_operation, Operation,
 //! };
 //!
-//! // In the contract:
-//! pub fn schedule(e: &Env, operation: Operation, delay: u32) {
-//!     // Add authorization checks here
-//!     let id = schedule_operation(e, &operation, delay);
-//!     // Emit events
-//! }
+//! #[contractimpl(contracttrait)]
+//! impl Timelock for MyTimelockController {
+//!     fn schedule_op(e: &Env, target: Address, ...) -> BytesN<32> {
+//!         // Add authorization checks here
+//!         let operation = Operation { target, function, args, predecessor, salt };
+//!         schedule_operation(e, &operation, delay)
+//!     }
 //!
-//! pub fn execute(e: &Env, operation: Operation) {
-//!     // Add authorization checks here
-//!     execute_operation(e, &operation);
-//!     // Emit events
+//!     fn execute_op(e: &Env, target: Address, ...) -> Val {
+//!         // Add authorization checks here
+//!         let operation = Operation { target, function, args, predecessor, salt };
+//!         execute_operation(e, &operation)
+//!     }
+//!     // ...
 //! }
 //! ```
 
@@ -50,7 +56,9 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contracterror, contractevent, Address, BytesN, Env, Symbol, Val, Vec};
+use soroban_sdk::{
+    contracterror, contractevent, contracttrait, Address, BytesN, Env, Symbol, Val, Vec,
+};
 
 pub use crate::timelock::storage::{
     cancel_operation, execute_operation, get_min_delay, get_operation_ledger, get_operation_state,
@@ -58,6 +66,259 @@ pub use crate::timelock::storage::{
     schedule_operation, set_execute_operation, set_min_delay, Operation, OperationState,
     TimelockStorageKey,
 };
+
+/// Trait for timelock controller contracts.
+///
+/// The `Timelock` trait defines the interface for time-delayed execution of
+/// operations, enabling governance mechanisms where actions must wait for a
+/// minimum delay before execution. Implementing this trait generates a
+/// `TimelockClient` that other contracts can use for type-safe cross-contract
+/// calls.
+///
+/// # Methods Without Default Implementation
+///
+/// The following methods have no default implementation because they require
+/// access-control logic that varies per contract:
+///
+/// - [`Timelock::schedule_op`]
+/// - [`Timelock::execute_op`]
+/// - [`Timelock::cancel_op`]
+/// - [`Timelock::update_delay`]
+#[contracttrait]
+pub trait Timelock {
+    /// Returns the minimum delay in ledgers required for operations.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`TimelockError::MinDelayNotSet`] - If the minimum delay has not been
+    ///   initialized.
+    fn get_min_delay(e: &Env) -> u32 {
+        storage::get_min_delay(e)
+    }
+
+    /// Computes the unique identifier for an operation from its parameters.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `target` - The target contract address.
+    /// * `function` - The function name to invoke.
+    /// * `args` - The arguments to pass to the function.
+    /// * `predecessor` - The predecessor operation ID.
+    /// * `salt` - The salt for uniqueness.
+    fn hash_operation(
+        e: &Env,
+        target: Address,
+        function: Symbol,
+        args: Vec<Val>,
+        predecessor: BytesN<32>,
+        salt: BytesN<32>,
+    ) -> BytesN<32> {
+        let operation = Operation { target, function, args, predecessor, salt };
+        storage::hash_operation(e, &operation)
+    }
+
+    /// Returns the ledger sequence number at which an operation becomes ready.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `operation_id` - The unique identifier of the operation.
+    fn get_operation_ledger(e: &Env, operation_id: BytesN<32>) -> u32 {
+        storage::get_operation_ledger(e, &operation_id)
+    }
+
+    /// Returns the current state of an operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `operation_id` - The unique identifier of the operation.
+    fn get_operation_state(e: &Env, operation_id: BytesN<32>) -> OperationState {
+        storage::get_operation_state(e, &operation_id)
+    }
+
+    /// Returns whether an operation exists (scheduled or done).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `operation_id` - The unique identifier of the operation.
+    fn operation_exists(e: &Env, operation_id: BytesN<32>) -> bool {
+        storage::operation_exists(e, &operation_id)
+    }
+
+    /// Returns whether an operation is pending (waiting or ready).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `operation_id` - The unique identifier of the operation.
+    fn is_operation_pending(e: &Env, operation_id: BytesN<32>) -> bool {
+        storage::is_operation_pending(e, &operation_id)
+    }
+
+    /// Returns whether an operation is ready for execution.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `operation_id` - The unique identifier of the operation.
+    fn is_operation_ready(e: &Env, operation_id: BytesN<32>) -> bool {
+        storage::is_operation_ready(e, &operation_id)
+    }
+
+    /// Returns whether an operation has been executed.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `operation_id` - The unique identifier of the operation.
+    fn is_operation_done(e: &Env, operation_id: BytesN<32>) -> bool {
+        storage::is_operation_done(e, &operation_id)
+    }
+
+    /// Schedules an operation for execution after a delay and returns the
+    /// unique operation identifier.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `target` - The target contract address.
+    /// * `function` - The function name to invoke on the target.
+    /// * `args` - The arguments to pass to the function.
+    /// * `predecessor` - The predecessor operation ID. Use
+    ///   `BytesN::<32>::from_array(&[0u8; 32])` for no predecessor.
+    /// * `salt` - A salt value for uniqueness. Allows scheduling the same
+    ///   operation multiple times with different IDs.
+    /// * `delay` - The delay in ledgers before the operation can be executed.
+    /// * `proposer` - The address proposing the operation.
+    ///
+    /// # Errors
+    ///
+    /// * [`TimelockError::OperationAlreadyScheduled`] - If an operation with
+    ///   the same ID is already scheduled.
+    /// * [`TimelockError::InsufficientDelay`] - If `delay` is less than the
+    ///   minimum required delay.
+    /// * [`TimelockError::MinDelayNotSet`] - If the minimum delay has not been
+    ///   initialized.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["operation_scheduled", id: BytesN<32>, target: Address]`
+    /// * data - `[function: Symbol, args: Vec<Val>, predecessor: BytesN<32>,
+    ///   salt: BytesN<32>, delay: u32]`
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for `proposer` is required.
+    /// * The implementer must verify that `proposer` has the appropriate role,
+    ///   construct an [`Operation`], and call [`schedule_operation`].
+    #[allow(clippy::too_many_arguments)]
+    fn schedule_op(
+        e: &Env,
+        target: Address,
+        function: Symbol,
+        args: Vec<Val>,
+        predecessor: BytesN<32>,
+        salt: BytesN<32>,
+        delay: u32,
+        proposer: Address,
+    ) -> BytesN<32>;
+
+    /// Executes a scheduled operation that is ready and returns the result of
+    /// the target contract invocation.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `target` - The target contract address.
+    /// * `function` - The function name to invoke on the target.
+    /// * `args` - The arguments to pass to the function.
+    /// * `predecessor` - The predecessor operation ID.
+    /// * `salt` - The salt value used when scheduling.
+    /// * `executor` - The address executing the operation, or `None` if open
+    ///   execution is allowed.
+    ///
+    /// # Errors
+    ///
+    /// * [`TimelockError::InvalidOperationState`] - If the operation is not in
+    ///   the `Ready` state.
+    /// * [`TimelockError::UnexecutedPredecessor`] - If the predecessor
+    ///   operation has not been executed.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["operation_executed", id: BytesN<32>, target: Address]`
+    /// * data - `[function: Symbol, args: Vec<Val>, predecessor: BytesN<32>,
+    ///   salt: BytesN<32>]`
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for `executor` is optional (open execution is allowed
+    ///   when `executor` is `None`).
+    /// * The implementer must construct an [`Operation`] and call
+    ///   [`execute_operation`].
+    fn execute_op(
+        e: &Env,
+        target: Address,
+        function: Symbol,
+        args: Vec<Val>,
+        predecessor: BytesN<32>,
+        salt: BytesN<32>,
+        executor: Option<Address>,
+    ) -> Val;
+
+    /// Cancels a pending operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `operation_id` - The unique identifier of the operation to cancel.
+    /// * `canceller` - The address cancelling the operation.
+    ///
+    /// # Errors
+    ///
+    /// * [`TimelockError::OperationNotScheduled`] - If the operation has not
+    ///   been scheduled.
+    /// * [`TimelockError::InvalidOperationState`] - If the operation is not in
+    ///   a pending state.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["operation_cancelled", id: BytesN<32>]`
+    /// * data - `[]`
+    ///
+    /// # Notes
+    ///
+    /// * Authorization for `canceller` is required.
+    /// * The implementer must verify that `canceller` has the appropriate role
+    ///   and call [`cancel_operation`].
+    fn cancel_op(e: &Env, operation_id: BytesN<32>, canceller: Address);
+
+    /// Updates the minimum delay for future operations.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `new_delay` - The new minimum delay in ledgers.
+    /// * `operator` - The address updating the delay.
+    ///
+    /// # Events
+    ///
+    /// * topics - `["min_delay_changed"]`
+    /// * data - `[old_delay: u32, new_delay: u32]`
+    ///
+    /// # Notes
+    ///
+    /// * The implementer must verify that `operator` has administrative
+    ///   privileges and call [`set_min_delay`].
+    fn update_delay(e: &Env, new_delay: u32, operator: Address);
+}
 
 // ################## ERRORS ##################
 

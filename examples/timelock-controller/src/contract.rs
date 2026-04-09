@@ -113,11 +113,8 @@ use stellar_access::access_control::{
     ensure_role, get_role_member_count, grant_role_no_auth, set_admin, AccessControl,
 };
 use stellar_governance::timelock::{
-    cancel_operation, execute_operation, get_min_delay as timelock_get_min_delay,
-    get_operation_ledger, get_operation_state, hash_operation as timelock_hash_operation,
-    is_operation_done, is_operation_pending, is_operation_ready, operation_exists,
-    schedule_operation, set_execute_operation, set_min_delay as timelock_set_min_delay, Operation,
-    OperationState, TimelockError,
+    cancel_operation, execute_operation, schedule_operation, set_execute_operation,
+    set_min_delay as timelock_set_min_delay, Operation, OperationState, Timelock, TimelockError,
 };
 use stellar_macros::{only_admin, only_role};
 
@@ -267,33 +264,13 @@ impl TimelockController {
 
         timelock_set_min_delay(e, min_delay);
     }
+}
 
-    /// Schedules an operation for execution after a delay.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
-    /// * `target` - The target contract address.
-    /// * `function` - The function name to invoke.
-    /// * `args` - The arguments to pass to the function.
-    /// * `predecessor` - The predecessor operation ID (use empty bytes for
-    ///   none).
-    /// * `salt` - Salt for uniqueness (use empty bytes for default).
-    /// * `delay` - The delay in ledgers before the operation can be executed.
-    /// * `proposer` - The address proposing the operation (must have proposer
-    ///   role).
-    ///
-    /// # Returns
-    ///
-    /// The unique identifier (hash) of the scheduled operation.
-    ///
-    /// # Notes
-    ///
-    /// * Authorization for `proposer` is required.
-    /// * The proposer must have the PROPOSER_ROLE.
+#[contractimpl(contracttrait)]
+impl Timelock for TimelockController {
     #[allow(clippy::too_many_arguments)]
     #[only_role(proposer, "proposer")]
-    pub fn schedule_op(
+    fn schedule_op(
         e: &Env,
         target: Address,
         function: Symbol,
@@ -307,34 +284,7 @@ impl TimelockController {
         schedule_operation(e, &operation, delay)
     }
 
-    /// Executes a scheduled operation that is ready.
-    ///
-    /// **Note**: This function is only for executing operations on external
-    /// contracts. For self-administration operations (where target is this
-    /// timelock contract), call the admin function directly instead.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
-    /// * `target` - The target contract address.
-    /// * `function` - The function name to invoke.
-    /// * `args` - The arguments to pass to the function.
-    /// * `predecessor` - The predecessor operation ID.
-    /// * `salt` - Salt for uniqueness.
-    /// * `executor` - The address executing the operation (must have executor
-    ///   role if Some).
-    ///
-    /// # Returns
-    ///
-    /// The return value from the executed operation.
-    ///
-    /// # Notes
-    ///
-    /// * If executors are configured (EXECUTOR_ROLE has members), authorization
-    ///   for `executor` is required and the executor must have the
-    ///   EXECUTOR_ROLE.
-    /// * If no executors are configured, anyone can execute ready operations.
-    pub fn execute_op(
+    fn execute_op(
         e: &Env,
         target: Address,
         function: Symbol,
@@ -353,87 +303,14 @@ impl TimelockController {
         execute_operation(e, &operation)
     }
 
-    /// Cancels a scheduled operation.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
-    /// * `operation_id` - The unique identifier of the operation to cancel.
-    /// * `canceller` - The address cancelling the operation (must have
-    ///   canceller role).
-    ///
-    /// # Notes
-    ///
-    /// * Authorization for `canceller` is required.
-    /// * The canceller must have the CANCELLER_ROLE.
     #[only_role(canceller, "canceller")]
-    pub fn cancel_op(e: &Env, operation_id: BytesN<32>, canceller: Address) {
+    fn cancel_op(e: &Env, operation_id: BytesN<32>, canceller: Address) {
         cancel_operation(e, &operation_id);
     }
 
-    /// Updates the minimum delay for future operations.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to Soroban environment.
-    /// * `new_delay` - The new minimum delay in ledgers.
-    ///
-    /// # Notes
-    ///
-    /// * Authorization for `admin` is required.
-    /// * This function should typically be called through the timelock itself
-    ///   (self-administration) to ensure transparency.
     #[only_admin]
-    pub fn update_delay(e: &Env, new_delay: u32) {
+    fn update_delay(e: &Env, new_delay: u32, _operator: Address) {
         timelock_set_min_delay(e, new_delay);
-    }
-
-    /// Returns the minimum delay in ledgers required for operations.
-    pub fn get_min_delay(e: &Env) -> u32 {
-        timelock_get_min_delay(e)
-    }
-
-    /// Computes the unique identifier for an operation.
-    pub fn hash_operation(
-        e: &Env,
-        target: Address,
-        function: Symbol,
-        args: Vec<Val>,
-        predecessor: BytesN<32>,
-        salt: BytesN<32>,
-    ) -> BytesN<32> {
-        let operation = Operation { target, function, args, predecessor, salt };
-        timelock_hash_operation(e, &operation)
-    }
-
-    /// Returns the ledger sequence number at which an operation becomes ready.
-    pub fn get_operation_ledger(e: &Env, operation_id: BytesN<32>) -> u32 {
-        get_operation_ledger(e, &operation_id)
-    }
-
-    /// Returns the current state of an operation.
-    pub fn get_operation_state(e: &Env, operation_id: BytesN<32>) -> OperationState {
-        get_operation_state(e, &operation_id)
-    }
-
-    /// Returns whether an operation exists (scheduled or done).
-    pub fn operation_exists(e: &Env, operation_id: BytesN<32>) -> bool {
-        operation_exists(e, &operation_id)
-    }
-
-    /// Returns whether an operation is pending (waiting or ready).
-    pub fn is_operation_pending(e: &Env, operation_id: BytesN<32>) -> bool {
-        is_operation_pending(e, &operation_id)
-    }
-
-    /// Returns whether an operation is ready for execution.
-    pub fn is_operation_ready(e: &Env, operation_id: BytesN<32>) -> bool {
-        is_operation_ready(e, &operation_id)
-    }
-
-    /// Returns whether an operation has been executed.
-    pub fn is_operation_done(e: &Env, operation_id: BytesN<32>) -> bool {
-        is_operation_done(e, &operation_id)
     }
 }
 
