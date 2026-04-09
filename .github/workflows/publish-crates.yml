@@ -62,7 +62,7 @@ jobs:
     needs: dry-run
     if: ${{ !contains(github.ref_name, '-rc.') }}
     env:
-      CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -83,25 +83,25 @@ jobs:
 
       # Leaf crates (no workspace dependencies)
       - name: Publish stellar-access
-        run: cargo publish -p stellar-access --no-verify --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-access --no-verify
 
       - name: Publish stellar-accounts
-        run: cargo publish -p stellar-accounts --no-verify --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-accounts --no-verify
 
       - name: Publish stellar-contract-utils
-        run: cargo publish -p stellar-contract-utils --no-verify --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-contract-utils --no-verify
 
       - name: Publish stellar-governance
-        run: cargo publish -p stellar-governance --no-verify --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-governance --no-verify
 
       - name: Publish stellar-macros
-        run: cargo publish -p stellar-macros --no-verify --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-macros --no-verify
 
       # Dependent crates (published after their dependencies are available)
       # stellar-tokens depends on stellar-contract-utils, stellar-governance
       - name: Publish stellar-tokens
-        run: cargo publish -p stellar-tokens --no-verify --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-tokens --no-verify
 
       # stellar-fee-abstraction dev-depends on stellar-tokens, stellar-macros
       - name: Publish stellar-fee-abstraction
-        run: cargo publish -p stellar-fee-abstraction --no-verify --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-fee-abstraction --no-verify
