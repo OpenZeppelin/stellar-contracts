@@ -1,45 +1,24 @@
 # Stellar Macros
 
-Macros for Stellar contracts.
+Procedural attribute macros for Stellar contracts, providing compile-time checks for access control and pausable patterns.
 
-## Modules
+This crate is part of the [OpenZeppelin Stellar Contracts](https://github.com/OpenZeppelin/stellar-contracts) library, which is published as separate crates on [crates.io](https://crates.io):
 
-### Default Implementation
+- [stellar-access](https://crates.io/crates/stellar-access): Role-based access controls and ownable
+- [stellar-accounts](https://crates.io/crates/stellar-accounts): Smart accounts with custom authentication and authorization
+- [stellar-contract-utils](https://crates.io/crates/stellar-contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
+- [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
+- [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
+- **[stellar-macros](https://crates.io/crates/stellar-macros)**: Proc macros (`#[only_owner]`, `#[when_not_paused]`, etc.)
+- [stellar-tokens](https://crates.io/crates/stellar-tokens): Token types (fungible, non-fungible, real-world assets, vaults)
 
-The `#[contractimpl(contracttrait)]` macro generates missing default implementations for traits provided by this library.
+Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/stellar-contracts) page for additional information.
 
-#### Usage Examples
-
-```rust
-use soroban_sdk::{contract, contractimpl, Address, Env};
-use stellar_tokens::fungible::{Base, FungibleToken};
-
-#[contract]
-pub struct MyContract;
-
-#[contractimpl(contracttrait)]
-impl FungibleToken for MyContract {
-    type ContractType = Base;
-
-    // Only provide overrides here, default implementations are auto-generated
-}
-```
-
-#### Supported Traits
-
-- `FungibleToken`
-- `FungibleBurnable`
-- `NonFungibleToken`
-- `NonFungibleBurnable`
-- `NonFungibleEnumerable`
-- `AccessControl`
-- `Ownable`
-
-### Access Control Macros
+## Access Control Macros
 
 Macros for role-based and ownership-based access control.
 
-#### Usage Examples
+### Usage Examples
 
 ```rust
 use soroban_sdk::{contract, contractimpl, Address, Env};
@@ -74,7 +53,7 @@ impl MyContract {
 }
 ```
 
-#### Available Macros
+### Available Macros
 
 - `#[only_admin]`: Restricts access to admin only
 - `#[only_role(account, "role")]`: Role check with authorization
@@ -90,11 +69,11 @@ impl MyContract {
 
 Use role-only macros when your function already contains `require_auth()` calls to avoid duplicate authorization panics.
 
-### Pausable Macros
+## Pausable Macros
 
 Macros for implementing pausable functionality in contracts.
 
-#### Usage Examples
+### Usage Examples
 
 ```rust
 use soroban_sdk::{contract, contractimpl, Env};
@@ -117,7 +96,7 @@ impl MyContract {
 }
 ```
 
-#### Available Macros
+### Available Macros
 
 - `#[when_not_paused]`: Function executes only when contract is not paused
 - `#[when_paused]`: Function executes only when contract is paused
