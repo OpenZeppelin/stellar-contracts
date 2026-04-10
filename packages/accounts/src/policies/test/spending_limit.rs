@@ -32,10 +32,12 @@ fn create_context_rule(e: &Env) -> ContextRule {
     let policies = Vec::new(e);
     ContextRule {
         id: 1,
-        context_type: ContextRuleType::Default,
+        context_type: ContextRuleType::CallContract(Address::generate(e)),
         name: soroban_sdk::String::from_str(e, "rule"),
         signers,
+        signer_ids: Vec::new(e),
         policies,
+        policy_ids: Vec::new(e),
         valid_until: None,
     }
 }
@@ -99,6 +101,43 @@ fn install_already_installed_fails() {
     });
 
     e.as_contract(&address, || {
+        install(&e, &params, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3227)")]
+fn install_default_rule_not_allowed() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let mut context_rule = create_context_rule(&e);
+        context_rule.context_type = ContextRuleType::Default;
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+
+        install(&e, &params, &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3227)")]
+fn install_create_contract_rule_not_allowed() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let mut context_rule = create_context_rule(&e);
+        context_rule.context_type =
+            ContextRuleType::CreateContract(BytesN::from_array(&e, &[0u8; 32]));
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+
         install(&e, &params, &context_rule, &smart_account);
     });
 }
@@ -601,6 +640,28 @@ fn enforce_missing_amount_arg_errors() {
         });
 
         enforce(&e, &context, &Vec::new(&e), &context_rule, &smart_account);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3226)")]
+fn enforce_negative_amount_errors() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let smart_account = Address::generate(&e);
+    let context_rule = create_context_rule(&e);
+
+    e.mock_all_auths();
+
+    e.as_contract(&address, || {
+        let params = SpendingLimitAccountParams { spending_limit: 1_000_000, period_ledgers: 100 };
+        install(&e, &params, &context_rule, &smart_account);
+    });
+
+    e.as_contract(&address, || {
+        // A negative amount must be rejected regardless of the cached total
+        let context = create_transfer_context(&e, -1);
+        enforce(&e, &context, &context_rule.signers, &context_rule, &smart_account);
     });
 }
 

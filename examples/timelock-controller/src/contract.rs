@@ -105,7 +105,7 @@
 
 use soroban_sdk::{
     auth::{Context, ContractContext, CustomAccountInterface},
-    contract, contractimpl, contracttype,
+    contract, contracterror, contractimpl, contracttype,
     crypto::Hash,
     panic_with_error, symbol_short, Address, BytesN, Env, IntoVal, Symbol, Val, Vec,
 };
@@ -120,6 +120,12 @@ use stellar_governance::timelock::{
     OperationState, TimelockError,
 };
 use stellar_macros::{only_admin, only_role};
+
+#[contracterror]
+#[repr(u32)]
+enum TimelockControllerError {
+    Mismatch = 0,
+}
 
 // Role constants
 const PROPOSER_ROLE: Symbol = symbol_short!("proposer");
@@ -166,6 +172,9 @@ impl CustomAccountInterface for TimelockController {
         context_meta: Vec<OperationMeta>,
         auth_contexts: Vec<Context>,
     ) -> Result<(), Self::Error> {
+        if auth_contexts.len() != context_meta.len() {
+            panic_with_error!(&e, TimelockControllerError::Mismatch);
+        }
         for (context, meta) in auth_contexts.iter().zip(context_meta) {
             match context.clone() {
                 Context::Contract(ContractContext { contract, fn_name, args }) => {

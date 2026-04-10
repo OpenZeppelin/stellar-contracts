@@ -27,7 +27,7 @@
 ///   Adapted from:
 ///   * https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/cryptography/WebAuthn.sol
 ///   * https://github.com/kalepail/passkey-kit/blob/next/contracts/smart-wallet/src/verify.rs
-use soroban_sdk::{contracterror, contracttype, panic_with_error, Bytes, BytesN, Env, String};
+use soroban_sdk::{contracterror, contracttype, panic_with_error, Bytes, BytesN, Env, String, Vec};
 
 use crate::verifiers::utils::{base64_url_encode, extract_from_bytes};
 
@@ -374,4 +374,19 @@ pub fn canonicalize_key(e: &Env, key_data: &Bytes) -> Bytes {
     let pub_key: BytesN<65> = extract_from_bytes(e, key_data, 0..65)
         .unwrap_or_else(|| panic_with_error!(e, WebAuthnError::KeyDataInvalid));
     Bytes::from_slice(e, &pub_key.to_array())
+}
+
+/// Canonicalizes a batch of WebAuthn keys, preserving input order.
+///
+/// This is a batched variant of [`canonicalize_key`] that guarantees
+/// positional correspondence between input keys and output canonical
+/// representations.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `keys` - A vector of bytes, each containing the 65-byte public key and
+///   optional credential ID suffix.
+pub fn batch_canonicalize_key(e: &Env, keys: &Vec<Bytes>) -> Vec<Bytes> {
+    Vec::from_iter(e, keys.iter().map(|key| canonicalize_key(e, &key)))
 }

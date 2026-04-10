@@ -396,6 +396,8 @@ impl Enumerable {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    /// * `owner` - The address of the token owner.
+    /// * `token_id` - The identifier of the token to add.
     ///
     /// # Errors
     ///
