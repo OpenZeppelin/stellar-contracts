@@ -27,29 +27,14 @@
 //! - Authorization checks (who can schedule/execute/cancel)
 //! - Initialization of minimum delay
 //!
-//! # Example
+//! # Examples
 //!
-//! ```ignore
-//! use stellar_governance::timelock::{
-//!     Timelock, schedule_operation, execute_operation, Operation,
-//! };
-//!
-//! #[contractimpl(contracttrait)]
-//! impl Timelock for MyTimelockController {
-//!     fn schedule(e: &Env, target: Address, ...) -> BytesN<32> {
-//!         // Add authorization checks here
-//!         let operation = Operation { target, function, args, predecessor, salt };
-//!         schedule_operation(e, &operation, delay)
-//!     }
-//!
-//!     fn execute(e: &Env, target: Address, ...) -> Val {
-//!         // Add authorization checks here
-//!         let operation = Operation { target, function, args, predecessor, salt };
-//!         execute_operation(e, &operation)
-//!     }
-//!     // ...
-//! }
-//! ```
+//! - `examples/timelock-controller`: A standalone role-based timelock
+//!   controller with proposer/executor/canceller roles and self-administration
+//!   mechanism.
+//! - `examples/fungible-governor-timelock`: A governor contract that integrates
+//!   with a timelock, scheduling and executing governance proposals through the
+//!   timelock delay mechanism.
 
 mod storage;
 
@@ -178,6 +163,26 @@ pub trait Timelock {
     /// * Authorization for `proposer` is required.
     /// * The implementer must verify that `proposer` has the appropriate role,
     ///   construct an [`Operation`], and call [`schedule_operation`].
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// fn schedule(
+    ///     e: &Env,
+    ///     target: Address,
+    ///     function: Symbol,
+    ///     args: Vec<Val>,
+    ///     predecessor: BytesN<32>,
+    ///     salt: BytesN<32>,
+    ///     delay: u32,
+    ///     proposer: Address,
+    /// ) -> BytesN<32> {
+    ///     proposer.require_auth();
+    ///     ensure_role(e, &PROPOSER_ROLE, &proposer);
+    ///     let operation = Operation { target, function, args, predecessor, salt };
+    ///     schedule_operation(e, &operation, delay)
+    /// }
+    /// ```
     #[allow(clippy::too_many_arguments)]
     fn schedule(
         e: &Env,
@@ -223,6 +228,27 @@ pub trait Timelock {
     ///   when `executor` is `None`).
     /// * The implementer must construct an [`Operation`] and call
     ///   [`execute_operation`].
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// fn execute(
+    ///     e: &Env,
+    ///     target: Address,
+    ///     function: Symbol,
+    ///     args: Vec<Val>,
+    ///     predecessor: BytesN<32>,
+    ///     salt: BytesN<32>,
+    ///     executor: Option<Address>,
+    /// ) -> Val {
+    ///     if let Some(ref exec) = executor {
+    ///         exec.require_auth();
+    ///         ensure_role(e, &EXECUTOR_ROLE, exec);
+    ///     }
+    ///     let operation = Operation { target, function, args, predecessor, salt };
+    ///     execute_operation(e, &operation)
+    /// }
+    /// ```
     fn execute(
         e: &Env,
         target: Address,
@@ -258,6 +284,16 @@ pub trait Timelock {
     /// * Authorization for `canceller` is required.
     /// * The implementer must verify that `canceller` has the appropriate role
     ///   and call [`cancel_operation`].
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// fn cancel(e: &Env, operation_id: BytesN<32>, canceller: Address) {
+    ///     canceller.require_auth();
+    ///     ensure_role(e, &CANCELLER_ROLE, &canceller);
+    ///     cancel_operation(e, &operation_id);
+    /// }
+    /// ```
     fn cancel(e: &Env, operation_id: BytesN<32>, canceller: Address);
 
     /// Updates the minimum delay for future operations.
