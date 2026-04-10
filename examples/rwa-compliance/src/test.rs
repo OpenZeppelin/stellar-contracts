@@ -1,12 +1,16 @@
 extern crate std;
 
-use rwa_country_allow::{CountryAllowContract, CountryAllowContractClient};
-use rwa_country_restrict::{CountryRestrictContract, CountryRestrictContractClient};
-use rwa_initial_lockup_period::{InitialLockupPeriodContract, InitialLockupPeriodContractClient};
-use rwa_max_balance::{MaxBalanceContract, MaxBalanceContractClient};
-use rwa_supply_limit::{SupplyLimitContract, SupplyLimitContractClient};
-use rwa_time_transfers_limits::{TimeTransfersLimitsContract, TimeTransfersLimitsContractClient};
-use rwa_transfer_restrict::{TransferRestrictContract, TransferRestrictContractClient};
+use rwa_country_allow::contract::{CountryAllowContract, CountryAllowContractClient};
+use rwa_country_restrict::contract::{CountryRestrictContract, CountryRestrictContractClient};
+use rwa_initial_lockup_period::contract::{
+    InitialLockupPeriodContract, InitialLockupPeriodContractClient,
+};
+use rwa_max_balance::contract::{MaxBalanceContract, MaxBalanceContractClient};
+use rwa_supply_limit::contract::{SupplyLimitContract, SupplyLimitContractClient};
+use rwa_time_transfers_limits::contract::{
+    TimeTransfersLimitsContract, TimeTransfersLimitsContractClient,
+};
+use rwa_transfer_restrict::contract::{TransferRestrictContract, TransferRestrictContractClient};
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
     vec, Address, Env, IntoVal, String,

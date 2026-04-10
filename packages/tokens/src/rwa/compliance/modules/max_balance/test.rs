@@ -4,9 +4,8 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, testutils::Address as _, Address, Env, Val, Vec,
 };
 
-use super::{
-    storage::{set_id_balance, set_max_balance},
-    *,
+use super::storage::{
+    can_create, can_transfer, set_id_balance, set_max_balance, verify_hook_wiring,
 };
 use crate::rwa::{
     compliance::{
@@ -196,13 +195,6 @@ impl MockComplianceContract {
 #[contract]
 struct TestMaxBalanceContract;
 
-#[contractimpl(contracttrait)]
-impl MaxBalance for TestMaxBalanceContract {
-    fn set_compliance_address(_e: &Env, _compliance: Address) {
-        unreachable!("set_compliance_address is not used in these tests");
-    }
-}
-
 fn arm_hooks(e: &Env) {
     e.storage().instance().set(&ComplianceModuleStorageKey::HooksVerified, &true);
 }
@@ -227,7 +219,7 @@ fn verify_hook_wiring_sets_cache_when_registered() {
     e.as_contract(&module_id, || {
         set_compliance_address(&e, &compliance_id);
 
-        <TestMaxBalanceContract as MaxBalance>::verify_hook_wiring(&e);
+        verify_hook_wiring(&e);
 
         assert!(hooks_verified(&e));
     });
@@ -251,18 +243,8 @@ fn can_create_rejects_mint_when_cap_would_be_exceeded() {
         set_max_balance(&e, &token, 100);
         set_id_balance(&e, &token, &recipient_identity, 60);
 
-        assert!(!<TestMaxBalanceContract as MaxBalance>::can_create(
-            &e,
-            recipient.clone(),
-            50,
-            token.clone(),
-        ));
-        assert!(<TestMaxBalanceContract as MaxBalance>::can_create(
-            &e,
-            recipient,
-            40,
-            token.clone(),
-        ));
+        assert!(!can_create(&e, &recipient, 50, &token));
+        assert!(can_create(&e, &recipient, 40, &token));
     });
 }
 
@@ -287,20 +269,8 @@ fn can_transfer_checks_distinct_recipient_identity_balance() {
         set_max_balance(&e, &token, 100);
         set_id_balance(&e, &token, &recipient_identity, 60);
 
-        assert!(!<TestMaxBalanceContract as MaxBalance>::can_transfer(
-            &e,
-            sender.clone(),
-            recipient.clone(),
-            50,
-            token.clone(),
-        ));
-        assert!(<TestMaxBalanceContract as MaxBalance>::can_transfer(
-            &e,
-            sender,
-            recipient,
-            40,
-            token.clone(),
-        ));
+        assert!(!can_transfer(&e, &sender, &recipient, 50, &token));
+        assert!(can_transfer(&e, &sender, &recipient, 40, &token));
     });
 }
 
@@ -321,18 +291,8 @@ fn can_create_allows_without_cap_and_rejects_negative_amount() {
         arm_hooks(&e);
         set_id_balance(&e, &token, &recipient_identity, 500);
 
-        assert!(<TestMaxBalanceContract as MaxBalance>::can_create(
-            &e,
-            recipient.clone(),
-            1_000,
-            token.clone(),
-        ));
-        assert!(!<TestMaxBalanceContract as MaxBalance>::can_create(
-            &e,
-            recipient,
-            -1,
-            token.clone(),
-        ));
+        assert!(can_create(&e, &recipient, 1_000, &token));
+        assert!(!can_create(&e, &recipient, -1, &token));
     });
 }
 
@@ -346,6 +306,6 @@ fn can_create_rejects_negative_amount_before_requiring_irs() {
     e.as_contract(&module_id, || {
         arm_hooks(&e);
 
-        assert!(!<TestMaxBalanceContract as MaxBalance>::can_create(&e, recipient, -1, token,));
+        assert!(!can_create(&e, &recipient, -1, &token));
     });
 }
