@@ -5,8 +5,9 @@ use soroban_sdk::{
     Vec,
 };
 
-use super::*;
+use super::storage::{can_transfer, set_country_restricted};
 use crate::rwa::{
+    compliance::modules::storage::set_irs_address,
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
         IndividualCountryRelation, OrganizationCountryRelation,
@@ -122,13 +123,6 @@ impl MockIRSContract {
 #[contract]
 struct TestCountryRestrictContract;
 
-#[contractimpl(contracttrait)]
-impl CountryRestrict for TestCountryRestrictContract {
-    fn set_compliance_address(_e: &Env, _compliance: Address) {
-        unreachable!("set_compliance_address is not used in these tests");
-    }
-}
-
 fn individual_country(code: u32) -> CountryData {
     CountryData {
         country: CountryRelation::Individual(IndividualCountryRelation::Residence(code)),
@@ -146,13 +140,12 @@ fn organization_country(code: u32) -> CountryData {
 }
 
 #[test]
-fn can_transfer_and_create_reject_when_any_country_is_restricted() {
+fn can_transfer_rejects_when_any_country_is_restricted() {
     let e = Env::default();
     let module_id = e.register(TestCountryRestrictContract, ());
     let irs_id = e.register(MockIRSContract, ());
     let irs = MockIRSContractClient::new(&e, &irs_id);
     let token = Address::generate(&e);
-    let from = Address::generate(&e);
     let to = Address::generate(&e);
 
     irs.set_country_data_entries(
@@ -164,30 +157,17 @@ fn can_transfer_and_create_reject_when_any_country_is_restricted() {
         set_irs_address(&e, &token, &irs_id);
         set_country_restricted(&e, &token, 408);
 
-        assert!(!<TestCountryRestrictContract as CountryRestrict>::can_transfer(
-            &e,
-            from.clone(),
-            to.clone(),
-            100,
-            token.clone(),
-        ));
-        assert!(!<TestCountryRestrictContract as CountryRestrict>::can_create(
-            &e,
-            to.clone(),
-            100,
-            token.clone(),
-        ));
+        assert!(!can_transfer(&e, &to, &token));
     });
 }
 
 #[test]
-fn can_transfer_and_create_allow_when_no_country_is_restricted() {
+fn can_transfer_allows_when_no_country_is_restricted() {
     let e = Env::default();
     let module_id = e.register(TestCountryRestrictContract, ());
     let irs_id = e.register(MockIRSContract, ());
     let irs = MockIRSContractClient::new(&e, &irs_id);
     let token = Address::generate(&e);
-    let from = Address::generate(&e);
     let empty_to = Address::generate(&e);
     let unrestricted_to = Address::generate(&e);
 
@@ -200,32 +180,7 @@ fn can_transfer_and_create_allow_when_no_country_is_restricted() {
         set_irs_address(&e, &token, &irs_id);
         set_country_restricted(&e, &token, 408);
 
-        assert!(<TestCountryRestrictContract as CountryRestrict>::can_transfer(
-            &e,
-            from.clone(),
-            empty_to.clone(),
-            100,
-            token.clone(),
-        ));
-        assert!(<TestCountryRestrictContract as CountryRestrict>::can_create(
-            &e,
-            empty_to,
-            100,
-            token.clone(),
-        ));
-
-        assert!(<TestCountryRestrictContract as CountryRestrict>::can_transfer(
-            &e,
-            from.clone(),
-            unrestricted_to.clone(),
-            100,
-            token.clone(),
-        ));
-        assert!(<TestCountryRestrictContract as CountryRestrict>::can_create(
-            &e,
-            unrestricted_to,
-            100,
-            token.clone(),
-        ));
+        assert!(can_transfer(&e, &empty_to, &token));
+        assert!(can_transfer(&e, &unrestricted_to, &token));
     });
 }
