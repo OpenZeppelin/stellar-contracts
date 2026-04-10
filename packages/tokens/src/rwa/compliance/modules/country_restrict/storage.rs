@@ -123,7 +123,8 @@ pub fn batch_unrestrict_countries(e: &Env, token: &Address, countries: &Vec<u32>
 
 // ################## COMPLIANCE HOOKS ##################
 
-/// Checks whether `to` has any restricted country in the IRS for `token`.
+/// Returns `false` if `to` has any restricted country in the IRS for `token`,
+/// and `true` otherwise.
 ///
 /// # Arguments
 ///
@@ -131,9 +132,10 @@ pub fn batch_unrestrict_countries(e: &Env, token: &Address, countries: &Vec<u32>
 /// * `to` - The recipient whose country data is checked.
 /// * `token` - The token address.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `false` if the recipient has any restricted country, `true` otherwise.
+/// * [`crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet`]
+///   - When no IRS has been configured for `token`.
 ///
 /// # Cross-Contract Calls
 ///
