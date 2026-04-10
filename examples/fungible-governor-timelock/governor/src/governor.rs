@@ -1,12 +1,16 @@
 use soroban_sdk::{
     contract, contractimpl, contracttype, Address, BytesN, Env, IntoVal, String, Symbol, Val, Vec,
 };
-use stellar_governance::governor::{self as governor, Governor, ProposalState};
+use stellar_governance::{
+    governor::{self as governor, Governor, ProposalState},
+    timelock::TimelockClient,
+};
 
 /// Storage key for the timelock contract address.
 #[contracttype]
 enum GovernorTimelockKey {
     Timelock,
+    OperationID(BytesN<32>),
 }
 
 #[contract]
@@ -35,16 +39,8 @@ impl GovernorTimelockContract {
 
     /// Returns the address of the timelock contract.
     pub fn timelock(e: &Env) -> Address {
-        get_timelock(e)
+        e.storage().instance().get(&GovernorTimelockKey::Timelock).expect("timelock not set")
     }
-}
-
-fn get_timelock(e: &Env) -> Address {
-    e.storage().instance().get(&GovernorTimelockKey::Timelock).expect("timelock not set")
-}
-
-fn zero_predecessor(e: &Env) -> BytesN<32> {
-    BytesN::from_array(e, &[0u8; 32])
 }
 
 #[contractimpl(contracttrait)]
@@ -90,7 +86,7 @@ impl Governor for GovernorTimelockContract {
 
         // Schedule a timelock operation that calls governor.execute() after
         // the delay. The timelock becomes the executor.
-        let timelock = get_timelock(e);
+        let timelock = Self::timelock(e);
         let delay = eta.saturating_sub(e.ledger().sequence());
 
         // The timelock operation will call: governor.execute(targets,
@@ -98,20 +94,20 @@ impl Governor for GovernorTimelockContract {
         let execute_args: Vec<Val> =
             (targets, functions, args, description_hash.clone(), timelock.clone()).into_val(e);
 
-        e.invoke_contract::<BytesN<32>>(
-            &timelock,
-            &Symbol::new(e, "schedule_op"),
-            (
-                e.current_contract_address(),
-                Symbol::new(e, "execute"),
-                execute_args,
-                zero_predecessor(e),
-                description_hash,
-                delay,
-                e.current_contract_address(),
-            )
-                .into_val(e),
+        let timelock_client = TimelockClient::new(e, &timelock);
+        let zero_predecessor = BytesN::from_array(e, &[0u8; 32]);
+        let op_id = timelock_client.schedule(
+            &e.current_contract_address(),
+            &Symbol::new(e, "execute"),
+            &execute_args,
+            &zero_predecessor,
+            &description_hash,
+            &delay,
+            &e.current_contract_address(),
         );
+        e.storage()
+            .persistent()
+            .set(&GovernorTimelockKey::OperationID(proposal_id.clone()), &op_id);
 
         proposal_id
     }
@@ -129,7 +125,7 @@ impl Governor for GovernorTimelockContract {
         executor: Address,
     ) -> BytesN<32> {
         // Only the timelock contract can call execute.
-        let timelock = get_timelock(e);
+        let timelock = Self::timelock(e);
         assert!(executor == timelock);
         executor.require_auth();
 
@@ -166,6 +162,18 @@ impl Governor for GovernorTimelockContract {
         let proposer = governor::get_proposal_proposer(e, &proposal_id);
         assert!(operator == proposer);
         operator.require_auth();
+
+        // Cancel in timelock if it's been already queued.
+        if let Some(op_id) = e
+            .storage()
+            .persistent()
+            .get::<_, BytesN<32>>(&GovernorTimelockKey::OperationID(proposal_id))
+        {
+            let timelock = Self::timelock(e);
+            let timelock_client = TimelockClient::new(e, &timelock);
+            timelock_client.cancel(&op_id, &e.current_contract_address());
+        }
+
         governor::cancel(e, targets, functions, args, &description_hash)
     }
 }
