@@ -2,7 +2,7 @@
 ///
 /// This module provides Ed25519 signature verification functionality for
 /// Stellar smart contracts.
-use soroban_sdk::{Bytes, BytesN, Env};
+use soroban_sdk::{Bytes, BytesN, Env, Vec};
 
 /// Verifies an Ed25519 digital signature.
 ///
@@ -52,4 +52,18 @@ pub fn verify(
 /// * `public_key` - The 32-byte Ed25519 public key.
 pub fn canonicalize_key(e: &Env, public_key: &BytesN<32>) -> Bytes {
     Bytes::from_slice(e, &public_key.to_array())
+}
+
+/// Canonicalizes a batch of Ed25519 public keys, preserving input order.
+///
+/// This is a batched variant of [`canonicalize_key`] that guarantees
+/// positional correspondence between input keys and output canonical
+/// representations.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `keys` - A vector of 32-byte Ed25519 public keys.
+pub fn batch_canonicalize_key(e: &Env, keys: &Vec<BytesN<32>>) -> Vec<Bytes> {
+    Vec::from_iter(e, keys.iter().map(|key| canonicalize_key(e, &key)))
 }

@@ -336,7 +336,9 @@ impl Base {
     /// # Events
     ///
     /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `[to_muxed_id: Option<u64>, amount: i128]`
+    /// * data - `amount: i128` (when `to` has no muxed ID)
+    /// * data - `{to_muxed_id: Option<u64>, amount: i128}` (when `to` has a
+    ///   muxed ID)
     ///
     /// # Notes
     ///

@@ -26,6 +26,9 @@ impl GovernorContract {
 
 #[contractimpl(contracttrait)]
 impl Governor for GovernorContract {
+    // `queue` uses the default open-queueing implementation.
+    // To enable queueing, override `proposals_need_queuing` to return `true`.
+
     fn execute(
         e: &Env,
         targets: Vec<Address>,
@@ -37,13 +40,18 @@ impl Governor for GovernorContract {
         // Open execution: any account can trigger a succeeded proposal,
         // as long as they authenticate themselves as `executor`.
         executor.require_auth();
+        let proposal_id =
+            governor::hash_proposal(e, &targets, &functions, &args, &description_hash);
+        let snapshot = governor::get_proposal_snapshot(e, &proposal_id);
+        let quorum = Self::quorum(e, snapshot);
         governor::execute(
             e,
             targets,
             functions,
             args,
             &description_hash,
-            Self::proposal_needs_queuing(e),
+            Self::proposals_need_queuing(e),
+            quorum,
         )
     }
 

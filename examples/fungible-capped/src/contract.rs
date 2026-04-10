@@ -23,7 +23,7 @@ impl ExampleContract {
     }
 
     pub fn mint(e: &Env, to: Address, amount: i128) {
-        check_cap(e, amount);
+        check_cap(e, amount, Base::total_supply(e));
         Base::mint(e, &to, amount);
     }
 }

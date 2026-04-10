@@ -2,6 +2,18 @@
 
 This package provides a comprehensive smart account framework for Soroban, enabling flexible, programmable authorization. Instead of hard‑coding signature checks, smart accounts organize authorization as a composition of context rules, signers, and policies. The result is a system that reads naturally, scales to complex requirements, and remains auditable.
 
+This crate is part of the [OpenZeppelin Stellar Contracts](https://github.com/OpenZeppelin/stellar-contracts) library, which is published as separate crates on [crates.io](https://crates.io):
+
+- [stellar-access](https://crates.io/crates/stellar-access): Role-based access controls and ownable
+- **[stellar-accounts](https://crates.io/crates/stellar-accounts)**: Smart accounts with custom authentication and authorization
+- [stellar-contract-utils](https://crates.io/crates/stellar-contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
+- [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
+- [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
+- [stellar-macros](https://crates.io/crates/stellar-macros): Proc macros (`#[only_owner]`, `#[when_not_paused]`, etc.)
+- [stellar-tokens](https://crates.io/crates/stellar-tokens): Token types (fungible, non-fungible, real-world assets, vaults)
+
+Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/stellar-contracts) page for additional information.
+
 ## Overview
 
 Smart accounts in Soroban implement `CustomAccountInterface` and define authorization as data and behavior that can be evolved over time. The framework is context‑centric:
@@ -303,7 +315,7 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-accounts = "=0.6.0"
+stellar-accounts = "=0.7.0"
 ```
 
 ### 2. Implement the Smart Account Trait
@@ -478,6 +490,32 @@ creds.signature = ScVal::Map(Some(ScMap::sorted_from([
         sig_map,
     ),
 ])?));
+```
+
+### Auth digest now binds `context_rule_ids` (breaking change)
+
+Signers no longer sign the raw `signature_payload` from the host. Instead, the smart account computes an **auth digest** that includes the selected rule IDs:
+
+```
+auth_digest = sha256(signature_payload || context_rule_ids.to_xdr())
+```
+
+This prevents rule-selection downgrade attacks where a sponsor swaps `context_rule_ids` to a weaker rule after collecting signatures. Off-chain signing flows must replicate this digest computation:
+
+1. Take the 32-byte `signature_payload` from the host
+2. XDR-encode the `Vec<u32>` of rule IDs (one per auth context)
+3. Concatenate and SHA-256 hash the result
+4. Sign the resulting auth digest
+
+In Rust (Soroban SDK):
+
+```rust
+use soroban_sdk::xdr::ToXdr;
+
+let mut preimage = signature_payload.to_bytes().to_bytes();
+preimage.append(&context_rule_ids.to_xdr(e));
+let auth_digest = e.crypto().sha256(&preimage);
+// Sign auth_digest, not signature_payload
 ```
 
 ### `Policy` trait (breaking change)

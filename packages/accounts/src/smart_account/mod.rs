@@ -1,7 +1,7 @@
-//! # Smart Account Storage - Context-Centric Authorization
+//! # Smart Account
 //!
 //! This module implements a flexible, context-centric authorization system for
-//! smart accounts that separates concerns into three key dimensions:
+//! smart accounts.
 //!
 //! ## Architecture Overview
 //!
@@ -119,11 +119,11 @@ use soroban_sdk::{
     String, Symbol, Val, Vec,
 };
 pub use storage::{
-    add_context_rule, add_policy, add_signer, authenticate, batch_add_signer,
-    contains_canonical_duplicate, do_check_auth, get_context_rule, get_context_rules_count,
-    get_validated_context_by_id, remove_context_rule, remove_policy, remove_signer,
-    update_context_rule_name, update_context_rule_valid_until, validate_signer_key_size,
-    AuthPayload, ContextRule, ContextRuleEntry, ContextRuleType, Signer, SmartAccountStorageKey,
+    add_context_rule, add_policy, add_signer, authenticate, batch_add_signer, do_check_auth,
+    get_context_rule, get_context_rules_count, get_validated_context_by_id, remove_context_rule,
+    remove_policy, remove_signer, update_context_rule_name, update_context_rule_valid_until,
+    validate_no_canonical_duplicates, validate_signer_key_size, AuthPayload, ContextRule,
+    ContextRuleEntry, ContextRuleType, Signer, SmartAccountStorageKey,
 };
 
 /// Core trait for smart account functionality, extending Soroban's
@@ -161,6 +161,36 @@ pub trait SmartAccount: CustomAccountInterface {
         storage::get_context_rule(e, context_rule_id)
     }
 
+    /// Retrieves the global registry ID for a signer.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `signer` - The signer to look up.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::SignerNotFound`] - When the signer is not
+    ///   registered in the global registry.
+    fn get_signer_id(e: &Env, signer: Signer) -> u32 {
+        storage::get_signer_id(e, &signer)
+    }
+
+    /// Retrieves the global registry ID for a policy.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `policy` - The policy address to look up.
+    ///
+    /// # Errors
+    ///
+    /// * [`SmartAccountError::PolicyNotFound`] - When the policy is not
+    ///   registered in the global registry.
+    fn get_policy_id(e: &Env, policy: Address) -> u32 {
+        storage::get_policy_id(e, &policy)
+    }
+
     /// Creates a new context rule with the specified configuration, returning
     /// the newly created `ContextRule` with a unique ID assigned. Installs
     /// all specified policies during creation.
@@ -196,6 +226,11 @@ pub trait SmartAccount: CustomAccountInterface {
     ///   Option<u32>, signer_ids: Vec<u32>, policy_ids: Vec<u32>]`
     ///
     /// # Notes
+    ///
+    /// No uniqueness constraint is enforced on the combination of context
+    /// type, signers, and policies. Multiple rules with identical
+    /// authorization requirements can coexist. It is the caller's
+    /// responsibility to avoid creating redundant rules.
     ///
     /// Defaults to requiring authorization from the smart account itself
     /// (`e.current_contract_address().require_auth()`) and then delegating to
@@ -503,8 +538,6 @@ pub const MAX_EXTERNAL_KEY_SIZE: u32 = 256;
 pub enum SmartAccountError {
     /// The specified context rule does not exist.
     ContextRuleNotFound = 3000,
-    /// A duplicate context rule already exists.
-    DuplicateContextRule = 3001,
     /// The provided context cannot be validated against any rule.
     UnvalidatedContext = 3002,
     /// External signature verification failed.
@@ -534,6 +567,8 @@ pub enum SmartAccountError {
     ContextRuleIdsLengthMismatch = 3014,
     /// Context rule name exceeds the maximum allowed length.
     NameTooLong = 3015,
+    /// A signer in `AuthPayload` is not part of any selected context rule.
+    UnauthorizedSigner = 3016,
 }
 
 // ################## EVENTS ##################
@@ -556,7 +591,12 @@ pub struct ContextRuleAdded {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `context_rule` - The newly created context rule.
+/// * `context_rule_id` - The ID assigned to the new context rule.
+/// * `name` - The name of the context rule.
+/// * `context_type` - The type of context this rule applies to.
+/// * `valid_until` - Optional ledger number at which the rule expires.
+/// * `signer_ids` - The IDs of the signers associated with this rule.
+/// * `policy_ids` - The IDs of the policies associated with this rule.
 ///
 /// # Events
 ///
