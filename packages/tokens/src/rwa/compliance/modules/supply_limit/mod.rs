@@ -9,14 +9,7 @@ pub mod storage;
 #[cfg(test)]
 mod test;
 
-use soroban_sdk::{contractevent, contracttrait, vec, Address, Env, String, Vec};
-use storage::{get_internal_supply, get_supply_limit, set_internal_supply, set_supply_limit};
-
-use super::storage::{
-    add_i128_or_panic, get_compliance_address, hooks_verified, module_name,
-    require_non_negative_amount, sub_i128_or_panic, verify_required_hooks,
-};
-use crate::rwa::compliance::ComplianceHook;
+use soroban_sdk::{contractevent, Address};
 
 /// Emitted when a token's supply cap is configured or changed.
 #[contractevent]
@@ -25,92 +18,4 @@ pub struct SupplyLimitSet {
     #[topic]
     pub token: Address,
     pub limit: i128,
-}
-
-#[contracttrait]
-pub trait SupplyLimit {
-    fn set_supply_limit(e: &Env, token: Address, limit: i128) {
-        get_compliance_address(e).require_auth();
-        require_non_negative_amount(e, limit);
-        set_supply_limit(e, &token, limit);
-        SupplyLimitSet { token, limit }.publish(e);
-    }
-
-    fn pre_set_internal_supply(e: &Env, token: Address, supply: i128) {
-        get_compliance_address(e).require_auth();
-        require_non_negative_amount(e, supply);
-        set_internal_supply(e, &token, supply);
-    }
-
-    fn get_supply_limit(e: &Env, token: Address) -> i128 {
-        get_supply_limit(e, &token)
-    }
-
-    fn get_internal_supply(e: &Env, token: Address) -> i128 {
-        get_internal_supply(e, &token)
-    }
-
-    fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
-        vec![e, ComplianceHook::CanCreate, ComplianceHook::Created, ComplianceHook::Destroyed]
-    }
-
-    fn verify_hook_wiring(e: &Env) {
-        verify_required_hooks(e, Self::required_hooks(e));
-    }
-
-    fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
-
-    fn on_created(e: &Env, _to: Address, amount: i128, token: Address) {
-        get_compliance_address(e).require_auth();
-        require_non_negative_amount(e, amount);
-        let current = get_internal_supply(e, &token);
-        set_internal_supply(e, &token, add_i128_or_panic(e, current, amount));
-    }
-
-    fn on_destroyed(e: &Env, _from: Address, amount: i128, token: Address) {
-        get_compliance_address(e).require_auth();
-        require_non_negative_amount(e, amount);
-        let current = get_internal_supply(e, &token);
-        set_internal_supply(e, &token, sub_i128_or_panic(e, current, amount));
-    }
-
-    fn can_transfer(
-        _e: &Env,
-        _from: Address,
-        _to: Address,
-        _amount: i128,
-        _token: Address,
-    ) -> bool {
-        true
-    }
-
-    fn can_create(e: &Env, _to: Address, amount: i128, token: Address) -> bool {
-        assert!(
-            hooks_verified(e),
-            "SupplyLimitModule: not armed — call verify_hook_wiring() after wiring hooks \
-             [CanCreate, Created, Destroyed]"
-        );
-        if amount < 0 {
-            return false;
-        }
-        let limit = get_supply_limit(e, &token);
-        if limit == 0 {
-            return true;
-        }
-        let supply = get_internal_supply(e, &token);
-        add_i128_or_panic(e, supply, amount) <= limit
-    }
-
-    fn name(e: &Env) -> String {
-        module_name(e, "SupplyLimitModule")
-    }
-
-    fn get_compliance_address(e: &Env) -> Address {
-        get_compliance_address(e)
-    }
-
-    /// Implementers must gate this entrypoint with bootstrap-admin auth before
-    /// delegating to
-    /// [`storage::set_compliance_address`](super::storage::set_compliance_address).
-    fn set_compliance_address(e: &Env, compliance: Address);
 }
