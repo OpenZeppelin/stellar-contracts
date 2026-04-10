@@ -5,7 +5,8 @@ use soroban_sdk::{
 };
 
 use super::storage::{
-    can_create, can_transfer, set_id_balance, set_max_balance, verify_hook_wiring,
+    can_create, can_transfer, get_id_balance, on_created, on_destroyed, on_transfer,
+    set_id_balance, set_max_balance, verify_hook_wiring,
 };
 use crate::rwa::{
     compliance::{
@@ -307,5 +308,140 @@ fn can_create_rejects_negative_amount_before_requiring_irs() {
         arm_hooks(&e);
 
         assert!(!can_create(&e, &recipient, -1, &token));
+    });
+}
+
+#[test]
+fn can_transfer_rejects_negative_amount_before_requiring_irs() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        arm_hooks(&e);
+
+        assert!(!can_transfer(&e, &sender, &recipient, -1, &token));
+    });
+}
+
+#[test]
+fn can_transfer_allows_when_sender_and_recipient_share_identity() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let shared_identity = Address::generate(&e);
+
+    irs.set_identity(&sender, &shared_identity);
+    irs.set_identity(&recipient, &shared_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        arm_hooks(&e);
+        set_max_balance(&e, &token, 1);
+
+        assert!(can_transfer(&e, &sender, &recipient, 1_000, &token));
+    });
+}
+
+#[test]
+fn on_transfer_updates_balances_for_distinct_identities() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let sender_identity = Address::generate(&e);
+    let recipient_identity = Address::generate(&e);
+
+    irs.set_identity(&sender, &sender_identity);
+    irs.set_identity(&recipient, &recipient_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_max_balance(&e, &token, 200);
+        set_id_balance(&e, &token, &sender_identity, 100);
+        set_id_balance(&e, &token, &recipient_identity, 20);
+
+        on_transfer(&e, &sender, &recipient, 30, &token);
+
+        assert_eq!(get_id_balance(&e, &token, &sender_identity), 70);
+        assert_eq!(get_id_balance(&e, &token, &recipient_identity), 50);
+    });
+}
+
+#[test]
+fn on_transfer_is_noop_for_same_identity() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let shared_identity = Address::generate(&e);
+
+    irs.set_identity(&sender, &shared_identity);
+    irs.set_identity(&recipient, &shared_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_id_balance(&e, &token, &shared_identity, 100);
+
+        on_transfer(&e, &sender, &recipient, 30, &token);
+
+        assert_eq!(get_id_balance(&e, &token, &shared_identity), 100);
+    });
+}
+
+#[test]
+fn on_created_updates_identity_balance() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let recipient_identity = Address::generate(&e);
+
+    irs.set_identity(&recipient, &recipient_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_max_balance(&e, &token, 200);
+        set_id_balance(&e, &token, &recipient_identity, 50);
+
+        on_created(&e, &recipient, 30, &token);
+
+        assert_eq!(get_id_balance(&e, &token, &recipient_identity), 80);
+    });
+}
+
+#[test]
+fn on_destroyed_updates_identity_balance() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let holder = Address::generate(&e);
+    let holder_identity = Address::generate(&e);
+
+    irs.set_identity(&holder, &holder_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_id_balance(&e, &token, &holder_identity, 90);
+
+        on_destroyed(&e, &holder, 40, &token);
+
+        assert_eq!(get_id_balance(&e, &token, &holder_identity), 50);
     });
 }
