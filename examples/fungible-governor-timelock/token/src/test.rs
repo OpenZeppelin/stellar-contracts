@@ -157,7 +157,7 @@ fn create_succeeded_proposal(
 // ==================== Tests ====================
 
 /// Full lifecycle: Propose -> Vote -> Queue (schedules in timelock) ->
-/// timelock.execute_op() triggers governor.execute() -> real targets invoked.
+/// timelock.execute() triggers governor.execute() -> real targets invoked.
 #[test]
 fn full_governance_lifecycle_with_timelock() {
     let s = setup();
@@ -188,7 +188,7 @@ fn full_governance_lifecycle_with_timelock() {
     )
         .into_val(&s.e);
 
-    s.timelock.execute_op(
+    s.timelock.execute(
         &s.governor.address,
         &Symbol::new(&s.e, "execute"),
         &execute_args,
@@ -218,7 +218,7 @@ fn execute_fails_before_timelock_delay() {
     let execute_args: Vec<Val> =
         (targets, functions, args, desc_hash.clone(), s.timelock.address.clone()).into_val(&s.e);
 
-    s.timelock.execute_op(
+    s.timelock.execute(
         &s.governor.address,
         &Symbol::new(&s.e, "execute"),
         &execute_args,
