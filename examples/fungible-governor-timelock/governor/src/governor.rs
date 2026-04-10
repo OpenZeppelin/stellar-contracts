@@ -96,7 +96,7 @@ impl Governor for GovernorTimelockContract {
 
         let timelock_client = TimelockClient::new(e, &timelock);
         let zero_predecessor = BytesN::from_array(e, &[0u8; 32]);
-        let op_id = timelock_client.schedule_op(
+        let op_id = timelock_client.schedule(
             &e.current_contract_address(),
             &Symbol::new(e, "execute"),
             &execute_args,
@@ -171,7 +171,7 @@ impl Governor for GovernorTimelockContract {
         {
             let timelock = Self::timelock(e);
             let timelock_client = TimelockClient::new(e, &timelock);
-            timelock_client.cancel_op(&op_id, &e.current_contract_address());
+            timelock_client.cancel(&op_id, &e.current_contract_address());
         }
 
         governor::cancel(e, targets, functions, args, &description_hash)

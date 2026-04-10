@@ -6,7 +6,7 @@ use soroban_sdk::{
     testutils::{Address as _, BytesN as _, Ledger, MockAuth, MockAuthInvoke},
     vec, Address, BytesN, Env, IntoVal, Symbol, Vec,
 };
-use stellar_governance::timelock::TimelockError;
+use stellar_governance::timelock::{OperationState, TimelockError};
 
 use crate::{OperationMeta, TimelockController, TimelockControllerClient};
 
@@ -74,7 +74,7 @@ fn schedule_and_execute_operation() {
     let target_client = TargetContractClient::new(&e, &target);
 
     let args = vec![&e, 42u32.into_val(&e)];
-    let operation_id = client.schedule_op(
+    let operation_id = client.schedule(
         &target,
         &symbol_short!("set_value"),
         &args,
@@ -84,16 +84,19 @@ fn schedule_and_execute_operation() {
         &proposer,
     );
 
-    assert!(client.operation_exists(&operation_id));
-    assert!(client.is_operation_pending(&operation_id));
-    assert!(!client.is_operation_ready(&operation_id));
+    assert!(client.get_operation_state(&operation_id) != OperationState::Unset);
+    assert!(matches!(
+        client.get_operation_state(&operation_id),
+        OperationState::Waiting | OperationState::Ready
+    ));
+    assert_ne!(client.get_operation_state(&operation_id), OperationState::Ready);
 
     // Advance ledgers to make operation ready
     e.ledger().with_mut(|li| li.sequence_number += 10);
 
-    assert!(client.is_operation_ready(&operation_id));
+    assert_eq!(client.get_operation_state(&operation_id), OperationState::Ready);
 
-    client.execute_op(
+    client.execute(
         &target,
         &symbol_short!("set_value"),
         &args,
@@ -103,7 +106,7 @@ fn schedule_and_execute_operation() {
     );
 
     assert_eq!(target_client.get_value(), 42);
-    assert!(client.is_operation_done(&operation_id));
+    assert_eq!(client.get_operation_state(&operation_id), OperationState::Done);
 }
 
 #[test]
@@ -124,7 +127,7 @@ fn schedule_and_execute_operation_no_executors() {
     let target_client = TargetContractClient::new(&e, &target);
 
     let args = vec![&e, 42u32.into_val(&e)];
-    let operation_id = client.schedule_op(
+    let operation_id = client.schedule(
         &target,
         &symbol_short!("set_value"),
         &args,
@@ -134,15 +137,18 @@ fn schedule_and_execute_operation_no_executors() {
         &proposer,
     );
 
-    assert!(client.operation_exists(&operation_id));
-    assert!(client.is_operation_pending(&operation_id));
-    assert!(!client.is_operation_ready(&operation_id));
+    assert!(client.get_operation_state(&operation_id) != OperationState::Unset);
+    assert!(matches!(
+        client.get_operation_state(&operation_id),
+        OperationState::Waiting | OperationState::Ready
+    ));
+    assert_ne!(client.get_operation_state(&operation_id), OperationState::Ready);
 
     e.ledger().with_mut(|li| li.sequence_number += 10);
 
-    assert!(client.is_operation_ready(&operation_id));
+    assert_eq!(client.get_operation_state(&operation_id), OperationState::Ready);
 
-    client.execute_op(
+    client.execute(
         &target,
         &symbol_short!("set_value"),
         &args,
@@ -153,7 +159,7 @@ fn schedule_and_execute_operation_no_executors() {
     );
 
     assert_eq!(target_client.get_value(), 42);
-    assert!(client.is_operation_done(&operation_id));
+    assert_eq!(client.get_operation_state(&operation_id), OperationState::Done);
 }
 
 #[test]
@@ -176,7 +182,7 @@ fn schedule_and_execute_self_admin_operation() {
             address: &proposer,
             invoke: &MockAuthInvoke {
                 contract: &timelock,
-                fn_name: "schedule_op",
+                fn_name: "schedule",
                 args: (
                     timelock.clone(),
                     Symbol::new(&e, "update_delay"),
@@ -190,7 +196,7 @@ fn schedule_and_execute_self_admin_operation() {
                 sub_invokes: &[],
             },
         }])
-        .schedule_op(
+        .schedule(
             &timelock,
             &Symbol::new(&e, "update_delay"),
             &args,
@@ -201,13 +207,16 @@ fn schedule_and_execute_self_admin_operation() {
         );
 
     // Check operation is pending
-    assert!(client.operation_exists(&operation_id));
-    assert!(client.is_operation_pending(&operation_id));
-    assert!(!client.is_operation_ready(&operation_id));
+    assert!(client.get_operation_state(&operation_id) != OperationState::Unset);
+    assert!(matches!(
+        client.get_operation_state(&operation_id),
+        OperationState::Waiting | OperationState::Ready
+    ));
+    assert_ne!(client.get_operation_state(&operation_id), OperationState::Ready);
 
     e.ledger().with_mut(|li| li.sequence_number += 10);
 
-    assert!(client.is_operation_ready(&operation_id));
+    assert_eq!(client.get_operation_state(&operation_id), OperationState::Ready);
 
     // Mock executor's require_auth_for_args() that's called in `__check_auth`
     e.mock_auths(&[MockAuth {
@@ -254,7 +263,7 @@ fn schedule_and_execute_self_admin_operation() {
     )
     .unwrap();
 
-    assert!(client.is_operation_done(&operation_id));
+    assert_eq!(client.get_operation_state(&operation_id), OperationState::Done);
 }
 
 #[test]
@@ -273,7 +282,7 @@ fn cancel_operation() {
     let client = TimelockControllerClient::new(&e, &timelock);
 
     let args = vec![&e, 42u32.into_val(&e)];
-    let operation_id = client.schedule_op(
+    let operation_id = client.schedule(
         &target,
         &symbol_short!("set_value"),
         &args,
@@ -283,12 +292,15 @@ fn cancel_operation() {
         &proposer,
     );
 
-    assert!(client.is_operation_pending(&operation_id));
+    assert!(matches!(
+        client.get_operation_state(&operation_id),
+        OperationState::Waiting | OperationState::Ready
+    ));
 
-    client.cancel_op(&operation_id, &proposer);
+    client.cancel(&operation_id, &proposer);
 
     // Check operation is no longer existing
-    assert!(!client.operation_exists(&operation_id));
+    assert_eq!(client.get_operation_state(&operation_id), OperationState::Unset);
 }
 
 #[test]
@@ -309,7 +321,7 @@ fn schedule_with_insufficient_delay() {
 
     // Try to schedule with delay less than minimum
     let args = vec![&e, 42u32.into_val(&e)];
-    client.schedule_op(
+    client.schedule(
         &target,
         &symbol_short!("set_value"),
         &args,
@@ -339,7 +351,7 @@ fn execute_before_ready() {
 
     // Schedule operation
     let args = vec![&e, 42u32.into_val(&e)];
-    client.schedule_op(
+    client.schedule(
         &target,
         &symbol_short!("set_value"),
         &args,
@@ -350,7 +362,7 @@ fn execute_before_ready() {
     );
 
     // Try to execute before delay passes (should panic)
-    client.execute_op(
+    client.execute(
         &target,
         &symbol_short!("set_value"),
         &args,

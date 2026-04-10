@@ -36,13 +36,13 @@
 //!
 //! #[contractimpl(contracttrait)]
 //! impl Timelock for MyTimelockController {
-//!     fn schedule_op(e: &Env, target: Address, ...) -> BytesN<32> {
+//!     fn schedule(e: &Env, target: Address, ...) -> BytesN<32> {
 //!         // Add authorization checks here
 //!         let operation = Operation { target, function, args, predecessor, salt };
 //!         schedule_operation(e, &operation, delay)
 //!     }
 //!
-//!     fn execute_op(e: &Env, target: Address, ...) -> Val {
+//!     fn execute(e: &Env, target: Address, ...) -> Val {
 //!         // Add authorization checks here
 //!         let operation = Operation { target, function, args, predecessor, salt };
 //!         execute_operation(e, &operation)
@@ -80,9 +80,9 @@ pub use crate::timelock::storage::{
 /// The following methods have no default implementation because they require
 /// access-control logic that varies per contract:
 ///
-/// - [`Timelock::schedule_op`]
-/// - [`Timelock::execute_op`]
-/// - [`Timelock::cancel_op`]
+/// - [`Timelock::schedule`]
+/// - [`Timelock::execute`]
+/// - [`Timelock::cancel`]
 /// - [`Timelock::update_delay`]
 #[contracttrait]
 pub trait Timelock {
@@ -142,46 +142,6 @@ pub trait Timelock {
         storage::get_operation_state(e, &operation_id)
     }
 
-    /// Returns whether an operation exists (scheduled or done).
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `operation_id` - The unique identifier of the operation.
-    fn operation_exists(e: &Env, operation_id: BytesN<32>) -> bool {
-        storage::operation_exists(e, &operation_id)
-    }
-
-    /// Returns whether an operation is pending (waiting or ready).
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `operation_id` - The unique identifier of the operation.
-    fn is_operation_pending(e: &Env, operation_id: BytesN<32>) -> bool {
-        storage::is_operation_pending(e, &operation_id)
-    }
-
-    /// Returns whether an operation is ready for execution.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `operation_id` - The unique identifier of the operation.
-    fn is_operation_ready(e: &Env, operation_id: BytesN<32>) -> bool {
-        storage::is_operation_ready(e, &operation_id)
-    }
-
-    /// Returns whether an operation has been executed.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `operation_id` - The unique identifier of the operation.
-    fn is_operation_done(e: &Env, operation_id: BytesN<32>) -> bool {
-        storage::is_operation_done(e, &operation_id)
-    }
-
     /// Schedules an operation for execution after a delay and returns the
     /// unique operation identifier.
     ///
@@ -219,7 +179,7 @@ pub trait Timelock {
     /// * The implementer must verify that `proposer` has the appropriate role,
     ///   construct an [`Operation`], and call [`schedule_operation`].
     #[allow(clippy::too_many_arguments)]
-    fn schedule_op(
+    fn schedule(
         e: &Env,
         target: Address,
         function: Symbol,
@@ -263,7 +223,7 @@ pub trait Timelock {
     ///   when `executor` is `None`).
     /// * The implementer must construct an [`Operation`] and call
     ///   [`execute_operation`].
-    fn execute_op(
+    fn execute(
         e: &Env,
         target: Address,
         function: Symbol,
@@ -298,7 +258,7 @@ pub trait Timelock {
     /// * Authorization for `canceller` is required.
     /// * The implementer must verify that `canceller` has the appropriate role
     ///   and call [`cancel_operation`].
-    fn cancel_op(e: &Env, operation_id: BytesN<32>, canceller: Address);
+    fn cancel(e: &Env, operation_id: BytesN<32>, canceller: Address);
 
     /// Updates the minimum delay for future operations.
     ///

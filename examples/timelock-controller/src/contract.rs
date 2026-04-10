@@ -270,7 +270,7 @@ impl TimelockController {
 impl Timelock for TimelockController {
     #[allow(clippy::too_many_arguments)]
     #[only_role(proposer, "proposer")]
-    fn schedule_op(
+    fn schedule(
         e: &Env,
         target: Address,
         function: Symbol,
@@ -284,7 +284,7 @@ impl Timelock for TimelockController {
         schedule_operation(e, &operation, delay)
     }
 
-    fn execute_op(
+    fn execute(
         e: &Env,
         target: Address,
         function: Symbol,
@@ -304,7 +304,7 @@ impl Timelock for TimelockController {
     }
 
     #[only_role(canceller, "canceller")]
-    fn cancel_op(e: &Env, operation_id: BytesN<32>, canceller: Address) {
+    fn cancel(e: &Env, operation_id: BytesN<32>, canceller: Address) {
         cancel_operation(e, &operation_id);
     }
 
