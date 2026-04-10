@@ -2,6 +2,18 @@
 
 Utilities for Stellar contracts.
 
+This crate is part of the [OpenZeppelin Stellar Contracts](https://github.com/OpenZeppelin/stellar-contracts) library, which is published as separate crates on [crates.io](https://crates.io):
+
+- [stellar-access](https://crates.io/crates/stellar-access): Role-based access controls and ownable
+- [stellar-accounts](https://crates.io/crates/stellar-accounts): Smart accounts with custom authentication and authorization
+- **[stellar-contract-utils](https://crates.io/crates/stellar-contract-utils)**: Utilities for contracts (pausable, upgradeable, cryptography, etc.)
+- [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
+- [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
+- [stellar-macros](https://crates.io/crates/stellar-macros): Proc macros (`#[only_owner]`, `#[when_not_paused]`, etc.)
+- [stellar-tokens](https://crates.io/crates/stellar-tokens): Token types (fungible, non-fungible, real-world assets, vaults)
+
+Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/stellar-contracts) page for additional information.
+
 ## Modules
 
 ### Pausable
@@ -141,9 +153,9 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-contract-utils = "=0.6.0"
+stellar-contract-utils = "=0.7.0"
 # Add this if you want to use macros
-stellar-macros = "=0.6.0"
+stellar-macros = "=0.7.0"
 ```
 
 ## Examples

@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, panic_with_error, Env};
 
-use crate::fungible::{FungibleStorageKey, FungibleTokenError};
+use crate::fungible::FungibleTokenError;
 
 /// Storage key for the cap value
 #[contracttype]
@@ -54,25 +54,24 @@ pub fn query_cap(e: &Env) -> i128 {
         .unwrap_or_else(|| panic_with_error!(e, FungibleTokenError::CapNotSet))
 }
 
-/// Panics if new `amount` of tokens added to the current supply will exceed the
-/// maximum supply.
+/// Panics if new `amount` of tokens added to the given `total_supply` will
+/// exceed the maximum supply.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `amount` - The new amount of tokens to be added to the total supply.
+/// * `total_supply` - The current total supply of tokens.
 ///
 /// # Errors
 ///
-/// * refer to [`query_cap`] errors.
 /// * [`FungibleTokenError::MathOverflow`] - Occurs when the sum of the new
 ///   amount and the current total supply will overflow.
 /// * [`FungibleTokenError::ExceededCap`] - Occurs when the new amount of tokens
 ///   will exceed the cap.
-pub fn check_cap(e: &Env, amount: i128) {
+/// * refer to [`query_cap`] errors.
+pub fn check_cap(e: &Env, amount: i128, total_supply: i128) {
     let cap: i128 = query_cap(e);
-    let total_supply: i128 =
-        e.storage().instance().get(&FungibleStorageKey::TotalSupply).unwrap_or(0);
     let Some(sum) = total_supply.checked_add(amount) else {
         panic_with_error!(e, FungibleTokenError::MathOverflow);
     };

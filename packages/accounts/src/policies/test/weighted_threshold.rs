@@ -37,7 +37,9 @@ fn create_test_context_rule(e: &Env) -> ContextRule {
         context_type: ContextRuleType::Default,
         name: soroban_sdk::String::from_str(e, "test_rule"),
         signers,
+        signer_ids: Vec::new(e),
         policies,
+        policy_ids: Vec::new(e),
         valid_until: None,
     }
 }

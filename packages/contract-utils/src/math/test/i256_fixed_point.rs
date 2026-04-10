@@ -36,6 +36,24 @@ fn test_checked_mul_div_zero_denominator() {
 }
 
 #[test]
+fn test_checked_mul_div_div_overflow_returns_none() {
+    let env = Env::default();
+    let i256_min = I256::from_parts(&env, i64::MIN, 0, 0, 0);
+    let one = I256::from_i128(&env, 1);
+    let neg_one = I256::from_i128(&env, -1);
+
+    // I256::MIN * 1 / -1 would overflow (result is I256::MAX + 1),
+    // checked variant must return None instead of panicking.
+    let result = checked_mul_div(&i256_min, &one, &neg_one);
+    assert_eq!(result, None);
+
+    // Also verify via checked_mul_div_with_rounding with Truncate rounding,
+    // which dispatches to checked_mul_div.
+    let result = checked_mul_div_with_rounding(i256_min, one, neg_one, Rounding::Truncate);
+    assert_eq!(result, None);
+}
+
+#[test]
 fn test_mul_div_floor_rounds_down() {
     let env = Env::default();
     let x: I256 = I256::from_i128(&env, 1_5391283);

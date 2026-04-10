@@ -51,6 +51,6 @@ impl Verifier for Ed25519VerifierContract {
     ///
     /// * `keys_data` - A vector with 32-byte Ed25519 public keys.
     fn batch_canonicalize_key(e: &Env, keys_data: Vec<BytesN<32>>) -> Vec<Bytes> {
-        Vec::from_iter(e, keys_data.iter().map(|key| ed25519::canonicalize_key(e, &key)))
+        ed25519::batch_canonicalize_key(e, &keys_data)
     }
 }

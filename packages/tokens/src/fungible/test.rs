@@ -7,7 +7,7 @@ use soroban_sdk::{
         storage::{Instance, Persistent},
         Address as _, AuthorizedFunction, Events, Ledger, MuxedAddress as _,
     },
-    vec, Address, Env, Event, IntoVal, MuxedAddress, String,
+    vec, Address, Env, Event, FromVal, IntoVal, Map, MuxedAddress, String, Symbol, TryFromVal, Val,
 };
 use stellar_event_assertion::EventAssertion;
 
@@ -246,7 +246,7 @@ fn transfer_works() {
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_fungible_mint(&from, 100);
-        event_assert.assert_fungible_transfer(&from, &recipient, None, 50);
+        event_assert.assert_fungible_transfer(&from, &recipient, 50);
     });
 }
 
@@ -285,7 +285,104 @@ fn transfer_muxed_address_works() {
         let mut event_assert = EventAssertion::new(&e, address.clone());
         event_assert.assert_event_count(2);
         event_assert.assert_fungible_mint(&from, 100);
-        event_assert.assert_fungible_transfer(&from, &recipient.address(), recipient.id(), 50);
+        event_assert.assert_fungible_muxed_transfer(
+            &from,
+            &recipient.address(),
+            recipient.id(),
+            50,
+        );
+    });
+}
+
+/// Verifies that `transfer` to a non-muxed address emits a SEP-41
+/// compliant event whose data is a bare `i128` (not a struct).
+#[test]
+fn transfer_non_muxed_emits_bare_i128_event_data() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Base::mint(&e, &from, 100);
+        Base::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
+
+        // Grab the raw transfer event (skip mint at index 0).
+        let events = e.events().all();
+        let transfer_event = events.events().get(1).unwrap();
+
+        // The data field must decode as a bare i128, proving it is NOT
+        // wrapped in a map/struct.
+        let data = match &transfer_event.body {
+            soroban_sdk::xdr::ContractEventBody::V0(ref body) => &body.data,
+        };
+        let val = Val::try_from_val(&e, data).unwrap();
+        let amount: i128 = FromVal::from_val(&e, &val);
+        assert_eq!(amount, 50);
+    });
+}
+
+/// Verifies that `transfer_from` emits a SEP-41 compliant event whose data
+/// is a bare `i128`.
+#[test]
+fn transfer_from_emits_bare_i128_event_data() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let owner = Address::generate(&e);
+    let spender = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        Base::mint(&e, &owner, 100);
+        Base::approve(&e, &owner, &spender, 50, 1000);
+        Base::transfer_from(&e, &spender, &owner, &to, 30);
+
+        // Grab the raw transfer event (skip mint at 0, approve at 1).
+        let events = e.events().all();
+        let transfer_event = events.events().get(2).unwrap();
+
+        let data = match &transfer_event.body {
+            soroban_sdk::xdr::ContractEventBody::V0(ref body) => &body.data,
+        };
+        let val = Val::try_from_val(&e, data).unwrap();
+        let amount: i128 = FromVal::from_val(&e, &val);
+        assert_eq!(amount, 30);
+    });
+}
+
+/// Verifies that `transfer` to a muxed address emits event data as a
+/// struct containing both `to_muxed_id` and `amount`, distinct from the
+/// bare `i128` emitted for non-muxed transfers.
+#[test]
+fn transfer_muxed_emits_struct_event_data() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let from = Address::generate(&e);
+    let recipient = MuxedAddress::generate(&e);
+
+    e.as_contract(&address, || {
+        Base::mint(&e, &from, 100);
+        Base::transfer(&e, &from, &recipient, 50);
+
+        // Grab the raw transfer event (skip mint at index 0).
+        let events = e.events().all();
+        let transfer_event = events.events().get(1).unwrap();
+
+        let data = match &transfer_event.body {
+            soroban_sdk::xdr::ContractEventBody::V0(ref body) => &body.data,
+        };
+
+        // The data must be a map with both `to_muxed_id` and `amount` keys.
+        let data_map: Map<Symbol, Val> = Map::from_val(&e, data);
+        let event_amount: i128 = data_map.get(symbol_short!("amount")).unwrap().into_val(&e);
+        let event_muxed_id: Option<u64> =
+            data_map.get(Symbol::new(&e, "to_muxed_id")).unwrap().into_val(&e);
+
+        assert_eq!(event_amount, 50);
+        assert_eq!(event_muxed_id, recipient.id());
     });
 }
 
@@ -339,7 +436,7 @@ fn approve_and_transfer_from() {
         event_assert.assert_event_count(3);
         event_assert.assert_fungible_mint(&owner, 100);
         event_assert.assert_fungible_approve(&owner, &spender, 50, 1000);
-        event_assert.assert_fungible_transfer(&owner, &recipient, None, 30);
+        event_assert.assert_fungible_transfer(&owner, &recipient, 30);
     });
 }
 

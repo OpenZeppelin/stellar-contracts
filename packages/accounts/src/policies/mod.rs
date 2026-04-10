@@ -98,6 +98,11 @@ pub trait Policy {
     /// * `smart_account` - The address of the smart account installing this
     ///   policy.
     ///
+    /// # Authorization
+    ///
+    /// This method must be called with proper authorization from the smart
+    /// account, e.g. `smart_account.require_auth()`.
+    ///
     /// # Events
     ///
     /// Implementations should emit a policy-specific installed event
@@ -130,6 +135,11 @@ pub trait Policy {
     /// * `context_rule` - The context rule this policy is being removed from.
     /// * `smart_account` - The address of the smart account uninstalling this
     ///   policy.
+    ///
+    /// # Authorization
+    ///
+    /// This method must be called with proper authorization from the smart
+    /// account, e.g. `smart_account.require_auth()`.
     ///
     /// # Events
     ///

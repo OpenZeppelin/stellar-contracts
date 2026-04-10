@@ -327,10 +327,34 @@ pub const INSTANCE_TTL_THRESHOLD: u32 = INSTANCE_EXTEND_AMOUNT - DAY_IN_LEDGERS;
 
 // ################## EVENTS ##################
 
-/// Event emitted when tokens are transferred between addresses.
-#[contractevent]
+/// Event emitted when tokens are transferred between addresses without a
+/// muxed destination.
+///
+/// Per SEP-41, the event data is a bare `i128` when no muxed address is
+/// involved. The `data_format = "single-value"` attribute ensures the
+/// `amount` field is serialized as a bare value rather than a map.
+#[contractevent(data_format = "single-value")]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Transfer {
+    #[topic]
+    pub from: Address,
+    #[topic]
+    pub to: Address,
+    pub amount: i128,
+}
+
+/// Event emitted when tokens are transferred to a muxed address.
+///
+/// Per SEP-41, when the destination is a [`MuxedAddress`] the event data
+/// carries both the amount and the muxed identifier so that off-chain
+/// consumers can attribute the transfer to the correct sub-account.
+///
+/// Uses `topics = ["transfer"]` so that both [`Transfer`] and
+/// [`MuxedTransfer`] share the same `"transfer"` event symbol, as required
+/// by SEP-41.
+#[contractevent(topics = ["transfer"])]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MuxedTransfer {
     #[topic]
     pub from: Address,
     #[topic]
@@ -340,6 +364,14 @@ pub struct Transfer {
 }
 
 /// Emits an event indicating a transfer of tokens.
+///
+/// When `to_muxed_id` is `Some`, a [`MuxedTransfer`] event is published
+/// whose data field is `{to_muxed_id: Option<u64>, amount: i128}`. When it
+/// is `None`, a [`Transfer`] event is published whose data field is a bare
+/// `i128`, conforming to the SEP-41 standard.
+///
+/// Both variants share the same topic structure:
+/// `["transfer", from: Address, to: Address]`.
 ///
 /// # Arguments
 ///
@@ -355,7 +387,14 @@ pub fn emit_transfer(
     to_muxed_id: Option<u64>,
     amount: i128,
 ) {
-    Transfer { from: from.clone(), to: to.clone(), to_muxed_id, amount }.publish(e);
+    match to_muxed_id {
+        Some(_) => {
+            MuxedTransfer { from: from.clone(), to: to.clone(), to_muxed_id, amount }.publish(e);
+        }
+        None => {
+            Transfer { from: from.clone(), to: to.clone(), amount }.publish(e);
+        }
+    }
 }
 
 /// Event emitted when an allowance is approved.
