@@ -12,8 +12,9 @@ use crate::{
     smart_account::{
         storage::{
             add_context_rule, add_policy, add_signer, batch_add_signer, get_context_rule,
-            remove_policy, remove_signer, validate_signers_and_policies, ContextRule,
-            ContextRuleType, PolicyEntry, Signer, SignerEntry, SmartAccountStorageKey,
+            get_policy_id, get_signer_id, remove_policy, remove_signer,
+            validate_signers_and_policies, ContextRule, ContextRuleType, PolicyEntry, Signer,
+            SignerEntry, SmartAccountStorageKey,
         },
         MAX_POLICIES, MAX_SIGNERS,
     },
@@ -58,26 +59,6 @@ fn create_test_signers(e: &Env) -> Vec<Signer> {
     let signer1 = Signer::Delegated(Address::generate(e));
     let signer2 = Signer::Delegated(Address::generate(e));
     Vec::from_array(e, [signer1, signer2])
-}
-
-// Helper to get signer ID from a rule by signer object
-fn get_signer_id(e: &Env, rule_id: u32, signer: &Signer) -> u32 {
-    let rule = get_context_rule(e, rule_id);
-    let pos = rule.signers.iter().rposition(|s| s == *signer).expect("signer not found");
-    let entry_key = SmartAccountStorageKey::ContextRuleData(rule_id);
-    let entry: crate::smart_account::storage::ContextRuleEntry =
-        e.storage().persistent().get(&entry_key).unwrap();
-    entry.signer_ids.get_unchecked(pos as u32)
-}
-
-// Helper to get policy ID from a rule by policy address
-fn get_policy_id(e: &Env, rule_id: u32, policy: &Address) -> u32 {
-    let rule = get_context_rule(e, rule_id);
-    let pos = rule.policies.iter().rposition(|p| p == *policy).expect("policy not found");
-    let entry_key = SmartAccountStorageKey::ContextRuleData(rule_id);
-    let entry: crate::smart_account::storage::ContextRuleEntry =
-        e.storage().persistent().get(&entry_key).unwrap();
-    entry.policy_ids.get_unchecked(pos as u32)
 }
 
 fn setup_test_rule(e: &Env, address: &Address) -> ContextRule {
@@ -169,7 +150,7 @@ fn remove_signer_success() {
 
     e.as_contract(&address, || {
         let signer_to_remove = rule.signers.get(0).unwrap();
-        let signer_id = get_signer_id(&e, rule.id, &signer_to_remove);
+        let signer_id = get_signer_id(&e, &signer_to_remove);
 
         remove_signer(&e, rule.id, signer_id);
 
@@ -216,12 +197,12 @@ fn remove_signer_last_one_fails() {
     e.as_contract(&address, || {
         // Remove first signer - should succeed (still have one left)
         let signer1 = rule.signers.get(0).unwrap();
-        let signer1_id = get_signer_id(&e, rule.id, &signer1);
+        let signer1_id = get_signer_id(&e, &signer1);
         remove_signer(&e, rule.id, signer1_id);
 
         // Try to remove last signer - should fail with NoSignersAndPolicies
         let signer2 = rule.signers.get(1).unwrap();
-        let signer2_id = get_signer_id(&e, rule.id, &signer2);
+        let signer2_id = get_signer_id(&e, &signer2);
         remove_signer(&e, rule.id, signer2_id);
     });
 }
@@ -242,8 +223,8 @@ fn remove_signer_with_policy_present_success() {
         // Now we can remove all signers because we have a policy
         let signer1 = rule.signers.get(0).unwrap();
         let signer2 = rule.signers.get(1).unwrap();
-        let signer1_id = get_signer_id(&e, rule.id, &signer1);
-        let signer2_id = get_signer_id(&e, rule.id, &signer2);
+        let signer1_id = get_signer_id(&e, &signer1);
+        let signer2_id = get_signer_id(&e, &signer2);
 
         remove_signer(&e, rule.id, signer1_id);
         remove_signer(&e, rule.id, signer2_id);
@@ -277,7 +258,7 @@ fn remove_signer_shared_across_rules_decrements_count() {
             &Map::new(&e),
         );
 
-        // Different context type so the fingerprint differs; same signer re-used.
+        // Different context type; same signer re-used.
         let extra_signer = Signer::Delegated(Address::generate(&e));
         let _ = add_context_rule(
             &e,
@@ -289,7 +270,7 @@ fn remove_signer_shared_across_rules_decrements_count() {
         );
 
         // Remove the shared signer from rule_a (count 2 → 1, not deleted).
-        let signer_id = get_signer_id(&e, rule_a.id, &shared_signer);
+        let signer_id = get_signer_id(&e, &shared_signer);
         remove_signer(&e, rule_a.id, signer_id);
 
         let count_key = SmartAccountStorageKey::SignerData(signer_id);
@@ -370,7 +351,7 @@ fn remove_policy_success() {
         add_policy(&e, rule.id, &policy_address, install_param);
 
         // Then remove it
-        let policy_id = get_policy_id(&e, rule.id, &policy_address);
+        let policy_id = get_policy_id(&e, &policy_address);
         remove_policy(&e, rule.id, policy_id);
 
         let updated_rule = get_context_rule(&e, rule.id);
@@ -381,7 +362,7 @@ fn remove_policy_success() {
         assert!(!updated_rule.policies.contains(&policy_address));
     });
 
-    // case when `unistall` of the policy panics
+    // case when `uninstall` of the policy panics
     e.as_contract(&policy_address, || {
         e.storage().persistent().set(&symbol_short!("veto"), &true);
     });
@@ -392,7 +373,7 @@ fn remove_policy_success() {
         add_policy(&e, rule.id, &policy_address, install_param);
 
         // Removal succeeds
-        let policy_id = get_policy_id(&e, rule.id, &policy_address);
+        let policy_id = get_policy_id(&e, &policy_address);
         remove_policy(&e, rule.id, policy_id);
     });
 }
@@ -443,7 +424,7 @@ fn remove_policy_last_one_fails() {
         );
 
         // Try to remove the only policy - should fail with NoSignersAndPolicies
-        let policy_id = get_policy_id(&e, rule.id, &policy_address);
+        let policy_id = get_policy_id(&e, &policy_address);
         remove_policy(&e, rule.id, policy_id);
     });
 }
@@ -462,7 +443,7 @@ fn remove_policy_with_signers_present_success() {
         add_policy(&e, rule.id, &policy_address, install_param);
 
         // Remove the policy - should succeed because we still have signers
-        let policy_id = get_policy_id(&e, rule.id, &policy_address);
+        let policy_id = get_policy_id(&e, &policy_address);
         remove_policy(&e, rule.id, policy_id);
 
         let updated_rule = get_context_rule(&e, rule.id);
@@ -509,12 +490,74 @@ fn remove_policy_shared_across_rules_decrements_count() {
         );
 
         // Remove the policy from rule_a (count 2 → 1, not deleted).
-        let policy_id = get_policy_id(&e, rule_a.id, &policy_address);
+        let policy_id = get_policy_id(&e, &policy_address);
         remove_policy(&e, rule_a.id, policy_id);
 
         let count_key = SmartAccountStorageKey::PolicyData(policy_id);
         let policy_data: PolicyEntry = e.storage().persistent().get(&count_key).unwrap();
         assert_eq!(policy_data.count, 1);
+    });
+}
+
+// ################## ID LOOKUP TESTS ##################
+
+#[test]
+fn get_signer_id_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    let rule = setup_test_rule(&e, &address);
+
+    e.as_contract(&address, || {
+        let signer = rule.signers.get(0).unwrap();
+        let id = get_signer_id(&e, &signer);
+        // Verify the ID resolves back to the same signer
+        let entry: SignerEntry =
+            e.storage().persistent().get(&SmartAccountStorageKey::SignerData(id)).unwrap();
+        assert_eq!(entry.signer, signer);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3006)")]
+fn get_signer_id_not_found() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let unregistered = Signer::Delegated(Address::generate(&e));
+        get_signer_id(&e, &unregistered);
+    });
+}
+
+#[test]
+fn get_policy_id_success() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+    let policy_address = e.register(MockPolicyContract, ());
+
+    let rule = setup_test_rule(&e, &address);
+
+    e.as_contract(&address, || {
+        let install_param: Val = Val::from_void().into();
+        add_policy(&e, rule.id, &policy_address, install_param);
+
+        let id = get_policy_id(&e, &policy_address);
+        let entry: PolicyEntry =
+            e.storage().persistent().get(&SmartAccountStorageKey::PolicyData(id)).unwrap();
+        assert_eq!(entry.policy, policy_address);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3008)")]
+fn get_policy_id_not_found() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let unregistered = Address::generate(&e);
+        get_policy_id(&e, &unregistered);
     });
 }
 

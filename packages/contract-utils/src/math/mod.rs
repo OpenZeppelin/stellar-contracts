@@ -8,11 +8,13 @@
 //! The library exposes free functions for `i128` and `I256` fixed-point
 //! multiplication and division, in both panicking and checked variants:
 //!
-//! - **Panicking variants** (e.g. [`mul_div_with_rounding_i128`]): panic on
-//!   overflow or division by zero with a [`SorobanFixedPointError`].
-//! - **Checked variants** (e.g. [`checked_mul_div_with_rounding_i128`]): return
-//!   `None` on error for graceful handling. Note that for `I256` operations,
-//!   the intermediate `x * y` multiplication still panics on overflow because
+//! - **Panicking variants** (e.g. [`i128_fixed_point::mul_div_with_rounding`]):
+//!   panic with [`SorobanFixedPointError::Overflow`] when the result overflows,
+//!   and with a native arithmetic panic when dividing by zero.
+//! - **Checked variants** (e.g.
+//!   [`i128_fixed_point::checked_mul_div_with_rounding`]): return `None` on
+//!   error for graceful handling. Note that for `I256` operations, the
+//!   intermediate `x * y` multiplication still panics on overflow because
 //!   `soroban-sdk` does not yet provide a checked multiply for `I256`; once it
 //!   does, `I256` checked variants will also return `None` for that case.
 //!

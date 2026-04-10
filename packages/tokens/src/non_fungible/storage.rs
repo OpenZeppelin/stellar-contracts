@@ -441,6 +441,7 @@ impl Base {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
+    /// * `owner` - The address of the token owner.
     /// * `approver` - The address of the approver (should be `owner` or
     ///   `operator`).
     /// * `approved` - The address receiving the approval.
@@ -452,8 +453,8 @@ impl Base {
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::InvalidApprover`] - If the owner address is
-    ///   not the actual owner of the token.
+    /// * [`NonFungibleTokenError::InvalidApprover`] - If the approver is
+    ///   neither the owner nor an approved operator.
     /// * [`NonFungibleTokenError::InvalidLiveUntilLedger`] - If the ledger
     ///   number is less than the current ledger number.
     pub fn approve_for_owner(
@@ -539,19 +540,19 @@ impl Base {
         e.storage().persistent().set(&NFTStorageKey::Balance(to.clone()), &balance);
     }
 
-    /// Low-level function for decreasing the balance of `to`, without handling
-    /// authorization.
+    /// Low-level function for decreasing the balance of `from`, without
+    /// handling authorization.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `to` - The address whose balance gets decreased.
+    /// * `from` - The address whose balance gets decreased.
     /// * `amount` - The amount by which the balance gets decreased.
     ///
     /// # Errors
     ///
-    /// * [`NonFungibleTokenError::MathOverflow`] - If the balance of the `from`
-    ///   would overflow.
+    /// * [`NonFungibleTokenError::MathOverflow`] - If the resulting balance
+    ///   would underflow.
     pub fn decrease_balance(e: &Env, from: &Address, amount: u32) {
         let Some(balance) = Base::balance(e, from).checked_sub(amount) else {
             panic_with_error!(e, NonFungibleTokenError::MathOverflow);

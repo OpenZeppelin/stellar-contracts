@@ -129,9 +129,10 @@ pub trait Verifier {
     ///
     /// # Panics
     ///
-    /// Implementations should panic with appropriate error codes when:
-    /// - `key_data` is malformed or has invalid length
-    /// - `key_data` does not represent a valid key for this scheme
+    /// Implementations must panic when `key_data` has invalid length. Checks
+    /// that `key_data` is well-formatted and represents a valid key for the
+    /// given scheme might be also implemented if the resource costs for
+    /// such checks are justifiable.
     ///
     /// # Security Requirements
     ///

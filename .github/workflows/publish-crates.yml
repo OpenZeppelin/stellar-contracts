@@ -1,14 +1,19 @@
 name: Publish on crates.io
+
 # This workflow publishes all crates on crates.io.
 on:
   push:
     tags:
       - v*
+  workflow_dispatch:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
+
 jobs:
   dry-run:
     name: Dry run
@@ -22,32 +27,42 @@ jobs:
         with:
           target: wasm32v1-none
 
+      - name: Install Stellar CLI
+        run: curl -fsSL https://github.com/stellar/stellar-cli/raw/main/install.sh | sh
+
+      - name: Build with Stellar CLI
+        run: stellar contract build
+
+      # Dry-run checks validate packaging metadata against crates.io.
+      # Crates with versioned workspace dependencies (including dev-deps)
+      # cannot be dry-run checked because those versions don't exist on
+      # crates.io yet. Their build is already verified by `stellar contract build`.
+
       - name: Check stellar-access
-        run: cargo publish -p stellar-access --target wasm32v1-none --dry-run
+        run: cargo publish -p stellar-access --dry-run --no-verify
 
       - name: Check stellar-accounts
-        run: cargo publish -p stellar-accounts --target wasm32v1-none --dry-run
+        run: cargo publish -p stellar-accounts --dry-run --no-verify
 
       - name: Check stellar-contract-utils
-        run: cargo publish -p stellar-contract-utils --target wasm32v1-none --dry-run
-
-      - name: Check stellar-fee-abstraction
-        run: cargo publish -p stellar-fee-abstraction --target wasm32v1-none --dry-run
+        run: cargo publish -p stellar-contract-utils --dry-run --no-verify
 
       - name: Check stellar-governance
-        run: cargo publish -p stellar-governance --target wasm32v1-none --dry-run
+        run: cargo publish -p stellar-governance --dry-run --no-verify
 
       - name: Check stellar-macros
-        run: cargo publish -p stellar-macros --target wasm32v1-none --dry-run
+        run: cargo publish -p stellar-macros --dry-run --no-verify
 
-        # Intentionally skipping "stellar-tokens" because dependant on "stellar-contract-utils"
+      # Skipped: stellar-fee-abstraction (dev-deps on stellar-tokens, stellar-macros)
+      # Skipped: stellar-tokens (depends on stellar-contract-utils, stellar-governance)
+      # Skipped: stellar-zk-email (not published to crates.io yet)
 
   publish:
     name: Publish
     needs: dry-run
     if: ${{ !contains(github.ref_name, '-rc.') }}
     env:
-      CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -56,25 +71,37 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: wasm32v1-none
+
+      - name: Install Stellar CLI
+        run: curl -fsSL https://github.com/stellar/stellar-cli/raw/main/install.sh | sh
+
+      - name: Build with Stellar CLI
+        run: stellar contract build
+
+      # Publish order matters: leaf crates first, then dependents.
+      # crates.io may have indexing latency, so dependents are published last.
+
+      # Leaf crates (no workspace dependencies)
       - name: Publish stellar-access
-        run: cargo publish -p stellar-access --target wasm32v1-none --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-access --no-verify
 
       - name: Publish stellar-accounts
-        run: cargo publish -p stellar-accounts --target wasm32v1-none --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-accounts --no-verify
 
       - name: Publish stellar-contract-utils
-        run: cargo publish -p stellar-contract-utils --target wasm32v1-none --token $CRATES_IO_TOKEN
-
-      - name: Publish stellar-fee-abstraction
-        run: cargo publish -p stellar-fee-abstraction --target wasm32v1-none --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-contract-utils --no-verify
 
       - name: Publish stellar-governance
-        run: cargo publish -p stellar-governance --target wasm32v1-none --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-governance --no-verify
 
       - name: Publish stellar-macros
-        run: cargo publish -p stellar-macros --target wasm32v1-none --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-macros --no-verify
 
-      # "stellar-token" is dependant on "stellar-contract-utils" and if there's some latency from crates.io, it might be useful to add a sleep step e.g. `sleep 300`
-
+      # Dependent crates (published after their dependencies are available)
+      # stellar-tokens depends on stellar-contract-utils, stellar-governance
       - name: Publish stellar-tokens
-        run: cargo publish -p stellar-tokens --target wasm32v1-none --token $CRATES_IO_TOKEN
+        run: cargo publish -p stellar-tokens --no-verify
+
+      # stellar-fee-abstraction dev-depends on stellar-tokens, stellar-macros
+      - name: Publish stellar-fee-abstraction
+        run: cargo publish -p stellar-fee-abstraction --no-verify
