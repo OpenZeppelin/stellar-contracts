@@ -5,6 +5,10 @@ license.workspace = true
 repository.workspace = true
 publish = false
 version.workspace = true
+authors.workspace = true
+
+[package.metadata.stellar]
+cargo_inherit = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]
