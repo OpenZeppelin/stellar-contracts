@@ -8,6 +8,9 @@ publish = true
 description = "Macros for Stellar contracts."
 
 
+[package.metadata.stellar]
+cargo_inherit = true
+
 [lib]
 proc-macro = true
 doctest = false
