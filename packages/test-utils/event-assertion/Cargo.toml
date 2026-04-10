@@ -6,6 +6,9 @@ repository.workspace = true
 publish = false
 version.workspace = true
 
+[package.metadata.stellar]
+cargo_inherit = true
+
 [lib]
 crate-type = ["lib"]
 doctest = false
