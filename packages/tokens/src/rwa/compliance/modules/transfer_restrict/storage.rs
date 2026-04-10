@@ -116,7 +116,7 @@ pub fn batch_disallow_users(e: &Env, token: &Address, users: &Vec<Address>) {
 
 // ################## COMPLIANCE HOOKS ##################
 
-/// Checks whether the transfer is allowed by the address allowlist.
+/// Returns `true` if the sender or recipient is allowlisted.
 ///
 /// T-REX semantics: if the sender is allowlisted, the transfer passes;
 /// otherwise the recipient must be allowlisted.
@@ -127,10 +127,6 @@ pub fn batch_disallow_users(e: &Env, token: &Address, users: &Vec<Address>) {
 /// * `from` - The sender address.
 /// * `to` - The recipient address.
 /// * `token` - The token address.
-///
-/// # Returns
-///
-/// `true` if the sender or recipient is allowlisted, `false` otherwise.
 pub fn can_transfer(e: &Env, from: &Address, to: &Address, token: &Address) -> bool {
     if is_user_allowed(e, token, from) {
         return true;
