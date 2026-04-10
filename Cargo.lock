@@ -1586,7 +1586,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-country-allow"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
@@ -1594,7 +1594,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-country-restrict"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
