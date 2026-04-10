@@ -11,6 +11,21 @@
 OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stellar network. Our goal is to bring Web3 standards under the OpenZeppelin quality by providing a set of high-quality, battle-tested contracts that can be used to build decentralized applications on the Stellar network.
 
 
+## Published Crates
+
+OpenZeppelin Stellar Contracts are published as separate crates on [crates.io](https://crates.io):
+
+- [stellar-access](https://crates.io/crates/stellar-access): Role-based access controls and ownable
+- [stellar-accounts](https://crates.io/crates/stellar-accounts): Smart accounts with custom authentication and authorization
+- [stellar-contract-utils](https://crates.io/crates/stellar-contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
+- [stellar-fee-abstraction](https://crates.io/crates/stellar-fee-abstraction): Fee abstraction utilities
+- [stellar-governance](https://crates.io/crates/stellar-governance): Governance utilities (governor, votes, timelock)
+- [stellar-macros](https://crates.io/crates/stellar-macros): Proc macros (`#[only_owner]`, `#[when_not_paused]`, etc.)
+- [stellar-tokens](https://crates.io/crates/stellar-tokens): Token types (fungible, non-fungible, real-world assets, vaults)
+
+Refer to the [OpenZeppelin for Stellar Contracts](https://docs.openzeppelin.com/stellar-contracts) page for additional information.
+
+
 ## Project Structure
 
 - `packages/`: Source code
@@ -18,10 +33,11 @@ OpenZeppelin Stellar Soroban Contracts is a collection of contracts for the Stel
   - [`accounts/`](packages/accounts): Smart accounts with custom authentication and authorization
   - [`contract-utils/`](packages/contract-utils): Utilities for contracts (pausable, upgradeable, cryptography, etc.)
   - [`fee-abstraction/`](packages/fee-abstraction): Utilities for covering transaction fees with fungible tokens instead of XLM
-  - [`governance/`](packages/governance): Governance utilities such as timelock
+  - [`governance/`](packages/governance): Governance utilities (governor, votes, timelock)
   - [`macros/`](packages/macros): Proc macros for some of the modules (`#[only_owner]`, `#[when_not_paused]`, etc.)
   - [`test-utils/`](packages/test-utils): Utilities for testing
   - [`tokens/`](packages/tokens): Various token types (fungible, non-fungible, real-world assets, vaults)
+  - [`zk-email/`](packages/zk-email): On-chain DKIM registry for zkEmail verification
 - `examples/`: Example contracts
 - `audits/`: Audit reports
 
@@ -58,9 +74,13 @@ We recommend pinning to a specific version, because rapid iterations are expecte
 
 ```toml
 [dependencies]
-stellar-tokens = "=0.6.0"
-stellar-access = "=0.6.0"
-stellar-contract-utils = "=0.6.0"
+stellar-tokens = "=0.7.0"
+stellar-access = "=0.7.0"
+stellar-contract-utils = "=0.7.0"
+stellar-governance = "=0.7.0"
+stellar-accounts = "=0.7.0"
+stellar-fee-abstraction = "=0.7.0"
+stellar-macros = "=0.7.0"
 ```
 
 ## Notes

@@ -1,6 +1,10 @@
 extern crate std;
 
-use soroban_sdk::{contract, testutils::Address as _, Address, Env};
+use soroban_sdk::{
+    contract,
+    testutils::{Address as _, Ledger},
+    Address, Env,
+};
 use stellar_event_assertion::EventAssertion;
 
 use crate::{
@@ -144,6 +148,38 @@ fn renounce_fails_if_pending_transfer_exists() {
 
     e.as_contract(&contract, || {
         renounce_ownership(&e);
+    });
+}
+
+/// Renouncing should succeed when a pending transfer exists but has expired.
+#[test]
+fn renounce_succeeds_when_pending_transfer_expired() {
+    let e = Env::default();
+    let owner = Address::generate(&e);
+    let pending = Address::generate(&e);
+    let contract = e.register(MockContract, ());
+
+    e.as_contract(&contract, || {
+        set_owner(&e, &owner);
+        // Set a pending transfer that expires at ledger 100.
+        let pending_transfer = PendingTransfer { address: pending.clone(), live_until_ledger: 100 };
+        e.storage().temporary().set(&OwnableStorageKey::PendingOwner, &pending_transfer);
+    });
+
+    e.mock_all_auths();
+
+    // Advance ledger past the expiry.
+    e.ledger().set_sequence_number(101);
+
+    e.as_contract(&contract, || {
+        // Should succeed — expired pending transfer is treated as absent.
+        renounce_ownership(&e);
+        assert_eq!(get_owner(&e), None);
+
+        // Verify the expired entry was cleaned up.
+        let stored: Option<PendingTransfer> =
+            e.storage().temporary().get(&OwnableStorageKey::PendingOwner);
+        assert!(stored.is_none());
     });
 }
 

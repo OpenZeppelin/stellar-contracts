@@ -1,7 +1,7 @@
 use ed25519_dalek::{Signer as Ed25519Signer, SigningKey};
 use soroban_sdk::{contract, Bytes, BytesN, Env};
 
-use crate::verifiers::ed25519::verify;
+use crate::verifiers::ed25519::{batch_canonicalize_key, verify};
 
 #[contract]
 struct MockContract;
@@ -113,5 +113,25 @@ fn ed25519_canonicalize_key() {
 
         assert_eq!(canonical, Bytes::from_array(&e, &key_bytes));
         assert_eq!(canonical.len(), 32);
+    });
+}
+
+#[test]
+fn ed25519_batch_canonicalize_key_preserves_order() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let key1 = BytesN::<32>::from_array(&e, &[1u8; 32]);
+        let key2 = BytesN::<32>::from_array(&e, &[2u8; 32]);
+        let key3 = BytesN::<32>::from_array(&e, &[3u8; 32]);
+
+        let keys = soroban_sdk::Vec::from_array(&e, [key1, key2, key3]);
+        let canonical = batch_canonicalize_key(&e, &keys);
+
+        assert_eq!(canonical.len(), 3);
+        assert_eq!(canonical.get(0).unwrap(), Bytes::from_array(&e, &[1u8; 32]));
+        assert_eq!(canonical.get(1).unwrap(), Bytes::from_array(&e, &[2u8; 32]));
+        assert_eq!(canonical.get(2).unwrap(), Bytes::from_array(&e, &[3u8; 32]));
     });
 }

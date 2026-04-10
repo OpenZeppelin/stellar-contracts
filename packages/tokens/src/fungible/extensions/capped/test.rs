@@ -19,7 +19,7 @@ fn test_mint_under_cap() {
     e.as_contract(&contract_address, || {
         set_cap(&e, 1000);
 
-        check_cap(&e, 500);
+        check_cap(&e, 500, Base::total_supply(&e));
         Base::mint(&e, &user, 500);
 
         assert_eq!(Base::balance(&e, &user), 500);
@@ -36,7 +36,7 @@ fn test_mint_exact_cap() {
     e.as_contract(&contract_address, || {
         set_cap(&e, 1000);
 
-        check_cap(&e, 1000);
+        check_cap(&e, 1000, Base::total_supply(&e));
         Base::mint(&e, &user, 1000);
 
         assert_eq!(Base::balance(&e, &user), 1000);
@@ -54,7 +54,7 @@ fn test_mint_exceeds_cap() {
     e.as_contract(&contract_address, || {
         set_cap(&e, 1000);
 
-        check_cap(&e, 1001);
+        check_cap(&e, 1001, Base::total_supply(&e));
         Base::mint(&e, &user, 1001); // This should panic
     });
 }
@@ -70,14 +70,14 @@ fn test_mint_multiple_exceeds_cap() {
         set_cap(&e, 1000);
 
         // Mint 600 tokens first
-        check_cap(&e, 600);
+        check_cap(&e, 600, Base::total_supply(&e));
         Base::mint(&e, &user, 600);
 
         assert_eq!(Base::balance(&e, &user), 600);
         assert_eq!(Base::total_supply(&e), 600);
 
         // Attempt to mint 500 more tokens (would exceed cap)
-        check_cap(&e, 500);
+        check_cap(&e, 500, Base::total_supply(&e));
         Base::mint(&e, &user, 500); // This should panic
     });
 }
@@ -93,7 +93,7 @@ fn test_check_cap_overflows() {
         set_cap(&e, i128::MAX);
         Base::mint(&e, &user, i128::MAX);
 
-        check_cap(&e, 1); // should overflow
+        check_cap(&e, 1, Base::total_supply(&e)); // should overflow
     });
 }
 

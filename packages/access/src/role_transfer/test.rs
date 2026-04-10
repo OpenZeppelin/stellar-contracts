@@ -6,7 +6,9 @@ use soroban_sdk::{
     Address, Env,
 };
 
-use crate::role_transfer::{accept_transfer, transfer_role, PendingTransfer};
+use crate::role_transfer::{
+    accept_transfer, has_active_pending_transfer, transfer_role, PendingTransfer,
+};
 
 #[contract]
 struct MockContract;
@@ -191,6 +193,60 @@ fn transfer_with_invalid_live_until_ledger_panics() {
 
         // Start admin transfer
         transfer_role(&e, &new_admin, &pending_key, 3);
+    });
+}
+
+/// Verifies that `has_active_pending_transfer` removes an expired entry from
+/// storage and returns `false`.
+#[test]
+fn has_active_pending_transfer_cleans_up_expired_entry() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let new_admin = Address::generate(&e);
+    let pending_key = MockRole::PendingAdmin;
+
+    e.ledger().set_sequence_number(200);
+
+    e.as_contract(&address, || {
+        // Manually insert a pending transfer that expired at ledger 100.
+        // Use a high storage TTL so the entry survives past the deadline.
+        let expired = PendingTransfer { address: new_admin.clone(), live_until_ledger: 100 };
+        e.storage().temporary().set(&pending_key, &expired);
+        e.storage().temporary().extend_ttl(&pending_key, 1000, 1000);
+
+        // The entry is in storage…
+        assert!(e.storage().temporary().get::<_, PendingTransfer>(&pending_key).is_some());
+
+        // …but has_active_pending_transfer should treat it as absent.
+        assert!(!has_active_pending_transfer(&e, &pending_key));
+
+        // And the stale entry should now be removed from storage.
+        assert!(e.storage().temporary().get::<_, PendingTransfer>(&pending_key).is_none());
+    });
+}
+
+/// Verifies that `has_active_pending_transfer` returns `true` for a
+/// non-expired entry and does not remove it.
+#[test]
+fn has_active_pending_transfer_returns_true_for_active_entry() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+    let new_admin = Address::generate(&e);
+    let pending_key = MockRole::PendingAdmin;
+
+    e.ledger().set_sequence_number(50);
+
+    e.as_contract(&address, || {
+        let active = PendingTransfer { address: new_admin.clone(), live_until_ledger: 100 };
+        e.storage().temporary().set(&pending_key, &active);
+        e.storage().temporary().extend_ttl(&pending_key, 1000, 1000);
+
+        assert!(has_active_pending_transfer(&e, &pending_key));
+
+        // Entry should still be in storage.
+        assert!(e.storage().temporary().get::<_, PendingTransfer>(&pending_key).is_some());
     });
 }
 
