@@ -1594,7 +1594,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-country-allow"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
@@ -1602,7 +1602,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-country-restrict"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
@@ -1640,7 +1640,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-initial-lockup-period"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
@@ -1648,7 +1648,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-max-balance"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
@@ -1656,7 +1656,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-supply-limit"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
@@ -1664,7 +1664,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-time-transfers-limits"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
@@ -1683,7 +1683,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-transfer-restrict"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
