@@ -8,6 +8,9 @@ publish = true
 description = "Governance Utilities for Stellar contracts."
 
 
+[package.metadata.stellar]
+cargo_inherit = true
+
 [lib]
 crate-type = ["lib", "cdylib"]
 doctest = false

@@ -146,7 +146,7 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-governance = "=0.7.0"
+stellar-governance = "=0.7.1"
 ```
 
 ## Examples

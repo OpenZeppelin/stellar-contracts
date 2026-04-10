@@ -7,6 +7,9 @@ version.workspace = true
 publish = true
 description = "zkEmail utilities for Stellar contracts."
 
+[package.metadata.stellar]
+cargo_inherit = true
+
 [lib]
 crate-type = ["lib", "cdylib"]
 doctest = false
