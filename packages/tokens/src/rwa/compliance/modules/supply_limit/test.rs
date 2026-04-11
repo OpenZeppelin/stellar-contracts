@@ -3,8 +3,8 @@ extern crate std;
 use soroban_sdk::{contract, contractimpl, contracttype, testutils::Address as _, Address, Env};
 
 use super::storage::{
-    can_create, configure_supply_limit, get_internal_supply, on_created, on_destroyed,
-    pre_set_supply, verify_hook_wiring,
+    can_create, configure_supply_limit, get_internal_supply, get_supply_limit_or_panic, on_created,
+    on_destroyed, pre_set_supply, verify_hook_wiring,
 };
 use crate::rwa::{
     compliance::{
@@ -178,5 +178,30 @@ fn pre_set_internal_supply_seeds_existing_supply_for_cap_checks() {
         assert_eq!(get_internal_supply(&e, &token), 90);
         assert!(!can_create(&e, 11, &token));
         assert!(can_create(&e, 10, &token));
+    });
+}
+
+#[test]
+fn get_supply_limit_or_panic_returns_configured_limit() {
+    let e = Env::default();
+    let module_id = e.register(TestSupplyLimitContract, ());
+    let token = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        configure_supply_limit(&e, &token, 100);
+
+        assert_eq!(get_supply_limit_or_panic(&e, &token), 100);
+    });
+}
+
+#[test]
+#[should_panic]
+fn get_supply_limit_or_panic_panics_when_unconfigured() {
+    let e = Env::default();
+    let module_id = e.register(TestSupplyLimitContract, ());
+    let token = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        let _ = get_supply_limit_or_panic(&e, &token);
     });
 }

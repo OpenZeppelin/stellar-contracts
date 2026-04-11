@@ -6,7 +6,8 @@ use soroban_sdk::{
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::only_role;
 use stellar_tokens::rwa::{
-    emit_claim_topics_and_issuers_set, identity_verifier::IdentityVerifier, RWAError,
+    emit_claim_topics_and_issuers_set, identity_registry_storage::IdentityRegistryStorageClient,
+    identity_verifier::IdentityVerifier, RWAError,
 };
 
 #[contracttype]
@@ -14,13 +15,6 @@ use stellar_tokens::rwa::{
 enum DataKey {
     Irs,
     ClaimTopicsAndIssuers,
-}
-
-#[soroban_sdk::contractclient(name = "IRSClient")]
-#[allow(dead_code)]
-trait IRSView {
-    fn stored_identity(e: &Env, account: Address) -> Address;
-    fn get_recovered_to(e: &Env, old: Address) -> Option<Address>;
 }
 
 #[contract]
@@ -46,7 +40,7 @@ impl SimpleIdentityVerifier {
 impl IdentityVerifier for SimpleIdentityVerifier {
     fn verify_identity(e: &Env, account: &Address) {
         let irs = identity_registry_storage(e);
-        let client = IRSClient::new(e, &irs);
+        let client = IdentityRegistryStorageClient::new(e, &irs);
         if client.try_stored_identity(account).is_err() {
             panic_with_error!(e, RWAError::IdentityVerificationFailed);
         }
@@ -54,7 +48,7 @@ impl IdentityVerifier for SimpleIdentityVerifier {
 
     fn recovery_target(e: &Env, old_account: &Address) -> Option<Address> {
         let irs = identity_registry_storage(e);
-        let client = IRSClient::new(e, &irs);
+        let client = IdentityRegistryStorageClient::new(e, &irs);
         client.get_recovered_to(old_account)
     }
 
