@@ -380,7 +380,8 @@ pub fn on_destroyed(e: &Env, from: &Address, amount: i128, token: &Address) {
     set_internal_balance(e, token, from, sub_i128_or_panic(e, current, amount));
 }
 
-/// Checks whether a transfer is allowed based on lockup restrictions.
+/// Returns `true` if the sender has sufficient unlocked balance for the
+/// transfer.
 ///
 /// # Arguments
 ///
@@ -388,10 +389,6 @@ pub fn on_destroyed(e: &Env, from: &Address, amount: i128, token: &Address) {
 /// * `from` - The sender address.
 /// * `amount` - The transfer amount.
 /// * `token` - The token address.
-///
-/// # Returns
-///
-/// `true` if the sender has sufficient unlocked balance.
 pub fn can_transfer(e: &Env, from: &Address, amount: i128, token: &Address) -> bool {
     assert!(
         hooks_verified(e),

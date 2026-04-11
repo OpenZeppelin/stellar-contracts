@@ -306,7 +306,8 @@ pub fn on_transfer(e: &Env, from: &Address, amount: i128, token: &Address) {
     increase_counters(e, token, &from_id, amount);
 }
 
-/// Checks whether a transfer is within the configured time-window limits.
+/// Returns `true` if the transfer does not exceed any configured
+/// time-window limit.
 ///
 /// # Arguments
 ///
@@ -315,9 +316,10 @@ pub fn on_transfer(e: &Env, from: &Address, amount: i128, token: &Address) {
 /// * `amount` - The transfer amount.
 /// * `token` - The token address.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `true` if the transfer does not exceed any limit.
+/// * [`crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet`]
+///   - When no IRS has been configured for `token`.
 pub fn can_transfer(e: &Env, from: &Address, amount: i128, token: &Address) -> bool {
     assert!(
         hooks_verified(e),

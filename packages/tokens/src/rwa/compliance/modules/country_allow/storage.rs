@@ -123,7 +123,7 @@ pub fn batch_disallow_countries(e: &Env, token: &Address, countries: &Vec<u32>) 
 
 // ################## COMPLIANCE HOOKS ##################
 
-/// Checks whether `to` has at least one allowed country in the IRS for
+/// Returns `true` if `to` has at least one allowed country in the IRS for
 /// `token`.
 ///
 /// # Arguments
@@ -132,10 +132,10 @@ pub fn batch_disallow_countries(e: &Env, token: &Address, countries: &Vec<u32>) 
 /// * `to` - The recipient whose country data is checked.
 /// * `token` - The token address.
 ///
-/// # Returns
+/// # Errors
 ///
-/// `true` if the recipient has at least one allowed country, `false`
-/// otherwise.
+/// * [`crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet`]
+///   - When no IRS has been configured for `token`.
 ///
 /// # Cross-Contract Calls
 ///
