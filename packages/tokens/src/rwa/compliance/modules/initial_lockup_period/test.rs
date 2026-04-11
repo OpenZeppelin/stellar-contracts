@@ -1,12 +1,15 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, testutils::Address as _, vec, Address, Env,
+    contract, contractimpl, contracttype,
+    testutils::{Address as _, Ledger as _},
+    vec, Address, Env,
 };
 
 use super::storage::{
-    can_transfer, get_internal_balance, get_total_locked, pre_set_lockup_state, verify_hook_wiring,
-    LockedTokens,
+    can_transfer, configure_lockup_period, get_internal_balance, get_locks, get_total_locked,
+    on_created, on_destroyed, on_transfer, pre_set_lockup_state, set_internal_balance, set_locks,
+    set_total_locked, verify_hook_wiring, LockedTokens,
 };
 use crate::rwa::{
     compliance::{
@@ -155,5 +158,151 @@ fn pre_set_lockup_state_seeds_existing_locked_balance() {
         assert_eq!(get_total_locked(&e, &token, &wallet), 80);
         assert!(!can_transfer(&e, &wallet, 21, &token));
         assert!(can_transfer(&e, &wallet, 20, &token));
+    });
+}
+
+#[test]
+fn can_transfer_returns_true_without_locks_and_false_for_negative_amount() {
+    let e = Env::default();
+    let module_id = e.register(TestModuleContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        arm_hooks(&e);
+
+        assert!(!can_transfer(&e, &wallet, -1, &token));
+        assert!(can_transfer(&e, &wallet, 1_000, &token));
+    });
+}
+
+#[test]
+fn on_created_locks_minted_amount_when_period_is_configured() {
+    let e = Env::default();
+    e.ledger().set_timestamp(100);
+
+    let module_id = e.register(TestModuleContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        configure_lockup_period(&e, &token, 60);
+
+        on_created(&e, &wallet, 40, &token);
+
+        let locks = get_locks(&e, &token, &wallet);
+        assert_eq!(locks.len(), 1);
+        let lock = locks.get(0).unwrap();
+        assert_eq!(lock.amount, 40);
+        assert_eq!(lock.release_timestamp, 160);
+        assert_eq!(get_total_locked(&e, &token, &wallet), 40);
+        assert_eq!(get_internal_balance(&e, &token, &wallet), 40);
+    });
+}
+
+#[test]
+fn on_transfer_consumes_unlocked_locks_before_updating_balances() {
+    let e = Env::default();
+    e.ledger().set_timestamp(100);
+
+    let module_id = e.register(TestModuleContract, ());
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_internal_balance(&e, &token, &sender, 100);
+        set_internal_balance(&e, &token, &recipient, 10);
+        set_locks(
+            &e,
+            &token,
+            &sender,
+            &vec![
+                &e,
+                LockedTokens { amount: 30, release_timestamp: 90 },
+                LockedTokens { amount: 40, release_timestamp: 200 },
+            ],
+        );
+        set_total_locked(&e, &token, &sender, 70);
+
+        on_transfer(&e, &sender, &recipient, 50, &token);
+
+        let locks = get_locks(&e, &token, &sender);
+        assert_eq!(locks.len(), 2);
+        let first_lock = locks.get(0).unwrap();
+        assert_eq!(first_lock.amount, 10);
+        assert_eq!(first_lock.release_timestamp, 90);
+        let second_lock = locks.get(1).unwrap();
+        assert_eq!(second_lock.amount, 40);
+        assert_eq!(second_lock.release_timestamp, 200);
+        assert_eq!(get_total_locked(&e, &token, &sender), 50);
+        assert_eq!(get_internal_balance(&e, &token, &sender), 50);
+        assert_eq!(get_internal_balance(&e, &token, &recipient), 60);
+    });
+}
+
+#[test]
+fn on_destroyed_consumes_unlocked_locks_before_burning() {
+    let e = Env::default();
+    e.ledger().set_timestamp(100);
+
+    let module_id = e.register(TestModuleContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_internal_balance(&e, &token, &wallet, 100);
+        set_locks(
+            &e,
+            &token,
+            &wallet,
+            &vec![
+                &e,
+                LockedTokens { amount: 30, release_timestamp: 90 },
+                LockedTokens { amount: 40, release_timestamp: 200 },
+            ],
+        );
+        set_total_locked(&e, &token, &wallet, 70);
+
+        on_destroyed(&e, &wallet, 50, &token);
+
+        let locks = get_locks(&e, &token, &wallet);
+        assert_eq!(locks.len(), 2);
+        let first_lock = locks.get(0).unwrap();
+        assert_eq!(first_lock.amount, 10);
+        assert_eq!(first_lock.release_timestamp, 90);
+        let second_lock = locks.get(1).unwrap();
+        assert_eq!(second_lock.amount, 40);
+        assert_eq!(second_lock.release_timestamp, 200);
+        assert_eq!(get_total_locked(&e, &token, &wallet), 50);
+        assert_eq!(get_internal_balance(&e, &token, &wallet), 50);
+    });
+}
+
+#[test]
+#[should_panic]
+fn on_destroyed_panics_when_burn_exceeds_unlocked_balance() {
+    let e = Env::default();
+    e.ledger().set_timestamp(100);
+
+    let module_id = e.register(TestModuleContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_internal_balance(&e, &token, &wallet, 100);
+        set_locks(
+            &e,
+            &token,
+            &wallet,
+            &vec![
+                &e,
+                LockedTokens { amount: 10, release_timestamp: 90 },
+                LockedTokens { amount: 70, release_timestamp: 200 },
+            ],
+        );
+        set_total_locked(&e, &token, &wallet, 80);
+
+        on_destroyed(&e, &wallet, 40, &token);
     });
 }

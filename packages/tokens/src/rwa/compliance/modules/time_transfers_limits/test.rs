@@ -1,11 +1,14 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, testutils::Address as _, Address, Env, Val, Vec,
+    contract, contractimpl, contracttype,
+    testutils::{Address as _, Ledger as _},
+    Address, Env, Val, Vec,
 };
 
 use super::storage::{
-    can_transfer, pre_set_transfer_counter, set_time_transfer_limit, verify_hook_wiring, Limit,
+    can_transfer, get_counter, get_limits, on_transfer, pre_set_transfer_counter,
+    remove_time_transfer_limit, set_time_transfer_limit, verify_hook_wiring, Limit,
     TransferCounter,
 };
 use crate::rwa::{
@@ -270,5 +273,109 @@ fn set_time_transfer_limit_rejects_more_than_four_limits() {
         }
 
         set_time_transfer_limit(&e, &token, &Limit { limit_time: 300, limit_value: 100 });
+    });
+}
+
+#[test]
+fn set_time_transfer_limit_replaces_existing_window() {
+    let e = Env::default();
+    let module_id = e.register(TestModuleContract, ());
+    let token = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_time_transfer_limit(&e, &token, &Limit { limit_time: 60, limit_value: 100 });
+        set_time_transfer_limit(&e, &token, &Limit { limit_time: 60, limit_value: 150 });
+
+        let limits = get_limits(&e, &token);
+        assert_eq!(limits.len(), 1);
+        assert_eq!(limits.get(0).unwrap(), Limit { limit_time: 60, limit_value: 150 });
+    });
+}
+
+#[test]
+fn on_transfer_resets_finished_counter_before_incrementing() {
+    let e = Env::default();
+    e.ledger().set_timestamp(100);
+
+    let module_id = e.register(TestModuleContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let sender_identity = Address::generate(&e);
+
+    irs.set_identity(&sender, &sender_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_time_transfer_limit(&e, &token, &Limit { limit_time: 60, limit_value: 100 });
+        pre_set_transfer_counter(
+            &e,
+            &token,
+            &sender_identity,
+            60,
+            &TransferCounter { value: 90, timer: 100 },
+        );
+
+        on_transfer(&e, &sender, 20, &token);
+
+        assert_eq!(
+            get_counter(&e, &token, &sender_identity, 60),
+            TransferCounter { value: 20, timer: 160 }
+        );
+    });
+}
+
+#[test]
+#[should_panic]
+fn remove_time_transfer_limit_panics_when_limit_is_missing() {
+    let e = Env::default();
+    let module_id = e.register(TestModuleContract, ());
+    let token = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        remove_time_transfer_limit(&e, &token, 60);
+    });
+}
+
+#[test]
+#[should_panic]
+fn pre_set_transfer_counter_panics_when_limit_is_missing() {
+    let e = Env::default();
+    let module_id = e.register(TestModuleContract, ());
+    let token = Address::generate(&e);
+    let identity = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        pre_set_transfer_counter(
+            &e,
+            &token,
+            &identity,
+            60,
+            &TransferCounter { value: 10, timer: 100 },
+        );
+    });
+}
+
+#[test]
+fn can_transfer_rejects_negative_amount_and_amounts_above_limit() {
+    let e = Env::default();
+    let module_id = e.register(TestModuleContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let sender_identity = Address::generate(&e);
+
+    irs.set_identity(&sender, &sender_identity);
+
+    e.as_contract(&module_id, || {
+        arm_hooks(&e);
+        assert!(!can_transfer(&e, &sender, -1, &token));
+
+        set_irs_address(&e, &token, &irs_id);
+        set_time_transfer_limit(&e, &token, &Limit { limit_time: 60, limit_value: 100 });
+
+        assert!(!can_transfer(&e, &sender, 101, &token));
     });
 }
