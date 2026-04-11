@@ -457,6 +457,47 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 
 [[package]]
+name = "deploy-compliance"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "deploy-irs"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "deploy-token"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-contract-utils",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "deploy-verifier"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1575,12 +1616,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "rwa-compliance-example"
+name = "rwa-country-allow"
 version = "0.7.1"
 dependencies = [
  "soroban-sdk",
- "stellar-access",
- "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-country-restrict"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
  "stellar-tokens",
 ]
 
@@ -1615,6 +1662,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "rwa-initial-lockup-period"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-max-balance"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-supply-limit"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-time-transfers-limits"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "rwa-token-example"
 version = "0.7.1"
 dependencies = [
@@ -1622,6 +1701,14 @@ dependencies = [
  "stellar-access",
  "stellar-contract-utils",
  "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
+name = "rwa-transfer-restrict"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
  "stellar-tokens",
 ]
 

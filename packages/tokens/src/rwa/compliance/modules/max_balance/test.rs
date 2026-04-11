@@ -1,0 +1,447 @@
+extern crate std;
+
+use soroban_sdk::{
+    contract, contractimpl, contracttype, testutils::Address as _, Address, Env, Val, Vec,
+};
+
+use super::storage::{
+    can_create, can_transfer, get_id_balance, on_created, on_destroyed, on_transfer,
+    set_id_balance, set_max_balance, verify_hook_wiring,
+};
+use crate::rwa::{
+    compliance::{
+        modules::storage::{
+            hooks_verified, set_compliance_address, set_irs_address, ComplianceModuleStorageKey,
+        },
+        Compliance, ComplianceHook,
+    },
+    identity_registry_storage::{CountryDataManager, IdentityRegistryStorage},
+    utils::token_binder::TokenBinder,
+};
+
+#[contract]
+struct MockIRSContract;
+
+#[contracttype]
+#[derive(Clone)]
+enum MockIRSStorageKey {
+    Identity(Address),
+}
+
+#[contractimpl]
+impl TokenBinder for MockIRSContract {
+    fn linked_tokens(e: &Env) -> Vec<Address> {
+        Vec::new(e)
+    }
+
+    fn bind_token(_e: &Env, _token: Address, _operator: Address) {
+        unreachable!("bind_token is not used in these tests");
+    }
+
+    fn unbind_token(_e: &Env, _token: Address, _operator: Address) {
+        unreachable!("unbind_token is not used in these tests");
+    }
+}
+
+#[contractimpl]
+impl IdentityRegistryStorage for MockIRSContract {
+    fn add_identity(
+        _e: &Env,
+        _account: Address,
+        _identity: Address,
+        _country_data_list: Vec<Val>,
+        _operator: Address,
+    ) {
+        unreachable!("add_identity is not used in these tests");
+    }
+
+    fn remove_identity(_e: &Env, _account: Address, _operator: Address) {
+        unreachable!("remove_identity is not used in these tests");
+    }
+
+    fn modify_identity(_e: &Env, _account: Address, _identity: Address, _operator: Address) {
+        unreachable!("modify_identity is not used in these tests");
+    }
+
+    fn recover_identity(
+        _e: &Env,
+        _old_account: Address,
+        _new_account: Address,
+        _operator: Address,
+    ) {
+        unreachable!("recover_identity is not used in these tests");
+    }
+
+    fn stored_identity(e: &Env, account: Address) -> Address {
+        e.storage()
+            .persistent()
+            .get(&MockIRSStorageKey::Identity(account.clone()))
+            .unwrap_or(account)
+    }
+}
+
+#[contractimpl]
+impl CountryDataManager for MockIRSContract {
+    fn add_country_data_entries(
+        _e: &Env,
+        _account: Address,
+        _country_data_list: Vec<Val>,
+        _operator: Address,
+    ) {
+        unreachable!("add_country_data_entries is not used in these tests");
+    }
+
+    fn modify_country_data(
+        _e: &Env,
+        _account: Address,
+        _index: u32,
+        _country_data: Val,
+        _operator: Address,
+    ) {
+        unreachable!("modify_country_data is not used in these tests");
+    }
+
+    fn delete_country_data(_e: &Env, _account: Address, _index: u32, _operator: Address) {
+        unreachable!("delete_country_data is not used in these tests");
+    }
+
+    fn get_country_data_entries(e: &Env, _account: Address) -> Vec<Val> {
+        Vec::new(e)
+    }
+}
+
+#[contractimpl]
+impl MockIRSContract {
+    pub fn set_identity(e: &Env, account: Address, identity: Address) {
+        e.storage().persistent().set(&MockIRSStorageKey::Identity(account), &identity);
+    }
+}
+
+#[contract]
+struct MockComplianceContract;
+
+#[contracttype]
+#[derive(Clone)]
+enum MockComplianceStorageKey {
+    Registered(ComplianceHook, Address),
+}
+
+#[contractimpl]
+impl Compliance for MockComplianceContract {
+    fn add_module_to(_e: &Env, _hook: ComplianceHook, _module: Address, _operator: Address) {
+        unreachable!("add_module_to is not used in these tests");
+    }
+
+    fn remove_module_from(_e: &Env, _hook: ComplianceHook, _module: Address, _operator: Address) {
+        unreachable!("remove_module_from is not used in these tests");
+    }
+
+    fn get_modules_for_hook(_e: &Env, _hook: ComplianceHook) -> Vec<Address> {
+        unreachable!("get_modules_for_hook is not used in these tests");
+    }
+
+    fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool {
+        e.storage().persistent().has(&MockComplianceStorageKey::Registered(hook, module))
+    }
+
+    fn transferred(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {
+        unreachable!("transferred is not used in these tests");
+    }
+
+    fn created(_e: &Env, _to: Address, _amount: i128, _token: Address) {
+        unreachable!("created is not used in these tests");
+    }
+
+    fn destroyed(_e: &Env, _from: Address, _amount: i128, _token: Address) {
+        unreachable!("destroyed is not used in these tests");
+    }
+
+    fn can_transfer(
+        _e: &Env,
+        _from: Address,
+        _to: Address,
+        _amount: i128,
+        _token: Address,
+    ) -> bool {
+        unreachable!("can_transfer is not used in these tests");
+    }
+
+    fn can_create(_e: &Env, _to: Address, _amount: i128, _token: Address) -> bool {
+        unreachable!("can_create is not used in these tests");
+    }
+}
+
+#[contractimpl]
+impl TokenBinder for MockComplianceContract {
+    fn linked_tokens(e: &Env) -> Vec<Address> {
+        Vec::new(e)
+    }
+
+    fn bind_token(_e: &Env, _token: Address, _operator: Address) {
+        unreachable!("bind_token is not used in these tests");
+    }
+
+    fn unbind_token(_e: &Env, _token: Address, _operator: Address) {
+        unreachable!("unbind_token is not used in these tests");
+    }
+}
+
+#[contractimpl]
+impl MockComplianceContract {
+    pub fn register_hook(e: &Env, hook: ComplianceHook, module: Address) {
+        e.storage().persistent().set(&MockComplianceStorageKey::Registered(hook, module), &true);
+    }
+}
+
+#[contract]
+struct TestMaxBalanceContract;
+
+fn arm_hooks(e: &Env) {
+    e.storage().instance().set(&ComplianceModuleStorageKey::HooksVerified, &true);
+}
+
+#[test]
+fn verify_hook_wiring_sets_cache_when_registered() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let compliance_id = e.register(MockComplianceContract, ());
+    let compliance = MockComplianceContractClient::new(&e, &compliance_id);
+
+    for hook in [
+        ComplianceHook::CanTransfer,
+        ComplianceHook::CanCreate,
+        ComplianceHook::Transferred,
+        ComplianceHook::Created,
+        ComplianceHook::Destroyed,
+    ] {
+        compliance.register_hook(&hook, &module_id);
+    }
+
+    e.as_contract(&module_id, || {
+        set_compliance_address(&e, &compliance_id);
+
+        verify_hook_wiring(&e);
+
+        assert!(hooks_verified(&e));
+    });
+}
+
+#[test]
+fn can_create_rejects_mint_when_cap_would_be_exceeded() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let recipient_identity = Address::generate(&e);
+
+    irs.set_identity(&recipient, &recipient_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        arm_hooks(&e);
+        set_max_balance(&e, &token, 100);
+        set_id_balance(&e, &token, &recipient_identity, 60);
+
+        assert!(!can_create(&e, &recipient, 50, &token));
+        assert!(can_create(&e, &recipient, 40, &token));
+    });
+}
+
+#[test]
+fn can_transfer_checks_distinct_recipient_identity_balance() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let sender_identity = Address::generate(&e);
+    let recipient_identity = Address::generate(&e);
+
+    irs.set_identity(&sender, &sender_identity);
+    irs.set_identity(&recipient, &recipient_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        arm_hooks(&e);
+        set_max_balance(&e, &token, 100);
+        set_id_balance(&e, &token, &recipient_identity, 60);
+
+        assert!(!can_transfer(&e, &sender, &recipient, 50, &token));
+        assert!(can_transfer(&e, &sender, &recipient, 40, &token));
+    });
+}
+
+#[test]
+fn can_create_allows_without_cap_and_rejects_negative_amount() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let recipient_identity = Address::generate(&e);
+
+    irs.set_identity(&recipient, &recipient_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        arm_hooks(&e);
+        set_id_balance(&e, &token, &recipient_identity, 500);
+
+        assert!(can_create(&e, &recipient, 1_000, &token));
+        assert!(!can_create(&e, &recipient, -1, &token));
+    });
+}
+
+#[test]
+fn can_create_rejects_negative_amount_before_requiring_irs() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let token = Address::generate(&e);
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        arm_hooks(&e);
+
+        assert!(!can_create(&e, &recipient, -1, &token));
+    });
+}
+
+#[test]
+fn can_transfer_rejects_negative_amount_before_requiring_irs() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        arm_hooks(&e);
+
+        assert!(!can_transfer(&e, &sender, &recipient, -1, &token));
+    });
+}
+
+#[test]
+fn can_transfer_allows_when_sender_and_recipient_share_identity() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let shared_identity = Address::generate(&e);
+
+    irs.set_identity(&sender, &shared_identity);
+    irs.set_identity(&recipient, &shared_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        arm_hooks(&e);
+        set_max_balance(&e, &token, 1);
+
+        assert!(can_transfer(&e, &sender, &recipient, 1_000, &token));
+    });
+}
+
+#[test]
+fn on_transfer_updates_balances_for_distinct_identities() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let sender_identity = Address::generate(&e);
+    let recipient_identity = Address::generate(&e);
+
+    irs.set_identity(&sender, &sender_identity);
+    irs.set_identity(&recipient, &recipient_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_max_balance(&e, &token, 200);
+        set_id_balance(&e, &token, &sender_identity, 100);
+        set_id_balance(&e, &token, &recipient_identity, 20);
+
+        on_transfer(&e, &sender, &recipient, 30, &token);
+
+        assert_eq!(get_id_balance(&e, &token, &sender_identity), 70);
+        assert_eq!(get_id_balance(&e, &token, &recipient_identity), 50);
+    });
+}
+
+#[test]
+fn on_transfer_is_noop_for_same_identity() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let shared_identity = Address::generate(&e);
+
+    irs.set_identity(&sender, &shared_identity);
+    irs.set_identity(&recipient, &shared_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_id_balance(&e, &token, &shared_identity, 100);
+
+        on_transfer(&e, &sender, &recipient, 30, &token);
+
+        assert_eq!(get_id_balance(&e, &token, &shared_identity), 100);
+    });
+}
+
+#[test]
+fn on_created_updates_identity_balance() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let recipient_identity = Address::generate(&e);
+
+    irs.set_identity(&recipient, &recipient_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_max_balance(&e, &token, 200);
+        set_id_balance(&e, &token, &recipient_identity, 50);
+
+        on_created(&e, &recipient, 30, &token);
+
+        assert_eq!(get_id_balance(&e, &token, &recipient_identity), 80);
+    });
+}
+
+#[test]
+fn on_destroyed_updates_identity_balance() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let holder = Address::generate(&e);
+    let holder_identity = Address::generate(&e);
+
+    irs.set_identity(&holder, &holder_identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_id_balance(&e, &token, &holder_identity, 90);
+
+        on_destroyed(&e, &holder, 40, &token);
+
+        assert_eq!(get_id_balance(&e, &token, &holder_identity), 50);
+    });
+}
