@@ -230,6 +230,40 @@ fn set_identity_registry_storage_uses_compliance_auth_after_bind() {
 }
 
 #[test]
+fn add_allowed_country_uses_admin_auth_before_compliance_bind() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let token = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    client.add_allowed_country(&token, &276);
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 1);
+    let (addr, _) = &auths[0];
+    assert_eq!(addr, &admin);
+}
+
+#[test]
+fn add_allowed_country_uses_compliance_auth_after_bind() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let compliance = Address::generate(&e);
+    let token = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    client.set_compliance_address(&compliance);
+    client.add_allowed_country(&token, &276);
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 1);
+    let (addr, _) = &auths[0];
+    assert_eq!(addr, &compliance);
+}
+
+#[test]
 fn can_transfer_and_can_create_use_irs_country_entries() {
     let e = Env::default();
     e.mock_all_auths();

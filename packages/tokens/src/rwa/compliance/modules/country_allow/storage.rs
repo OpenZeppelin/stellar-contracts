@@ -24,13 +24,12 @@ pub enum CountryAllowStorageKey {
 /// * `country` - The ISO 3166-1 numeric country code.
 pub fn is_country_allowed(e: &Env, token: &Address, country: u32) -> bool {
     let key = CountryAllowStorageKey::AllowedCountry(token.clone(), country);
-    e.storage()
-        .persistent()
-        .get(&key)
-        .inspect(|_: &bool| {
-            e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
-        })
-        .unwrap_or_default()
+    if e.storage().persistent().has(&key) {
+        e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
+        true
+    } else {
+        false
+    }
 }
 
 /// Writes a country's allowed flag to persistent storage.
@@ -42,7 +41,7 @@ pub fn is_country_allowed(e: &Env, token: &Address, country: u32) -> bool {
 /// * `country` - The ISO 3166-1 numeric country code to allow.
 pub fn set_country_allowed(e: &Env, token: &Address, country: u32) {
     let key = CountryAllowStorageKey::AllowedCountry(token.clone(), country);
-    e.storage().persistent().set(&key, &true);
+    e.storage().persistent().set(&key, &());
     e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
 }
 
@@ -123,13 +122,13 @@ pub fn batch_disallow_countries(e: &Env, token: &Address, countries: &Vec<u32>) 
 
 // ################## COMPLIANCE HOOKS ##################
 
-/// Returns `true` if `to` has at least one allowed country in the IRS for
+/// Returns `true` if `account` has at least one allowed country in the IRS for
 /// `token`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `to` - The recipient whose country data is checked.
+/// * `account` - The account whose country data is checked.
 /// * `token` - The token address.
 ///
 /// # Errors
@@ -139,13 +138,32 @@ pub fn batch_disallow_countries(e: &Env, token: &Address, countries: &Vec<u32>) 
 ///
 /// # Cross-Contract Calls
 ///
-/// Calls the IRS to resolve country data for `to`.
-pub fn can_transfer(e: &Env, to: &Address, token: &Address) -> bool {
-    let entries = get_irs_country_data_entries(e, token, to);
+/// Calls the IRS to resolve country data for `account`.
+pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
+    let entries = get_irs_country_data_entries(e, token, account);
     for entry in entries.iter() {
         if is_country_allowed(e, token, country_code(&entry.country)) {
             return true;
         }
     }
     false
+}
+
+/// Returns `true` if the transfer recipient has at least one allowed country.
+///
+/// Country allowlist checks are recipient-based, so the sender and amount are
+/// intentionally ignored.
+pub fn can_transfer(
+    e: &Env,
+    _from: &Address,
+    to: &Address,
+    _amount: i128,
+    token: &Address,
+) -> bool {
+    can_receive(e, to, token)
+}
+
+/// Returns `true` if the mint recipient has at least one allowed country.
+pub fn can_create(e: &Env, to: &Address, _amount: i128, token: &Address) -> bool {
+    can_receive(e, to, token)
 }

@@ -5,7 +5,7 @@ use soroban_sdk::{
     Vec,
 };
 
-use super::storage::{can_transfer, set_country_allowed};
+use super::storage::{can_receive, set_country_allowed};
 use crate::rwa::{
     compliance::modules::storage::set_irs_address,
     identity_registry_storage::{
@@ -140,7 +140,7 @@ fn organization_country(code: u32) -> CountryData {
 }
 
 #[test]
-fn can_transfer_allows_when_any_country_matches() {
+fn can_receive_allows_when_any_country_matches() {
     let e = Env::default();
     let module_id = e.register(TestCountryAllowContract, ());
     let irs_id = e.register(MockIRSContract, ());
@@ -157,12 +157,12 @@ fn can_transfer_allows_when_any_country_matches() {
         set_irs_address(&e, &token, &irs_id);
         set_country_allowed(&e, &token, 276);
 
-        assert!(can_transfer(&e, &to, &token));
+        assert!(can_receive(&e, &to, &token));
     });
 }
 
 #[test]
-fn can_transfer_rejects_when_no_country_matches() {
+fn can_receive_rejects_when_no_country_matches() {
     let e = Env::default();
     let module_id = e.register(TestCountryAllowContract, ());
     let irs_id = e.register(MockIRSContract, ());
@@ -177,7 +177,7 @@ fn can_transfer_rejects_when_no_country_matches() {
         set_irs_address(&e, &token, &irs_id);
         set_country_allowed(&e, &token, 276);
 
-        assert!(!can_transfer(&e, &empty_to, &token));
-        assert!(!can_transfer(&e, &disallowed_to, &token));
+        assert!(!can_receive(&e, &empty_to, &token));
+        assert!(!can_receive(&e, &disallowed_to, &token));
     });
 }

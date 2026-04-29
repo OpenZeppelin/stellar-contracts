@@ -5,7 +5,7 @@ use soroban_sdk::{
     Vec,
 };
 
-use super::storage::{can_transfer, set_country_restricted};
+use super::storage::{can_receive, set_country_restricted};
 use crate::rwa::{
     compliance::modules::storage::set_irs_address,
     identity_registry_storage::{
@@ -140,7 +140,7 @@ fn organization_country(code: u32) -> CountryData {
 }
 
 #[test]
-fn can_transfer_rejects_when_any_country_is_restricted() {
+fn can_receive_rejects_when_any_country_is_restricted() {
     let e = Env::default();
     let module_id = e.register(TestCountryRestrictContract, ());
     let irs_id = e.register(MockIRSContract, ());
@@ -157,12 +157,12 @@ fn can_transfer_rejects_when_any_country_is_restricted() {
         set_irs_address(&e, &token, &irs_id);
         set_country_restricted(&e, &token, 408);
 
-        assert!(!can_transfer(&e, &to, &token));
+        assert!(!can_receive(&e, &to, &token));
     });
 }
 
 #[test]
-fn can_transfer_allows_when_no_country_is_restricted() {
+fn can_receive_allows_when_no_country_is_restricted() {
     let e = Env::default();
     let module_id = e.register(TestCountryRestrictContract, ());
     let irs_id = e.register(MockIRSContract, ());
@@ -180,7 +180,7 @@ fn can_transfer_allows_when_no_country_is_restricted() {
         set_irs_address(&e, &token, &irs_id);
         set_country_restricted(&e, &token, 408);
 
-        assert!(can_transfer(&e, &empty_to, &token));
-        assert!(can_transfer(&e, &unrestricted_to, &token));
+        assert!(can_receive(&e, &empty_to, &token));
+        assert!(can_receive(&e, &unrestricted_to, &token));
     });
 }

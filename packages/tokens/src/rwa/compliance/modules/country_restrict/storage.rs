@@ -24,13 +24,12 @@ pub enum CountryRestrictStorageKey {
 /// * `country` - The ISO 3166-1 numeric country code.
 pub fn is_country_restricted(e: &Env, token: &Address, country: u32) -> bool {
     let key = CountryRestrictStorageKey::RestrictedCountry(token.clone(), country);
-    e.storage()
-        .persistent()
-        .get(&key)
-        .inspect(|_: &bool| {
-            e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
-        })
-        .unwrap_or_default()
+    if e.storage().persistent().has(&key) {
+        e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
+        true
+    } else {
+        false
+    }
 }
 
 /// Writes a country's restricted flag to persistent storage.
@@ -42,7 +41,7 @@ pub fn is_country_restricted(e: &Env, token: &Address, country: u32) -> bool {
 /// * `country` - The ISO 3166-1 numeric country code to restrict.
 pub fn set_country_restricted(e: &Env, token: &Address, country: u32) {
     let key = CountryRestrictStorageKey::RestrictedCountry(token.clone(), country);
-    e.storage().persistent().set(&key, &true);
+    e.storage().persistent().set(&key, &());
     e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
 }
 
@@ -123,13 +122,13 @@ pub fn batch_unrestrict_countries(e: &Env, token: &Address, countries: &Vec<u32>
 
 // ################## COMPLIANCE HOOKS ##################
 
-/// Returns `false` if `to` has any restricted country in the IRS for `token`,
-/// and `true` otherwise.
+/// Returns `false` if `account` has any restricted country in the IRS for
+/// `token`, and `true` otherwise.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `to` - The recipient whose country data is checked.
+/// * `account` - The account whose country data is checked.
 /// * `token` - The token address.
 ///
 /// # Errors
@@ -139,13 +138,32 @@ pub fn batch_unrestrict_countries(e: &Env, token: &Address, countries: &Vec<u32>
 ///
 /// # Cross-Contract Calls
 ///
-/// Calls the IRS to resolve country data for `to`.
-pub fn can_transfer(e: &Env, to: &Address, token: &Address) -> bool {
-    let entries = get_irs_country_data_entries(e, token, to);
+/// Calls the IRS to resolve country data for `account`.
+pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
+    let entries = get_irs_country_data_entries(e, token, account);
     for entry in entries.iter() {
         if is_country_restricted(e, token, country_code(&entry.country)) {
             return false;
         }
     }
     true
+}
+
+/// Returns `true` if the transfer recipient has no restricted country.
+///
+/// Country restriction checks are recipient-based, so the sender and amount are
+/// intentionally ignored.
+pub fn can_transfer(
+    e: &Env,
+    _from: &Address,
+    to: &Address,
+    _amount: i128,
+    token: &Address,
+) -> bool {
+    can_receive(e, to, token)
+}
+
+/// Returns `true` if the mint recipient has no restricted country.
+pub fn can_create(e: &Env, to: &Address, _amount: i128, token: &Address) -> bool {
+    can_receive(e, to, token)
 }
