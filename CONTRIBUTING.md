@@ -86,7 +86,7 @@ As a contributor, you are expected to fork this repository, work on your own for
 If you are introducing a new feature, please add a new test to ensure that it works as expected. Unit tests are mandatory for each new feature. If you are unsure about whether to write an integration test, you can wait for the maintainer's feedback.
 
 
-## Use of AI Tools
+## Use of AI Tools & Code Conventions
 
 We welcome contributions regardless of how they are written — including with the help of AI coding assistants. That said, AI-generated code requires the same level of scrutiny as any other code, and in practice it often requires *more*.
 
@@ -96,14 +96,14 @@ Even capable AI models frequently produce subtle mistakes: incorrect assumptions
 
 - **You are responsible for the code you submit.** Treat AI output as a first draft, not a finished product. Review it thoroughly, understand every line, and verify that it follows the conventions of this library.
 - **Run the full CI pipeline locally before opening a PR.** At a minimum, ensure that `cargo test`, `cargo clippy`, and `cargo fmt` all pass. The [workflow section above](#a-typical-workflow) has the exact commands.
-- **Match the library's patterns and style.** Spend time reading existing modules to understand how things are structured here. AI tools lack this context and will often produce code that works in isolation but feels foreign to the codebase.
+- **Match the library's patterns and style.** All code submitted to this repository, whether written by hand or with the help of an AI assistant, is expected to follow the conventions documented in [`.claude/skills/code-quality.md`](.claude/skills/code-quality.md). The rules cover module and file layout, naming, storage TTL patterns, the `#[contracttrait]` / `ContractType` pattern, error / event / section ordering, the high-level vs `_no_auth` authorization split, macro selection (`only_*` vs `has_*`), testing, and more. PRs that violate these conventions may be rejected. This file is not only designed for AI, it is also human-readable, so we strongly advise you to read it if it is your first contribution to our repository.
 
 **What happens with low-effort, unreviewed submissions:**
 
 Our team has limited time and a tight development schedule. When a PR is clearly unreviewed AI output — full of basic mistakes, inconsistent style, or misaligned design — we cannot justify the time it takes to review it. In such cases:
 
 - The PR will be closed without a detailed review.
-- Repeated low-effort submissions from the same contributor may result in future PRs not being considered.
+- Repeated low-effort submissions from the same contributor may result in future PRs not being considered (blacklisting the author).
 
 This is not about discouraging AI usage — it's about respecting everyone's time. A good contribution, whether written by hand or with AI assistance, should feel like it has already been reviewed by someone who understands the library.
 
