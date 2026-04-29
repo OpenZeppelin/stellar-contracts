@@ -432,13 +432,6 @@ followed by `mod contract;` and `#[cfg(test)] mod test;`.
 
 - Triple-slash `///` for items rendered in rustdoc; double-slash `//` for
   inline notes. JavaDoc-style `/** */` is not used.
-- The methods that are closely relevant with the new implemented module,
-  that is expected to be implemented by the contracts, should be placed
-  under a trait, they shouldn't be implemented on the contract itself directly
-  using the storage functions. The trait should be implemented on the contract
-  instead.
-- If there is no good reason on not to, all the trait methods should have a
-  default implementation (utilize the relevant storage functions for that).
 - Every public item gets at least a one-line summary. Functions that take
   or produce non-trivial values get the full
   `# Arguments` / `# Errors` / `# Events` / `# Notes` /

@@ -48,7 +48,7 @@ Run `cargo build` to:
 - Verify the version bump doesn't break compilation
 - Update `Cargo.lock` with the new version numbers
 
-Command: `export PATH="/opt/homebrew/bin:$HOME/.cargo/bin:$PATH" && cargo build`
+Command: `cargo build`
 
 ### 4. Verify
 
