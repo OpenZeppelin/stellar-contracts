@@ -86,11 +86,6 @@ As a contributor, you are expected to fork this repository, work on your own for
 If you are introducing a new feature, please add a new test to ensure that it works as expected. Unit tests are mandatory for each new feature. If you are unsure about whether to write an integration test, you can wait for the maintainer's feedback.
 
 
-## Code Conventions
-
-
-
-
 ## Use of AI Tools & Code Conventions
 
 We welcome contributions regardless of how they are written — including with the help of AI coding assistants. That said, AI-generated code requires the same level of scrutiny as any other code, and in practice it often requires *more*.
