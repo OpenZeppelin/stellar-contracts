@@ -1,13 +1,12 @@
 extern crate std;
 
-#[allow(unused_imports)]
 use soroban_sdk::{
     contract, symbol_short,
     testutils::{
         storage::{Instance, Persistent},
-        Address as _, AuthorizedFunction, Events, Ledger, MuxedAddress as _,
+        Address as _, Events, Ledger, MuxedAddress as _,
     },
-    vec, Address, Env, Event, FromVal, IntoVal, Map, MuxedAddress, String, Symbol, TryFromVal, Val,
+    Address, Env, FromVal, IntoVal, Map, MuxedAddress, String, Symbol, TryFromVal, Val,
 };
 use stellar_event_assertion::EventAssertion;
 
