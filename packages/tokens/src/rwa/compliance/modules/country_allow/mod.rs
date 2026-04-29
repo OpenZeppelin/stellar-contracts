@@ -32,6 +32,28 @@ pub struct CountryUnallowed {
     pub country: u32,
 }
 
+/// Emits a [`CountryAllowed`] event.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose allowlist changed.
+/// * `country` - The ISO 3166-1 numeric country code that was allowed.
+pub fn emit_country_allowed(e: &Env, token: &Address, country: u32) {
+    CountryAllowed { token: token.clone(), country }.publish(e);
+}
+
+/// Emits a [`CountryUnallowed`] event.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose allowlist changed.
+/// * `country` - The ISO 3166-1 numeric country code that was removed.
+pub fn emit_country_unallowed(e: &Env, token: &Address, country: u32) {
+    CountryUnallowed { token: token.clone(), country }.publish(e);
+}
+
 /// Country allowlist compliance module trait.
 ///
 /// This trait defines the contract-facing API for the country allowlist module.
