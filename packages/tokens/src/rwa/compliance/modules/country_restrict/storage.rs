@@ -9,7 +9,7 @@ use crate::rwa::compliance::modules::{
 #[contracttype]
 #[derive(Clone)]
 pub enum CountryRestrictStorageKey {
-    /// Per-(token, country) restriction flag.
+    /// Per-(token, country) restriction membership entry.
     RestrictedCountry(Address, u32),
 }
 
@@ -32,13 +32,17 @@ pub fn is_country_restricted(e: &Env, token: &Address, country: u32) -> bool {
     }
 }
 
-/// Writes a country's restricted flag to persistent storage.
+/// Records a country as restricted in persistent storage.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `country` - The ISO 3166-1 numeric country code to restrict.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn set_country_restricted(e: &Env, token: &Address, country: u32) {
     let key = CountryRestrictStorageKey::RestrictedCountry(token.clone(), country);
     e.storage().persistent().set(&key, &());
@@ -52,6 +56,10 @@ pub fn set_country_restricted(e: &Env, token: &Address, country: u32) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `country` - The ISO 3166-1 numeric country code to unrestrict.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn remove_country_restricted(e: &Env, token: &Address, country: u32) {
     e.storage()
         .persistent()
@@ -69,9 +77,15 @@ pub fn remove_country_restricted(e: &Env, token: &Address, country: u32) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `country` - The ISO 3166-1 numeric country code to restrict.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn add_country_restriction(e: &Env, token: &Address, country: u32) {
-    set_country_restricted(e, token, country);
-    CountryRestricted { token: token.clone(), country }.publish(e);
+    if !is_country_restricted(e, token, country) {
+        set_country_restricted(e, token, country);
+        CountryRestricted { token: token.clone(), country }.publish(e);
+    }
 }
 
 /// Removes a country from the restriction list for `token`.
@@ -83,9 +97,15 @@ pub fn add_country_restriction(e: &Env, token: &Address, country: u32) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `country` - The ISO 3166-1 numeric country code to unrestrict.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn remove_country_restriction(e: &Env, token: &Address, country: u32) {
-    remove_country_restricted(e, token, country);
-    CountryUnrestricted { token: token.clone(), country }.publish(e);
+    if is_country_restricted(e, token, country) {
+        remove_country_restricted(e, token, country);
+        CountryUnrestricted { token: token.clone(), country }.publish(e);
+    }
 }
 
 /// Adds multiple countries to the restriction list in a single call.
@@ -97,10 +117,13 @@ pub fn remove_country_restriction(e: &Env, token: &Address, country: u32) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `countries` - The country codes to restrict.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn batch_restrict_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
     for country in countries.iter() {
-        set_country_restricted(e, token, country);
-        CountryRestricted { token: token.clone(), country }.publish(e);
+        add_country_restriction(e, token, country);
     }
 }
 
@@ -113,10 +136,13 @@ pub fn batch_restrict_countries(e: &Env, token: &Address, countries: &Vec<u32>) 
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `countries` - The country codes to unrestrict.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn batch_unrestrict_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
     for country in countries.iter() {
-        remove_country_restricted(e, token, country);
-        CountryUnrestricted { token: token.clone(), country }.publish(e);
+        remove_country_restriction(e, token, country);
     }
 }
 

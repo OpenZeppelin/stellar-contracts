@@ -9,7 +9,7 @@ use crate::rwa::compliance::modules::{
 #[contracttype]
 #[derive(Clone)]
 pub enum CountryAllowStorageKey {
-    /// Per-(token, country) allowlist flag.
+    /// Per-(token, country) allowlist membership entry.
     AllowedCountry(Address, u32),
 }
 
@@ -32,13 +32,17 @@ pub fn is_country_allowed(e: &Env, token: &Address, country: u32) -> bool {
     }
 }
 
-/// Writes a country's allowed flag to persistent storage.
+/// Records a country as allowed in persistent storage.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `country` - The ISO 3166-1 numeric country code to allow.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn set_country_allowed(e: &Env, token: &Address, country: u32) {
     let key = CountryAllowStorageKey::AllowedCountry(token.clone(), country);
     e.storage().persistent().set(&key, &());
@@ -52,6 +56,10 @@ pub fn set_country_allowed(e: &Env, token: &Address, country: u32) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `country` - The ISO 3166-1 numeric country code to remove.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn remove_country_allowed(e: &Env, token: &Address, country: u32) {
     e.storage()
         .persistent()
@@ -69,9 +77,15 @@ pub fn remove_country_allowed(e: &Env, token: &Address, country: u32) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `country` - The ISO 3166-1 numeric country code to allow.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn add_allowed_country(e: &Env, token: &Address, country: u32) {
-    set_country_allowed(e, token, country);
-    CountryAllowed { token: token.clone(), country }.publish(e);
+    if !is_country_allowed(e, token, country) {
+        set_country_allowed(e, token, country);
+        CountryAllowed { token: token.clone(), country }.publish(e);
+    }
 }
 
 /// Removes a country from the allowlist for `token`.
@@ -83,9 +97,15 @@ pub fn add_allowed_country(e: &Env, token: &Address, country: u32) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `country` - The ISO 3166-1 numeric country code to remove.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn remove_allowed_country(e: &Env, token: &Address, country: u32) {
-    remove_country_allowed(e, token, country);
-    CountryUnallowed { token: token.clone(), country }.publish(e);
+    if is_country_allowed(e, token, country) {
+        remove_country_allowed(e, token, country);
+        CountryUnallowed { token: token.clone(), country }.publish(e);
+    }
 }
 
 /// Adds multiple countries to the allowlist in a single call.
@@ -97,10 +117,13 @@ pub fn remove_allowed_country(e: &Env, token: &Address, country: u32) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `countries` - The country codes to allow.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn batch_allow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
     for country in countries.iter() {
-        set_country_allowed(e, token, country);
-        CountryAllowed { token: token.clone(), country }.publish(e);
+        add_allowed_country(e, token, country);
     }
 }
 
@@ -113,10 +136,13 @@ pub fn batch_allow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `countries` - The country codes to remove.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn batch_disallow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
     for country in countries.iter() {
-        remove_country_allowed(e, token, country);
-        CountryUnallowed { token: token.clone(), country }.publish(e);
+        remove_allowed_country(e, token, country);
     }
 }
 
