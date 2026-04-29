@@ -94,7 +94,6 @@ Even capable AI models frequently produce subtle mistakes: incorrect assumptions
 
 **What we expect from AI-assisted contributions:**
 
--
 - **You are responsible for the code you submit.** Treat AI output as a first draft, not a finished product. Review it thoroughly, understand every line, and verify that it follows the conventions of this library.
 - **Run the full CI pipeline locally before opening a PR.** At a minimum, ensure that `cargo test`, `cargo clippy`, and `cargo fmt` all pass. The [workflow section above](#a-typical-workflow) has the exact commands.
 - **Match the library's patterns and style.** All code submitted to this repository, whether written by hand or with the help of an AI assistant, is expected to follow the conventions documented in [`.claude/skills/code-quality.md`](.claude/skills/code-quality.md). The rules cover module and file layout, naming, storage TTL patterns, the `#[contracttrait]` / `ContractType` pattern, error / event / section ordering, the high-level vs `_no_auth` authorization split, macro selection (`only_*` vs `has_*`), testing, and more. PRs that violate these conventions may be rejected. This file is not only designed for AI, it is also human-readable, so we strongly advise you to read it if it is your first contribution to our repository.
