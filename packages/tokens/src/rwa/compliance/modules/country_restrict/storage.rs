@@ -13,7 +13,7 @@ pub enum CountryRestrictStorageKey {
     RestrictedCountry(Address, u32),
 }
 
-// ################## RAW STORAGE ##################
+// ################## QUERY STATE ##################
 
 /// Returns whether the given country is on the restriction list for `token`.
 ///
@@ -31,6 +31,79 @@ pub fn is_country_restricted(e: &Env, token: &Address, country: u32) -> bool {
         false
     }
 }
+
+/// Returns `false` if `account` has any restricted country in the IRS for
+/// `token`, and `true` otherwise.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `account` - The account whose country data is checked.
+/// * `token` - The token address.
+///
+/// # Errors
+///
+/// * [`crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet`]
+///   - When no IRS has been configured for `token`.
+///
+/// # Cross-Contract Calls
+///
+/// Calls the IRS to resolve country data for `account`.
+pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
+    let entries = get_irs_country_data_entries(e, token, account);
+    for entry in entries.iter() {
+        if is_country_restricted(e, token, country_code(&entry.country)) {
+            return false;
+        }
+    }
+    true
+}
+
+/// Returns `true` if the transfer recipient has no restricted country.
+///
+/// Country restriction checks are recipient-based, so the sender and amount are
+/// intentionally ignored.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `_from` - The sender address.
+/// * `to` - The recipient address.
+/// * `_amount` - The transfer amount.
+/// * `token` - The token address.
+///
+/// # Errors
+///
+/// * [`crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet`]
+///   - When no IRS has been configured for `token`.
+pub fn can_transfer(
+    e: &Env,
+    _from: &Address,
+    to: &Address,
+    _amount: i128,
+    token: &Address,
+) -> bool {
+    can_receive(e, to, token)
+}
+
+/// Returns `true` if the mint recipient has no restricted country.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `to` - The recipient address.
+/// * `_amount` - The minted amount.
+/// * `token` - The token address.
+///
+/// # Errors
+///
+/// * [`crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet`]
+///   - When no IRS has been configured for `token`.
+pub fn can_create(e: &Env, to: &Address, _amount: i128, token: &Address) -> bool {
+    can_receive(e, to, token)
+}
+
+// ################## CHANGE STATE ##################
 
 /// Records a country as restricted in persistent storage.
 ///
@@ -64,8 +137,6 @@ pub fn remove_country_restricted(e: &Env, token: &Address, country: u32) {
         .persistent()
         .remove(&CountryRestrictStorageKey::RestrictedCountry(token.clone(), country));
 }
-
-// ################## ACTIONS ##################
 
 /// Adds a country to the restriction list for `token`.
 ///
@@ -147,52 +218,4 @@ pub fn batch_unrestrict_countries(e: &Env, token: &Address, countries: &Vec<u32>
     for country in countries.iter() {
         remove_country_restriction(e, token, country);
     }
-}
-
-// ################## COMPLIANCE HOOKS ##################
-
-/// Returns `false` if `account` has any restricted country in the IRS for
-/// `token`, and `true` otherwise.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `account` - The account whose country data is checked.
-/// * `token` - The token address.
-///
-/// # Errors
-///
-/// * [`crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet`]
-///   - When no IRS has been configured for `token`.
-///
-/// # Cross-Contract Calls
-///
-/// Calls the IRS to resolve country data for `account`.
-pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
-    let entries = get_irs_country_data_entries(e, token, account);
-    for entry in entries.iter() {
-        if is_country_restricted(e, token, country_code(&entry.country)) {
-            return false;
-        }
-    }
-    true
-}
-
-/// Returns `true` if the transfer recipient has no restricted country.
-///
-/// Country restriction checks are recipient-based, so the sender and amount are
-/// intentionally ignored.
-pub fn can_transfer(
-    e: &Env,
-    _from: &Address,
-    to: &Address,
-    _amount: i128,
-    token: &Address,
-) -> bool {
-    can_receive(e, to, token)
-}
-
-/// Returns `true` if the mint recipient has no restricted country.
-pub fn can_create(e: &Env, to: &Address, _amount: i128, token: &Address) -> bool {
-    can_receive(e, to, token)
 }
