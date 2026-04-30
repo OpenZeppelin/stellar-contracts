@@ -1,6 +1,8 @@
 use soroban_sdk::{contracterror, contracttrait, Address, Env, String};
 
+pub mod max_balance;
 pub mod storage;
+pub mod supply_limit;
 
 #[cfg(test)]
 mod test;
