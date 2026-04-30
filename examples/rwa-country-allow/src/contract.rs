@@ -1,7 +1,11 @@
 use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec};
 use stellar_tokens::rwa::compliance::modules::{
     country_allow::{storage as country_allow, CountryAllow},
-    storage::{set_compliance_address, set_irs_address, ComplianceModuleStorageKey},
+    storage::{
+        get_compliance_address, module_name, set_compliance_address, set_irs_address,
+        ComplianceModuleStorageKey,
+    },
+    ComplianceModule,
 };
 
 #[contracttype]
@@ -62,6 +66,31 @@ impl CountryAllow for CountryAllowContract {
     fn batch_disallow_countries(e: &Env, token: Address, countries: Vec<u32>) {
         require_module_admin_or_compliance_auth(e);
         country_allow::batch_disallow_countries(e, &token, &countries);
+    }
+}
+
+#[contractimpl(contracttrait)]
+impl ComplianceModule for CountryAllowContract {
+    fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
+
+    fn on_created(_e: &Env, _to: Address, _amount: i128, _token: Address) {}
+
+    fn on_destroyed(_e: &Env, _from: Address, _amount: i128, _token: Address) {}
+
+    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
+        country_allow::can_transfer(e, &from, &to, amount, &token)
+    }
+
+    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
+        country_allow::can_create(e, &to, amount, &token)
+    }
+
+    fn name(e: &Env) -> String {
+        module_name(e, "CountryAllowModule")
+    }
+
+    fn get_compliance_address(e: &Env) -> Address {
+        get_compliance_address(e)
     }
 
     fn set_compliance_address(e: &Env, compliance: Address) {
