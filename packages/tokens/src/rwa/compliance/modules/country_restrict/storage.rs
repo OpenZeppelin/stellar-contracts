@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, Address, Env, Vec};
 
-use super::{CountryRestricted, CountryUnrestricted};
+use super::{emit_country_restricted, emit_country_unrestricted};
 use crate::rwa::compliance::modules::{
     storage::{country_code, get_irs_country_data_entries},
     MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
@@ -46,7 +46,6 @@ pub fn is_country_restricted(e: &Env, token: &Address, country: u32) -> bool {
 pub fn set_country_restricted(e: &Env, token: &Address, country: u32) {
     let key = CountryRestrictStorageKey::RestrictedCountry(token.clone(), country);
     e.storage().persistent().set(&key, &());
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
 }
 
 /// Removes a country from the restriction list in persistent storage.
@@ -70,7 +69,9 @@ pub fn remove_country_restricted(e: &Env, token: &Address, country: u32) {
 
 /// Adds a country to the restriction list for `token`.
 ///
-/// Writes the flag to storage and emits [`CountryRestricted`].
+/// Records the membership entry and emits
+/// [`CountryRestricted`](super::CountryRestricted) if the country was not
+/// already restricted.
 ///
 /// # Arguments
 ///
@@ -84,13 +85,15 @@ pub fn remove_country_restricted(e: &Env, token: &Address, country: u32) {
 pub fn add_country_restriction(e: &Env, token: &Address, country: u32) {
     if !is_country_restricted(e, token, country) {
         set_country_restricted(e, token, country);
-        CountryRestricted { token: token.clone(), country }.publish(e);
+        emit_country_restricted(e, token, country);
     }
 }
 
 /// Removes a country from the restriction list for `token`.
 ///
-/// Deletes the flag from storage and emits [`CountryUnrestricted`].
+/// Deletes the membership entry and emits
+/// [`CountryUnrestricted`](super::CountryUnrestricted) if the country was
+/// currently restricted.
 ///
 /// # Arguments
 ///
@@ -104,7 +107,7 @@ pub fn add_country_restriction(e: &Env, token: &Address, country: u32) {
 pub fn remove_country_restriction(e: &Env, token: &Address, country: u32) {
     if is_country_restricted(e, token, country) {
         remove_country_restricted(e, token, country);
-        CountryUnrestricted { token: token.clone(), country }.publish(e);
+        emit_country_unrestricted(e, token, country);
     }
 }
 

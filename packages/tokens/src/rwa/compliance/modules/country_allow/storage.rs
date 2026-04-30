@@ -1,6 +1,6 @@
 use soroban_sdk::{contracttype, Address, Env, Vec};
 
-use super::{CountryAllowed, CountryUnallowed};
+use super::{emit_country_allowed, emit_country_unallowed};
 use crate::rwa::compliance::modules::{
     storage::{country_code, get_irs_country_data_entries},
     MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
@@ -46,7 +46,6 @@ pub fn is_country_allowed(e: &Env, token: &Address, country: u32) -> bool {
 pub fn set_country_allowed(e: &Env, token: &Address, country: u32) {
     let key = CountryAllowStorageKey::AllowedCountry(token.clone(), country);
     e.storage().persistent().set(&key, &());
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
 }
 
 /// Removes a country from the allowlist in persistent storage.
@@ -70,7 +69,9 @@ pub fn remove_country_allowed(e: &Env, token: &Address, country: u32) {
 
 /// Adds a country to the allowlist for `token`.
 ///
-/// Writes the flag to storage and emits [`CountryAllowed`].
+/// Records the membership entry and emits
+/// [`CountryAllowed`](super::CountryAllowed) if the country was not already
+/// allowed.
 ///
 /// # Arguments
 ///
@@ -84,13 +85,15 @@ pub fn remove_country_allowed(e: &Env, token: &Address, country: u32) {
 pub fn add_allowed_country(e: &Env, token: &Address, country: u32) {
     if !is_country_allowed(e, token, country) {
         set_country_allowed(e, token, country);
-        CountryAllowed { token: token.clone(), country }.publish(e);
+        emit_country_allowed(e, token, country);
     }
 }
 
 /// Removes a country from the allowlist for `token`.
 ///
-/// Deletes the flag from storage and emits [`CountryUnallowed`].
+/// Deletes the membership entry and emits
+/// [`CountryUnallowed`](super::CountryUnallowed) if the country was currently
+/// allowed.
 ///
 /// # Arguments
 ///
@@ -104,7 +107,7 @@ pub fn add_allowed_country(e: &Env, token: &Address, country: u32) {
 pub fn remove_allowed_country(e: &Env, token: &Address, country: u32) {
     if is_country_allowed(e, token, country) {
         remove_country_allowed(e, token, country);
-        CountryUnallowed { token: token.clone(), country }.publish(e);
+        emit_country_unallowed(e, token, country);
     }
 }
 

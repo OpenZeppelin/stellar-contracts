@@ -32,6 +32,28 @@ pub struct CountryUnrestricted {
     pub country: u32,
 }
 
+/// Emits a [`CountryRestricted`] event.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose restriction list changed.
+/// * `country` - The ISO 3166-1 numeric country code that was restricted.
+pub fn emit_country_restricted(e: &Env, token: &Address, country: u32) {
+    CountryRestricted { token: token.clone(), country }.publish(e);
+}
+
+/// Emits a [`CountryUnrestricted`] event.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose restriction list changed.
+/// * `country` - The ISO 3166-1 numeric country code that was removed.
+pub fn emit_country_unrestricted(e: &Env, token: &Address, country: u32) {
+    CountryUnrestricted { token: token.clone(), country }.publish(e);
+}
+
 /// Country restriction compliance module trait.
 ///
 /// This trait defines the contract-facing API for the country restriction
