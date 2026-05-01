@@ -14,46 +14,6 @@ use soroban_sdk::{contractevent, contracttrait, Address, Env, Vec};
 
 use super::ComplianceModule;
 
-/// Emitted when a country is added to the restriction list.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CountryRestricted {
-    #[topic]
-    pub token: Address,
-    pub country: u32,
-}
-
-/// Emitted when a country is removed from the restriction list.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CountryUnrestricted {
-    #[topic]
-    pub token: Address,
-    pub country: u32,
-}
-
-/// Emits a [`CountryRestricted`] event.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token whose restriction list changed.
-/// * `country` - The ISO 3166-1 numeric country code that was restricted.
-pub fn emit_country_restricted(e: &Env, token: &Address, country: u32) {
-    CountryRestricted { token: token.clone(), country }.publish(e);
-}
-
-/// Emits a [`CountryUnrestricted`] event.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token whose restriction list changed.
-/// * `country` - The ISO 3166-1 numeric country code that was removed.
-pub fn emit_country_unrestricted(e: &Env, token: &Address, country: u32) {
-    CountryUnrestricted { token: token.clone(), country }.publish(e);
-}
-
 /// Country restriction compliance module trait.
 ///
 /// This trait defines the contract-facing API for the country restriction
@@ -164,4 +124,44 @@ pub trait CountryRestrict: ComplianceModule {
     fn is_country_restricted(e: &Env, token: Address, country: u32) -> bool {
         storage::is_country_restricted(e, &token, country)
     }
+}
+
+/// Emitted when a country is added to the restriction list.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CountryRestricted {
+    #[topic]
+    pub token: Address,
+    pub country: u32,
+}
+
+/// Emitted when a country is removed from the restriction list.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CountryUnrestricted {
+    #[topic]
+    pub token: Address,
+    pub country: u32,
+}
+
+/// Emits a [`CountryRestricted`] event.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose restriction list changed.
+/// * `country` - The ISO 3166-1 numeric country code that was restricted.
+pub fn emit_country_restricted(e: &Env, token: &Address, country: u32) {
+    CountryRestricted { token: token.clone(), country }.publish(e);
+}
+
+/// Emits a [`CountryUnrestricted`] event.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose restriction list changed.
+/// * `country` - The ISO 3166-1 numeric country code that was removed.
+pub fn emit_country_unrestricted(e: &Env, token: &Address, country: u32) {
+    CountryUnrestricted { token: token.clone(), country }.publish(e);
 }
