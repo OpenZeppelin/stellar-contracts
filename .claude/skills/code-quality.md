@@ -65,33 +65,61 @@ Rust files in scope" and stop.
 Read every file in scope before checking rules — partial reads produce
 partial reviews.
 
-### 3. Identify violations
+### 3. Identify violations & discrepancies
 
-Walk the file set against the rules in the `Rules` section below. Build a
-numbered list (1-based, sequential across all files). Each entry has:
+Walk the file set against **two** reference points:
+
+1. **The rules in the `Rules` section below.** These are the codified
+   conventions — explicit, named, and stable.
+2. **The closest existing sibling in the repo.** For each file under
+   review, pick the most relevant established counterpart and read it
+   in full as the working "ground truth". Anything the new file does
+   differently from its sibling is a *discrepancy* — possibly a
+   violation, possibly a deliberate choice, but always worth surfacing.
+
+How to pick the sibling: judge by context and relevancy.
+Read the file under review, understand what it is doing (what kind of
+module, which traits it touches, what state it manages), then scan the
+repo for the existing file whose purpose is closest. For example, if it
+is a token, a good example may be `packages/tokens/src/fungible`.
+Always compare file type to file type — a `mod.rs` against another
+`mod.rs`, a `storage.rs` against another `storage.rs`, a `test.rs`
+against another `test.rs`, an example `contract.rs` against another example
+`contract.rs`.
+
+If no good sibling exists take `packages/tokens/src/fungible` for the base
+example for styling (ordering of sections, inline documentation style, etc.).
+
+Build a numbered list of findings. Each entry has:
 
 - **file path** (repo-relative)
 - **line number** (or line range)
-- **rule** — short name from the `Rules` section
+- **kind** — either `rule:<short-rule-name>` or
+  `discrepancy:<reference-file-path>`
+- **finding** — what differs and why it matters
 - **fix** — one or two sentences describing what should change
-
-Numbering is mandatory — it lets the user reference items by number when
-choosing what to fix.
 
 ### 4. Choose an action
 
-Present the numbered list to the user and ask how to proceed:
+Tell the user how many findings were collected and ask which mode to
+run in:
 
-- **Apply all** — fix every flagged item.
-- **Apply subset** — user names items by number, range (`N-M`), or file
-  path; fix only those.
-- **Report only** — leave the report as-is, do not edit anything. Skip to
-  step 7.
-- **Cancel** — abort before any edit.
+1. **Apply all** — apply every fix in one pass without further prompts.
+   Stop only on a tool error or a finding the skill cannot fix on its
+   own.
+2. **One-by-one** — walk the findings in order. For each, describe it
+   (file, line, what's wrong, what the proposed edit would do), then
+   ask the user to approve before editing. Findings the user skips are
+   recorded in the final report so they can be revisited.
+3. **Report only** — print the full list of findings and stop. Do not
+   edit anything. Skip directly to step 7.
+
+The user may also cancel entirely; in that case stop without further
+action.
 
 If the list is empty, say so plainly and stop:
 
-> ✅ No violations found in &lt;N&gt; file(s).
+> ✅ No violations or discrepancies found in <N> file(s).
 
 ### 5. Apply fixes
 
@@ -257,7 +285,10 @@ followed by `mod contract;` and `#[cfg(test)] mod test;`.
   when both the module path and the trait are needed.
 - Wildcard imports (`use foo::bar::*;`) are not used anywhere in the
   codebase.
-- `super` keyword is frowned upon and should be avoided for the sake of full concrete path.
+
+### `Super` keyword
+
+- `super` keyword is frowned upon and should be avoided for the sake of full concrete path, both in code and in inline documentation. Use the full path always instead of `super`.
 
 ### Errors and panics
 
@@ -436,6 +467,9 @@ followed by `mod contract;` and `#[cfg(test)] mod test;`.
   or produce non-trivial values get the full
   `# Arguments` / `# Errors` / `# Events` / `# Notes` /
   `# Security Warning` block in that order.
+- Trait methods in `mod.rs`, and functions in `storage.rs` need to have a
+  rigid inline documentation style. Follow the `packages/tokens/src/fungible` directory's
+  `mod.rs` and `storage.rs` files as examples for that.
 - The module-level `//!` docstring at the top of each `mod.rs` explains
   purpose, structure, and any non-obvious design choices (the dual-layer
   high/low-level split, mutual exclusivity of extensions, the
