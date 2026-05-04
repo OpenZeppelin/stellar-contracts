@@ -288,7 +288,7 @@ followed by `mod contract;` and `#[cfg(test)] mod test;`.
 
 ### `Super` keyword
 
-- `super` keyword is frowned upon and should be avoided for the sake of full concrete path, both in code and in inline documentations. Use the full path always instead of `super`.
+- `super` keyword is frowned upon and should be avoided for the sake of full concrete path, both in code and in inline documentation. Use the full path always instead of `super`.
 
 ### Errors and panics
 
@@ -467,7 +467,7 @@ followed by `mod contract;` and `#[cfg(test)] mod test;`.
   or produce non-trivial values get the full
   `# Arguments` / `# Errors` / `# Events` / `# Notes` /
   `# Security Warning` block in that order.
-- Trait methods in `mod.rs`, and functions in `storage.rs` needs to have a
+- Trait methods in `mod.rs`, and functions in `storage.rs` need to have a
   rigid inline documentation style. Follow the `packages/tokens/src/fungible` directory's
   `mod.rs` and `storage.rs` files as examples for that.
 - The module-level `//!` docstring at the top of each `mod.rs` explains
