@@ -3,7 +3,7 @@ use soroban_sdk::{contracttype, Address, Env, Vec};
 use crate::rwa::compliance::modules::{
     country_restrict::{emit_country_restricted, emit_country_unrestricted},
     storage::{country_code, get_irs_country_data_entries},
-    MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+    ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
 };
 
 #[contracttype]
@@ -43,8 +43,8 @@ pub fn is_country_restricted(e: &Env, token: &Address, country: u32) -> bool {
 ///
 /// # Errors
 ///
-/// * [`crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet`]
-///   - When no IRS has been configured for `token`.
+/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
+///   configured for `token`.
 ///
 /// # Cross-Contract Calls
 ///
@@ -74,8 +74,8 @@ pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
 ///
 /// # Errors
 ///
-/// * [`crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet`]
-///   - When no IRS has been configured for `token`.
+/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
+///   configured for `token`.
 pub fn can_transfer(
     e: &Env,
     _from: &Address,
@@ -97,8 +97,8 @@ pub fn can_transfer(
 ///
 /// # Errors
 ///
-/// * [`crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet`]
-///   - When no IRS has been configured for `token`.
+/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
+///   configured for `token`.
 pub fn can_create(e: &Env, to: &Address, _amount: i128, token: &Address) -> bool {
     can_receive(e, to, token)
 }
