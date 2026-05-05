@@ -30,6 +30,11 @@ pub trait CountryAllow: ComplianceModule {
     /// * `token` - The token whose IRS is being configured.
     /// * `irs` - The Identity Registry Storage contract address.
     ///
+    /// # Errors
+    ///
+    /// Implementations should fail if the caller is not authorized to configure
+    /// the IRS address.
+    ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
@@ -46,9 +51,15 @@ pub trait CountryAllow: ComplianceModule {
     /// * `token` - The token whose allowlist is updated.
     /// * `country` - The ISO 3166-1 numeric country code to allow.
     ///
+    /// # Errors
+    ///
+    /// Implementations should fail if the caller is not authorized to update
+    /// the allowlist.
+    ///
     /// # Events
     ///
-    /// Emits [`CountryAllowed`].
+    /// * topics - `["country_allowed", token: Address]`
+    /// * data - `[country: u32]`
     ///
     /// # Notes
     ///
@@ -65,9 +76,15 @@ pub trait CountryAllow: ComplianceModule {
     /// * `token` - The token whose allowlist is updated.
     /// * `country` - The ISO 3166-1 numeric country code to remove.
     ///
+    /// # Errors
+    ///
+    /// Implementations should fail if the caller is not authorized to update
+    /// the allowlist.
+    ///
     /// # Events
     ///
-    /// Emits [`CountryUnallowed`].
+    /// * topics - `["country_unallowed", token: Address]`
+    /// * data - `[country: u32]`
     ///
     /// # Notes
     ///
@@ -84,9 +101,16 @@ pub trait CountryAllow: ComplianceModule {
     /// * `token` - The token whose allowlist is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to allow.
     ///
+    /// # Errors
+    ///
+    /// Implementations should fail if the caller is not authorized to update
+    /// the allowlist.
+    ///
     /// # Events
     ///
-    /// Emits [`CountryAllowed`] for each country.
+    /// For each country newly added to the allowlist:
+    /// * topics - `["country_allowed", token: Address]`
+    /// * data - `[country: u32]`
     ///
     /// # Notes
     ///
@@ -103,9 +127,16 @@ pub trait CountryAllow: ComplianceModule {
     /// * `token` - The token whose allowlist is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to remove.
     ///
+    /// # Errors
+    ///
+    /// Implementations should fail if the caller is not authorized to update
+    /// the allowlist.
+    ///
     /// # Events
     ///
-    /// Emits [`CountryUnallowed`] for each country.
+    /// For each country removed from the allowlist:
+    /// * topics - `["country_unallowed", token: Address]`
+    /// * data - `[country: u32]`
     ///
     /// # Notes
     ///

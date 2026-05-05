@@ -30,6 +30,11 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `token` - The token whose IRS is being configured.
     /// * `irs` - The Identity Registry Storage contract address.
     ///
+    /// # Errors
+    ///
+    /// Implementations should fail if the caller is not authorized to configure
+    /// the IRS address.
+    ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
@@ -46,9 +51,15 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `token` - The token whose restriction list is updated.
     /// * `country` - The ISO 3166-1 numeric country code to restrict.
     ///
+    /// # Errors
+    ///
+    /// Implementations should fail if the caller is not authorized to update
+    /// the restriction list.
+    ///
     /// # Events
     ///
-    /// Emits [`CountryRestricted`].
+    /// * topics - `["country_restricted", token: Address]`
+    /// * data - `[country: u32]`
     ///
     /// # Notes
     ///
@@ -65,9 +76,15 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `token` - The token whose restriction list is updated.
     /// * `country` - The ISO 3166-1 numeric country code to unrestrict.
     ///
+    /// # Errors
+    ///
+    /// Implementations should fail if the caller is not authorized to update
+    /// the restriction list.
+    ///
     /// # Events
     ///
-    /// Emits [`CountryUnrestricted`].
+    /// * topics - `["country_unrestricted", token: Address]`
+    /// * data - `[country: u32]`
     ///
     /// # Notes
     ///
@@ -84,9 +101,16 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `token` - The token whose restriction list is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to restrict.
     ///
+    /// # Errors
+    ///
+    /// Implementations should fail if the caller is not authorized to update
+    /// the restriction list.
+    ///
     /// # Events
     ///
-    /// Emits [`CountryRestricted`] for each country.
+    /// For each country newly added to the restriction list:
+    /// * topics - `["country_restricted", token: Address]`
+    /// * data - `[country: u32]`
     ///
     /// # Notes
     ///
@@ -103,9 +127,16 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `token` - The token whose restriction list is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to unrestrict.
     ///
+    /// # Errors
+    ///
+    /// Implementations should fail if the caller is not authorized to update
+    /// the restriction list.
+    ///
     /// # Events
     ///
-    /// Emits [`CountryUnrestricted`] for each country.
+    /// For each country removed from the restriction list:
+    /// * topics - `["country_unrestricted", token: Address]`
+    /// * data - `[country: u32]`
     ///
     /// # Notes
     ///
