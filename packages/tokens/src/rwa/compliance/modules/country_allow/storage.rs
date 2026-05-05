@@ -3,7 +3,7 @@ use soroban_sdk::{contracttype, Address, Env, Vec};
 use crate::rwa::compliance::modules::{
     country_allow::{emit_country_allowed, emit_country_unallowed},
     storage::{country_code, get_irs_country_data_entries},
-    ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+    MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
 };
 
 #[contracttype]
@@ -49,6 +49,8 @@ pub fn is_country_allowed(e: &Env, token: &Address, country: u32) -> bool {
 /// # Cross-Contract Calls
 ///
 /// Calls the IRS to resolve country data for `account`.
+///
+/// [`ComplianceModuleError::IdentityRegistryNotSet`]: crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet
 pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
     let entries = get_irs_country_data_entries(e, token, account);
     for entry in entries.iter() {
@@ -76,6 +78,8 @@ pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
 ///
 /// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
 ///   configured for `token`.
+///
+/// [`ComplianceModuleError::IdentityRegistryNotSet`]: crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet
 pub fn can_transfer(
     e: &Env,
     _from: &Address,
@@ -99,6 +103,8 @@ pub fn can_transfer(
 ///
 /// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
 ///   configured for `token`.
+///
+/// [`ComplianceModuleError::IdentityRegistryNotSet`]: crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet
 pub fn can_create(e: &Env, to: &Address, _amount: i128, token: &Address) -> bool {
     can_receive(e, to, token)
 }
