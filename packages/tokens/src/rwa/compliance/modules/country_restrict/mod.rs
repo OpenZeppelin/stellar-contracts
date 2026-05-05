@@ -12,7 +12,7 @@ mod test;
 
 use soroban_sdk::{contractevent, contracttrait, Address, Env, Vec};
 
-use super::ComplianceModule;
+use crate::rwa::compliance::modules::ComplianceModule;
 
 /// Country restriction compliance module trait.
 ///
@@ -35,7 +35,7 @@ pub trait CountryRestrict: ComplianceModule {
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
     /// enforced before calling
-    /// [`super::storage::set_irs_address`].
+    /// [`crate::rwa::compliance::modules::storage::set_irs_address`].
     fn set_identity_registry_storage(e: &Env, token: Address, irs: Address);
 
     /// Adds a country to the restriction list for `token`.

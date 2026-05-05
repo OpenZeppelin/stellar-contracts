@@ -5,9 +5,11 @@ use soroban_sdk::{
     Vec,
 };
 
-use super::storage::{can_receive, set_country_restricted};
 use crate::rwa::{
-    compliance::modules::storage::set_irs_address,
+    compliance::modules::{
+        country_restrict::storage::{can_receive, set_country_restricted},
+        storage::set_irs_address,
+    },
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
         IndividualCountryRelation, OrganizationCountryRelation,

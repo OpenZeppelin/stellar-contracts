@@ -1,7 +1,7 @@
 use soroban_sdk::{contracttype, Address, Env, Vec};
 
-use super::{emit_country_allowed, emit_country_unallowed};
 use crate::rwa::compliance::modules::{
+    country_allow::{emit_country_allowed, emit_country_unallowed},
     storage::{country_code, get_irs_country_data_entries},
     MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
 };
@@ -141,8 +141,8 @@ pub fn remove_country_allowed(e: &Env, token: &Address, country: u32) {
 /// Adds a country to the allowlist for `token`.
 ///
 /// Records the membership entry and emits
-/// [`CountryAllowed`](super::CountryAllowed) if the country was not already
-/// allowed.
+/// [`crate::rwa::compliance::modules::country_allow::CountryAllowed`] if the
+/// country was not already allowed.
 ///
 /// # Arguments
 ///
@@ -163,8 +163,8 @@ pub fn add_allowed_country(e: &Env, token: &Address, country: u32) {
 /// Removes a country from the allowlist for `token`.
 ///
 /// Deletes the membership entry and emits
-/// [`CountryUnallowed`](super::CountryUnallowed) if the country was currently
-/// allowed.
+/// [`crate::rwa::compliance::modules::country_allow::CountryUnallowed`] if the
+/// country was currently allowed.
 ///
 /// # Arguments
 ///
