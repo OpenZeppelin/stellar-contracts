@@ -24,3 +24,7 @@ lcov.info
 coverage/
 
 **/test_snapshots/
+
+# Compiled WASM artifacts and testnet state
+examples/rwa-deploy/wasm/
+examples/rwa-deploy/testnet-addresses.json
