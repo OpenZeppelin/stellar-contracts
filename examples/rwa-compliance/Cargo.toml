@@ -1,0 +1,28 @@
+[package]
+name = "rwa-compliance-example"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+version.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+stellar-access = { workspace = true }
+stellar-contract-utils = { workspace = true }
+stellar-macros = { workspace = true }
+stellar-tokens = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+rwa-country-allow = { path = "../rwa-country-allow" }
+rwa-country-restrict = { path = "../rwa-country-restrict" }
+rwa-initial-lockup-period = { path = "../rwa-initial-lockup-period" }
+rwa-max-balance = { path = "../rwa-max-balance" }
+rwa-supply-limit = { path = "../rwa-supply-limit" }
+rwa-time-transfers-limits = { path = "../rwa-time-transfers-limits" }
+rwa-transfer-restrict = { path = "../rwa-transfer-restrict" }
