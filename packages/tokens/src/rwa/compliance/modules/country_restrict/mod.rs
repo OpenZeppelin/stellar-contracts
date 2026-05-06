@@ -30,11 +30,6 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `token` - The token whose IRS is being configured.
     /// * `irs` - The Identity Registry Storage contract address.
     ///
-    /// # Errors
-    ///
-    /// Implementations should fail if the caller is not authorized to configure
-    /// the IRS address.
-    ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
@@ -50,11 +45,6 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose restriction list is updated.
     /// * `country` - The ISO 3166-1 numeric country code to restrict.
-    ///
-    /// # Errors
-    ///
-    /// Implementations should fail if the caller is not authorized to update
-    /// the restriction list.
     ///
     /// # Events
     ///
@@ -76,11 +66,6 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `token` - The token whose restriction list is updated.
     /// * `country` - The ISO 3166-1 numeric country code to unrestrict.
     ///
-    /// # Errors
-    ///
-    /// Implementations should fail if the caller is not authorized to update
-    /// the restriction list.
-    ///
     /// # Events
     ///
     /// * topics - `["country_unrestricted", token: Address]`
@@ -100,11 +85,6 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose restriction list is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to restrict.
-    ///
-    /// # Errors
-    ///
-    /// Implementations should fail if the caller is not authorized to update
-    /// the restriction list.
     ///
     /// # Events
     ///
@@ -126,11 +106,6 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose restriction list is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to unrestrict.
-    ///
-    /// # Errors
-    ///
-    /// Implementations should fail if the caller is not authorized to update
-    /// the restriction list.
     ///
     /// # Events
     ///

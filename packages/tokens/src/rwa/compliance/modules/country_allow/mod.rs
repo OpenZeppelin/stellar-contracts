@@ -30,11 +30,6 @@ pub trait CountryAllow: ComplianceModule {
     /// * `token` - The token whose IRS is being configured.
     /// * `irs` - The Identity Registry Storage contract address.
     ///
-    /// # Errors
-    ///
-    /// Implementations should fail if the caller is not authorized to configure
-    /// the IRS address.
-    ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
@@ -50,11 +45,6 @@ pub trait CountryAllow: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose allowlist is updated.
     /// * `country` - The ISO 3166-1 numeric country code to allow.
-    ///
-    /// # Errors
-    ///
-    /// Implementations should fail if the caller is not authorized to update
-    /// the allowlist.
     ///
     /// # Events
     ///
@@ -76,11 +66,6 @@ pub trait CountryAllow: ComplianceModule {
     /// * `token` - The token whose allowlist is updated.
     /// * `country` - The ISO 3166-1 numeric country code to remove.
     ///
-    /// # Errors
-    ///
-    /// Implementations should fail if the caller is not authorized to update
-    /// the allowlist.
-    ///
     /// # Events
     ///
     /// * topics - `["country_unallowed", token: Address]`
@@ -100,11 +85,6 @@ pub trait CountryAllow: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose allowlist is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to allow.
-    ///
-    /// # Errors
-    ///
-    /// Implementations should fail if the caller is not authorized to update
-    /// the allowlist.
     ///
     /// # Events
     ///
@@ -126,11 +106,6 @@ pub trait CountryAllow: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose allowlist is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to remove.
-    ///
-    /// # Errors
-    ///
-    /// Implementations should fail if the caller is not authorized to update
-    /// the allowlist.
     ///
     /// # Events
     ///

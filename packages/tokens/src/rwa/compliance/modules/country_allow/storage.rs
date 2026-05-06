@@ -119,6 +119,11 @@ pub fn can_create(e: &Env, to: &Address, _amount: i128, token: &Address) -> bool
 /// * `token` - The token address.
 /// * `country` - The ISO 3166-1 numeric country code to allow.
 ///
+/// # Events
+///
+/// * topics - `["country_allowed", token: Address]`
+/// * data - `[country: u32]`
+///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
@@ -134,6 +139,11 @@ pub fn set_country_allowed(e: &Env, token: &Address, country: u32) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `country` - The ISO 3166-1 numeric country code to remove.
+///
+/// # Events
+///
+/// * topics - `["country_unallowed", token: Address]`
+/// * data - `[country: u32]`
 ///
 /// # Security Warning
 ///
@@ -198,6 +208,12 @@ pub fn remove_allowed_country(e: &Env, token: &Address, country: u32) {
 /// * `token` - The token address.
 /// * `countries` - The country codes to allow.
 ///
+/// # Events
+///
+/// For each country newly added to the allowlist:
+/// * topics - `["country_allowed", token: Address]`
+/// * data - `[country: u32]`
+///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
@@ -216,6 +232,12 @@ pub fn batch_allow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `countries` - The country codes to remove.
+///
+/// # Events
+///
+/// For each country removed from the allowlist:
+/// * topics - `["country_unallowed", token: Address]`
+/// * data - `[country: u32]`
 ///
 /// # Security Warning
 ///
