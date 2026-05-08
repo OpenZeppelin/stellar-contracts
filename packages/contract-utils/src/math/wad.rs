@@ -379,7 +379,6 @@ impl Wad {
     /// truncation toward zero.
     ///
     /// For non-integer exponents, see [`Wad::powf`] (uses `exp(y * ln(x))`).
-    /// Naming follows Rust's `f64::{powi, powf}` convention.
     ///
     /// # Arguments
     ///
@@ -565,9 +564,6 @@ impl Wad {
     /// `exp(exponent * ln(self))`. Falls back to integer exponentiation
     /// (via [`Wad::powi`]) when `exponent` is an exact non-negative integer
     /// in the `u32` range — this is faster and more precise.
-    ///
-    /// Naming follows Rust's `f64::{powi, powf}` convention: `powi` for
-    /// integer exponents, `powf` for fractional / Wad-typed ones.
     ///
     /// # Special cases
     ///
