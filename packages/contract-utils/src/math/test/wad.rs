@@ -495,75 +495,75 @@ fn test_abs_with_fractional() {
 // ################## POW TESTS ##################
 
 #[test]
-fn test_pow_zero_exponent() {
+fn test_powi_zero_exponent() {
     let e = Env::default();
     let base = Wad::from_integer(&e, 42);
-    let result = base.pow(&e, 0);
+    let result = base.powi(&e, 0);
     assert_eq!(result, Wad::from_integer(&e, 1)); // x^0 = 1
 }
 
 #[test]
-fn test_pow_zero_base_zero_exponent() {
+fn test_powi_zero_base_zero_exponent() {
     let e = Env::default();
     let zero = Wad::from_raw(0);
-    let result = zero.pow(&e, 0);
+    let result = zero.powi(&e, 0);
     assert_eq!(result, Wad::from_integer(&e, 1)); // 0^0 = 1 (by convention)
 }
 
 #[test]
-fn test_pow_one_exponent() {
+fn test_powi_one_exponent() {
     let e = Env::default();
     let base = Wad::from_ratio(&e, 355, 113); // π approximation
-    let result = base.pow(&e, 1);
+    let result = base.powi(&e, 1);
     assert_eq!(result, base); // x^1 = x
 }
 
 #[test]
-fn test_pow_zero_base() {
+fn test_powi_zero_base() {
     let e = Env::default();
     let zero = Wad::from_raw(0);
-    let result = zero.pow(&e, 5);
+    let result = zero.powi(&e, 5);
     assert_eq!(result, Wad::from_raw(0)); // 0^n = 0 for n > 0
 }
 
 #[test]
-fn test_pow_one_base() {
+fn test_powi_one_base() {
     let e = Env::default();
     let one = Wad::from_integer(&e, 1);
-    let result = one.pow(&e, 100);
+    let result = one.powi(&e, 100);
     assert_eq!(result, Wad::from_integer(&e, 1)); // 1^n = 1
 }
 
 #[test]
-fn test_pow_integer_base_small_exponent() {
+fn test_powi_integer_base_small_exponent() {
     let e = Env::default();
     let two = Wad::from_integer(&e, 2);
-    let result = two.pow(&e, 10);
+    let result = two.powi(&e, 10);
     assert_eq!(result, Wad::from_integer(&e, 1024)); // 2^10 = 1024
 }
 
 #[test]
-fn test_pow_integer_base_quadratic() {
+fn test_powi_integer_base_quadratic() {
     let e = Env::default();
     let five = Wad::from_integer(&e, 5);
-    let result = five.pow(&e, 2);
+    let result = five.powi(&e, 2);
     assert_eq!(result, Wad::from_integer(&e, 25)); // 5^2 = 25
 }
 
 #[test]
-fn test_pow_integer_base_cubic() {
+fn test_powi_integer_base_cubic() {
     let e = Env::default();
     let three = Wad::from_integer(&e, 3);
-    let result = three.pow(&e, 3);
+    let result = three.powi(&e, 3);
     assert_eq!(result, Wad::from_integer(&e, 27)); // 3^3 = 27
 }
 
 #[test]
-fn test_pow_compound_interest() {
+fn test_powi_compound_interest() {
     let e = Env::default();
     // 5% annual rate: 1.05
     let rate = Wad::from_ratio(&e, 105, 100);
-    let result = rate.pow(&e, 10);
+    let result = rate.powi(&e, 10);
 
     // (1.05)^10 ≈ 1.62889462677744140625
     // In WAD: 1_628_894_626_777_441_406 (with truncation)
@@ -572,10 +572,10 @@ fn test_pow_compound_interest() {
 }
 
 #[test]
-fn test_pow_fractional_base_squared() {
+fn test_powi_fractional_base_squared() {
     let e = Env::default();
     let half = Wad::from_ratio(&e, 1, 2); // 0.5
-    let result = half.pow(&e, 2);
+    let result = half.powi(&e, 2);
 
     // 0.5^2 = 0.25
     let expected = Wad::from_ratio(&e, 1, 4);
@@ -583,10 +583,10 @@ fn test_pow_fractional_base_squared() {
 }
 
 #[test]
-fn test_pow_fractional_base_cubed() {
+fn test_powi_fractional_base_cubed() {
     let e = Env::default();
     let half = Wad::from_ratio(&e, 1, 2); // 0.5
-    let result = half.pow(&e, 3);
+    let result = half.powi(&e, 3);
 
     // 0.5^3 = 0.125
     let expected = Wad::from_ratio(&e, 1, 8);
@@ -594,11 +594,11 @@ fn test_pow_fractional_base_cubed() {
 }
 
 #[test]
-fn test_pow_fractional_less_than_one() {
+fn test_powi_fractional_less_than_one() {
     let e = Env::default();
     // 0.95
     let decay = Wad::from_ratio(&e, 95, 100);
-    let result = decay.pow(&e, 10);
+    let result = decay.powi(&e, 10);
 
     // (0.95)^10 ≈ 0.59873693923837890625
     // In WAD: 598_736_939_238_378_906 (with truncation)
@@ -607,26 +607,26 @@ fn test_pow_fractional_less_than_one() {
 }
 
 #[test]
-fn test_pow_negative_base_even_exponent() {
+fn test_powi_negative_base_even_exponent() {
     let e = Env::default();
     let neg_two = Wad::from_integer(&e, -2);
-    let result = neg_two.pow(&e, 4);
+    let result = neg_two.powi(&e, 4);
     assert_eq!(result, Wad::from_integer(&e, 16)); // (-2)^4 = 16
 }
 
 #[test]
-fn test_pow_negative_base_odd_exponent() {
+fn test_powi_negative_base_odd_exponent() {
     let e = Env::default();
     let neg_two = Wad::from_integer(&e, -2);
-    let result = neg_two.pow(&e, 3);
+    let result = neg_two.powi(&e, 3);
     assert_eq!(result, Wad::from_integer(&e, -8)); // (-2)^3 = -8
 }
 
 #[test]
-fn test_pow_negative_fractional_even() {
+fn test_powi_negative_fractional_even() {
     let e = Env::default();
     let neg_half = Wad::from_ratio(&e, -1, 2); // -0.5
-    let result = neg_half.pow(&e, 2);
+    let result = neg_half.powi(&e, 2);
 
     // (-0.5)^2 = 0.25
     let expected = Wad::from_ratio(&e, 1, 4);
@@ -634,10 +634,10 @@ fn test_pow_negative_fractional_even() {
 }
 
 #[test]
-fn test_pow_negative_fractional_odd() {
+fn test_powi_negative_fractional_odd() {
     let e = Env::default();
     let neg_half = Wad::from_ratio(&e, -1, 2); // -0.5
-    let result = neg_half.pow(&e, 3);
+    let result = neg_half.powi(&e, 3);
 
     // (-0.5)^3 = -0.125
     let expected = Wad::from_ratio(&e, -1, 8);
@@ -645,11 +645,11 @@ fn test_pow_negative_fractional_odd() {
 }
 
 #[test]
-fn test_pow_precision_decay() {
+fn test_powi_precision_decay() {
     let e = Env::default();
     // Each power operation involves truncation
     let base = Wad::from_ratio(&e, 999, 1000); // 0.999
-    let result = base.pow(&e, 100);
+    let result = base.powi(&e, 100);
 
     // (0.999)^100 =
     // actual          -> 0.9047921471137089XX
@@ -661,19 +661,19 @@ fn test_pow_precision_decay() {
 }
 
 #[test]
-fn test_pow_large_integer_base() {
+fn test_powi_large_integer_base() {
     let e = Env::default();
     let base = Wad::from_integer(&e, 10);
-    let result = base.pow(&e, 5);
+    let result = base.powi(&e, 5);
     assert_eq!(result, Wad::from_integer(&e, 100_000)); // 10^5 = 100,000
 }
 
 #[test]
-fn test_pow_truncation_behavior() {
+fn test_powi_truncation_behavior() {
     let e = Env::default();
     // Use a base that will produce fractional intermediate results
     let base = Wad::from_raw(1_414_213_562_373_095_048); // √2 ≈ 1.414213562373095048
-    let result = base.pow(&e, 2);
+    let result = base.powi(&e, 2);
 
     // (√2)^2 should be very close to 2, but truncation may cause slight deviation
     let two = Wad::from_integer(&e, 2);
@@ -685,75 +685,75 @@ fn test_pow_truncation_behavior() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #1500)")]
-fn test_pow_overflow_large_base() {
+fn test_powi_overflow_large_base() {
     let e = Env::default();
     // Base that's too large
     let large = Wad::from_integer(&e, i128::MAX / WAD_SCALE);
-    let _ = large.pow(&e, 2); // Will overflow
+    let _ = large.powi(&e, 2); // Will overflow
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #1500)")]
-fn test_pow_overflow_large_exponent() {
+fn test_powi_overflow_large_exponent() {
     let e = Env::default();
     let two = Wad::from_integer(&e, 2);
-    let _ = two.pow(&e, 128); // 2^128 overflows i128
+    let _ = two.powi(&e, 128); // 2^128 overflows i128
 }
 
 // ################## CHECKED_POW TESTS ##################
 
 #[test]
-fn test_checked_pow_success() {
+fn test_checked_powi_success() {
     let e = Env::default();
     let two = Wad::from_integer(&e, 2);
-    let result = two.checked_pow(&e, 10);
+    let result = two.checked_powi(&e, 10);
     assert_eq!(result, Some(Wad::from_integer(&e, 1024)));
 }
 
 #[test]
-fn test_checked_pow_overflow_returns_none() {
+fn test_checked_powi_overflow_returns_none() {
     let e = Env::default();
     let large = Wad::from_integer(&e, i128::MAX / WAD_SCALE);
-    let result = large.checked_pow(&e, 2);
+    let result = large.checked_powi(&e, 2);
     assert_eq!(result, None); // Overflow returns None instead of panicking
 }
 
 #[test]
-fn test_checked_pow_zero_exponent() {
+fn test_checked_powi_zero_exponent() {
     let e = Env::default();
     let base = Wad::from_integer(&e, 42);
-    let result = base.checked_pow(&e, 0);
+    let result = base.checked_powi(&e, 0);
     assert_eq!(result, Some(Wad::from_integer(&e, 1)));
 }
 
 #[test]
-fn test_checked_pow_one_exponent() {
+fn test_checked_powi_one_exponent() {
     let e = Env::default();
     let base = Wad::from_ratio(&e, 355, 113);
-    let result = base.checked_pow(&e, 1);
+    let result = base.checked_powi(&e, 1);
     assert_eq!(result, Some(base));
 }
 
 #[test]
-fn test_checked_pow_zero_base() {
+fn test_checked_powi_zero_base() {
     let e = Env::default();
     let zero = Wad::from_raw(0);
-    let result = zero.checked_pow(&e, 5);
+    let result = zero.checked_powi(&e, 5);
     assert_eq!(result, Some(Wad::from_raw(0)));
 }
 
 #[test]
-fn test_checked_pow_compound_interest() {
+fn test_checked_powi_compound_interest() {
     let e = Env::default();
     let rate = Wad::from_ratio(&e, 105, 100); // 1.05
-    let result = rate.checked_pow(&e, 10);
+    let result = rate.checked_powi(&e, 10);
 
     let expected = Wad::from_raw(1_628_894_626_777_441_406);
     assert_eq!(result, Some(expected));
 }
 
 #[test]
-fn test_checked_pow_large_exponent_overflow() {
+fn test_checked_powi_large_exponent_overflow() {
     /*
     2^n × 10^18 ≤ i128::MAX
     2^n × 2^59.79 ≤ 2^127
@@ -763,14 +763,396 @@ fn test_checked_pow_large_exponent_overflow() {
     */
     let e = Env::default();
     let two = Wad::from_integer(&e, 2);
-    let result = two.checked_pow(&e, 68);
+    let result = two.checked_powi(&e, 68);
     assert_eq!(result, None);
 }
 
 #[test]
-fn test_checked_pow_fractional_base() {
+fn test_checked_powi_fractional_base() {
     let e = Env::default();
     let half = Wad::from_ratio(&e, 1, 2);
-    let result = half.checked_pow(&e, 3);
+    let result = half.checked_powi(&e, 3);
     assert_eq!(result, Some(Wad::from_ratio(&e, 1, 8)));
+}
+
+// ################## LN TESTS ##################
+
+/// Helper: assert two Wad values are within `tol` (tolerance) raw units of each
+/// other.
+fn assert_close(actual: Wad, expected: Wad, tol: i128, label: &str) {
+    let diff = (actual.raw() - expected.raw()).abs();
+    assert!(
+        diff <= tol,
+        "{label}: actual={} expected={} diff={} tol={}",
+        actual.raw(),
+        expected.raw(),
+        diff,
+        tol
+    );
+}
+
+#[test]
+fn test_ln_one() {
+    let e = Env::default();
+    let one = Wad::from_integer(&e, 1);
+    // ln(1) = 0 exactly
+    assert_eq!(one.ln(&e), Wad::from_raw(0));
+}
+
+#[test]
+fn test_ln_e() {
+    let e = Env::default();
+    // e ≈ 2.718281828459045235
+    let e_wad = Wad::from_raw(2_718_281_828_459_045_235);
+    let result = e_wad.ln(&e);
+    // ln(e) = 1
+    assert_close(result, Wad::from_integer(&e, 1), 5, "ln(e)");
+}
+
+#[test]
+fn test_ln_two() {
+    let e = Env::default();
+    let two = Wad::from_integer(&e, 2);
+    let result = two.ln(&e);
+    // ln(2) ≈ 0.693147180559945309
+    let expected = Wad::from_raw(693_147_180_559_945_309);
+    assert_close(result, expected, 5, "ln(2)");
+}
+
+#[test]
+fn test_ln_ten() {
+    let e = Env::default();
+    let ten = Wad::from_integer(&e, 10);
+    let result = ten.ln(&e);
+    // ln(10) ≈ 2.302585092994045684
+    let expected = Wad::from_raw(2_302_585_092_994_045_684);
+    assert_close(result, expected, 5, "ln(10)");
+}
+
+#[test]
+fn test_ln_half() {
+    let e = Env::default();
+    let half = Wad::from_ratio(&e, 1, 2);
+    let result = half.ln(&e);
+    // ln(0.5) = -ln(2) ≈ -0.693147180559945309
+    let expected = Wad::from_raw(-693_147_180_559_945_309);
+    assert_close(result, expected, 5, "ln(0.5)");
+}
+
+#[test]
+fn test_ln_large() {
+    let e = Env::default();
+    // ln(1e10) = 10 * ln(10) ≈ 23.025850929940456840
+    let large = Wad::from_integer(&e, 10_000_000_000);
+    let result = large.ln(&e);
+    let expected = Wad::from_raw(23_025_850_929_940_456_840);
+    assert_close(result, expected, 50, "ln(1e10)");
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1502)")]
+fn test_ln_zero_panics() {
+    let e = Env::default();
+    let _ = Wad::from_raw(0).ln(&e);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1502)")]
+fn test_ln_negative_panics() {
+    let e = Env::default();
+    let _ = Wad::from_integer(&e, -5).ln(&e);
+}
+
+#[test]
+fn test_checked_ln_zero_returns_none() {
+    let e = Env::default();
+    assert_eq!(Wad::from_raw(0).checked_ln(&e), None);
+}
+
+#[test]
+fn test_checked_ln_negative_returns_none() {
+    let e = Env::default();
+    assert_eq!(Wad::from_integer(&e, -1).checked_ln(&e), None);
+}
+
+#[test]
+fn test_checked_ln_positive() {
+    let e = Env::default();
+    let two = Wad::from_integer(&e, 2);
+    let result = two.checked_ln(&e).unwrap();
+    let expected = Wad::from_raw(693_147_180_559_945_309);
+    assert_close(result, expected, 5, "checked_ln(2)");
+}
+
+// ################## EXP TESTS ##################
+
+#[test]
+fn test_exp_zero() {
+    let e = Env::default();
+    let result = Wad::from_raw(0).exp(&e);
+    assert_eq!(result, Wad::from_integer(&e, 1));
+}
+
+#[test]
+fn test_exp_one() {
+    let e = Env::default();
+    let one = Wad::from_integer(&e, 1);
+    let result = one.exp(&e);
+    // e ≈ 2.718281828459045235
+    let expected = Wad::from_raw(2_718_281_828_459_045_235);
+    assert_close(result, expected, 5, "exp(1)");
+}
+
+#[test]
+fn test_exp_negative_one() {
+    let e = Env::default();
+    let neg_one = Wad::from_integer(&e, -1);
+    let result = neg_one.exp(&e);
+    // 1/e ≈ 0.367879441171442322
+    let expected = Wad::from_raw(367_879_441_171_442_322);
+    assert_close(result, expected, 5, "exp(-1)");
+}
+
+#[test]
+fn test_exp_ln_two_is_two() {
+    let e = Env::default();
+    // ln(2) ≈ 0.693147180559945309 → exp(ln(2)) = 2
+    let ln2 = Wad::from_raw(693_147_180_559_945_309);
+    let result = ln2.exp(&e);
+    assert_close(result, Wad::from_integer(&e, 2), 5, "exp(ln(2))");
+}
+
+#[test]
+fn test_exp_underflow_returns_zero() {
+    let e = Env::default();
+    // Below -42.139... — Solmate convention: rounds to 0.
+    let very_negative = Wad::from_integer(&e, -100);
+    assert_eq!(very_negative.exp(&e), Wad::from_raw(0));
+}
+
+#[test]
+fn test_exp_at_lower_bound_returns_zero() {
+    let e = Env::default();
+    let bound = Wad::from_raw(-42_139_678_854_452_767_551);
+    assert_eq!(bound.exp(&e), Wad::from_raw(0));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1500)")]
+fn test_exp_overflow_panics() {
+    let e = Env::default();
+    // Just above the upper bound (135.305...).
+    let too_large = Wad::from_raw(135_305_999_368_893_231_589);
+    let _ = too_large.exp(&e);
+}
+
+#[test]
+fn test_checked_exp_overflow_returns_none() {
+    let e = Env::default();
+    let too_large = Wad::from_integer(&e, 200);
+    assert_eq!(too_large.checked_exp(&e), None);
+}
+
+#[test]
+fn test_checked_exp_underflow_returns_zero() {
+    // Underflow is not an error — it's a defined return of 0.
+    let e = Env::default();
+    let very_negative = Wad::from_integer(&e, -100);
+    assert_eq!(very_negative.checked_exp(&e), Some(Wad::from_raw(0)));
+}
+
+#[test]
+fn test_exp_ln_roundtrip() {
+    let e = Env::default();
+    // exp(ln(x)) ≈ x for various positive x. Tolerance is per-magnitude
+    // (~1e-15 relative): for large x, raw error scales with x.
+    for raw_x in [
+        500_000_000_000_000_000i128,   // 0.5
+        1_000_000_000_000_000_000,     // 1
+        2_500_000_000_000_000_000,     // 2.5
+        100_000_000_000_000_000_000,   // 100
+        1_000_000_000_000_000_000_000, // 1000
+    ] {
+        let x = Wad::from_raw(raw_x);
+        let recovered = x.ln(&e).exp(&e);
+        // ~1e-15 relative tolerance: tol = max(10, raw_x / 1e15)
+        let tol = (raw_x / 1_000_000_000_000_000).max(10);
+        assert_close(recovered, x, tol, "exp(ln(x)) roundtrip");
+    }
+}
+
+// ################## POW_WAD TESTS ##################
+
+#[test]
+fn test_powf_y_zero() {
+    let e = Env::default();
+    let x = Wad::from_integer(&e, 42);
+    assert_eq!(x.powf(&e, Wad::from_raw(0)), Wad::from_integer(&e, 1));
+}
+
+#[test]
+fn test_powf_zero_zero() {
+    let e = Env::default();
+    let zero = Wad::from_raw(0);
+    // 0^0 = 1 (matches existing pow convention)
+    assert_eq!(zero.powf(&e, zero), Wad::from_integer(&e, 1));
+}
+
+#[test]
+fn test_powf_zero_positive_y() {
+    let e = Env::default();
+    let zero = Wad::from_raw(0);
+    let y = Wad::from_integer(&e, 5);
+    assert_eq!(zero.powf(&e, y), Wad::from_raw(0));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1501)")]
+fn test_powf_zero_negative_y_panics() {
+    let e = Env::default();
+    let zero = Wad::from_raw(0);
+    let neg_y = Wad::from_integer(&e, -1);
+    let _ = zero.powf(&e, neg_y);
+}
+
+#[test]
+fn test_powf_one_base() {
+    let e = Env::default();
+    let one = Wad::from_integer(&e, 1);
+    let weird_y = Wad::from_ratio(&e, 355, 113); // π-ish
+    assert_eq!(one.powf(&e, weird_y), one);
+}
+
+#[test]
+fn test_powf_y_one() {
+    let e = Env::default();
+    let x = Wad::from_ratio(&e, 7, 13);
+    let one = Wad::from_integer(&e, 1);
+    assert_eq!(x.powf(&e, one), x);
+}
+
+#[test]
+fn test_powf_integer_exponent_matches_powi() {
+    // Integer-y fast path should produce identical results to pow(u32).
+    let e = Env::default();
+    for &(raw_x, n) in &[
+        (2_000_000_000_000_000_000i128, 10u32), // 2^10
+        (1_050_000_000_000_000_000, 20),        // 1.05^20
+        (3_000_000_000_000_000_000, 5),         // 3^5
+    ] {
+        let x = Wad::from_raw(raw_x);
+        let y_wad = Wad::from_integer(&e, n as i128);
+        assert_eq!(x.powf(&e, y_wad), x.powi(&e, n));
+    }
+}
+
+#[test]
+fn test_powf_negative_base_integer_exponent() {
+    let e = Env::default();
+    let neg_two = Wad::from_integer(&e, -2);
+    // (-2)^3 = -8 — handled by integer fast path.
+    assert_eq!(neg_two.powf(&e, Wad::from_integer(&e, 3)), Wad::from_integer(&e, -8));
+    // (-2)^4 = 16
+    assert_eq!(neg_two.powf(&e, Wad::from_integer(&e, 4)), Wad::from_integer(&e, 16));
+}
+
+#[test]
+fn test_powf_sqrt_two() {
+    let e = Env::default();
+    // 2^0.5 = √2 ≈ 1.414213562373095048
+    let two = Wad::from_integer(&e, 2);
+    let half = Wad::from_ratio(&e, 1, 2);
+    let result = two.powf(&e, half);
+    let expected = Wad::from_raw(1_414_213_562_373_095_048);
+    assert_close(result, expected, 10, "2^0.5");
+}
+
+#[test]
+fn test_powf_two_to_the_2_5() {
+    let e = Env::default();
+    // 2^2.5 = 4 * √2 ≈ 5.656854249492380195
+    let two = Wad::from_integer(&e, 2);
+    let exp = Wad::from_raw(2_500_000_000_000_000_000); // 2.5
+    let result = two.powf(&e, exp);
+    let expected = Wad::from_raw(5_656_854_249_492_380_195);
+    assert_close(result, expected, 50, "2^2.5");
+}
+
+#[test]
+fn test_powf_compound_interest_fractional() {
+    let e = Env::default();
+    // (1.05)^2.5 ≈ 1.126162419641586023
+    let rate = Wad::from_ratio(&e, 105, 100);
+    let years = Wad::from_raw(2_500_000_000_000_000_000); // 2.5
+    let result = rate.powf(&e, years);
+    // Truncated 1.129726321947045721750119514527445981979...
+    let expected = Wad::from_raw(1_129_726_321_947_045_721);
+    assert_close(result, expected, 10, "1.05^2.5");
+}
+
+#[test]
+fn test_powf_negative_exponent() {
+    let e = Env::default();
+    // 2^(-1) = 0.5 — falls through to general path (negative non-integer-flagged y)
+    let two = Wad::from_integer(&e, 2);
+    let neg_one = Wad::from_integer(&e, -1);
+    let result = two.powf(&e, neg_one);
+    let expected = Wad::from_ratio(&e, 1, 2);
+    assert_close(result, expected, 10, "2^-1");
+}
+
+#[test]
+fn test_powf_negative_fractional_exponent() {
+    let e = Env::default();
+    // 2^(-0.5) = 1/√2 ≈ 0.707106781186547524
+    let two = Wad::from_integer(&e, 2);
+    let neg_half = Wad::from_ratio(&e, -1, 2);
+    let result = two.powf(&e, neg_half);
+    let expected = Wad::from_raw(707_106_781_186_547_524);
+    assert_close(result, expected, 10, "2^-0.5");
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1502)")]
+fn test_powf_negative_base_non_integer_panics() {
+    let e = Env::default();
+    // (-2)^0.5 — undefined in real numbers.
+    let neg_two = Wad::from_integer(&e, -2);
+    let half = Wad::from_ratio(&e, 1, 2);
+    let _ = neg_two.powf(&e, half);
+}
+
+#[test]
+fn test_checked_powf_overflow_returns_none() {
+    let e = Env::default();
+    // 1000^1000 overflows wildly.
+    let big = Wad::from_integer(&e, 1000);
+    let result = big.checked_powf(&e, big);
+    assert_eq!(result, None);
+}
+
+#[test]
+fn test_checked_powf_negative_base_returns_none() {
+    let e = Env::default();
+    let neg_two = Wad::from_integer(&e, -2);
+    let half = Wad::from_ratio(&e, 1, 2);
+    assert_eq!(neg_two.checked_powf(&e, half), None);
+}
+
+#[test]
+fn test_checked_powf_zero_negative_returns_none() {
+    let e = Env::default();
+    let zero = Wad::from_raw(0);
+    let neg_one = Wad::from_integer(&e, -1);
+    assert_eq!(zero.checked_powf(&e, neg_one), None);
+}
+
+#[test]
+fn test_checked_powf_success() {
+    let e = Env::default();
+    let two = Wad::from_integer(&e, 2);
+    let half = Wad::from_ratio(&e, 1, 2);
+    let result = two.checked_powf(&e, half).unwrap();
+    let expected = Wad::from_raw(1_414_213_562_373_095_048);
+    assert_close(result, expected, 10, "checked_powf(2, 0.5)");
 }

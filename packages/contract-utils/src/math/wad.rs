@@ -5,7 +5,11 @@ use core::{
 
 use soroban_sdk::{panic_with_error, Env};
 
-use crate::math::{i128_fixed_point::checked_mul_div, SorobanFixedPointError};
+use crate::math::{
+    exp_ln::{exp_wad, ln_wad},
+    i128_fixed_point::checked_mul_div,
+    SorobanFixedPointError,
+};
 
 /// Fixed-point decimal number with 18 decimal places of precision.
 ///
@@ -374,6 +378,9 @@ impl Wad {
     /// maintains fixed-point precision by dividing by WAD_SCALE, with
     /// truncation toward zero.
     ///
+    /// For non-integer exponents, see [`Wad::powf`] (uses `exp(y * ln(x))`).
+    /// Naming follows Rust's `f64::{powi, powf}` convention.
+    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment for error handling.
@@ -389,19 +396,19 @@ impl Wad {
     /// ```ignore
     /// // Compound interest: (1.05)^10
     /// let rate = Wad::from_ratio(&e, 105, 100);  // 1.05
-    /// let final_multiplier = rate.pow(&e, 10);
+    /// let final_multiplier = rate.powi(&e, 10);
     /// let final_amount = principal * final_multiplier;
     ///
     /// // Quadratic bonding curve: price = supply^2
     /// let supply = Wad::from_integer(&e, 1000);
-    /// let price = supply.pow(&e, 2);
+    /// let price = supply.powi(&e, 2);
     /// ```
-    pub fn pow(self, e: &Env, exponent: u32) -> Self {
-        self.checked_pow(e, exponent)
+    pub fn powi(self, e: &Env, exponent: u32) -> Self {
+        self.checked_powi(e, exponent)
             .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
     }
 
-    /// Checked version of [`Wad::pow`].
+    /// Checked version of [`Wad::powi`].
     ///
     /// Returns `None` instead of panicking on overflow. Handles phantom
     /// overflow transparently by scaling to `I256` when intermediate
@@ -417,16 +424,16 @@ impl Wad {
     /// ```ignore
     /// let e = Env::default();
     /// let small = Wad::from_integer(&e, 2);
-    /// assert_eq!(small.checked_pow(&e, 10), Some(Wad::from_integer(&e, 1024)));
+    /// assert_eq!(small.checked_powi(&e, 10), Some(Wad::from_integer(&e, 1024)));
     ///
     /// let large = Wad::from_integer(&e, i128::MAX / WAD_SCALE);
-    /// assert_eq!(large.checked_pow(&e, 2), None); // Overflows
+    /// assert_eq!(large.checked_powi(&e, 2), None); // Overflows
     /// ```
     ///
     /// # Notes
     ///
     /// Phantom overflow is handled internally.
-    pub fn checked_pow(self, e: &Env, mut exponent: u32) -> Option<Self> {
+    pub fn checked_powi(self, e: &Env, mut exponent: u32) -> Option<Self> {
         // Handle base cases
         if exponent == 0 {
             return Some(Wad(WAD_SCALE)); // x^0 = 1
@@ -481,6 +488,210 @@ impl Wad {
         }
 
         Some(result)
+    }
+
+    /// Natural logarithm of `self`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`SorobanFixedPointError::InvalidBase`] - When `self <= 0`. `ln` is
+    ///   undefined for non-positive inputs.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let e = Env::default();
+    /// let one = Wad::from_integer(&e, 1);
+    /// assert_eq!(one.ln(&e), Wad::from_raw(0)); // ln(1) = 0
+    /// ```
+    pub fn ln(self, e: &Env) -> Self {
+        self.checked_ln(e)
+            .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::InvalidBase))
+    }
+
+    /// Checked version of [`Wad::ln`].
+    ///
+    /// Returns `None` if `self <= 0`.
+    pub fn checked_ln(self, e: &Env) -> Option<Self> {
+        ln_wad(e, self.0).map(Wad)
+    }
+
+    /// Natural exponential of `self`: returns `e^self`, where `e ≈ 2.71828`
+    /// is Euler's number.
+    ///
+    /// This is **not** a generic power function — for `x^y` with an arbitrary
+    /// base, use [`Wad::powf`]. `Wad::exp` is the inverse of [`Wad::ln`]
+    ///
+    /// Returns `0` for inputs at or below `≈ -42.139` (the result rounds to 0
+    /// in WAD precision). Panics for inputs at or above `≈ 135.305` (overflow).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    ///
+    /// # Errors
+    ///
+    /// * [`SorobanFixedPointError::Overflow`] - When the input is too large to
+    ///   represent the result in i128.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let e = Env::default();
+    /// let zero = Wad::from_raw(0);
+    /// assert_eq!(zero.exp(&e), Wad::from_integer(&e, 1)); // exp(0) = 1
+    /// ```
+    pub fn exp(self, e: &Env) -> Self {
+        self.checked_exp(e)
+            .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
+    }
+
+    /// Checked version of [`Wad::exp`]. Computes `e^self` where `e` is
+    /// Euler's number; not a power function.
+    ///
+    /// Returns `None` if the input is at or above the overflow bound.
+    pub fn checked_exp(self, e: &Env) -> Option<Self> {
+        exp_wad(e, self.0).map(Wad)
+    }
+
+    /// Raises `self` to a `Wad` power (the floating-point analogue of
+    /// [`Wad::powi`]).
+    ///
+    /// Computes `self^exponent` for arbitrary fractional exponents using
+    /// `exp(exponent * ln(self))`. Falls back to integer exponentiation
+    /// (via [`Wad::powi`]) when `exponent` is an exact non-negative integer
+    /// in the `u32` range — this is faster and more precise.
+    ///
+    /// Naming follows Rust's `f64::{powi, powf}` convention: `powi` for
+    /// integer exponents, `powf` for fractional / Wad-typed ones.
+    ///
+    /// # Special cases
+    ///
+    /// - `x^0 = 1` for any `x` (including `0^0 = 1`, matching the convention
+    ///   used by [`Wad::powi`], Python's `pow`, and IEEE 754).
+    /// - `0^y = 0` for `y > 0`.
+    /// - `1^y = 1` for any `y`.
+    /// - `x^1 = x` for any `x`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `exponent` - The exponent.
+    ///
+    /// # Errors
+    ///
+    /// * [`SorobanFixedPointError::DivisionByZero`] - When `self == 0` and
+    ///   `exponent < 0`.
+    /// * [`SorobanFixedPointError::InvalidBase`] - When `self < 0`
+    /// * [`SorobanFixedPointError::Overflow`] - When the result doesn't fit in
+    ///   i128.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// let e = Env::default();
+    /// // 2^0.5 ≈ √2
+    /// let two = Wad::from_integer(&e, 2);
+    /// let half = Wad::from_ratio(&e, 1, 2);
+    /// let sqrt_two = two.powf(&e, half);
+    /// ```
+    pub fn powf(self, e: &Env, exponent: Wad) -> Self {
+        // 0^0 = 1
+        if exponent.0 == 0 {
+            return Wad(WAD_SCALE);
+        }
+        // 0^y for y > 0 = 0;
+        // 0^y for y < 0 → division by zero
+        if self.0 == 0 {
+            if exponent.0 > 0 {
+                return Wad(0);
+            }
+            panic_with_error!(e, SorobanFixedPointError::DivisionByZero);
+        }
+        // 1^y = 1
+        if self.0 == WAD_SCALE {
+            return self;
+        }
+        // x^1 = x
+        if exponent.0 == WAD_SCALE {
+            return self;
+        }
+
+        // Integer-y fast path: when `exponent` is an exact non-negative
+        // integer that fits in u32, delegate to the integer `powi`. This
+        // also handles `x < 0` correctly (e.g. `(-2)^3 = -8`), which the
+        // general path below rejects (`(-2)^1.5` is complex).
+        //
+        // `exponent.0 % WAD_SCALE == 0` checks for "no fractional part":
+        // a WAD value is an exact integer iff its raw representation is a
+        // clean multiple of `WAD_SCALE` (10^18). For example, `2.0` has
+        // raw = `2 * 10^18` (mod = 0); `2.5` has raw = `2.5 * 10^18`
+        // (mod ≠ 0).
+        if exponent.0 > 0 && exponent.0 % WAD_SCALE == 0 {
+            let n = exponent.0 / WAD_SCALE;
+            if n <= u32::MAX as i128 {
+                return self.powi(e, n as u32);
+            }
+        }
+
+        // General path requires a positive base (because we compute ln(x)).
+        if self.0 < 0 {
+            panic_with_error!(e, SorobanFixedPointError::InvalidBase);
+        }
+
+        // x^y = exp(y * ln(x))
+        let ln_x = ln_wad(e, self.0)
+            .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::InvalidBase));
+        let y_ln_x = checked_mul_div(e, &exponent.0, &ln_x, &WAD_SCALE)
+            .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow));
+        exp_wad(e, y_ln_x)
+            .map(Wad)
+            .unwrap_or_else(|| panic_with_error!(e, SorobanFixedPointError::Overflow))
+    }
+
+    /// Checked version of [`Wad::powf`].
+    ///
+    /// Special cases mirror [`Wad::powf`]: `x^0 = 1` for any `x` (including
+    /// `0^0 = 1`), `0^y = 0` for `y > 0`, `1^y = 1`, `x^1 = x`.
+    ///
+    /// Returns `None` for all error conditions: overflow, `0^negative`,
+    /// and negative base with non-integer exponent.
+    pub fn checked_powf(self, e: &Env, exponent: Wad) -> Option<Self> {
+        if exponent.0 == 0 {
+            return Some(Wad(WAD_SCALE));
+        }
+        if self.0 == 0 {
+            return if exponent.0 > 0 { Some(Wad(0)) } else { None };
+        }
+        if self.0 == WAD_SCALE {
+            return Some(self);
+        }
+        if exponent.0 == WAD_SCALE {
+            return Some(self);
+        }
+
+        // Integer-y fast path. `exponent.0 % WAD_SCALE == 0` means the WAD
+        // value has no fractional part (raw is an exact multiple of 10^18).
+        // See `powf` for details.
+        if exponent.0 > 0 && exponent.0 % WAD_SCALE == 0 {
+            let n = exponent.0 / WAD_SCALE;
+            if n <= u32::MAX as i128 {
+                return self.checked_powi(e, n as u32);
+            }
+        }
+
+        if self.0 < 0 {
+            return None;
+        }
+
+        // x^y = exp(y * ln(x))
+        let ln_x = ln_wad(e, self.0)?;
+        let y_ln_x = checked_mul_div(e, &exponent.0, &ln_x, &WAD_SCALE)?;
+        exp_wad(e, y_ln_x).map(Wad)
     }
 }
 

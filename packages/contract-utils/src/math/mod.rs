@@ -44,6 +44,7 @@
 //! Based on the Soroban fixed-point mathematics library.
 //! Original implementation: <https://github.com/script3/soroban-fixed-point-math>
 
+mod exp_ln;
 pub mod i128_fixed_point;
 pub mod i256_fixed_point;
 pub mod wad;
@@ -63,6 +64,9 @@ pub enum SorobanFixedPointError {
     Overflow = 1500,
     /// Division by zero
     DivisionByZero = 1501,
+    /// Base is outside the valid domain (e.g. `ln(x)` for `x <= 0`,
+    /// or `powf(x, y)` with non-positive `x` combined with float exponent).
+    InvalidBase = 1502,
 }
 
 /// Rounding direction for division operations
