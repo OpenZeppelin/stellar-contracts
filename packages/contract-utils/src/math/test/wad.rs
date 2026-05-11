@@ -1156,3 +1156,40 @@ fn test_checked_powf_success() {
     let expected = Wad::from_raw(1_414_213_562_373_095_048);
     assert_close(result, expected, 10, "checked_powf(2, 0.5)");
 }
+
+#[test]
+fn test_checked_powf_y_zero() {
+    // x^0 = 1 for any x, via the y==0 fast path.
+    let e = Env::default();
+    let x = Wad::from_integer(&e, 42);
+    assert_eq!(x.checked_powf(&e, Wad::from_raw(0)), Some(Wad::from_integer(&e, 1)));
+}
+
+#[test]
+fn test_checked_powf_one_base() {
+    // 1^y = 1 for any y, via the x==1 fast path.
+    let e = Env::default();
+    let one = Wad::from_integer(&e, 1);
+    let weird_y = Wad::from_ratio(&e, 355, 113); // π-ish, definitely non-integer
+    assert_eq!(one.checked_powf(&e, weird_y), Some(one));
+}
+
+#[test]
+fn test_checked_powf_y_one() {
+    // x^1 = x for any x, via the y==1 fast path.
+    let e = Env::default();
+    let x = Wad::from_ratio(&e, 7, 13);
+    let one = Wad::from_integer(&e, 1);
+    assert_eq!(x.checked_powf(&e, one), Some(x));
+}
+
+#[test]
+fn test_checked_powf_integer_exponent_matches_powi() {
+    // Integer-y fast path: checked_powf delegates to checked_powi when the
+    // exponent is an exact non-negative integer in u32 range.
+    let e = Env::default();
+    let two = Wad::from_integer(&e, 2);
+    let three_wad = Wad::from_integer(&e, 3);
+    assert_eq!(two.checked_powf(&e, three_wad), two.checked_powi(&e, 3));
+    assert_eq!(two.checked_powf(&e, three_wad), Some(Wad::from_integer(&e, 8)));
+}
