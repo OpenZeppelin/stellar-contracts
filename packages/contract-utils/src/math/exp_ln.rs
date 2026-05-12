@@ -24,6 +24,20 @@
 
 use soroban_sdk::{Env, I256, U256};
 
+/// Input threshold at/below which `exp_wad(x)` returns 0.
+///
+/// For `x` this small, `e^x * 10^18` evaluates to less than `0.5`, which
+/// truncates to `0` in WAD precision. The exact value is
+/// `floor(ln(0.5 * 10^-18) * 10^18)` ≈ `-42.139 * 10^18`.
+const EXP_INPUT_MIN: i128 = -42_139_678_854_452_767_551;
+
+/// Input threshold at/above which `exp_wad(x)` overflows.
+///
+/// For `x` this large, `e^x` exceeds the range Solmate's algorithm can
+/// represent in its internal i256-with-2^96-scale basis. The exact value
+/// is `floor(ln((2^255 - 1) / 10^18) * 10^18)` ≈ `135.305 * 10^18`.
+const EXP_INPUT_MAX: i128 = 135_305_999_368_893_231_589;
+
 /// Natural logarithm of a WAD value.
 ///
 /// Returns `None` if `x <= 0` or the result doesn't fit in `i128`.
@@ -68,7 +82,7 @@ pub(super) fn ln_wad(e: &Env, x: i128) -> Option<i128> {
     p = p.mul(&x).shr(96).sub(&I256::from_parts(e, 0, 0, 0xb9a025d814, 0xb29c212b8b1a07ce));
     // p = p * x - (795164235651350426258249787498 << 96)
     // (Pre-shifted constant; leaves p in 2^192 basis to skip a final shift.)
-    p = p.mul(&x).sub(&I256::from_parts(e, 10, 0x09507084cc699bb0, 0xe71ea86a00000000, 0));
+    p = p.mul(&x).sub(&I256::from_parts(e, 0xa, 0x09507084cc699bb0, 0xe71ea86a00000000, 0));
 
     // q polynomial — q has no zeros in the domain (all roots complex).
 
@@ -105,7 +119,7 @@ pub(super) fn ln_wad(e: &Env, x: i128) -> Option<i128> {
     r = r.add(
         &I256::from_parts(
             e,
-            2_644_146_654_357,
+            0x267a36c0c95,
             0xb3975ab3ee5b203a,
             0x7614a3f75373f047,
             0xd803ae7b6687f2b3,
@@ -115,7 +129,7 @@ pub(super) fn ln_wad(e: &Env, x: i128) -> Option<i128> {
     // r += 600920179829731861736702779321621459595472258049074101567377883020018308
     r = r.add(&I256::from_parts(
         e,
-        95_732_107_772_300,
+        0x57115e47018c,
         0x7177eebf7cd370a3,
         0x356a1b7863008a5a,
         0xe8028c72b8864284,
@@ -132,17 +146,14 @@ pub(super) fn ln_wad(e: &Env, x: i128) -> Option<i128> {
 /// This is **not** a power function. To raise an arbitrary base to an
 /// arbitrary power, use [`crate::math::wad::Wad::powf`].
 ///
-/// Returns `Some(0)` for `x <= -42139678854452767551` (underflow to 0,
-/// matching Solmate). Returns `None` for `x >= 135305999368893231589`
-/// (would overflow even in i256-with-2^96-scale).
+/// Returns `Some(0)` for `x <= EXP_INPUT_MIN` (underflow to 0, matching
+/// Solmate). Returns `None` for `x >= EXP_INPUT_MAX` (would overflow even
+/// in i256-with-2^96-scale).
 pub(super) fn exp_wad(e: &Env, x: i128) -> Option<i128> {
-    // dec: -42139678854452767551 — below this, exp(x) rounds to 0 in WAD.
-    if x <= -42_139_678_854_452_767_551 {
+    if x <= EXP_INPUT_MIN {
         return Some(0);
     }
-    // dec: 135305999368893231589 — at/above this, the result exceeds i256
-    // headroom in Solmate's algorithm.
-    if x >= 135_305_999_368_893_231_589 {
+    if x >= EXP_INPUT_MAX {
         return None;
     }
 
@@ -178,7 +189,7 @@ pub(super) fn exp_wad(e: &Env, x: i128) -> Option<i128> {
     p = p.mul(&y).shr(96).add(&I256::from_parts(e, 0, 0, 0x587f503bb6ea2, 0x9d25fcb740196450));
     // p = p * x + (4385272521454847904659076985693276 << 96)
     // (pre-shifted constant)
-    p = p.mul(&x).add(&I256::from_parts(e, 55_349, 0xebba824c98fb31b8, 0x3b2ca45c00000000, 0));
+    p = p.mul(&x).add(&I256::from_parts(e, 0xd835, 0xebba824c98fb31b8, 0x3b2ca45c00000000, 0));
 
     // q = x - 2855989394907223263936484059900
     let mut q = x.sub(&I256::from_parts(e, 0, 0, 0x240c330e9f, 0xb2d9cbaf0fd5aafc));
