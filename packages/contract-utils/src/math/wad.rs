@@ -362,7 +362,6 @@ impl Wad {
     /// # Examples
     ///
     /// ```ignore
-    /// let e = Env::default();
     /// let negative = Wad::from_integer(&e, -5);
     /// assert_eq!(negative.abs(), Wad::from_integer(&e, 5));
     /// ```
@@ -421,7 +420,6 @@ impl Wad {
     /// # Examples
     ///
     /// ```ignore
-    /// let e = Env::default();
     /// let small = Wad::from_integer(&e, 2);
     /// assert_eq!(small.checked_powi(&e, 10), Some(Wad::from_integer(&e, 1024)));
     ///
@@ -503,7 +501,6 @@ impl Wad {
     /// # Examples
     ///
     /// ```ignore
-    /// let e = Env::default();
     /// let one = Wad::from_integer(&e, 1);
     /// assert_eq!(one.ln(&e), Wad::from_raw(0)); // ln(1) = 0
     /// ```
@@ -540,7 +537,6 @@ impl Wad {
     /// # Examples
     ///
     /// ```ignore
-    /// let e = Env::default();
     /// let zero = Wad::from_raw(0);
     /// assert_eq!(zero.exp(&e), Wad::from_integer(&e, 1)); // exp(0) = 1
     /// ```
@@ -589,7 +585,6 @@ impl Wad {
     /// # Examples
     ///
     /// ```ignore
-    /// let e = Env::default();
     /// // 2^0.5 ≈ √2
     /// let two = Wad::from_integer(&e, 2);
     /// let half = Wad::from_ratio(&e, 1, 2);
