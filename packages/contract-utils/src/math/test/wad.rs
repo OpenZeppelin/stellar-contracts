@@ -850,6 +850,18 @@ fn test_ln_large() {
 }
 
 #[test]
+fn test_ln_very_large_triggers_shr_branch() {
+    let e = Env::default();
+    // Raw WAD value 10^30 ≈ 2^99.66, so ilog2 = 99 and k = 3 > 0,
+    // which exercises the right-shift normalization branch in ln_wad.
+    // ln(1e12) = 12 * ln(10) ≈ 27.631021115928548208
+    let large = Wad::from_integer(&e, 1_000_000_000_000);
+    let result = large.ln(&e);
+    let expected = Wad::from_raw(27_631_021_115_928_548_208);
+    assert_close(result, expected, 100, "ln(1e12)");
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #1502)")]
 fn test_ln_zero_panics() {
     let e = Env::default();
