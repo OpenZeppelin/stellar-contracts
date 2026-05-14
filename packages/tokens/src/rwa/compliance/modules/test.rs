@@ -7,94 +7,15 @@ use soroban_sdk::{
 
 use super::storage::*;
 use crate::rwa::{
-    compliance::{Compliance, ComplianceHook},
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
-        IndividualCountryRelation,
+        IndividualCountryRelation, OrganizationCountryRelation,
     },
     utils::token_binder::TokenBinder,
 };
 
 #[contract]
 struct MockModuleContract;
-
-#[contract]
-struct MockComplianceContract;
-
-#[contracttype]
-#[derive(Clone)]
-enum MockComplianceStorageKey {
-    Registered(ComplianceHook, Address),
-}
-
-#[contractimpl]
-impl Compliance for MockComplianceContract {
-    fn add_module_to(_e: &Env, _hook: ComplianceHook, _module: Address, _operator: Address) {
-        unreachable!("add_module_to is not used in these tests");
-    }
-
-    fn remove_module_from(_e: &Env, _hook: ComplianceHook, _module: Address, _operator: Address) {
-        unreachable!("remove_module_from is not used in these tests");
-    }
-
-    fn get_modules_for_hook(_e: &Env, _hook: ComplianceHook) -> Vec<Address> {
-        unreachable!("get_modules_for_hook is not used in these tests");
-    }
-
-    fn is_module_registered(e: &Env, hook: ComplianceHook, module: Address) -> bool {
-        let key = MockComplianceStorageKey::Registered(hook, module);
-        e.storage().persistent().has(&key)
-    }
-
-    fn transferred(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {
-        unreachable!("transferred is not used in these tests");
-    }
-
-    fn created(_e: &Env, _to: Address, _amount: i128, _token: Address) {
-        unreachable!("created is not used in these tests");
-    }
-
-    fn destroyed(_e: &Env, _from: Address, _amount: i128, _token: Address) {
-        unreachable!("destroyed is not used in these tests");
-    }
-
-    fn can_transfer(
-        _e: &Env,
-        _from: Address,
-        _to: Address,
-        _amount: i128,
-        _token: Address,
-    ) -> bool {
-        unreachable!("can_transfer is not used in these tests");
-    }
-
-    fn can_create(_e: &Env, _to: Address, _amount: i128, _token: Address) -> bool {
-        unreachable!("can_create is not used in these tests");
-    }
-}
-
-#[contractimpl]
-impl TokenBinder for MockComplianceContract {
-    fn linked_tokens(e: &Env) -> Vec<Address> {
-        Vec::new(e)
-    }
-
-    fn bind_token(_e: &Env, _token: Address, _operator: Address) {
-        unreachable!("bind_token is not used in these tests");
-    }
-
-    fn unbind_token(_e: &Env, _token: Address, _operator: Address) {
-        unreachable!("unbind_token is not used in these tests");
-    }
-}
-
-#[contractimpl]
-impl MockComplianceContract {
-    pub fn register_hook(e: &Env, hook: ComplianceHook, module: Address) {
-        let key = MockComplianceStorageKey::Registered(hook, module);
-        e.storage().persistent().set(&key, &true);
-    }
-}
 
 #[contract]
 struct MockIRSContract;
@@ -202,65 +123,6 @@ fn sample_country_entry() -> CountryData {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #390)")]
-fn verify_required_hooks_panics_when_unconfigured() {
-    let e = Env::default();
-    let module_id = e.register(MockModuleContract, ());
-
-    e.as_contract(&module_id, || {
-        verify_required_hooks(&e, vec![&e, ComplianceHook::CanTransfer]);
-    });
-}
-
-#[test]
-fn verify_required_hooks_sets_cache_when_registered() {
-    let e = Env::default();
-    let module_id = e.register(MockModuleContract, ());
-    let compliance_id = e.register(MockComplianceContract, ());
-    let compliance = MockComplianceContractClient::new(&e, &compliance_id);
-
-    compliance.register_hook(&ComplianceHook::CanTransfer, &module_id);
-
-    e.as_contract(&module_id, || {
-        set_compliance_address(&e, &compliance_id);
-
-        verify_required_hooks(&e, vec![&e, ComplianceHook::CanTransfer]);
-
-        assert!(hooks_verified(&e));
-    });
-}
-
-#[test]
-fn verify_required_hooks_returns_early_when_cached() {
-    let e = Env::default();
-    let module_id = e.register(MockModuleContract, ());
-    let compliance_id = e.register(MockComplianceContract, ());
-
-    e.as_contract(&module_id, || {
-        set_compliance_address(&e, &compliance_id);
-        e.storage().instance().set(&ComplianceModuleStorageKey::HooksVerified, &true);
-
-        verify_required_hooks(&e, vec![&e, ComplianceHook::CanTransfer]);
-
-        assert!(hooks_verified(&e));
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #398)")]
-fn verify_required_hooks_missing_required_hook_panics_with_contract_error() {
-    let e = Env::default();
-    let module_id = e.register(MockModuleContract, ());
-    let compliance_id = e.register(MockComplianceContract, ());
-
-    e.as_contract(&module_id, || {
-        set_compliance_address(&e, &compliance_id);
-
-        verify_required_hooks(&e, vec![&e, ComplianceHook::CanTransfer]);
-    });
-}
-
-#[test]
 fn get_irs_client_returns_working_client_for_configured_token() {
     let e = Env::default();
     let module_id = e.register(MockModuleContract, ());
@@ -298,7 +160,7 @@ fn get_irs_country_data_entries_returns_typed_entries() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #397)")]
+#[should_panic(expected = "Error(Contract, #396)")]
 fn get_irs_client_panics_when_not_configured() {
     let e = Env::default();
     let module_id = e.register(MockModuleContract, ());
@@ -306,43 +168,6 @@ fn get_irs_client_panics_when_not_configured() {
 
     e.as_contract(&module_id, || {
         let _ = get_irs_client(&e, &token);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #399)")]
-fn set_compliance_address_panics_with_contract_error_when_already_set() {
-    let e = Env::default();
-    let module_id = e.register(MockModuleContract, ());
-    let compliance_id = e.register(MockComplianceContract, ());
-
-    e.as_contract(&module_id, || {
-        set_compliance_address(&e, &compliance_id);
-        set_compliance_address(&e, &compliance_id);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #390)")]
-fn get_compliance_address_panics_when_not_configured() {
-    let e = Env::default();
-    let module_id = e.register(MockModuleContract, ());
-
-    e.as_contract(&module_id, || {
-        let _ = get_compliance_address(&e);
-    });
-}
-
-#[test]
-fn get_compliance_address_returns_configured_address() {
-    let e = Env::default();
-    let module_id = e.register(MockModuleContract, ());
-    let compliance_id = e.register(MockComplianceContract, ());
-
-    e.as_contract(&module_id, || {
-        set_compliance_address(&e, &compliance_id);
-
-        assert_eq!(get_compliance_address(&e), compliance_id);
     });
 }
 
@@ -355,7 +180,7 @@ fn panicking_math_helpers_return_expected_values() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #392)")]
+#[should_panic(expected = "Error(Contract, #391)")]
 fn add_i128_or_panic_panics_on_overflow() {
     let e = Env::default();
 
@@ -363,9 +188,157 @@ fn add_i128_or_panic_panics_on_overflow() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #393)")]
+#[should_panic(expected = "Error(Contract, #392)")]
 fn sub_i128_or_panic_panics_on_underflow() {
     let e = Env::default();
 
     let _ = sub_i128_or_panic(&e, i128::MIN, 1);
+}
+
+#[test]
+fn set_and_get_compliance_address_round_trip() {
+    let e = Env::default();
+    let module_id = e.register(MockModuleContract, ());
+    let token = Address::generate(&e);
+    let compliance = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_compliance_address(&e, &token, &compliance);
+
+        assert_eq!(get_compliance_address(&e, &token), compliance);
+    });
+}
+
+#[test]
+fn set_compliance_address_overwrites_existing_binding() {
+    let e = Env::default();
+    let module_id = e.register(MockModuleContract, ());
+    let token = Address::generate(&e);
+    let first = Address::generate(&e);
+    let second = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_compliance_address(&e, &token, &first);
+        set_compliance_address(&e, &token, &second);
+
+        assert_eq!(get_compliance_address(&e, &token), second);
+    });
+}
+
+#[test]
+fn compliance_address_is_isolated_per_token() {
+    let e = Env::default();
+    let module_id = e.register(MockModuleContract, ());
+    let token_a = Address::generate(&e);
+    let token_b = Address::generate(&e);
+    let compliance_a = Address::generate(&e);
+    let compliance_b = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_compliance_address(&e, &token_a, &compliance_a);
+        set_compliance_address(&e, &token_b, &compliance_b);
+
+        assert_eq!(get_compliance_address(&e, &token_a), compliance_a);
+        assert_eq!(get_compliance_address(&e, &token_b), compliance_b);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #398)")]
+fn get_compliance_address_panics_when_not_configured() {
+    let e = Env::default();
+    let module_id = e.register(MockModuleContract, ());
+    let token = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        let _ = get_compliance_address(&e, &token);
+    });
+}
+
+#[test]
+fn require_non_negative_amount_accepts_zero_and_positive() {
+    let e = Env::default();
+
+    require_non_negative_amount(&e, 0);
+    require_non_negative_amount(&e, i128::MAX);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #390)")]
+fn require_non_negative_amount_panics_on_negative() {
+    let e = Env::default();
+
+    require_non_negative_amount(&e, -1);
+}
+
+#[test]
+fn module_name_allocates_soroban_string() {
+    let e = Env::default();
+
+    let name = module_name(&e, "MyModule");
+    assert_eq!(name, soroban_sdk::String::from_str(&e, "MyModule"));
+}
+
+#[test]
+fn country_code_extracts_value_across_all_relation_variants() {
+    let e = Env::default();
+    let custom_label = soroban_sdk::Symbol::new(&e, "custom");
+
+    // Individual variants.
+    assert_eq!(
+        country_code(&CountryRelation::Individual(IndividualCountryRelation::Residence(840))),
+        840
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Individual(IndividualCountryRelation::Citizenship(124))),
+        124
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Individual(IndividualCountryRelation::SourceOfFunds(76))),
+        76
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Individual(IndividualCountryRelation::TaxResidency(36))),
+        36
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Individual(IndividualCountryRelation::Custom(
+            custom_label.clone(),
+            250
+        ))),
+        250
+    );
+
+    // Organization variants.
+    assert_eq!(
+        country_code(&CountryRelation::Organization(OrganizationCountryRelation::Incorporation(
+            826
+        ))),
+        826
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Organization(
+            OrganizationCountryRelation::OperatingJurisdiction(276)
+        )),
+        276
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Organization(OrganizationCountryRelation::TaxJurisdiction(
+            392
+        ))),
+        392
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Organization(OrganizationCountryRelation::SourceOfFunds(
+            56
+        ))),
+        56
+    );
+    assert_eq!(
+        country_code(&CountryRelation::Organization(OrganizationCountryRelation::Custom(
+            custom_label,
+            100
+        ))),
+        100
+    );
 }

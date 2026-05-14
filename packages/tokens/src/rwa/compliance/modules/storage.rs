@@ -1,17 +1,17 @@
-//! Shared storage and helper utilities for compliance modules.
+//! Storage primitives and shared utilities for compliance modules.
 //!
-//! Centralizes compliance-address ownership/auth checks, safe arithmetic
-//! guards, and identity registry storage (IRS) resolution helpers.
+//! Holds the storage-key enum and free functions that back the per-token
+//! compliance and IRS bindings exposed through the
+//! [`crate::rwa::compliance::modules::ComplianceModule`] trait, plus the
+//! safe-arithmetic and `CountryRelation` utilities reused across module
+//! implementations.
 
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, FromVal, String, Vec};
 
 use super::{ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD};
-use crate::rwa::{
-    compliance::{ComplianceClient, ComplianceHook},
-    identity_registry_storage::{
-        CountryData, CountryDataManagerClient, CountryRelation, IdentityRegistryStorageClient,
-        IndividualCountryRelation, OrganizationCountryRelation,
-    },
+use crate::rwa::identity_registry_storage::{
+    CountryData, CountryDataManagerClient, CountryRelation, IdentityRegistryStorageClient,
+    IndividualCountryRelation, OrganizationCountryRelation,
 };
 
 // ---------------------------------------------------------------------------
@@ -21,47 +21,41 @@ use crate::rwa::{
 #[contracttype]
 #[derive(Clone)]
 pub enum ComplianceModuleStorageKey {
-    /// Maps to the compliance contract address for this module instance.
-    Compliance,
-    /// Caches successful required-hook verification for this module instance.
-    HooksVerified,
     /// The IRS contract address for a specific token.
     Registry(Address),
+    /// The authorized compliance dispatcher for a specific token. Used by
+    /// state-mutating modules to authenticate their hook callers.
+    Compliance(Address),
 }
 
 // ################## QUERY STATE ##################
 
-/// Returns the stored compliance address.
+/// Returns the dispatcher bound to `token`.
+///
+/// State-mutating modules call this and `require_auth()` on the result to
+/// verify a hook call genuinely came from the authorized dispatcher.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose authorized dispatcher is being queried.
 ///
 /// # Errors
 ///
-/// * [`ComplianceModuleError::ComplianceNotSet`] - When no compliance contract
-///   has been configured yet.
-pub fn get_compliance_address(e: &Env) -> Address {
-    let key = ComplianceModuleStorageKey::Compliance;
-    if let Some(addr) = e.storage().instance().get::<_, Address>(&key) {
-        addr
-    } else {
-        panic_with_error!(e, ComplianceModuleError::ComplianceNotSet)
-    }
+/// * [`ComplianceModuleError::ComplianceNotSet`] - When no dispatcher has been
+///   bound for `token`.
+pub fn get_compliance_address(e: &Env, token: &Address) -> Address {
+    let key = ComplianceModuleStorageKey::Compliance(token.clone());
+    let compliance: Address = e
+        .storage()
+        .persistent()
+        .get(&key)
+        .unwrap_or_else(|| panic_with_error!(e, ComplianceModuleError::ComplianceNotSet));
+    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
+    compliance
 }
 
-/// Returns `true` if the hook wiring has already been verified for this
-/// module instance (cached after the first successful check).
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-pub fn hooks_verified(e: &Env) -> bool {
-    let key = ComplianceModuleStorageKey::HooksVerified;
-    e.storage().instance().has(&key)
-}
-
-/// Returns an IRS cross-contract client for the given token.
+/// Returns a cross-contract client for the IRS bound to `token`.
 ///
 /// # Arguments
 ///
@@ -71,25 +65,25 @@ pub fn hooks_verified(e: &Env) -> bool {
 /// # Errors
 ///
 /// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
-///   configured for this token.
+///   configured for `token`.
 pub fn get_irs_client<'a>(e: &'a Env, token: &Address) -> IdentityRegistryStorageClient<'a> {
     let irs = get_irs_address(e, token);
     IdentityRegistryStorageClient::new(e, &irs)
 }
 
-/// Returns the typed country data entries for `account` resolved via the
-/// token's configured IRS.
+/// Returns `account`'s country data entries from the IRS bound to `token`,
+/// decoded into the typed [`CountryData`] form.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `token` - The token whose IRS client is requested.
-/// * `account` - The account whose country data should be read.
+/// * `token` - The token whose IRS the entries are read through.
+/// * `account` - The account whose country data is being read.
 ///
 /// # Errors
 ///
 /// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
-///   configured for this token.
+///   configured for `token`.
 pub fn get_irs_country_data_entries(
     e: &Env,
     token: &Address,
@@ -104,87 +98,41 @@ pub fn get_irs_country_data_entries(
 
 // ################## CHANGE STATE ##################
 
-/// Persists the compliance contract address that governs this module.
-///
-/// This is a **one-time** operation. Once set, the compliance address cannot
-/// be changed. This prevents unauthorized rebinding after initial deployment.
+/// Binds `compliance` as the dispatcher authorized to drive hooks for
+/// `token`, overwriting any prior binding.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `compliance` - The address of the compliance contract.
-///
-/// # Errors
-///
-/// * [`ComplianceModuleError::ComplianceAlreadySet`] - When the compliance
-///   address has already been set.
+/// * `token` - The token whose dispatcher binding is being configured.
+/// * `compliance` - The dispatcher address authorized to call this module's
+///   hooks for `token`.
 ///
 /// # Security Warning
 ///
-/// This helper performs **no authorization checks**. It must only be called
-/// during contract initialization or from entrypoints that are strictly
-/// restricted to an admin or token owner. Exposing this as, or calling it
-/// from, a publicly accessible module entrypoint would allow unauthorized
-/// parties to bind the compliance contract for this module.
-pub fn set_compliance_address(e: &Env, compliance: &Address) {
-    let key = ComplianceModuleStorageKey::Compliance;
-    if e.storage().instance().has(&key) {
-        panic_with_error!(e, ComplianceModuleError::ComplianceAlreadySet);
-    }
-    e.storage().instance().set(&key, compliance);
+/// This function performs no authorization checks. Callers must gate access
+/// (e.g. with [`stellar_macros::only_admin`]) before invoking it.
+pub fn set_compliance_address(e: &Env, token: &Address, compliance: &Address) {
+    let key = ComplianceModuleStorageKey::Compliance(token.clone());
+    e.storage().persistent().set(&key, compliance);
 }
 
-/// Cross-calls the compliance contract to verify that this module is
-/// registered on every hook in `required`. Caches the result on success
-/// so subsequent calls are a single storage read.
+/// Binds `irs` as the Identity Registry Storage contract for `token`,
+/// overwriting any prior binding.
 ///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `required` - The list of hooks this module requires to be registered.
-///
-/// # Errors
-///
-/// * [`ComplianceModuleError::ComplianceNotSet`] - When the compliance contract
-///   has not been configured yet.
-/// * [`ComplianceModuleError::MissingRequiredHook`] - When any required hook is
-///   not registered, which means the deployment is misconfigured and internal
-///   state would drift.
-pub fn verify_required_hooks(e: &Env, required: Vec<ComplianceHook>) {
-    if hooks_verified(e) {
-        return;
-    }
-
-    let compliance = get_compliance_address(e);
-    let self_addr = e.current_contract_address();
-    let client = ComplianceClient::new(e, &compliance);
-
-    for hook in required.iter() {
-        if !client.is_module_registered(&hook, &self_addr) {
-            panic_with_error!(e, ComplianceModuleError::MissingRequiredHook);
-        }
-    }
-
-    let vkey = ComplianceModuleStorageKey::HooksVerified;
-    e.storage().instance().set(&vkey, &true);
-}
-
-/// Low-level helper that stores the IRS contract address for a given token.
-///
-/// This function **does not perform any authorization checks**. It directly
-/// updates the per-token Identity Registry Storage pointer in persistent
-/// storage.
-///
-/// SAFETY: This must only be called from initialization logic or from
-/// admin-gated entrypoints that have already enforced the appropriate
-/// ownership and authorization checks. Do **not** expose this helper directly
-/// as a public contract method.
+/// This is the canonical body that each module's
+/// `set_identity_registry_storage` trait method wraps with its own auth check.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token whose IRS is being configured.
 /// * `irs` - The IRS contract address.
+///
+/// # Security Warning
+///
+/// This function performs no authorization checks. Callers must gate access
+/// (e.g. with [`stellar_macros::only_admin`]) before invoking it.
 pub fn set_irs_address(e: &Env, token: &Address, irs: &Address) {
     let key = ComplianceModuleStorageKey::Registry(token.clone());
     e.storage().persistent().set(&key, irs);
@@ -192,13 +140,16 @@ pub fn set_irs_address(e: &Env, token: &Address, irs: &Address) {
 
 // ################## HELPERS ##################
 
-/// Panics with [`ComplianceModuleError::InvalidAmount`] if `amount` is
-/// negative.
+/// Validates that `amount` is non-negative.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `amount` - The amount to validate.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
 pub fn require_non_negative_amount(e: &Env, amount: i128) {
     if amount < 0 {
         panic_with_error!(e, ComplianceModuleError::InvalidAmount);
@@ -238,13 +189,12 @@ pub fn sub_i128_or_panic(e: &Env, left: i128, right: i128) -> i128 {
         .unwrap_or_else(|| panic_with_error!(e, ComplianceModuleError::MathUnderflow))
 }
 
-/// Allocates a Soroban [`String`] from a static `&str` for use as a
-/// module name.
+/// Converts a static module-name `&str` into a Soroban [`String`].
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `name` - The name to convert.
+/// * `name` - The static name to convert.
 pub fn module_name(e: &Env, name: &str) -> String {
     String::from_str(e, name)
 }
@@ -260,8 +210,8 @@ fn get_irs_address(e: &Env, token: &Address) -> Address {
     irs
 }
 
-/// Extracts the numeric ISO 3166-1 country code from any
-/// [`CountryRelation`] variant, regardless of individual/organization type.
+/// Returns the ISO 3166-1 numeric country code carried by `relation`,
+/// regardless of which individual- or organization-side variant it is.
 ///
 /// # Arguments
 ///
