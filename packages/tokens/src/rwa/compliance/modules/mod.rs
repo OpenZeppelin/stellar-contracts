@@ -7,7 +7,11 @@
 //! modules registered for each hook type. Shared helpers, storage keys, and
 //! TTL constants live in [`storage`].
 
+pub mod country_allow;
+pub mod country_restrict;
+pub mod max_balance;
 pub mod storage;
+pub mod supply_limit;
 
 #[cfg(test)]
 mod test;
@@ -277,6 +281,16 @@ pub enum ComplianceModuleError {
     /// No authorized compliance dispatcher has been bound for the given
     /// token.
     ComplianceNotSet = 398,
+    /// A transfer or mint would push an identity's aggregate balance above the
+    /// configured maximum.
+    MaxBalanceExceeded = 401,
+    /// A mint would push the tracked supply above the configured limit.
+    SupplyLimitExceeded = 402,
+    /// A preset operation was attempted after the preset phase has been
+    /// finalized.
+    PresetAlreadyCompleted = 403,
+    /// The two parallel arrays in a batch call have different lengths.
+    BatchSizeMismatch = 404,
 }
 
 // ################## CONSTANTS ##################

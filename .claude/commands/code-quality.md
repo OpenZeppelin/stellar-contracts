@@ -301,8 +301,19 @@ followed by `mod contract;` and `#[cfg(test)] mod test;`.
   to be present, not what it is.
 - Document errors in the `# Errors` section of every public function that
   can panic. Each bullet uses
-  ``[`ModuleError::Variant`] - <one-sentence reason>`` form. For functions
-  that delegate, write ``refer to [`other_function`] errors.``
+  ``[`ModuleError::Variant`] - <one-sentence reason>`` form.
+  - **In `storage.rs`**: when a fn delegates to another helper in the same
+    crate, `` * refer to [`other_function`] errors.`` is the canonical
+    shorthand. Use it freely for delegating helpers — this matches
+    `fungible/storage.rs`.
+  - **In `mod.rs` trait methods**: do **not** use `refer to`. List every
+    concrete variant the implementing contract will surface, even when the
+    canonical body delegates to a `storage::*` helper. The trait doc is the
+    public contract for downstream consumers; they should not have to
+    navigate to `storage.rs` to learn what errors can escape. If the error
+    enum lives in a different module, link with the full
+    `[\`crate::path::ErrorEnum::Variant\`]` path rather than adding a
+    `use` import solely for doc resolution.
 - Each public function's doc comment uses the section order:
   `# Arguments` → `# Errors` → `# Events` → `# Notes` →
   `# Security Warning`. Skip any section that doesn't apply, but do not
@@ -467,9 +478,11 @@ followed by `mod contract;` and `#[cfg(test)] mod test;`.
   or produce non-trivial values get the full
   `# Arguments` / `# Errors` / `# Events` / `# Notes` /
   `# Security Warning` block in that order.
-- Trait methods in `mod.rs`, and functions in `storage.rs` need to have a
-  rigid inline documentation style. Follow the `packages/tokens/src/fungible` directory's
-  `mod.rs` and `storage.rs` files as examples for that.
+- Trait methods in `mod.rs` and functions in `storage.rs` follow a **rigid**
+  inline documentation style. The two reference files are absolute:
+  - **`mod.rs`** must follow `packages/tokens/src/fungible/mod.rs` rigidly.
+  - **`storage.rs`** must follow `packages/tokens/src/fungible/storage.rs`
+    rigidly.
 - The module-level `//!` docstring at the top of each `mod.rs` explains
   purpose, structure, and any non-obvious design choices (the dual-layer
   high/low-level split, mutual exclusivity of extensions, the
