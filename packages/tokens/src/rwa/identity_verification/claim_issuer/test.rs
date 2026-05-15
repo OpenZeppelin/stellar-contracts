@@ -937,6 +937,38 @@ fn max_registries_per_key_exceeded() {
 }
 
 #[test]
+fn max_registries_per_key_boundary() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    // Use two registries spanning the cap to stay under the per-registry topic
+    // limit while still producing MAX_REGISTRIES_PER_KEY distinct (topic,
+    // registry) pairs for the signing key.
+    let half = MAX_REGISTRIES_PER_KEY / 2;
+    let topics_a: std::vec::Vec<u32> = (0..half).collect();
+    let topics_b: std::vec::Vec<u32> = (half..MAX_REGISTRIES_PER_KEY).collect();
+    let registry_a = setup_mock_registry(&e, &contract_id, &topics_a);
+    let registry_b = setup_mock_registry(&e, &contract_id, &topics_b);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+
+    e.as_contract(&contract_id, || {
+        for i in 0..half {
+            allow_key(&e, &public_key, &registry_a, scheme, i);
+        }
+        for i in half..MAX_REGISTRIES_PER_KEY {
+            allow_key(&e, &public_key, &registry_b, scheme, i);
+        }
+
+        let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+        let pairs_key = ClaimIssuerStorageKey::Pairs(signing_key);
+        let pairs: Vec<(u32, Address)> = e.storage().persistent().get(&pairs_key).unwrap();
+        assert_eq!(pairs.len(), MAX_REGISTRIES_PER_KEY);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #354)")]
 fn allow_key_topic_not_allowed() {
     let e = Env::default();
