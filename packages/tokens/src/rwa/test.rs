@@ -1,11 +1,11 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, symbol_short,
-    testutils::{Address as _, Events as _},
-    Address, Env, String,
+    contract, contractimpl, panic_with_error, symbol_short, testutils::Address as _, Address, Env,
+    String,
 };
 use stellar_contract_utils::pausable;
+use stellar_event_assertion::EventAssertion;
 
 use crate::{
     fungible::ContractOverrides,
@@ -114,7 +114,7 @@ fn set_and_get_onchain_id() {
         let onchain_id = Address::generate(&e);
         RWA::set_onchain_id(&e, &onchain_id);
         assert_eq!(RWA::onchain_id(&e), onchain_id);
-        assert_eq!(e.events().all().events().len(), 1);
+        EventAssertion::new(&e, address.clone()).assert_event_count(1);
     });
 }
 
@@ -138,7 +138,7 @@ fn set_and_get_compliance() {
         let compliance = Address::generate(&e);
         RWA::set_compliance(&e, &compliance);
         assert_eq!(RWA::compliance(&e), compliance);
-        assert_eq!(e.events().all().events().len(), 1);
+        EventAssertion::new(&e, address.clone()).assert_event_count(1);
     });
 }
 
@@ -162,7 +162,7 @@ fn set_and_get_identity_verifier() {
         let identity_verifier = Address::generate(&e);
         RWA::set_identity_verifier(&e, &identity_verifier);
         assert_eq!(RWA::identity_verifier(&e), identity_verifier);
-        assert_eq!(e.events().all().events().len(), 1);
+        EventAssertion::new(&e, address.clone()).assert_event_count(1);
     });
 }
 
@@ -190,7 +190,7 @@ fn mint_tokens() {
         assert_eq!(RWA::balance(&e, &to), 100);
         assert_eq!(RWA::total_supply(&e), 100);
         // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted
-        assert_eq!(e.events().all().events().len(), 3);
+        EventAssertion::new(&e, address.clone()).assert_event_count(3);
     });
 }
 
@@ -262,7 +262,7 @@ fn burn_tokens() {
         assert_eq!(RWA::balance(&e, &account), 70);
         assert_eq!(RWA::total_supply(&e), 70);
         // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 Burned
-        assert_eq!(e.events().all().events().len(), 4);
+        EventAssertion::new(&e, address.clone()).assert_event_count(4);
     });
 }
 
@@ -315,7 +315,7 @@ fn address_freezing() {
         RWA::set_address_frozen(&e, &user, false);
         assert!(!RWA::is_frozen(&e, &user));
         // 1 AddressFrozen (true) + 1 AddressFrozen (false)
-        assert_eq!(e.events().all().events().len(), 2);
+        EventAssertion::new(&e, address.clone()).assert_event_count(2);
     });
 }
 
@@ -342,7 +342,7 @@ fn partial_token_freezing() {
         assert_eq!(RWA::get_frozen_tokens(&e, &user), 20);
         // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 TokensFrozen + 1
         // TokensUnfrozen
-        assert_eq!(e.events().all().events().len(), 5);
+        EventAssertion::new(&e, address.clone()).assert_event_count(5);
     });
 }
 
@@ -406,7 +406,7 @@ fn recover_balance() {
         assert_eq!(RWA::balance(&e, &new_account), 100);
         // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 Transfer (forced) + 1
         // RecoverySuccess
-        assert_eq!(e.events().all().events().len(), 5);
+        EventAssertion::new(&e, address.clone()).assert_event_count(5);
     });
 }
 

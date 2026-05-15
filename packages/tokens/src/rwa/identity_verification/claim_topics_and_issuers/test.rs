@@ -1,10 +1,7 @@
 extern crate std;
 
-use soroban_sdk::{
-    contract,
-    testutils::{Address as _, Events as _},
-    Address, Env, Vec,
-};
+use soroban_sdk::{contract, testutils::Address as _, Address, Env, Vec};
+use stellar_event_assertion::EventAssertion;
 
 use crate::rwa::identity_verification::claim_topics_and_issuers::storage::{
     add_claim_topic, add_trusted_issuer, get_claim_topic_issuers, get_claim_topics,
@@ -34,7 +31,7 @@ fn add_claim_topic_works() {
         let topics = get_claim_topics(&e);
         assert_eq!(topics.len(), 1);
         assert!(topics.contains(1));
-        assert_eq!(e.events().all().events().len(), 1);
+        EventAssertion::new(&e, address.clone()).assert_event_count(1);
     });
 }
 
@@ -113,7 +110,7 @@ fn remove_claim_topic_works() {
         assert!(!topics.contains(1));
         assert!(topics.contains(2));
         // 2 ClaimTopicAdded + 1 ClaimTopicRemoved
-        assert_eq!(e.events().all().events().len(), 3);
+        EventAssertion::new(&e, address.clone()).assert_event_count(3);
     });
 }
 
@@ -245,7 +242,7 @@ fn add_trusted_issuer_works() {
         assert!(issuer_topics.contains(1));
         assert!(issuer_topics.contains(2));
         // 2 ClaimTopicAdded + 1 TrustedIssuerAdded
-        assert_eq!(e.events().all().events().len(), 3);
+        EventAssertion::new(&e, address.clone()).assert_event_count(3);
     });
 }
 
@@ -402,7 +399,7 @@ fn remove_trusted_issuer_works() {
         assert!(!issuer_topics.contains(&issuer1));
         assert!(issuer_topics.contains(&issuer2));
         // 1 ClaimTopicAdded + 2 TrustedIssuerAdded + 1 TrustedIssuerRemoved
-        assert_eq!(e.events().all().events().len(), 4);
+        EventAssertion::new(&e, address.clone()).assert_event_count(4);
     });
 }
 
@@ -563,7 +560,7 @@ fn update_issuer_claim_topics_works() {
         assert!(topic4_issuers.contains(&issuer)); // should be added
 
         // 5 ClaimTopicAdded + 1 TrustedIssuerAdded + 1 IssuerTopicsUpdated
-        assert_eq!(e.events().all().events().len(), 7);
+        EventAssertion::new(&e, address.clone()).assert_event_count(7);
     });
 }
 
