@@ -1,13 +1,17 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, testutils::Address as _, vec, Address, Env, IntoVal, Val,
-    Vec,
+    contract, contractimpl, contracttype,
+    testutils::{Address as _, Events as _},
+    vec, Address, Env, IntoVal, Val, Vec,
 };
 
 use crate::rwa::{
     compliance::modules::{
-        country_allow::storage::{can_receive, set_country_allowed},
+        country_allow::storage::{
+            add_allowed_country, can_receive, is_country_allowed, remove_allowed_country,
+            set_country_allowed,
+        },
         storage::set_irs_address,
     },
     identity_registry_storage::{
@@ -160,6 +164,39 @@ fn can_receive_allows_when_any_country_matches() {
         set_country_allowed(&e, &token, 276);
 
         assert!(can_receive(&e, &to, &token));
+    });
+}
+
+#[test]
+fn add_allowed_country_is_idempotent() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryAllowContract, ());
+    let token = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        add_allowed_country(&e, &token, 276);
+        let after_first = e.events().all().events().len();
+
+        add_allowed_country(&e, &token, 276);
+
+        assert!(is_country_allowed(&e, &token, 276));
+        assert_eq!(e.events().all().events().len(), after_first);
+    });
+}
+
+#[test]
+fn remove_allowed_country_is_noop_when_not_present() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryAllowContract, ());
+    let token = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        let before = e.events().all().events().len();
+
+        remove_allowed_country(&e, &token, 276);
+
+        assert!(!is_country_allowed(&e, &token, 276));
+        assert_eq!(e.events().all().events().len(), before);
     });
 }
 
