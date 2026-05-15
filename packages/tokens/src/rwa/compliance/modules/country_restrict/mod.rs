@@ -14,12 +14,41 @@ use soroban_sdk::{contractevent, contracttrait, Address, Env, Vec};
 
 use crate::rwa::compliance::modules::ComplianceModule;
 
-/// Country restriction compliance module trait.
+/// Country Restriction Compliance Module Trait
 ///
-/// This trait defines the contract-facing API for the country restriction
-/// module. Low-level state changes live in [`storage`]. Privileged methods have
-/// no default implementation because each contract must enforce its own access
-/// control before delegating to storage helpers.
+/// The `CountryRestrict` trait extends the [`ComplianceModule`] trait to
+/// provide a per-token country restriction list. When this module is
+/// registered on a token's modular compliance contract, transfers and mints
+/// are blocked whenever the recipient's identity (resolved via the Identity
+/// Registry Storage) has any country code that appears in the token's
+/// restriction list.
+///
+/// Only the recipient's country data is consulted. Although the underlying
+/// compliance hooks ([`ComplianceModule::can_transfer`],
+/// [`ComplianceModule::can_create`]) also receive the sender address and the
+/// transfer amount, this module ignores both: a sender whose own countries
+/// are on the restriction list can still send tokens out, and the size of
+/// the transfer has no effect on the decision. If you need rules that
+/// constrain the sender or scale with amount, those belong in a different
+/// compliance module that you register alongside this one.
+///
+/// Countries are identified by ISO 3166-1 numeric codes and tracked
+/// per-`token`, so a single compliance module contract can serve multiple
+/// tokens with independent restriction lists.
+///
+/// This trait is designed to be used in conjunction with the
+/// [`ComplianceModule`] trait.
+///
+/// **NOTE**
+///
+/// All setter functions exposed in the `CountryRestrict` trait are
+/// privileged operations and intentionally omit an `operator: Address`
+/// parameter. Access control for a compliance module is typically expressed
+/// in terms of the module's admin and the compliance contract it is
+/// registered on (e.g. requiring auth from the module admin, the compliance
+/// contract, or both), rather than from a per-call operator. Implementors
+/// should enforce the access policy that matches their deployment before
+/// delegating to the corresponding `storage::*` helper.
 #[contracttrait]
 pub trait CountryRestrict: ComplianceModule {
     /// Configures the Identity Registry Storage contract for `token`.
@@ -35,7 +64,8 @@ pub trait CountryRestrict: ComplianceModule {
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
     /// enforced before calling
-    /// [`crate::rwa::compliance::modules::storage::set_irs_address`].
+    /// [`crate::rwa::compliance::modules::storage::set_irs_address`] for the
+    /// implementation.
     fn set_identity_registry_storage(e: &Env, token: Address, irs: Address);
 
     /// Adds a country to the restriction list for `token`.
@@ -55,7 +85,8 @@ pub trait CountryRestrict: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::add_country_restriction`].
+    /// enforced before calling [`storage::add_country_restriction`] for the
+    /// implementation.
     fn add_country_restriction(e: &Env, token: Address, country: u32);
 
     /// Removes a country from the restriction list for `token`.
@@ -75,7 +106,8 @@ pub trait CountryRestrict: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::remove_country_restriction`].
+    /// enforced before calling [`storage::remove_country_restriction`] for the
+    /// implementation.
     fn remove_country_restriction(e: &Env, token: Address, country: u32);
 
     /// Adds multiple countries to the restriction list for `token`.
@@ -96,7 +128,8 @@ pub trait CountryRestrict: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::batch_restrict_countries`].
+    /// enforced before calling [`storage::batch_restrict_countries`] for the
+    /// implementation.
     fn batch_restrict_countries(e: &Env, token: Address, countries: Vec<u32>);
 
     /// Removes multiple countries from the restriction list for `token`.
@@ -117,7 +150,8 @@ pub trait CountryRestrict: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::batch_unrestrict_countries`].
+    /// enforced before calling [`storage::batch_unrestrict_countries`] for the
+    /// implementation.
     fn batch_unrestrict_countries(e: &Env, token: Address, countries: Vec<u32>);
 
     /// Returns `true` if `country` is restricted for `token`.
@@ -143,15 +177,6 @@ pub struct CountryRestricted {
     pub country: u32,
 }
 
-/// Emitted when a country is removed from the restriction list.
-#[contractevent]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CountryUnrestricted {
-    #[topic]
-    pub token: Address,
-    pub country: u32,
-}
-
 /// Emits a [`CountryRestricted`] event.
 ///
 /// # Arguments
@@ -161,6 +186,15 @@ pub struct CountryUnrestricted {
 /// * `country` - The ISO 3166-1 numeric country code that was restricted.
 pub fn emit_country_restricted(e: &Env, token: &Address, country: u32) {
     CountryRestricted { token: token.clone(), country }.publish(e);
+}
+
+/// Emitted when a country is removed from the restriction list.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CountryUnrestricted {
+    #[topic]
+    pub token: Address,
+    pub country: u32,
 }
 
 /// Emits a [`CountryUnrestricted`] event.
