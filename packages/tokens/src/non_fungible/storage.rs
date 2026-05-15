@@ -371,9 +371,9 @@ impl Base {
 
         let current_ledger = e.ledger().sequence();
 
-        // If the provided ledger number is invalid (less than the current ledger
-        // number)
-        if live_until_ledger < current_ledger {
+        if live_until_ledger > e.ledger().max_live_until_ledger()
+            || live_until_ledger < current_ledger
+        {
             panic_with_error!(e, NonFungibleTokenError::InvalidLiveUntilLedger);
         }
 
