@@ -2,7 +2,8 @@ extern crate std;
 
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, map, panic_with_error, symbol_short,
-    testutils::Address as _, vec, Address, Bytes, BytesN, Env, Map, Vec,
+    testutils::{Address as _, Events as _},
+    vec, Address, Bytes, BytesN, Env, Map, Vec,
 };
 
 use crate::rwa::identity_verification::{
@@ -127,6 +128,8 @@ fn set_and_get_claim_topics_and_issuers() {
         let claim_topics_and_issuers_contract = Address::generate(&e);
         set_claim_topics_and_issuers(&e, &claim_topics_and_issuers_contract);
         assert_eq!(claim_topics_and_issuers(&e), claim_topics_and_issuers_contract);
+
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -150,6 +153,8 @@ fn set_and_get_identity_registry_storage() {
         let identity_registry_contract = Address::generate(&e);
         set_identity_registry_storage(&e, &identity_registry_contract);
         assert_eq!(identity_registry_storage(&e), identity_registry_contract);
+
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
