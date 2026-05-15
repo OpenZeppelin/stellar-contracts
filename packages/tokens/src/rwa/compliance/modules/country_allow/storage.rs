@@ -43,14 +43,11 @@ pub fn is_country_allowed(e: &Env, token: &Address, country: u32) -> bool {
 ///
 /// # Errors
 ///
-/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
-///   configured for `token`.
+/// * refer to [`get_irs_country_data_entries`] errors.
 ///
 /// # Cross-Contract Calls
 ///
 /// Calls the IRS to resolve country data for `account`.
-///
-/// [`ComplianceModuleError::IdentityRegistryNotSet`]: crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet
 pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
     let entries = get_irs_country_data_entries(e, token, account);
     for entry in entries.iter() {
@@ -76,10 +73,7 @@ pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
 ///
 /// # Errors
 ///
-/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
-///   configured for `token`.
-///
-/// [`ComplianceModuleError::IdentityRegistryNotSet`]: crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet
+/// * refer to [`get_irs_country_data_entries`] errors.
 pub fn can_transfer(
     e: &Env,
     _from: &Address,
@@ -101,10 +95,7 @@ pub fn can_transfer(
 ///
 /// # Errors
 ///
-/// * [`ComplianceModuleError::IdentityRegistryNotSet`] - When no IRS has been
-///   configured for `token`.
-///
-/// [`ComplianceModuleError::IdentityRegistryNotSet`]: crate::rwa::compliance::modules::ComplianceModuleError::IdentityRegistryNotSet
+/// * refer to [`get_irs_country_data_entries`] errors.
 pub fn can_create(e: &Env, to: &Address, _amount: i128, token: &Address) -> bool {
     can_receive(e, to, token)
 }
@@ -146,9 +137,8 @@ pub fn remove_country_allowed(e: &Env, token: &Address, country: u32) {
 
 /// Adds a country to the allowlist for `token`.
 ///
-/// Records the membership entry and emits
-/// [`crate::rwa::compliance::modules::country_allow::CountryAllowed`] if the
-/// country was not already allowed.
+/// Records the membership entry and emits an event if the country was not
+/// already allowed.
 ///
 /// # Arguments
 ///
@@ -173,9 +163,8 @@ pub fn add_allowed_country(e: &Env, token: &Address, country: u32) {
 
 /// Removes a country from the allowlist for `token`.
 ///
-/// Deletes the membership entry and emits
-/// [`crate::rwa::compliance::modules::country_allow::CountryUnallowed`] if the
-/// country was currently allowed.
+/// Deletes the membership entry and emits an event if the country was currently
+/// allowed.
 ///
 /// # Arguments
 ///
@@ -200,7 +189,7 @@ pub fn remove_allowed_country(e: &Env, token: &Address, country: u32) {
 
 /// Adds multiple countries to the allowlist in a single call.
 ///
-/// Emits [`CountryAllowed`] for each country added.
+/// Adds each country through [`add_allowed_country`].
 ///
 /// # Arguments
 ///
@@ -225,7 +214,7 @@ pub fn batch_allow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
 
 /// Removes multiple countries from the allowlist in a single call.
 ///
-/// Emits [`CountryUnallowed`] for each country removed.
+/// Removes each country through [`remove_allowed_country`].
 ///
 /// # Arguments
 ///
