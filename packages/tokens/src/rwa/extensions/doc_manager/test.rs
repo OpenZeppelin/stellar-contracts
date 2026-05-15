@@ -1,6 +1,6 @@
 extern crate std;
 
-use soroban_sdk::{contract, Bytes, BytesN, Env, String, Vec};
+use soroban_sdk::{contract, testutils::Events as _, Bytes, BytesN, Env, String, Vec};
 
 use crate::rwa::extensions::doc_manager::{
     storage::{
@@ -50,6 +50,7 @@ fn set_document_success() {
         assert_eq!(stored_doc.document_hash, hash);
         // Timestamp should be set (in test environment it may be 0)
         let _ = stored_doc.timestamp;
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -112,6 +113,8 @@ fn remove_document_success() {
         // Remove document
         remove_document(&e, &name);
         assert_eq!(get_document_count(&e), 0);
+        // 1 DocumentUpdated + 1 DocumentRemoved
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 

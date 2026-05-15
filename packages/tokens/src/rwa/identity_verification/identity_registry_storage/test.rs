@@ -1,8 +1,9 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, testutils::Address as _, vec, Address, Env, FromVal, IntoVal, Map, String, Symbol,
-    Val, Vec,
+    contract,
+    testutils::{Address as _, Events as _},
+    vec, Address, Env, FromVal, IntoVal, Map, String, Symbol, Val, Vec,
 };
 
 use crate::rwa::identity_verification::identity_registry_storage::{
@@ -47,6 +48,8 @@ fn add_identity_success() {
         assert_eq!(profile.identity_type, IdentityType::Individual);
         assert_eq!(profile.countries.len(), 1);
         assert_eq!(get_country_data(&e, &account, 0), country_data);
+        // 1 IdentityStored + 1 CountryDataAdded
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 
@@ -105,6 +108,8 @@ fn modify_identity_success() {
         modify_identity(&e, &account, &new_identity);
 
         assert_eq!(stored_identity(&e, &account), new_identity);
+        // 1 IdentityStored + 1 CountryDataAdded + 1 IdentityModified
+        assert_eq!(e.events().all().events().len(), 3);
     });
 }
 
@@ -184,6 +189,9 @@ fn remove_identity_success() {
         assert_eq!(get_country_data_entries(&e, &account).len(), 1);
 
         remove_identity(&e, &account);
+        // 1 IdentityStored + 1 CountryDataAdded (from add) + 1 IdentityUnstored + 1
+        // CountryDataRemoved (from remove)
+        assert_eq!(e.events().all().events().len(), 4);
 
         stored_identity(&e, &account);
     });
@@ -229,6 +237,9 @@ fn add_country_data_entries_success() {
 
         assert_eq!(get_country_data_entries(&e, &account).len(), 2);
         assert_eq!(get_country_data(&e, &account, 1), country_data2);
+        // 1 IdentityStored + 1 CountryDataAdded (from add_identity) + 1
+        // CountryDataAdded (from add_country_data_entries)
+        assert_eq!(e.events().all().events().len(), 3);
     });
 }
 
@@ -261,6 +272,8 @@ fn modify_country_data_success() {
         modify_country_data(&e, &account, 0, &modified_country_data);
 
         assert_eq!(get_country_data(&e, &account, 0), modified_country_data);
+        // 1 IdentityStored + 1 CountryDataAdded + 1 CountryDataModified
+        assert_eq!(e.events().all().events().len(), 3);
     });
 }
 
@@ -326,6 +339,8 @@ fn delete_country_data_success() {
         assert_eq!(get_country_data_entries(&e, &account).len(), 2);
         assert_eq!(get_country_data(&e, &account, 0), country_data1);
         assert_eq!(get_country_data(&e, &account, 1), country_data3);
+        // 1 IdentityStored + 3 CountryDataAdded + 1 CountryDataRemoved
+        assert_eq!(e.events().all().events().len(), 5);
     });
 }
 
@@ -691,6 +706,8 @@ fn recover_identity_success() {
         assert_eq!(profile.countries.len(), 2);
         assert_eq!(get_country_data(&e, &new_account, 0), country_data1);
         assert_eq!(get_country_data(&e, &new_account, 1), country_data2);
+        // 1 IdentityStored + 2 CountryDataAdded + 1 IdentityRecovered
+        assert_eq!(e.events().all().events().len(), 4);
     });
 }
 

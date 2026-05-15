@@ -13,7 +13,7 @@ use p256::{
 };
 use soroban_sdk::{
     contract, contractimpl,
-    testutils::{Address as _, Ledger as _},
+    testutils::{Address as _, Events as _, Ledger as _},
     Address, Bytes, BytesN, Env, Map, Vec,
 };
 
@@ -508,6 +508,7 @@ fn set_and_check_claim_revocation() {
         set_claim_revoked(&e, &identity, claim_topic, &claim_data, true);
 
         assert!(is_claim_revoked(&e, &identity, claim_topic, &claim_data));
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -586,6 +587,8 @@ fn topic_specific_key_management() {
 
         remove_key(&e, &public_key, &registry, 1, topic);
         assert!(!is_key_allowed_for_topic(&e, &public_key, 1, topic));
+        // 1 KeyAllowed + 1 KeyRemoved
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 
@@ -1127,6 +1130,8 @@ fn invalidate_claim_signatures_increments_nonce() {
         // Invalidate again - nonce should increment to 2
         invalidate_claim_signatures(&e, &identity, claim_topic);
         assert_eq!(get_current_nonce_for(&e, &identity, claim_topic), 2);
+        // 2 SignaturesInvalidated
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 

@@ -1,6 +1,10 @@
 extern crate std;
 
-use soroban_sdk::{contract, contractimpl, testutils::Address as _, vec, Address, Env};
+use soroban_sdk::{
+    contract, contractimpl,
+    testutils::{Address as _, Events as _},
+    vec, Address, Env,
+};
 
 use crate::rwa::{
     compliance::{
@@ -37,6 +41,7 @@ fn add_module_to_works() {
         let modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         assert_eq!(modules.len(), 1);
         assert_eq!(modules.get(0).unwrap(), module);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -125,9 +130,7 @@ fn remove_module_from_works() {
         // Add module first
         add_module_to(&e, ComplianceHook::Transferred, module.clone());
         assert!(is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
-    });
 
-    e.as_contract(&address, || {
         // Remove module
         remove_module_from(&e, ComplianceHook::Transferred, module.clone());
 
@@ -135,6 +138,8 @@ fn remove_module_from_works() {
         assert!(!is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
         let modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         assert!(modules.is_empty());
+        // 1 ModuleAdded + 1 ModuleRemoved
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 

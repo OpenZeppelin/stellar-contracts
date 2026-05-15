@@ -1,4 +1,8 @@
-use soroban_sdk::{contract, testutils::Address as _, Address, Env, Vec};
+use soroban_sdk::{
+    contract,
+    testutils::{Address as _, Events as _},
+    Address, Env, Vec,
+};
 
 use crate::rwa::utils::token_binder::{
     storage::{
@@ -55,6 +59,8 @@ fn bind_tokens_fits_current_bucket() {
         for i in 0..10u32 {
             assert_eq!(get_token_by_index(&e, i), batch.get(i).unwrap());
         }
+        // one TokenBound per token
+        assert_eq!(e.events().all().events().len(), 10);
 
         linked_tokens(&e)
     });
@@ -132,6 +138,7 @@ fn bind_single_token() {
         assert!(is_token_bound(&e, &token));
         assert_eq!(get_token_by_index(&e, 0), token);
         assert_eq!(get_token_index(&e, &token), 0);
+        assert_eq!(e.events().all().events().len(), 1);
     });
 }
 
@@ -189,6 +196,8 @@ fn unbind_single_token() {
         unbind_token(&e, &token);
         assert_eq!(linked_token_count(&e), 0);
         assert!(!is_token_bound(&e, &token));
+        // 1 TokenBound + 1 TokenUnbound
+        assert_eq!(e.events().all().events().len(), 2);
     });
 }
 
