@@ -132,6 +132,8 @@ pub trait CountryAllow: ComplianceModule {
     }
 }
 
+// ################## EVENTS ##################
+
 /// Emitted when a country is added to the allowlist.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]

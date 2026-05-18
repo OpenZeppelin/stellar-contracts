@@ -1,5 +1,6 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
 use stellar_access::access_control;
+use stellar_macros::only_admin;
 use stellar_tokens::rwa::compliance::modules::{
     country_allow::{storage as country_allow, CountryAllow},
     storage::{
@@ -85,8 +86,8 @@ impl ComplianceModule for CountryAllowContract {
         get_compliance_address(e)
     }
 
+    #[only_admin]
     fn set_compliance_address(e: &Env, compliance: Address) {
-        get_admin(e).require_auth();
         set_compliance_address(e, &compliance);
     }
 }
