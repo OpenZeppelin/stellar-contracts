@@ -1,11 +1,10 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
 use stellar_access::access_control;
+use stellar_macros::only_admin;
 use stellar_tokens::rwa::compliance::{
     modules::{
-        storage::{
-            get_compliance_address, module_name, set_compliance_address, ComplianceModuleStorageKey,
-        },
-        supply_limit::storage as supply_limit,
+        storage::{get_compliance_address, module_name, set_compliance_address},
+        supply_limit::{storage as supply_limit, SupplyLimit},
         ComplianceModule,
     },
     ComplianceHook,
@@ -14,18 +13,8 @@ use stellar_tokens::rwa::compliance::{
 #[contract]
 pub struct SupplyLimitContract;
 
-fn get_admin(e: &Env) -> Address {
-    access_control::get_admin(e).expect("admin is set in the constructor")
-}
-
-fn require_module_admin_or_compliance_auth(e: &Env) {
-    if let Some(compliance) =
-        e.storage().instance().get::<_, Address>(&ComplianceModuleStorageKey::Compliance)
-    {
-        compliance.require_auth();
-    } else {
-        get_admin(e).require_auth();
-    }
+fn require_compliance_auth(e: &Env) {
+    get_compliance_address(e).require_auth();
 }
 
 #[contractimpl]
@@ -33,30 +22,33 @@ impl SupplyLimitContract {
     pub fn __constructor(e: &Env, admin: Address) {
         access_control::set_admin(e, &admin);
     }
+}
 
-    pub fn set_supply_limit(e: &Env, token: Address, limit: i128) {
-        require_module_admin_or_compliance_auth(e);
+#[contractimpl(contracttrait)]
+impl SupplyLimit for SupplyLimitContract {
+    #[only_admin]
+    fn set_supply_limit(e: &Env, token: Address, limit: i128) {
         supply_limit::configure_supply_limit(e, &token, limit);
     }
 
-    pub fn pre_set_supply(e: &Env, token: Address, supply: i128) {
-        require_module_admin_or_compliance_auth(e);
+    #[only_admin]
+    fn pre_set_supply(e: &Env, token: Address, supply: i128) {
         supply_limit::pre_set_supply(e, &token, supply);
     }
 
-    pub fn get_supply_limit(e: &Env, token: Address) -> i128 {
+    fn get_supply_limit(e: &Env, token: Address) -> i128 {
         supply_limit::get_supply_limit(e, &token)
     }
 
-    pub fn get_internal_supply(e: &Env, token: Address) -> i128 {
+    fn get_internal_supply(e: &Env, token: Address) -> i128 {
         supply_limit::get_internal_supply(e, &token)
     }
 
-    pub fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
+    fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
         supply_limit::required_hooks(e)
     }
 
-    pub fn verify_hook_wiring(e: &Env) {
+    fn verify_hook_wiring(e: &Env) {
         supply_limit::verify_hook_wiring(e);
     }
 }
@@ -66,12 +58,12 @@ impl ComplianceModule for SupplyLimitContract {
     fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
 
     fn on_created(e: &Env, _to: Address, amount: i128, token: Address) {
-        require_module_admin_or_compliance_auth(e);
+        require_compliance_auth(e);
         supply_limit::on_created(e, amount, &token);
     }
 
     fn on_destroyed(e: &Env, _from: Address, amount: i128, token: Address) {
-        require_module_admin_or_compliance_auth(e);
+        require_compliance_auth(e);
         supply_limit::on_destroyed(e, amount, &token);
     }
 
@@ -97,8 +89,8 @@ impl ComplianceModule for SupplyLimitContract {
         get_compliance_address(e)
     }
 
+    #[only_admin]
     fn set_compliance_address(e: &Env, compliance: Address) {
-        get_admin(e).require_auth();
         set_compliance_address(e, &compliance);
     }
 }

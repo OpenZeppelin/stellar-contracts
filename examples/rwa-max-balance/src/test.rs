@@ -238,7 +238,7 @@ fn set_identity_registry_storage_uses_admin_auth_before_compliance_bind() {
 }
 
 #[test]
-fn set_identity_registry_storage_uses_compliance_auth_after_bind() {
+fn set_identity_registry_storage_uses_admin_auth_after_compliance_bind() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -254,6 +254,36 @@ fn set_identity_registry_storage_uses_compliance_auth_after_bind() {
     assert_eq!(addr, &admin);
 
     client.set_identity_registry_storage(&token, &irs);
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 1);
+    let (addr, _) = &auths[0];
+    assert_eq!(addr, &admin);
+}
+
+#[test]
+fn compliance_hooks_use_compliance_auth_after_bind() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let compliance = Address::generate(&e);
+    let token = Address::generate(&e);
+    let sender = Address::generate(&e);
+    let recipient = Address::generate(&e);
+    let sender_identity = Address::generate(&e);
+    let recipient_identity = Address::generate(&e);
+    let (_address, client) = create_client(&e, &admin);
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+
+    irs.set_identity(&sender, &sender_identity);
+    irs.set_identity(&recipient, &recipient_identity);
+    client.set_compliance_address(&compliance);
+    client.set_identity_registry_storage(&token, &irs_id);
+    client.set_max_balance(&token, &100);
+    client.pre_set_identity_balance(&token, &sender_identity, &50);
+
+    client.on_transfer(&sender, &recipient, &10, &token);
 
     let auths = e.auths();
     assert_eq!(auths.len(), 1);

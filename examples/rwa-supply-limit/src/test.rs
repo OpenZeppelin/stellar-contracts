@@ -141,7 +141,7 @@ fn set_supply_limit_uses_admin_auth_before_compliance_bind() {
 }
 
 #[test]
-fn set_supply_limit_uses_compliance_auth_after_bind() {
+fn set_supply_limit_uses_admin_auth_after_compliance_bind() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -156,6 +156,27 @@ fn set_supply_limit_uses_compliance_auth_after_bind() {
     assert_eq!(addr, &admin);
 
     client.set_supply_limit(&token, &100);
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 1);
+    let (addr, _) = &auths[0];
+    assert_eq!(addr, &admin);
+}
+
+#[test]
+fn compliance_hooks_use_compliance_auth_after_bind() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let compliance = Address::generate(&e);
+    let token = Address::generate(&e);
+    let account = Address::generate(&e);
+    let (_address, client) = create_client(&e, &admin);
+
+    client.set_compliance_address(&compliance);
+    client.set_supply_limit(&token, &100);
+
+    client.on_created(&account, &10, &token);
 
     let auths = e.auths();
     assert_eq!(auths.len(), 1);
