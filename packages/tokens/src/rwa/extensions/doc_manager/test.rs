@@ -1,6 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{contract, Bytes, BytesN, Env, String, Vec};
+use stellar_event_assertion::EventAssertion;
 
 use crate::rwa::extensions::doc_manager::{
     storage::{
@@ -50,6 +51,7 @@ fn set_document_success() {
         assert_eq!(stored_doc.document_hash, hash);
         // Timestamp should be set (in test environment it may be 0)
         let _ = stored_doc.timestamp;
+        EventAssertion::new(&e, contract_id.clone()).assert_event_count(1);
     });
 }
 
@@ -112,6 +114,8 @@ fn remove_document_success() {
         // Remove document
         remove_document(&e, &name);
         assert_eq!(get_document_count(&e), 0);
+        // 1 DocumentUpdated + 1 DocumentRemoved
+        EventAssertion::new(&e, contract_id.clone()).assert_event_count(2);
     });
 }
 
