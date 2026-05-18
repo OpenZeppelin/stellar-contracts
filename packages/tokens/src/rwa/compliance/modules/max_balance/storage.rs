@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, vec, Address, Env, Vec};
+use soroban_sdk::{contracttype, panic_with_error, vec, Address, Env, Vec};
 
 use crate::rwa::compliance::{
     modules::{
@@ -7,7 +7,7 @@ use crate::rwa::compliance::{
             add_i128_or_panic, get_irs_client, hooks_verified, require_non_negative_amount,
             sub_i128_or_panic, verify_required_hooks,
         },
-        MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+        ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
     },
     ComplianceHook,
 };
@@ -163,10 +163,9 @@ pub fn batch_pre_set_identity_balances(
     identities: &Vec<Address>,
     balances: &Vec<i128>,
 ) {
-    assert!(
-        identities.len() == balances.len(),
-        "MaxBalanceModule: identities and balances length mismatch"
-    );
+    if identities.len() != balances.len() {
+        panic_with_error!(e, ComplianceModuleError::VectorLengthMismatch);
+    }
     for i in 0..identities.len() {
         let id = identities.get_unchecked(i);
         let bal = balances.get_unchecked(i);
@@ -219,10 +218,9 @@ pub fn on_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &
     }
 
     let from_balance = get_id_balance(e, token, &from_id);
-    assert!(
-        can_increase_identity_balance(e, token, &to_id, amount),
-        "MaxBalanceModule: recipient identity balance exceeds max"
-    );
+    if !can_increase_identity_balance(e, token, &to_id, amount) {
+        panic_with_error!(e, ComplianceModuleError::MaxBalanceExceeded);
+    }
 
     let to_balance = get_id_balance(e, token, &to_id);
     let new_to_balance = add_i128_or_panic(e, to_balance, amount);
@@ -248,10 +246,9 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
     let irs = get_irs_client(e, token);
     let to_id = irs.stored_identity(to);
 
-    assert!(
-        can_increase_identity_balance(e, token, &to_id, amount),
-        "MaxBalanceModule: recipient identity balance exceeds max after mint"
-    );
+    if !can_increase_identity_balance(e, token, &to_id, amount) {
+        panic_with_error!(e, ComplianceModuleError::MaxBalanceExceeded);
+    }
 
     let current = get_id_balance(e, token, &to_id);
     let new_balance = add_i128_or_panic(e, current, amount);
@@ -291,11 +288,9 @@ pub fn on_destroyed(e: &Env, from: &Address, amount: i128, token: &Address) {
 /// * `amount` - The transfer amount.
 /// * `token` - The token address.
 pub fn can_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &Address) -> bool {
-    assert!(
-        hooks_verified(e),
-        "MaxBalanceModule: not armed — call verify_hook_wiring() after wiring hooks [CanTransfer, \
-         CanCreate, Transferred, Created, Destroyed]"
-    );
+    if !hooks_verified(e) {
+        panic_with_error!(e, ComplianceModuleError::HooksNotVerified);
+    }
     if amount < 0 {
         return false;
     }
@@ -320,11 +315,9 @@ pub fn can_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: 
 /// * `amount` - The mint amount.
 /// * `token` - The token address.
 pub fn can_create(e: &Env, to: &Address, amount: i128, token: &Address) -> bool {
-    assert!(
-        hooks_verified(e),
-        "MaxBalanceModule: not armed — call verify_hook_wiring() after wiring hooks [CanTransfer, \
-         CanCreate, Transferred, Created, Destroyed]"
-    );
+    if !hooks_verified(e) {
+        panic_with_error!(e, ComplianceModuleError::HooksNotVerified);
+    }
     if amount < 0 {
         return false;
     }

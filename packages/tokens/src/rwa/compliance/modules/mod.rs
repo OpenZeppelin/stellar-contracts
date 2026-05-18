@@ -213,7 +213,7 @@ pub trait ComplianceModule {
 
 /// Error codes shared by all compliance modules.
 ///
-/// Compliance module errors occupy the 390–400 range, following the RWA
+/// Compliance module errors occupy the 390–403 range, following the RWA
 /// error numbering convention.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -241,6 +241,12 @@ pub enum ComplianceModuleError {
     ComplianceAlreadySet = 399,
     /// A token has reached the maximum number of configured limit entries.
     TooManyLimits = 400,
+    /// A provided pair of vectors does not have matching lengths.
+    VectorLengthMismatch = 401,
+    /// A transfer or mint would exceed the configured max balance.
+    MaxBalanceExceeded = 402,
+    /// Required hook wiring has not been verified before use.
+    HooksNotVerified = 403,
 }
 
 // ################## CONSTANTS ##################

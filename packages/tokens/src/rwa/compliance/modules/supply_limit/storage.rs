@@ -204,11 +204,9 @@ pub fn on_destroyed(e: &Env, amount: i128, token: &Address) {
 /// * `amount` - The mint amount.
 /// * `token` - The token address.
 pub fn can_create(e: &Env, amount: i128, token: &Address) -> bool {
-    assert!(
-        hooks_verified(e),
-        "SupplyLimitModule: not armed — call verify_hook_wiring() after wiring hooks [CanCreate, \
-         Created, Destroyed]"
-    );
+    if !hooks_verified(e) {
+        panic_with_error!(e, ComplianceModuleError::HooksNotVerified);
+    }
     if amount < 0 {
         return false;
     }
