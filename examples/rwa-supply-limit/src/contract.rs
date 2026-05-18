@@ -1,4 +1,5 @@
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec};
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
+use stellar_access::access_control;
 use stellar_tokens::rwa::compliance::{
     modules::{
         storage::{
@@ -10,20 +11,11 @@ use stellar_tokens::rwa::compliance::{
     ComplianceHook,
 };
 
-#[contracttype]
-enum DataKey {
-    Admin,
-}
-
 #[contract]
 pub struct SupplyLimitContract;
 
-fn set_admin(e: &Env, admin: &Address) {
-    e.storage().instance().set(&DataKey::Admin, admin);
-}
-
 fn get_admin(e: &Env) -> Address {
-    e.storage().instance().get(&DataKey::Admin).expect("admin must be set")
+    access_control::get_admin(e).expect("admin is set in the constructor")
 }
 
 fn require_module_admin_or_compliance_auth(e: &Env) {
@@ -39,7 +31,7 @@ fn require_module_admin_or_compliance_auth(e: &Env) {
 #[contractimpl]
 impl SupplyLimitContract {
     pub fn __constructor(e: &Env, admin: Address) {
-        set_admin(e, &admin);
+        access_control::set_admin(e, &admin);
     }
 
     pub fn set_supply_limit(e: &Env, token: Address, limit: i128) {

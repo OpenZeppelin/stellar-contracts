@@ -1,12 +1,12 @@
 use soroban_sdk::{contracttype, panic_with_error, vec, Address, Env, Vec};
 
-use super::SupplyLimitSet;
 use crate::rwa::compliance::{
     modules::{
         storage::{
             add_i128_or_panic, hooks_verified, require_non_negative_amount, sub_i128_or_panic,
             verify_required_hooks,
         },
+        supply_limit::emit_supply_limit_set,
         ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
     },
     ComplianceHook,
@@ -15,13 +15,13 @@ use crate::rwa::compliance::{
 #[contracttype]
 #[derive(Clone)]
 pub enum SupplyLimitStorageKey {
-    /// Per-token supply cap.
+    /// Per-token supply cap that bounds future minting.
     SupplyLimit(Address),
-    /// Per-token internal supply counter (updated via hooks).
+    /// Per-token internal supply mirror updated by mint and burn hooks.
     InternalSupply(Address),
 }
 
-// ################## RAW STORAGE ##################
+// ################## QUERY STATE ##################
 
 /// Returns the supply limit for `token`, or `0` if not set.
 ///
@@ -62,19 +62,6 @@ pub fn get_supply_limit_or_panic(e: &Env, token: &Address) -> i128 {
     limit
 }
 
-/// Sets the supply limit for `token`.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token address.
-/// * `limit` - The maximum total supply.
-pub fn set_supply_limit(e: &Env, token: &Address, limit: i128) {
-    let key = SupplyLimitStorageKey::SupplyLimit(token.clone());
-    e.storage().persistent().set(&key, &limit);
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
-}
-
 /// Returns the internal supply counter for `token`, or `0` if not set.
 ///
 /// # Arguments
@@ -92,6 +79,24 @@ pub fn get_internal_supply(e: &Env, token: &Address) -> i128 {
         .unwrap_or_default()
 }
 
+// ################## CHANGE STATE ##################
+
+/// Sets the supply limit for `token`.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token address.
+/// * `limit` - The maximum total supply.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
+pub fn set_supply_limit(e: &Env, token: &Address, limit: i128) {
+    let key = SupplyLimitStorageKey::SupplyLimit(token.clone());
+    e.storage().persistent().set(&key, &limit);
+}
+
 /// Sets the internal supply counter for `token`.
 ///
 /// # Arguments
@@ -99,25 +104,35 @@ pub fn get_internal_supply(e: &Env, token: &Address) -> i128 {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `supply` - The new supply value.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn set_internal_supply(e: &Env, token: &Address, supply: i128) {
     let key = SupplyLimitStorageKey::InternalSupply(token.clone());
     e.storage().persistent().set(&key, &supply);
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
 }
 
-// ################## ACTIONS ##################
-
-/// Validates, stores, and emits [`SupplyLimitSet`] for the given cap.
+/// Validates and stores the supply cap for `token`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `limit` - The supply cap.
+///
+/// # Events
+///
+/// * topics - `["supply_limit_set", token: Address]`
+/// * data - `[limit: i128]`
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn configure_supply_limit(e: &Env, token: &Address, limit: i128) {
     require_non_negative_amount(e, limit);
     set_supply_limit(e, token, limit);
-    SupplyLimitSet { token: token.clone(), limit }.publish(e);
+    emit_supply_limit_set(e, token, limit);
 }
 
 /// Pre-seeds the internal supply counter for a token.
@@ -127,12 +142,14 @@ pub fn configure_supply_limit(e: &Env, token: &Address, limit: i128) {
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `supply` - The pre-seeded supply value.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn pre_set_supply(e: &Env, token: &Address, supply: i128) {
     require_non_negative_amount(e, supply);
     set_internal_supply(e, token, supply);
 }
-
-// ################## HOOK WIRING ##################
 
 /// Returns the set of compliance hooks this module requires.
 pub fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
@@ -145,8 +162,6 @@ pub fn verify_hook_wiring(e: &Env) {
     verify_required_hooks(e, required_hooks(e));
 }
 
-// ################## COMPLIANCE HOOKS ##################
-
 /// Updates the internal supply counter after a mint.
 ///
 /// # Arguments
@@ -154,6 +169,10 @@ pub fn verify_hook_wiring(e: &Env) {
 /// * `e` - Access to the Soroban environment.
 /// * `amount` - The minted amount.
 /// * `token` - The token address.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn on_created(e: &Env, amount: i128, token: &Address) {
     require_non_negative_amount(e, amount);
     let current = get_internal_supply(e, token);
@@ -167,6 +186,10 @@ pub fn on_created(e: &Env, amount: i128, token: &Address) {
 /// * `e` - Access to the Soroban environment.
 /// * `amount` - The burned amount.
 /// * `token` - The token address.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn on_destroyed(e: &Env, amount: i128, token: &Address) {
     require_non_negative_amount(e, amount);
     let current = get_internal_supply(e, token);

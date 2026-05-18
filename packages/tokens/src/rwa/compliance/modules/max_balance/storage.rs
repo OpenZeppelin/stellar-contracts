@@ -1,8 +1,8 @@
 use soroban_sdk::{contracttype, vec, Address, Env, Vec};
 
-use super::{IDBalancePreSet, MaxBalanceSet};
 use crate::rwa::compliance::{
     modules::{
+        max_balance::{emit_id_balance_pre_set, emit_max_balance_set},
         storage::{
             add_i128_or_panic, get_irs_client, hooks_verified, require_non_negative_amount,
             sub_i128_or_panic, verify_required_hooks,
@@ -21,7 +21,7 @@ pub enum MaxBalanceStorageKey {
     IDBalance(Address, Address),
 }
 
-// ################## RAW STORAGE ##################
+// ################## QUERY STATE ##################
 
 /// Returns the per-identity balance cap for `token`, or `0` if not set.
 ///
@@ -38,19 +38,6 @@ pub fn get_max_balance(e: &Env, token: &Address) -> i128 {
             e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
         })
         .unwrap_or_default()
-}
-
-/// Sets the per-identity balance cap for `token`.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token address.
-/// * `value` - The maximum balance per identity.
-pub fn set_max_balance(e: &Env, token: &Address, value: i128) {
-    let key = MaxBalanceStorageKey::MaxBalance(token.clone());
-    e.storage().persistent().set(&key, &value);
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
 }
 
 /// Returns the tracked balance for `identity` on `token`, or `0` if not
@@ -72,6 +59,24 @@ pub fn get_id_balance(e: &Env, token: &Address, identity: &Address) -> i128 {
         .unwrap_or_default()
 }
 
+// ################## CHANGE STATE ##################
+
+/// Sets the per-identity balance cap for `token`.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token address.
+/// * `value` - The maximum balance per identity.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
+pub fn set_max_balance(e: &Env, token: &Address, value: i128) {
+    let key = MaxBalanceStorageKey::MaxBalance(token.clone());
+    e.storage().persistent().set(&key, &value);
+}
+
 /// Sets the tracked balance for `identity` on `token`.
 ///
 /// # Arguments
@@ -80,50 +85,38 @@ pub fn get_id_balance(e: &Env, token: &Address, identity: &Address) -> i128 {
 /// * `token` - The token address.
 /// * `identity` - The on-chain identity address.
 /// * `balance` - The new balance value.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn set_id_balance(e: &Env, token: &Address, identity: &Address, balance: i128) {
     let key = MaxBalanceStorageKey::IDBalance(token.clone(), identity.clone());
     e.storage().persistent().set(&key, &balance);
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
 }
 
-// ################## HELPERS ##################
-
-fn can_increase_identity_balance(
-    e: &Env,
-    token: &Address,
-    identity: &Address,
-    amount: i128,
-) -> bool {
-    if amount < 0 {
-        return false;
-    }
-
-    let max = get_max_balance(e, token);
-    if max == 0 {
-        return true;
-    }
-
-    let current = get_id_balance(e, token, identity);
-    add_i128_or_panic(e, current, amount) <= max
-}
-
-// ################## ACTIONS ##################
-
-/// Validates, stores, and emits [`MaxBalanceSet`] for the given cap.
+/// Validates and stores the identity balance cap for `token`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `max` - The maximum balance per identity.
+///
+/// # Events
+///
+/// * topics - `["max_balance_set", token: Address]`
+/// * data - `[max_balance: i128]`
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn configure_max_balance(e: &Env, token: &Address, max: i128) {
     require_non_negative_amount(e, max);
     set_max_balance(e, token, max);
-    MaxBalanceSet { token: token.clone(), max_balance: max }.publish(e);
+    emit_max_balance_set(e, token, max);
 }
 
-/// Pre-seeds the tracked balance for an identity and emits
-/// [`IDBalancePreSet`].
+/// Pre-seeds the tracked balance for an identity.
 ///
 /// # Arguments
 ///
@@ -131,14 +124,22 @@ pub fn configure_max_balance(e: &Env, token: &Address, max: i128) {
 /// * `token` - The token address.
 /// * `identity` - The on-chain identity address.
 /// * `balance` - The pre-seeded balance value.
+///
+/// # Events
+///
+/// * topics - `["id_balance_pre_set", token: Address, identity: Address]`
+/// * data - `[balance: i128]`
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn pre_set_identity_balance(e: &Env, token: &Address, identity: &Address, balance: i128) {
     require_non_negative_amount(e, balance);
     set_id_balance(e, token, identity, balance);
-    IDBalancePreSet { token: token.clone(), identity: identity.clone(), balance }.publish(e);
+    emit_id_balance_pre_set(e, token, identity, balance);
 }
 
-/// Pre-seeds tracked balances for multiple identities. Emits
-/// [`IDBalancePreSet`] for each.
+/// Pre-seeds tracked balances for multiple identities.
 ///
 /// # Arguments
 ///
@@ -146,6 +147,16 @@ pub fn pre_set_identity_balance(e: &Env, token: &Address, identity: &Address, ba
 /// * `token` - The token address.
 /// * `identities` - Identity addresses.
 /// * `balances` - Corresponding balance values.
+///
+/// # Events
+///
+/// For each identity balance pre-seeded:
+/// * topics - `["id_balance_pre_set", token: Address, identity: Address]`
+/// * data - `[balance: i128]`
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn batch_pre_set_identity_balances(
     e: &Env,
     token: &Address,
@@ -157,15 +168,13 @@ pub fn batch_pre_set_identity_balances(
         "MaxBalanceModule: identities and balances length mismatch"
     );
     for i in 0..identities.len() {
-        let id = identities.get(i).unwrap();
-        let bal = balances.get(i).unwrap();
+        let id = identities.get_unchecked(i);
+        let bal = balances.get_unchecked(i);
         require_non_negative_amount(e, bal);
         set_id_balance(e, token, &id, bal);
-        IDBalancePreSet { token: token.clone(), identity: id, balance: bal }.publish(e);
+        emit_id_balance_pre_set(e, token, &id, bal);
     }
 }
-
-// ################## HOOK WIRING ##################
 
 /// Returns the set of compliance hooks this module requires.
 pub fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
@@ -185,8 +194,6 @@ pub fn verify_hook_wiring(e: &Env) {
     verify_required_hooks(e, required_hooks(e));
 }
 
-// ################## COMPLIANCE HOOKS ##################
-
 /// Updates identity balances after a transfer.
 ///
 /// # Arguments
@@ -196,6 +203,10 @@ pub fn verify_hook_wiring(e: &Env) {
 /// * `to` - The recipient address.
 /// * `amount` - The transfer amount.
 /// * `token` - The token address.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn on_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &Address) {
     require_non_negative_amount(e, amount);
 
@@ -227,6 +238,10 @@ pub fn on_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &
 /// * `to` - The recipient address.
 /// * `amount` - The minted amount.
 /// * `token` - The token address.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
     require_non_negative_amount(e, amount);
 
@@ -251,6 +266,10 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
 /// * `from` - The burner address.
 /// * `amount` - The burned amount.
 /// * `token` - The token address.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
 pub fn on_destroyed(e: &Env, from: &Address, amount: i128, token: &Address) {
     require_non_negative_amount(e, amount);
 
@@ -312,4 +331,25 @@ pub fn can_create(e: &Env, to: &Address, amount: i128, token: &Address) -> bool 
     let irs = get_irs_client(e, token);
     let to_id = irs.stored_identity(to);
     can_increase_identity_balance(e, token, &to_id, amount)
+}
+
+// ################## HELPERS ##################
+
+fn can_increase_identity_balance(
+    e: &Env,
+    token: &Address,
+    identity: &Address,
+    amount: i128,
+) -> bool {
+    if amount < 0 {
+        return false;
+    }
+
+    let max = get_max_balance(e, token);
+    if max == 0 {
+        return true;
+    }
+
+    let current = get_id_balance(e, token, identity);
+    add_i128_or_panic(e, current, amount) <= max
 }

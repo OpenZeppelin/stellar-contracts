@@ -2,13 +2,15 @@ extern crate std;
 
 use soroban_sdk::{contract, contractimpl, contracttype, testutils::Address as _, Address, Env};
 
-use super::storage::{
-    can_create, configure_supply_limit, get_internal_supply, get_supply_limit_or_panic, on_created,
-    on_destroyed, pre_set_supply, verify_hook_wiring,
-};
 use crate::rwa::{
     compliance::{
-        modules::storage::{hooks_verified, set_compliance_address, ComplianceModuleStorageKey},
+        modules::{
+            storage::{hooks_verified, set_compliance_address, ComplianceModuleStorageKey},
+            supply_limit::storage::{
+                can_create, configure_supply_limit, get_internal_supply, get_supply_limit_or_panic,
+                on_created, on_destroyed, pre_set_supply, verify_hook_wiring,
+            },
+        },
         Compliance, ComplianceHook,
     },
     utils::token_binder::TokenBinder,
@@ -124,7 +126,10 @@ fn get_supply_limit_returns_zero_when_unconfigured() {
     let token = Address::generate(&e);
 
     e.as_contract(&module_id, || {
-        assert_eq!(super::storage::get_supply_limit(&e, &token), 0);
+        assert_eq!(
+            crate::rwa::compliance::modules::supply_limit::storage::get_supply_limit(&e, &token),
+            0
+        );
     });
 }
 

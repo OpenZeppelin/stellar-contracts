@@ -19,3 +19,14 @@ pub struct SupplyLimitSet {
     pub token: Address,
     pub limit: i128,
 }
+
+/// Emits a [`SupplyLimitSet`] event.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token whose supply limit was configured.
+/// * `limit` - The configured supply cap.
+pub fn emit_supply_limit_set(e: &soroban_sdk::Env, token: &Address, limit: i128) {
+    SupplyLimitSet { token: token.clone(), limit }.publish(e);
+}

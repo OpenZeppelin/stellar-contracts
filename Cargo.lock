@@ -1651,6 +1651,7 @@ name = "rwa-max-balance"
 version = "0.7.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
  "stellar-tokens",
 ]
 
@@ -1659,6 +1660,7 @@ name = "rwa-supply-limit"
 version = "0.7.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
  "stellar-tokens",
 ]
 

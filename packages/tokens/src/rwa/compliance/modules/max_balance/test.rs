@@ -4,14 +4,16 @@ use soroban_sdk::{
     contract, contractimpl, contracttype, testutils::Address as _, Address, Env, Val, Vec,
 };
 
-use super::storage::{
-    can_create, can_transfer, get_id_balance, on_created, on_destroyed, on_transfer,
-    set_id_balance, set_max_balance, verify_hook_wiring,
-};
 use crate::rwa::{
     compliance::{
-        modules::storage::{
-            hooks_verified, set_compliance_address, set_irs_address, ComplianceModuleStorageKey,
+        modules::{
+            max_balance::storage::{
+                can_create, can_transfer, get_id_balance, on_created, on_destroyed, on_transfer,
+                set_id_balance, set_max_balance, verify_hook_wiring,
+            },
+            storage::{
+                hooks_verified, set_compliance_address, set_irs_address, ComplianceModuleStorageKey,
+            },
         },
         Compliance, ComplianceHook,
     },
