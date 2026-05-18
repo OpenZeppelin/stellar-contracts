@@ -1651,6 +1651,8 @@ name = "rwa-initial-lockup-period"
 version = "0.7.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -1659,6 +1661,8 @@ name = "rwa-time-transfers-limits"
 version = "0.7.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -1678,6 +1682,8 @@ name = "rwa-transfer-restrict"
 version = "0.7.1"
 dependencies = [
  "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
  "stellar-tokens",
 ]
 

@@ -1,65 +1,45 @@
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env, String, Vec};
+use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
+use stellar_access::access_control;
+use stellar_macros::only_admin;
 use stellar_tokens::rwa::compliance::modules::{
-    storage::{
-        get_compliance_address, module_name, set_compliance_address, ComplianceModuleStorageKey,
-    },
-    transfer_restrict::storage as transfer_restrict,
+    storage::{get_compliance_address, module_name, set_compliance_address},
+    transfer_restrict::{storage as transfer_restrict, TransferRestrict},
     ComplianceModule,
 };
-
-#[contracttype]
-enum DataKey {
-    Admin,
-}
 
 #[contract]
 pub struct TransferRestrictContract;
 
-fn set_admin(e: &Env, admin: &Address) {
-    e.storage().instance().set(&DataKey::Admin, admin);
-}
-
-fn get_admin(e: &Env) -> Address {
-    e.storage().instance().get(&DataKey::Admin).expect("admin must be set")
-}
-
-fn require_module_admin_or_compliance_auth(e: &Env) {
-    if let Some(compliance) =
-        e.storage().instance().get::<_, Address>(&ComplianceModuleStorageKey::Compliance)
-    {
-        compliance.require_auth();
-    } else {
-        get_admin(e).require_auth();
-    }
-}
-
 #[contractimpl]
 impl TransferRestrictContract {
     pub fn __constructor(e: &Env, admin: Address) {
-        set_admin(e, &admin);
+        access_control::set_admin(e, &admin);
     }
+}
 
-    pub fn allow_user(e: &Env, token: Address, user: Address) {
-        require_module_admin_or_compliance_auth(e);
+#[contractimpl(contracttrait)]
+impl TransferRestrict for TransferRestrictContract {
+    #[only_admin]
+    fn allow_user(e: &Env, token: Address, user: Address) {
         transfer_restrict::allow_user(e, &token, &user);
     }
 
-    pub fn disallow_user(e: &Env, token: Address, user: Address) {
-        require_module_admin_or_compliance_auth(e);
+    #[only_admin]
+    fn disallow_user(e: &Env, token: Address, user: Address) {
         transfer_restrict::disallow_user(e, &token, &user);
     }
 
-    pub fn batch_allow_users(e: &Env, token: Address, users: Vec<Address>) {
-        require_module_admin_or_compliance_auth(e);
+    #[only_admin]
+    fn batch_allow_users(e: &Env, token: Address, users: Vec<Address>) {
         transfer_restrict::batch_allow_users(e, &token, &users);
     }
 
-    pub fn batch_disallow_users(e: &Env, token: Address, users: Vec<Address>) {
-        require_module_admin_or_compliance_auth(e);
+    #[only_admin]
+    fn batch_disallow_users(e: &Env, token: Address, users: Vec<Address>) {
         transfer_restrict::batch_disallow_users(e, &token, &users);
     }
 
-    pub fn is_user_allowed(e: &Env, token: Address, user: Address) -> bool {
+    fn is_user_allowed(e: &Env, token: Address, user: Address) -> bool {
         transfer_restrict::is_user_allowed(e, &token, &user)
     }
 }
@@ -88,8 +68,8 @@ impl ComplianceModule for TransferRestrictContract {
         get_compliance_address(e)
     }
 
+    #[only_admin]
     fn set_compliance_address(e: &Env, compliance: Address) {
-        get_admin(e).require_auth();
         set_compliance_address(e, &compliance);
     }
 }

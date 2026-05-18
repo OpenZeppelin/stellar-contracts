@@ -73,7 +73,7 @@ fn allow_user_uses_admin_auth_before_compliance_bind() {
 }
 
 #[test]
-fn allow_user_uses_compliance_auth_after_bind() {
+fn allow_user_uses_admin_auth_after_compliance_bind() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -93,5 +93,5 @@ fn allow_user_uses_compliance_auth_after_bind() {
     let auths = e.auths();
     assert_eq!(auths.len(), 1);
     let (addr, _) = &auths[0];
-    assert_eq!(addr, &compliance);
+    assert_eq!(addr, &admin);
 }
