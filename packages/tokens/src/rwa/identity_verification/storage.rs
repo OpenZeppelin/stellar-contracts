@@ -1,7 +1,7 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env};
 
 use crate::rwa::{
-    emit_claim_topics_and_issuers_set,
+    emit_claim_topics_and_issuers_set, emit_identity_registry_storage_set,
     identity_registry_storage::IdentityRegistryStorageClient,
     identity_verification::{
         claim_issuer::ClaimIssuerClient,
@@ -202,4 +202,5 @@ pub fn set_identity_registry_storage(e: &Env, identity_registry_storage: &Addres
     e.storage()
         .instance()
         .set(&IdentityVerifierStorageKey::IdentityRegistryStorage, identity_registry_storage);
+    emit_identity_registry_storage_set(e, identity_registry_storage);
 }

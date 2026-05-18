@@ -686,6 +686,27 @@ pub fn emit_claim_topics_and_issuers_set(e: &Env, claim_topics_and_issuers: &Add
         .publish(e);
 }
 
+/// Event emitted when identity registry storage contract is set.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IdentityRegistryStorageSet {
+    #[topic]
+    pub identity_registry_storage: Address,
+}
+
+/// Emits an event indicating the Identity Registry Storage contract has been
+/// set.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `identity_registry_storage` - The address of the Identity Registry Storage
+///   contract.
+pub fn emit_identity_registry_storage_set(e: &Env, identity_registry_storage: &Address) {
+    IdentityRegistryStorageSet { identity_registry_storage: identity_registry_storage.clone() }
+        .publish(e);
+}
+
 /// Event emitted when identity verifier contract is set.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
