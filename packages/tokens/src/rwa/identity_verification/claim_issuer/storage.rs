@@ -486,11 +486,11 @@ pub fn allow_key(e: &Env, public_key: &Bytes, registry: &Address, scheme: u32, c
         panic_with_error!(e, ClaimIssuerError::KeyAlreadyAllowed)
     }
 
-    pairs.push_back((claim_topic, registry.clone()));
-
     if pairs.len() >= MAX_REGISTRIES_PER_KEY {
         panic_with_error!(e, ClaimIssuerError::LimitExceeded)
     }
+
+    pairs.push_back((claim_topic, registry.clone()));
 
     e.storage().persistent().set(&pairs_storage_key, &pairs);
 

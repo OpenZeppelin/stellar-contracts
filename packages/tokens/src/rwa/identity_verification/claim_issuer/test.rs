@@ -16,6 +16,7 @@ use soroban_sdk::{
     testutils::{Address as _, Ledger as _},
     Address, Bytes, BytesN, Env, Map, Vec,
 };
+use stellar_event_assertion::EventAssertion;
 
 use crate::rwa::identity_verification::{
     claim_issuer::{
@@ -508,6 +509,7 @@ fn set_and_check_claim_revocation() {
         set_claim_revoked(&e, &identity, claim_topic, &claim_data, true);
 
         assert!(is_claim_revoked(&e, &identity, claim_topic, &claim_data));
+        EventAssertion::new(&e, contract_id.clone()).assert_event_count(1);
     });
 }
 
@@ -586,6 +588,8 @@ fn topic_specific_key_management() {
 
         remove_key(&e, &public_key, &registry, 1, topic);
         assert!(!is_key_allowed_for_topic(&e, &public_key, 1, topic));
+        // 1 KeyAllowed + 1 KeyRemoved
+        EventAssertion::new(&e, contract_id.clone()).assert_event_count(2);
     });
 }
 
@@ -934,6 +938,38 @@ fn max_registries_per_key_exceeded() {
 }
 
 #[test]
+fn max_registries_per_key_boundary() {
+    let e = Env::default();
+    let contract_id = e.register(MockContract, ());
+
+    // Use two registries spanning the cap to stay under the per-registry topic
+    // limit while still producing MAX_REGISTRIES_PER_KEY distinct (topic,
+    // registry) pairs for the signing key.
+    let half = MAX_REGISTRIES_PER_KEY / 2;
+    let topics_a: std::vec::Vec<u32> = (0..half).collect();
+    let topics_b: std::vec::Vec<u32> = (half..MAX_REGISTRIES_PER_KEY).collect();
+    let registry_a = setup_mock_registry(&e, &contract_id, &topics_a);
+    let registry_b = setup_mock_registry(&e, &contract_id, &topics_b);
+
+    let public_key = Bytes::from_array(&e, &[1u8; 32]);
+    let scheme = 1u32;
+
+    e.as_contract(&contract_id, || {
+        for i in 0..half {
+            allow_key(&e, &public_key, &registry_a, scheme, i);
+        }
+        for i in half..MAX_REGISTRIES_PER_KEY {
+            allow_key(&e, &public_key, &registry_b, scheme, i);
+        }
+
+        let signing_key = SigningKey { public_key: public_key.clone(), scheme };
+        let pairs_key = ClaimIssuerStorageKey::Pairs(signing_key);
+        let pairs: Vec<(u32, Address)> = e.storage().persistent().get(&pairs_key).unwrap();
+        assert_eq!(pairs.len(), MAX_REGISTRIES_PER_KEY);
+    });
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #354)")]
 fn allow_key_topic_not_allowed() {
     let e = Env::default();
@@ -1127,6 +1163,8 @@ fn invalidate_claim_signatures_increments_nonce() {
         // Invalidate again - nonce should increment to 2
         invalidate_claim_signatures(&e, &identity, claim_topic);
         assert_eq!(get_current_nonce_for(&e, &identity, claim_topic), 2);
+        // 2 SignaturesInvalidated
+        EventAssertion::new(&e, contract_id.clone()).assert_event_count(2);
     });
 }
 
