@@ -121,6 +121,10 @@ pub fn set_internal_supply(e: &Env, token: &Address, supply: i128) {
 /// * `token` - The token address.
 /// * `limit` - The supply cap.
 ///
+/// # Errors
+///
+/// * refer to [`require_non_negative_amount`] errors.
+///
 /// # Events
 ///
 /// * topics - `["supply_limit_set", token: Address]`
@@ -143,6 +147,10 @@ pub fn configure_supply_limit(e: &Env, token: &Address, limit: i128) {
 /// * `token` - The token address.
 /// * `supply` - The pre-seeded supply value.
 ///
+/// # Errors
+///
+/// * refer to [`require_non_negative_amount`] errors.
+///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
@@ -152,12 +160,24 @@ pub fn pre_set_supply(e: &Env, token: &Address, supply: i128) {
 }
 
 /// Returns the set of compliance hooks this module requires.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
 pub fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
     vec![e, ComplianceHook::CanCreate, ComplianceHook::Created, ComplianceHook::Destroyed]
 }
 
 /// Cross-calls the compliance contract to verify that this module is
 /// registered on all required hooks.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * refer to [`verify_required_hooks`] errors.
 pub fn verify_hook_wiring(e: &Env) {
     verify_required_hooks(e, required_hooks(e));
 }
@@ -169,6 +189,11 @@ pub fn verify_hook_wiring(e: &Env) {
 /// * `e` - Access to the Soroban environment.
 /// * `amount` - The minted amount.
 /// * `token` - The token address.
+///
+/// # Errors
+///
+/// * refer to [`require_non_negative_amount`] errors.
+/// * refer to [`add_i128_or_panic`] errors.
 ///
 /// # Security Warning
 ///
@@ -187,6 +212,11 @@ pub fn on_created(e: &Env, amount: i128, token: &Address) {
 /// * `amount` - The burned amount.
 /// * `token` - The token address.
 ///
+/// # Errors
+///
+/// * refer to [`require_non_negative_amount`] errors.
+/// * refer to [`sub_i128_or_panic`] errors.
+///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
@@ -196,13 +226,20 @@ pub fn on_destroyed(e: &Env, amount: i128, token: &Address) {
     set_internal_supply(e, token, sub_i128_or_panic(e, current, amount));
 }
 
-/// Checks whether a mint would exceed the supply cap.
+/// Checks whether a mint would exceed the supply cap. A missing or zero cap
+/// rejects positive mints, matching the T-REX default of `0`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `amount` - The mint amount.
 /// * `token` - The token address.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::HooksNotVerified`] - When required hook wiring
+///   has not been verified.
+/// * refer to [`add_i128_or_panic`] errors.
 pub fn can_create(e: &Env, amount: i128, token: &Address) -> bool {
     if !hooks_verified(e) {
         panic_with_error!(e, ComplianceModuleError::HooksNotVerified);
@@ -211,9 +248,6 @@ pub fn can_create(e: &Env, amount: i128, token: &Address) -> bool {
         return false;
     }
     let limit = get_supply_limit(e, token);
-    if limit == 0 {
-        return true;
-    }
     let supply = get_internal_supply(e, token);
     add_i128_or_panic(e, supply, amount) <= limit
 }

@@ -134,7 +134,7 @@ fn get_supply_limit_returns_zero_when_unconfigured() {
 }
 
 #[test]
-fn can_create_allows_when_limit_is_unset_and_rejects_negative_amount() {
+fn can_create_rejects_when_limit_is_unset_and_rejects_negative_amount() {
     let e = Env::default();
     let module_id = e.register(TestSupplyLimitContract, ());
     let token = Address::generate(&e);
@@ -142,7 +142,7 @@ fn can_create_allows_when_limit_is_unset_and_rejects_negative_amount() {
     e.as_contract(&module_id, || {
         arm_hooks(&e);
 
-        assert!(can_create(&e, 100, &token));
+        assert!(!can_create(&e, 100, &token));
         assert!(!can_create(&e, -1, &token));
     });
 }
@@ -200,7 +200,7 @@ fn get_supply_limit_or_panic_returns_configured_limit() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Error(Contract, #394)")]
 fn get_supply_limit_or_panic_panics_when_unconfigured() {
     let e = Env::default();
     let module_id = e.register(TestSupplyLimitContract, ());

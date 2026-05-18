@@ -102,6 +102,10 @@ pub fn set_id_balance(e: &Env, token: &Address, identity: &Address, balance: i12
 /// * `token` - The token address.
 /// * `max` - The maximum balance per identity.
 ///
+/// # Errors
+///
+/// * refer to [`require_non_negative_amount`] errors.
+///
 /// # Events
 ///
 /// * topics - `["max_balance_set", token: Address]`
@@ -125,6 +129,10 @@ pub fn configure_max_balance(e: &Env, token: &Address, max: i128) {
 /// * `identity` - The on-chain identity address.
 /// * `balance` - The pre-seeded balance value.
 ///
+/// # Errors
+///
+/// * refer to [`require_non_negative_amount`] errors.
+///
 /// # Events
 ///
 /// * topics - `["id_balance_pre_set", token: Address, identity: Address]`
@@ -147,6 +155,12 @@ pub fn pre_set_identity_balance(e: &Env, token: &Address, identity: &Address, ba
 /// * `token` - The token address.
 /// * `identities` - Identity addresses.
 /// * `balances` - Corresponding balance values.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::VectorLengthMismatch`] - When `identities` and
+///   `balances` have different lengths.
+/// * refer to [`require_non_negative_amount`] errors.
 ///
 /// # Events
 ///
@@ -176,6 +190,10 @@ pub fn batch_pre_set_identity_balances(
 }
 
 /// Returns the set of compliance hooks this module requires.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
 pub fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
     vec![
         e,
@@ -189,6 +207,14 @@ pub fn required_hooks(e: &Env) -> Vec<ComplianceHook> {
 
 /// Cross-calls the compliance contract to verify that this module is
 /// registered on all required hooks.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+///
+/// # Errors
+///
+/// * refer to [`verify_required_hooks`] errors.
 pub fn verify_hook_wiring(e: &Env) {
     verify_required_hooks(e, required_hooks(e));
 }
@@ -202,6 +228,15 @@ pub fn verify_hook_wiring(e: &Env) {
 /// * `to` - The recipient address.
 /// * `amount` - The transfer amount.
 /// * `token` - The token address.
+///
+/// # Errors
+///
+/// * refer to [`require_non_negative_amount`] errors.
+/// * refer to [`get_irs_client`] errors.
+/// * [`ComplianceModuleError::MaxBalanceExceeded`] - When the transfer would
+///   exceed the recipient identity's configured balance cap.
+/// * refer to [`add_i128_or_panic`] errors.
+/// * refer to [`sub_i128_or_panic`] errors.
 ///
 /// # Security Warning
 ///
@@ -237,6 +272,14 @@ pub fn on_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &
 /// * `amount` - The minted amount.
 /// * `token` - The token address.
 ///
+/// # Errors
+///
+/// * refer to [`require_non_negative_amount`] errors.
+/// * refer to [`get_irs_client`] errors.
+/// * [`ComplianceModuleError::MaxBalanceExceeded`] - When the mint would exceed
+///   the recipient identity's configured balance cap.
+/// * refer to [`add_i128_or_panic`] errors.
+///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
@@ -264,6 +307,12 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
 /// * `amount` - The burned amount.
 /// * `token` - The token address.
 ///
+/// # Errors
+///
+/// * refer to [`require_non_negative_amount`] errors.
+/// * refer to [`get_irs_client`] errors.
+/// * refer to [`sub_i128_or_panic`] errors.
+///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
@@ -287,6 +336,13 @@ pub fn on_destroyed(e: &Env, from: &Address, amount: i128, token: &Address) {
 /// * `to` - The recipient address.
 /// * `amount` - The transfer amount.
 /// * `token` - The token address.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::HooksNotVerified`] - When required hook wiring
+///   has not been verified.
+/// * refer to [`get_irs_client`] errors.
+/// * refer to [`add_i128_or_panic`] errors.
 pub fn can_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &Address) -> bool {
     if !hooks_verified(e) {
         panic_with_error!(e, ComplianceModuleError::HooksNotVerified);
@@ -306,7 +362,8 @@ pub fn can_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: 
 }
 
 /// Checks whether a mint would exceed the recipient identity's balance
-/// cap.
+/// cap. A missing or zero cap rejects positive increases, matching the
+/// T-REX default of `0`.
 ///
 /// # Arguments
 ///
@@ -314,6 +371,13 @@ pub fn can_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: 
 /// * `to` - The recipient address.
 /// * `amount` - The mint amount.
 /// * `token` - The token address.
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::HooksNotVerified`] - When required hook wiring
+///   has not been verified.
+/// * refer to [`get_irs_client`] errors.
+/// * refer to [`add_i128_or_panic`] errors.
 pub fn can_create(e: &Env, to: &Address, amount: i128, token: &Address) -> bool {
     if !hooks_verified(e) {
         panic_with_error!(e, ComplianceModuleError::HooksNotVerified);
@@ -339,10 +403,6 @@ fn can_increase_identity_balance(
     }
 
     let max = get_max_balance(e, token);
-    if max == 0 {
-        return true;
-    }
-
     let current = get_id_balance(e, token, identity);
     add_i128_or_panic(e, current, amount) <= max
 }

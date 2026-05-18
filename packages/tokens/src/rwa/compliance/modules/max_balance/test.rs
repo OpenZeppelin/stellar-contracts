@@ -278,7 +278,7 @@ fn can_transfer_checks_distinct_recipient_identity_balance() {
 }
 
 #[test]
-fn can_create_allows_without_cap_and_rejects_negative_amount() {
+fn can_create_rejects_without_cap_and_rejects_negative_amount() {
     let e = Env::default();
     let module_id = e.register(TestMaxBalanceContract, ());
     let irs_id = e.register(MockIRSContract, ());
@@ -294,7 +294,7 @@ fn can_create_allows_without_cap_and_rejects_negative_amount() {
         arm_hooks(&e);
         set_id_balance(&e, &token, &recipient_identity, 500);
 
-        assert!(can_create(&e, &recipient, 1_000, &token));
+        assert!(!can_create(&e, &recipient, 1_000, &token));
         assert!(!can_create(&e, &recipient, -1, &token));
     });
 }
