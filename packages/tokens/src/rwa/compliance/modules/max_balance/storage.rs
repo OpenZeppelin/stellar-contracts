@@ -25,6 +25,9 @@ pub enum MaxBalanceStorageKey {
 
 /// Returns the per-identity balance cap for `token`, or `0` if not set.
 ///
+/// A missing or zero cap is the raw T-REX default. Validation helpers treat it
+/// as fail-closed for positive balance increases, not as an unlimited cap.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
@@ -327,7 +330,8 @@ pub fn on_destroyed(e: &Env, from: &Address, amount: i128, token: &Address) {
 }
 
 /// Checks whether a transfer would exceed the recipient identity's
-/// balance cap.
+/// balance cap. A missing or zero cap rejects positive recipient increases,
+/// matching the T-REX default of `0`.
 ///
 /// # Arguments
 ///
