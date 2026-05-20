@@ -34,6 +34,11 @@ jobs:
     steps:
       - name: git checkout
         uses: actions/checkout@v4
+        with:
+          # This job only reads source files -- no push, no API calls. Drop
+          # the persisted GITHUB_TOKEN so a compromised dependency in any
+          # subsequent step can't exfiltrate it.
+          persist-credentials: false
 
       - name: Install noirup
         # noirup is the official installer; it lands at ~/.nargo/bin/nargo.

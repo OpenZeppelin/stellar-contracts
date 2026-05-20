@@ -285,7 +285,7 @@ Token kinds that require zero-knowledge proofs (currently `confidential/`) ship 
 
 Noir artifacts for a token kind live under `packages/tokens/src/<kind>/circuits/`:
 
-```
+```text
 packages/tokens/src/<kind>/circuits/
 ├── Nargo.toml               # Nargo workspace manifest
 ├── lib/                     # Shared primitives (type = "lib", no `main`)
