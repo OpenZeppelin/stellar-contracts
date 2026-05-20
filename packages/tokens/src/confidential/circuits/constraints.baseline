@@ -4,7 +4,11 @@
 # Regenerate with:
 #
 #   cd packages/tokens/src/confidential/circuits
-#   nargo info | grep '^|' | sort > constraints.baseline
+#   LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline
+#
+# LC_ALL=C is mandatory -- it makes `sort` use byte order, which is the
+# only ordering that's stable across macOS (en_US locale) and the Ubuntu
+# CI runner (C locale).
 #
 # CI diffs the current normalized `nargo info` against this file and
 # fails on any change. Bumping constraint counts is expected when the
@@ -13,6 +17,7 @@
 #
 # Toolchain: nargo 1.0.0-beta.11
 #
+| Package                     | Function                   | Expression Width     | ACIR Opcodes | Brillig Opcodes |
 | gadget_commit               | decompose_hint             | N/A                  | N/A          | 30              |
 | gadget_commit               | lte_hint                   | N/A                  | N/A          | 33              |
 | gadget_commit               | main                       | Bounded { width: 4 } | 23           | 63              |
@@ -25,4 +30,3 @@
 | gadget_range_128            | directive_invert           | N/A                  | N/A          | 9               |
 | gadget_range_128            | main                       | Bounded { width: 4 } | 14           | 17              |
 | gadget_vk_from_sk           | main                       | Bounded { width: 4 } | 4            | 0               |
-| Package                     | Function                   | Expression Width     | ACIR Opcodes | Brillig Opcodes |

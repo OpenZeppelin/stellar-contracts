@@ -59,6 +59,12 @@ jobs:
         # `constraints.baseline`. When the lib genuinely changes, regenerate
         # the baseline in the same PR (the failure message tells reviewers
         # how) so the delta is visible side-by-side in the diff.
+        #
+        # LC_ALL=C is load-bearing -- it makes `sort` use byte order, which
+        # is the only ordering stable across macOS (where contributors
+        # regenerate the baseline) and Ubuntu (CI).
+        env:
+          LC_ALL: C
         run: |
           nargo info | grep '^|' | sort > /tmp/nargo-info.current
           grep -v '^#' constraints.baseline | sed '/^[[:space:]]*$/d' > /tmp/nargo-info.baseline
@@ -81,7 +87,7 @@ jobs:
               echo ""
               echo '```'
               echo "cd packages/tokens/src/confidential/circuits"
-              echo "nargo info | grep '^|' | sort > constraints.baseline"
+              echo "LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline"
               echo '```'
               echo ""
               echo "(Leave the header comments in \`constraints.baseline\` intact.)"
