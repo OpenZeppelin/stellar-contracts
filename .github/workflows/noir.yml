@@ -74,17 +74,19 @@ jobs:
 
       - name: Diff extracted VKs against committed artifacts
         # Re-extracts the VK for each per-operation circuit using the pinned
-        # bb version and compares against the committed `vks/*.vk`. Mirrors
-        # the constraint-baseline diff: drift means either the circuit
-        # changed (regenerate and commit in this PR) or the toolchain
-        # drifted (don't regenerate -- investigate).
+        # bb version and compares against the committed `vks/*.vk.json`.
+        # Mirrors the constraint-baseline diff: drift means either the
+        # circuit changed (regenerate and commit in this PR) or the
+        # toolchain drifted (don't regenerate -- investigate).
         run: |
           mkdir -p /tmp/vks-current
-          cp vks/*.vk /tmp/vks-current/ 2>/dev/null || true
-          rm -f vks/*.vk
+          cp vks/*.vk.json /tmp/vks-current/ 2>/dev/null || true
+          rm -f vks/*.vk.json
           ./scripts/extract_vks.sh
 
-          if ! diff -q /tmp/vks-current vks > /tmp/vks-diff 2>&1; then
+          # Exclude README.md from the diff; only `.vk.json` artifacts
+          # should be compared.
+          if ! diff -q --exclude='*.md' /tmp/vks-current vks > /tmp/vks-diff 2>&1; then
             {
               echo ""
               echo "### ❌ VK artifact drift detected"

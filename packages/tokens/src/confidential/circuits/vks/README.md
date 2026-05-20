@@ -1,8 +1,13 @@
 # Verification keys
 
-UltraHonk verification keys for the per-operation circuits, one binary file
-per circuit. These are committed artifacts -- the integration contract with
-the verifier (#701).
+UltraHonk verification keys for the per-operation circuits, one JSON file
+per circuit (`<name>.vk.json`). These are committed artifacts -- the
+integration contract with the verifier (#701).
+
+**Format:** each file is a JSON array of hex-encoded `Fr` elements, produced
+by `bb write_vk --output_format fields`. Used instead of bb's raw `bytes`
+format because the latter includes platform-dependent header bytes that
+spuriously break cross-platform reproducibility (macOS vs Linux CI).
 
 Reproducible from the circuit sources with the pinned toolchain:
 
