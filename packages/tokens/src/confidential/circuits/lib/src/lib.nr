@@ -132,11 +132,7 @@ pub fn assert_on_curve(p: EmbeddedCurvePoint) {
     let inf_as_field = p.is_infinite as Field;
 
     // Canonical identity encoding (Section 7.1 point 2): if is_infinite then
-    // x == 0 and y == 0. Without this, a prover could supply
-    // (42, 7, is_infinite=true) and pass the curve check below -- the curve_eq
-    // term gates off (x, y) when is_infinite=1, leaving them unconstrained.
-    // Downstream field-wise comparisons on those coords could then be tricked
-    // into accepting attacker-chosen values.
+    // x == 0 and y == 0.
     assert(inf_as_field * p.x == 0);
     assert(inf_as_field * p.y == 0);
 
