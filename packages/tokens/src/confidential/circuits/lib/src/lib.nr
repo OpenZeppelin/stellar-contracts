@@ -129,10 +129,19 @@ pub fn assert_range_128(x: Field) {
 /// gap in-circuit, on top of the wrapper contract's own validation. Cost: ~3
 /// mul gates per point, negligible vs. one scalar multiplication.
 pub fn assert_on_curve(p: EmbeddedCurvePoint) {
-    // (1 - is_infinite) * (y^2 - x^3 + 17) == 0
-    //   identity branch (is_infinite = 1): constraint becomes 0 == 0, free pass.
-    //   affine branch  (is_infinite = 0): y^2 == x^3 - 17 must hold.
     let inf_as_field = p.is_infinite as Field;
+
+    // Canonical identity encoding (Section 7.1 point 2): if is_infinite then
+    // x == 0 and y == 0. Without this, a prover could supply
+    // (42, 7, is_infinite=true) and pass the curve check below -- the curve_eq
+    // term gates off (x, y) when is_infinite=1, leaving them unconstrained.
+    // Downstream field-wise comparisons on those coords could then be tricked
+    // into accepting attacker-chosen values.
+    assert(inf_as_field * p.x == 0);
+    assert(inf_as_field * p.y == 0);
+
+    // Affine branch (is_infinite = 0): y^2 == x^3 - 17 must hold.
+    // Identity branch (is_infinite = 1): constraint becomes 0 == 0, free pass.
     let curve_eq = p.y * p.y - p.x * p.x * p.x + 17;
     assert((1 - inf_as_field) * curve_eq == 0);
 }
@@ -363,6 +372,16 @@ fn on_curve_accepts_identity_lenient_only() {
 fn on_curve_rejects_off_curve() {
     // (1, 2) is not on Grumpkin: 2^2 = 4, 1^3 - 17 = -16. 4 != -16.
     let bad = EmbeddedCurvePoint { x: 1, y: 2, is_infinite: false };
+    assert_on_curve(bad);
+}
+
+#[test(should_fail)]
+fn on_curve_rejects_non_canonical_identity() {
+    // Identity must be encoded as (0, 0, is_infinite=true). A prover declaring
+    // (42, 7, is_infinite=true) would leave x, y unconstrained without the
+    // canonical-encoding asserts and could later trick field-wise coordinate
+    // comparisons in callers.
+    let bad = EmbeddedCurvePoint { x: 42, y: 7, is_infinite: true };
     assert_on_curve(bad);
 }
 
