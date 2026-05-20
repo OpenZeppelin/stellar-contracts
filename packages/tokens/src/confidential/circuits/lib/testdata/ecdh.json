@@ -1,0 +1,11 @@
+{
+  "primitive": "ecdh",
+  "design_doc_refs": ["Section 2.4"],
+  "description": "ECDH shared-secret x-coordinate: (s*P).x. Vector below pins (r_e * H).x.",
+  "vectors": [
+    {
+      "inputs": { "scalar": "0xfeedface", "point": "H" },
+      "output": "0x114ed4fcf2c57014eb678c577aa02f30ef590b713d7a6a5e87702d1c7f71957f"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+[package]
+name = "stellar_confidential_lib"
+type = "lib"
+authors = ["OpenZeppelin"]
+compiler_version = ">=0.30.0"

@@ -1,0 +1,8 @@
+[package]
+name = "gadget_poseidon_with_domain"
+type = "bin"
+authors = ["OpenZeppelin"]
+compiler_version = ">=0.30.0"
+
+[dependencies]
+stellar_confidential_lib = { path = "../../lib" }

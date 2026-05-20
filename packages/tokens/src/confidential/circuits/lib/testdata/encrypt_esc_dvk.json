@@ -1,0 +1,15 @@
+{
+  "primitive": "encrypt_esc_dvk",
+  "design_doc_refs": ["Section 7.11", "Constraint S12"],
+  "description": "Delegation-key escrow mask: escrowed_dvk = dvk + Poseidon2(ESC_DVK, s, op_i) where s = (r_e * Y_op).x.",
+  "vectors": [
+    {
+      "inputs": {
+        "dvk": "0x1dec1da326d325cf918eed33f097cfb854b41aac8ece9e6e8bd54b7a7c448785",
+        "s": "0x12345",
+        "op_i": "0xabcd"
+      },
+      "output": "0x2468d02775ad21aa5928d049770287249af2a03dbaf4d18e22e3fe71fd292003"
+    }
+  ]
+}

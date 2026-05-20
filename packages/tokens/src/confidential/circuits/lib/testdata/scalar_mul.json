@@ -1,0 +1,14 @@
+{
+  "primitive": "scalar_mul",
+  "design_doc_refs": ["Section 2.4", "Section 4.1", "Section 4.3"],
+  "description": "Scalar multiplication s*P on Grumpkin. Vector below pins Y = sk*H, the spending public key from Section 4.1.",
+  "vectors": [
+    {
+      "inputs": { "scalar": "0xdead", "point": "H" },
+      "output": {
+        "x": "0x1b46b003b88a6c34549dc74115f088f4b231a151397526bc10cbf1d15b457646",
+        "y": "0x29116280600c10ead1fdbd9ab4b571896030679bf554d7f1ebf681e5147de21b"
+      }
+    }
+  ]
+}

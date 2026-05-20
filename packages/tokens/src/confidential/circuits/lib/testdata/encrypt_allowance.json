@@ -1,0 +1,15 @@
+{
+  "primitive": "encrypt_allowance",
+  "design_doc_refs": ["Constraint S8", "Constraint O12"],
+  "description": "Encrypted allowance scalar: a_tilde = v_a + Poseidon2(ENC_ALLOW, dvk, sigma_a).",
+  "vectors": [
+    {
+      "inputs": {
+        "v_a": "0x1f4",
+        "dvk": "0x1dec1da326d325cf918eed33f097cfb854b41aac8ece9e6e8bd54b7a7c448785",
+        "sigma_a": "0x02"
+      },
+      "output": "0x235db43a283e4e000337cdb80a99168ef4b718622cc06de4ab98b3d2bd5736d5"
+    }
+  ]
+}
