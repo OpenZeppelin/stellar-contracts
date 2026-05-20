@@ -126,10 +126,15 @@ use crate::fungible::FungibleToken;
 pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     // ################## CORE TOKEN FUNCTIONS ##################
 
-    /// Forces a transfer of tokens between two whitelisted wallets.
+    /// Forces a transfer of tokens from `from` to `to`.
     /// This function can only be called by the operator with necessary
     /// privileges. RBAC checks are expected to be enforced on the
     /// `operator`.
+    ///
+    /// The `to` address must pass identity verification, but `from` is not
+    /// verified, so this privileged action can still move tokens out of
+    /// accounts whose identity is no longer valid (sanctioned, revoked, or
+    /// compromised wallets).
     ///
     /// # Arguments
     ///
@@ -144,6 +149,8 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// * [`RWAError::InsufficientBalance`] - When the sender has insufficient
     ///   balance.
     /// * [`RWAError::LessThanZero`] - When the amount is negative.
+    /// * [`RWAError::IdentityVerificationFailed`] - When the identity of the
+    ///   `to` address cannot be verified.
     ///
     /// # Events
     ///

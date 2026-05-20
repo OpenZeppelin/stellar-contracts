@@ -164,6 +164,13 @@ impl RWA {
     // ################## CHANGE STATE ##################
 
     /// Forced transfer of `amount` tokens from `from` to `to`.
+    ///
+    /// The `to` address must pass identity verification. `from` is not
+    /// verified, so this privileged action remains usable to pull tokens out
+    /// of accounts whose identity is no longer valid (sanctioned, revoked, or
+    /// compromised wallets). This is also what makes `forced_transfer`
+    /// suitable as the underlying primitive for [`Self::recover_balance`].
+    ///
     /// This function can unfreeze tokens if needed for regulatory compliance.
     /// It bypasses paused state and frozen address checks.
     ///
@@ -178,6 +185,7 @@ impl RWA {
     ///
     /// * [`RWAError::InsufficientBalance`] - When attempting to transfer more
     ///   tokens than available.
+    /// * refer to [`IdentityVerifierClient::verify_identity`] errors.
     /// * refer to [`Base::update`] errors.
     ///
     /// # Events
@@ -200,6 +208,13 @@ impl RWA {
         if from_balance < amount {
             panic_with_error!(e, RWAError::InsufficientBalance);
         }
+
+        // Verify identity for the `to` address only; `from` is intentionally
+        // skipped so this privileged action can still move tokens out of
+        // accounts whose identity is no longer valid.
+        let identity_verifier_addr = Self::identity_verifier(e);
+        let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
+        identity_verifier_client.verify_identity(to);
 
         // Check if we need to unfreeze tokens to complete the transfer
         let free_tokens = Self::get_free_tokens(e, from);
