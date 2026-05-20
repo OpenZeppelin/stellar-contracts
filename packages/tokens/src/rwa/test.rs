@@ -17,7 +17,16 @@ pub struct MockIdentityVerifier;
 
 #[contractimpl]
 impl IdentityVerifier for MockIdentityVerifier {
-    fn verify_identity(e: &Env, _account: &Address) {
+    fn verify_identity(e: &Env, account: &Address) {
+        // Per-address denial: if `id_deny` is set and matches, this address
+        // fails verification while others still pass. Lets tests exercise
+        // the asymmetry between `from` and `to` in privileged operations.
+        if let Some(denied) = e.storage().persistent().get::<_, Address>(&symbol_short!("id_deny"))
+        {
+            if &denied == account {
+                panic_with_error!(e, RWAError::IdentityVerificationFailed)
+            }
+        }
         let result = e.storage().persistent().get(&symbol_short!("id_ok")).unwrap_or(true);
         if !result {
             panic_with_error!(e, RWAError::IdentityVerificationFailed)
@@ -531,6 +540,59 @@ fn forced_transfer_insufficient_balance_fails() {
         // Try to force transfer more than balance - should fail with
         // InsufficientBalance
         RWA::forced_transfer(&e, &from, &to, 100);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #304)")]
+fn forced_transfer_fails_when_to_identity_unverified() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        // Mint while `to` is still verifiable so the mint itself doesn't trip
+        // identity verification.
+        RWA::mint(&e, &from, 100);
+
+        // Now mark `to` as unverified.
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("id_deny"), &to);
+        });
+
+        // forced_transfer must reject when `to` cannot be verified.
+        RWA::forced_transfer(&e, &from, &to, 50);
+    });
+}
+
+#[test]
+fn forced_transfer_succeeds_when_from_identity_unverified() {
+    let e = Env::default();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        let identity_verifier = set_and_return_identity_verifier(&e);
+        let _ = set_and_return_compliance(&e);
+
+        RWA::mint(&e, &from, 100);
+
+        // Revoke `from`'s identity after the mint. forced_transfer must still
+        // succeed because it only verifies `to`; this is what lets it pull
+        // tokens out of sanctioned/compromised wallets and underlies
+        // `recover_balance`.
+        e.as_contract(&identity_verifier, || {
+            e.storage().persistent().set(&symbol_short!("id_deny"), &from);
+        });
+
+        RWA::forced_transfer(&e, &from, &to, 50);
+        assert_eq!(RWA::balance(&e, &from), 50);
+        assert_eq!(RWA::balance(&e, &to), 50);
     });
 }
 
