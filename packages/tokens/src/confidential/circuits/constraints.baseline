@@ -18,12 +18,13 @@
 # Toolchain: nargo 1.0.0-beta.11
 #
 | Package                     | Function                   | Expression Width     | ACIR Opcodes | Brillig Opcodes |
+| gadget_assert_on_curve      | main                       | Bounded { width: 4 } | 2            | 0               |
 | gadget_commit               | decompose_hint             | N/A                  | N/A          | 30              |
 | gadget_commit               | lte_hint                   | N/A                  | N/A          | 33              |
 | gadget_commit               | main                       | Bounded { width: 4 } | 23           | 63              |
 | gadget_ecdh                 | decompose_hint             | N/A                  | N/A          | 30              |
 | gadget_ecdh                 | lte_hint                   | N/A                  | N/A          | 33              |
-| gadget_ecdh                 | main                       | Bounded { width: 4 } | 12           | 63              |
+| gadget_ecdh                 | main                       | Bounded { width: 4 } | 14           | 63              |
 | gadget_encrypt_amount       | main                       | Bounded { width: 4 } | 4            | 0               |
 | gadget_poseidon_with_domain | main                       | Bounded { width: 4 } | 3            | 0               |
 | gadget_range_128            | directive_integer_quotient | N/A                  | N/A          | 8               |

@@ -119,6 +119,34 @@ pub fn assert_range_128(x: Field) {
     assert(x_u128 as Field == x);
 }
 
+/// Asserts `p` lies on Grumpkin (`y^2 = x^3 - 17`), allowing the point at
+/// infinity. Use this on every public-input *commitment* that enters a circuit
+/// (Section 7.1: balance and transfer commitments may equal the identity).
+///
+/// Soundness: the verifier doesn't check point validity on its own -- if an
+/// off-curve `(x, y)` reaches `multi_scalar_mul`, the proof still verifies but
+/// the resulting commitment has no binding guarantee. This helper closes that
+/// gap in-circuit, on top of the wrapper contract's own validation. Cost: ~3
+/// mul gates per point, negligible vs. one scalar multiplication.
+pub fn assert_on_curve(p: EmbeddedCurvePoint) {
+    // (1 - is_infinite) * (y^2 - x^3 + 17) == 0
+    //   identity branch (is_infinite = 1): constraint becomes 0 == 0, free pass.
+    //   affine branch  (is_infinite = 0): y^2 == x^3 - 17 must hold.
+    let inf_as_field = p.is_infinite as Field;
+    let curve_eq = p.y * p.y - p.x * p.x * p.x + 17;
+    assert((1 - inf_as_field) * curve_eq == 0);
+}
+
+/// Asserts `p` is on Grumpkin AND not the identity. Use this for every
+/// public-input *key* (Section 7.1 point 4: `R_e`, `Y`, `PVK`, `K_aud` must all
+/// satisfy `P != O`). The identity element collapses ECDH (`S = O` regardless
+/// of the secret scalar), so accepting it would let an adversary publish a key
+/// for which every shared secret is known.
+pub fn assert_on_curve_non_identity(p: EmbeddedCurvePoint) {
+    assert(!p.is_infinite);
+    assert(p.y * p.y == p.x * p.x * p.x - 17);
+}
+
 // ################## POSEIDON2 FUNNEL ##################
 
 /// Poseidon2 sponge with rate=3, capacity=1, matching Noir stdlib's hasher and
@@ -313,6 +341,43 @@ fn ecdh_symmetric() {
     let s_a_b = ecdh(a, b_pub);
     let s_b_a = ecdh(b, a_pub);
     assert(s_a_b == s_b_a);
+}
+
+#[test]
+fn on_curve_accepts_G_and_H() {
+    // Both generators are valid Grumpkin points (no DL relation).
+    assert_on_curve(G);
+    assert_on_curve(H);
+    assert_on_curve_non_identity(G);
+    assert_on_curve_non_identity(H);
+}
+
+#[test]
+fn on_curve_accepts_identity_lenient_only() {
+    let o = EmbeddedCurvePoint { x: 0, y: 0, is_infinite: true };
+    // Identity is allowed for commitments (e.g. fresh accounts with v=r=0).
+    assert_on_curve(o);
+}
+
+#[test(should_fail)]
+fn on_curve_rejects_off_curve() {
+    // (1, 2) is not on Grumpkin: 2^2 = 4, 1^3 - 17 = -16. 4 != -16.
+    let bad = EmbeddedCurvePoint { x: 1, y: 2, is_infinite: false };
+    assert_on_curve(bad);
+}
+
+#[test(should_fail)]
+fn on_curve_non_identity_rejects_identity() {
+    // Identity must be rejected when the point will be used as a key in ECDH:
+    // S = sk * O = O regardless of sk, collapsing the shared secret.
+    let o = EmbeddedCurvePoint { x: 0, y: 0, is_infinite: true };
+    assert_on_curve_non_identity(o);
+}
+
+#[test(should_fail)]
+fn on_curve_non_identity_rejects_off_curve() {
+    let bad = EmbeddedCurvePoint { x: 7, y: 11, is_infinite: false };
+    assert_on_curve_non_identity(bad);
 }
 
 #[test]
