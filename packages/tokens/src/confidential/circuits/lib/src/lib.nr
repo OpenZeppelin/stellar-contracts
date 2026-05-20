@@ -310,9 +310,9 @@ fn ecdh_symmetric() {
     let b: Field = 67890;
     let a_pub = scalar_mul(a, H);
     let b_pub = scalar_mul(b, H);
-    let s_ab = ecdh(a, b_pub);
-    let s_ba = ecdh(b, a_pub);
-    assert(s_ab == s_ba);
+    let s_a_b = ecdh(a, b_pub);
+    let s_b_a = ecdh(b, a_pub);
+    assert(s_a_b == s_b_a);
 }
 
 #[test]
