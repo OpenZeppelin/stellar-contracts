@@ -131,10 +131,10 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     /// privileges. RBAC checks are expected to be enforced on the
     /// `operator`.
     ///
-    /// The `to` address must pass identity verification, but `from` is not
-    /// verified, so this privileged action can still move tokens out of
-    /// accounts whose identity is no longer valid (sanctioned, revoked, or
-    /// compromised wallets).
+    /// The `to` address must pass identity verification, but  `from` is not
+    /// required to be verified, so this privileged action can still move
+    /// tokens out of accounts whose identity is no longer valid
+    /// (sanctioned, revoked, or compromised wallets).
     ///
     /// # Arguments
     ///

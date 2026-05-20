@@ -165,11 +165,12 @@ impl RWA {
 
     /// Forced transfer of `amount` tokens from `from` to `to`.
     ///
-    /// The `to` address must pass identity verification. `from` is not
-    /// verified, so this privileged action remains usable to pull tokens out
-    /// of accounts whose identity is no longer valid (sanctioned, revoked, or
-    /// compromised wallets). This is also what makes `forced_transfer`
-    /// suitable as the underlying primitive for [`Self::recover_balance`].
+    /// The `to` address must pass identity verification. `from` is not required
+    /// to be verified, so this privileged action remains usable to pull
+    /// tokens out of accounts whose identity is no longer valid
+    /// (sanctioned, revoked, or compromised wallets). This is also what
+    /// makes `forced_transfer` suitable as the underlying primitive for
+    /// [`Self::recover_balance`].
     ///
     /// This function can unfreeze tokens if needed for regulatory compliance.
     /// It bypasses paused state and frozen address checks.
