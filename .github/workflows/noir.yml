@@ -20,9 +20,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Keep CI pinned to the same nargo version contributors run locally. Bump
-  # together with any toolchain change.
+  # Keep CI pinned to the same nargo + bb versions contributors run locally.
+  # Bump together; the VK extraction pipeline (vks/) is byte-sensitive to bb.
   NARGO_VERSION: 1.0.0-beta.11
+  BB_VERSION: 0.87.0
 
 jobs:
   check-test-info:
@@ -50,14 +51,55 @@ jobs:
       - name: Pin nargo version
         run: noirup -v "$NARGO_VERSION"
 
-      - name: nargo --version
-        run: nargo --version
+      - name: Install bbup
+        # bbup is the official Barretenberg installer; lands at ~/.bb/bb.
+        run: |
+          curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/master/barretenberg/bbup/install | bash
+          echo "$HOME/.bb" >> "$GITHUB_PATH"
+        working-directory: ${{ github.workspace }}
+
+      - name: Pin bb version
+        run: bbup -v "$BB_VERSION"
+
+      - name: Tool versions
+        run: |
+          nargo --version
+          bb --version
 
       - name: nargo check
         run: nargo check
 
       - name: nargo test
         run: nargo test
+
+      - name: Diff extracted VKs against committed artifacts
+        # Re-extracts the VK for each per-operation circuit using the pinned
+        # bb version and compares against the committed `vks/*.vk`. Mirrors
+        # the constraint-baseline diff: drift means either the circuit
+        # changed (regenerate and commit in this PR) or the toolchain
+        # drifted (don't regenerate -- investigate).
+        run: |
+          mkdir -p /tmp/vks-current
+          cp vks/*.vk /tmp/vks-current/ 2>/dev/null || true
+          rm -f vks/*.vk
+          ./scripts/extract_vks.sh
+
+          if ! diff -q /tmp/vks-current vks > /tmp/vks-diff 2>&1; then
+            {
+              echo ""
+              echo "### ❌ VK artifact drift detected"
+              echo ""
+              cat /tmp/vks-diff
+              echo ""
+              echo "If this is intentional, regenerate VKs in this PR:"
+              echo ""
+              echo '```'
+              echo "cd packages/tokens/src/confidential/circuits"
+              echo "./scripts/extract_vks.sh"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
 
       - name: Diff nargo info against checked-in baseline
         # Fails the build if the per-primitive constraint counts drift from
