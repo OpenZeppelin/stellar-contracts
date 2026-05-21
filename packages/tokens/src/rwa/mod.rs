@@ -281,8 +281,7 @@ pub trait RWAToken: Pausable + FungibleToken<ContractType = RWA> {
     ///
     /// # Events
     ///
-    /// * topics - `["address_frozen", user_address: Address, is_frozen: bool,
-    ///   operator: Address]`
+    /// * topics - `["address_frozen", user_address: Address, is_frozen: bool]`
     /// * data - `[]`
     ///
     /// # Notes
