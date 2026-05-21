@@ -1,18 +1,26 @@
 # Cross-language test vectors
 
-Each JSON file in this directory pins one primitive's output for a fixed input. These fixtures are the durable contract between the Noir library (this crate) and any language binding that needs to reproduce the wrapper's cryptography.
+## What this is
 
-A consumer in any language is correct *iff* it reproduces every output below byte-for-byte from the same inputs.
+Each JSON file in this directory pins one primitive's output for a fixed input. They are the durable, language-agnostic contract for everything that has to reproduce this library's cryptography off-chain:
 
-## Regenerating
+- the TypeScript SDK that builds proof inputs from wallet state,
+- on-chain Rust integration tests that mirror a primitive to assert end-to-end consistency,
+- any future port (mobile, hardware wallet, indexer).
 
-The fixtures are produced from the Noir lib itself:
+A consumer in any language is correct *iff*, given the inputs documented below, it reproduces every output in every JSON file byte-for-byte.
+
+## How they're produced
+
+Run the `print_fixtures` test inside the Noir library and read its output:
 
 ```bash
 nargo test print_fixtures --package stellar_confidential_lib --show-output
 ```
 
-Capture the printed values into the corresponding `*.json` file (one per primitive). The `fixtures_match_testdata` test in `lib.nr` asserts the lib still produces these exact values; if it fails, either the fixtures were regenerated without updating the test (out-of-sync) or a primitive's semantics changed (breaking the cross-language contract — bump a version).
+That test (in `lib/src/tests.nr`) feeds a fixed input set through every primitive and prints `name = 0x...` for each. The JSON files in this directory mirror those outputs, one file per primitive — they are not generated automatically; if a primitive's behavior is changed, one must (a) re-run `print_fixtures`, (b) update the matching `*.json`, and (c) update the hard-coded expected values inside the `fixtures_match_testdata` test so it stays in lockstep.
+
+`fixtures_match_testdata` is the in-Noir guard: it asserts that every value documented here is still what the lib produces. If one changes a primitive without updating both this directory *and* that test, CI fails. If a primitive is intentionally changed, the cross-language contract is broken — every downstream consumer must be updated and the change should bump a version (see `Cargo.toml` once the SDK lands).
 
 ## Inputs (shared across fixtures)
 

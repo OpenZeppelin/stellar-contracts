@@ -281,6 +281,13 @@ The non-fungible token implementation is designed to be compatible with existing
 
 Token kinds that require zero-knowledge proofs (currently `confidential/`) ship Noir circuits alongside the Soroban contract. Noir is compiled by `nargo`, not `cargo`, and its packages are described by `Nargo.toml`, so the Noir tree forms its own workspace independent of the Cargo workspace — nothing in `Cargo.toml` references it and nothing inside the Noir tree references `Cargo.toml`.
 
+### Noir package model
+
+Noir has two package types, declared by `type =` in each `Nargo.toml`:
+
+- **`lib`** — exports items, has no entry point. Equivalent to a Rust `[lib]`.
+- **`bin`** — defines one circuit via `fn main(...)`. The parameters tagged `pub` are the circuit's public inputs; everything else is a private witness. `nargo compile` emits ACIR for that circuit; `nargo info` reports its constraint cost; `nargo prove` / `nargo verify` operate on it.
+
 ### Layout
 
 Noir artifacts for a token kind live under `packages/tokens/src/<kind>/circuits/`:
@@ -292,10 +299,15 @@ packages/tokens/src/<kind>/circuits/
 │   ├── src/lib.nr
 │   └── testdata/*.json      # cross-language test vectors
 ├── gadgets/<primitive>/     # one tiny `bin` crate per primitive
-│   └── src/main.nr
-└── <operation>/             # full circuits (e.g. register, transfer)
-    └── src/main.nr
+│   └── src/main.nr          # measurement-only: wraps one lib call
+└── <operation>/             # full circuits (planned -- one per proof type,
+    └── src/main.nr          # e.g. register / withdraw / transfer)
 ```
+
+The `main.nr` files in `gadgets/` and `<operation>/` are both Noir circuit entry points, but they serve very different purposes:
+
+- **Gadget `main`s** are measurement-only. Each one wraps a single lib primitive in the smallest circuit that exercises it, so `nargo info` can report per-primitive constraint costs.
+- **Operation `main`s** *are* the production circuits — one per proof type listed in the design doc's §7. They consume on-chain state as public inputs and enforce the constraint set that the wrapper contract relies on.
 
 ### Commands
 
