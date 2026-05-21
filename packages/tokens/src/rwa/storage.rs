@@ -247,6 +247,8 @@ impl RWA {
     ///
     /// # Errors
     ///
+    /// * [`PausableError::EnforcedPause`] - When the contract is paused.
+    /// * [`RWAError::AddressFrozen`] - When the recipient address is frozen.
     /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
     ///   configured.
     /// * [`RWAError::MintNotCompliant`] - When the mint operation violates
@@ -275,6 +277,14 @@ impl RWA {
     /// admin.require_auth();
     /// ```
     pub fn mint(e: &Env, to: &Address, amount: i128) {
+        if paused(e) {
+            panic_with_error!(e, PausableError::EnforcedPause);
+        }
+
+        if Self::is_frozen(e, to) {
+            panic_with_error!(e, RWAError::AddressFrozen);
+        }
+
         let identity_verifier_addr = Self::identity_verifier(e);
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
         identity_verifier_client.verify_identity(to);
