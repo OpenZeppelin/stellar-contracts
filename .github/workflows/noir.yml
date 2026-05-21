@@ -66,9 +66,6 @@ jobs:
           nargo --version
           bb --version
 
-      - name: nargo check
-        run: nargo check
-
       - name: nargo test
         run: nargo test
 
