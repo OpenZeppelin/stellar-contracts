@@ -50,12 +50,6 @@ jobs:
       - name: Pin nargo version
         run: noirup -v "$NARGO_VERSION"
 
-      - name: nargo --version
-        run: nargo --version
-
-      - name: nargo check
-        run: nargo check
-
       - name: nargo test
         run: nargo test
 
