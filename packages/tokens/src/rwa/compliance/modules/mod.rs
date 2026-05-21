@@ -33,11 +33,16 @@ use soroban_sdk::{contracterror, contracttrait, Address, Env, String};
 /// 3. Compliance contract forwards each hook call to all registered modules for
 ///    that hook type.
 ///
+/// ┌─────────────────┐
+/// │  Token Contract │
+/// └────────┬────────┘
+///          │ 1. set_compliance_address()
+///          ▼
 /// ┌──────────────────────────────────────────┐
-/// │ Compliance Contract (bound on the token) │◄──── 1. add_module_to() /
+/// │ Compliance Contract (bound on the token) │◄──── 2. add_module_to() /
 /// │                                          │       remove_module_from()
 /// └──────────┬───────────────────────────────┘
-///            │ 2. On transfer/mint/burn:
+///            │ 3. On transfer/mint/burn:
 ///            │
 ///            │    - transferred() / created() / destroyed()
 ///            │    - can_transfer() / can_create()

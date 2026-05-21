@@ -2,11 +2,11 @@
 //!
 //! Holds the storage-key enum and free functions that back the per-token
 //! compliance and IRS bindings exposed through the
-//! [`crate::rwa::compliance::modules::ComplianceModule`] trait, plus the
+//! [`crate::rwa::compliance::modules::ComplianceModule`] trait, plus
 //! safe-arithmetic and `CountryRelation` utilities reused across module
 //! implementations.
 
-use soroban_sdk::{contracttype, panic_with_error, Address, Env, FromVal, String, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, FromVal, Vec};
 
 use super::{ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD};
 use crate::rwa::identity_registry_storage::{
@@ -187,16 +187,6 @@ pub fn add_i128_or_panic(e: &Env, left: i128, right: i128) -> i128 {
 pub fn sub_i128_or_panic(e: &Env, left: i128, right: i128) -> i128 {
     left.checked_sub(right)
         .unwrap_or_else(|| panic_with_error!(e, ComplianceModuleError::MathUnderflow))
-}
-
-/// Converts a static module-name `&str` into a Soroban [`String`].
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `name` - The static name to convert.
-pub fn module_name(e: &Env, name: &str) -> String {
-    String::from_str(e, name)
 }
 
 fn get_irs_address(e: &Env, token: &Address) -> Address {

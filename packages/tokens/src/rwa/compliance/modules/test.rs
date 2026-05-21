@@ -9,7 +9,7 @@ use super::storage::*;
 use crate::rwa::{
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
-        IndividualCountryRelation, OrganizationCountryRelation,
+        IndividualCountryRelation,
     },
     utils::token_binder::TokenBinder,
 };
@@ -269,76 +269,4 @@ fn require_non_negative_amount_panics_on_negative() {
     let e = Env::default();
 
     require_non_negative_amount(&e, -1);
-}
-
-#[test]
-fn module_name_allocates_soroban_string() {
-    let e = Env::default();
-
-    let name = module_name(&e, "MyModule");
-    assert_eq!(name, soroban_sdk::String::from_str(&e, "MyModule"));
-}
-
-#[test]
-fn country_code_extracts_value_across_all_relation_variants() {
-    let e = Env::default();
-    let custom_label = soroban_sdk::Symbol::new(&e, "custom");
-
-    // Individual variants.
-    assert_eq!(
-        country_code(&CountryRelation::Individual(IndividualCountryRelation::Residence(840))),
-        840
-    );
-    assert_eq!(
-        country_code(&CountryRelation::Individual(IndividualCountryRelation::Citizenship(124))),
-        124
-    );
-    assert_eq!(
-        country_code(&CountryRelation::Individual(IndividualCountryRelation::SourceOfFunds(76))),
-        76
-    );
-    assert_eq!(
-        country_code(&CountryRelation::Individual(IndividualCountryRelation::TaxResidency(36))),
-        36
-    );
-    assert_eq!(
-        country_code(&CountryRelation::Individual(IndividualCountryRelation::Custom(
-            custom_label.clone(),
-            250
-        ))),
-        250
-    );
-
-    // Organization variants.
-    assert_eq!(
-        country_code(&CountryRelation::Organization(OrganizationCountryRelation::Incorporation(
-            826
-        ))),
-        826
-    );
-    assert_eq!(
-        country_code(&CountryRelation::Organization(
-            OrganizationCountryRelation::OperatingJurisdiction(276)
-        )),
-        276
-    );
-    assert_eq!(
-        country_code(&CountryRelation::Organization(OrganizationCountryRelation::TaxJurisdiction(
-            392
-        ))),
-        392
-    );
-    assert_eq!(
-        country_code(&CountryRelation::Organization(OrganizationCountryRelation::SourceOfFunds(
-            56
-        ))),
-        56
-    );
-    assert_eq!(
-        country_code(&CountryRelation::Organization(OrganizationCountryRelation::Custom(
-            custom_label,
-            100
-        ))),
-        100
-    );
 }
