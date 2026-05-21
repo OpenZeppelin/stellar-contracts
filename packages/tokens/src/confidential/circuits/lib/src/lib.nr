@@ -9,15 +9,33 @@
 //! through one of the helpers exported here. Circuits never hash raw --
 //! `poseidon_with_domain` is the only Poseidon entry point.
 //!
-//! ## Curve
+//! ## Background: BN254, Grumpkin, and why this works in-circuit
 //!
-//! Grumpkin `y^2 = x^3 - 17` over `Fr_{BN254}`. Both generators below come
-//! from Barretenberg's standard Pedersen domain ("DEFAULT_DOMAIN_SEPARATOR")
-//! via `std::hash::derive_generators`, so `commit(v, r)` is point-for-point
-//! identical to `std::hash::pedersen_commitment([v, r])`. The numeric values
-//! are extracted via the `print_generators` test (run `nargo test
-//! print_generators --show-output`) so they are reproducible by anyone with
-//! a Noir toolchain -- no off-chain trust required.
+//! An elliptic curve is defined over a *base field* and has a *scalar field*
+//! of the same size as its prime-order subgroup. Noir circuits, when targeting
+//! the Barretenberg backend (UltraHonk), operate natively over the **BN254
+//! scalar field**, written `F_r` (Noir's built-in `Field` type *is* `F_r`).
+//!
+//! **Grumpkin** is a curve specifically constructed so that its *base field*
+//! equals BN254's *scalar field*. That means Grumpkin point coordinates are
+//! `F_r` elements -- the same field the circuit is already working over. So
+//! Grumpkin point arithmetic inside a Noir circuit is native field
+//! arithmetic. This is what makes ! Pedersen commitments and ECDH cheap in
+//! this design.
+//!
+//! Grumpkin's equation is `y^2 = x^3 - 17`. For a longer write-up, see
+//! Aztec's primer:
+//! <https://aztecprotocol.github.io/aztec-connect/primitives.html#2-grumpkin---a-curve-on-top-of-bn-254-for-snark-efficient-group-operations>
+//!
+//! ## Generators
+//!
+//! Both generators below come from Barretenberg's standard Pedersen domain
+//! ("DEFAULT_DOMAIN_SEPARATOR") via `std::hash::derive_generators`, so
+//! `commit(v, r)` is point-for-point identical to
+//! `std::hash::pedersen_commitment([v, r])`. The numeric values are extracted
+//! via the `print_generators` test (run
+//! `nargo test print_generators --show-output`) so they are reproducible by
+//! anyone with a Noir toolchain -- no off-chain trust required.
 
 mod tests;
 
@@ -46,8 +64,9 @@ pub global H: EmbeddedCurvePoint = EmbeddedCurvePoint {
 
 // ################## CONSTANTS ##################
 
-/// Poseidon2 sponge IV multiplier: `iv = (input_length as Field) * 2^64`.
-/// Matches Noir stdlib's `Poseidon2Hasher` and Barretenberg's Poseidon2 sponge.
+/// Poseidon2 sponge Initialization Vector (IV) multiplier:
+/// `iv = (input_length as Field) * 2^64`. Matches Noir stdlib's
+/// `Poseidon2Hasher` and Barretenberg's Poseidon2 sponge.
 global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
 
 /// Domain separation tags (Section 13 of the design document). Module-private --
