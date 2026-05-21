@@ -61,11 +61,6 @@ jobs:
       - name: Pin bb version
         run: bbup -v "$BB_VERSION"
 
-      - name: Tool versions
-        run: |
-          nargo --version
-          bb --version
-
       - name: nargo test
         run: nargo test
 
