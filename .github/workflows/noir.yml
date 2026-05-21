@@ -43,8 +43,17 @@ jobs:
 
       - name: Install noirup
         # noirup is the official installer; it lands at ~/.nargo/bin/nargo.
+        # The install script is pinned to a specific commit (not the moving
+        # `main` branch) and its SHA256 is checked before execution so a
+        # silently rewritten upstream cannot subvert this job. Bump the URL
+        # and the hash together when intentionally tracking new upstream.
+        env:
+          NOIRUP_INSTALL_URL: https://raw.githubusercontent.com/noir-lang/noirup/c3bc9922bf7eeafdaba08fb6518776c4ba263a8c/install
+          NOIRUP_INSTALL_SHA256: 89dde59d8ef9e7794d694abca097fa139fa7395b947cb7b0b7a8d1839c737d8b
         run: |
-          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash
+          curl -fsSL "$NOIRUP_INSTALL_URL" -o /tmp/noirup-install.sh
+          echo "$NOIRUP_INSTALL_SHA256  /tmp/noirup-install.sh" | sha256sum -c -
+          bash /tmp/noirup-install.sh
           echo "$HOME/.nargo/bin" >> "$GITHUB_PATH"
         working-directory: ${{ github.workspace }}
 
@@ -53,8 +62,14 @@ jobs:
 
       - name: Install bbup
         # bbup is the official Barretenberg installer; lands at ~/.bb/bb.
+        # Same pinning + SHA256 verification as noirup above.
+        env:
+          BBUP_INSTALL_URL: https://raw.githubusercontent.com/AztecProtocol/aztec-packages/073ea66ad92c53ebbf7be70d28973a68a8628942/barretenberg/bbup/install
+          BBUP_INSTALL_SHA256: 3e4b7ce2d18e7680b897d23de0328ba6365616b2c7d592a5ebb74a368f364efd
         run: |
-          curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/master/barretenberg/bbup/install | bash
+          curl -fsSL "$BBUP_INSTALL_URL" -o /tmp/bbup-install.sh
+          echo "$BBUP_INSTALL_SHA256  /tmp/bbup-install.sh" | sha256sum -c -
+          bash /tmp/bbup-install.sh
           echo "$HOME/.bb" >> "$GITHUB_PATH"
         working-directory: ${{ github.workspace }}
 
