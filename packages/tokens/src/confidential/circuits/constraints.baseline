@@ -19,8 +19,9 @@
 #
 | Package                     | Function                   | Expression Width     | ACIR Opcodes | Brillig Opcodes |
 | circuit_register            | decompose_hint             | N/A                  | N/A          | 30              |
+| circuit_register            | directive_invert           | N/A                  | N/A          | 9               |
 | circuit_register            | lte_hint                   | N/A                  | N/A          | 33              |
-| circuit_register            | main                       | Bounded { width: 4 } | 33           | 63              |
+| circuit_register            | main                       | Bounded { width: 4 } | 33           | 72              |
 | gadget_assert_on_curve      | main                       | Bounded { width: 4 } | 2            | 0               |
 | gadget_commit               | decompose_hint             | N/A                  | N/A          | 30              |
 | gadget_commit               | lte_hint                   | N/A                  | N/A          | 33              |

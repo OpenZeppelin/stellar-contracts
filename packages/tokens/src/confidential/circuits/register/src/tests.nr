@@ -18,31 +18,39 @@ fn matches_fixture() {
 
 #[test(should_fail)]
 fn rejects_tampered_pvk() {
-    // Perturb PVK.x by +1. The point almost certainly leaves the curve, which
-    // trips assert_on_curve_non_identity first; on the unlikely chance it stays
-    // on-curve, R3 sees PVK != vk*H and fails there. Either way: rejected.
+    // PVK.x +1: R3 sees pvk_derived != (pvk_x, pvk_y).
     main(SK, Y_X, Y_Y, PVK_X + 1, PVK_Y, WRAP);
 }
 
 #[test(should_fail)]
 fn rejects_wrong_wrap() {
-    // Y and PVK are the values that match (sk, wrap=0xbeef). Passing a
-    // different wrap recomputes vk under that wrap; PVK = vk*H then mismatches.
+    // Y / PVK match (sk, wrap=0xbeef). A different wrap recomputes vk under
+    // that wrap; PVK = vk*H then mismatches under R3.
     main(SK, Y_X, Y_Y, PVK_X, PVK_Y, 0xcafe);
 }
 
 #[test(should_fail)]
 fn rejects_off_curve_y() {
-    // (1, 2) fails Grumpkin's y^2 = x^3 - 17: 4 != 1 - 17 = -16.
+    // (1, 2) is off-curve. R1 fails because scalar_mul(sk, H) yields an
+    // on-curve point that cannot equal (1, 2).
     main(SK, 1, 2, PVK_X, PVK_Y, WRAP);
 }
 
 #[test(should_fail)]
 fn rejects_identity_y() {
-    // Encoding Y as (0, 0) -- the canonical identity -- with is_infinite=false
-    // (which is what the public-input wiring forces) fails the on-curve check:
-    // 0 != 0 - 17. Documents that the identity cannot slip through as a key.
+    // Y = (0, 0) is the identity encoding. To pass R1, sk*H would have to
+    // equal (0, 0), which means sk = 0 -- but R4 rules that out before R1
+    // can see it. Either way: rejected.
     main(SK, 0, 0, PVK_X, PVK_Y, WRAP);
+}
+
+#[test(should_fail)]
+fn rejects_sk_zero() {
+    // sk = 0 is the exact attack R4 closes: without it the prover could
+    // publish Y = O and collapse every ECDH involving the spending key.
+    // Y / PVK are fixture values that would otherwise be rejected here
+    // because they don't derive from sk = 0 -- R4 fires first.
+    main(0, Y_X, Y_Y, PVK_X, PVK_Y, WRAP);
 }
 
 #[test]
