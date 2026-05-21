@@ -176,17 +176,17 @@ fn domain_separation_distinct() {
     // Touches every domain tag at least once.
     let a: Field = 42;
     let b: Field = 99;
-    let h_vk = poseidon_with_domain(domain::VK, [a, b]);
-    let h_dvk = poseidon_with_domain(domain::DVK, [a, b]);
-    let h_sr = poseidon_with_domain(domain::SPEND_R, [a, b]);
-    let h_tb = poseidon_with_domain(domain::TX_BLIND, [a, b]);
+    let h_vk = poseidon_with_domain(domain::VIEWING_KEY, [a, b]);
+    let h_dvk = poseidon_with_domain(domain::DELEGATION_VIEWING_KEY, [a, b]);
+    let h_sr = poseidon_with_domain(domain::SPEND_RANDOMNESS, [a, b]);
+    let h_tb = poseidon_with_domain(domain::TX_BLINDING, [a, b]);
     let h_ta = poseidon_with_domain(domain::TX_AMOUNT, [a, b]);
-    let h_eb = poseidon_with_domain(domain::ENC_BAL, [a, b]);
-    let h_ea = poseidon_with_domain(domain::ENC_ALLOW, [a, b]);
-    let h_ar = poseidon_with_domain(domain::ALLOW_R, [a, b]);
-    let h_ed = poseidon_with_domain(domain::ESC_DVK, [a, b]);
-    let h_at = poseidon_with_domain(domain::AUD_TX, [a, b]);
-    let h_ab = poseidon_with_domain(domain::AUD_BAL, [a, b]);
+    let h_eb = poseidon_with_domain(domain::ENCRYPTED_BALANCE, [a, b]);
+    let h_ea = poseidon_with_domain(domain::ENCRYPTED_ALLOWANCE, [a, b]);
+    let h_ar = poseidon_with_domain(domain::ALLOWANCE_RANDOMNESS, [a, b]);
+    let h_ed = poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [a, b]);
+    let h_at = poseidon_with_domain(domain::AUDITOR_TX, [a, b]);
+    let h_ab = poseidon_with_domain(domain::AUDITOR_BALANCE, [a, b]);
 
     // Distinct from VK.
     assert(h_vk != h_dvk);
@@ -215,23 +215,23 @@ fn encrypt_decrypt_round_trip() {
     assert(v_tilde - mask_tx == v);
 
     let b_tilde = encrypt_balance(v, s, sigma);
-    let mask_bal = poseidon_with_domain(domain::ENC_BAL, [s, sigma]);
+    let mask_bal = poseidon_with_domain(domain::ENCRYPTED_BALANCE, [s, sigma]);
     assert(b_tilde - mask_bal == v);
 
     let a_tilde = encrypt_allowance(v, s, sigma);
-    let mask_allow = poseidon_with_domain(domain::ENC_ALLOW, [s, sigma]);
+    let mask_allow = poseidon_with_domain(domain::ENCRYPTED_ALLOWANCE, [s, sigma]);
     assert(a_tilde - mask_allow == v);
 
     let v_tilde_aud = encrypt_auditor_tx(v, s, sigma);
-    let mask_aud_tx = poseidon_with_domain(domain::AUD_TX, [s, sigma]);
+    let mask_aud_tx = poseidon_with_domain(domain::AUDITOR_TX, [s, sigma]);
     assert(v_tilde_aud - mask_aud_tx == v);
 
     let b_tilde_aud = encrypt_auditor_bal(v, s, sigma);
-    let mask_aud_bal = poseidon_with_domain(domain::AUD_BAL, [s, sigma]);
+    let mask_aud_bal = poseidon_with_domain(domain::AUDITOR_BALANCE, [s, sigma]);
     assert(b_tilde_aud - mask_aud_bal == v);
 
     let dvk_escrowed = encrypt_esc_dvk(v, s, sigma);
-    let mask_esc = poseidon_with_domain(domain::ESC_DVK, [s, sigma]);
+    let mask_esc = poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, sigma]);
     assert(dvk_escrowed - mask_esc == v);
 }
 
@@ -324,7 +324,7 @@ fn print_fixtures() {
     println(f"encrypt_esc_dvk = {esc}");
 
     // poseidon_with_domain(VK, [sk, wrap]) -- direct funnel access, equals vk_from_sk
-    let pwd = poseidon_with_domain(domain::VK, [sk, wrap]);
+    let pwd = poseidon_with_domain(domain::VIEWING_KEY, [sk, wrap]);
     println(f"poseidon_with_domain_VK_2 = {pwd}");
 }
 
@@ -408,7 +408,7 @@ fn fixtures_match_testdata() {
     );
 
     // poseidon_with_domain funnel is the same operation that backs vk_from_sk.
-    assert(poseidon_with_domain(domain::VK, [sk, wrap]) == vk);
+    assert(poseidon_with_domain(domain::VIEWING_KEY, [sk, wrap]) == vk);
 }
 
 #[test]

@@ -69,42 +69,65 @@ pub global H: EmbeddedCurvePoint = EmbeddedCurvePoint {
 /// `Poseidon2Hasher` and Barretenberg's Poseidon2 sponge.
 global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
 
-/// Domain separation tags (Section 13 of the design document). Module-private --
-/// callers reach them through the typed `poseidon_with_domain` helpers below.
+/// Domain separation tags (Section 13 of the design document). The integer
+/// values are the cross-language contract -- they appear as the first absorbed
+/// element in every Poseidon2 call and the SDK must use the exact same numbers.
+/// The names spell out what the design doc abbreviates; the table below maps
+/// design-doc notation to the constant defined here.
+///
+/// | Design doc        | Value | Constant                          |
+/// |:------------------|:------|:----------------------------------|
+/// | `delta_vk`        | 1     | `VIEWING_KEY`                     |
+/// | `delta_dvk`       | 2     | `DELEGATION_VIEWING_KEY`          |
+/// | `delta_spend_r`   | 3     | `SPEND_RANDOMNESS`                |
+/// | `delta_tx_blind`  | 4     | `TX_BLINDING`                     |
+/// | `delta_tx_amount` | 5     | `TX_AMOUNT`                       |
+/// | `delta_enc_bal`   | 6     | `ENCRYPTED_BALANCE`               |
+/// | `delta_enc_allow` | 7     | `ENCRYPTED_ALLOWANCE`             |
+/// | `delta_allow_r`   | 8     | `ALLOWANCE_RANDOMNESS`            |
+/// | `delta_esc_dvk`   | 9     | `ESCROWED_DELEGATION_VIEWING_KEY` |
+/// | `delta_aud_tx`    | 10    | `AUDITOR_TX`                      |
+/// | `delta_aud_bal`   | 11    | `AUDITOR_BALANCE`                 |
 mod domain {
-    /// Viewing-key derivation. `vk = Poseidon2(VK, sk, wrap)` -- Section 4.2.
-    pub(crate) global VK: Field = 1;
-    /// Delegation viewing-key derivation. `dvk = Poseidon2(DVK, vk, op_i)` -- Section 4.4.
-    pub(crate) global DVK: Field = 2;
-    /// Deterministic randomness for the spendable balance.
-    /// `r' = Poseidon2(SPEND_R, vk, sigma)` -- constraints W5/T10/S9/V6.
-    pub(crate) global SPEND_R: Field = 3;
-    /// ECDH-derived blinding for the transfer commitment.
-    /// `r_tx = Poseidon2(TX_BLIND, s, sigma)` -- constraints T7/O7.
-    pub(crate) global TX_BLIND: Field = 4;
-    /// ECDH-derived mask for the encrypted transfer amount.
-    /// `v_tilde = v_tx + Poseidon2(TX_AMOUNT, s, sigma)` -- constraints T9/O9.
+    /// Viewing-key derivation: `vk = Poseidon2(VIEWING_KEY, sk, wrap)`.
+    /// Section 4.2 (`delta_vk`).
+    pub(crate) global VIEWING_KEY: Field = 1;
+    /// Delegation viewing-key derivation:
+    /// `dvk = Poseidon2(DELEGATION_VIEWING_KEY, vk, op_i)`. Section 4.4 (`delta_dvk`).
+    pub(crate) global DELEGATION_VIEWING_KEY: Field = 2;
+    /// Deterministic randomness for the new spendable balance:
+    /// `r' = Poseidon2(SPEND_RANDOMNESS, vk, sigma)`. Constraints W5/T10/S9/V6 (`delta_spend_r`).
+    pub(crate) global SPEND_RANDOMNESS: Field = 3;
+    /// ECDH-derived blinding for the transfer commitment:
+    /// `r_tx = Poseidon2(TX_BLINDING, s, sigma)`. Constraints T7/O7 (`delta_tx_blind`).
+    pub(crate) global TX_BLINDING: Field = 4;
+    /// Mask for the encrypted transfer amount:
+    /// `v_tilde = v_tx + Poseidon2(TX_AMOUNT, s, sigma)`. Constraints T9/O9 (`delta_tx_amount`).
     pub(crate) global TX_AMOUNT: Field = 5;
-    /// Mask for the encrypted balance scalar.
-    /// `b_tilde = v_new + Poseidon2(ENC_BAL, vk, sigma)` -- constraints W7/T12/S11/V8.
-    pub(crate) global ENC_BAL: Field = 6;
-    /// Mask for the encrypted allowance scalar.
-    /// `a_tilde = v_a + Poseidon2(ENC_ALLOW, dvk, sigma_a)` -- constraints S8/O12.
-    pub(crate) global ENC_ALLOW: Field = 7;
-    /// Deterministic randomness for the operator allowance.
-    /// `r_a = Poseidon2(ALLOW_R, dvk, sigma_a)` -- constraints S6/O3/O10.
-    pub(crate) global ALLOW_R: Field = 8;
-    /// Delegation-key escrow (operator ECDH).
-    /// `Poseidon2(ESC_DVK, s, op_i)` -- constraint S12 (Section 7.11).
-    pub(crate) global ESC_DVK: Field = 9;
-    /// Auditor mask for transfer amount.
-    /// `v_tilde_aud = v_tx + Poseidon2(AUD_TX, s_a, sigma)` -- constraints
-    /// T_a2 / T_a4 / O_a2 / O_a4 / S_a3 / V_a3.
-    pub(crate) global AUD_TX: Field = 10;
-    /// Auditor mask for balance/allowance checkpoint.
-    /// `b_tilde_aud = v_new + Poseidon2(AUD_BAL, s_a, sigma)` -- constraints
-    /// W_a3 / T_a5 / S_a4 / V_a4 / O_a5.
-    pub(crate) global AUD_BAL: Field = 11;
+    /// Mask for the encrypted balance scalar:
+    /// `b_tilde = v_new + Poseidon2(ENCRYPTED_BALANCE, vk, sigma)`.
+    /// Constraints W7/T12/S11/V8 (`delta_enc_bal`).
+    pub(crate) global ENCRYPTED_BALANCE: Field = 6;
+    /// Mask for the encrypted allowance scalar:
+    /// `a_tilde = v_a + Poseidon2(ENCRYPTED_ALLOWANCE, dvk, sigma_a)`.
+    /// Constraints S8/O12 (`delta_enc_allow`).
+    pub(crate) global ENCRYPTED_ALLOWANCE: Field = 7;
+    /// Deterministic randomness for the operator allowance:
+    /// `r_a = Poseidon2(ALLOWANCE_RANDOMNESS, dvk, sigma_a)`.
+    /// Constraints S6/O3/O10 (`delta_allow_r`).
+    pub(crate) global ALLOWANCE_RANDOMNESS: Field = 8;
+    /// Delegation-key escrow mask (operator ECDH):
+    /// `Poseidon2(ESCROWED_DELEGATION_VIEWING_KEY, s, op_i)`.
+    /// Constraint S12, Section 7.11 (`delta_esc_dvk`).
+    pub(crate) global ESCROWED_DELEGATION_VIEWING_KEY: Field = 9;
+    /// Auditor mask for transfer amount:
+    /// `v_tilde_aud = v_tx + Poseidon2(AUDITOR_TX, s_a, sigma)`.
+    /// Constraints T_a2 / T_a4 / O_a2 / O_a4 / S_a3 / V_a3 (`delta_aud_tx`).
+    pub(crate) global AUDITOR_TX: Field = 10;
+    /// Auditor mask for balance / allowance checkpoint:
+    /// `b_tilde_aud = v_new + Poseidon2(AUDITOR_BALANCE, s_a, sigma)`.
+    /// Constraints W_a3 / T_a5 / S_a4 / V_a4 / O_a5 (`delta_aud_bal`).
+    pub(crate) global AUDITOR_BALANCE: Field = 11;
 }
 
 // ################## CORE PRIMITIVES ##################
@@ -224,7 +247,7 @@ pub fn poseidon_with_domain<let N: u32>(d: Field, inputs: [Field; N]) -> Field {
 /// -- to a specific deployed wrapper. Dropping `wrap` here would let a proof for
 /// one wrapper verify against another's verifier.
 pub fn vk_from_sk(sk: Field, wrap: Field) -> Field {
-    poseidon_with_domain(domain::VK, [sk, wrap])
+    poseidon_with_domain(domain::VIEWING_KEY, [sk, wrap])
 }
 
 /// Public viewing key `PVK = vk*H`. Section 4.3. The recipient's ECDH long-term key
@@ -235,25 +258,25 @@ pub fn pvk_from_vk(vk: Field) -> EmbeddedCurvePoint {
 
 /// Delegation viewing key. Section 4.4. `dvk_i = Poseidon2(DVK, vk, op_i)`.
 pub fn dvk_from_vk_op(vk: Field, op_i: Field) -> Field {
-    poseidon_with_domain(domain::DVK, [vk, op_i])
+    poseidon_with_domain(domain::DELEGATION_VIEWING_KEY, [vk, op_i])
 }
 
 /// Deterministic randomness for the new spendable balance after an
 /// owner-initiated proof operation. Constraints W5 / T10 / S9 / V6.
 pub fn derive_spend_r(vk: Field, sigma: Field) -> Field {
-    poseidon_with_domain(domain::SPEND_R, [vk, sigma])
+    poseidon_with_domain(domain::SPEND_RANDOMNESS, [vk, sigma])
 }
 
 /// Deterministic randomness for the operator allowance commitment.
 /// Constraints S6 / O3 / O10.
 pub fn derive_allow_r(dvk: Field, sigma_a: Field) -> Field {
-    poseidon_with_domain(domain::ALLOW_R, [dvk, sigma_a])
+    poseidon_with_domain(domain::ALLOWANCE_RANDOMNESS, [dvk, sigma_a])
 }
 
 /// ECDH-derived blinding for the transfer commitment `C_tx`.
 /// Constraints T7 / O7. `s` is the recipient-ECDH shared secret x-coordinate.
 pub fn derive_tx_blind(s: Field, sigma: Field) -> Field {
-    poseidon_with_domain(domain::TX_BLIND, [s, sigma])
+    poseidon_with_domain(domain::TX_BLINDING, [s, sigma])
 }
 
 // ################## ENCRYPTED SCALARS ##################
@@ -267,31 +290,31 @@ pub fn encrypt_amount(v_tx: Field, s: Field, sigma: Field) -> Field {
 /// Encrypts the new spendable balance under the owner's viewing key.
 /// Constraints W7 / T12 / S11 / V8. `b_tilde = v_new + Poseidon2(ENC_BAL, vk, sigma)`.
 pub fn encrypt_balance(v_new: Field, vk: Field, sigma: Field) -> Field {
-    v_new + poseidon_with_domain(domain::ENC_BAL, [vk, sigma])
+    v_new + poseidon_with_domain(domain::ENCRYPTED_BALANCE, [vk, sigma])
 }
 
 /// Encrypts the operator allowance under the delegation viewing key.
 /// Constraints S8 / O12. `a_tilde = v_a + Poseidon2(ENC_ALLOW, dvk, sigma_a)`.
 pub fn encrypt_allowance(v_a: Field, dvk: Field, sigma_a: Field) -> Field {
-    v_a + poseidon_with_domain(domain::ENC_ALLOW, [dvk, sigma_a])
+    v_a + poseidon_with_domain(domain::ENCRYPTED_ALLOWANCE, [dvk, sigma_a])
 }
 
 /// Encrypts the transfer amount under an auditor's ECDH shared secret.
 /// Constraints T_a2 / T_a4 / O_a2 / O_a4 / S_a3 / V_a3.
 /// `v_tilde_aud = v_tx + Poseidon2(AUD_TX, s_a, sigma)`.
 pub fn encrypt_auditor_tx(v_tx: Field, s_a: Field, sigma: Field) -> Field {
-    v_tx + poseidon_with_domain(domain::AUD_TX, [s_a, sigma])
+    v_tx + poseidon_with_domain(domain::AUDITOR_TX, [s_a, sigma])
 }
 
 /// Encrypts the post-operation balance (or allowance) under an auditor's ECDH
 /// shared secret. Constraints W_a3 / T_a5 / S_a4 / V_a4 / O_a5.
 /// `b_tilde_aud = v_new + Poseidon2(AUD_BAL, s_a, sigma)`.
 pub fn encrypt_auditor_bal(v_new: Field, s_a: Field, sigma: Field) -> Field {
-    v_new + poseidon_with_domain(domain::AUD_BAL, [s_a, sigma])
+    v_new + poseidon_with_domain(domain::AUDITOR_BALANCE, [s_a, sigma])
 }
 
 /// Delegation-key escrow mask for the operator handoff at `set_operator`. Section 7.11.
 /// `escrowed_dvk = dvk + Poseidon2(ESC_DVK, s, op_i)` where `s = (r_e * Y_op).x`.
 pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
-    dvk + poseidon_with_domain(domain::ESC_DVK, [s, op_i])
+    dvk + poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, op_i])
 }
