@@ -255,6 +255,40 @@ fn mint_fails_when_identity_verification_fails() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #1000)")]
+fn mint_fails_when_contract_paused() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        pausable::pause(&e);
+
+        RWA::mint(&e, &to, 100);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #302)")]
+fn mint_fails_when_recipient_address_frozen() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let to = Address::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        RWA::set_address_frozen(&e, &to, true);
+
+        RWA::mint(&e, &to, 100);
+    });
+}
+
+#[test]
 fn burn_tokens() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
