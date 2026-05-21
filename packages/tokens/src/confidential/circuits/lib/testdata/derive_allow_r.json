@@ -1,0 +1,14 @@
+{
+  "primitive": "derive_allow_r",
+  "design_doc_refs": ["Constraint S6", "Constraint O3", "Constraint O10"],
+  "description": "Deterministic randomness for the operator allowance: r_a = Poseidon2(ALLOW_R, dvk, sigma_a).",
+  "vectors": [
+    {
+      "inputs": {
+        "dvk": "0x1dec1da326d325cf918eed33f097cfb854b41aac8ece9e6e8bd54b7a7c448785",
+        "sigma_a": "0x02"
+      },
+      "output": "0x199b47ff8b24b165411fa44b06d541b9d1b74d0d202fd651712e24c11e05cb35"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "primitive": "derive_spend_r",
+  "design_doc_refs": ["Constraint W5", "Constraint T10", "Constraint S9", "Constraint V6"],
+  "description": "Deterministic randomness for the new spendable balance: r' = Poseidon2(SPEND_R, vk, sigma).",
+  "vectors": [
+    {
+      "inputs": {
+        "vk": "0x0ac6ade91aea36f4de35eb5a06a67e1b9c3dab9842479f1cce85caf826194ec2",
+        "sigma": "0x01"
+      },
+      "output": "0x1b9d813c7c14c78969edb37cce24f3bb867f6e64efe73d950cfbbe8ed4c31482"
+    }
+  ]
+}

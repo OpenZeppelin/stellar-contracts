@@ -1,0 +1,14 @@
+{
+  "primitive": "commit",
+  "design_doc_refs": ["Section 2.3"],
+  "description": "Pedersen commitment v*G + r*H on Grumpkin.",
+  "vectors": [
+    {
+      "inputs": { "value": "0x3e8", "randomness": "0x2a" },
+      "output": {
+        "x": "0x195a5d8ecd032fe1696054b28f0852b5f03a613681991ace823245ab2f97ed05",
+        "y": "0x0e67489ecfee0e581dce7db22a383c635886cfb616c3b3bb033bff0c46e9789e"
+      }
+    }
+  ]
+}

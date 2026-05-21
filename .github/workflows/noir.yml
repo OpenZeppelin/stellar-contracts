@@ -1,0 +1,95 @@
+name: "noir workflow"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/tokens/src/confidential/circuits/**"
+      - ".github/workflows/noir.yml"
+  pull_request:
+    paths:
+      - "packages/tokens/src/confidential/circuits/**"
+      - ".github/workflows/noir.yml"
+  workflow_dispatch:
+
+# Same concurrency policy as the Rust workflow: cancel in-flight runs for a PR
+# branch when a new commit lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep CI pinned to the same nargo version contributors run locally. Bump
+  # together with any toolchain change.
+  NARGO_VERSION: 1.0.0-beta.11
+
+jobs:
+  check-test-info:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/tokens/src/confidential/circuits
+
+    steps:
+      - name: git checkout
+        uses: actions/checkout@v4
+        with:
+          # This job only reads source files -- no push, no API calls. Drop
+          # the persisted GITHUB_TOKEN so a compromised dependency in any
+          # subsequent step can't exfiltrate it.
+          persist-credentials: false
+
+      - name: Install noirup
+        # noirup is the official installer; it lands at ~/.nargo/bin/nargo.
+        run: |
+          curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash
+          echo "$HOME/.nargo/bin" >> "$GITHUB_PATH"
+        working-directory: ${{ github.workspace }}
+
+      - name: Pin nargo version
+        run: noirup -v "$NARGO_VERSION"
+
+      - name: nargo test
+        run: nargo test
+
+      - name: Diff nargo info against checked-in baseline
+        # Fails the build if the per-primitive constraint counts drift from
+        # `constraints.baseline`. When the lib genuinely changes, regenerate
+        # the baseline in the same PR (the failure message tells reviewers
+        # how) so the delta is visible side-by-side in the diff.
+        #
+        # LC_ALL=C is load-bearing -- it makes `sort` use byte order, which
+        # is the only ordering stable across macOS (where contributors
+        # regenerate the baseline) and Ubuntu (CI).
+        env:
+          LC_ALL: C
+        run: |
+          nargo info | grep '^|' | sort > /tmp/nargo-info.current
+          grep -v '^#' constraints.baseline | sed '/^[[:space:]]*$/d' > /tmp/nargo-info.baseline
+
+          {
+            echo "## Noir constraint baseline"
+            echo ""
+            echo '```'
+            cat /tmp/nargo-info.current
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if ! diff -u /tmp/nargo-info.baseline /tmp/nargo-info.current; then
+            {
+              echo ""
+              echo "### ❌ Baseline drift detected"
+              echo ""
+              echo "The current \`nargo info\` output differs from \`constraints.baseline\`."
+              echo "If this is intentional, regenerate the baseline in this PR:"
+              echo ""
+              echo '```'
+              echo "cd packages/tokens/src/confidential/circuits"
+              echo "LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline"
+              echo '```'
+              echo ""
+              echo "(Leave the header comments in \`constraints.baseline\` intact.)"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi

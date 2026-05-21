@@ -1,0 +1,3 @@
+# Per-package build output and auto-generated prover input templates.
+target/
+Prover.toml

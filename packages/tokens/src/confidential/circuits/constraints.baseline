@@ -1,0 +1,33 @@
+# Noir constraint baseline (DO NOT EDIT BY HAND)
+#
+# Normalized output of `nargo info` for the confidential token Noir crate.
+# Regenerate with:
+#
+#   cd packages/tokens/src/confidential/circuits
+#   LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline
+#
+# LC_ALL=C is mandatory -- it makes `sort` use byte order, which is the
+# only ordering that's stable across macOS (en_US locale) and the Ubuntu
+# CI runner (C locale).
+#
+# CI diffs the current normalized `nargo info` against this file and
+# fails on any change. Bumping constraint counts is expected when the
+# lib changes -- regenerate this file in the same PR and reviewers
+# will see the delta side-by-side.
+#
+# Toolchain: nargo 1.0.0-beta.11
+#
+| Package                     | Function                   | Expression Width     | ACIR Opcodes | Brillig Opcodes |
+| gadget_assert_on_curve      | main                       | Bounded { width: 4 } | 2            | 0               |
+| gadget_commit               | decompose_hint             | N/A                  | N/A          | 30              |
+| gadget_commit               | lte_hint                   | N/A                  | N/A          | 33              |
+| gadget_commit               | main                       | Bounded { width: 4 } | 23           | 63              |
+| gadget_ecdh                 | decompose_hint             | N/A                  | N/A          | 30              |
+| gadget_ecdh                 | lte_hint                   | N/A                  | N/A          | 33              |
+| gadget_ecdh                 | main                       | Bounded { width: 4 } | 14           | 63              |
+| gadget_encrypt_amount       | main                       | Bounded { width: 4 } | 4            | 0               |
+| gadget_poseidon_with_domain | main                       | Bounded { width: 4 } | 3            | 0               |
+| gadget_range_128            | directive_integer_quotient | N/A                  | N/A          | 8               |
+| gadget_range_128            | directive_invert           | N/A                  | N/A          | 9               |
+| gadget_range_128            | main                       | Bounded { width: 4 } | 14           | 17              |
+| gadget_vk_from_sk           | main                       | Bounded { width: 4 } | 4            | 0               |

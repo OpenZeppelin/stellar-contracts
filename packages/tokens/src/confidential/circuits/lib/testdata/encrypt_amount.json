@@ -1,0 +1,11 @@
+{
+  "primitive": "encrypt_amount",
+  "design_doc_refs": ["Constraint T9", "Constraint O9"],
+  "description": "Encrypted transfer amount: v_tilde = v_tx + Poseidon2(TX_AMOUNT, s, sigma).",
+  "vectors": [
+    {
+      "inputs": { "v_tx": "0x64", "s": "0x12345", "sigma": "0x01" },
+      "output": "0x274c4f45d57544efca9f6f505e6b29ae098f1d30243de28f7cef62d05484c8a1"
+    }
+  ]
+}

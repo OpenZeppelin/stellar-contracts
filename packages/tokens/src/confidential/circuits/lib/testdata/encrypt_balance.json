@@ -1,0 +1,15 @@
+{
+  "primitive": "encrypt_balance",
+  "design_doc_refs": ["Constraint W7", "Constraint T12", "Constraint S11", "Constraint V8"],
+  "description": "Encrypted balance scalar: b_tilde = v_new + Poseidon2(ENC_BAL, vk, sigma).",
+  "vectors": [
+    {
+      "inputs": {
+        "v_new": "0x3e8",
+        "vk": "0x0ac6ade91aea36f4de35eb5a06a67e1b9c3dab9842479f1cce85caf826194ec2",
+        "sigma": "0x01"
+      },
+      "output": "0x2b7f92c72c05ae8ecf7207fdaecea32ef748cd4dd43ca9ed6dc6d226865b43af"
+    }
+  ]
+}
