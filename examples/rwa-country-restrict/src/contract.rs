@@ -3,7 +3,7 @@ use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::only_admin;
 use stellar_tokens::rwa::compliance::modules::{
     country_restrict::{storage as country_restrict, CountryRestrict},
-    storage::{self as compliance_storage, module_name, set_irs_address},
+    storage::{self as compliance_storage, set_irs_address},
     ComplianceModule,
 };
 
@@ -71,7 +71,7 @@ impl ComplianceModule for CountryRestrictContract {
     }
 
     fn name(e: &Env) -> String {
-        module_name(e, "CountryRestrictModule")
+        String::from_str(e, "Country Restriction Module")
     }
 
     #[only_admin]

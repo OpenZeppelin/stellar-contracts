@@ -9,7 +9,7 @@ use super::storage::*;
 use crate::rwa::{
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
-        IndividualCountryRelation, OrganizationCountryRelation,
+        IndividualCountryRelation,
     },
     utils::token_binder::TokenBinder,
 };
