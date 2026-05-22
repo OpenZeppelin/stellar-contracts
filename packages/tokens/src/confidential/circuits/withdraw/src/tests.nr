@@ -219,15 +219,18 @@ fn rejects_under_funded_withdrawal() {
 fn rejects_v_out_of_range() {
     // 2^127 is exactly the boundary W4 rules out (Section 2.6 / 3.4 -- SEP-41
     // i128 non-negative range is [0, 2^127), so 2^127 is the smallest value
-    // that must fail).
+    // that must fail). C_spend must be recomputed against v_huge so W3
+    // passes and W4 is the load-bearing assertion; downstream constraints
+    // (W6/W7/W_a4) are never reached.
     let v_huge: Field = 0x80000000000000000000000000000000;
+    let c_spend = commit(v_huge, R);
     main(
         SK,
         v_huge,
         R,
         R_E,
-        C_SPEND_X,
-        C_SPEND_Y,
+        c_spend.x,
+        c_spend.y,
         Y_X,
         Y_Y,
         WRAP,
