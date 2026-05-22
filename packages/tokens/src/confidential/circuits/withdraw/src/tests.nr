@@ -1,13 +1,18 @@
 use crate::main;
-use stellar_confidential_lib::{commit, derive_spend_r, encrypt_balance, H, scalar_mul, vk_from_sk};
+use stellar_confidential_lib::{
+    commit, derive_spend_r, ecdh, encrypt_auditor_sender_balance, encrypt_balance, H, scalar_mul,
+    vk_from_sk,
+};
+use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 // Canonical fixture inputs.
 //
 // SK / WRAP / SIGMA / V / R reuse the lib's pinned vectors (lib/testdata)
 // so that Y, C_spend, vk, r_new, and b_tilde are derivable from -- and
-// pinned by -- the lib's `fixtures_match_testdata` test. A is chosen to
-// be strictly less than V so the happy path exercises a non-trivial
-// `v_new = v - a` while still satisfying W4.
+// pinned by -- the lib's `fixtures_match_testdata` test. A is chosen
+// strictly less than V so the happy path exercises a non-trivial
+// `v_new = v - a` while still satisfying W4. R_E and K_AUD_S are local
+// to this circuit (no auditor-side primitives in lib's fixtures).
 global SK: Field = 0xdead;
 global WRAP: Field = 0xbeef;
 global SIGMA: Field = 0x01;
@@ -15,6 +20,12 @@ global V: Field = 1000;
 global R: Field = 42;
 global A: Field = 300;
 global V_NEW: Field = 700;
+global R_E: Field = 0xfeedface;
+
+// K_aud_s = `sk_aud * H` for a placeholder auditor secret 0xc0ffee. Any
+// non-identity Grumpkin point would do; reusing scalar_mul on a constant
+// scalar keeps the value derivable from lib primitives.
+global K_AUD_S_SCALAR: Field = 0xc0ffee;
 
 // Y = sk*H (= lib `scalar_mul_Y` fixture).
 global Y_X: Field = 0x1b46b003b88a6c34549dc74115f088f4b231a151397526bc10cbf1d15b457646;
@@ -36,29 +47,51 @@ global C_SPEND_NEW_Y: Field =
 global B_TILDE: Field =
     0x2b7f92c72c05ae8ecf7207fdaecea32ef748cd4dd43ca9ed6dc6d226865b4283;
 
+// Auditor-block fixtures. Pinned by `withdraw_auditor_fixtures_match_lib`.
+// R_E_X (= (R_E * H).x) matches the lib's `ecdh` fixture (`ecdh(r_e, H)` for
+// the same r_e), pinning the cross-circuit relationship between R_e and the
+// lib's scalar-mul output.
+global K_AUD_S_X: Field =
+    0x22502c7b20b64aeaaaa4d4fa5f2f8600f9734e828f7284a8d1431da36b33803a;
+global K_AUD_S_Y: Field =
+    0x0419089353d24334f03f4a1c9c9b19282e32f6879c5c69b9cdffba6a13a7c5ed;
+global R_E_X: Field = 0x114ed4fcf2c57014eb678c577aa02f30ef590b713d7a6a5e87702d1c7f71957f;
+global R_E_Y: Field = 0x07a70cf826350d4f438c7a3c5e8761b0ae6cb63de757f0c96815f4057b9205f4;
+global B_TILDE_AUD_S: Field =
+    0x216ab12ea2182712721d79c9a9222a261452ab06a90309e23efaa6ecb0e20714;
+
 #[test]
 fn print_fixtures() {
-    // One-shot harness: prints C_spend', b_tilde for the chosen (SK, WRAP,
-    // SIGMA, V, R, A) tuple. Run with
+    // One-shot harness: prints C_spend', b_tilde, K_aud_s, R_e, b_tilde_aud_s
+    // for the chosen fixture tuple. Run with
     // `nargo test --package circuit_withdraw print_fixtures --show-output`
-    // and paste the values into the C_SPEND_NEW_* / B_TILDE globals above.
+    // and paste the values into the globals above.
     let vk = vk_from_sk(SK, WRAP);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(V_NEW, r_new);
     let b_tilde = encrypt_balance(V_NEW, vk, SIGMA);
+    let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
+    let r_e_pt = scalar_mul(R_E, H);
+    let s_a_s_x = ecdh(R_E, k_aud_s);
+    let b_tilde_aud_s = encrypt_auditor_sender_balance(V_NEW, s_a_s_x, SIGMA);
     let cx = c_new.x;
     let cy = c_new.y;
+    let kx = k_aud_s.x;
+    let ky = k_aud_s.y;
+    let rx = r_e_pt.x;
+    let ry = r_e_pt.y;
     println(f"C_SPEND_NEW_X = {cx}");
     println(f"C_SPEND_NEW_Y = {cy}");
     println(f"B_TILDE = {b_tilde}");
+    println(f"K_AUD_S_X = {kx}");
+    println(f"K_AUD_S_Y = {ky}");
+    println(f"R_E_X = {rx}");
+    println(f"R_E_Y = {ry}");
+    println(f"B_TILDE_AUD_S = {b_tilde_aud_s}");
 }
 
 #[test]
 fn withdraw_fixtures_match_lib() {
-    // Cross-check the hard-coded fixture values against the lib's
-    // primitives. If a lib primitive's output changes the fixture
-    // assertions break here -- which is exactly when the rest of the
-    // withdraw tests would silently start using stale public inputs.
     let vk = vk_from_sk(SK, WRAP);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(V_NEW, r_new);
@@ -76,228 +109,450 @@ fn withdraw_fixtures_match_lib() {
 }
 
 #[test]
+fn withdraw_auditor_fixtures_match_lib() {
+    let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
+    let r_e_pt = scalar_mul(R_E, H);
+    let s_a_s_x = ecdh(R_E, k_aud_s);
+    let b_tilde_aud_s = encrypt_auditor_sender_balance(V_NEW, s_a_s_x, SIGMA);
+    assert(k_aud_s.x == K_AUD_S_X);
+    assert(k_aud_s.y == K_AUD_S_Y);
+    assert(r_e_pt.x == R_E_X);
+    assert(r_e_pt.y == R_E_Y);
+    assert(b_tilde_aud_s == B_TILDE_AUD_S);
+}
+
+#[test]
 fn matches_fixture() {
     main(
         SK,
         V,
         R,
+        R_E,
         C_SPEND_X,
         C_SPEND_Y,
         Y_X,
         Y_Y,
         WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
         A,
         C_SPEND_NEW_X,
         C_SPEND_NEW_Y,
         SIGMA,
         B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
     );
 }
 
 #[test]
 fn full_withdrawal() {
-    // Boundary: a = v, so v_new = 0. C_spend' commits to (0, r_new) which
-    // is a valid commitment to zero (and is non-identity because r_new is
-    // a Poseidon output, vanishingly unlikely to equal 0). W6 binds it.
+    // Boundary: a = v, so v_new = 0. C_spend' commits to (0, r_new) which is
+    // a valid commitment to zero. b_tilde and b_tilde_aud_s both bind to 0
+    // (plus mask) so the auditor sees the post-withdrawal balance reach zero.
     let vk = vk_from_sk(SK, WRAP);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(0, r_new);
     let b_tilde = encrypt_balance(0, vk, SIGMA);
+    let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
+    let s_a_s_x = ecdh(R_E, k_aud_s);
+    let b_tilde_aud_s = encrypt_auditor_sender_balance(0, s_a_s_x, SIGMA);
     main(
         SK,
         V,
         R,
+        R_E,
         C_SPEND_X,
         C_SPEND_Y,
         Y_X,
         Y_Y,
         WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
         V,
         c_new.x,
         c_new.y,
         SIGMA,
         b_tilde,
+        R_E_X,
+        R_E_Y,
+        b_tilde_aud_s,
     );
 }
 
 #[test(should_fail)]
 fn rejects_under_funded_withdrawal() {
-    // a > v: v - a underflows in the field to a value >= 2^128. W4's
-    // range check on v_new fires before any downstream constraint, so
-    // this is exactly the under-funded-withdraw soundness gap closed.
+    // a > v: v - a underflows in the field to a value >= 2^128. W4 fires.
     let a_too_large: Field = V + 1;
-    // C_spend_new is whatever the (necessarily wrong) prover supplies;
-    // W6 would also fail, but W4 should fail first. Pick C_spend_new for
-    // some valid v_new derivation just to keep the test focused on W4.
     let vk = vk_from_sk(SK, WRAP);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new_invalid = commit(V - a_too_large, r_new);
     let b_tilde_invalid = encrypt_balance(V - a_too_large, vk, SIGMA);
+    let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
+    let s_a_s_x = ecdh(R_E, k_aud_s);
+    let b_tilde_aud_s_invalid = encrypt_auditor_sender_balance(V - a_too_large, s_a_s_x, SIGMA);
     main(
         SK,
         V,
         R,
+        R_E,
         C_SPEND_X,
         C_SPEND_Y,
         Y_X,
         Y_Y,
         WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
         a_too_large,
         c_new_invalid.x,
         c_new_invalid.y,
         SIGMA,
         b_tilde_invalid,
+        R_E_X,
+        R_E_Y,
+        b_tilde_aud_s_invalid,
     );
 }
 
 #[test(should_fail)]
 fn rejects_v_out_of_range() {
-    // v claimed by the prover is >= 2^128: W4 rejects on the v check
-    // before W3 even looks at C_spend.
     let v_huge: Field = 0x100000000000000000000000000000000; // 2^128
     main(
         SK,
         v_huge,
         R,
+        R_E,
         C_SPEND_X,
         C_SPEND_Y,
         Y_X,
         Y_Y,
         WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
         A,
         C_SPEND_NEW_X,
         C_SPEND_NEW_Y,
         SIGMA,
         B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
     );
 }
 
 #[test(should_fail)]
 fn rejects_a_out_of_range() {
-    // a >= 2^128: W4's range check on a fails. (The wrapper's a >= 0
-    // entrypoint check is out-of-scope for the circuit; here we only
-    // close the upper bound.)
     let a_huge: Field = 0x100000000000000000000000000000000;
     main(
         SK,
         V,
         R,
+        R_E,
         C_SPEND_X,
         C_SPEND_Y,
         Y_X,
         Y_Y,
         WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
         a_huge,
         C_SPEND_NEW_X,
         C_SPEND_NEW_Y,
         SIGMA,
         B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
     );
 }
 
 #[test(should_fail)]
 fn rejects_wrong_sk() {
-    // sk does not derive the claimed Y: W1 fails.
     main(
         SK + 1,
         V,
         R,
+        R_E,
         C_SPEND_X,
         C_SPEND_Y,
         Y_X,
         Y_Y,
         WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
         A,
         C_SPEND_NEW_X,
         C_SPEND_NEW_Y,
         SIGMA,
         B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
     );
 }
 
 #[test(should_fail)]
 fn rejects_wrong_balance_opening() {
-    // (v, r) supplied don't open C_spend: W3 fails. Use a v that still
-    // passes the W4 range check so the failure is squarely W3.
     main(
         SK,
         V + 1,
         R,
+        R_E,
         C_SPEND_X,
         C_SPEND_Y,
         Y_X,
         Y_Y,
         WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
         A,
         C_SPEND_NEW_X,
         C_SPEND_NEW_Y,
         SIGMA,
         B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
     );
 }
 
 #[test(should_fail)]
 fn rejects_wrong_wrap() {
-    // wrap != WRAP under which Y was derived. vk recomputes under the
-    // new wrap, the new vk produces a different r_new (W5) and a
-    // different b_tilde (W7). W6 / W7 fire. (W1 still passes because Y
-    // is the prover-claimed Y and sk*H is recomputed against it without
-    // using wrap.)
     main(
         SK,
         V,
         R,
+        R_E,
         C_SPEND_X,
         C_SPEND_Y,
         Y_X,
         Y_Y,
         0xcafe,
+        K_AUD_S_X,
+        K_AUD_S_Y,
         A,
         C_SPEND_NEW_X,
         C_SPEND_NEW_Y,
         SIGMA,
         B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
     );
 }
 
 #[test(should_fail)]
 fn rejects_tampered_b_tilde() {
-    // b_tilde mutated by +1: W7 fails because encrypt_balance derives a
-    // specific scalar that no longer matches.
     main(
         SK,
         V,
         R,
+        R_E,
         C_SPEND_X,
         C_SPEND_Y,
         Y_X,
         Y_Y,
         WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
         A,
         C_SPEND_NEW_X,
         C_SPEND_NEW_Y,
         SIGMA,
         B_TILDE + 1,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
     );
 }
 
 #[test(should_fail)]
 fn rejects_tampered_c_spend_new() {
-    // C_spend' supplied with wrong x: W6 fails because the prover's
-    // claim no longer matches the in-circuit (v - a)*G + r'*H.
     main(
         SK,
         V,
         R,
+        R_E,
         C_SPEND_X,
         C_SPEND_Y,
         Y_X,
         Y_Y,
         WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
         A,
         C_SPEND_NEW_X + 1,
         C_SPEND_NEW_Y,
         SIGMA,
         B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
+    );
+}
+
+#[test(should_fail)]
+fn rejects_r_e_zero() {
+    // W_a5 fires: r_e = 0 would force R_e = O (identity) and collapse
+    // S_a,s to O, making m_b a knowable constant function of sigma.
+    main(
+        SK,
+        V,
+        R,
+        0,
+        C_SPEND_X,
+        C_SPEND_Y,
+        Y_X,
+        Y_Y,
+        WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        A,
+        C_SPEND_NEW_X,
+        C_SPEND_NEW_Y,
+        SIGMA,
+        B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
+    );
+}
+
+#[test(should_fail)]
+fn rejects_wrong_r_e() {
+    // r_e mismatches the public R_e: W_a1 fails because scalar_mul(r_e, H)
+    // no longer equals the claimed (R_e_x, R_e_y).
+    main(
+        SK,
+        V,
+        R,
+        R_E + 1,
+        C_SPEND_X,
+        C_SPEND_Y,
+        Y_X,
+        Y_Y,
+        WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        A,
+        C_SPEND_NEW_X,
+        C_SPEND_NEW_Y,
+        SIGMA,
+        B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
+    );
+}
+
+#[test(should_fail)]
+fn rejects_off_curve_k_aud_s() {
+    // (1, 2) is off-curve: 4 != 1 - 17. The on-curve check in main()
+    // fires before W_a2 ever consumes K_aud_s.
+    main(
+        SK,
+        V,
+        R,
+        R_E,
+        C_SPEND_X,
+        C_SPEND_Y,
+        Y_X,
+        Y_Y,
+        WRAP,
+        1,
+        2,
+        A,
+        C_SPEND_NEW_X,
+        C_SPEND_NEW_Y,
+        SIGMA,
+        B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
+    );
+}
+
+#[test(should_fail)]
+fn rejects_identity_k_aud_s() {
+    // K_aud_s = identity collapses ECDH (S = r_e * O = O), so the on-curve
+    // check explicitly rejects the identity for keys.
+    main(
+        SK,
+        V,
+        R,
+        R_E,
+        C_SPEND_X,
+        C_SPEND_Y,
+        Y_X,
+        Y_Y,
+        WRAP,
+        0,
+        0,
+        A,
+        C_SPEND_NEW_X,
+        C_SPEND_NEW_Y,
+        SIGMA,
+        B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
+    );
+}
+
+#[test(should_fail)]
+fn rejects_tampered_b_tilde_aud_s() {
+    // b_tilde_aud_s mutated by +1: W_a3+W_a4 fail because
+    // encrypt_auditor_sender_balance derives a specific scalar that no
+    // longer matches the prover's claim. Closes the
+    // tampered-ciphertext criterion in the issue.
+    main(
+        SK,
+        V,
+        R,
+        R_E,
+        C_SPEND_X,
+        C_SPEND_Y,
+        Y_X,
+        Y_Y,
+        WRAP,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        A,
+        C_SPEND_NEW_X,
+        C_SPEND_NEW_Y,
+        SIGMA,
+        B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S + 1,
+    );
+}
+
+#[test(should_fail)]
+fn rejects_wrong_k_aud_s() {
+    // K_aud_s replaced by a *valid* but different on-curve key (Y_X, Y_Y is
+    // sk*H from the fixtures, definitely on-curve and non-identity). The
+    // shared secret changes, m_b changes, W_a4 fails.
+    main(
+        SK,
+        V,
+        R,
+        R_E,
+        C_SPEND_X,
+        C_SPEND_Y,
+        Y_X,
+        Y_Y,
+        WRAP,
+        Y_X,
+        Y_Y,
+        A,
+        C_SPEND_NEW_X,
+        C_SPEND_NEW_Y,
+        SIGMA,
+        B_TILDE,
+        R_E_X,
+        R_E_Y,
+        B_TILDE_AUD_S,
     );
 }

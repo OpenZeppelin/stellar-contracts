@@ -337,3 +337,15 @@ pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
     let state = poseidon2_permutation([d, s_x, sigma, iv], 4);
     [state[0], state[1]]
 }
+
+/// Sender-auditor encrypted balance/allowance checkpoint for circuits whose
+/// auditor block emits a single ciphertext (Withdraw W_a3/W_a4, RevokeOperator
+/// V_a3/V_a5, SetOperator S_a3/S_a5).
+///
+/// `b_tilde_aud_s = v_new + SpongeSqueeze_1(AUDITOR_SENDER, s_a_s_x, sigma)`.
+/// The two-squeeze sender-channel form (Transfer T_a6-T_a8, OperatorTransfer
+/// O_a6-O_a8) is a different composition that callers spell out directly with
+/// `sponge_squeeze_2`.
+pub fn encrypt_auditor_sender_balance(v_new: Field, s_a_s_x: Field, sigma: Field) -> Field {
+    v_new + sponge_squeeze_1(domain::AUDITOR_SENDER, s_a_s_x, sigma)
+}

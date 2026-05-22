@@ -26,7 +26,7 @@
 | circuit_withdraw            | directive_integer_quotient | N/A                  | N/A          | 8               |
 | circuit_withdraw            | directive_invert           | N/A                  | N/A          | 9               |
 | circuit_withdraw            | lte_hint                   | N/A                  | N/A          | 33              |
-| circuit_withdraw            | main                       | Bounded { width: 4 } | 109          | 80              |
+| circuit_withdraw            | main                       | Bounded { width: 4 } | 130          | 80              |
 | gadget_assert_on_curve      | main                       | Bounded { width: 4 } | 2            | 0               |
 | gadget_commit               | decompose_hint             | N/A                  | N/A          | 30              |
 | gadget_commit               | lte_hint                   | N/A                  | N/A          | 33              |

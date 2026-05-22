@@ -1,8 +1,8 @@
 use crate::{
     assert_on_curve, assert_on_curve_non_identity, assert_range_128, commit, derive_allow_r,
     derive_spend_r, derive_tx_blind, domain, dvk_from_vk_op, ecdh, encrypt_allowance,
-    encrypt_amount, encrypt_balance, encrypt_esc_dvk, G, H, poseidon_with_domain, pvk_from_vk,
-    scalar_mul, sponge_squeeze_1, sponge_squeeze_2, vk_from_sk,
+    encrypt_amount, encrypt_auditor_sender_balance, encrypt_balance, encrypt_esc_dvk, G, H,
+    poseidon_with_domain, pvk_from_vk, scalar_mul, sponge_squeeze_1, sponge_squeeze_2, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 use std::hash::{derive_generators, pedersen_commitment};
@@ -230,6 +230,10 @@ fn encrypt_decrypt_round_trip() {
     let dvk_escrowed = encrypt_esc_dvk(v, s, sigma);
     let mask_esc = poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, sigma]);
     assert(dvk_escrowed - mask_esc == v);
+
+    let b_tilde_aud_s = encrypt_auditor_sender_balance(v, s, sigma);
+    let mask_aud_s = sponge_squeeze_1(domain::AUDITOR_SENDER, s, sigma);
+    assert(b_tilde_aud_s - mask_aud_s == v);
 }
 
 #[test]
@@ -368,6 +372,10 @@ fn print_fixtures() {
     let ss1_s = sponge_squeeze_1(domain::AUDITOR_SENDER, s_ecdh, sigma);
     println(f"sponge_squeeze_1_AUDITOR_SENDER = {ss1_s}");
 
+    // encrypt_auditor_sender_balance(v, s, sigma)
+    let b_aud_s = encrypt_auditor_sender_balance(v, s_ecdh, sigma);
+    println(f"encrypt_auditor_sender_balance = {b_aud_s}");
+
     // sponge_squeeze_2(AUDITOR_SENDER, s, sigma) -- (amount, balance) masks
     let ss2_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_ecdh, sigma);
     let ss2_s0 = ss2_s[0];
@@ -463,6 +471,13 @@ fn fixtures_match_testdata() {
     assert(
         sponge_squeeze_1(domain::AUDITOR_SENDER, s_ecdh, sigma)
             == SPONGE_SQUEEZE_1_AUDITOR_SENDER,
+    );
+    // encrypt_auditor_sender_balance is the canonical composition:
+    // v + SpongeSqueeze_1(AUDITOR_SENDER, ...) -- pin so the lib helper and
+    // its raw sponge cousin can't drift apart.
+    assert(
+        encrypt_auditor_sender_balance(v, s_ecdh, sigma)
+            == v + SPONGE_SQUEEZE_1_AUDITOR_SENDER,
     );
     let ss2_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_ecdh, sigma);
     assert(ss2_s[0] == SPONGE_SQUEEZE_2_AUDITOR_SENDER_0);
