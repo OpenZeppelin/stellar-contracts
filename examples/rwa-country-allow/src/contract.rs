@@ -71,7 +71,7 @@ impl ComplianceModule for CountryAllowContract {
     }
 
     fn name(e: &Env) -> String {
-        String::from_str(e, "Country Allow Module")
+        String::from_str(e, "CountryAllowModule")
     }
 
     #[only_admin]
