@@ -67,16 +67,29 @@ use soroban_sdk::{contracterror, contracttrait, Address, Env, String};
 ///
 /// # Security Note
 ///
-/// State-mutating hooks, (potentially[`ComplianceModule::on_transfer`],
+/// State-mutating hooks (potentially [`ComplianceModule::on_transfer`],
 /// [`ComplianceModule::on_created`], [`ComplianceModule::on_destroyed`])
 /// must authenticate their caller. Hook arguments — including `token` —
 /// are forgeable: any contract can call these methods directly with
-/// arbitrary values, and Soroban provides no built-in caller-identity
-/// primitive beyond `require_auth()`. Soroban's invoker auth is also
-/// single-level — the token contract that triggered the operation is not
-/// the direct caller of the module hook, so `token.require_auth()` does
-/// not work; the dispatcher (Compliance Contract that is bound to the token)
-/// is the direct caller.
+/// arbitrary values. Soroban's invoker auth is single-level by default —
+/// the token contract that triggered the operation is not the direct
+/// caller of the module hook, so `token.require_auth()` does not succeed
+/// out of the box; the dispatcher (the compliance contract bound to the
+/// token) is the direct caller.
+///
+/// There is a primitive that can extend a contract's auth deeper into
+/// the call tree:`Env::authorize_as_current_contract`. With it, the
+/// token could pre-authorize the specific module hook invocation so that
+/// `token.require_auth()` succeeds inside the module. We deliberately do
+/// not use this pattern in the library: it requires the token contract to
+/// know every registered module's address, function signature, and exact
+/// argument values, and to re-emit that auth tree on every transfer, mint,
+/// and burn. Adding or changing a module would then require redeploying
+/// every bound token. The per-token `(token → dispatcher)` binding below
+/// keeps the token ignorant of the module layer at the cost of one
+/// persistent storage entry per (module, token) pair, which we consider
+/// the better trade-off for a modular compliance system. Implementors are
+/// of course free to choose differently for their own deployments.
 ///
 /// The canonical pattern is to record a per-token mapping of authorized
 /// dispatcher addresses (via
@@ -242,14 +255,18 @@ pub trait ComplianceModule {
     /// * `token` - The token whose dispatcher binding is being configured.
     /// * `compliance` - The dispatcher address that should be authorized to
     ///   call this module's hooks for `token`.
+    /// * `operator` - The address authorizing the invocation. Carried as a
+    ///   parameter so the implementor can express access-control policies
+    ///   (admin-only, role-based, multi-sig, etc.) without changing the trait
+    ///   shape.
     ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Access control should
-    /// be enforced before calling [`storage::set_compliance_address`] for
-    /// the implementation.
-    fn set_compliance_address(e: &Env, token: Address, compliance: Address);
+    /// operation that requires custom access control. The implementor should
+    /// enforce auth on `operator` (e.g. with `#[only_admin]`) before
+    /// delegating to [`storage::set_compliance_address`].
+    fn set_compliance_address(e: &Env, token: Address, compliance: Address, operator: Address);
 }
 
 // ################## ERRORS ##################

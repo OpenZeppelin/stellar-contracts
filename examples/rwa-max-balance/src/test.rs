@@ -183,7 +183,7 @@ fn set_and_get_compliance_address_round_trip() {
     let compliance = Address::generate(&e);
     let client = create_client(&e, &admin);
 
-    client.set_compliance_address(&token, &compliance);
+    client.set_compliance_address(&token, &compliance, &admin);
 
     assert_eq!(client.get_compliance_address(&token), compliance);
 }
@@ -197,7 +197,7 @@ fn set_compliance_address_requires_admin_auth() {
     let compliance = Address::generate(&e);
     let client = create_client(&e, &admin);
 
-    client.set_compliance_address(&token, &compliance);
+    client.set_compliance_address(&token, &compliance, &admin);
 
     let auths = e.auths();
     assert_eq!(auths.len(), 1);
@@ -280,7 +280,7 @@ fn on_created_and_on_destroyed_track_aggregate_supply() {
 
     irs.set_identity(&wallet, &identity);
 
-    client.set_compliance_address(&token, &compliance);
+    client.set_compliance_address(&token, &compliance, &admin);
     client.set_identity_registry_storage(&token, &irs_id);
     client.set_max_balance(&token, &100_i128);
 

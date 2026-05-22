@@ -43,7 +43,7 @@ fn set_and_get_compliance_address_round_trip() {
     let compliance = Address::generate(&e);
     let client = create_client(&e, &admin);
 
-    client.set_compliance_address(&token, &compliance);
+    client.set_compliance_address(&token, &compliance, &admin);
 
     assert_eq!(client.get_compliance_address(&token), compliance);
 }
@@ -57,7 +57,7 @@ fn set_compliance_address_requires_admin_auth() {
     let compliance = Address::generate(&e);
     let client = create_client(&e, &admin);
 
-    client.set_compliance_address(&token, &compliance);
+    client.set_compliance_address(&token, &compliance, &admin);
 
     let auths = e.auths();
     assert_eq!(auths.len(), 1);
@@ -91,7 +91,7 @@ fn can_create_reflects_running_supply() {
     let to = Address::generate(&e);
     let client = create_client(&e, &admin);
 
-    client.set_compliance_address(&token, &compliance);
+    client.set_compliance_address(&token, &compliance, &admin);
     client.set_supply_limit(&token, &100_i128);
 
     assert!(client.can_create(&to, &100_i128, &token));
@@ -125,7 +125,7 @@ fn on_created_and_on_destroyed_track_supply() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin);
 
-    client.set_compliance_address(&token, &compliance);
+    client.set_compliance_address(&token, &compliance, &admin);
     client.set_supply_limit(&token, &200_i128);
 
     client.on_created(&to, &120_i128, &token);
@@ -146,7 +146,7 @@ fn on_created_panics_when_exceeding_limit() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin);
 
-    client.set_compliance_address(&token, &compliance);
+    client.set_compliance_address(&token, &compliance, &admin);
     client.set_supply_limit(&token, &50_i128);
 
     client.on_created(&to, &51_i128, &token);
