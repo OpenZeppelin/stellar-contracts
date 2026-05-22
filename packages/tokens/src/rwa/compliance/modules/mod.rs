@@ -1,6 +1,9 @@
 use soroban_sdk::{contracterror, contracttrait, Address, Env, String};
 
+pub mod initial_lockup_period;
 pub mod storage;
+pub mod time_transfers_limits;
+pub mod transfer_restrict;
 
 #[cfg(test)]
 mod test;
@@ -53,7 +56,7 @@ mod test;
 ///     after the token action
 ///   - CanTransfer/CanCreate: Validation hooks called before the token action
 ///
-/// # Security Note
+/// # Security Warning
 ///
 /// If a hook modifies state, it should typically only be called by the
 /// compliance contract. `set_compliance_address` and `get_compliance_address`
@@ -79,7 +82,7 @@ pub trait ComplianceModule {
     /// * `amount` - The amount of tokens transferred.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
-    /// # Security Note
+    /// # Security Warning
     ///
     /// If this function modifies state, it should be called only by the
     /// compliance contract. To enforce this, add the following at the start of
@@ -104,7 +107,7 @@ pub trait ComplianceModule {
     /// * `amount` - The amount of tokens created.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
-    /// # Security Note
+    /// # Security Warning
     ///
     /// If this function modifies state, it should be called only by the
     /// compliance contract. To enforce this, add the following at the start of
@@ -129,7 +132,7 @@ pub trait ComplianceModule {
     /// * `amount` - The amount of tokens destroyed.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
-    /// # Security Note
+    /// # Security Warning
     ///
     /// If this function modifies state, it should be called only by the
     /// compliance contract. To enforce this, add the following at the start of
@@ -211,7 +214,7 @@ pub trait ComplianceModule {
 
 /// Error codes shared by all compliance modules.
 ///
-/// Compliance module errors occupy the 390–400 range, following the RWA
+/// Compliance module errors occupy the 390–406 range, following the RWA
 /// error numbering convention.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -239,6 +242,14 @@ pub enum ComplianceModuleError {
     ComplianceAlreadySet = 399,
     /// A token has reached the maximum number of configured limit entries.
     TooManyLimits = 400,
+    /// Required hook wiring has not been verified before use.
+    HooksNotVerified = 403,
+    /// Locked token state is inconsistent with the mirrored balance.
+    LockupExceedsBalance = 404,
+    /// A transfer or burn would consume more unlocked balance than available.
+    InsufficientUnlockedBalance = 405,
+    /// A configured time-window limit has an invalid duration.
+    InvalidLimitTime = 406,
 }
 
 // ################## CONSTANTS ##################
