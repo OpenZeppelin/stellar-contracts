@@ -1,29 +1,14 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
+use stellar_macros::only_admin;
 use stellar_tokens::rwa::compliance::modules::{
-    storage::{
-        get_compliance_address, module_name, set_compliance_address, ComplianceModuleStorageKey,
-    },
+    storage::{self as compliance_storage},
     supply_limit::{storage as supply_limit, SupplyLimit},
     ComplianceModule,
 };
 
 #[contract]
 pub struct SupplyLimitContract;
-
-fn get_admin(e: &Env) -> Address {
-    access_control::get_admin(e).expect("admin is set in the constructor")
-}
-
-fn require_module_admin_or_compliance_auth(e: &Env) {
-    if let Some(compliance) =
-        e.storage().instance().get::<_, Address>(&ComplianceModuleStorageKey::Compliance)
-    {
-        compliance.require_auth();
-    } else {
-        get_admin(e).require_auth();
-    }
-}
 
 #[contractimpl]
 impl SupplyLimitContract {
@@ -37,23 +22,25 @@ impl AccessControl for SupplyLimitContract {}
 
 #[contractimpl(contracttrait)]
 impl SupplyLimit for SupplyLimitContract {
+    #[only_admin]
     fn set_supply_limit(e: &Env, token: Address, limit: i128) {
-        require_module_admin_or_compliance_auth(e);
         supply_limit::set_supply_limit(e, &token, limit);
     }
 }
 
 #[contractimpl(contracttrait)]
 impl ComplianceModule for SupplyLimitContract {
+    // Transfers do not affect the tracked supply; no auth or bookkeeping
+    // needed.
     fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
 
     fn on_created(e: &Env, to: Address, amount: i128, token: Address) {
-        get_compliance_address(e).require_auth();
+        compliance_storage::get_compliance_address(e, &token).require_auth();
         supply_limit::on_created(e, &to, amount, &token);
     }
 
     fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address) {
-        get_compliance_address(e).require_auth();
+        compliance_storage::get_compliance_address(e, &token).require_auth();
         supply_limit::on_destroyed(e, &from, amount, &token);
     }
 
@@ -66,15 +53,11 @@ impl ComplianceModule for SupplyLimitContract {
     }
 
     fn name(e: &Env) -> String {
-        module_name(e, "SupplyLimitModule")
+        String::from_str(e, "SupplyLimitModule")
     }
 
-    fn get_compliance_address(e: &Env) -> Address {
-        get_compliance_address(e)
-    }
-
-    fn set_compliance_address(e: &Env, compliance: Address) {
-        get_admin(e).require_auth();
-        set_compliance_address(e, &compliance);
+    #[only_admin]
+    fn set_compliance_address(e: &Env, token: Address, compliance: Address) {
+        compliance_storage::set_compliance_address(e, &token, &compliance);
     }
 }

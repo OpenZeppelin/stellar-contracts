@@ -121,7 +121,7 @@ fn on_created_panics_when_exceeding_limit() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #393)")]
+#[should_panic(expected = "Error(Contract, #392)")]
 fn on_destroyed_panics_on_underflow() {
     let e = Env::default();
     let module_id = e.register(TestSupplyLimitContract, ());
@@ -134,7 +134,7 @@ fn on_destroyed_panics_on_underflow() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #391)")]
+#[should_panic(expected = "Error(Contract, #390)")]
 fn set_supply_limit_panics_on_negative_value() {
     let e = Env::default();
     let module_id = e.register(TestSupplyLimitContract, ());
@@ -146,7 +146,7 @@ fn set_supply_limit_panics_on_negative_value() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #391)")]
+#[should_panic(expected = "Error(Contract, #390)")]
 fn can_create_panics_on_negative_amount() {
     let e = Env::default();
     let module_id = e.register(TestSupplyLimitContract, ());

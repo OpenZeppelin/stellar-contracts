@@ -9,8 +9,8 @@ use soroban_sdk::{
 use crate::rwa::{
     compliance::modules::{
         country_restrict::storage::{
-            add_country_restriction, can_receive, is_country_restricted, remove_country_restriction,
-            set_country_restricted,
+            add_country_restriction, can_receive, is_country_restricted,
+            remove_country_restriction, set_country_restricted,
         },
         storage::set_irs_address,
     },

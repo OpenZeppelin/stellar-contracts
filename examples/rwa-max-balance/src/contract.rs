@@ -1,30 +1,14 @@
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
+use stellar_macros::only_admin;
 use stellar_tokens::rwa::compliance::modules::{
     max_balance::{storage as max_balance, MaxBalance},
-    storage::{
-        get_compliance_address, module_name, set_compliance_address, set_irs_address,
-        ComplianceModuleStorageKey,
-    },
+    storage::{self as compliance_storage, set_irs_address},
     ComplianceModule,
 };
 
 #[contract]
 pub struct MaxBalanceContract;
-
-fn get_admin(e: &Env) -> Address {
-    access_control::get_admin(e).expect("admin is set in the constructor")
-}
-
-fn require_module_admin_or_compliance_auth(e: &Env) {
-    if let Some(compliance) =
-        e.storage().instance().get::<_, Address>(&ComplianceModuleStorageKey::Compliance)
-    {
-        compliance.require_auth();
-    } else {
-        get_admin(e).require_auth();
-    }
-}
 
 #[contractimpl]
 impl MaxBalanceContract {
@@ -38,33 +22,33 @@ impl AccessControl for MaxBalanceContract {}
 
 #[contractimpl(contracttrait)]
 impl MaxBalance for MaxBalanceContract {
+    #[only_admin]
     fn set_identity_registry_storage(e: &Env, token: Address, irs: Address) {
-        require_module_admin_or_compliance_auth(e);
         set_irs_address(e, &token, &irs);
     }
 
+    #[only_admin]
     fn set_max_balance(e: &Env, token: Address, max: i128) {
-        require_module_admin_or_compliance_auth(e);
         max_balance::set_max_balance(e, &token, max);
     }
 
+    #[only_admin]
     fn preset_id_balance(e: &Env, token: Address, identity: Address, balance: i128) {
-        require_module_admin_or_compliance_auth(e);
         max_balance::preset_id_balance(e, &token, &identity, balance);
     }
 
+    #[only_admin]
     fn batch_preset_id_balances(
         e: &Env,
         token: Address,
         identities: Vec<Address>,
         balances: Vec<i128>,
     ) {
-        require_module_admin_or_compliance_auth(e);
         max_balance::batch_preset_id_balances(e, &token, &identities, &balances);
     }
 
+    #[only_admin]
     fn mark_preset_completed(e: &Env, token: Address) {
-        require_module_admin_or_compliance_auth(e);
         max_balance::mark_preset_completed(e, &token);
     }
 }
@@ -72,17 +56,17 @@ impl MaxBalance for MaxBalanceContract {
 #[contractimpl(contracttrait)]
 impl ComplianceModule for MaxBalanceContract {
     fn on_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) {
-        get_compliance_address(e).require_auth();
+        compliance_storage::get_compliance_address(e, &token).require_auth();
         max_balance::on_transfer(e, &from, &to, amount, &token);
     }
 
     fn on_created(e: &Env, to: Address, amount: i128, token: Address) {
-        get_compliance_address(e).require_auth();
+        compliance_storage::get_compliance_address(e, &token).require_auth();
         max_balance::on_created(e, &to, amount, &token);
     }
 
     fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address) {
-        get_compliance_address(e).require_auth();
+        compliance_storage::get_compliance_address(e, &token).require_auth();
         max_balance::on_destroyed(e, &from, amount, &token);
     }
 
@@ -95,15 +79,11 @@ impl ComplianceModule for MaxBalanceContract {
     }
 
     fn name(e: &Env) -> String {
-        module_name(e, "MaxBalanceModule")
+        String::from_str(e, "MaxBalanceModule")
     }
 
-    fn get_compliance_address(e: &Env) -> Address {
-        get_compliance_address(e)
-    }
-
-    fn set_compliance_address(e: &Env, compliance: Address) {
-        get_admin(e).require_auth();
-        set_compliance_address(e, &compliance);
+    #[only_admin]
+    fn set_compliance_address(e: &Env, token: Address, compliance: Address) {
+        compliance_storage::set_compliance_address(e, &token, &compliance);
     }
 }

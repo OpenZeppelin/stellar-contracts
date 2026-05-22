@@ -1622,6 +1622,7 @@ version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -1631,6 +1632,7 @@ version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -1670,6 +1672,7 @@ version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
+ "stellar-macros",
  "stellar-tokens",
 ]
 
@@ -1679,6 +1682,7 @@ version = "0.7.1"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
+ "stellar-macros",
  "stellar-tokens",
 ]
 

@@ -165,21 +165,48 @@ fn mark_preset_completed_flips_flag() {
 }
 
 #[test]
-fn name_and_compliance_address_work() {
+fn name_returns_module_identifier() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
-    let compliance = Address::generate(&e);
     let client = create_client(&e, &admin);
 
     assert_eq!(client.name(), String::from_str(&e, "MaxBalanceModule"));
-
-    client.set_compliance_address(&compliance);
-    assert_eq!(client.get_compliance_address(), compliance);
 }
 
 #[test]
-fn set_max_balance_uses_admin_auth_before_compliance_bind() {
+fn set_and_get_compliance_address_round_trip() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let token = Address::generate(&e);
+    let compliance = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    client.set_compliance_address(&token, &compliance);
+
+    assert_eq!(client.get_compliance_address(&token), compliance);
+}
+
+#[test]
+fn set_compliance_address_requires_admin_auth() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let token = Address::generate(&e);
+    let compliance = Address::generate(&e);
+    let client = create_client(&e, &admin);
+
+    client.set_compliance_address(&token, &compliance);
+
+    let auths = e.auths();
+    assert_eq!(auths.len(), 1);
+    let (addr, _) = &auths[0];
+    assert_eq!(addr, &admin);
+}
+
+#[test]
+fn set_max_balance_requires_admin_auth() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -195,25 +222,7 @@ fn set_max_balance_uses_admin_auth_before_compliance_bind() {
 }
 
 #[test]
-fn set_max_balance_uses_compliance_auth_after_bind() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let admin = Address::generate(&e);
-    let compliance = Address::generate(&e);
-    let token = Address::generate(&e);
-    let client = create_client(&e, &admin);
-
-    client.set_compliance_address(&compliance);
-    client.set_max_balance(&token, &100_i128);
-
-    let auths = e.auths();
-    assert_eq!(auths.len(), 1);
-    let (addr, _) = &auths[0];
-    assert_eq!(addr, &compliance);
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #397)")]
+#[should_panic(expected = "Error(Contract, #396)")]
 fn can_transfer_panics_when_irs_not_configured() {
     let e = Env::default();
     e.mock_all_auths();
@@ -271,7 +280,7 @@ fn on_created_and_on_destroyed_track_aggregate_supply() {
 
     irs.set_identity(&wallet, &identity);
 
-    client.set_compliance_address(&compliance);
+    client.set_compliance_address(&token, &compliance);
     client.set_identity_registry_storage(&token, &irs_id);
     client.set_max_balance(&token, &100_i128);
 

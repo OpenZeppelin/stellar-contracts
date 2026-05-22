@@ -264,7 +264,7 @@ fn on_created_panics_when_exceeding_max() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #393)")]
+#[should_panic(expected = "Error(Contract, #392)")]
 fn on_destroyed_panics_when_identity_has_insufficient_balance() {
     let e = Env::default();
     let module_id = e.register(TestMaxBalanceContract, ());
@@ -399,7 +399,7 @@ fn batch_preset_id_balances_panics_on_length_mismatch() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #391)")]
+#[should_panic(expected = "Error(Contract, #390)")]
 fn preset_id_balance_panics_on_negative_balance() {
     let e = Env::default();
     let module_id = e.register(TestMaxBalanceContract, ());
@@ -412,7 +412,7 @@ fn preset_id_balance_panics_on_negative_balance() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #391)")]
+#[should_panic(expected = "Error(Contract, #390)")]
 fn set_max_balance_panics_on_negative_value() {
     let e = Env::default();
     let module_id = e.register(TestMaxBalanceContract, ());
