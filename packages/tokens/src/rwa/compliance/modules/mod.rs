@@ -1,9 +1,18 @@
-use soroban_sdk::{contracterror, contracttrait, Address, Env, String};
+//! Compliance modules subsystem.
+//!
+//! Each module is deployed as its own contract that implements
+//! [`ComplianceModule`] plus any module-specific trait (e.g.
+//! [`country_allow::CountryAllow`], [`country_restrict::CountryRestrict`]).
+//! The modular compliance contract dispatches transfer/mint/burn hooks to the
+//! modules registered for each hook type. Shared helpers, storage keys, and
+//! TTL constants live in [`storage`].
 
 pub mod storage;
 
 #[cfg(test)]
 mod test;
+
+use soroban_sdk::{contracterror, contracttrait, Address, Env, String};
 
 /// Trait for compliance modules that can be registered with the modular
 /// compliance system.
@@ -14,16 +23,14 @@ mod test;
 ///
 /// # General Workflow
 ///
-/// 1. Token contract calls `set_compliance_address` to store the compliance
-///    contract address.
-/// 2. Operator registers compliance modules via `add_module_to()` for specific
-///    hooks.
-/// 3. On token operations (`transfer`, `mint`, `burn`):
+/// 1. Operator registers compliance modules, using the compliance contract's
+///    [`crate::rwa::compliance::Compliance::add_module_to`] for specific hooks.
+/// 2. On token operations (`transfer`, `mint`, `burn`):
 ///    - **Before**: Token contract calls validation hooks (`can_transfer`,
-///      `can_create`)
+///      `can_create`) on the compliance contract.
 ///    - **After**: Token contract calls notification hooks (`transferred`,
-///      `created`, `destroyed`)
-/// 4. Compliance contract forwards each hook call to all registered modules for
+///      `created`, `destroyed`) on the compliance contract.
+/// 3. Compliance contract forwards each hook call to all registered modules for
 ///    that hook type.
 ///
 /// ┌─────────────────┐
@@ -31,9 +38,10 @@ mod test;
 /// └────────┬────────┘
 ///          │ 1. set_compliance_address()
 ///          ▼
-/// ┌─────────────────────┐
-/// │ Compliance Contract │◄──── 2. add_module_to() / remove_module_from()
-/// └──────────┬──────────┘
+/// ┌──────────────────────────────────────────┐
+/// │ Compliance Contract (bound on the token) │◄──── 2. add_module_to() /
+/// │                                          │       remove_module_from()
+/// └──────────┬───────────────────────────────┘
 ///            │ 3. On transfer/mint/burn:
 ///            │
 ///            │    - transferred() / created() / destroyed()
@@ -55,18 +63,52 @@ mod test;
 ///
 /// # Security Note
 ///
-/// If a hook modifies state, it should typically only be called by the
-/// compliance contract. `set_compliance_address` and `get_compliance_address`
-/// are intended to support that pattern.
+/// State-mutating hooks, (potentially[`ComplianceModule::on_transfer`],
+/// [`ComplianceModule::on_created`], [`ComplianceModule::on_destroyed`])
+/// must authenticate their caller. Hook arguments — including `token` —
+/// are forgeable: any contract can call these methods directly with
+/// arbitrary values, and Soroban provides no built-in caller-identity
+/// primitive beyond `require_auth()`. Soroban's invoker auth is also
+/// single-level — the token contract that triggered the operation is not
+/// the direct caller of the module hook, so `token.require_auth()` does
+/// not work; the dispatcher (Compliance Contract that is bound to the token)
+/// is the direct caller.
 ///
-/// If a hook is read-only, it can be safely exposed more broadly and those
-/// methods can use simple or dummy implementations.
+/// The canonical pattern is to record a per-token mapping of authorized
+/// dispatcher addresses (via
+/// [`ComplianceModule::set_compliance_address`] / the storage helper
+/// [`storage::set_compliance_address`]) and call
+/// [`ComplianceModule::get_compliance_address`] inside each state-mutating
+/// hook to look up the dispatcher bound to the `token` argument, then
+/// `require_auth()` on it:
 ///
+/// ```ignore
+/// fn on_transfer(e: &Env, _from: Address, _to: Address, _amount: i128, token: Address) {
+///     // Only the dispatcher bound to `token` may drive this module's
+///     // state for that token. A malicious caller passing a forged `token`
+///     // argument cannot satisfy this auth check because they did not
+///     // make the call as the bound dispatcher.
+///     Self::get_compliance_address(e, token.clone()).require_auth();
 ///
-/// No default implementations are provided for the methods of this trait.
-/// [`ComplianceModule`] is designed to be implemented by multiple independent
-/// contracts, each with its own storage layout, access control, and business
-/// logic. A meaningful default is therefore not possible.
+///     // ... module-specific per-token state mutation ...
+/// }
+/// ```
+///
+/// The per-token shape lets one module instance be reused across multiple
+/// dispatchers safely: a dispatcher that didn't bind itself for `token`
+/// cannot drive that token's state.
+///
+/// Read-only hooks ([`ComplianceModule::can_transfer`],
+/// [`ComplianceModule::can_create`]) do not mutate state, so
+/// unauthenticated calls are harmless — they may return a boolean but
+/// cannot corrupt anything.
+///
+/// [`ComplianceModule::get_compliance_address`] has a default
+/// implementation that delegates to the storage layer. Every other method
+/// must be implemented by each module contract: this trait is designed to
+/// be implemented by multiple independent contracts, each with its own
+/// storage layout, access control, and business logic, so meaningful
+/// defaults are otherwise impossible.
 #[contracttrait]
 pub trait ComplianceModule {
     /// Called when tokens are transferred (for Transfer hook).
@@ -79,20 +121,12 @@ pub trait ComplianceModule {
     /// * `amount` - The amount of tokens transferred.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
-    /// # Security Note
-    ///
-    /// If this function modifies state, it should be called only by the
-    /// compliance contract. To enforce this, add the following at the start of
-    /// the implementation:
-    ///
-    /// ```ignore
-    /// get_compliance_address(e).require_auth();
-    /// ```
-    ///
     /// # Notes
     ///
     /// No default implementation is provided; see the trait-level
-    /// documentation.
+    /// documentation. If this implementation mutates state, the trait-level
+    /// `# Security Note` applies — authenticate the caller via
+    /// [`storage::get_compliance_address`].
     fn on_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address);
 
     /// Called when tokens are created/minted (for Created hook).
@@ -104,20 +138,12 @@ pub trait ComplianceModule {
     /// * `amount` - The amount of tokens created.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
-    /// # Security Note
-    ///
-    /// If this function modifies state, it should be called only by the
-    /// compliance contract. To enforce this, add the following at the start of
-    /// the implementation:
-    ///
-    /// ```ignore
-    /// get_compliance_address(e).require_auth();
-    /// ```
-    ///
     /// # Notes
     ///
     /// No default implementation is provided; see the trait-level
-    /// documentation.
+    /// documentation. If this implementation mutates state, the trait-level
+    /// `# Security Note` applies — authenticate the caller via
+    /// [`storage::get_compliance_address`].
     fn on_created(e: &Env, to: Address, amount: i128, token: Address);
 
     /// Called when tokens are destroyed/burned (for Destroyed hook).
@@ -129,20 +155,12 @@ pub trait ComplianceModule {
     /// * `amount` - The amount of tokens destroyed.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
-    /// # Security Note
-    ///
-    /// If this function modifies state, it should be called only by the
-    /// compliance contract. To enforce this, add the following at the start of
-    /// the implementation:
-    ///
-    /// ```ignore
-    /// get_compliance_address(e).require_auth();
-    /// ```
-    ///
     /// # Notes
     ///
     /// No default implementation is provided; see the trait-level
-    /// documentation.
+    /// documentation. If this implementation mutates state, the trait-level
+    /// `# Security Note` applies — authenticate the caller via
+    /// [`storage::get_compliance_address`].
     fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address);
 
     /// Called to check if a transfer should be allowed (for CanTransfer hook).
@@ -191,20 +209,43 @@ pub trait ComplianceModule {
     /// documentation.
     fn name(e: &Env) -> String;
 
-    /// Returns the address of the compliance contract.
+    /// Returns the dispatcher address authorized to drive hooks for `token`.
+    ///
+    /// State-mutating modules should call this and `require_auth()` on the
+    /// result at the top of each `on_*` hook — see the trait-level
+    /// `# Security Note` for the recommended pattern and an example.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    fn get_compliance_address(e: &Env) -> Address;
+    /// * `token` - The token whose authorized dispatcher is being queried.
+    ///
+    /// # Errors
+    ///
+    /// * [`ComplianceModuleError::ComplianceNotSet`] - When no dispatcher has
+    ///   been bound for `token`.
+    fn get_compliance_address(e: &Env, token: Address) -> Address {
+        storage::get_compliance_address(e, &token)
+    }
 
-    /// Sets the address of the compliance contract.
+    /// Binds `compliance` as the dispatcher authorized to drive hooks for
+    /// `token`. Calling this with a new value overwrites any prior binding
+    /// for the same token.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `compliance` - The address of the compliance contract.
-    fn set_compliance_address(e: &Env, compliance: Address);
+    /// * `token` - The token whose dispatcher binding is being configured.
+    /// * `compliance` - The dispatcher address that should be authorized to
+    ///   call this module's hooks for `token`.
+    ///
+    /// # Notes
+    ///
+    /// No default implementation is provided because this is a privileged
+    /// operation that requires custom access control. Access control should
+    /// be enforced before calling [`storage::set_compliance_address`] for
+    /// the implementation.
+    fn set_compliance_address(e: &Env, token: Address, compliance: Address);
 }
 
 // ################## ERRORS ##################
@@ -217,28 +258,25 @@ pub trait ComplianceModule {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum ComplianceModuleError {
-    /// The compliance contract address has not been set.
-    ComplianceNotSet = 390,
     /// An amount argument is negative when it must be non-negative.
-    InvalidAmount = 391,
+    InvalidAmount = 390,
     /// Arithmetic overflow in a checked addition.
-    MathOverflow = 392,
+    MathOverflow = 391,
     /// Arithmetic underflow in a checked subtraction.
-    MathUnderflow = 393,
+    MathUnderflow = 392,
     /// A required limit entry is missing for the given token.
-    MissingLimit = 394,
+    MissingLimit = 393,
     /// A required transfer counter entry is missing.
-    MissingCounter = 395,
+    MissingCounter = 394,
     /// A required country data entry is missing.
-    MissingCountry = 396,
+    MissingCountry = 395,
     /// The identity registry storage address has not been configured.
-    IdentityRegistryNotSet = 397,
-    /// A module is not registered on a required compliance hook.
-    MissingRequiredHook = 398,
-    /// The compliance contract address has already been set.
-    ComplianceAlreadySet = 399,
+    IdentityRegistryNotSet = 396,
     /// A token has reached the maximum number of configured limit entries.
-    TooManyLimits = 400,
+    TooManyLimits = 397,
+    /// No authorized compliance dispatcher has been bound for the given
+    /// token.
+    ComplianceNotSet = 398,
 }
 
 // ################## CONSTANTS ##################
