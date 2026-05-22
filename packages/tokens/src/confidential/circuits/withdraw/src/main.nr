@@ -11,42 +11,42 @@ mod tests;
 // Constraints
 // -----------
 // Main block (balance conservation + ownership)
-//   W1 Y         = sk * H                              owner key ownership
-//   W2 vk        = Poseidon2(delta_vk, sk, wrap)       wrapper-bound viewing
-//                                                      key
-//   W3 C_spend   = v * G + r * H                       opening of current
-//                                                      spendable balance
-//   W4 v, a, v - a in [0, 2^127)                       range validity
+//   W1 Y         = sk * H                              Owner key ownership.
+//   W2 vk        = Poseidon2(delta_vk, sk, wrap)       Wrapper-bound viewing
+//                                                      key.
+//   W3 C_spend   = v * G + r * H                       Opening of current
+//                                                      spendable balance.
+//   W4 v, a, v - a in [0, 2^127)                       Range validity
 //                                                      (Section 2.6); the
 //                                                      [0, 2^127) bound is
 //                                                      the SEP-41 i128
 //                                                      non-negative range
 //                                                      (Section 3.4)
-//   W5 r'        = Poseidon2(delta_spend_r, vk, sigma) deterministic
+//   W5 r'        = Poseidon2(delta_spend_r, vk, sigma) Deterministic
 //                                                      randomness for the
-//                                                      new balance
-//   W6 C_spend'  = (v - a) * G + r' * H                new spendable
-//                                                      commitment
+//                                                      new balance.
+//   W6 C_spend'  = (v - a) * G + r' * H                New spendable
+//                                                      commitment.
 //   W7 b_tilde   = (v - a)
 //                    + Poseidon2(delta_enc_bal, vk, sigma)
-//                                                      encrypted balance
-//                                                      scalar (emitted)
-// Auditor block (sender-auditor visibility, Section 8.1)
-//   W_a1 R_e         = r_e * H                         ephemeral key for
-//                                                      auditor ECDH
-//   W_a2 S_{a,s}     = r_e * K_{aud,s}                 sender-auditor ECDH
-//                                                      shared secret
-//   W_a3 m_b         = SpongeSqueeze_1(delta_aud_s,
-//                                     S_{a,s}.x, sigma) sender-channel
-//                                                      sponge, single squeeze
-//   W_a4 b_tilde_aud_s = (v - a) + m_b                  sender-auditor
-//                                                      encrypted balance
-//                                                      checkpoint (emitted)
-//   W_a5 r_e != 0                                      rules out R_e = O and
+//                                                      Encrypted balance
+//                                                      scalar (emitted).
+//   W8 r_e != 0                                        Rules out R_e = O and
 //                                                      S_{a,s} = O, which
 //                                                      would collapse m_b to
 //                                                      a constant function
-//                                                      of sigma
+//                                                      of sigma.
+// Auditor block (sender-auditor visibility, Section 8.1)
+//   W_a1 R_e         = r_e * H                         Ephemeral key for
+//                                                      auditor ECDH.
+//   W_a2 S_{a,s}     = r_e * K_{aud,s}                 Sender-auditor ECDH
+//                                                      shared secret.
+//   W_a3 m_b         = SpongeSqueeze_1(delta_aud_s,
+//                                     S_{a,s}.x, sigma) Sender-channel
+//                                                      sponge, single squeeze.
+//   W_a4 b_tilde_aud_s = (v - a) + m_b                  Sender-auditor
+//                                                      encrypted balance
+//                                                      checkpoint (emitted).
 //
 // W_a3 + W_a4 are encapsulated by `encrypt_auditor_sender_balance` in the lib.
 //
@@ -90,7 +90,7 @@ mod tests;
 //   v     Plaintext spendable-balance value.
 //   r     Plaintext blinding factor for C_spend.
 //   r_e   Ephemeral scalar for the auditor ECDH; must satisfy r_e != 0
-//         (W_a5).
+//         (W8).
 
 fn main(
     sk: Field,
@@ -113,7 +113,7 @@ fn main(
     r_e_y: pub Field,
     b_tilde_aud_s: pub Field,
 ) {
-    // W_a5 -- runs first so the r_e = 0 attack is rejected before any
+    // W8 -- runs first so the r_e = 0 attack is rejected before any
     // scalar mul against it could quietly produce the identity.
     assert(r_e != 0);
 
