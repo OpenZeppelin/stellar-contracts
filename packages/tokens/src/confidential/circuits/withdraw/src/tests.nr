@@ -217,7 +217,10 @@ fn rejects_under_funded_withdrawal() {
 
 #[test(should_fail)]
 fn rejects_v_out_of_range() {
-    let v_huge: Field = 0x100000000000000000000000000000000; // 2^128
+    // 2^127 is exactly the boundary W4 rules out (Section 2.6 / 3.4 -- SEP-41
+    // i128 non-negative range is [0, 2^127), so 2^127 is the smallest value
+    // that must fail).
+    let v_huge: Field = 0x80000000000000000000000000000000;
     main(
         SK,
         v_huge,
@@ -243,7 +246,8 @@ fn rejects_v_out_of_range() {
 
 #[test(should_fail)]
 fn rejects_a_out_of_range() {
-    let a_huge: Field = 0x100000000000000000000000000000000;
+    // a = 2^127: W4's range check on a fires at the exact SEP-41 boundary.
+    let a_huge: Field = 0x80000000000000000000000000000000;
     main(
         SK,
         V,

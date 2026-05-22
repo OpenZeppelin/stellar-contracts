@@ -1,6 +1,6 @@
 use stellar_confidential_lib::{
-    H, assert_on_curve_non_identity, assert_range_128, commit, derive_spend_r, ecdh,
-    encrypt_auditor_sender_balance, encrypt_balance, scalar_mul, vk_from_sk,
+    H, assert_on_curve_non_identity, commit, derive_spend_r, ecdh, encrypt_auditor_sender_balance,
+    encrypt_balance, scalar_mul, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 
@@ -16,8 +16,12 @@ mod tests;
 //                                                      key
 //   W3 C_spend   = v * G + r * H                       opening of current
 //                                                      spendable balance
-//   W4 v, a, v - a in [0, 2^128)                       range validity
-//                                                      (Section 2.6)
+//   W4 v, a, v - a in [0, 2^127)                       range validity
+//                                                      (Section 2.6); the
+//                                                      [0, 2^127) bound is
+//                                                      the SEP-41 i128
+//                                                      non-negative range
+//                                                      (Section 3.4)
 //   W5 r'        = Poseidon2(delta_spend_r, vk, sigma) deterministic
 //                                                      randomness for the
 //                                                      new balance
@@ -67,8 +71,9 @@ mod tests;
 //   5    k_aud_s_x      K_aud_s.x     Fetched from the auditor contract by
 //   6    k_aud_s_y     K_aud_s.y       `from.auditor_id`.
 //   7    a              a             Public withdrawal amount; the wrapper
-//                                     pre-checks a >= 0 at the entrypoint,
-//                                     W4 then closes a < 2^128 in-circuit.
+//                                     pre-checks a >= 0 at the entrypoint
+//                                     (Section 3.4), W4 then closes
+//                                     a < 2^127 in-circuit.
 //   8    c_spend_new_x  C_spend'.x    Prover-supplied; written to
 //   9    c_spend_new_y  C_spend'.y      `from.spendable_balance` on success.
 //   10   sigma          sigma         Prover-supplied random salt; emitted.
@@ -125,11 +130,13 @@ fn main(
     assert(c_spend_derived.x == c_spend_x);
     assert(c_spend_derived.y == c_spend_y);
 
-    // W4
-    assert_range_128(v);
-    assert_range_128(a);
+    // W4 -- Section 2.6 spells out the 127-bit decomposition / recomposition
+    // pattern; `assert_max_bit_size` is the Noir stdlib primitive that
+    // implements it directly.
+    v.assert_max_bit_size::<127>();
+    a.assert_max_bit_size::<127>();
     let v_new = v - a;
-    assert_range_128(v_new);
+    v_new.assert_max_bit_size::<127>();
 
     // W5
     let r_new = derive_spend_r(vk, sigma);
