@@ -86,8 +86,8 @@ global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
 /// | `delta_enc_allow` | 7     | `ENCRYPTED_ALLOWANCE`             |
 /// | `delta_allow_r`   | 8     | `ALLOWANCE_RANDOMNESS`            |
 /// | `delta_esc_dvk`   | 9     | `ESCROWED_DELEGATION_VIEWING_KEY` |
-/// | `delta_aud_tx`    | 10    | `AUDITOR_TX`                      |
-/// | `delta_aud_bal`   | 11    | `AUDITOR_BALANCE`                 |
+/// | `delta_aud_s`     | 10    | `AUDITOR_SENDER`                  |
+/// | `delta_aud_r`     | 11    | `AUDITOR_RECIPIENT`               |
 mod domain {
     /// Viewing-key derivation: `vk = Poseidon2(VIEWING_KEY, sk, wrap)`.
     /// Section 4.2 (`delta_vk`).
@@ -120,14 +120,16 @@ mod domain {
     /// `Poseidon2(ESCROWED_DELEGATION_VIEWING_KEY, s, op_i)`.
     /// Constraint S12, Section 7.11 (`delta_esc_dvk`).
     pub(crate) global ESCROWED_DELEGATION_VIEWING_KEY: Field = 9;
-    /// Auditor mask for transfer amount:
-    /// `v_tilde_aud = v_tx + Poseidon2(AUDITOR_TX, s_a, sigma)`.
-    /// Constraints T_a2 / T_a4 / O_a2 / O_a4 / S_a3 / V_a3 (`delta_aud_tx`).
-    pub(crate) global AUDITOR_TX: Field = 10;
-    /// Auditor mask for balance / allowance checkpoint:
-    /// `b_tilde_aud = v_new + Poseidon2(AUDITOR_BALANCE, s_a, sigma)`.
-    /// Constraints W_a3 / T_a5 / S_a4 / V_a4 / O_a5 (`delta_aud_bal`).
-    pub(crate) global AUDITOR_BALANCE: Field = 11;
+    /// Sender or owner-auditor channel tag for Poseidon2 sponge masks
+    /// (Section 2.5, Section 8.1). Squeeze 1 yields the amount mask (where
+    /// applicable); squeeze 2 yields the balance/allowance checkpoint mask.
+    /// Constraints W_a3 / T_a6 / S_a3 / V_a3 / O_a6 (`delta_aud_s`).
+    pub(crate) global AUDITOR_SENDER: Field = 10;
+    /// Recipient-auditor channel tag for Poseidon2 sponge masks
+    /// (Section 2.5, Section 8.1). Squeeze 1 yields the amount mask; squeeze
+    /// 2 yields the per-transfer Pedersen randomness mask.
+    /// Constraints T_a2 / O_a2 (`delta_aud_r`).
+    pub(crate) global AUDITOR_RECIPIENT: Field = 11;
 }
 
 // ################## CORE PRIMITIVES ##################
@@ -299,22 +301,39 @@ pub fn encrypt_allowance(v_a: Field, dvk: Field, sigma_a: Field) -> Field {
     v_a + poseidon_with_domain(domain::ENCRYPTED_ALLOWANCE, [dvk, sigma_a])
 }
 
-/// Encrypts the transfer amount under an auditor's ECDH shared secret.
-/// Constraints T_a2 / T_a4 / O_a2 / O_a4 / S_a3 / V_a3.
-/// `v_tilde_aud = v_tx + Poseidon2(AUD_TX, s_a, sigma)`.
-pub fn encrypt_auditor_tx(v_tx: Field, s_a: Field, sigma: Field) -> Field {
-    v_tx + poseidon_with_domain(domain::AUDITOR_TX, [s_a, sigma])
-}
-
-/// Encrypts the post-operation balance (or allowance) under an auditor's ECDH
-/// shared secret. Constraints W_a3 / T_a5 / S_a4 / V_a4 / O_a5.
-/// `b_tilde_aud = v_new + Poseidon2(AUD_BAL, s_a, sigma)`.
-pub fn encrypt_auditor_bal(v_new: Field, s_a: Field, sigma: Field) -> Field {
-    v_new + poseidon_with_domain(domain::AUDITOR_BALANCE, [s_a, sigma])
-}
-
 /// Delegation-key escrow mask for the operator handoff at `set_operator`. Section 7.11.
 /// `escrowed_dvk = dvk + Poseidon2(ESC_DVK, s, op_i)` where `s = (r_e * Y_op).x`.
 pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
     dvk + poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, op_i])
+}
+
+// ################## AUDITOR-CHANNEL SPONGE ##################
+
+/// Poseidon2 sponge with a single squeeze. Absorbs `(d, s_x, sigma)` and
+/// returns the first rate-element of the post-permutation state.
+///
+/// Equivalent to `poseidon_with_domain(d, [s_x, sigma])` -- the alias exists so
+/// design-doc constraints written as `m = SpongeSqueeze_1(delta, S.x, sigma)`
+/// (Section 2.5) translate 1:1 to source. The single-squeeze case is the
+/// sender-auditor channel for Withdraw (W_a3), RevokeOperator (V_a3), and
+/// SetOperator (S_a3), which need only the balance/allowance mask.
+pub fn sponge_squeeze_1(d: Field, s_x: Field, sigma: Field) -> Field {
+    poseidon_with_domain(d, [s_x, sigma])
+}
+
+/// Poseidon2 sponge with two squeezes. Absorbs `(d, s_x, sigma)` and returns
+/// the first two rate-elements of the post-permutation state in order.
+///
+/// Implements `SpongeSqueeze_2(delta, S.x, sigma)` from Section 2.5. The canonical
+/// squeeze order is: index 0 = amount mask, index 1 = balance / randomness
+/// mask, fixed by Sections 7 and 8. With rate = 3 the absorb fits one block
+/// and both outputs are served from the same permutation, so the constraint
+/// cost is exactly one Poseidon2 permutation per call.
+///
+/// Used by: Transfer (T_a2 recipient-auditor amount + randomness, T_a6
+/// sender-auditor amount + balance) and OperatorTransfer (O_a2, O_a6).
+pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
+    let iv: Field = 3 * POSEIDON2_IV_BASE;
+    let state = poseidon2_permutation([d, s_x, sigma, iv], 4);
+    [state[0], state[1]]
 }

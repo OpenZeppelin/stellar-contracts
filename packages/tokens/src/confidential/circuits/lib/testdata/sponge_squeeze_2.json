@@ -1,0 +1,21 @@
+{
+  "primitive": "sponge_squeeze_2",
+  "design_doc_refs": ["Section 2.5", "Constraint T_a2", "Constraint T_a6", "Constraint O_a2", "Constraint O_a6"],
+  "description": "Poseidon2 sponge with two squeezes (one absorb of (d, s_x, sigma), permute, output (state[0], state[1])). Canonical squeeze order: index 0 = amount mask, index 1 = balance / per-transfer Pedersen randomness mask, fixed per design doc Sections 7 and 8. The sender-auditor channel uses d = AUDITOR_SENDER (10); the recipient-auditor channel uses d = AUDITOR_RECIPIENT (11). The first squeeze must match sponge_squeeze_1 on the same inputs.",
+  "vectors": [
+    {
+      "inputs": { "d": "0x0a", "s_x": "0x12345", "sigma": "0x01" },
+      "output": [
+        "0x266e76dccd3d7c654ab7a48045cca920c497b1a6758981acfa6f217427ac3074",
+        "0x248b757f9fec92895bd3fb91b1a5c9c17467df6f0f55ab574d85e943df8e5cf3"
+      ]
+    },
+    {
+      "inputs": { "d": "0x0b", "s_x": "0x12345", "sigma": "0x01" },
+      "output": [
+        "0x2787d1e01bbca7828e13e9b2b3fa11cfcfe9c3d2b121b9e17543146822fe1feb",
+        "0x27f3739a132c6353cd5af3edac0ac75faf7fc606acb61367774e4f764ec17b77"
+      ]
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 use crate::{
     assert_on_curve, assert_on_curve_non_identity, assert_range_128, commit, derive_allow_r,
     derive_spend_r, derive_tx_blind, domain, dvk_from_vk_op, ecdh, encrypt_allowance,
-    encrypt_amount, encrypt_auditor_bal, encrypt_auditor_tx, encrypt_balance, encrypt_esc_dvk,
-    G, H, poseidon_with_domain, pvk_from_vk, scalar_mul, vk_from_sk,
+    encrypt_amount, encrypt_balance, encrypt_esc_dvk, G, H, poseidon_with_domain, pvk_from_vk,
+    scalar_mul, sponge_squeeze_1, sponge_squeeze_2, vk_from_sk,
 };
 use std::embedded_curve_ops::EmbeddedCurvePoint;
 use std::hash::{derive_generators, pedersen_commitment};
@@ -185,8 +185,8 @@ fn domain_separation_distinct() {
     let h_ea = poseidon_with_domain(domain::ENCRYPTED_ALLOWANCE, [a, b]);
     let h_ar = poseidon_with_domain(domain::ALLOWANCE_RANDOMNESS, [a, b]);
     let h_ed = poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [a, b]);
-    let h_at = poseidon_with_domain(domain::AUDITOR_TX, [a, b]);
-    let h_ab = poseidon_with_domain(domain::AUDITOR_BALANCE, [a, b]);
+    let h_as = poseidon_with_domain(domain::AUDITOR_SENDER, [a, b]);
+    let h_ar2 = poseidon_with_domain(domain::AUDITOR_RECIPIENT, [a, b]);
 
     // Distinct from VK.
     assert(h_vk != h_dvk);
@@ -197,8 +197,13 @@ fn domain_separation_distinct() {
     assert(h_vk != h_ea);
     assert(h_vk != h_ar);
     assert(h_vk != h_ed);
-    assert(h_vk != h_at);
-    assert(h_vk != h_ab);
+    assert(h_vk != h_as);
+    assert(h_vk != h_ar2);
+
+    // The two auditor channels must yield distinct masks under identical
+    // inputs -- if they collide, the same shared-secret `S.x` would leak the
+    // same ciphertext on both channels, defeating channel separation.
+    assert(h_as != h_ar2);
 }
 
 #[test]
@@ -222,17 +227,61 @@ fn encrypt_decrypt_round_trip() {
     let mask_allow = poseidon_with_domain(domain::ENCRYPTED_ALLOWANCE, [s, sigma]);
     assert(a_tilde - mask_allow == v);
 
-    let v_tilde_aud = encrypt_auditor_tx(v, s, sigma);
-    let mask_aud_tx = poseidon_with_domain(domain::AUDITOR_TX, [s, sigma]);
-    assert(v_tilde_aud - mask_aud_tx == v);
-
-    let b_tilde_aud = encrypt_auditor_bal(v, s, sigma);
-    let mask_aud_bal = poseidon_with_domain(domain::AUDITOR_BALANCE, [s, sigma]);
-    assert(b_tilde_aud - mask_aud_bal == v);
-
     let dvk_escrowed = encrypt_esc_dvk(v, s, sigma);
     let mask_esc = poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, sigma]);
     assert(dvk_escrowed - mask_esc == v);
+}
+
+#[test]
+fn sponge_squeeze_1_matches_poseidon_with_domain() {
+    // sponge_squeeze_1 is documented as an alias of poseidon_with_domain on
+    // a 2-element payload; the canonical-form check here is what lets every
+    // SpongeSqueeze_1(...) call site in the design doc translate to either
+    // helper without ambiguity.
+    let d: Field = domain::AUDITOR_SENDER;
+    let s_x: Field = 0xfeed;
+    let sigma: Field = 0xbeef;
+    assert(sponge_squeeze_1(d, s_x, sigma) == poseidon_with_domain(d, [s_x, sigma]));
+}
+
+#[test]
+fn sponge_squeeze_2_first_matches_squeeze_1() {
+    // SpongeSqueeze_n shares a single absorb (Section 2.5); n=1 and n=2 must
+    // produce identical first masks. If this diverges, a circuit doing
+    // SpongeSqueeze_1 cannot be substituted for the first output of
+    // SpongeSqueeze_2 and vice versa.
+    let d: Field = domain::AUDITOR_RECIPIENT;
+    let s_x: Field = 0x12345;
+    let sigma: Field = 0x6789;
+    let m2 = sponge_squeeze_2(d, s_x, sigma);
+    assert(m2[0] == sponge_squeeze_1(d, s_x, sigma));
+}
+
+#[test]
+fn sponge_squeeze_2_outputs_distinct() {
+    // The two squeezed masks come from different rate positions of the same
+    // permutation. They must differ -- a collision would let an attacker who
+    // recovers one mask recover the other, breaking the per-ciphertext
+    // independence assumption that justifies the dual-mask construction
+    // (Section 8.1, the recipient-auditor ciphertext pair).
+    let d: Field = domain::AUDITOR_SENDER;
+    let s_x: Field = 0x42;
+    let sigma: Field = 0x07;
+    let m = sponge_squeeze_2(d, s_x, sigma);
+    assert(m[0] != m[1]);
+}
+
+#[test]
+fn sponge_squeeze_channel_separation() {
+    // Same (S.x, sigma) under the two channel domains must produce different
+    // mask pairs. This is the property that makes a leaked sender-channel
+    // ciphertext useless for decrypting the recipient channel and vice versa.
+    let s_x: Field = 0xcafe;
+    let sigma: Field = 0xdead;
+    let m_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_x, sigma);
+    let m_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_x, sigma);
+    assert(m_s[0] != m_r[0]);
+    assert(m_s[1] != m_r[1]);
 }
 
 /// One-shot fixture-generation harness. Prints every primitive's output for a
@@ -311,17 +360,27 @@ fn print_fixtures() {
     let a_tilde = encrypt_allowance(v_a, dvk, sigma_a);
     println(f"encrypt_allowance = {a_tilde}");
 
-    // encrypt_auditor_tx(v_tx, s, sigma)
-    let v_aud = encrypt_auditor_tx(v_tx, s_ecdh, sigma);
-    println(f"encrypt_auditor_tx = {v_aud}");
-
-    // encrypt_auditor_bal(v, s, sigma)
-    let b_aud = encrypt_auditor_bal(v, s_ecdh, sigma);
-    println(f"encrypt_auditor_bal = {b_aud}");
-
     // encrypt_esc_dvk(dvk, s, op_i)
     let esc = encrypt_esc_dvk(dvk, s_ecdh, op_i);
     println(f"encrypt_esc_dvk = {esc}");
+
+    // sponge_squeeze_1(AUDITOR_SENDER, s, sigma)
+    let ss1_s = sponge_squeeze_1(domain::AUDITOR_SENDER, s_ecdh, sigma);
+    println(f"sponge_squeeze_1_AUDITOR_SENDER = {ss1_s}");
+
+    // sponge_squeeze_2(AUDITOR_SENDER, s, sigma) -- (amount, balance) masks
+    let ss2_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_ecdh, sigma);
+    let ss2_s0 = ss2_s[0];
+    let ss2_s1 = ss2_s[1];
+    println(f"sponge_squeeze_2_AUDITOR_SENDER_0 = {ss2_s0}");
+    println(f"sponge_squeeze_2_AUDITOR_SENDER_1 = {ss2_s1}");
+
+    // sponge_squeeze_2(AUDITOR_RECIPIENT, s, sigma) -- (amount, r_tx) masks
+    let ss2_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_ecdh, sigma);
+    let ss2_r0 = ss2_r[0];
+    let ss2_r1 = ss2_r[1];
+    println(f"sponge_squeeze_2_AUDITOR_RECIPIENT_0 = {ss2_r0}");
+    println(f"sponge_squeeze_2_AUDITOR_RECIPIENT_1 = {ss2_r1}");
 
     // poseidon_with_domain(VK, [sk, wrap]) -- direct funnel access, equals vk_from_sk
     let pwd = poseidon_with_domain(domain::VIEWING_KEY, [sk, wrap]);
@@ -395,21 +454,44 @@ fn fixtures_match_testdata() {
             == 0x235db43a283e4e000337cdb80a99168ef4b718622cc06de4ab98b3d2bd5736d5,
     );
     assert(
-        encrypt_auditor_tx(v_tx, s_ecdh, sigma)
-            == 0x266e76dccd3d7c654ab7a48045cca920c497b1a6758981acfa6f217427ac30d8,
-    );
-    assert(
-        encrypt_auditor_bal(v, s_ecdh, sigma)
-            == 0x2787d1e01bbca7828e13e9b2b3fa11cfcfe9c3d2b121b9e17543146822fe23d3,
-    );
-    assert(
         encrypt_esc_dvk(dvk, s_ecdh, op_i)
             == 0x2468d02775ad21aa5928d049770287249af2a03dbaf4d18e22e3fe71fd292003,
     );
 
+    // Per-channel auditor sponge (v0.6, Section 2.5). Values pinned below are
+    // produced by `nargo test print_fixtures` against the same fixture inputs.
+    assert(
+        sponge_squeeze_1(domain::AUDITOR_SENDER, s_ecdh, sigma)
+            == SPONGE_SQUEEZE_1_AUDITOR_SENDER,
+    );
+    let ss2_s = sponge_squeeze_2(domain::AUDITOR_SENDER, s_ecdh, sigma);
+    assert(ss2_s[0] == SPONGE_SQUEEZE_2_AUDITOR_SENDER_0);
+    assert(ss2_s[1] == SPONGE_SQUEEZE_2_AUDITOR_SENDER_1);
+    let ss2_r = sponge_squeeze_2(domain::AUDITOR_RECIPIENT, s_ecdh, sigma);
+    assert(ss2_r[0] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_0);
+    assert(ss2_r[1] == SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1);
+
+    // Cross-form invariant: SpongeSqueeze_1 must equal the first squeeze of
+    // SpongeSqueeze_2 on the same absorb (single permutation, same state[0]).
+    assert(ss2_s[0] == sponge_squeeze_1(domain::AUDITOR_SENDER, s_ecdh, sigma));
+
     // poseidon_with_domain funnel is the same operation that backs vk_from_sk.
     assert(poseidon_with_domain(domain::VIEWING_KEY, [sk, wrap]) == vk);
 }
+
+// Sponge fixture outputs -- pinned by `print_fixtures` and mirrored in
+// `testdata/sponge_squeeze_*.json`. Update both sides together if the lib's
+// sponge construction or domain constants change.
+global SPONGE_SQUEEZE_1_AUDITOR_SENDER: Field =
+    0x266e76dccd3d7c654ab7a48045cca920c497b1a6758981acfa6f217427ac3074;
+global SPONGE_SQUEEZE_2_AUDITOR_SENDER_0: Field =
+    0x266e76dccd3d7c654ab7a48045cca920c497b1a6758981acfa6f217427ac3074;
+global SPONGE_SQUEEZE_2_AUDITOR_SENDER_1: Field =
+    0x248b757f9fec92895bd3fb91b1a5c9c17467df6f0f55ab574d85e943df8e5cf3;
+global SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_0: Field =
+    0x2787d1e01bbca7828e13e9b2b3fa11cfcfe9c3d2b121b9e17543146822fe1feb;
+global SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1: Field =
+    0x27f3739a132c6353cd5af3edac0ac75faf7fc606acb61367774e4f764ec17b77;
 
 #[test]
 fn derive_helpers_deterministic_and_distinct() {

@@ -34,4 +34,5 @@
 | gadget_range_128            | directive_integer_quotient | N/A                  | N/A          | 8               |
 | gadget_range_128            | directive_invert           | N/A                  | N/A          | 9               |
 | gadget_range_128            | main                       | Bounded { width: 4 } | 14           | 17              |
+| gadget_sponge_squeeze_2     | main                       | Bounded { width: 4 } | 4            | 0               |
 | gadget_vk_from_sk           | main                       | Bounded { width: 4 } | 4            | 0               |

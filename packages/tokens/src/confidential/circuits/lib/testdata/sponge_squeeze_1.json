@@ -1,0 +1,11 @@
+{
+  "primitive": "sponge_squeeze_1",
+  "design_doc_refs": ["Section 2.5", "Constraint W_a3", "Constraint S_a3", "Constraint V_a3"],
+  "description": "Poseidon2 sponge with a single squeeze (one absorb of (d, s_x, sigma), permute, output state[0]). Used by sender-auditor channels that emit only the balance/allowance mask. Equivalent to poseidon_with_domain(d, [s_x, sigma]).",
+  "vectors": [
+    {
+      "inputs": { "d": "0x0a", "s_x": "0x12345", "sigma": "0x01" },
+      "output": "0x266e76dccd3d7c654ab7a48045cca920c497b1a6758981acfa6f217427ac3074"
+    }
+  ]
+}
