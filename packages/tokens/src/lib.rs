@@ -13,6 +13,7 @@
 
 #![no_std]
 
+pub mod confidential;
 pub mod fungible;
 pub mod non_fungible;
 pub mod rwa;

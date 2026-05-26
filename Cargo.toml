@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "examples/confidential/*",
     "examples/fungible-allowlist",
     "examples/fungible-blocklist",
     "examples/fungible-capped",
