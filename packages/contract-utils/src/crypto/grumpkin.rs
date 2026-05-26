@@ -42,16 +42,28 @@ pub struct Grumpkin;
 
 impl Grumpkin {
     /// Returns the encoded identity element (the point at infinity).
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
     pub fn identity(e: &Env) -> Point {
         BytesN::from_array(e, &[0u8; 64])
     }
 
     /// Returns `true` iff `p` is the identity (all-zero 64-byte encoding).
+    ///
+    /// # Arguments
+    ///
+    /// * `p` - The point to check.
     pub fn is_identity(p: &Point) -> bool {
         p.to_array() == [0u8; 64]
     }
 
     /// Returns `true` iff `p` is not the identity.
+    ///
+    /// # Arguments
+    ///
+    /// * `p` - The point to check.
     pub fn is_not_identity(p: &Point) -> bool {
         !Self::is_identity(p)
     }
@@ -69,6 +81,11 @@ impl Grumpkin {
     /// The identity encoding `(0, 0)` returns `false`: `0² ≠ -17 (mod r)`. To
     /// admit `O` as a valid group element, combine this with
     /// [`Self::is_identity`] at the call site.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `p` - The point to validate.
     pub fn is_on_curve(e: &Env, p: &Point) -> bool {
         let bytes = p.to_array();
         if !is_canonical_coord(&bytes[..32]) || !is_canonical_coord(&bytes[32..]) {
@@ -82,6 +99,11 @@ impl Grumpkin {
 
     /// Returns `-p`. For non-identity `p = (x, y)`, this is `(x, -y mod r)`;
     /// `-O = O`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `p` - The point to negate.
     pub fn neg(e: &Env, p: &Point) -> Point {
         if Self::is_identity(p) {
             return p.clone();
@@ -103,6 +125,12 @@ impl Grumpkin {
     ///    two-torsion edge case `y = 0`, since then `y = -y` and `p = -p`.
     /// 4. `p1 = p2` → doubling with slope `λ_dbl = 3·x1² / (2·y1)`.
     /// 5. Otherwise (generic) → slope `λ_add = (y2 - y1) / (x2 - x1)`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `p1` - The first summand.
+    /// * `p2` - The second summand.
     pub fn add(e: &Env, p1: &Point, p2: &Point) -> Point {
         if Self::is_identity(p1) {
             return p2.clone();
@@ -142,11 +170,23 @@ impl Grumpkin {
 
     /// Returns `p1 - p2 = p1 + (-p2)`. Subtraction of a point from itself
     /// returns `O` via the inverse case in [`Self::add`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `p1` - The minuend.
+    /// * `p2` - The subtrahend.
     pub fn sub(e: &Env, p1: &Point, p2: &Point) -> Point {
         Self::add(e, p1, &Self::neg(e, p2))
     }
 
     /// Encodes `(x, y)` as a 64-byte [`Point`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `x` - The x-coordinate as a `Bn254Fr` element.
+    /// * `y` - The y-coordinate as a `Bn254Fr` element.
     pub fn from_xy(e: &Env, x: &Bn254Fr, y: &Bn254Fr) -> Point {
         let mut bytes = [0u8; 64];
         bytes[..32].copy_from_slice(&x.to_bytes().to_array());
@@ -155,6 +195,11 @@ impl Grumpkin {
     }
 
     /// Decodes `(x, y)` from a 64-byte [`Point`].
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `p` - The encoded point to decode.
     pub fn coordinates(e: &Env, p: &Point) -> (Bn254Fr, Bn254Fr) {
         let bytes = p.to_array();
         let mut x = [0u8; 32];
