@@ -4,10 +4,10 @@
   "description": "Public viewing key PVK = vk*H. Inputs use the vk produced by vk_from_sk(0xdead, 0xbeef).",
   "vectors": [
     {
-      "inputs": { "vk": "0x0ac6ade91aea36f4de35eb5a06a67e1b9c3dab9842479f1cce85caf826194ec2" },
+      "inputs": { "vk": "0x208fbdb70d2faacf04f987b54f12aeeaeb432acc29d650c86ce0f6275b958eb8" },
       "output": {
-        "x": "0x01de20bfe21ad660e073b14a106feae4afce4e78a020953ca16b767e0615331b",
-        "y": "0x12cf407b75fccb5c7721c5fdadc3d1a22b5440e36b08fe52658ab885529e92fd"
+        "x": "0x2e7421c0e86a4c8eed823edf851c364ecee448bf70eae2a95befe3dd9364cc45",
+        "y": "0x0b060655740aabef84e7305bb886b75da8d258f346381f03925d69645292fe7a"
       }
     }
   ]

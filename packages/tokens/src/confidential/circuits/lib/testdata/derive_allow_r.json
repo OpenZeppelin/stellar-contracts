@@ -5,10 +5,10 @@
   "vectors": [
     {
       "inputs": {
-        "dvk": "0x1dec1da326d325cf918eed33f097cfb854b41aac8ece9e6e8bd54b7a7c448785",
+        "dvk": "0x1a088264ebf7269160bbf34d5a3f94d7dec37efc609ef76c5dbfa8690af3eae9",
         "sigma_a": "0x02"
       },
-      "output": "0x199b47ff8b24b165411fa44b06d541b9d1b74d0d202fd651712e24c11e05cb35"
+      "output": "0x0afda20e062a277afc0c86e31ea22597ee2c094b1b9cd08b8d8a2a212a8af1ee"
     }
   ]
 }

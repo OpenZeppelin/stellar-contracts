@@ -77,59 +77,65 @@ global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
 ///
 /// | Design doc        | Value | Constant                          |
 /// |:------------------|:------|:----------------------------------|
-/// | `delta_vk`        | 1     | `VIEWING_KEY`                     |
-/// | `delta_dvk`       | 2     | `DELEGATION_VIEWING_KEY`          |
-/// | `delta_spend_r`   | 3     | `SPEND_RANDOMNESS`                |
-/// | `delta_tx_blind`  | 4     | `TX_BLINDING`                     |
-/// | `delta_tx_amount` | 5     | `TX_AMOUNT`                       |
-/// | `delta_enc_bal`   | 6     | `ENCRYPTED_BALANCE`               |
-/// | `delta_enc_allow` | 7     | `ENCRYPTED_ALLOWANCE`             |
-/// | `delta_allow_r`   | 8     | `ALLOWANCE_RANDOMNESS`            |
-/// | `delta_esc_dvk`   | 9     | `ESCROWED_DELEGATION_VIEWING_KEY` |
-/// | `delta_aud_s`     | 10    | `AUDITOR_SENDER`                  |
-/// | `delta_aud_r`     | 11    | `AUDITOR_RECIPIENT`               |
+/// | `delta_addr`      | 1     | `ADDRESS`                         |
+/// | `delta_vk`        | 2     | `VIEWING_KEY`                     |
+/// | `delta_dvk`       | 3     | `DELEGATION_VIEWING_KEY`          |
+/// | `delta_spend_r`   | 4     | `SPEND_RANDOMNESS`                |
+/// | `delta_tx_blind`  | 5     | `TX_BLINDING`                     |
+/// | `delta_tx_amount` | 6     | `TX_AMOUNT`                       |
+/// | `delta_enc_bal`   | 7     | `ENCRYPTED_BALANCE`               |
+/// | `delta_enc_allow` | 8     | `ENCRYPTED_ALLOWANCE`             |
+/// | `delta_allow_r`   | 9     | `ALLOWANCE_RANDOMNESS`            |
+/// | `delta_esc_dvk`   | 10    | `ESCROWED_DELEGATION_VIEWING_KEY` |
+/// | `delta_aud_s`     | 11    | `AUDITOR_SENDER`                  |
+/// | `delta_aud_r`     | 12    | `AUDITOR_RECIPIENT`               |
 mod domain {
+    /// Soroban Address compression into a single `F_r` Field:
+    /// `address_to_field(a) = Poseidon2(ADDRESS, lo(a), hi(a))`.
+    /// Section 2.7 (`delta_addr`). The wrapper computes `wrap` and `op_i`
+    /// off-circuit via this tag; circuits consume the resulting Field directly.
+    pub(crate) global ADDRESS: Field = 1;
     /// Viewing-key derivation: `vk = Poseidon2(VIEWING_KEY, sk, wrap)`.
     /// Section 4.2 (`delta_vk`).
-    pub(crate) global VIEWING_KEY: Field = 1;
+    pub(crate) global VIEWING_KEY: Field = 2;
     /// Delegation viewing-key derivation:
     /// `dvk = Poseidon2(DELEGATION_VIEWING_KEY, vk, op_i)`. Section 4.4 (`delta_dvk`).
-    pub(crate) global DELEGATION_VIEWING_KEY: Field = 2;
+    pub(crate) global DELEGATION_VIEWING_KEY: Field = 3;
     /// Deterministic randomness for the new spendable balance:
     /// `r' = Poseidon2(SPEND_RANDOMNESS, vk, sigma)`. Constraints W5/T10/S9/V6 (`delta_spend_r`).
-    pub(crate) global SPEND_RANDOMNESS: Field = 3;
+    pub(crate) global SPEND_RANDOMNESS: Field = 4;
     /// ECDH-derived blinding for the transfer commitment:
     /// `r_tx = Poseidon2(TX_BLINDING, s, sigma)`. Constraints T7/O7 (`delta_tx_blind`).
-    pub(crate) global TX_BLINDING: Field = 4;
+    pub(crate) global TX_BLINDING: Field = 5;
     /// Mask for the encrypted transfer amount:
     /// `v_tilde = v_tx + Poseidon2(TX_AMOUNT, s, sigma)`. Constraints T9/O9 (`delta_tx_amount`).
-    pub(crate) global TX_AMOUNT: Field = 5;
+    pub(crate) global TX_AMOUNT: Field = 6;
     /// Mask for the encrypted balance scalar:
     /// `b_tilde = v_new + Poseidon2(ENCRYPTED_BALANCE, vk, sigma)`.
     /// Constraints W7/T12/S11/V8 (`delta_enc_bal`).
-    pub(crate) global ENCRYPTED_BALANCE: Field = 6;
+    pub(crate) global ENCRYPTED_BALANCE: Field = 7;
     /// Mask for the encrypted allowance scalar:
     /// `a_tilde = v_a + Poseidon2(ENCRYPTED_ALLOWANCE, dvk, sigma_a)`.
     /// Constraints S8/O12 (`delta_enc_allow`).
-    pub(crate) global ENCRYPTED_ALLOWANCE: Field = 7;
+    pub(crate) global ENCRYPTED_ALLOWANCE: Field = 8;
     /// Deterministic randomness for the operator allowance:
     /// `r_a = Poseidon2(ALLOWANCE_RANDOMNESS, dvk, sigma_a)`.
     /// Constraints S6/O3/O10 (`delta_allow_r`).
-    pub(crate) global ALLOWANCE_RANDOMNESS: Field = 8;
+    pub(crate) global ALLOWANCE_RANDOMNESS: Field = 9;
     /// Delegation-key escrow mask (operator ECDH):
     /// `Poseidon2(ESCROWED_DELEGATION_VIEWING_KEY, s, op_i)`.
     /// Constraint S12, Section 7.11 (`delta_esc_dvk`).
-    pub(crate) global ESCROWED_DELEGATION_VIEWING_KEY: Field = 9;
+    pub(crate) global ESCROWED_DELEGATION_VIEWING_KEY: Field = 10;
     /// Sender or owner-auditor channel tag for Poseidon2 sponge masks
     /// (Section 2.5, Section 8.1). Squeeze 1 yields the amount mask (where
     /// applicable); squeeze 2 yields the balance/allowance checkpoint mask.
     /// Constraints W_a3 / T_a6 / S_a3 / V_a3 / O_a6 (`delta_aud_s`).
-    pub(crate) global AUDITOR_SENDER: Field = 10;
+    pub(crate) global AUDITOR_SENDER: Field = 11;
     /// Recipient-auditor channel tag for Poseidon2 sponge masks
     /// (Section 2.5, Section 8.1). Squeeze 1 yields the amount mask; squeeze
     /// 2 yields the per-transfer Pedersen randomness mask.
     /// Constraints T_a2 / O_a2 (`delta_aud_r`).
-    pub(crate) global AUDITOR_RECIPIENT: Field = 11;
+    pub(crate) global AUDITOR_RECIPIENT: Field = 12;
 }
 
 // ################## CORE PRIMITIVES ##################

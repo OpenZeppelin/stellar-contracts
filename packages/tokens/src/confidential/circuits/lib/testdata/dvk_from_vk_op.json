@@ -5,10 +5,10 @@
   "vectors": [
     {
       "inputs": {
-        "vk": "0x0ac6ade91aea36f4de35eb5a06a67e1b9c3dab9842479f1cce85caf826194ec2",
+        "vk": "0x208fbdb70d2faacf04f987b54f12aeeaeb432acc29d650c86ce0f6275b958eb8",
         "op_i": "0xabcd"
       },
-      "output": "0x1dec1da326d325cf918eed33f097cfb854b41aac8ece9e6e8bd54b7a7c448785"
+      "output": "0x1a088264ebf7269160bbf34d5a3f94d7dec37efc609ef76c5dbfa8690af3eae9"
     }
   ]
 }

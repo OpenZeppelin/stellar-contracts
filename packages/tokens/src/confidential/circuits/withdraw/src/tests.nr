@@ -41,11 +41,11 @@ global C_SPEND_Y: Field =
 // which re-derives them from the lib primitives and asserts the values
 // declared here -- if either side drifts the test fails immediately.
 global C_SPEND_NEW_X: Field =
-    0x2fb2d785d71d4c62ce4130675a6c44020c03a236ab21450b6f20282549caadac;
+    0x22f167015ee0e4b33dcb278cdc824c336c919dc4cd06f391850305d5083336e6;
 global C_SPEND_NEW_Y: Field =
-    0x069a978c07b99e97858a6e94cef5b3d2c49f1df0d2aa5e04dffcefaca9320814;
+    0x0be3d0fda4f8f70b04e2d609db4e29b30345da9288bf208c7560572b2bef172d;
 global B_TILDE: Field =
-    0x2b7f92c72c05ae8ecf7207fdaecea32ef748cd4dd43ca9ed6dc6d226865b4283;
+    0x04d1659db899a50a94dcfc54a18b8adaf6e9e8e3046bd11893fbd4a86a7c5670;
 
 // Auditor-block fixtures. Pinned by `withdraw_auditor_fixtures_match_lib`.
 // R_E_X (= (R_E * H).x) matches the lib's `ecdh` fixture (`ecdh(r_e, H)` for
@@ -58,7 +58,7 @@ global K_AUD_S_Y: Field =
 global R_E_X: Field = 0x114ed4fcf2c57014eb678c577aa02f30ef590b713d7a6a5e87702d1c7f71957f;
 global R_E_Y: Field = 0x07a70cf826350d4f438c7a3c5e8761b0ae6cb63de757f0c96815f4057b9205f4;
 global B_TILDE_AUD_S: Field =
-    0x216ab12ea2182712721d79c9a9222a261452ab06a90309e23efaa6ecb0e20714;
+    0x0a607feb31e56e89ed94a3e1dc3811d3d23aaf10b2f27874ce670878b9f6f071;
 
 #[test]
 fn print_fixtures() {
@@ -401,7 +401,7 @@ fn rejects_tampered_c_spend_new() {
 
 #[test(should_fail)]
 fn rejects_r_e_zero() {
-    // W_a5 fires: r_e = 0 would force R_e = O (identity) and collapse
+    // W8 fires: r_e = 0 would force R_e = O (identity) and collapse
     // S_a,s to O, making m_b a knowable constant function of sigma.
     main(
         SK,

@@ -176,6 +176,7 @@ fn domain_separation_distinct() {
     // Touches every domain tag at least once.
     let a: Field = 42;
     let b: Field = 99;
+    let h_addr = poseidon_with_domain(domain::ADDRESS, [a, b]);
     let h_vk = poseidon_with_domain(domain::VIEWING_KEY, [a, b]);
     let h_dvk = poseidon_with_domain(domain::DELEGATION_VIEWING_KEY, [a, b]);
     let h_sr = poseidon_with_domain(domain::SPEND_RANDOMNESS, [a, b]);
@@ -189,6 +190,7 @@ fn domain_separation_distinct() {
     let h_ar2 = poseidon_with_domain(domain::AUDITOR_RECIPIENT, [a, b]);
 
     // Distinct from VK.
+    assert(h_vk != h_addr);
     assert(h_vk != h_dvk);
     assert(h_vk != h_sr);
     assert(h_vk != h_tb);
@@ -427,43 +429,43 @@ fn fixtures_match_testdata() {
     );
 
     let vk = vk_from_sk(sk, wrap);
-    assert(vk == 0x0ac6ade91aea36f4de35eb5a06a67e1b9c3dab9842479f1cce85caf826194ec2);
+    assert(vk == 0x208fbdb70d2faacf04f987b54f12aeeaeb432acc29d650c86ce0f6275b958eb8);
 
     let pvk = pvk_from_vk(vk);
-    assert(pvk.x == 0x01de20bfe21ad660e073b14a106feae4afce4e78a020953ca16b767e0615331b);
-    assert(pvk.y == 0x12cf407b75fccb5c7721c5fdadc3d1a22b5440e36b08fe52658ab885529e92fd);
+    assert(pvk.x == 0x2e7421c0e86a4c8eed823edf851c364ecee448bf70eae2a95befe3dd9364cc45);
+    assert(pvk.y == 0x0b060655740aabef84e7305bb886b75da8d258f346381f03925d69645292fe7a);
 
     let dvk = dvk_from_vk_op(vk, op_i);
-    assert(dvk == 0x1dec1da326d325cf918eed33f097cfb854b41aac8ece9e6e8bd54b7a7c448785);
+    assert(dvk == 0x1a088264ebf7269160bbf34d5a3f94d7dec37efc609ef76c5dbfa8690af3eae9);
 
     assert(
         derive_spend_r(vk, sigma)
-            == 0x1b9d813c7c14c78969edb37cce24f3bb867f6e64efe73d950cfbbe8ed4c31482,
+            == 0x0218f93b7ea0735d4934904f2bf26fc20c33dc01fb032a8f00aa67147132ec91,
     );
     assert(
         derive_allow_r(dvk, sigma_a)
-            == 0x199b47ff8b24b165411fa44b06d541b9d1b74d0d202fd651712e24c11e05cb35,
+            == 0x0afda20e062a277afc0c86e31ea22597ee2c094b1b9cd08b8d8a2a212a8af1ee,
     );
     assert(
         derive_tx_blind(s_ecdh, sigma)
-            == 0x15388ad70c7a48cfed4fb9cfbd633ff18617c9e52829b5d51eaab938baae33a7,
+            == 0x274c4f45d57544efca9f6f505e6b29ae098f1d30243de28f7cef62d05484c83d,
     );
 
     assert(
         encrypt_amount(v_tx, s_ecdh, sigma)
-            == 0x274c4f45d57544efca9f6f505e6b29ae098f1d30243de28f7cef62d05484c8a1,
+            == 0x2a07070eb651b03ecc22453ad1cc69a39567ca27fb4224e8727a5fbc83091526,
     );
     assert(
         encrypt_balance(v, vk, sigma)
-            == 0x2b7f92c72c05ae8ecf7207fdaecea32ef748cd4dd43ca9ed6dc6d226865b43af,
+            == 0x04d1659db899a50a94dcfc54a18b8adaf6e9e8e3046bd11893fbd4a86a7c579c,
     );
     assert(
         encrypt_allowance(v_a, dvk, sigma_a)
-            == 0x235db43a283e4e000337cdb80a99168ef4b718622cc06de4ab98b3d2bd5736d5,
+            == 0x2440e4fcb575aa4433cd53a37a7396d5022f8c287298cacc0cfc0857250ef02a,
     );
     assert(
         encrypt_esc_dvk(dvk, s_ecdh, op_i)
-            == 0x2468d02775ad21aa5928d049770287249af2a03dbaf4d18e22e3fe71fd292003,
+            == 0x15f3b867cbe94f0b6371e46752431be550f907ba8448c6191b7ba1f47c2cb83e,
     );
 
     // Per-channel auditor sponge (v0.6, Section 2.5). Values pinned below are
@@ -498,15 +500,15 @@ fn fixtures_match_testdata() {
 // `testdata/sponge_squeeze_*.json`. Update both sides together if the lib's
 // sponge construction or domain constants change.
 global SPONGE_SQUEEZE_1_AUDITOR_SENDER: Field =
-    0x266e76dccd3d7c654ab7a48045cca920c497b1a6758981acfa6f217427ac3074;
-global SPONGE_SQUEEZE_2_AUDITOR_SENDER_0: Field =
-    0x266e76dccd3d7c654ab7a48045cca920c497b1a6758981acfa6f217427ac3074;
-global SPONGE_SQUEEZE_2_AUDITOR_SENDER_1: Field =
-    0x248b757f9fec92895bd3fb91b1a5c9c17467df6f0f55ab574d85e943df8e5cf3;
-global SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_0: Field =
     0x2787d1e01bbca7828e13e9b2b3fa11cfcfe9c3d2b121b9e17543146822fe1feb;
-global SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1: Field =
+global SPONGE_SQUEEZE_2_AUDITOR_SENDER_0: Field =
+    0x2787d1e01bbca7828e13e9b2b3fa11cfcfe9c3d2b121b9e17543146822fe1feb;
+global SPONGE_SQUEEZE_2_AUDITOR_SENDER_1: Field =
     0x27f3739a132c6353cd5af3edac0ac75faf7fc606acb61367774e4f764ec17b77;
+global SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_0: Field =
+    0x0801e6d7184cea11e6225fcfb4e88a90674cb085da8ebc04918c57cc44b9c25d;
+global SPONGE_SQUEEZE_2_AUDITOR_RECIPIENT_1: Field =
+    0x131187e2ac296c1c54c2be2a5cbe614644f01c754108ce25359212d67b36ecc3;
 
 #[test]
 fn derive_helpers_deterministic_and_distinct() {
