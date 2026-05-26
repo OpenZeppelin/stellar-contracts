@@ -361,11 +361,15 @@ const FR_MODULUS_BE: [u8; 32] = [
     0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
 ];
 
-/// Adds the BN254 scalar field modulus `r` to a canonical 32-byte big-endian
-/// coordinate, producing a non-canonical encoding that reduces to the same
-/// field element under `Bn254Fr::from_bytes`. Returns `None` if the sum
-/// overflows 32 bytes (only happens for `coord` very close to `r`, which is
-/// extremely unlikely for randomly generated points).
+/// Adds the BN254 scalar field modulus `r` (see [`FR_MODULUS_BE`]) to a
+/// canonical 32-byte big-endian coordinate, producing a non-canonical encoding
+/// that reduces to the same field element under `Bn254Fr::from_bytes`.
+///
+/// For any canonical `coord` (`coord < r`), `coord + r < 2r < 2^255 < 2^256`,
+/// so the 32-byte sum cannot overflow and [`add_modulus_be`] always returns
+/// `Some`. The `None` branch is purely defensive and only reachable if
+/// `coord >= 2^256 - r`, which requires a non-canonical / invalid input
+/// outside the field's representative range.
 fn add_modulus_be(coord: &[u8; 32]) -> Option<[u8; 32]> {
     let mut out = [0u8; 32];
     let mut carry: u16 = 0;
