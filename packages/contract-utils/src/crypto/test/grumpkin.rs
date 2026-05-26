@@ -353,3 +353,78 @@ fn prop_is_on_curve_rejects_corrupted_y() {
         prop_assert!(!Grumpkin::is_on_curve(&e, &corrupted));
     })
 }
+
+/// BN254 scalar field modulus r in big-endian bytes — duplicated here so the
+/// test exercises a value independent of the production constant.
+const FR_MODULUS_BE: [u8; 32] = [
+    0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58, 0x5d,
+    0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
+];
+
+/// Adds the BN254 scalar field modulus `r` to a canonical 32-byte big-endian
+/// coordinate, producing a non-canonical encoding that reduces to the same
+/// field element under `Bn254Fr::from_bytes`. Returns `None` if the sum
+/// overflows 32 bytes (only happens for `coord` very close to `r`, which is
+/// extremely unlikely for randomly generated points).
+fn add_modulus_be(coord: &[u8; 32]) -> Option<[u8; 32]> {
+    let mut out = [0u8; 32];
+    let mut carry: u16 = 0;
+    for i in (0..32).rev() {
+        let sum = coord[i] as u16 + FR_MODULUS_BE[i] as u16 + carry;
+        out[i] = sum as u8;
+        carry = sum >> 8;
+    }
+    if carry != 0 {
+        None
+    } else {
+        Some(out)
+    }
+}
+
+#[test]
+fn prop_is_on_curve_rejects_non_canonical_x() {
+    let e = Env::default();
+    e.cost_estimate().budget().reset_unlimited();
+
+    proptest!(|(k: [u8; 32])| {
+        let canonical = to_point(&e, &scalar_mul_g(nonzero_scalar(&k))).to_array();
+        let mut x = [0u8; 32];
+        x.copy_from_slice(&canonical[..32]);
+        let Some(x_plus_r) = add_modulus_be(&x) else { return Ok(()); };
+        let mut malleated = canonical;
+        malleated[..32].copy_from_slice(&x_plus_r);
+        let mutated = BytesN::from_array(&e, &malleated);
+        // Same logical point under mod-r reduction; distinct bytes.
+        prop_assert_ne!(malleated, canonical);
+        prop_assert!(!Grumpkin::is_on_curve(&e, &mutated));
+    })
+}
+
+#[test]
+fn prop_is_on_curve_rejects_non_canonical_y() {
+    let e = Env::default();
+    e.cost_estimate().budget().reset_unlimited();
+
+    proptest!(|(k: [u8; 32])| {
+        let canonical = to_point(&e, &scalar_mul_g(nonzero_scalar(&k))).to_array();
+        let mut y = [0u8; 32];
+        y.copy_from_slice(&canonical[32..]);
+        let Some(y_plus_r) = add_modulus_be(&y) else { return Ok(()); };
+        let mut malleated = canonical;
+        malleated[32..].copy_from_slice(&y_plus_r);
+        let mutated = BytesN::from_array(&e, &malleated);
+        prop_assert_ne!(malleated, canonical);
+        prop_assert!(!Grumpkin::is_on_curve(&e, &mutated));
+    })
+}
+
+#[test]
+fn is_on_curve_rejects_x_equal_to_modulus() {
+    // x = r is the smallest non-canonical value that reduces to 0; check
+    // exactly that boundary.
+    let e = Env::default();
+    let mut bytes = [0u8; 64];
+    bytes[..32].copy_from_slice(&FR_MODULUS_BE);
+    let p = BytesN::from_array(&e, &bytes);
+    assert!(!Grumpkin::is_on_curve(&e, &p));
+}
