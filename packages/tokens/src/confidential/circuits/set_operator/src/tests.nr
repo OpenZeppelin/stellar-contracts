@@ -72,16 +72,19 @@ global B_TILDE: Field =
 // New values pinned by `set_operator_fixtures_match_lib` and
 // `set_operator_auditor_fixtures_match_lib` (re-derived from the lib
 // primitives -- if either side drifts the test fails immediately). Emitted by
-// `print_fixtures`; the placeholder zeros below are filled in by running
-// `nargo test --package circuit_set_operator print_fixtures --show-output`.
-global Y_OP_X: Field = 0x0;
-global Y_OP_Y: Field = 0x0;
-global C_A_X: Field = 0x0;
-global C_A_Y: Field = 0x0;
-global A_TILDE: Field = 0x0;
-global ESCROWED_DVK_CIPHER: Field = 0x0;
-global V_TILDE_AUD_S: Field = 0x0;
-global B_TILDE_AUD_S: Field = 0x0;
+// `print_fixtures`.
+global Y_OP_X: Field = 0x08a500f1d05ebcba6cdbe9c246475e406f28ee2285fdfa4ed9781013ebb1571e;
+global Y_OP_Y: Field = 0x2264cba150d089d7678ee412307b118826efb9e4c0f1b4ae10a851d63e83c632;
+global C_A_X: Field = 0x1c673e9370f2dcf333e4c63d6faf3957e5a667017406540713b248583c5ae7d7;
+global C_A_Y: Field = 0x1f9f86c84bed1f091c282300a063e4ff38082a63aeec17aef054d5ece0c3ebcc;
+global A_TILDE: Field =
+    0x0c4647bbcd2819afdcd6facf2037861da37e68008f3a40ec2f8db6487e1355c1;
+global ESCROWED_DVK_CIPHER: Field =
+    0x0d9a3beebbda646b71859a11420a74f8b3fe645d9f235f862733554e1d928405;
+global V_TILDE_AUD_S: Field =
+    0x0a607feb31e56e89ed94a3e1dc3811d3d23aaf10b2f27874ce670878b9f6eee1;
+global B_TILDE_AUD_S: Field =
+    0x0b586defafdf4583d0f338855fdf8391102adaac4634a3b80594aea6f788e103;
 
 #[test]
 fn print_fixtures() {
