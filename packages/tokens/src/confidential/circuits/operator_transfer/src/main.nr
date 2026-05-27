@@ -45,6 +45,10 @@ mod tests;
 //                                   sigma_a)                Encrypted amount
 //                                                           (emitted).
 // Allowance state (new)
+//   --  sigma_a' != sigma_a                                 Salt rotation
+//                                                           (implementation
+//                                                           hardening; not in
+//                                                           Section 7.8).
 //   O10 r_a'       = Poseidon2(delta_allow_r, dvk_i,
 //                              sigma_a')                    New allowance
 //                                                           randomness.
@@ -266,6 +270,9 @@ fn main(
     // O9
     let v_tilde_derived = encrypt_amount(v_tx, s_x, sigma_a);
     assert(v_tilde_derived == v_tilde);
+
+    // Salt rotation (implementation hardening).
+    assert(sigma_a_new != sigma_a);
 
     // O10
     let r_a_new = derive_allow_r(dvk_i, sigma_a_new);

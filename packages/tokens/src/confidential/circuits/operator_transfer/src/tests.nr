@@ -594,7 +594,7 @@ fn rejects_wrong_allowance_opening() {
 }
 
 #[test(should_fail)]
-fn rejects_under_funded_transfer() {
+fn rejects_v_a_new_out_of_range() {
     // v_tx > v_a: v_a - v_tx underflows in the field to a value >= 2^128.
     // O4's `v_a_new` range check fires. Every downstream public is
     // recomputed against v_tx_too_large so the single firing constraint is
@@ -887,6 +887,14 @@ fn rejects_tampered_v_tilde() {
     );
 }
 
+// O10 (`r_a' = Poseidon2(delta_allow_r, dvk_i, sigma_a')`) is exercised
+// transitively by the two tests below: a tampered `c_a_new` is detected by
+// O11 (which consumes `r_a_new`), and a tampered `a_tilde_new` is detected
+// by O12 (which consumes `dvk_i` and `sigma_a'` directly). `dvk_i` is the
+// single shared witness between O3 and O10, so isolating O10 with its own
+// dedicated negative test would require a second `dvk_i` witness that
+// doesn't exist in the circuit.
+
 #[test(should_fail)]
 fn rejects_tampered_a_tilde_new() {
     // O12 fires.
@@ -954,6 +962,53 @@ fn rejects_tampered_c_a_new() {
         V_TILDE,
         A_TILDE_NEW,
         SIGMA_A_NEW,
+        V_TILDE_AUD_R,
+        R_TILDE_AUD_R,
+        V_TILDE_AUD_S,
+        A_TILDE_AUD_S,
+    );
+}
+
+#[test(should_fail)]
+fn rejects_sigma_a_new_equal_to_sigma_a() {
+    // Salt-rotation hardening: the circuit rejects `sigma_a' == sigma_a`
+    // even though Section 7.8 does not require it. With `sigma_a' = sigma_a`:
+    //   r_a_new = derive_allow_r(dvk_i, sigma_a_new) = r_a
+    //   c_a_new = (V_A - V_TX) * G + r_a * H
+    //   a_tilde_new = encrypt_allowance(V_A - V_TX, dvk_i, sigma_a_new)
+    // All downstream publics are recomputed consistently so the only
+    // firing constraint is `assert(sigma_a_new != sigma_a)`.
+    let r_a_new = derive_allow_r(DVK_I, SIGMA_A);
+    let c_a_new = commit(V_A_NEW, r_a_new);
+    let a_tilde_new = encrypt_allowance(V_A_NEW, DVK_I, SIGMA_A);
+
+    run_main(
+        SK_OP,
+        DVK_I,
+        V_A,
+        R_A,
+        V_TX,
+        R_E,
+        C_A_X,
+        C_A_Y,
+        SIGMA_A,
+        Y_OP_X,
+        Y_OP_Y,
+        PVK_RECIPIENT_X,
+        PVK_RECIPIENT_Y,
+        K_AUD_R_X,
+        K_AUD_R_Y,
+        K_AUD_S_X,
+        K_AUD_S_Y,
+        c_a_new.x,
+        c_a_new.y,
+        C_TX_X,
+        C_TX_Y,
+        R_E_X,
+        R_E_Y,
+        V_TILDE,
+        a_tilde_new,
+        SIGMA_A,
         V_TILDE_AUD_R,
         R_TILDE_AUD_R,
         V_TILDE_AUD_S,
