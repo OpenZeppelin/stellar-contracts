@@ -1,3 +1,4 @@
+mod grumpkin;
 mod hashable;
 mod keccak;
 mod merkle;
