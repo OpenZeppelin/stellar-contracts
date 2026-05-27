@@ -45,6 +45,13 @@ pub enum ComplianceHook {
 
 /// Trait for implementing custom compliance logic to RWA tokens.
 ///
+/// The contract implementing this trait serves as the core compliance contract
+/// that RWA token contracts interact with. It manages the registration of
+/// compliance modules and forwards hook calls to those modules during token
+/// operations. In other words, this contract acts as the dispatcher for
+/// compliance logic, while the actual logic is implemented in separate module
+/// contracts that are registered to it.
+///
 /// [`Compliance`] trait is not expected to be an extension to a RWA smart
 /// contract, but it is a separate contract on its own. This design allows it to
 /// be shared across many RWA tokens. Note that, there is no `RWA` bound on the
