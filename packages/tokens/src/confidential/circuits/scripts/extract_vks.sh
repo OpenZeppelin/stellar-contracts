@@ -24,6 +24,7 @@ cd "$(dirname "$0")/.."
 CIRCUITS=(
     "register"
     "withdraw"
+    "set_operator"
 )
 
 OUT_DIR="vks"

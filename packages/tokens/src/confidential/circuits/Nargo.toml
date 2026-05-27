@@ -3,6 +3,7 @@ members = [
     "lib",
     "register",
     "withdraw",
+    "set_operator",
     "gadgets/assert_on_curve",
     "gadgets/commit",
     "gadgets/ecdh",
