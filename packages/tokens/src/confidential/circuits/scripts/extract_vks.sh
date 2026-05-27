@@ -23,8 +23,8 @@ cd "$(dirname "$0")/.."
 
 CIRCUITS=(
     "register"
-    "revoke_operator"
     "withdraw"
+    "revoke_operator"
 )
 
 OUT_DIR="vks"
