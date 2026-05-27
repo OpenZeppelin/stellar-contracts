@@ -23,6 +23,7 @@ cd "$(dirname "$0")/.."
 
 CIRCUITS=(
     "register"
+    "revoke_operator"
     "withdraw"
 )
 
