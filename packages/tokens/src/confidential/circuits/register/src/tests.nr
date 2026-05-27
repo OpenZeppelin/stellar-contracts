@@ -8,8 +8,8 @@ global SK: Field = 0xdead;
 global WRAP: Field = 0xbeef;
 global Y_X: Field = 0x1b46b003b88a6c34549dc74115f088f4b231a151397526bc10cbf1d15b457646;
 global Y_Y: Field = 0x29116280600c10ead1fdbd9ab4b571896030679bf554d7f1ebf681e5147de21b;
-global PVK_X: Field = 0x01de20bfe21ad660e073b14a106feae4afce4e78a020953ca16b767e0615331b;
-global PVK_Y: Field = 0x12cf407b75fccb5c7721c5fdadc3d1a22b5440e36b08fe52658ab885529e92fd;
+global PVK_X: Field = 0x2e7421c0e86a4c8eed823edf851c364ecee448bf70eae2a95befe3dd9364cc45;
+global PVK_Y: Field = 0x0b060655740aabef84e7305bb886b75da8d258f346381f03925d69645292fe7a;
 
 #[test]
 fn matches_fixture() {

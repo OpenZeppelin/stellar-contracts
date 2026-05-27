@@ -5,7 +5,7 @@
   "vectors": [
     {
       "inputs": { "sk": "0xdead", "wrap": "0xbeef" },
-      "output": "0x0ac6ade91aea36f4de35eb5a06a67e1b9c3dab9842479f1cce85caf826194ec2"
+      "output": "0x208fbdb70d2faacf04f987b54f12aeeaeb432acc29d650c86ce0f6275b958eb8"
     }
   ]
 }

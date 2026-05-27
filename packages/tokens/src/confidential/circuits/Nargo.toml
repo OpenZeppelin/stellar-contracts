@@ -2,6 +2,7 @@
 members = [
     "lib",
     "register",
+    "withdraw",
     "gadgets/assert_on_curve",
     "gadgets/commit",
     "gadgets/ecdh",
@@ -9,4 +10,5 @@ members = [
     "gadgets/encrypt_amount",
     "gadgets/range_128",
     "gadgets/poseidon_with_domain",
+    "gadgets/sponge_squeeze_2",
 ]
