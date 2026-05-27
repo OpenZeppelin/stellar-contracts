@@ -1,9 +1,9 @@
 [workspace]
 members = [
     "lib",
-    "operator_transfer",
     "register",
     "withdraw",
+    "operator_transfer",
     "gadgets/assert_on_curve",
     "gadgets/commit",
     "gadgets/ecdh",

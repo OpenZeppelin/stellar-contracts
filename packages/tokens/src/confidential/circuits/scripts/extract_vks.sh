@@ -22,9 +22,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 CIRCUITS=(
-    "operator_transfer"
     "register"
     "withdraw"
+    "operator_transfer"
 )
 
 OUT_DIR="vks"
