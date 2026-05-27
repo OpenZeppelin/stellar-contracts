@@ -113,8 +113,8 @@ fn print_fixtures() {
     let v_tilde_aud_s = V_A + m_s[0];
     let b_tilde_aud_s = V_NEW + m_s[1];
 
-    let yox = y_op.x;
-    let yoy = y_op.y;
+    let yopx = y_op.x;
+    let yopy = y_op.y;
     let cax = c_a.x;
     let cay = c_a.y;
     let csnx = c_spend_new.x;
@@ -123,8 +123,8 @@ fn print_fixtures() {
     let ky = k_aud_s.y;
     let rex = r_e_pt.x;
     let rey = r_e_pt.y;
-    println(f"Y_OP_X = {yox}");
-    println(f"Y_OP_Y = {yoy}");
+    println(f"Y_OP_X = {yopx}");
+    println(f"Y_OP_Y = {yopy}");
     println(f"C_A_X = {cax}");
     println(f"C_A_Y = {cay}");
     println(f"A_TILDE = {a_tilde}");
