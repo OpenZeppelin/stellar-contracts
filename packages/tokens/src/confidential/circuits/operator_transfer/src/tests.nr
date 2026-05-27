@@ -804,44 +804,6 @@ fn rejects_wrong_recipient_pvk() {
 }
 
 #[test(should_fail)]
-fn rejects_off_curve_pvk_recipient() {
-    // (1, 2) is off-curve: 4 != 1 - 17. The on-curve check on PVK_recipient
-    // fires before O5 ever consumes it.
-    run_main(
-        SK_OP,
-        DVK_I,
-        V_A,
-        R_A,
-        V_TX,
-        R_E,
-        C_A_X,
-        C_A_Y,
-        SIGMA_A,
-        Y_OP_X,
-        Y_OP_Y,
-        1,
-        2,
-        K_AUD_R_X,
-        K_AUD_R_Y,
-        K_AUD_S_X,
-        K_AUD_S_Y,
-        C_A_NEW_X,
-        C_A_NEW_Y,
-        C_TX_X,
-        C_TX_Y,
-        R_E_X,
-        R_E_Y,
-        V_TILDE,
-        A_TILDE_NEW,
-        SIGMA_A_NEW,
-        V_TILDE_AUD_R,
-        R_TILDE_AUD_R,
-        V_TILDE_AUD_S,
-        A_TILDE_AUD_S,
-    );
-}
-
-#[test(should_fail)]
 fn rejects_poisoned_c_tx() {
     // Anti-poisoning (Section 5.4): a prover that commits C_tx with arbitrary
     // blinding -- here r_tx + 1 -- desynchronizes the recipient's accumulated

@@ -118,15 +118,14 @@ mod tests;
 // Y_op, C_a, C_a', C_tx, R_e, S, S_{a,r}, and S_{a,s} are bound to in-circuit
 // multi_scalar_mul outputs (O1, O2, O11, O8, O6, O5, O_a1, O_a5) and are
 // therefore on-curve by construction -- no explicit check needed.
-// PVK_recipient, K_aud_r, and K_aud_s are public-input keys consumed by ECDH
-// multiplications (Section 10.8 path (3)); the verifier doesn't check curve
-// membership and an off-curve key would break the soundness of O5 / O_a1 /
-// O_a5. This file explicitly validates all three on-curve AND non-identity
-// before the corresponding ECDH consumes them. (PVK_recipient is path (2) of
-// Section 10.8 -- proof-constrained at the recipient's registration and
-// trusted on read from `to.viewing_public_key` -- but the explicit check
-// keeps the operator-side circuit defensive even if the recipient slot is
-// ever loaded outside the wrapper.)
+// PVK_recipient was constrained on-curve when the recipient registered (R3,
+// Section 7.2) and is loaded by the wrapper from trusted storage, so it is
+// path (2) of Section 10.8 and the circuit consumes it without re-checking.
+// K_aud_r and K_aud_s are public-input keys with no proof constraint at
+// insertion (path (3)) -- the verifier doesn't check curve membership and
+// an off-curve key would break the soundness of O_a1 / O_a5. This file
+// explicitly validates both on-curve AND non-identity before the
+// corresponding ECDH consumes them.
 //
 // Public inputs (24 fields, in design-doc canonical order)
 // --------------------------------------------------------
@@ -250,12 +249,10 @@ fn main(
     assert(r_e_derived.x == r_e_x);
     assert(r_e_derived.y == r_e_y);
 
-    // O5 -- PVK_recipient validated on-curve + non-identity before consumption
-    // (Section 10.8 path (3) wrt this circuit; defensive even though the
-    // recipient's PVK was proof-constrained at registration, R3).
+    // O5 -- PVK_recipient is path (2) of Section 10.8 (proof-constrained at
+    // the recipient's registration via R3, trusted on read).
     let pvk_recipient =
         EmbeddedCurvePoint { x: pvk_recipient_x, y: pvk_recipient_y, is_infinite: false };
-    assert_on_curve_non_identity(pvk_recipient);
     let s_x = ecdh(r_e, pvk_recipient);
 
     // O7 (anti-poisoning, Section 5.4)
