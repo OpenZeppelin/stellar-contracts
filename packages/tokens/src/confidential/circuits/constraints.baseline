@@ -1,3 +1,22 @@
+# Noir constraint baseline (DO NOT EDIT BY HAND)
+#
+# Normalized output of `nargo info` for the confidential token Noir crate.
+# Regenerate with:
+#
+#   cd packages/tokens/src/confidential/circuits
+#   LC_ALL=C nargo info | grep '^|' | LC_ALL=C sort > constraints.baseline
+#
+# LC_ALL=C is mandatory -- it makes `sort` use byte order, which is the
+# only ordering that's stable across macOS (en_US locale) and the Ubuntu
+# CI runner (C locale).
+#
+# CI diffs the current normalized `nargo info` against this file and
+# fails on any change. Bumping constraint counts is expected when the
+# lib changes -- regenerate this file in the same PR and reviewers
+# will see the delta side-by-side.
+#
+# Toolchain: nargo 1.0.0-beta.11
+#
 | Package                     | Function                   | Expression Width     | ACIR Opcodes | Brillig Opcodes |
 | circuit_operator_transfer   | decompose_hint             | N/A                  | N/A          | 30              |
 | circuit_operator_transfer   | directive_invert           | N/A                  | N/A          | 9               |
