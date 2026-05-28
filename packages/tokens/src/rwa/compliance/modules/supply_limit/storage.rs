@@ -119,7 +119,6 @@ pub fn set_supply_limit(e: &Env, token: &Address, limit: i128) {
     require_non_negative_amount(e, limit);
     let key = SupplyLimitStorageKey::SupplyLimit(token.clone());
     e.storage().persistent().set(&key, &limit);
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
     emit_supply_limit_set(e, token, limit);
 }
 
@@ -218,6 +217,5 @@ pub fn on_destroyed(e: &Env, _from: &Address, amount: i128, token: &Address) {
 pub fn set_supply_count(e: &Env, token: &Address, supply: i128) {
     let key = SupplyLimitStorageKey::SupplyCount(token.clone());
     e.storage().persistent().set(&key, &supply);
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
     emit_supply_count_updated(e, token, supply);
 }

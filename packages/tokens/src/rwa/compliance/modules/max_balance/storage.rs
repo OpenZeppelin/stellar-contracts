@@ -64,7 +64,7 @@ pub fn get_id_balance(e: &Env, token: &Address, identity: &Address) -> i128 {
 /// * `token` - The token address.
 pub fn is_preset_completed(e: &Env, token: &Address) -> bool {
     let key = MaxBalanceStorageKey::PresetCompleted(token.clone());
-    if e.storage().persistent().has(&key) {
+    if e.storage().persistent().get::<_, ()>(&key).is_some() {
         e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
         true
     } else {
@@ -182,7 +182,6 @@ pub fn set_max_balance(e: &Env, token: &Address, max: i128) {
     require_non_negative_amount(e, max);
     let key = MaxBalanceStorageKey::MaxBalance(token.clone());
     e.storage().persistent().set(&key, &max);
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
     emit_max_balance_set(e, token, max);
 }
 
@@ -279,7 +278,6 @@ pub fn batch_preset_id_balances(
 pub fn mark_preset_completed(e: &Env, token: &Address) {
     let key = MaxBalanceStorageKey::PresetCompleted(token.clone());
     e.storage().persistent().set(&key, &());
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
     emit_preset_completed(e, token);
 }
 
@@ -391,7 +389,6 @@ pub fn on_destroyed(e: &Env, from: &Address, amount: i128, token: &Address) {
 pub fn set_id_balance(e: &Env, token: &Address, identity: &Address, balance: i128) {
     let key = MaxBalanceStorageKey::IdBalance(token.clone(), identity.clone());
     e.storage().persistent().set(&key, &balance);
-    e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
 }
 
 /// Credits `amount` to `identity`'s tracked aggregate balance under `token`.
