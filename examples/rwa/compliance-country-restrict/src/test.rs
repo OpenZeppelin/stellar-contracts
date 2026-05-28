@@ -201,7 +201,7 @@ fn set_and_get_compliance_address_round_trip() {
     let compliance = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    client.set_compliance_address(&token, &compliance);
+    client.set_compliance_address(&token, &compliance, &admin);
 
     assert_eq!(client.get_compliance_address(&token), compliance);
 }
@@ -216,7 +216,7 @@ fn set_compliance_address_requires_admin_auth() {
     let compliance = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    client.set_compliance_address(&token, &compliance);
+    client.set_compliance_address(&token, &compliance, &admin);
 
     let auths = e.auths();
     assert_eq!(auths.len(), 1);

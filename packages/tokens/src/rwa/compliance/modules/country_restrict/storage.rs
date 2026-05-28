@@ -131,7 +131,9 @@ pub fn remove_country_restricted(e: &Env, token: &Address, country: u32) {
         .remove(&CountryRestrictStorageKey::RestrictedCountry(token.clone(), country));
 }
 
-/// Adds a country to the restriction list for `token`.
+/// Adds a country to the restriction list for `token`. If `country` is
+/// already restricted, the call is a no-op (no event emitted, no error
+/// raised).
 ///
 /// # Arguments
 ///
@@ -154,7 +156,9 @@ pub fn add_country_restriction(e: &Env, token: &Address, country: u32) {
     }
 }
 
-/// Removes a country from the restriction list for `token`.
+/// Removes a country from the restriction list for `token`. If `country` is
+/// not currently restricted, the call is a no-op (no event emitted, no error
+/// raised).
 ///
 /// # Arguments
 ///
@@ -177,7 +181,9 @@ pub fn remove_country_restriction(e: &Env, token: &Address, country: u32) {
     }
 }
 
-/// Adds multiple countries to the restriction list in a single call.
+/// Adds multiple countries to the restriction list in a single call. Entries
+/// that are already restricted are silently skipped (no event emitted, no
+/// error raised).
 ///
 /// # Arguments
 ///
@@ -205,6 +211,8 @@ pub fn batch_restrict_countries(e: &Env, token: &Address, countries: &Vec<u32>) 
 }
 
 /// Removes multiple countries from the restriction list in a single call.
+/// Entries that are not currently restricted are silently skipped (no event
+/// emitted, no error raised).
 ///
 /// # Arguments
 ///

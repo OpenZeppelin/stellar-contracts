@@ -58,7 +58,8 @@ pub trait CountryAllow: ComplianceModule {
     /// implementation.
     fn set_identity_registry_storage(e: &Env, token: Address, irs: Address, operator: Address);
 
-    /// Adds a country to the allowlist for `token`.
+    /// Adds a country to the allowlist for `token`. If `country` is already
+    /// allowed, the call is a no-op (no event emitted, no error raised).
     ///
     /// # Arguments
     ///
@@ -80,7 +81,9 @@ pub trait CountryAllow: ComplianceModule {
     /// for the implementation.
     fn add_allowed_country(e: &Env, token: Address, country: u32, operator: Address);
 
-    /// Removes a country from the allowlist for `token`.
+    /// Removes a country from the allowlist for `token`. If `country` is not
+    /// currently allowed, the call is a no-op (no event emitted, no error
+    /// raised).
     ///
     /// # Arguments
     ///
@@ -102,7 +105,9 @@ pub trait CountryAllow: ComplianceModule {
     /// [`storage::remove_allowed_country`] for the implementation.
     fn remove_allowed_country(e: &Env, token: Address, country: u32, operator: Address);
 
-    /// Adds multiple countries to the allowlist for `token`.
+    /// Adds multiple countries to the allowlist for `token`. Entries that are
+    /// already allowed are silently skipped (no event emitted, no error
+    /// raised).
     ///
     /// # Arguments
     ///
@@ -129,7 +134,9 @@ pub trait CountryAllow: ComplianceModule {
     /// network limits — see <https://lab.stellar.org/network-limits>.
     fn batch_allow_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address);
 
-    /// Removes multiple countries from the allowlist for `token`.
+    /// Removes multiple countries from the allowlist for `token`. Entries
+    /// that are not currently allowed are silently skipped (no event emitted,
+    /// no error raised).
     ///
     /// # Arguments
     ///

@@ -1,26 +1,19 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, contracttype, testutils::Address as _, vec, Address, Env, IntoVal,
-    String, Val, Vec,
+    contract, contractimpl, contracttype, testutils::Address as _, vec, Address, Env, String, Val,
+    Vec,
 };
 use stellar_tokens::rwa::{
-    identity_registry_storage::{
-        CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
-        IndividualCountryRelation, OrganizationCountryRelation,
-    },
+    identity_registry_storage::{CountryDataManager, IdentityRegistryStorage},
     utils::token_binder::TokenBinder,
 };
 
-use crate::contract::{CountryAllowContract, CountryAllowContractClient};
+use crate::contract::{MaxBalanceContract, MaxBalanceContractClient};
 
-fn create_client<'a>(
-    e: &Env,
-    admin: &Address,
-    manager: &Address,
-) -> CountryAllowContractClient<'a> {
-    let address = e.register(CountryAllowContract, (admin, manager));
-    CountryAllowContractClient::new(e, &address)
+fn create_client<'a>(e: &Env, admin: &Address, manager: &Address) -> MaxBalanceContractClient<'a> {
+    let address = e.register(MaxBalanceContract, (admin, manager));
+    MaxBalanceContractClient::new(e, &address)
 }
 
 #[contract]
@@ -30,7 +23,6 @@ struct MockIRSContract;
 #[derive(Clone)]
 enum MockIRSStorageKey {
     Identity(Address),
-    CountryEntries(Address),
 }
 
 #[contractimpl]
@@ -110,42 +102,20 @@ impl CountryDataManager for MockIRSContract {
         unreachable!("delete_country_data is not used in these tests");
     }
 
-    fn get_country_data_entries(e: &Env, account: Address) -> Vec<Val> {
-        let entries: Vec<CountryData> = e
-            .storage()
-            .persistent()
-            .get(&MockIRSStorageKey::CountryEntries(account))
-            .unwrap_or_else(|| Vec::new(e));
-
-        Vec::from_iter(e, entries.iter().map(|entry| entry.into_val(e)))
+    fn get_country_data_entries(_e: &Env, _account: Address) -> Vec<Val> {
+        unreachable!("get_country_data_entries is not used in these tests");
     }
 }
 
 #[contractimpl]
 impl MockIRSContract {
-    pub fn set_country_data_entries(e: &Env, account: Address, entries: Vec<CountryData>) {
-        e.storage().persistent().set(&MockIRSStorageKey::CountryEntries(account), &entries);
-    }
-}
-
-fn individual_country(code: u32) -> CountryData {
-    CountryData {
-        country: CountryRelation::Individual(IndividualCountryRelation::Residence(code)),
-        metadata: None,
-    }
-}
-
-fn organization_country(code: u32) -> CountryData {
-    CountryData {
-        country: CountryRelation::Organization(OrganizationCountryRelation::OperatingJurisdiction(
-            code,
-        )),
-        metadata: None,
+    pub fn set_identity(e: &Env, account: Address, identity: Address) {
+        e.storage().persistent().set(&MockIRSStorageKey::Identity(account), &identity);
     }
 }
 
 #[test]
-fn add_and_remove_allowed_country_work() {
+fn set_and_get_max_balance_work() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -153,17 +123,39 @@ fn add_and_remove_allowed_country_work() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    assert!(!client.is_country_allowed(&token, &276));
+    assert_eq!(client.get_max_balance(&token), 0);
 
-    client.add_allowed_country(&token, &276, &manager);
-    assert!(client.is_country_allowed(&token, &276));
-
-    client.remove_allowed_country(&token, &276, &manager);
-    assert!(!client.is_country_allowed(&token, &276));
+    client.set_max_balance(&token, &500_i128, &manager);
+    assert_eq!(client.get_max_balance(&token), 500);
 }
 
 #[test]
-fn batch_allow_and_disallow_countries_work() {
+fn preset_and_batch_preset_id_balances_work() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let token = Address::generate(&e);
+    let id_a = Address::generate(&e);
+    let id_b = Address::generate(&e);
+    let id_c = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    client.preset_id_balance(&token, &id_a, &100_i128, &manager);
+    assert_eq!(client.get_id_balance(&token, &id_a), 100);
+
+    client.batch_preset_id_balances(
+        &token,
+        &vec![&e, id_b.clone(), id_c.clone()],
+        &vec![&e, 200_i128, 300_i128],
+        &manager,
+    );
+    assert_eq!(client.get_id_balance(&token, &id_b), 200);
+    assert_eq!(client.get_id_balance(&token, &id_c), 300);
+}
+
+#[test]
+fn mark_preset_completed_flips_flag() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -171,13 +163,9 @@ fn batch_allow_and_disallow_countries_work() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    client.batch_allow_countries(&token, &vec![&e, 250u32, 276u32], &manager);
-    assert!(client.is_country_allowed(&token, &250));
-    assert!(client.is_country_allowed(&token, &276));
-
-    client.batch_disallow_countries(&token, &vec![&e, 250u32], &manager);
-    assert!(!client.is_country_allowed(&token, &250));
-    assert!(client.is_country_allowed(&token, &276));
+    assert!(!client.is_preset_completed(&token));
+    client.mark_preset_completed(&token, &manager);
+    assert!(client.is_preset_completed(&token));
 }
 
 #[test]
@@ -188,7 +176,7 @@ fn name_returns_module_identifier() {
     let manager = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    assert_eq!(client.name(), String::from_str(&e, "CountryAllowModule"));
+    assert_eq!(client.name(), String::from_str(&e, "MaxBalanceModule"));
 }
 
 #[test]
@@ -225,8 +213,7 @@ fn set_compliance_address_requires_admin_auth() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #398)")]
-fn get_compliance_address_panics_when_not_configured() {
+fn set_max_balance_requires_manager_auth() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -234,37 +221,7 @@ fn get_compliance_address_panics_when_not_configured() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    let _ = client.get_compliance_address(&token);
-}
-
-#[test]
-fn set_identity_registry_storage_requires_manager_auth() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let admin = Address::generate(&e);
-    let manager = Address::generate(&e);
-    let token = Address::generate(&e);
-    let irs = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
-
-    client.set_identity_registry_storage(&token, &irs, &manager);
-
-    let auths = e.auths();
-    assert_eq!(auths.len(), 1);
-    let (addr, _) = &auths[0];
-    assert_eq!(addr, &manager);
-}
-
-#[test]
-fn add_allowed_country_requires_manager_auth() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let admin = Address::generate(&e);
-    let manager = Address::generate(&e);
-    let token = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
-
-    client.add_allowed_country(&token, &276, &manager);
+    client.set_max_balance(&token, &100_i128, &manager);
 
     let auths = e.auths();
     assert_eq!(auths.len(), 1);
@@ -284,35 +241,93 @@ fn can_transfer_panics_when_irs_not_configured() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    client.can_transfer(&from, &to, &100_i128, &token);
+    client.set_max_balance(&token, &100_i128, &manager);
+    client.can_transfer(&from, &to, &10_i128, &token);
 }
 
 #[test]
-fn can_transfer_and_can_create_use_irs_country_entries() {
+fn can_transfer_and_can_create_use_identity_aggregate() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
     let from = Address::generate(&e);
     let token = Address::generate(&e);
-    let allowed_to = Address::generate(&e);
-    let disallowed_to = Address::generate(&e);
-    let amount = 100_i128;
+    let wallet_a = Address::generate(&e);
+    let wallet_b = Address::generate(&e);
+    let shared_id = Address::generate(&e);
+    let amount = 60_i128;
     let client = create_client(&e, &admin, &manager);
     let irs_id = e.register(MockIRSContract, ());
     let irs = MockIRSContractClient::new(&e, &irs_id);
 
-    irs.set_country_data_entries(
-        &allowed_to,
-        &vec![&e, individual_country(250), organization_country(276)],
-    );
-    irs.set_country_data_entries(&disallowed_to, &vec![&e, individual_country(250)]);
+    // Both wallets resolve to the same identity.
+    irs.set_identity(&wallet_a, &shared_id);
+    irs.set_identity(&wallet_b, &shared_id);
 
     client.set_identity_registry_storage(&token, &irs_id, &manager);
-    client.add_allowed_country(&token, &276, &manager);
+    client.set_max_balance(&token, &100_i128, &manager);
+    client.preset_id_balance(&token, &shared_id, &50_i128, &manager);
 
-    assert!(client.can_transfer(&from, &allowed_to, &amount, &token));
-    assert!(client.can_create(&allowed_to, &amount, &token));
-    assert!(!client.can_transfer(&from, &disallowed_to, &amount, &token));
-    assert!(!client.can_create(&disallowed_to, &amount, &token));
+    // shared_id at 50; receiving 60 on either wallet would push to 110.
+    assert!(!client.can_transfer(&from, &wallet_a, &amount, &token));
+    assert!(!client.can_create(&wallet_b, &amount, &token));
+    assert!(client.can_transfer(&from, &wallet_a, &30_i128, &token));
+}
+
+#[test]
+fn on_created_and_on_destroyed_track_aggregate_supply() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let compliance = Address::generate(&e);
+    let wallet = Address::generate(&e);
+    let identity = Address::generate(&e);
+    let token = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+
+    irs.set_identity(&wallet, &identity);
+
+    client.set_compliance_address(&token, &compliance, &admin);
+    client.set_identity_registry_storage(&token, &irs_id, &manager);
+    client.set_max_balance(&token, &100_i128, &manager);
+
+    client.on_created(&wallet, &40_i128, &token);
+    client.on_created(&wallet, &30_i128, &token);
+    assert_eq!(client.get_id_balance(&token, &identity), 70);
+
+    client.on_destroyed(&wallet, &20_i128, &token);
+    assert_eq!(client.get_id_balance(&token, &identity), 50);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #395)")]
+fn preset_id_balance_panics_after_completed() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let token = Address::generate(&e);
+    let identity = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    client.mark_preset_completed(&token, &manager);
+    client.preset_id_balance(&token, &identity, &1_i128, &manager);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #397)")]
+fn batch_preset_id_balances_rejects_length_mismatch() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let token = Address::generate(&e);
+    let id_a = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    client.batch_preset_id_balances(&token, &vec![&e, id_a], &vec![&e, 1_i128, 2_i128], &manager);
 }

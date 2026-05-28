@@ -78,7 +78,7 @@ impl ComplianceModule for CountryAllowContract {
     }
 
     #[only_admin]
-    fn set_compliance_address(e: &Env, token: Address, compliance: Address) {
+    fn set_compliance_address(e: &Env, token: Address, compliance: Address, _operator: Address) {
         compliance_storage::set_compliance_address(e, &token, &compliance);
     }
 }

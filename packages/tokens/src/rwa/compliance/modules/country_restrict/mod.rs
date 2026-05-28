@@ -58,7 +58,9 @@ pub trait CountryRestrict: ComplianceModule {
     /// implementation.
     fn set_identity_registry_storage(e: &Env, token: Address, irs: Address, operator: Address);
 
-    /// Adds a country to the restriction list for `token`.
+    /// Adds a country to the restriction list for `token`. If `country` is
+    /// already restricted, the call is a no-op (no event emitted, no error
+    /// raised).
     ///
     /// # Arguments
     ///
@@ -80,7 +82,9 @@ pub trait CountryRestrict: ComplianceModule {
     /// [`storage::add_country_restriction`] for the implementation.
     fn add_country_restriction(e: &Env, token: Address, country: u32, operator: Address);
 
-    /// Removes a country from the restriction list for `token`.
+    /// Removes a country from the restriction list for `token`. If `country`
+    /// is not currently restricted, the call is a no-op (no event emitted, no
+    /// error raised).
     ///
     /// # Arguments
     ///
@@ -102,7 +106,9 @@ pub trait CountryRestrict: ComplianceModule {
     /// [`storage::remove_country_restriction`] for the implementation.
     fn remove_country_restriction(e: &Env, token: Address, country: u32, operator: Address);
 
-    /// Adds multiple countries to the restriction list for `token`.
+    /// Adds multiple countries to the restriction list for `token`. Entries
+    /// that are already restricted are silently skipped (no event emitted,
+    /// no error raised).
     ///
     /// # Arguments
     ///
@@ -130,6 +136,8 @@ pub trait CountryRestrict: ComplianceModule {
     fn batch_restrict_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address);
 
     /// Removes multiple countries from the restriction list for `token`.
+    /// Entries that are not currently restricted are silently skipped (no
+    /// event emitted, no error raised).
     ///
     /// # Arguments
     ///

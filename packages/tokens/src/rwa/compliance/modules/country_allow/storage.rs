@@ -131,7 +131,8 @@ pub fn remove_country_allowed(e: &Env, token: &Address, country: u32) {
         .remove(&CountryAllowStorageKey::AllowedCountry(token.clone(), country));
 }
 
-/// Adds a country to the allowlist for `token`.
+/// Adds a country to the allowlist for `token`. If `country` is already
+/// allowed, the call is a no-op (no event emitted, no error raised).
 ///
 /// # Arguments
 ///
@@ -154,7 +155,9 @@ pub fn add_allowed_country(e: &Env, token: &Address, country: u32) {
     }
 }
 
-/// Removes a country from the allowlist for `token`.
+/// Removes a country from the allowlist for `token`. If `country` is not
+/// currently allowed, the call is a no-op (no event emitted, no error
+/// raised).
 ///
 /// # Arguments
 ///
@@ -177,7 +180,9 @@ pub fn remove_allowed_country(e: &Env, token: &Address, country: u32) {
     }
 }
 
-/// Adds multiple countries to the allowlist in a single call.
+/// Adds multiple countries to the allowlist in a single call. Entries that
+/// are already allowed are silently skipped (no event emitted, no error
+/// raised).
 ///
 /// # Arguments
 ///
@@ -204,7 +209,9 @@ pub fn batch_allow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
     }
 }
 
-/// Removes multiple countries from the allowlist in a single call.
+/// Removes multiple countries from the allowlist in a single call. Entries
+/// that are not currently allowed are silently skipped (no event emitted, no
+/// error raised).
 ///
 /// # Arguments
 ///
