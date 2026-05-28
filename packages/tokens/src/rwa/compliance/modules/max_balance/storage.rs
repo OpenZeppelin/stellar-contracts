@@ -118,24 +118,29 @@ pub fn can_receive(e: &Env, account: &Address, amount: i128, token: &Address) ->
 }
 
 /// Returns `true` when the transfer recipient can absorb `amount` without
-/// exceeding the per-identity cap.
-///
-/// The sender is intentionally ignored — transfers move balance between
-/// identities, and the only identity that can breach the cap is the
-/// recipient.
+/// exceeding the per-identity cap. Transfers where `from` and `to` resolve
+/// to the same identity are treated as no-ops: the tracked aggregate balance
+/// does not change, so the cap is always satisfied. In all other cases the only
+/// identity that can breach the cap is the recipient.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `_from` - The sender address.
+/// * `from` - The sender address.
 /// * `to` - The recipient address.
 /// * `amount` - The transfer amount.
 /// * `token` - The token address.
 ///
 /// # Errors
 ///
+/// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
 /// * refer to [`can_receive`] errors.
-pub fn can_transfer(e: &Env, _from: &Address, to: &Address, amount: i128, token: &Address) -> bool {
+pub fn can_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &Address) -> bool {
+    require_non_negative_amount(e, amount);
+    let irs = get_irs_client(e, token);
+    if irs.stored_identity(from) == irs.stored_identity(to) {
+        return true;
+    }
     can_receive(e, to, amount, token)
 }
 
@@ -287,7 +292,8 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 
 /// Records a transfer between two wallets: debits the sender's identity and
 /// credits the recipient's identity. Panics if crediting the recipient would
-/// exceed the per-identity cap.
+/// exceed the per-identity cap. Transfers where `from` and `to` resolve to
+/// the same identity are no-ops: no debit, no credit, no cap check.
 ///
 /// # Arguments
 ///
@@ -316,6 +322,9 @@ pub fn on_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &
     let irs = get_irs_client(e, token);
     let id_from = irs.stored_identity(from);
     let id_to = irs.stored_identity(to);
+    if id_from == id_to {
+        return;
+    }
     debit_identity(e, token, &id_from, amount);
     credit_identity(e, token, &id_to, amount);
 }

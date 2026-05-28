@@ -270,7 +270,7 @@ pub trait ComplianceModule {
 
 /// Error codes shared by all compliance modules.
 ///
-/// Compliance module errors occupy the 390–400 range, following the RWA
+/// Compliance module errors occupy the 390–398 range, following the RWA
 /// error numbering convention.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -282,29 +282,21 @@ pub enum ComplianceModuleError {
     MathOverflow = 391,
     /// Arithmetic underflow in a checked subtraction.
     MathUnderflow = 392,
-    /// A required limit entry is missing for the given token.
-    MissingLimit = 393,
-    /// A required transfer counter entry is missing.
-    MissingCounter = 394,
-    /// A required country data entry is missing.
-    MissingCountry = 395,
+    /// A transfer or mint would push an identity's aggregate balance above the
+    /// configured maximum.
+    MaxBalanceExceeded = 393,
+    /// A mint would push the tracked supply above the configured limit.
+    SupplyLimitExceeded = 394,
+    /// A preset operation was attempted after the preset phase has been
+    /// finalized.
+    PresetAlreadyCompleted = 395,
     /// The identity registry storage address has not been configured.
     IdentityRegistryNotSet = 396,
-    /// A token has reached the maximum number of configured limit entries.
-    TooManyLimits = 397,
+    /// The two parallel arrays in a batch call have different lengths.
+    BatchSizeMismatch = 397,
     /// No authorized compliance dispatcher has been bound for the given
     /// token.
     ComplianceNotSet = 398,
-    /// A transfer or mint would push an identity's aggregate balance above the
-    /// configured maximum.
-    MaxBalanceExceeded = 401,
-    /// A mint would push the tracked supply above the configured limit.
-    SupplyLimitExceeded = 402,
-    /// A preset operation was attempted after the preset phase has been
-    /// finalized.
-    PresetAlreadyCompleted = 403,
-    /// The two parallel arrays in a batch call have different lengths.
-    BatchSizeMismatch = 404,
 }
 
 // ################## CONSTANTS ##################

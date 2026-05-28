@@ -144,7 +144,7 @@ fn on_created_and_on_destroyed_track_supply() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #402)")]
+#[should_panic(expected = "Error(Contract, #394)")]
 fn on_created_panics_when_exceeding_limit() {
     let e = Env::default();
     e.mock_all_auths();

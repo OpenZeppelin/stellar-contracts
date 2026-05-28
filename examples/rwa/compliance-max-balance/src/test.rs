@@ -304,7 +304,7 @@ fn on_created_and_on_destroyed_track_aggregate_supply() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #403)")]
+#[should_panic(expected = "Error(Contract, #395)")]
 fn preset_id_balance_panics_after_completed() {
     let e = Env::default();
     e.mock_all_auths();
@@ -319,7 +319,7 @@ fn preset_id_balance_panics_after_completed() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #404)")]
+#[should_panic(expected = "Error(Contract, #397)")]
 fn batch_preset_id_balances_rejects_length_mismatch() {
     let e = Env::default();
     e.mock_all_auths();

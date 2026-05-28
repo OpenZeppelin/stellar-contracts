@@ -225,6 +225,34 @@ fn on_transfer_moves_balance_between_identities() {
 }
 
 #[test]
+fn same_identity_transfer_is_noop_for_cap_and_balance() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let wallet_a = Address::generate(&e);
+    let wallet_b = Address::generate(&e);
+    let identity = Address::generate(&e);
+
+    irs.set_identity(&wallet_a, &identity);
+    irs.set_identity(&wallet_b, &identity);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_max_balance(&e, &token, 100);
+        on_created(&e, &wallet_a, 100, &token);
+
+        // Identity is at the cap, but a transfer between two wallets of the
+        // same identity must still be permitted.
+        assert!(can_transfer(&e, &wallet_a, &wallet_b, 50, &token));
+
+        on_transfer(&e, &wallet_a, &wallet_b, 50, &token);
+        assert_eq!(get_id_balance(&e, &token, &identity), 100);
+    });
+}
+
+#[test]
 fn on_destroyed_decrements_identity_balance() {
     let e = Env::default();
     let module_id = e.register(TestMaxBalanceContract, ());
@@ -248,7 +276,7 @@ fn on_destroyed_decrements_identity_balance() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #401)")]
+#[should_panic(expected = "Error(Contract, #393)")]
 fn on_created_panics_when_exceeding_max() {
     let e = Env::default();
     let module_id = e.register(TestMaxBalanceContract, ());
@@ -279,7 +307,7 @@ fn on_destroyed_panics_when_identity_has_insufficient_balance() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #401)")]
+#[should_panic(expected = "Error(Contract, #393)")]
 fn on_transfer_panics_when_recipient_exceeds_max() {
     let e = Env::default();
     let module_id = e.register(TestMaxBalanceContract, ());
@@ -372,7 +400,7 @@ fn mark_preset_completed_blocks_further_presets() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #403)")]
+#[should_panic(expected = "Error(Contract, #395)")]
 fn preset_id_balance_panics_after_preset_completed() {
     let e = Env::default();
     let module_id = e.register(TestMaxBalanceContract, ());
@@ -386,7 +414,7 @@ fn preset_id_balance_panics_after_preset_completed() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #404)")]
+#[should_panic(expected = "Error(Contract, #397)")]
 fn batch_preset_id_balances_panics_on_length_mismatch() {
     let e = Env::default();
     let module_id = e.register(TestMaxBalanceContract, ());
