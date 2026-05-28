@@ -49,13 +49,13 @@ pub use storage::{get_key, register_key, rotate_key, AuditorStorageKey};
 /// Trait for managing Grumpkin auditor public keys used by the confidential
 /// token wrapper.
 ///
-/// The wrapper queries [`AuditorRegistry::get_key`] on every operation that
+/// The wrapper queries [`ConfidentialAuditor::get_key`] on every operation that
 /// produces an auditor ciphertext (withdraw, transfer, operator transfer,
-/// set/revoke operator). [`AuditorRegistry::register_key`] and
-/// [`AuditorRegistry::rotate_key`] are privileged operations expected to be
+/// set/revoke operator). [`ConfidentialAuditor::register_key`] and
+/// [`ConfidentialAuditor::rotate_key`] are privileged operations expected to be
 /// gated by the implementor's access-control scheme.
 #[contracttrait]
-pub trait AuditorRegistry {
+pub trait ConfidentialAuditor {
     /// Registers a Grumpkin public key under a fresh `auditor_id`.
     ///
     /// # Arguments

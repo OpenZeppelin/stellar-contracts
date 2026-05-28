@@ -1,17 +1,17 @@
-//! Confidential Auditor Registry Example Contract.
+//! Confidential Auditor Example Contract.
 
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, BytesN, Env, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::only_role;
-use stellar_tokens::confidential::auditor::{storage as auditor, AuditorRegistry};
+use stellar_tokens::confidential::auditor::{storage as auditor, ConfidentialAuditor};
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
 
 #[contract]
-pub struct AuditorRegistryContract;
+pub struct ConfidentialAuditorContract;
 
 #[contractimpl]
-impl AuditorRegistryContract {
+impl ConfidentialAuditorContract {
     pub fn __constructor(e: &Env, admin: Address, manager: Address) {
         access_control::set_admin(e, &admin);
         access_control::grant_role_no_auth(e, &manager, &MANAGER_ROLE, &admin);
@@ -19,7 +19,7 @@ impl AuditorRegistryContract {
 }
 
 #[contractimpl(contracttrait)]
-impl AuditorRegistry for AuditorRegistryContract {
+impl ConfidentialAuditor for ConfidentialAuditorContract {
     #[only_role(operator, "manager")]
     fn register_key(e: &Env, auditor_id: u32, point: BytesN<64>, operator: Address) {
         auditor::register_key(e, auditor_id, &point);
@@ -32,4 +32,4 @@ impl AuditorRegistry for AuditorRegistryContract {
 }
 
 #[contractimpl(contracttrait)]
-impl AccessControl for AuditorRegistryContract {}
+impl AccessControl for ConfidentialAuditorContract {}

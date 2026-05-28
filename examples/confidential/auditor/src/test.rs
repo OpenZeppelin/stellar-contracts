@@ -3,7 +3,7 @@ extern crate std;
 use soroban_sdk::{testutils::Address as _, Address, BytesN, Env};
 use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
-use crate::contract::{AuditorRegistryContract, AuditorRegistryContractClient};
+use crate::contract::{ConfidentialAuditorContract, ConfidentialAuditorContractClient};
 
 /// Grumpkin generator `G = (1, Y)`, the canonical on-curve fixture.
 const GRUMPKIN_G_BYTES: [u8; 64] = [
@@ -17,9 +17,9 @@ fn create_client<'a>(
     e: &Env,
     admin: &Address,
     manager: &Address,
-) -> AuditorRegistryContractClient<'a> {
-    let address = e.register(AuditorRegistryContract, (admin, manager));
-    AuditorRegistryContractClient::new(e, &address)
+) -> ConfidentialAuditorContractClient<'a> {
+    let address = e.register(ConfidentialAuditorContract, (admin, manager));
+    ConfidentialAuditorContractClient::new(e, &address)
 }
 
 fn generator(e: &Env) -> BytesN<64> {
