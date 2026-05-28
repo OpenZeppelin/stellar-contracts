@@ -148,7 +148,7 @@ fn register_non_canonical_panics() {
 }
 
 #[test]
-#[should_panic]
+#[should_panic(expected = "Error(Contract, #2000)")]
 fn register_by_non_manager_panics() {
     let e = Env::default();
     e.mock_all_auths();
