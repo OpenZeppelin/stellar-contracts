@@ -5,7 +5,7 @@
   "vectors": [
     {
       "inputs": { "v_tx": "0x64", "s": "0x12345", "sigma": "0x01" },
-      "output": "0x274c4f45d57544efca9f6f505e6b29ae098f1d30243de28f7cef62d05484c8a1"
+      "output": "0x2a07070eb651b03ecc22453ad1cc69a39567ca27fb4224e8727a5fbc83091526"
     }
   ]
 }

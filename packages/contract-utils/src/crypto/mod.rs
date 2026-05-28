@@ -1,4 +1,5 @@
 pub mod error;
+pub mod grumpkin;
 pub mod hashable;
 pub mod hasher;
 pub mod keccak;

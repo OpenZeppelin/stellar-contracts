@@ -4,8 +4,8 @@
   "description": "The single Poseidon2 entry point. The domain tag is the FIRST absorbed element; the sponge uses rate=3, capacity=1, IV = (input_length+1) * 2^64. Vector below pins the VK-domain hash of [sk, wrap] -- equal to vk_from_sk by construction.",
   "vectors": [
     {
-      "inputs": { "domain": "0x01", "inputs": ["0xdead", "0xbeef"] },
-      "output": "0x0ac6ade91aea36f4de35eb5a06a67e1b9c3dab9842479f1cce85caf826194ec2"
+      "inputs": { "domain": "0x02", "inputs": ["0xdead", "0xbeef"] },
+      "output": "0x208fbdb70d2faacf04f987b54f12aeeaeb432acc29d650c86ce0f6275b958eb8"
     }
   ]
 }
