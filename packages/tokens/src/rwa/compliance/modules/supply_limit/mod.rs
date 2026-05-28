@@ -45,18 +45,6 @@ use crate::rwa::compliance::modules::ComplianceModule;
 ///
 /// This trait is designed to be used in conjunction with the
 /// [`ComplianceModule`] trait.
-///
-/// **NOTE**
-///
-/// The single setter exposed by this trait
-/// ([`SupplyLimit::set_supply_limit`]) is a privileged operation and
-/// intentionally omits an `operator: Address` parameter. Access control
-/// for a compliance module is typically expressed in terms of the
-/// module's admin and the compliance contract it is registered on (e.g.
-/// requiring auth from the module admin, the compliance contract, or
-/// both), rather than from a per-call operator. Implementors should
-/// enforce the access policy that matches their deployment before
-/// delegating to the corresponding `storage::*` helper.
 #[contracttrait]
 pub trait SupplyLimit: ComplianceModule {
     /// Sets the supply cap for `token`.
@@ -66,6 +54,7 @@ pub trait SupplyLimit: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose cap is being configured.
     /// * `limit` - The new supply cap.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Errors
     ///
@@ -81,9 +70,9 @@ pub trait SupplyLimit: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::set_supply_limit`] for the
-    /// implementation.
-    fn set_supply_limit(e: &Env, token: Address, limit: i128);
+    /// enforced on `operator` before calling [`storage::set_supply_limit`] for
+    /// the implementation.
+    fn set_supply_limit(e: &Env, token: Address, limit: i128, operator: Address);
 
     /// Returns the configured supply cap for `token`.
     ///

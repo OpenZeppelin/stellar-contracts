@@ -11,8 +11,8 @@ use stellar_tokens::rwa::{
 
 use crate::contract::{MaxBalanceContract, MaxBalanceContractClient};
 
-fn create_client<'a>(e: &Env, admin: &Address) -> MaxBalanceContractClient<'a> {
-    let address = e.register(MaxBalanceContract, (admin,));
+fn create_client<'a>(e: &Env, admin: &Address, manager: &Address) -> MaxBalanceContractClient<'a> {
+    let address = e.register(MaxBalanceContract, (admin, manager));
     MaxBalanceContractClient::new(e, &address)
 }
 
@@ -119,12 +119,13 @@ fn set_and_get_max_balance_work() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
     assert_eq!(client.get_max_balance(&token), 0);
 
-    client.set_max_balance(&token, &500_i128);
+    client.set_max_balance(&token, &500_i128, &manager);
     assert_eq!(client.get_max_balance(&token), 500);
 }
 
@@ -133,19 +134,21 @@ fn preset_and_batch_preset_id_balances_work() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
     let id_a = Address::generate(&e);
     let id_b = Address::generate(&e);
     let id_c = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
-    client.preset_id_balance(&token, &id_a, &100_i128);
+    client.preset_id_balance(&token, &id_a, &100_i128, &manager);
     assert_eq!(client.get_id_balance(&token, &id_a), 100);
 
     client.batch_preset_id_balances(
         &token,
         &vec![&e, id_b.clone(), id_c.clone()],
         &vec![&e, 200_i128, 300_i128],
+        &manager,
     );
     assert_eq!(client.get_id_balance(&token, &id_b), 200);
     assert_eq!(client.get_id_balance(&token, &id_c), 300);
@@ -156,11 +159,12 @@ fn mark_preset_completed_flips_flag() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
     assert!(!client.is_preset_completed(&token));
-    client.mark_preset_completed(&token);
+    client.mark_preset_completed(&token, &manager);
     assert!(client.is_preset_completed(&token));
 }
 
@@ -169,7 +173,8 @@ fn name_returns_module_identifier() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let manager = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
 
     assert_eq!(client.name(), String::from_str(&e, "MaxBalanceModule"));
 }
@@ -179,9 +184,10 @@ fn set_and_get_compliance_address_round_trip() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
     let compliance = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
     client.set_compliance_address(&token, &compliance, &admin);
 
@@ -193,9 +199,10 @@ fn set_compliance_address_requires_admin_auth() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
     let compliance = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
     client.set_compliance_address(&token, &compliance, &admin);
 
@@ -206,19 +213,20 @@ fn set_compliance_address_requires_admin_auth() {
 }
 
 #[test]
-fn set_max_balance_requires_admin_auth() {
+fn set_max_balance_requires_manager_auth() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
-    client.set_max_balance(&token, &100_i128);
+    client.set_max_balance(&token, &100_i128, &manager);
 
     let auths = e.auths();
     assert_eq!(auths.len(), 1);
     let (addr, _) = &auths[0];
-    assert_eq!(addr, &admin);
+    assert_eq!(addr, &manager);
 }
 
 #[test]
@@ -227,12 +235,13 @@ fn can_transfer_panics_when_irs_not_configured() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let from = Address::generate(&e);
     let to = Address::generate(&e);
     let token = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
-    client.set_max_balance(&token, &100_i128);
+    client.set_max_balance(&token, &100_i128, &manager);
     client.can_transfer(&from, &to, &10_i128, &token);
 }
 
@@ -241,13 +250,14 @@ fn can_transfer_and_can_create_use_identity_aggregate() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let from = Address::generate(&e);
     let token = Address::generate(&e);
     let wallet_a = Address::generate(&e);
     let wallet_b = Address::generate(&e);
     let shared_id = Address::generate(&e);
     let amount = 60_i128;
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
     let irs_id = e.register(MockIRSContract, ());
     let irs = MockIRSContractClient::new(&e, &irs_id);
 
@@ -255,9 +265,9 @@ fn can_transfer_and_can_create_use_identity_aggregate() {
     irs.set_identity(&wallet_a, &shared_id);
     irs.set_identity(&wallet_b, &shared_id);
 
-    client.set_identity_registry_storage(&token, &irs_id);
-    client.set_max_balance(&token, &100_i128);
-    client.preset_id_balance(&token, &shared_id, &50_i128);
+    client.set_identity_registry_storage(&token, &irs_id, &manager);
+    client.set_max_balance(&token, &100_i128, &manager);
+    client.preset_id_balance(&token, &shared_id, &50_i128, &manager);
 
     // shared_id at 50; receiving 60 on either wallet would push to 110.
     assert!(!client.can_transfer(&from, &wallet_a, &amount, &token));
@@ -270,19 +280,20 @@ fn on_created_and_on_destroyed_track_aggregate_supply() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let compliance = Address::generate(&e);
     let wallet = Address::generate(&e);
     let identity = Address::generate(&e);
     let token = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
     let irs_id = e.register(MockIRSContract, ());
     let irs = MockIRSContractClient::new(&e, &irs_id);
 
     irs.set_identity(&wallet, &identity);
 
     client.set_compliance_address(&token, &compliance, &admin);
-    client.set_identity_registry_storage(&token, &irs_id);
-    client.set_max_balance(&token, &100_i128);
+    client.set_identity_registry_storage(&token, &irs_id, &manager);
+    client.set_max_balance(&token, &100_i128, &manager);
 
     client.on_created(&wallet, &40_i128, &token);
     client.on_created(&wallet, &30_i128, &token);
@@ -298,12 +309,13 @@ fn preset_id_balance_panics_after_completed() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
     let identity = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
-    client.mark_preset_completed(&token);
-    client.preset_id_balance(&token, &identity, &1_i128);
+    client.mark_preset_completed(&token, &manager);
+    client.preset_id_balance(&token, &identity, &1_i128, &manager);
 }
 
 #[test]
@@ -312,9 +324,10 @@ fn batch_preset_id_balances_rejects_length_mismatch() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
     let id_a = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
-    client.batch_preset_id_balances(&token, &vec![&e, id_a], &vec![&e, 1_i128, 2_i128]);
+    client.batch_preset_id_balances(&token, &vec![&e, id_a], &vec![&e, 1_i128, 2_i128], &manager);
 }

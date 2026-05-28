@@ -1,19 +1,22 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::only_admin;
+use stellar_macros::{only_admin, only_role};
 use stellar_tokens::rwa::compliance::modules::{
     storage::{self as compliance_storage},
     supply_limit::{storage as supply_limit, SupplyLimit},
     ComplianceModule,
 };
 
+const MANAGER_ROLE: Symbol = symbol_short!("manager");
+
 #[contract]
 pub struct SupplyLimitContract;
 
 #[contractimpl]
 impl SupplyLimitContract {
-    pub fn __constructor(e: &Env, admin: Address) {
+    pub fn __constructor(e: &Env, admin: Address, manager: Address) {
         access_control::set_admin(e, &admin);
+        access_control::grant_role_no_auth(e, &manager, &MANAGER_ROLE, &admin);
     }
 }
 
@@ -22,8 +25,8 @@ impl AccessControl for SupplyLimitContract {}
 
 #[contractimpl(contracttrait)]
 impl SupplyLimit for SupplyLimitContract {
-    #[only_admin]
-    fn set_supply_limit(e: &Env, token: Address, limit: i128) {
+    #[only_role(operator, "manager")]
+    fn set_supply_limit(e: &Env, token: Address, limit: i128, operator: Address) {
         supply_limit::set_supply_limit(e, &token, limit);
     }
 }

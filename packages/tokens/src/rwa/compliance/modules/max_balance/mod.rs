@@ -62,17 +62,6 @@ use crate::rwa::compliance::modules::ComplianceModule;
 ///
 /// This trait is designed to be used in conjunction with the
 /// [`ComplianceModule`] trait.
-///
-/// **NOTE**
-///
-/// All setter functions exposed in the `MaxBalance` trait are privileged
-/// operations and intentionally omit an `operator: Address` parameter.
-/// Access control for a compliance module is typically expressed in terms
-/// of the module's admin and the compliance contract it is registered on
-/// (e.g. requiring auth from the module admin, the compliance contract, or
-/// both), rather than from a per-call operator. Implementors should
-/// enforce the access policy that matches their deployment before
-/// delegating to the corresponding `storage::*` helper.
 #[contracttrait]
 pub trait MaxBalance: ComplianceModule {
     /// Configures the Identity Registry Storage contract for `token`.
@@ -82,15 +71,16 @@ pub trait MaxBalance: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose IRS is being configured.
     /// * `irs` - The Identity Registry Storage contract address.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling
+    /// enforced on `operator` before calling
     /// [`crate::rwa::compliance::modules::storage::set_irs_address`] for the
     /// implementation.
-    fn set_identity_registry_storage(e: &Env, token: Address, irs: Address);
+    fn set_identity_registry_storage(e: &Env, token: Address, irs: Address, operator: Address);
 
     /// Sets the per-identity maximum balance for `token`.
     ///
@@ -99,6 +89,7 @@ pub trait MaxBalance: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose cap is being configured.
     /// * `max` - The maximum aggregate balance any identity may hold.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Errors
     ///
@@ -114,9 +105,9 @@ pub trait MaxBalance: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::set_max_balance`] for the
-    /// implementation.
-    fn set_max_balance(e: &Env, token: Address, max: i128);
+    /// enforced on `operator` before calling [`storage::set_max_balance`] for
+    /// the implementation.
+    fn set_max_balance(e: &Env, token: Address, max: i128, operator: Address);
 
     /// Pre-seeds the tracked aggregate balance for `identity` under `token`.
     ///
@@ -126,6 +117,7 @@ pub trait MaxBalance: ComplianceModule {
     /// * `token` - The token whose tracked balance is being seeded.
     /// * `identity` - The identity address whose balance is being seeded.
     /// * `balance` - The balance to record for `identity`.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Errors
     ///
@@ -145,9 +137,15 @@ pub trait MaxBalance: ComplianceModule {
     ///   balances; only callable before [`MaxBalance::mark_preset_completed`].
     /// * No default implementation is provided because this is a privileged
     ///   operation that requires custom access control. Access control should
-    ///   be enforced before calling [`storage::preset_id_balance`] for the
-    ///   implementation.
-    fn preset_id_balance(e: &Env, token: Address, identity: Address, balance: i128);
+    ///   be enforced on `operator` before calling
+    ///   [`storage::preset_id_balance`] for the implementation.
+    fn preset_id_balance(
+        e: &Env,
+        token: Address,
+        identity: Address,
+        balance: i128,
+        operator: Address,
+    );
 
     /// Pre-seeds tracked balances for multiple identities in a single call.
     ///
@@ -158,6 +156,7 @@ pub trait MaxBalance: ComplianceModule {
     /// * `identities` - The identity addresses to seed.
     /// * `balances` - The balances aligned positionally with `identities`. Must
     ///   have the same length as `identities`.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Errors
     ///
@@ -178,13 +177,14 @@ pub trait MaxBalance: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::batch_preset_id_balances`] for the
-    /// implementation.
+    /// enforced on `operator` before calling
+    /// [`storage::batch_preset_id_balances`] for the implementation.
     fn batch_preset_id_balances(
         e: &Env,
         token: Address,
         identities: Vec<Address>,
         balances: Vec<i128>,
+        operator: Address,
     );
 
     /// Finalizes the preset phase for `token`.
@@ -193,6 +193,7 @@ pub trait MaxBalance: ComplianceModule {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose preset phase is being finalized.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Events
     ///
@@ -204,9 +205,9 @@ pub trait MaxBalance: ComplianceModule {
     /// * After this call, any further preset attempts panic.
     /// * No default implementation is provided because this is a privileged
     ///   operation that requires custom access control. Access control should
-    ///   be enforced before calling [`storage::mark_preset_completed`] for the
-    ///   implementation.
-    fn mark_preset_completed(e: &Env, token: Address);
+    ///   be enforced on `operator` before calling
+    ///   [`storage::mark_preset_completed`] for the implementation.
+    fn mark_preset_completed(e: &Env, token: Address, operator: Address);
 
     /// Returns the configured per-identity maximum balance for `token`.
     ///
