@@ -255,17 +255,14 @@ pub trait ComplianceModule {
     /// * `token` - The token whose dispatcher binding is being configured.
     /// * `compliance` - The dispatcher address that should be authorized to
     ///   call this module's hooks for `token`.
-    /// * `operator` - The address authorizing the invocation. Carried as a
-    ///   parameter so the implementor can express access-control policies
-    ///   (admin-only, role-based, multi-sig, etc.) without changing the trait
-    ///   shape.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. The implementor should
-    /// enforce auth on `operator` (e.g. with `#[only_admin]`) before
-    /// delegating to [`storage::set_compliance_address`].
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::set_compliance_address`] for the implementation.
     fn set_compliance_address(e: &Env, token: Address, compliance: Address, operator: Address);
 }
 

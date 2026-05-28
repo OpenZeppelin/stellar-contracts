@@ -24,7 +24,7 @@ pub enum CountryAllowStorageKey {
 /// * `country` - The ISO 3166-1 numeric country code.
 pub fn is_country_allowed(e: &Env, token: &Address, country: u32) -> bool {
     let key = CountryAllowStorageKey::AllowedCountry(token.clone(), country);
-    if e.storage().persistent().has(&key) {
+    if let Some(()) = e.storage().persistent().get::<_, ()>(&key) {
         e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
         true
     } else {
@@ -194,6 +194,10 @@ pub fn remove_allowed_country(e: &Env, token: &Address, country: u32) {
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
+///
+/// Each `(token, country)` pair lives in its own persistent entry, so the
+/// caller must size `countries` to stay within the per-transaction network
+/// limits — see <https://lab.stellar.org/network-limits>.
 pub fn batch_allow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
     for country in countries.iter() {
         add_allowed_country(e, token, country);
@@ -217,6 +221,10 @@ pub fn batch_allow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
+///
+/// Each `(token, country)` pair lives in its own persistent entry, so the
+/// caller must size `countries` to stay within the per-transaction network
+/// limits — see <https://lab.stellar.org/network-limits>.
 pub fn batch_disallow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
     for country in countries.iter() {
         remove_allowed_country(e, token, country);

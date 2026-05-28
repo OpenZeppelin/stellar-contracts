@@ -1,19 +1,22 @@
-use soroban_sdk::{contract, contractimpl, Address, Env, String, Symbol, Vec};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
-use stellar_macros::only_admin;
+use stellar_macros::{only_admin, only_role};
 use stellar_tokens::rwa::compliance::modules::{
     country_restrict::{storage as country_restrict, CountryRestrict},
     storage::{self as compliance_storage, set_irs_address},
     ComplianceModule,
 };
 
+const MANAGER_ROLE: Symbol = symbol_short!("manager");
+
 #[contract]
 pub struct CountryRestrictContract;
 
 #[contractimpl]
 impl CountryRestrictContract {
-    pub fn __constructor(e: &Env, admin: Address) {
+    pub fn __constructor(e: &Env, admin: Address, manager: Address) {
         access_control::set_admin(e, &admin);
+        access_control::grant_role_no_auth(e, &manager, &MANAGER_ROLE, &admin);
     }
 }
 
@@ -22,28 +25,28 @@ impl AccessControl for CountryRestrictContract {}
 
 #[contractimpl(contracttrait)]
 impl CountryRestrict for CountryRestrictContract {
-    #[only_admin]
-    fn set_identity_registry_storage(e: &Env, token: Address, irs: Address) {
+    #[only_role(operator, "manager")]
+    fn set_identity_registry_storage(e: &Env, token: Address, irs: Address, operator: Address) {
         set_irs_address(e, &token, &irs);
     }
 
-    #[only_admin]
-    fn add_country_restriction(e: &Env, token: Address, country: u32) {
+    #[only_role(operator, "manager")]
+    fn add_country_restriction(e: &Env, token: Address, country: u32, operator: Address) {
         country_restrict::add_country_restriction(e, &token, country);
     }
 
-    #[only_admin]
-    fn remove_country_restriction(e: &Env, token: Address, country: u32) {
+    #[only_role(operator, "manager")]
+    fn remove_country_restriction(e: &Env, token: Address, country: u32, operator: Address) {
         country_restrict::remove_country_restriction(e, &token, country);
     }
 
-    #[only_admin]
-    fn batch_restrict_countries(e: &Env, token: Address, countries: Vec<u32>) {
+    #[only_role(operator, "manager")]
+    fn batch_restrict_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address) {
         country_restrict::batch_restrict_countries(e, &token, &countries);
     }
 
-    #[only_admin]
-    fn batch_unrestrict_countries(e: &Env, token: Address, countries: Vec<u32>) {
+    #[only_role(operator, "manager")]
+    fn batch_unrestrict_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address) {
         country_restrict::batch_unrestrict_countries(e, &token, &countries);
     }
 }

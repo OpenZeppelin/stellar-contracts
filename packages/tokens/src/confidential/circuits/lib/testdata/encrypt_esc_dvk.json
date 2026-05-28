@@ -5,11 +5,11 @@
   "vectors": [
     {
       "inputs": {
-        "dvk": "0x1dec1da326d325cf918eed33f097cfb854b41aac8ece9e6e8bd54b7a7c448785",
+        "dvk": "0x1a088264ebf7269160bbf34d5a3f94d7dec37efc609ef76c5dbfa8690af3eae9",
         "s": "0x12345",
         "op_i": "0xabcd"
       },
-      "output": "0x2468d02775ad21aa5928d049770287249af2a03dbaf4d18e22e3fe71fd292003"
+      "output": "0x15f3b867cbe94f0b6371e46752431be550f907ba8448c6191b7ba1f47c2cb83e"
     }
   ]
 }

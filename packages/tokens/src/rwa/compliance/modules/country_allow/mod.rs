@@ -38,17 +38,6 @@ use crate::rwa::compliance::modules::ComplianceModule;
 ///
 /// This trait is designed to be used in conjunction with the
 /// [`ComplianceModule`] trait.
-///
-/// **NOTE**
-///
-/// All setter functions exposed in the `CountryAllow` trait are privileged
-/// operations and intentionally omit an `operator: Address` parameter. Access
-/// control for a compliance module is typically expressed in terms of the
-/// module's admin and the compliance contract it is registered on (e.g.
-/// requiring auth from the module admin, the compliance contract, or both),
-/// rather than from a per-call operator. Implementors should enforce the
-/// access policy that matches their deployment before delegating to the
-/// corresponding `storage::*` helper.
 #[contracttrait]
 pub trait CountryAllow: ComplianceModule {
     /// Configures the Identity Registry Storage contract for `token`.
@@ -58,15 +47,16 @@ pub trait CountryAllow: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose IRS is being configured.
     /// * `irs` - The Identity Registry Storage contract address.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling
+    /// enforced on `operator` before calling
     /// [`crate::rwa::compliance::modules::storage::set_irs_address`] for the
     /// implementation.
-    fn set_identity_registry_storage(e: &Env, token: Address, irs: Address);
+    fn set_identity_registry_storage(e: &Env, token: Address, irs: Address, operator: Address);
 
     /// Adds a country to the allowlist for `token`.
     ///
@@ -75,6 +65,7 @@ pub trait CountryAllow: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose allowlist is updated.
     /// * `country` - The ISO 3166-1 numeric country code to allow.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Events
     ///
@@ -85,9 +76,9 @@ pub trait CountryAllow: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::add_allowed_country`] for the
-    /// implementation.
-    fn add_allowed_country(e: &Env, token: Address, country: u32);
+    /// enforced on `operator` before calling [`storage::add_allowed_country`]
+    /// for the implementation.
+    fn add_allowed_country(e: &Env, token: Address, country: u32, operator: Address);
 
     /// Removes a country from the allowlist for `token`.
     ///
@@ -96,6 +87,7 @@ pub trait CountryAllow: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose allowlist is updated.
     /// * `country` - The ISO 3166-1 numeric country code to remove.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Events
     ///
@@ -106,9 +98,9 @@ pub trait CountryAllow: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::remove_allowed_country`] for the
-    /// implementation.
-    fn remove_allowed_country(e: &Env, token: Address, country: u32);
+    /// enforced on `operator` before calling
+    /// [`storage::remove_allowed_country`] for the implementation.
+    fn remove_allowed_country(e: &Env, token: Address, country: u32, operator: Address);
 
     /// Adds multiple countries to the allowlist for `token`.
     ///
@@ -117,6 +109,7 @@ pub trait CountryAllow: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose allowlist is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to allow.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Events
     ///
@@ -128,9 +121,13 @@ pub trait CountryAllow: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::batch_allow_countries`] for the
-    /// implementation.
-    fn batch_allow_countries(e: &Env, token: Address, countries: Vec<u32>);
+    /// enforced on `operator` before calling [`storage::batch_allow_countries`]
+    /// for the implementation.
+    ///
+    /// Each `(token, country)` pair is stored in its own persistent entry, so
+    /// the caller must size `countries` to stay within the per-transaction
+    /// network limits — see <https://lab.stellar.org/network-limits>.
+    fn batch_allow_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address);
 
     /// Removes multiple countries from the allowlist for `token`.
     ///
@@ -139,6 +136,7 @@ pub trait CountryAllow: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose allowlist is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to remove.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Events
     ///
@@ -150,9 +148,13 @@ pub trait CountryAllow: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::batch_disallow_countries`] for the
-    /// implementation.
-    fn batch_disallow_countries(e: &Env, token: Address, countries: Vec<u32>);
+    /// enforced on `operator` before calling
+    /// [`storage::batch_disallow_countries`] for the implementation.
+    ///
+    /// Each `(token, country)` pair lives in its own persistent entry, so the
+    /// caller must size `countries` to stay within the per-transaction network
+    /// limits — see <https://lab.stellar.org/network-limits>.
+    fn batch_disallow_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address);
 
     /// Returns `true` if `country` is allowed for `token`.
     ///

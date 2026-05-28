@@ -6,10 +6,10 @@
     {
       "inputs": {
         "v_a": "0x1f4",
-        "dvk": "0x1dec1da326d325cf918eed33f097cfb854b41aac8ece9e6e8bd54b7a7c448785",
+        "dvk": "0x1a088264ebf7269160bbf34d5a3f94d7dec37efc609ef76c5dbfa8690af3eae9",
         "sigma_a": "0x02"
       },
-      "output": "0x235db43a283e4e000337cdb80a99168ef4b718622cc06de4ab98b3d2bd5736d5"
+      "output": "0x2440e4fcb575aa4433cd53a37a7396d5022f8c287298cacc0cfc0857250ef02a"
     }
   ]
 }

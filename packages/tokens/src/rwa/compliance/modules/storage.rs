@@ -111,7 +111,7 @@ pub fn get_irs_country_data_entries(
 /// # Security Warning
 ///
 /// This function performs no authorization checks. Callers must gate access
-/// (e.g. with [`stellar_macros::only_owner`]) before invoking it.
+/// (e.g. with [`stellar_macros::only_admin`]) before invoking it.
 pub fn set_compliance_address(e: &Env, token: &Address, compliance: &Address) {
     let key = ComplianceModuleStorageKey::Compliance(token.clone());
     e.storage().persistent().set(&key, compliance);
@@ -132,7 +132,7 @@ pub fn set_compliance_address(e: &Env, token: &Address, compliance: &Address) {
 /// # Security Warning
 ///
 /// This function performs no authorization checks. Callers must gate access
-/// (e.g. with [`stellar_macros::only_owner`]) before invoking it.
+/// (e.g. with [`stellar_macros::only_admin`]) before invoking it.
 pub fn set_irs_address(e: &Env, token: &Address, irs: &Address) {
     let key = ComplianceModuleStorageKey::Registry(token.clone());
     e.storage().persistent().set(&key, irs);
