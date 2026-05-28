@@ -2,7 +2,7 @@
 //!
 //! Stores Grumpkin public keys used by the confidential token wrapper to
 //! produce auditor ECDH ciphertexts. Each key is indexed by a `u32`
-//! `auditor_id` so a single deployment can serve multiple wrapped tokens.
+//! `auditor_id` and a single deployment can serve multiple wrapped tokens.
 //!
 //! ## Why a Separate Contract
 //!
@@ -26,24 +26,17 @@
 //!
 //! ## Validation
 //!
-//! Every write path runs the same checks:
+//! Every write path runs the same checks, delegated to
+//! [`stellar_contract_utils::crypto::grumpkin::Grumpkin`]:
 //!
-//! 1. **Canonical**: both coordinates strictly less than `r`. Non-canonical
-//!    encodings (`x ≥ r` or `y ≥ r`) are rejected so the on-chain form is
-//!    unambiguous.
-//! 2. **Not identity**: `(x, y) ≠ (0, 0)`. The identity is a valid curve point,
-//!    but using it as a public key would make every auditor ECDH ciphertext
-//!    trivially decryptable, since the salt is public on-chain.
-//! 3. **On curve**: `y² ≡ x³ - 17 (mod r)` (Grumpkin: `a = 0`, `b = -17`).
-//!    Off-curve points break the small-subgroup security assumptions of the
-//!    audit protocol.
-//!
-//! ## Storage Layout
-//!
-//! Each key is stored in its own persistent entry under
-//! [`storage::AuditorStorageKey::Key`]. Per-key entries (rather than a single
-//! `Map<u32, BytesN<64>>` blob) keep reads and writes cheap and let each entry
-//! carry its own TTL.
+//! 1. **Not identity**: `(x, y) ≠ (0, 0)`. The identity is a valid group
+//!    element, but using it as a public key would make every auditor ECDH
+//!    ciphertext trivially decryptable, since the salt is public on-chain.
+//! 2. **Canonical + on curve**: each coordinate is a canonical 32-byte
+//!    representative (`< r`) and `(x, y)` satisfies `y² ≡ x³ - 17 (mod r)`
+//!    (Grumpkin: `a = 0`, `b = -17`). The two checks are fused because the
+//!    underlying validator rejects non-canonical encodings to keep byte
+//!    equality on validated points sound.
 
 pub mod storage;
 
@@ -65,12 +58,6 @@ pub use storage::{get_key, register_key, rotate_key, AuditorStorageKey};
 pub trait AuditorRegistry {
     /// Registers a Grumpkin public key under a fresh `auditor_id`.
     ///
-    /// Reverts if the `auditor_id` already exists; rotation is handled by
-    /// [`AuditorRegistry::rotate_key`].
-    ///
-    /// Only an operator with sufficient permissions should be able to call
-    /// this function.
-    ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
@@ -83,7 +70,9 @@ pub trait AuditorRegistry {
     ///
     /// * [`AuditorError::AuditorAlreadyRegistered`] - When `auditor_id` is
     ///   already in use.
-    /// * refer to [`storage::register_key`] errors.
+    /// * [`AuditorError::IdentityPoint`] - When the point is the identity.
+    /// * [`AuditorError::PointNotOnCurve`] - When the point is non-canonical or
+    ///   does not satisfy the Grumpkin curve equation.
     ///
     /// # Events
     ///
@@ -114,7 +103,9 @@ pub trait AuditorRegistry {
     ///
     /// * [`AuditorError::AuditorNotRegistered`] - When `auditor_id` has no
     ///   registered key.
-    /// * refer to [`storage::rotate_key`] errors.
+    /// * [`AuditorError::IdentityPoint`] - When the point is the identity.
+    /// * [`AuditorError::PointNotOnCurve`] - When the point is non-canonical or
+    ///   does not satisfy the Grumpkin curve equation.
     ///
     /// # Events
     ///
@@ -155,14 +146,12 @@ pub enum AuditorError {
     AuditorAlreadyRegistered = 3300,
     /// Indicates no key is registered under `auditor_id`.
     AuditorNotRegistered = 3301,
-    /// Indicates the point coordinates are not canonical (`x ≥ r` or
-    /// `y ≥ r`).
-    NonCanonicalPoint = 3302,
     /// Indicates the point is the identity `(0, 0)`, which is forbidden as an
     /// auditor public key.
-    IdentityPoint = 3303,
-    /// Indicates the point does not satisfy `y² ≡ x³ - 17 (mod r)`.
-    PointNotOnCurve = 3304,
+    IdentityPoint = 3302,
+    /// Indicates the point is non-canonical or does not satisfy
+    /// `y² ≡ x³ - 17 (mod r)`.
+    PointNotOnCurve = 3303,
 }
 
 // ################## CONSTANTS ##################

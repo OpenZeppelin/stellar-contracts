@@ -1,6 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{contract, BytesN, Env};
+use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 use stellar_event_assertion::EventAssertion;
 
 use crate::confidential::auditor::storage::{
@@ -10,31 +11,30 @@ use crate::confidential::auditor::storage::{
 #[contract]
 struct MockContract;
 
-/// Builds a `BytesN<64>` from a 32-byte `x` and a 32-byte `y`.
-fn point(e: &Env, x: [u8; 32], y: [u8; 32]) -> BytesN<64> {
-    let mut buf = [0u8; 64];
-    buf[..32].copy_from_slice(&x);
-    buf[32..].copy_from_slice(&y);
-    BytesN::from_array(e, &buf)
+/// Grumpkin generator `G = (1, Y)` with `Y =
+/// 17631683881184975370165255887551781615748388533673675138860`.
+///
+/// This is the canonical on-curve point shipped with `ark-grumpkin`; we use
+/// it as a deterministic test fixture so the auditor tests don't depend on
+/// `ark-grumpkin` themselves.
+const GRUMPKIN_G_BYTES: [u8; 64] = [
+    // x = 1 (32-byte big-endian)
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+    // y (32-byte big-endian)
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xcf, 0x13, 0x5e, 0x75, 0x06, 0xa4, 0x5d, 0x63,
+    0x2d, 0x27, 0x0d, 0x45, 0xf1, 0x18, 0x12, 0x94, 0x83, 0x3f, 0xc4, 0x8d, 0x82, 0x3f, 0x27, 0x2c,
+];
+
+fn generator(e: &Env) -> BytesN<64> {
+    BytesN::from_array(e, &GRUMPKIN_G_BYTES)
 }
 
-/// A canonical, non-identity sample point. The stubbed on-curve check
-/// accepts any such point; once the Grumpkin arithmetic crate lands the
-/// on-curve sample will be generated from an actual scalar.
-fn sample_point(e: &Env) -> BytesN<64> {
-    let mut x = [0u8; 32];
-    x[31] = 1;
-    let mut y = [0u8; 32];
-    y[31] = 2;
-    point(e, x, y)
-}
-
-fn another_sample_point(e: &Env) -> BytesN<64> {
-    let mut x = [0u8; 32];
-    x[31] = 3;
-    let mut y = [0u8; 32];
-    y[31] = 4;
-    point(e, x, y)
+/// A second on-curve sample: `2G`, obtained by doubling the generator on the
+/// real Grumpkin curve.
+fn two_generator(e: &Env) -> BytesN<64> {
+    let g = generator(e);
+    Grumpkin::add(e, &g, &g)
 }
 
 #[test]
@@ -42,7 +42,7 @@ fn register_and_get_key_works() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
-    let p = sample_point(&e);
+    let p = generator(&e);
 
     e.as_contract(&address, || {
         register_key(&e, 1, &p);
@@ -61,16 +61,15 @@ fn register_multiple_keys_round_trip() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        // Register a handful of keys under distinct ids and verify every
-        // get_key call round-trips to the registered point.
+        // Build a sequence of distinct on-curve points by repeated addition
+        // of G on the real Grumpkin curve, then verify every get_key
+        // round-trips.
+        let g = generator(&e);
+        let mut p = g.clone();
         for i in 0..5u32 {
-            let mut x = [0u8; 32];
-            x[31] = (i + 1) as u8;
-            let mut y = [0u8; 32];
-            y[31] = (i + 10) as u8;
-            let p = point(&e, x, y);
             register_key(&e, i, &p);
             assert_eq!(get_key(&e, i), p);
+            p = Grumpkin::add(&e, &p, &g);
         }
     });
 }
@@ -83,8 +82,8 @@ fn register_duplicate_id_panics() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        register_key(&e, 1, &sample_point(&e));
-        register_key(&e, 1, &another_sample_point(&e));
+        register_key(&e, 1, &generator(&e));
+        register_key(&e, 1, &two_generator(&e));
     });
 }
 
@@ -105,10 +104,10 @@ fn rotate_key_replaces_in_place() {
     e.mock_all_auths();
     let address = e.register(MockContract, ());
 
-    let old = sample_point(&e);
-    let new = another_sample_point(&e);
-
     e.as_contract(&address, || {
+        let old = generator(&e);
+        let new = two_generator(&e);
+
         register_key(&e, 1, &old);
         rotate_key(&e, 1, &new);
 
@@ -124,12 +123,12 @@ fn rotate_unknown_id_panics() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        rotate_key(&e, 7, &sample_point(&e));
+        rotate_key(&e, 7, &generator(&e));
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3303)")]
+#[should_panic(expected = "Error(Contract, #3302)")]
 fn register_identity_point_panics() {
     let e = Env::default();
     e.mock_all_auths();
@@ -141,53 +140,73 @@ fn register_identity_point_panics() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3303)")]
+#[should_panic(expected = "Error(Contract, #3302)")]
 fn rotate_to_identity_point_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        register_key(&e, 1, &sample_point(&e));
+        register_key(&e, 1, &generator(&e));
         rotate_key(&e, 1, &BytesN::from_array(&e, &[0u8; 64]));
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3302)")]
+#[should_panic(expected = "Error(Contract, #3303)")]
+fn register_off_curve_point_panics() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        // (1, 2) is canonical but `2² ≠ 1³ - 17 (mod r)`, so it is off the
+        // Grumpkin curve.
+        let mut buf = [0u8; 64];
+        buf[31] = 1;
+        buf[63] = 2;
+        register_key(&e, 1, &BytesN::from_array(&e, &buf));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3303)")]
 fn register_non_canonical_x_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        // `x = r` is the smallest non-canonical encoding.
-        let x: [u8; 32] = [
+        // `x = r` is the smallest non-canonical encoding; the Grumpkin
+        // validator rejects it as off-curve to keep byte equality sound.
+        let mut buf = [0u8; 64];
+        buf[..32].copy_from_slice(&[
             0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81,
             0x58, 0x5d, 0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93,
             0xf0, 0x00, 0x00, 0x01,
-        ];
-        let mut y = [0u8; 32];
-        y[31] = 1;
+        ]);
+        buf[63] = 1;
 
-        register_key(&e, 1, &point(&e, x, y));
+        register_key(&e, 1, &BytesN::from_array(&e, &buf));
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3302)")]
+#[should_panic(expected = "Error(Contract, #3303)")]
 fn register_non_canonical_y_panics() {
     let e = Env::default();
     e.mock_all_auths();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        let mut x = [0u8; 32];
-        x[31] = 1;
+        let mut buf = [0u8; 64];
+        buf[31] = 1;
         // `y = 2^256 - 1` is well above `r`.
-        let y = [0xffu8; 32];
+        for byte in &mut buf[32..] {
+            *byte = 0xff;
+        }
 
-        register_key(&e, 1, &point(&e, x, y));
+        register_key(&e, 1, &BytesN::from_array(&e, &buf));
     });
 }
 
@@ -197,10 +216,10 @@ fn rotate_emits_rotation_event() {
     e.mock_all_auths();
     let address = e.register(MockContract, ());
 
-    let old = sample_point(&e);
-    let new = another_sample_point(&e);
-
     e.as_contract(&address, || {
+        let old = generator(&e);
+        let new = two_generator(&e);
+
         register_key(&e, 1, &old);
         rotate_key(&e, 1, &new);
 
@@ -210,12 +229,12 @@ fn rotate_emits_rotation_event() {
 }
 
 #[test]
-fn validate_point_accepts_canonical_non_identity() {
+fn validate_point_accepts_generator() {
     let e = Env::default();
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        validate_point(&e, &sample_point(&e));
+        validate_point(&e, &generator(&e));
     });
 }
 
@@ -227,7 +246,7 @@ fn storage_key_round_trip() {
 
     e.as_contract(&address, || {
         // Direct read by storage key matches the value returned by get_key.
-        let p = sample_point(&e);
+        let p = generator(&e);
         register_key(&e, 9, &p);
 
         let stored: BytesN<64> = e.storage().persistent().get(&AuditorStorageKey::Key(9)).unwrap();

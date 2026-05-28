@@ -1,4 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, BytesN, Env, TryFromVal, Val};
+use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
 use crate::confidential::auditor::{
     emit_auditor_registered, emit_auditor_rotated, AuditorError, AUDITOR_KEY_EXTEND_AMOUNT,
@@ -33,9 +34,6 @@ pub fn get_key(e: &Env, auditor_id: u32) -> BytesN<64> {
 // ################## CHANGE STATE ##################
 
 /// Registers a Grumpkin public key under a fresh `auditor_id`.
-///
-/// Runs [`validate_point`] on `point` before storing it. Reverts if the
-/// `auditor_id` already has a key; use [`rotate_key`] to replace.
 ///
 /// # Arguments
 ///
@@ -76,8 +74,6 @@ pub fn register_key(e: &Env, auditor_id: u32, point: &BytesN<64>) {
 }
 
 /// Replaces the Grumpkin public key registered under `auditor_id`.
-///
-/// Runs [`validate_point`] on `new_point` before storing it.
 ///
 /// # Arguments
 ///
@@ -125,10 +121,13 @@ pub fn rotate_key(e: &Env, auditor_id: u32, new_point: &BytesN<64>) {
 ///
 /// The point is rejected when any of the following holds:
 ///
-/// 1. `x ≥ r` or `y ≥ r` (non-canonical encoding);
-/// 2. `(x, y) = (0, 0)` (identity, which would make every auditor ECDH
+/// 1. `(x, y) = (0, 0)` (identity, which would make every auditor ECDH
 ///    ciphertext trivially decryptable);
-/// 3. `y² ≢ x³ - 17 (mod r)` (not on the Grumpkin curve).
+/// 2. either coordinate is non-canonical (`x ≥ r` or `y ≥ r`), or `(x, y)` does
+///    not satisfy `y² ≡ x³ - 17 (mod r)`. The Grumpkin validator fuses these
+///    two checks: a non-canonical encoding has multiple bytewise
+///    representations of the same logical point, which would defeat any
+///    uniqueness check downstream contracts may run against the raw key bytes.
 ///
 /// # Arguments
 ///
@@ -137,19 +136,14 @@ pub fn rotate_key(e: &Env, auditor_id: u32, new_point: &BytesN<64>) {
 ///
 /// # Errors
 ///
-/// * [`AuditorError::NonCanonicalPoint`] - When either coordinate is not in
-///   `[0, r)`.
 /// * [`AuditorError::IdentityPoint`] - When the point is the identity.
-/// * [`AuditorError::PointNotOnCurve`] - When the point does not satisfy the
-///   Grumpkin curve equation.
+/// * [`AuditorError::PointNotOnCurve`] - When the point is non-canonical or
+///   does not satisfy the Grumpkin curve equation.
 pub fn validate_point(e: &Env, point: &BytesN<64>) {
-    if !point_validator::is_canonical(e, point) {
-        panic_with_error!(e, AuditorError::NonCanonicalPoint);
-    }
-    if !point_validator::is_not_identity(point) {
+    if !Grumpkin::is_not_identity(point) {
         panic_with_error!(e, AuditorError::IdentityPoint);
     }
-    if !point_validator::is_on_curve(e, point) {
+    if !Grumpkin::is_on_curve(e, point) {
         panic_with_error!(e, AuditorError::PointNotOnCurve);
     }
 }
@@ -164,58 +158,4 @@ fn get_persistent_entry<T: TryFromVal<Env, Val>>(e: &Env, key: &AuditorStorageKe
             AUDITOR_KEY_EXTEND_AMOUNT,
         );
     })
-}
-
-// ################## POINT VALIDATION ##################
-//
-// Grumpkin point validation. Until the dedicated Grumpkin arithmetic crate
-// (see issue #700) lands, these helpers live here so the auditor contract is
-// self-contained. The canonical and identity checks are final; the on-curve
-// check is a placeholder routed through a single function that will be
-// replaced by `stellar_grumpkin::is_on_curve` once available.
-mod point_validator {
-    use soroban_sdk::{Bytes, BytesN, Env, U256};
-
-    /// BN254 scalar field modulus `r`, in big-endian bytes. This is also the
-    /// Grumpkin coordinate field modulus.
-    ///
-    /// `r = 0x30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001`
-    const FR_MODULUS_BE: [u8; 32] = [
-        0x30, 0x64, 0x4e, 0x72, 0xe1, 0x31, 0xa0, 0x29, 0xb8, 0x50, 0x45, 0xb6, 0x81, 0x81, 0x58,
-        0x5d, 0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00,
-        0x00, 0x01,
-    ];
-
-    /// Returns true when both coordinates of `point` are strictly less than
-    /// the Grumpkin coordinate field modulus `r`.
-    pub fn is_canonical(e: &Env, point: &BytesN<64>) -> bool {
-        let raw = point.to_array();
-        let modulus = U256::from_be_bytes(e, &Bytes::from_array(e, &FR_MODULUS_BE));
-
-        let mut x_bytes = [0u8; 32];
-        let mut y_bytes = [0u8; 32];
-        x_bytes.copy_from_slice(&raw[..32]);
-        y_bytes.copy_from_slice(&raw[32..]);
-
-        let x = U256::from_be_bytes(e, &Bytes::from_array(e, &x_bytes));
-        let y = U256::from_be_bytes(e, &Bytes::from_array(e, &y_bytes));
-
-        x < modulus && y < modulus
-    }
-
-    /// Returns true when `point` is not the identity `(0, 0)`.
-    pub fn is_not_identity(point: &BytesN<64>) -> bool {
-        point.to_array().iter().any(|byte| *byte != 0)
-    }
-
-    /// Returns true when `point` satisfies `y² ≡ x³ - 17 (mod r)`.
-    ///
-    /// TODO(#700): replace this stub with the on-curve helper from the
-    /// dedicated Grumpkin arithmetic crate. Until that crate lands, this
-    /// helper accepts any canonical, non-identity point. The auditor
-    /// contract's structure is intentionally arranged so the swap is a
-    /// one-line change here.
-    pub fn is_on_curve(_e: &Env, _point: &BytesN<64>) -> bool {
-        true
-    }
 }
