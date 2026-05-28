@@ -123,6 +123,10 @@ pub trait CountryAllow: ComplianceModule {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling [`storage::batch_allow_countries`]
     /// for the implementation.
+    ///
+    /// Each `(token, country)` pair is stored in its own persistent entry, so
+    /// the caller must size `countries` to stay within the per-transaction
+    /// network limits — see <https://lab.stellar.org/network-limits>.
     fn batch_allow_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address);
 
     /// Removes multiple countries from the allowlist for `token`.
@@ -146,6 +150,10 @@ pub trait CountryAllow: ComplianceModule {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
     /// [`storage::batch_disallow_countries`] for the implementation.
+    ///
+    /// Each `(token, country)` pair lives in its own persistent entry, so the
+    /// caller must size `countries` to stay within the per-transaction network
+    /// limits — see <https://lab.stellar.org/network-limits>.
     fn batch_disallow_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address);
 
     /// Returns `true` if `country` is allowed for `token`.

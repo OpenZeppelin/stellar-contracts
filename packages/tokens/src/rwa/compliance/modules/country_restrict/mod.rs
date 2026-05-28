@@ -123,6 +123,10 @@ pub trait CountryRestrict: ComplianceModule {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
     /// [`storage::batch_restrict_countries`] for the implementation.
+    ///
+    /// Each `(token, country)` pair is stored in its own persistent entry, so
+    /// the caller must size `countries` to stay within the per-transaction
+    /// network limits — see <https://lab.stellar.org/network-limits>.
     fn batch_restrict_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address);
 
     /// Removes multiple countries from the restriction list for `token`.
@@ -146,6 +150,10 @@ pub trait CountryRestrict: ComplianceModule {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
     /// [`storage::batch_unrestrict_countries`] for the implementation.
+    ///
+    /// Each `(token, country)` pair lives in its own persistent entry, so the
+    /// caller must size `countries` to stay within the per-transaction network
+    /// limits — see <https://lab.stellar.org/network-limits>.
     fn batch_unrestrict_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address);
 
     /// Returns `true` if `country` is restricted for `token`.

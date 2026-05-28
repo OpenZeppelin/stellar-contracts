@@ -194,6 +194,10 @@ pub fn remove_allowed_country(e: &Env, token: &Address, country: u32) {
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
+///
+/// Each `(token, country)` pair lives in its own persistent entry, so the
+/// caller must size `countries` to stay within the per-transaction network
+/// limits — see <https://lab.stellar.org/network-limits>.
 pub fn batch_allow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
     for country in countries.iter() {
         add_allowed_country(e, token, country);
@@ -217,6 +221,10 @@ pub fn batch_allow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
+///
+/// Each `(token, country)` pair lives in its own persistent entry, so the
+/// caller must size `countries` to stay within the per-transaction network
+/// limits — see <https://lab.stellar.org/network-limits>.
 pub fn batch_disallow_countries(e: &Env, token: &Address, countries: &Vec<u32>) {
     for country in countries.iter() {
         remove_allowed_country(e, token, country);
