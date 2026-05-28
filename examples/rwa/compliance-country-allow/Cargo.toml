@@ -1,5 +1,5 @@
 [package]
-name = "rwa-country-allow"
+name = "compliance-country-allow"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -11,7 +11,7 @@ authors.workspace = true
 cargo_inherit = true
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 doctest = false
 
 [dependencies]
