@@ -79,7 +79,7 @@ pub fn register_verification_key(e: &Env, circuit_type: CircuitType, vk: &Bytes)
 ///
 /// - **A wrong VK silently breaks soundness.** This function writes the
 ///   `new_vk` bytes verbatim; nothing here checks that they correspond to the
-///   audited circuit. A corrupted, mis-derived, or maliciously crafted
+///   audited circuit. A corrupted, misderived, or maliciously crafted
 ///   replacement will happily verify forged proofs — minting tokens, draining
 ///   accounts, impersonating registered users.
 /// - **The update invalidates every in-flight proof for the affected circuit.**
