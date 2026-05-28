@@ -244,6 +244,10 @@ pub fn preset_id_balance(e: &Env, token: &Address, identity: &Address, balance: 
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
+///
+/// Each `(token, identity)` pair lives in its own persistent entry, so the
+/// caller must size `identities` to stay within the per-transaction network
+/// limits — see <https://lab.stellar.org/network-limits>.
 pub fn batch_preset_id_balances(
     e: &Env,
     token: &Address,

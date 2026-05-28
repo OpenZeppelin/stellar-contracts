@@ -179,6 +179,10 @@ pub trait MaxBalance: ComplianceModule {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
     /// [`storage::batch_preset_id_balances`] for the implementation.
+    ///
+    /// Each `(token, identity)` pair is stored in its own persistent entry, so
+    /// the caller must size `identities` to stay within the per-transaction
+    /// network limits — see <https://lab.stellar.org/network-limits>.
     fn batch_preset_id_balances(
         e: &Env,
         token: Address,
