@@ -14,8 +14,12 @@ use stellar_tokens::rwa::{
 
 use crate::contract::{CountryRestrictContract, CountryRestrictContractClient};
 
-fn create_client<'a>(e: &Env, admin: &Address) -> CountryRestrictContractClient<'a> {
-    let address = e.register(CountryRestrictContract, (admin,));
+fn create_client<'a>(
+    e: &Env,
+    admin: &Address,
+    manager: &Address,
+) -> CountryRestrictContractClient<'a> {
+    let address = e.register(CountryRestrictContract, (admin, manager));
     CountryRestrictContractClient::new(e, &address)
 }
 
@@ -145,15 +149,16 @@ fn add_and_remove_country_restriction_work() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
     assert!(!client.is_country_restricted(&token, &276));
 
-    client.add_country_restriction(&token, &276);
+    client.add_country_restriction(&token, &276, &manager);
     assert!(client.is_country_restricted(&token, &276));
 
-    client.remove_country_restriction(&token, &276);
+    client.remove_country_restriction(&token, &276, &manager);
     assert!(!client.is_country_restricted(&token, &276));
 }
 
@@ -162,14 +167,15 @@ fn batch_restrict_and_unrestrict_countries_work() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
-    client.batch_restrict_countries(&token, &vec![&e, 250u32, 276u32]);
+    client.batch_restrict_countries(&token, &vec![&e, 250u32, 276u32], &manager);
     assert!(client.is_country_restricted(&token, &250));
     assert!(client.is_country_restricted(&token, &276));
 
-    client.batch_unrestrict_countries(&token, &vec![&e, 250u32]);
+    client.batch_unrestrict_countries(&token, &vec![&e, 250u32], &manager);
     assert!(!client.is_country_restricted(&token, &250));
     assert!(client.is_country_restricted(&token, &276));
 }
@@ -179,7 +185,8 @@ fn name_returns_module_identifier() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let manager = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
 
     assert_eq!(client.name(), String::from_str(&e, "CountryRestrictModule"));
 }
@@ -189,9 +196,10 @@ fn set_and_get_compliance_address_round_trip() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
     let compliance = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
     client.set_compliance_address(&token, &compliance);
 
@@ -203,9 +211,10 @@ fn set_compliance_address_requires_admin_auth() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
     let compliance = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
     client.set_compliance_address(&token, &compliance);
 
@@ -221,43 +230,46 @@ fn get_compliance_address_panics_when_not_configured() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
     let _ = client.get_compliance_address(&token);
 }
 
 #[test]
-fn set_identity_registry_storage_requires_admin_auth() {
+fn set_identity_registry_storage_requires_manager_auth() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
     let irs = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
-    client.set_identity_registry_storage(&token, &irs);
+    client.set_identity_registry_storage(&token, &irs, &manager);
 
     let auths = e.auths();
     assert_eq!(auths.len(), 1);
     let (addr, _) = &auths[0];
-    assert_eq!(addr, &admin);
+    assert_eq!(addr, &manager);
 }
 
 #[test]
-fn add_country_restriction_requires_admin_auth() {
+fn add_country_restriction_requires_manager_auth() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let token = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
-    client.add_country_restriction(&token, &276);
+    client.add_country_restriction(&token, &276, &manager);
 
     let auths = e.auths();
     assert_eq!(auths.len(), 1);
     let (addr, _) = &auths[0];
-    assert_eq!(addr, &admin);
+    assert_eq!(addr, &manager);
 }
 
 #[test]
@@ -266,10 +278,11 @@ fn can_transfer_panics_when_irs_not_configured() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let from = Address::generate(&e);
     let to = Address::generate(&e);
     let token = Address::generate(&e);
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
 
     client.can_transfer(&from, &to, &100_i128, &token);
 }
@@ -279,12 +292,13 @@ fn can_transfer_and_can_create_use_irs_country_entries() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
     let from = Address::generate(&e);
     let token = Address::generate(&e);
     let allowed_to = Address::generate(&e);
     let restricted_to = Address::generate(&e);
     let amount = 100_i128;
-    let client = create_client(&e, &admin);
+    let client = create_client(&e, &admin, &manager);
     let irs_id = e.register(MockIRSContract, ());
     let irs = MockIRSContractClient::new(&e, &irs_id);
 
@@ -294,8 +308,8 @@ fn can_transfer_and_can_create_use_irs_country_entries() {
         &vec![&e, individual_country(250), organization_country(276)],
     );
 
-    client.set_identity_registry_storage(&token, &irs_id);
-    client.add_country_restriction(&token, &276);
+    client.set_identity_registry_storage(&token, &irs_id, &manager);
+    client.add_country_restriction(&token, &276, &manager);
 
     assert!(client.can_transfer(&from, &allowed_to, &amount, &token));
     assert!(client.can_create(&allowed_to, &amount, &token));

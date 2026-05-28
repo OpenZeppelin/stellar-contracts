@@ -38,17 +38,6 @@ use crate::rwa::compliance::modules::ComplianceModule;
 ///
 /// This trait is designed to be used in conjunction with the
 /// [`ComplianceModule`] trait.
-///
-/// **NOTE**
-///
-/// All setter functions exposed in the `CountryRestrict` trait are
-/// privileged operations and intentionally omit an `operator: Address`
-/// parameter. Access control for a compliance module is typically expressed
-/// in terms of the module's admin and the compliance contract it is
-/// registered on (e.g. requiring auth from the module admin, the compliance
-/// contract, or both), rather than from a per-call operator. Implementors
-/// should enforce the access policy that matches their deployment before
-/// delegating to the corresponding `storage::*` helper.
 #[contracttrait]
 pub trait CountryRestrict: ComplianceModule {
     /// Configures the Identity Registry Storage contract for `token`.
@@ -58,15 +47,16 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose IRS is being configured.
     /// * `irs` - The Identity Registry Storage contract address.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling
+    /// enforced on `operator` before calling
     /// [`crate::rwa::compliance::modules::storage::set_irs_address`] for the
     /// implementation.
-    fn set_identity_registry_storage(e: &Env, token: Address, irs: Address);
+    fn set_identity_registry_storage(e: &Env, token: Address, irs: Address, operator: Address);
 
     /// Adds a country to the restriction list for `token`.
     ///
@@ -75,6 +65,7 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose restriction list is updated.
     /// * `country` - The ISO 3166-1 numeric country code to restrict.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Events
     ///
@@ -85,9 +76,9 @@ pub trait CountryRestrict: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::add_country_restriction`] for the
-    /// implementation.
-    fn add_country_restriction(e: &Env, token: Address, country: u32);
+    /// enforced on `operator` before calling
+    /// [`storage::add_country_restriction`] for the implementation.
+    fn add_country_restriction(e: &Env, token: Address, country: u32, operator: Address);
 
     /// Removes a country from the restriction list for `token`.
     ///
@@ -96,6 +87,7 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose restriction list is updated.
     /// * `country` - The ISO 3166-1 numeric country code to unrestrict.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Events
     ///
@@ -106,9 +98,9 @@ pub trait CountryRestrict: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::remove_country_restriction`] for the
-    /// implementation.
-    fn remove_country_restriction(e: &Env, token: Address, country: u32);
+    /// enforced on `operator` before calling
+    /// [`storage::remove_country_restriction`] for the implementation.
+    fn remove_country_restriction(e: &Env, token: Address, country: u32, operator: Address);
 
     /// Adds multiple countries to the restriction list for `token`.
     ///
@@ -117,6 +109,7 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose restriction list is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to restrict.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Events
     ///
@@ -128,9 +121,9 @@ pub trait CountryRestrict: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::batch_restrict_countries`] for the
-    /// implementation.
-    fn batch_restrict_countries(e: &Env, token: Address, countries: Vec<u32>);
+    /// enforced on `operator` before calling
+    /// [`storage::batch_restrict_countries`] for the implementation.
+    fn batch_restrict_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address);
 
     /// Removes multiple countries from the restriction list for `token`.
     ///
@@ -139,6 +132,7 @@ pub trait CountryRestrict: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose restriction list is updated.
     /// * `countries` - The ISO 3166-1 numeric country codes to unrestrict.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Events
     ///
@@ -150,9 +144,9 @@ pub trait CountryRestrict: ComplianceModule {
     ///
     /// No default implementation is provided because this is a privileged
     /// operation that requires custom access control. Access control should be
-    /// enforced before calling [`storage::batch_unrestrict_countries`] for the
-    /// implementation.
-    fn batch_unrestrict_countries(e: &Env, token: Address, countries: Vec<u32>);
+    /// enforced on `operator` before calling
+    /// [`storage::batch_unrestrict_countries`] for the implementation.
+    fn batch_unrestrict_countries(e: &Env, token: Address, countries: Vec<u32>, operator: Address);
 
     /// Returns `true` if `country` is restricted for `token`.
     ///
