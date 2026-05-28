@@ -7,12 +7,15 @@
 //!
 //! - `fungible`: Implementation of fungible tokens (similar to ERC-20)
 //! - `non_fungible`: Implementation of non-fungible tokens (similar to ERC-721)
+//! - `confidential`: Building blocks for the confidential token wrapper
+//!   (encrypted balances + zero-knowledge proofs)
 //!
 //! Each module provides its own set of traits, functions, and extensions for
 //! working with the respective token type.
 
 #![no_std]
 
+pub mod confidential;
 pub mod fungible;
 pub mod non_fungible;
 pub mod rwa;
