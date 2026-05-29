@@ -7,7 +7,11 @@
 //! modules registered for each hook type. Shared helpers, storage keys, and
 //! TTL constants live in [`storage`].
 
+pub mod country_allow;
+pub mod country_restrict;
+pub mod max_balance;
 pub mod storage;
+pub mod supply_limit;
 
 #[cfg(test)]
 mod test;
@@ -63,16 +67,29 @@ use soroban_sdk::{contracterror, contracttrait, Address, Env, String};
 ///
 /// # Security Note
 ///
-/// State-mutating hooks, (potentially[`ComplianceModule::on_transfer`],
+/// State-mutating hooks (potentially [`ComplianceModule::on_transfer`],
 /// [`ComplianceModule::on_created`], [`ComplianceModule::on_destroyed`])
 /// must authenticate their caller. Hook arguments — including `token` —
 /// are forgeable: any contract can call these methods directly with
-/// arbitrary values, and Soroban provides no built-in caller-identity
-/// primitive beyond `require_auth()`. Soroban's invoker auth is also
-/// single-level — the token contract that triggered the operation is not
-/// the direct caller of the module hook, so `token.require_auth()` does
-/// not work; the dispatcher (Compliance Contract that is bound to the token)
-/// is the direct caller.
+/// arbitrary values. Soroban's invoker auth is single-level by default —
+/// the token contract that triggered the operation is not the direct
+/// caller of the module hook, so `token.require_auth()` does not succeed
+/// out of the box; the dispatcher (the compliance contract bound to the
+/// token) is the direct caller.
+///
+/// There is a primitive that can extend a contract's auth deeper into
+/// the call tree:`Env::authorize_as_current_contract`. With it, the
+/// token could pre-authorize the specific module hook invocation so that
+/// `token.require_auth()` succeeds inside the module. We deliberately do
+/// not use this pattern in the library: it requires the token contract to
+/// know every registered module's address, function signature, and exact
+/// argument values, and to re-emit that auth tree on every transfer, mint,
+/// and burn. Adding or changing a module would then require redeploying
+/// every bound token. The per-token `(token → dispatcher)` binding below
+/// keeps the token ignorant of the module layer at the cost of one
+/// persistent storage entry per (module, token) pair, which we consider
+/// the better trade-off for a modular compliance system. Implementors are
+/// of course free to choose differently for their own deployments.
 ///
 /// The canonical pattern is to record a per-token mapping of authorized
 /// dispatcher addresses (via
@@ -238,21 +255,22 @@ pub trait ComplianceModule {
     /// * `token` - The token whose dispatcher binding is being configured.
     /// * `compliance` - The dispatcher address that should be authorized to
     ///   call this module's hooks for `token`.
+    /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Notes
     ///
     /// No default implementation is provided because this is a privileged
-    /// operation that requires custom access control. Access control should
-    /// be enforced before calling [`storage::set_compliance_address`] for
-    /// the implementation.
-    fn set_compliance_address(e: &Env, token: Address, compliance: Address);
+    /// operation that requires custom access control. Access control should be
+    /// enforced on `operator` before calling
+    /// [`storage::set_compliance_address`] for the implementation.
+    fn set_compliance_address(e: &Env, token: Address, compliance: Address, operator: Address);
 }
 
 // ################## ERRORS ##################
 
 /// Error codes shared by all compliance modules.
 ///
-/// Compliance module errors occupy the 390–400 range, following the RWA
+/// Compliance module errors occupy the 390–398 range, following the RWA
 /// error numbering convention.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -264,16 +282,18 @@ pub enum ComplianceModuleError {
     MathOverflow = 391,
     /// Arithmetic underflow in a checked subtraction.
     MathUnderflow = 392,
-    /// A required limit entry is missing for the given token.
-    MissingLimit = 393,
-    /// A required transfer counter entry is missing.
-    MissingCounter = 394,
-    /// A required country data entry is missing.
-    MissingCountry = 395,
+    /// A transfer or mint would push an identity's aggregate balance above the
+    /// configured maximum.
+    MaxBalanceExceeded = 393,
+    /// A mint would push the tracked supply above the configured limit.
+    SupplyLimitExceeded = 394,
+    /// A preset operation was attempted after the preset phase has been
+    /// finalized.
+    PresetAlreadyCompleted = 395,
     /// The identity registry storage address has not been configured.
     IdentityRegistryNotSet = 396,
-    /// A token has reached the maximum number of configured limit entries.
-    TooManyLimits = 397,
+    /// The two parallel arrays in a batch call have different lengths.
+    BatchSizeMismatch = 397,
     /// No authorized compliance dispatcher has been bound for the given
     /// token.
     ComplianceNotSet = 398,
