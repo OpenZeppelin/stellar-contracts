@@ -6,6 +6,7 @@ members = [
     "transfer",
     "set_operator",
     "operator_transfer",
+    "revoke_operator",
     "gadgets/assert_on_curve",
     "gadgets/commit",
     "gadgets/ecdh",

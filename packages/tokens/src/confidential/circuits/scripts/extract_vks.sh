@@ -27,6 +27,7 @@ CIRCUITS=(
     "transfer"
     "set_operator"
     "operator_transfer"
+    "revoke_operator"
 )
 
 OUT_DIR="vks"

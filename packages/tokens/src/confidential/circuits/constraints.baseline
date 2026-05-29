@@ -26,6 +26,10 @@
 | circuit_register            | directive_invert           | N/A                  | N/A          | 9               |
 | circuit_register            | lte_hint                   | N/A                  | N/A          | 33              |
 | circuit_register            | main                       | Bounded { width: 4 } | 33           | 72              |
+| circuit_revoke_operator     | decompose_hint             | N/A                  | N/A          | 30              |
+| circuit_revoke_operator     | directive_invert           | N/A                  | N/A          | 9               |
+| circuit_revoke_operator     | lte_hint                   | N/A                  | N/A          | 33              |
+| circuit_revoke_operator     | main                       | Bounded { width: 4 } | 121          | 72              |
 | circuit_set_operator        | decompose_hint             | N/A                  | N/A          | 30              |
 | circuit_set_operator        | directive_invert           | N/A                  | N/A          | 9               |
 | circuit_set_operator        | lte_hint                   | N/A                  | N/A          | 33              |
