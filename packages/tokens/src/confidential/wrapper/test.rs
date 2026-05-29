@@ -257,6 +257,7 @@ fn register_stores_account_with_identity_balances() {
     let alice = Address::generate(&h.e);
 
     h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    EventAssertion::new(&h.e, h.wrapper_addr.clone()).assert_event_count(1);
 
     let account: ConfidentialAccount = h.wrapper.confidential_balance(&alice);
     assert_eq!(account.spending_key, fixture_point(&h.e));
@@ -317,6 +318,8 @@ fn deposit_credits_receiving_balance() {
     h.sac.mint(&depositor, &1_000i128);
 
     h.wrapper.deposit(&depositor, &alice, &500i128);
+    // 1 SAC transfer event + 1 Deposit event.
+    EventAssertion::new(&h.e, h.wrapper_addr.clone()).assert_event_count(2);
 
     // Receiving balance must move off identity.
     let account = h.wrapper.confidential_balance(&alice);
@@ -380,6 +383,8 @@ fn merge_folds_receiving_into_spendable() {
 
     let pre = h.wrapper.confidential_balance(&alice);
     h.wrapper.merge(&alice);
+    EventAssertion::new(&h.e, h.wrapper_addr.clone()).assert_event_count(1);
+
     let post = h.wrapper.confidential_balance(&alice);
 
     // Spendable now equals the prior receiving (since prior spendable was
@@ -411,6 +416,8 @@ fn withdraw_transfers_tokens_and_updates_spendable() {
     h.wrapper.merge(&alice);
 
     h.wrapper.withdraw(&alice, &beneficiary, &300i128, &withdraw_data(&h.e));
+    // 1 SAC transfer event + 1 Withdraw event.
+    EventAssertion::new(&h.e, h.wrapper_addr.clone()).assert_event_count(2);
 
     let token_client = soroban_sdk::token::TokenClient::new(&h.e, &h.sac_addr);
     assert_eq!(token_client.balance(&beneficiary), 300);
@@ -458,6 +465,7 @@ fn confidential_transfer_updates_both_sides() {
     h.wrapper.merge(&alice);
 
     h.wrapper.confidential_transfer(&alice, &bob, &transfer_data(&h.e));
+    EventAssertion::new(&h.e, h.wrapper_addr.clone()).assert_event_count(1);
 
     // Sender's spendable balance was overwritten.
     let alice_acc = h.wrapper.confidential_balance(&alice);
@@ -479,6 +487,7 @@ fn set_operator_stores_delegation() {
     h.wrapper.register(&operator, &1u32, &register_data(&h.e));
 
     h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
+    EventAssertion::new(&h.e, h.wrapper_addr.clone()).assert_event_count(1);
 
     let delegation = h.wrapper.get_operator(&alice, &operator);
     assert_eq!(delegation.expiration_ledger, 1_000);
@@ -509,6 +518,7 @@ fn revoke_operator_deletes_delegation() {
     h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
 
     h.wrapper.revoke_operator(&alice, &operator, &revoke_operator_data(&h.e));
+    EventAssertion::new(&h.e, h.wrapper_addr.clone()).assert_event_count(1);
 
     assert!(!h.wrapper.is_operator(&alice, &operator));
 }
@@ -547,6 +557,7 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
     h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
 
     h.wrapper.confidential_transfer_from(&operator, &alice, &bob, &operator_transfer_data(&h.e));
+    EventAssertion::new(&h.e, h.wrapper_addr.clone()).assert_event_count(1);
 
     // Delegation allowance commitment was rotated.
     let delegation = h.wrapper.get_operator(&alice, &operator);
