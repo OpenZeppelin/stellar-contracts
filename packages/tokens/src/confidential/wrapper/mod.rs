@@ -45,6 +45,31 @@
 //! construction as `Poseidon2(δ_addr, lo, hi)` over the wrapper's own
 //! address (DESIGN §2.7, §3.5) and stored in instance storage.
 //!
+//! ## Underlying Token Requirements
+//!
+//! The wrapper assumes the underlying SEP-41 token has **exact-transfer
+//! semantics**: a successful `transfer(from, to, amount)` moves exactly
+//! `amount` units between the two accounts, with no fees deducted in transit
+//! and no rebasing applied. [`storage::deposit_no_auth`] credits the
+//! confidential receiving balance with `amount · G` after the SEP-41
+//! transfer, and [`storage::withdraw_no_auth`] debits the confidential
+//! spendable balance by `amount` before transferring the same amount out;
+//! neither call re-measures the wrapper's own balance. With a
+//! fee-on-transfer, rebasing, or otherwise malicious token implementation,
+//! the confidential ledger would drift from the on-chain reserves —
+//! credit a higher amount than was actually received, or pay out less than
+//! was debited.
+//!
+//! Supported token implementations:
+//!
+//! - the Stellar Asset Contract (SAC), and
+//! - OpenZeppelin's [`fungible`](crate::fungible) token (which preserves SEP-41
+//!   exact-transfer semantics).
+//!
+//! Deploying the wrapper over any other token implementation is the
+//! deployer's responsibility — verify that `transfer` does not skim a fee
+//! or otherwise diverge from exact-transfer semantics before doing so.
+//!
 //! ## Storage
 //!
 //! Singleton configuration (`token`, `verifier`, `auditor`, `wrap`) lives in

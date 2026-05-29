@@ -475,6 +475,15 @@ pub fn register_no_auth(
 /// * topics - `["deposit", from: Address, to: Address]`
 /// * data - `[amount: i128]`
 ///
+/// # Notes
+///
+/// This function credits `amount · G` to `to`'s confidential receiving
+/// balance immediately after invoking `transfer` on the underlying token,
+/// without re-measuring the wrapper's balance. The underlying token MUST
+/// therefore have exact-transfer semantics (no fee-on-transfer, no
+/// rebasing). See the [module-level constraint](super) for the list of
+/// supported token implementations.
+///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
@@ -550,6 +559,17 @@ pub fn merge_no_auth(e: &Env, account: &Address) {
 /// * topics - `["withdraw", from: Address, to: Address]`
 /// * data - `[amount: i128, r_e: BytesN<64>, sigma: BytesN<32>, b_tilde:
 ///   BytesN<32>, b_aud_s: BytesN<32>]`
+///
+/// # Notes
+///
+/// The proof binds the confidential balance debit to exactly `amount`, and
+/// this function then invokes `transfer` on the underlying token for the
+/// same `amount` without re-measuring the recipient's balance. The
+/// underlying token MUST therefore have exact-transfer semantics (no
+/// fee-on-transfer, no rebasing) — otherwise the recipient would receive
+/// less than was debited from the confidential balance. See the
+/// [module-level constraint](super) for the list of supported token
+/// implementations.
 ///
 /// # Security Warning
 ///
