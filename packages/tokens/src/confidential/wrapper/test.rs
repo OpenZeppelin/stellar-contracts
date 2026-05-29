@@ -13,9 +13,10 @@ use crate::confidential::{
     verifier::{CircuitType, ConfidentialVerifier},
     wrapper::{
         storage as wrapper_storage, ConfidentialAccount, ConfidentialTokenWrapper,
-        ConfidentialTokenWrapperClient, OperatorDelegation, OperatorTransferPayload,
-        RegisterPayload, RevokeOperatorPayload, SetOperatorPayload, TransferPayload,
-        WithdrawPayload,
+        ConfidentialTokenWrapperClient, NoHooks, OperatorDelegation, OperatorTransferData,
+        OperatorTransferPayload, RegisterData, RegisterPayload, RevokeOperatorData,
+        RevokeOperatorPayload, SetOperatorData, SetOperatorPayload, TransferData, TransferPayload,
+        WithdrawData, WithdrawPayload,
     },
 };
 
@@ -58,7 +59,9 @@ impl WrapperContract {
 }
 
 #[contractimpl(contracttrait)]
-impl ConfidentialTokenWrapper for WrapperContract {}
+impl ConfidentialTokenWrapper for WrapperContract {
+    type Hooks = NoHooks;
+}
 
 #[contract]
 struct MockVerifier;
@@ -148,81 +151,95 @@ fn setup_with_verifier_addr<'a>(e: Env, verifier_addr: Address) -> Harness<'a> {
     Harness { e, wrapper, wrapper_addr, token_admin, sac: sac_client, sac_addr }
 }
 
-fn register_payload(e: &Env) -> Bytes {
-    RegisterPayload { y: fixture_point(e), pvk: fixture_point(e), proof: Bytes::new(e) }.to_xdr(e)
-}
-
-fn withdraw_payload(e: &Env) -> Bytes {
-    WithdrawPayload {
-        c_spend_new: fixture_point(e),
-        b_tilde: fixture_field(e, 0xaa),
-        r_e: fixture_point(e),
-        sigma: fixture_field(e, 0xbb),
-        b_aud_s: fixture_field(e, 0xcc),
+fn register_data(e: &Env) -> Bytes {
+    RegisterData {
+        payload: RegisterPayload { y: fixture_point(e), pvk: fixture_point(e) },
         proof: Bytes::new(e),
     }
     .to_xdr(e)
 }
 
-fn transfer_payload(e: &Env) -> Bytes {
-    TransferPayload {
-        c_spend_new: fixture_point(e),
-        c_tx: fixture_point(e),
-        r_e: fixture_point(e),
-        v_tilde: fixture_field(e, 0x11),
-        b_tilde: fixture_field(e, 0x12),
-        sigma: fixture_field(e, 0x13),
-        v_aud_r: fixture_field(e, 0x14),
-        r_aud_r: fixture_field(e, 0x15),
-        v_aud_s: fixture_field(e, 0x16),
-        b_aud_s: fixture_field(e, 0x17),
+fn withdraw_data(e: &Env) -> Bytes {
+    WithdrawData {
+        payload: WithdrawPayload {
+            c_spend_new: fixture_point(e),
+            b_tilde: fixture_field(e, 0xaa),
+            r_e: fixture_point(e),
+            sigma: fixture_field(e, 0xbb),
+            b_aud_s: fixture_field(e, 0xcc),
+        },
         proof: Bytes::new(e),
     }
     .to_xdr(e)
 }
 
-fn set_operator_payload(e: &Env) -> Bytes {
-    SetOperatorPayload {
-        c_spend_new: fixture_point(e),
-        c_a: fixture_point(e),
-        escrowed_dvk: fixture_point(e),
-        b_tilde: fixture_field(e, 0x21),
-        a_tilde: fixture_field(e, 0x22),
-        r_e: fixture_point(e),
-        sigma: fixture_field(e, 0x23),
-        sigma_a: fixture_field(e, 0x24),
-        v_aud_s: fixture_field(e, 0x25),
-        b_aud_s: fixture_field(e, 0x26),
+fn transfer_data(e: &Env) -> Bytes {
+    TransferData {
+        payload: TransferPayload {
+            c_spend_new: fixture_point(e),
+            c_tx: fixture_point(e),
+            r_e: fixture_point(e),
+            v_tilde: fixture_field(e, 0x11),
+            b_tilde: fixture_field(e, 0x12),
+            sigma: fixture_field(e, 0x13),
+            v_aud_r: fixture_field(e, 0x14),
+            r_aud_r: fixture_field(e, 0x15),
+            v_aud_s: fixture_field(e, 0x16),
+            b_aud_s: fixture_field(e, 0x17),
+        },
         proof: Bytes::new(e),
     }
     .to_xdr(e)
 }
 
-fn operator_transfer_payload(e: &Env) -> Bytes {
-    OperatorTransferPayload {
-        c_a_new: fixture_point(e),
-        c_tx: fixture_point(e),
-        r_e: fixture_point(e),
-        v_tilde: fixture_field(e, 0x31),
-        a_tilde_new: fixture_field(e, 0x32),
-        sigma_a_new: fixture_field(e, 0x33),
-        v_aud_r: fixture_field(e, 0x34),
-        r_aud_r: fixture_field(e, 0x35),
-        v_aud_s: fixture_field(e, 0x36),
-        a_aud_s: fixture_field(e, 0x37),
+fn set_operator_data(e: &Env) -> Bytes {
+    SetOperatorData {
+        payload: SetOperatorPayload {
+            c_spend_new: fixture_point(e),
+            c_a: fixture_point(e),
+            escrowed_dvk: fixture_point(e),
+            b_tilde: fixture_field(e, 0x21),
+            a_tilde: fixture_field(e, 0x22),
+            r_e: fixture_point(e),
+            sigma: fixture_field(e, 0x23),
+            sigma_a: fixture_field(e, 0x24),
+            v_aud_s: fixture_field(e, 0x25),
+            b_aud_s: fixture_field(e, 0x26),
+        },
         proof: Bytes::new(e),
     }
     .to_xdr(e)
 }
 
-fn revoke_operator_payload(e: &Env) -> Bytes {
-    RevokeOperatorPayload {
-        c_spend_new: fixture_point(e),
-        b_tilde: fixture_field(e, 0x41),
-        r_e: fixture_point(e),
-        sigma: fixture_field(e, 0x42),
-        v_aud_s: fixture_field(e, 0x43),
-        b_aud_s: fixture_field(e, 0x44),
+fn operator_transfer_data(e: &Env) -> Bytes {
+    OperatorTransferData {
+        payload: OperatorTransferPayload {
+            c_a_new: fixture_point(e),
+            c_tx: fixture_point(e),
+            r_e: fixture_point(e),
+            v_tilde: fixture_field(e, 0x31),
+            a_tilde_new: fixture_field(e, 0x32),
+            sigma_a_new: fixture_field(e, 0x33),
+            v_aud_r: fixture_field(e, 0x34),
+            r_aud_r: fixture_field(e, 0x35),
+            v_aud_s: fixture_field(e, 0x36),
+            a_aud_s: fixture_field(e, 0x37),
+        },
+        proof: Bytes::new(e),
+    }
+    .to_xdr(e)
+}
+
+fn revoke_operator_data(e: &Env) -> Bytes {
+    RevokeOperatorData {
+        payload: RevokeOperatorPayload {
+            c_spend_new: fixture_point(e),
+            b_tilde: fixture_field(e, 0x41),
+            r_e: fixture_point(e),
+            sigma: fixture_field(e, 0x42),
+            v_aud_s: fixture_field(e, 0x43),
+            b_aud_s: fixture_field(e, 0x44),
+        },
         proof: Bytes::new(e),
     }
     .to_xdr(e)
@@ -235,7 +252,7 @@ fn register_stores_account_with_identity_balances() {
     let h = setup();
     let alice = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
 
     let account: ConfidentialAccount = h.wrapper.confidential_balance(&alice);
     assert_eq!(account.spending_key, fixture_point(&h.e));
@@ -251,8 +268,8 @@ fn register_stores_account_with_identity_balances() {
 fn register_twice_panics() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
 }
 
 #[test]
@@ -272,7 +289,7 @@ fn register_wrong_type_payload_panics() {
 fn register_invalid_proof_panics() {
     let h = setup_with_failing_verifier();
     let alice = Address::generate(&h.e);
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
 }
 
 #[test]
@@ -281,7 +298,7 @@ fn register_unknown_auditor_panics() {
     // Routes through the auditor registry's `AuditorNotRegistered` (3301).
     let h = setup();
     let alice = Address::generate(&h.e);
-    h.wrapper.register(&alice, &999u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &999u32, &register_data(&h.e));
 }
 
 // ################## DEPOSIT ##################
@@ -292,7 +309,7 @@ fn deposit_credits_receiving_balance() {
     let alice = Address::generate(&h.e);
     let depositor = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
     h.sac.mint(&depositor, &1_000i128);
 
     h.wrapper.deposit(&depositor, &alice, &500i128);
@@ -314,7 +331,7 @@ fn deposit_negative_amount_panics() {
     let alice = Address::generate(&h.e);
     let depositor = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
     h.wrapper.deposit(&depositor, &alice, &-1i128);
 }
 
@@ -336,7 +353,7 @@ fn deposit_zero_amount_is_ok() {
     let alice = Address::generate(&h.e);
     let depositor = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
     h.sac.mint(&depositor, &1i128);
 
     h.wrapper.deposit(&depositor, &alice, &0i128);
@@ -353,7 +370,7 @@ fn merge_folds_receiving_into_spendable() {
     let alice = Address::generate(&h.e);
     let depositor = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
     h.sac.mint(&depositor, &1_000i128);
     h.wrapper.deposit(&depositor, &alice, &500i128);
 
@@ -384,12 +401,12 @@ fn withdraw_transfers_tokens_and_updates_spendable() {
     let depositor = Address::generate(&h.e);
     let beneficiary = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
     h.sac.mint(&depositor, &1_000i128);
     h.wrapper.deposit(&depositor, &alice, &1_000i128);
     h.wrapper.merge(&alice);
 
-    h.wrapper.withdraw(&alice, &beneficiary, &300i128, &withdraw_payload(&h.e));
+    h.wrapper.withdraw(&alice, &beneficiary, &300i128, &withdraw_data(&h.e));
 
     let token_client = soroban_sdk::token::TokenClient::new(&h.e, &h.sac_addr);
     assert_eq!(token_client.balance(&beneficiary), 300);
@@ -407,8 +424,8 @@ fn withdraw_negative_amount_panics() {
     let alice = Address::generate(&h.e);
     let beneficiary = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
-    h.wrapper.withdraw(&alice, &beneficiary, &-1i128, &withdraw_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    h.wrapper.withdraw(&alice, &beneficiary, &-1i128, &withdraw_data(&h.e));
 }
 
 #[test]
@@ -418,7 +435,7 @@ fn withdraw_from_unknown_account_panics() {
     let stranger = Address::generate(&h.e);
     let beneficiary = Address::generate(&h.e);
 
-    h.wrapper.withdraw(&stranger, &beneficiary, &1i128, &withdraw_payload(&h.e));
+    h.wrapper.withdraw(&stranger, &beneficiary, &1i128, &withdraw_data(&h.e));
 }
 
 // ################## CONFIDENTIAL TRANSFER ##################
@@ -430,13 +447,13 @@ fn confidential_transfer_updates_both_sides() {
     let bob = Address::generate(&h.e);
     let depositor = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&bob, &1u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    h.wrapper.register(&bob, &1u32, &register_data(&h.e));
     h.sac.mint(&depositor, &1_000i128);
     h.wrapper.deposit(&depositor, &alice, &1_000i128);
     h.wrapper.merge(&alice);
 
-    h.wrapper.confidential_transfer(&alice, &bob, &transfer_payload(&h.e));
+    h.wrapper.confidential_transfer(&alice, &bob, &transfer_data(&h.e));
 
     // Sender's spendable balance was overwritten.
     let alice_acc = h.wrapper.confidential_balance(&alice);
@@ -454,10 +471,10 @@ fn set_operator_stores_delegation() {
     let alice = Address::generate(&h.e);
     let operator = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&operator, &1u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    h.wrapper.register(&operator, &1u32, &register_data(&h.e));
 
-    h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_payload(&h.e));
+    h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
 
     let delegation = h.wrapper.get_operator(&alice, &operator);
     assert_eq!(delegation.expiration_ledger, 1_000);
@@ -471,10 +488,10 @@ fn set_operator_twice_panics() {
     let alice = Address::generate(&h.e);
     let operator = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&operator, &1u32, &register_payload(&h.e));
-    h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_payload(&h.e));
-    h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    h.wrapper.register(&operator, &1u32, &register_data(&h.e));
+    h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
+    h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
 }
 
 #[test]
@@ -483,11 +500,11 @@ fn revoke_operator_deletes_delegation() {
     let alice = Address::generate(&h.e);
     let operator = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&operator, &1u32, &register_payload(&h.e));
-    h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    h.wrapper.register(&operator, &1u32, &register_data(&h.e));
+    h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
 
-    h.wrapper.revoke_operator(&alice, &operator, &revoke_operator_payload(&h.e));
+    h.wrapper.revoke_operator(&alice, &operator, &revoke_operator_data(&h.e));
 
     assert!(!h.wrapper.is_operator(&alice, &operator));
 }
@@ -498,8 +515,8 @@ fn revoke_unknown_operator_panics() {
     let h = setup();
     let alice = Address::generate(&h.e);
     let operator = Address::generate(&h.e);
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
-    h.wrapper.revoke_operator(&alice, &operator, &revoke_operator_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    h.wrapper.revoke_operator(&alice, &operator, &revoke_operator_data(&h.e));
 }
 
 #[test]
@@ -520,12 +537,12 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
     let operator = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&operator, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&bob, &1u32, &register_payload(&h.e));
-    h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    h.wrapper.register(&operator, &1u32, &register_data(&h.e));
+    h.wrapper.register(&bob, &1u32, &register_data(&h.e));
+    h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
 
-    h.wrapper.confidential_transfer_from(&operator, &alice, &bob, &operator_transfer_payload(&h.e));
+    h.wrapper.confidential_transfer_from(&operator, &alice, &bob, &operator_transfer_data(&h.e));
 
     // Delegation allowance commitment was rotated.
     let delegation = h.wrapper.get_operator(&alice, &operator);
@@ -543,15 +560,15 @@ fn confidential_transfer_from_expired_panics() {
     let operator = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&operator, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&bob, &1u32, &register_payload(&h.e));
-    h.wrapper.set_operator(&alice, &operator, &10u32, &set_operator_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    h.wrapper.register(&operator, &1u32, &register_data(&h.e));
+    h.wrapper.register(&bob, &1u32, &register_data(&h.e));
+    h.wrapper.set_operator(&alice, &operator, &10u32, &set_operator_data(&h.e));
 
     // Advance past the delegation's expiration.
     h.e.ledger().set_sequence_number(100);
 
-    h.wrapper.confidential_transfer_from(&operator, &alice, &bob, &operator_transfer_payload(&h.e));
+    h.wrapper.confidential_transfer_from(&operator, &alice, &bob, &operator_transfer_data(&h.e));
 }
 
 #[test]
@@ -562,11 +579,11 @@ fn confidential_transfer_from_no_delegation_panics() {
     let operator = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
 
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&operator, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&bob, &1u32, &register_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    h.wrapper.register(&operator, &1u32, &register_data(&h.e));
+    h.wrapper.register(&bob, &1u32, &register_data(&h.e));
 
-    h.wrapper.confidential_transfer_from(&operator, &alice, &bob, &operator_transfer_payload(&h.e));
+    h.wrapper.confidential_transfer_from(&operator, &alice, &bob, &operator_transfer_data(&h.e));
 }
 
 // ################## READ METHODS ##################
@@ -589,9 +606,9 @@ fn is_operator_returns_false_for_missing_and_expired() {
     assert!(!h.wrapper.is_operator(&alice, &operator));
 
     // Active.
-    h.wrapper.register(&alice, &1u32, &register_payload(&h.e));
-    h.wrapper.register(&operator, &1u32, &register_payload(&h.e));
-    h.wrapper.set_operator(&alice, &operator, &50u32, &set_operator_payload(&h.e));
+    h.wrapper.register(&alice, &1u32, &register_data(&h.e));
+    h.wrapper.register(&operator, &1u32, &register_data(&h.e));
+    h.wrapper.set_operator(&alice, &operator, &50u32, &set_operator_data(&h.e));
     assert!(h.wrapper.is_operator(&alice, &operator));
 
     // Expired.
