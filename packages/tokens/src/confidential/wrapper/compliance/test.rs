@@ -188,12 +188,17 @@ fn hooks_short_circuit_without_config() {
     let h = setup();
     let alice = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
+    let op = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
         // No config written — every hook must be a silent no-op.
         ComplianceHooks::on_merge(&h.e, &alice);
         ComplianceHooks::on_transfer(&h.e, &alice, &bob, void_val(&h.e));
         ComplianceHooks::on_deposit(&h.e, &alice, &bob, 0);
         ComplianceHooks::on_register(&h.e, &alice, void_val(&h.e));
+        ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, void_val(&h.e));
+        ComplianceHooks::on_operator_transfer(&h.e, &op, &alice, &bob, void_val(&h.e));
+        ComplianceHooks::on_set_operator(&h.e, &alice, &op, 0, void_val(&h.e));
+        ComplianceHooks::on_revoke_operator(&h.e, &alice, &op, void_val(&h.e));
         assert!(compliance_config(&h.e).is_none());
         assert!(!is_frozen(&h.e, &alice));
     });
@@ -285,6 +290,84 @@ fn on_operator_transfer_panics_when_operator_frozen() {
         set_compliance_config_no_auth(&h.e, &base_config());
         freeze_no_auth(&h.e, &op);
         ComplianceHooks::on_operator_transfer(&h.e, &op, &alice, &bob, void_val(&h.e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3601)")]
+fn on_withdraw_panics_when_sender_frozen() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let bob = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        set_compliance_config_no_auth(&h.e, &base_config());
+        freeze_no_auth(&h.e, &alice);
+        ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, void_val(&h.e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3601)")]
+fn on_withdraw_panics_when_recipient_frozen() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let bob = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        set_compliance_config_no_auth(&h.e, &base_config());
+        freeze_no_auth(&h.e, &bob);
+        ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, void_val(&h.e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3601)")]
+fn on_set_operator_panics_when_account_frozen() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let op = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        set_compliance_config_no_auth(&h.e, &base_config());
+        freeze_no_auth(&h.e, &alice);
+        ComplianceHooks::on_set_operator(&h.e, &alice, &op, 0, void_val(&h.e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3601)")]
+fn on_set_operator_panics_when_operator_frozen() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let op = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        set_compliance_config_no_auth(&h.e, &base_config());
+        freeze_no_auth(&h.e, &op);
+        ComplianceHooks::on_set_operator(&h.e, &alice, &op, 0, void_val(&h.e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3601)")]
+fn on_revoke_operator_panics_when_account_frozen() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let op = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        set_compliance_config_no_auth(&h.e, &base_config());
+        freeze_no_auth(&h.e, &alice);
+        ComplianceHooks::on_revoke_operator(&h.e, &alice, &op, void_val(&h.e));
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3601)")]
+fn on_revoke_operator_panics_when_operator_frozen() {
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    let op = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        set_compliance_config_no_auth(&h.e, &base_config());
+        freeze_no_auth(&h.e, &op);
+        ComplianceHooks::on_revoke_operator(&h.e, &alice, &op, void_val(&h.e));
     });
 }
 
