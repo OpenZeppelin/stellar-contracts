@@ -7,12 +7,14 @@
 //!
 //! This module exposes:
 //!
-//! * [`Grumpkin::add`], [`Grumpkin::sub`], [`Grumpkin::neg`] — affine point
-//!   arithmetic with full identity handling.
+//! * [`Grumpkin::add`], [`Grumpkin::sub`], [`Grumpkin::neg`], [`Grumpkin::mul`]
+//!   — affine point arithmetic with full identity handling.
 //! * [`Grumpkin::is_on_curve`], [`Grumpkin::is_not_identity`] — validation
 //!   helpers for points that enter the system without a soundness proof.
 //! * [`Grumpkin::identity`] — the encoded point at infinity, `(0, 0)` over 64
 //!   bytes.
+//! * [`Grumpkin::generator`] — the canonical Barretenberg generator `G` used by
+//!   the Pedersen commitment scheme.
 //!
 //! # Encoding
 //!
@@ -41,6 +43,20 @@ const BN254_FR_MODULUS_BE: [u8; 32] = [
     0x28, 0x33, 0xe8, 0x48, 0x79, 0xb9, 0x70, 0x91, 0x43, 0xe1, 0xf5, 0x93, 0xf0, 0x00, 0x00, 0x01,
 ];
 
+/// Canonical Barretenberg Grumpkin generator `G`. Encoded as `be(x) || be(y)`
+/// over 64 bytes.
+///
+/// - `x = 0x083e7911d835097629f0067531fc15cafd79a89beecb39903f69572c636f4a5a`
+/// - `y = 0x1a7f5efaad7f315c25a918f30cc8d7333fccab7ad7c90f14de81bcc528f9935d`
+const GENERATOR_BYTES: [u8; 64] = [
+    // x
+    0x08, 0x3e, 0x79, 0x11, 0xd8, 0x35, 0x09, 0x76, 0x29, 0xf0, 0x06, 0x75, 0x31, 0xfc, 0x15, 0xca,
+    0xfd, 0x79, 0xa8, 0x9b, 0xee, 0xcb, 0x39, 0x90, 0x3f, 0x69, 0x57, 0x2c, 0x63, 0x6f, 0x4a, 0x5a,
+    // y
+    0x1a, 0x7f, 0x5e, 0xfa, 0xad, 0x7f, 0x31, 0x5c, 0x25, 0xa9, 0x18, 0xf3, 0x0c, 0xc8, 0xd7, 0x33,
+    0x3f, 0xcc, 0xab, 0x7a, 0xd7, 0xc9, 0x0f, 0x14, 0xde, 0x81, 0xbc, 0xc5, 0x28, 0xf9, 0x93, 0x5d,
+];
+
 /// Grumpkin point arithmetic over `Bn254Fr`.
 ///
 /// The implementation performs no on-curve check on its inputs: callers must
@@ -58,6 +74,22 @@ impl Grumpkin {
     /// * `e` - Access to the Soroban environment.
     pub fn identity(e: &Env) -> Point {
         BytesN::from_array(e, &IDENTITY_BYTES)
+    }
+
+    /// Returns the canonical Barretenberg Grumpkin generator `G`.
+    ///
+    /// This is the same `G` used by Barretenberg's Pedersen commitment scheme
+    /// and is the curve generator referenced by the noir/UltraHonk circuits
+    /// that consume this library's outputs. It differs from ark-grumpkin's
+    /// default generator: callers cross-validating against ark-grumpkin must
+    /// construct an `ArkPoint` from the documented `(x, y)` instead of using
+    /// `ArkProj::generator()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    pub fn generator(e: &Env) -> Point {
+        BytesN::from_array(e, &GENERATOR_BYTES)
     }
 
     /// Returns `true` iff `p` is the identity (all-zero 64-byte encoding).
@@ -188,6 +220,38 @@ impl Grumpkin {
     /// * `p2` - The subtrahend.
     pub fn sub(e: &Env, p1: &Point, p2: &Point) -> Point {
         Self::add(e, p1, &Self::neg(e, p2))
+    }
+
+    /// Returns `scalar · p` on Grumpkin via double-and-add.
+    ///
+    /// Handles edges cleanly: `0 · p = O` for any `p`, and `scalar · O = O`
+    /// for any `scalar`.
+    ///
+    /// # Arguments
+    ///
+    /// * `e` - Access to the Soroban environment.
+    /// * `p` - The base point.
+    /// * `scalar` - The scalar multiplier. Sized for the on-chain consumers'
+    ///   needs (token amounts and similar bounded quantities); off-chain
+    ///   provers typically use larger scalars and should pre-compute on the
+    ///   prover side rather than calling this function.
+    pub fn mul(e: &Env, p: &Point, scalar: u128) -> Point {
+        if scalar == 0 || Self::is_identity(p) {
+            return Self::identity(e);
+        }
+        let mut k = scalar;
+        let mut result = Self::identity(e);
+        let mut base = p.clone();
+        while k > 0 {
+            if k & 1 == 1 {
+                result = Self::add(e, &result, &base);
+            }
+            k >>= 1;
+            if k > 0 {
+                base = Self::add(e, &base, &base);
+            }
+        }
+        result
     }
 
     /// Encodes `(x, y)` as a 64-byte [`Point`].

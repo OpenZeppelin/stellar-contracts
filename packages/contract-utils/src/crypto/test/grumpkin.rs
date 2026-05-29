@@ -216,6 +216,77 @@ fn from_xy_and_coordinates_roundtrip() {
     assert_eq!(rebuilt.to_array(), p.to_array());
 }
 
+// ################## UNIT TESTS — generator, scalar multiplication
+// ##################
+
+#[test]
+fn generator_is_on_curve_and_non_identity() {
+    let e = Env::default();
+    let g = Grumpkin::generator(&e);
+    assert!(Grumpkin::is_not_identity(&g));
+    assert!(Grumpkin::is_on_curve(&e, &g));
+}
+
+#[test]
+fn generator_matches_documented_bytes() {
+    let e = Env::default();
+    let g = Grumpkin::generator(&e).to_array();
+    let expected_x = [
+        0x08, 0x3e, 0x79, 0x11, 0xd8, 0x35, 0x09, 0x76, 0x29, 0xf0, 0x06, 0x75, 0x31, 0xfc, 0x15,
+        0xca, 0xfd, 0x79, 0xa8, 0x9b, 0xee, 0xcb, 0x39, 0x90, 0x3f, 0x69, 0x57, 0x2c, 0x63, 0x6f,
+        0x4a, 0x5a,
+    ];
+    let expected_y = [
+        0x1a, 0x7f, 0x5e, 0xfa, 0xad, 0x7f, 0x31, 0x5c, 0x25, 0xa9, 0x18, 0xf3, 0x0c, 0xc8, 0xd7,
+        0x33, 0x3f, 0xcc, 0xab, 0x7a, 0xd7, 0xc9, 0x0f, 0x14, 0xde, 0x81, 0xbc, 0xc5, 0x28, 0xf9,
+        0x93, 0x5d,
+    ];
+    assert_eq!(&g[..32], &expected_x[..]);
+    assert_eq!(&g[32..], &expected_y[..]);
+}
+
+#[test]
+fn mul_by_zero_is_identity() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0x44; 32]);
+    assert_eq!(Grumpkin::mul(&e, &p, 0).to_array(), [0u8; 64]);
+}
+
+#[test]
+fn mul_of_identity_is_identity() {
+    let e = Env::default();
+    let o = Grumpkin::identity(&e);
+    assert_eq!(Grumpkin::mul(&e, &o, 12345).to_array(), [0u8; 64]);
+}
+
+#[test]
+fn mul_by_one_is_self() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0x88; 32]);
+    assert_eq!(Grumpkin::mul(&e, &p, 1).to_array(), p.to_array());
+}
+
+#[test]
+fn mul_by_two_matches_doubling() {
+    let e = Env::default();
+    let p = rand_point(&e, &[0xAB; 32]);
+    let twice = Grumpkin::add(&e, &p, &p);
+    assert_eq!(Grumpkin::mul(&e, &p, 2).to_array(), twice.to_array());
+}
+
+#[test]
+fn mul_matches_reference_for_small_scalars() {
+    let e = Env::default();
+    // For each k in {3, 7, 13, 100, u128::MAX}, verify Grumpkin::mul(p, k) matches
+    // ark's p * k for an arbitrary base point.
+    let p_ark = scalar_mul_g(scalar_from_bytes(&[0xDE; 32]));
+    let p = to_point(&e, &p_ark);
+    for &k in &[3u128, 7, 13, 100, 1u128 << 64, u128::MAX] {
+        let expected = to_point(&e, &(p_ark.into_group() * ArkScalar::from(k)).into_affine());
+        assert_eq!(Grumpkin::mul(&e, &p, k).to_array(), expected.to_array(), "k = {}", k);
+    }
+}
+
 // ################## PROPERTY TESTS ##################
 
 fn nonzero_scalar(seed: &[u8; 32]) -> ArkScalar {
