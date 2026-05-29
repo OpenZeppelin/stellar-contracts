@@ -8,8 +8,6 @@
 //! and dual auditor ciphertexts are emitted in each transfer event. See
 //! [`docs/DESIGN.github.md`] for the full specification.
 //!
-//! [`docs/DESIGN.github.md`]: https://github.com/OpenZeppelin/stellar-contracts/blob/main/packages/tokens/src/confidential/docs/DESIGN.github.md
-//!
 //! # ⚠️ Not Production Ready
 //!
 //! This module depends on
@@ -53,6 +51,7 @@
 //! instance storage. Per-account state lives in persistent storage; reads
 //! extend TTL, writes do not (CLAUDE.md storage convention).
 
+pub mod compliance;
 pub mod storage;
 
 #[cfg(test)]
