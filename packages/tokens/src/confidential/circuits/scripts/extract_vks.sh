@@ -26,6 +26,7 @@ CIRCUITS=(
     "withdraw"
     "transfer"
     "set_operator"
+    "operator_transfer"
 )
 
 OUT_DIR="vks"
