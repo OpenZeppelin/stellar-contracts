@@ -20,7 +20,7 @@ use crate::confidential::{
             ComplianceConfig, ComplianceHooks, ConfidentialCompliance,
             ConfidentialComplianceClient, Policy,
         },
-        storage::{set_auditor, set_token, set_verifier, set_wrap},
+        storage::{set_auditor_no_auth, set_token_no_auth, set_verifier_no_auth, set_wrap_no_auth},
         ConfidentialAccount, ConfidentialTokenWrapper, ConfidentialTokenWrapperClient, Hooks,
         OperatorDelegation, RegisterData, RegisterPayload,
     },
@@ -34,10 +34,10 @@ struct WrapperHost;
 #[contractimpl]
 impl WrapperHost {
     pub fn __constructor(e: &Env, token: Address, verifier: Address, auditor: Address) {
-        set_token(e, &token);
-        set_verifier(e, &verifier);
-        set_auditor(e, &auditor);
-        set_wrap(e);
+        set_token_no_auth(e, &token);
+        set_verifier_no_auth(e, &verifier);
+        set_auditor_no_auth(e, &auditor);
+        set_wrap_no_auth(e);
     }
 }
 

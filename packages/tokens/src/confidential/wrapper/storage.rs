@@ -9,9 +9,10 @@ use crate::confidential::{
     auditor::ConfidentialAuditorClient,
     verifier::{CircuitType, ConfidentialVerifierClient},
     wrapper::{
-        emit_deposit, emit_merge, emit_operator_transfer, emit_register, emit_revoke_operator,
-        emit_set_operator, emit_transfer, emit_withdraw, WrapperError, ACCOUNT_EXTEND_AMOUNT,
-        ACCOUNT_TTL_THRESHOLD, DELEGATION_EXTEND_AMOUNT, DELEGATION_TTL_THRESHOLD, DELTA_ADDR,
+        emit_auditor_set, emit_deposit, emit_merge, emit_operator_transfer, emit_register,
+        emit_revoke_operator, emit_set_operator, emit_token_set, emit_transfer, emit_verifier_set,
+        emit_withdraw, emit_wrap_set, WrapperError, ACCOUNT_EXTEND_AMOUNT, ACCOUNT_TTL_THRESHOLD,
+        DELEGATION_EXTEND_AMOUNT, DELEGATION_TTL_THRESHOLD, DELTA_ADDR,
     },
 };
 
@@ -996,6 +997,13 @@ pub fn revoke_operator_no_auth(
 
 /// Sets the SEP-41 token address.
 ///
+/// This function is **single-shot**: it reverts on any call after the first.
+/// The token address is the reserve identity backing every confidential
+/// balance; changing it after construction would break the link between the
+/// on-chain reserves and the credits issued by [`deposit_no_auth`] /
+/// [`withdraw_no_auth`]. The intended caller is the contract's
+/// `__constructor`.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
@@ -1006,6 +1014,11 @@ pub fn revoke_operator_no_auth(
 /// * [`WrapperError::TokenAlreadySet`] - When the token address has already
 ///   been set.
 ///
+/// # Events
+///
+/// * topics - `["token_set"]`
+/// * data - `[token: Address]`
+///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks and should
@@ -1015,20 +1028,34 @@ pub fn revoke_operator_no_auth(
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn set_token(e: &Env, token: &Address) {
+pub fn set_token_no_auth(e: &Env, token: &Address) {
     if e.storage().instance().has(&WrapperStorageKey::Token) {
         panic_with_error!(e, WrapperError::TokenAlreadySet);
     }
     e.storage().instance().set(&WrapperStorageKey::Token, token);
+    emit_token_set(e, token);
 }
 
 /// Sets the confidential verifier contract address.
+///
+/// Unlike [`set_token_no_auth`] and [`set_wrap_no_auth`], this function has
+/// no single-shot guard: rotating the verifier is a legitimate operation
+/// (e.g. when a new circuit version ships or the verifier contract is
+/// patched). Contract authors who need to rotate the verifier post-deployment
+/// should expose the operation behind an admin-gated entry point — typically
+/// owned by a multisig or timelock — since changing the verifier changes the
+/// set of proofs the wrapper will accept.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `verifier` - The verifier registry contract.
 ///
+/// # Events
+///
+/// * topics - `["verifier_set"]`
+/// * data - `[verifier: Address]`
+///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks and should
@@ -1038,17 +1065,31 @@ pub fn set_token(e: &Env, token: &Address) {
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn set_verifier(e: &Env, verifier: &Address) {
+pub fn set_verifier_no_auth(e: &Env, verifier: &Address) {
     e.storage().instance().set(&WrapperStorageKey::Verifier, verifier);
+    emit_verifier_set(e, verifier);
 }
 
 /// Sets the auditor registry contract address.
+///
+/// Unlike [`set_token_no_auth`] and [`set_wrap_no_auth`], this function has
+/// no single-shot guard: rotating the auditor registry is a legitimate
+/// operation (e.g. when auditor key custody changes or the registry contract
+/// is patched). Contract authors who need to rotate the auditor
+/// post-deployment should expose the operation behind an admin-gated entry
+/// point — typically owned by a multisig or timelock — since the registry
+/// controls which keys auditor ciphertexts are encrypted under.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `auditor` - The auditor registry contract.
 ///
+/// # Events
+///
+/// * topics - `["auditor_set"]`
+/// * data - `[auditor: Address]`
+///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks and should
@@ -1058,8 +1099,9 @@ pub fn set_verifier(e: &Env, verifier: &Address) {
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn set_auditor(e: &Env, auditor: &Address) {
+pub fn set_auditor_no_auth(e: &Env, auditor: &Address) {
     e.storage().instance().set(&WrapperStorageKey::Auditor, auditor);
+    emit_auditor_set(e, auditor);
 }
 
 /// Stores the wrapper's compressed `wrap` Field in instance storage.
@@ -1068,6 +1110,11 @@ pub fn set_auditor(e: &Env, auditor: &Address) {
 /// bound into every owner-initiated circuit's viewing-key derivation, so it
 /// must be computed once over `env.current_contract_address()` at
 /// construction and never re-derived.
+///
+/// This function is **single-shot**: it reverts on any call after the first.
+/// Changing `wrap` after construction would invalidate every previously
+/// registered account, since their `vk` derivations are bound to the
+/// original value. The intended caller is the contract's `__constructor`.
 ///
 /// # Arguments
 ///
@@ -1078,6 +1125,11 @@ pub fn set_auditor(e: &Env, auditor: &Address) {
 /// * [`WrapperError::WrapAlreadySet`] - When the `wrap` field has already been
 ///   set.
 ///
+/// # Events
+///
+/// * topics - `["wrap_set"]`
+/// * data - `[wrap: BytesN<32>]`
+///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks and should
@@ -1087,12 +1139,13 @@ pub fn set_auditor(e: &Env, auditor: &Address) {
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn set_wrap(e: &Env) {
+pub fn set_wrap_no_auth(e: &Env) {
     if e.storage().instance().has(&WrapperStorageKey::Wrap) {
         panic_with_error!(e, WrapperError::WrapAlreadySet);
     }
     let computed = compute_wrap(e, &e.current_contract_address());
     e.storage().instance().set(&WrapperStorageKey::Wrap, &computed);
+    emit_wrap_set(e, &computed);
 }
 
 // ################## LOW-LEVEL HELPERS ##################

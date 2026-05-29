@@ -823,3 +823,55 @@ pub fn emit_revoke_operator(
     }
     .publish(e);
 }
+
+/// Event emitted when the SEP-41 token address is set. Expected to fire
+/// exactly once, from the contract's constructor.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TokenSet {
+    pub token: Address,
+}
+
+/// Emits a `TokenSet` event.
+pub fn emit_token_set(e: &Env, token: &Address) {
+    TokenSet { token: token.clone() }.publish(e);
+}
+
+/// Event emitted when the verifier registry contract address is set or
+/// rotated. May fire more than once over the lifetime of the wrapper.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifierSet {
+    pub verifier: Address,
+}
+
+/// Emits a `VerifierSet` event.
+pub fn emit_verifier_set(e: &Env, verifier: &Address) {
+    VerifierSet { verifier: verifier.clone() }.publish(e);
+}
+
+/// Event emitted when the auditor registry contract address is set or
+/// rotated. May fire more than once over the lifetime of the wrapper.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AuditorSet {
+    pub auditor: Address,
+}
+
+/// Emits an `AuditorSet` event.
+pub fn emit_auditor_set(e: &Env, auditor: &Address) {
+    AuditorSet { auditor: auditor.clone() }.publish(e);
+}
+
+/// Event emitted when the wrapper's compressed `wrap` field is computed and
+/// stored. Expected to fire exactly once, from the contract's constructor.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WrapSet {
+    pub wrap: BytesN<32>,
+}
+
+/// Emits a `WrapSet` event.
+pub fn emit_wrap_set(e: &Env, wrap: &BytesN<32>) {
+    WrapSet { wrap: wrap.clone() }.publish(e);
+}
