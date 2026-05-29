@@ -24,6 +24,9 @@ cd "$(dirname "$0")/.."
 CIRCUITS=(
     "register"
     "withdraw"
+    "transfer"
+    "set_operator"
+    "operator_transfer"
     "revoke_operator"
 )
 

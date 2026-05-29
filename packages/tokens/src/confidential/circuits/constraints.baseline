@@ -18,6 +18,10 @@
 # Toolchain: nargo 1.0.0-beta.11
 #
 | Package                     | Function                   | Expression Width     | ACIR Opcodes | Brillig Opcodes |
+| circuit_operator_transfer   | decompose_hint             | N/A                  | N/A          | 30              |
+| circuit_operator_transfer   | directive_invert           | N/A                  | N/A          | 9               |
+| circuit_operator_transfer   | lte_hint                   | N/A                  | N/A          | 33              |
+| circuit_operator_transfer   | main                       | Bounded { width: 4 } | 131          | 72              |
 | circuit_register            | decompose_hint             | N/A                  | N/A          | 30              |
 | circuit_register            | directive_invert           | N/A                  | N/A          | 9               |
 | circuit_register            | lte_hint                   | N/A                  | N/A          | 33              |
@@ -26,6 +30,14 @@
 | circuit_revoke_operator     | directive_invert           | N/A                  | N/A          | 9               |
 | circuit_revoke_operator     | lte_hint                   | N/A                  | N/A          | 33              |
 | circuit_revoke_operator     | main                       | Bounded { width: 4 } | 121          | 72              |
+| circuit_set_operator        | decompose_hint             | N/A                  | N/A          | 30              |
+| circuit_set_operator        | directive_invert           | N/A                  | N/A          | 9               |
+| circuit_set_operator        | lte_hint                   | N/A                  | N/A          | 33              |
+| circuit_set_operator        | main                       | Bounded { width: 4 } | 128          | 72              |
+| circuit_transfer            | decompose_hint             | N/A                  | N/A          | 30              |
+| circuit_transfer            | directive_invert           | N/A                  | N/A          | 9               |
+| circuit_transfer            | lte_hint                   | N/A                  | N/A          | 33              |
+| circuit_transfer            | main                       | Bounded { width: 4 } | 129          | 72              |
 | circuit_withdraw            | decompose_hint             | N/A                  | N/A          | 30              |
 | circuit_withdraw            | directive_invert           | N/A                  | N/A          | 9               |
 | circuit_withdraw            | lte_hint                   | N/A                  | N/A          | 33              |
