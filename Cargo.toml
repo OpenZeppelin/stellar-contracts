@@ -56,6 +56,7 @@ version = "0.7.1"
 soroban-sdk = { version = "26.0.0", features = [
     "experimental_spec_shaking_v2",
 ] }
+soroban-poseidon = "26.0.0"
 proc-macro2 = "1.0"
 proptest = "1"
 quote = "1.0"

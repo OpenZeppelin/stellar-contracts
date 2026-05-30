@@ -12,6 +12,10 @@
 //! - **Verifier**: per-`CircuitType` UltraHonk verification key store consumed
 //!   by the wrapper to verify proofs accompanying every state-changing
 //!   operation (register, withdraw, transfer, operator flows).
+//! - **Wrapper**: the confidential token wrapper itself — holds the SEP-41
+//!   balance, manages per-account encrypted state, and delegates proof
+//!   verification and auditor-key lookup to the two registries above.
 
 pub mod auditor;
 pub mod verifier;
+pub mod wrapper;
