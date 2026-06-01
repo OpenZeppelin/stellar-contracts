@@ -55,10 +55,10 @@ struct WrapperContract;
 #[contractimpl]
 impl WrapperContract {
     pub fn __constructor(e: &Env, token: Address, verifier: Address, auditor: Address) {
-        wrapper_storage::set_token_no_auth(e, &token);
-        wrapper_storage::set_verifier_no_auth(e, &verifier);
-        wrapper_storage::set_auditor_no_auth(e, &auditor);
-        wrapper_storage::set_wrap_no_auth(e);
+        wrapper_storage::set_token(e, &token);
+        wrapper_storage::set_verifier(e, &verifier);
+        wrapper_storage::set_auditor(e, &auditor);
+        wrapper_storage::set_wrap(e);
     }
 }
 
@@ -644,7 +644,7 @@ fn set_token_twice_panics() {
     let h = setup();
     let other_token = Address::generate(&h.e);
     h.e.as_contract(&h.wrapper_addr, || {
-        wrapper_storage::set_token_no_auth(&h.e, &other_token);
+        wrapper_storage::set_token(&h.e, &other_token);
     });
 }
 
@@ -655,49 +655,49 @@ fn set_wrap_twice_panics() {
     // must trip `WrapAlreadySet`.
     let h = setup();
     h.e.as_contract(&h.wrapper_addr, || {
-        wrapper_storage::set_wrap_no_auth(&h.e);
+        wrapper_storage::set_wrap(&h.e);
     });
 }
 
 #[test]
-fn set_token_no_auth_emits_event() {
+fn set_token_emits_event() {
     let e = Env::default();
     let bare = e.register(BareContract, ());
     let token = Address::generate(&e);
     e.as_contract(&bare, || {
-        wrapper_storage::set_token_no_auth(&e, &token);
+        wrapper_storage::set_token(&e, &token);
         EventAssertion::new(&e, bare.clone()).assert_event_count(1);
     });
 }
 
 #[test]
-fn set_verifier_no_auth_emits_event() {
+fn set_verifier_emits_event() {
     let e = Env::default();
     let bare = e.register(BareContract, ());
     let verifier = Address::generate(&e);
     e.as_contract(&bare, || {
-        wrapper_storage::set_verifier_no_auth(&e, &verifier);
+        wrapper_storage::set_verifier(&e, &verifier);
         EventAssertion::new(&e, bare.clone()).assert_event_count(1);
     });
 }
 
 #[test]
-fn set_auditor_no_auth_emits_event() {
+fn set_auditor_emits_event() {
     let e = Env::default();
     let bare = e.register(BareContract, ());
     let auditor = Address::generate(&e);
     e.as_contract(&bare, || {
-        wrapper_storage::set_auditor_no_auth(&e, &auditor);
+        wrapper_storage::set_auditor(&e, &auditor);
         EventAssertion::new(&e, bare.clone()).assert_event_count(1);
     });
 }
 
 #[test]
-fn set_wrap_no_auth_emits_event() {
+fn set_wrap_emits_event() {
     let e = Env::default();
     let bare = e.register(BareContract, ());
     e.as_contract(&bare, || {
-        wrapper_storage::set_wrap_no_auth(&e);
+        wrapper_storage::set_wrap(&e);
         EventAssertion::new(&e, bare.clone()).assert_event_count(1);
     });
 }

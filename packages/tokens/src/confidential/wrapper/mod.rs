@@ -50,9 +50,9 @@
 //! The wrapper assumes the underlying SEP-41 token has **exact-transfer
 //! semantics**: a successful `transfer(from, to, amount)` moves exactly
 //! `amount` units between the two accounts, with no fees deducted in transit
-//! and no rebasing applied. [`storage::deposit_no_auth`] credits the
+//! and no rebasing applied. [`storage::deposit`] credits the
 //! confidential receiving balance with `amount · G` after the SEP-41
-//! transfer, and [`storage::withdraw_no_auth`] debits the confidential
+//! transfer, and [`storage::withdraw`] debits the confidential
 //! spendable balance by `amount` before transferring the same amount out;
 //! neither call re-measures the wrapper's own balance. With a
 //! fee-on-transfer, rebasing, or otherwise malicious token implementation,
@@ -163,7 +163,7 @@ impl Hooks for NoHooks {}
 ///
 /// Each entry point has a default body that authorizes the caller,
 /// XDR-decodes the `data` envelope, runs the matching [`Hooks`] callback,
-/// then delegates to a `*_no_auth` free function in [`storage`]. The
+/// then delegates to a matching free function in [`storage`]. The
 /// storage layer loads every trusted-state public input from on-chain
 /// state (never from caller-controlled bytes), assembles the public-input
 /// blob in the prescribed order, calls
@@ -189,7 +189,7 @@ pub trait ConfidentialTokenWrapper {
     /// # Errors
     ///
     /// * refer to [`storage::decode_data`] errors.
-    /// * refer to [`storage::register_no_auth`] errors.
+    /// * refer to [`storage::register`] errors.
     ///
     /// # Events
     ///
@@ -200,7 +200,7 @@ pub trait ConfidentialTokenWrapper {
 
         let decoded: RegisterData = storage::decode_data(e, &data);
         Self::Hooks::on_register(e, &account, decoded.payload.clone().into_val(e));
-        storage::register_no_auth(e, &account, auditor_id, &decoded.payload, &decoded.proof);
+        storage::register(e, &account, auditor_id, &decoded.payload, &decoded.proof);
     }
 
     /// Deposits `amount` units of the underlying SEP-41 token from `from`
@@ -220,7 +220,7 @@ pub trait ConfidentialTokenWrapper {
     ///
     /// # Errors
     ///
-    /// * refer to [`storage::deposit_no_auth`] errors.
+    /// * refer to [`storage::deposit`] errors.
     ///
     /// # Events
     ///
@@ -230,7 +230,7 @@ pub trait ConfidentialTokenWrapper {
         from.require_auth();
 
         Self::Hooks::on_deposit(e, &from, &to, amount);
-        storage::deposit_no_auth(e, &from, &to, amount);
+        storage::deposit(e, &from, &to, amount);
     }
 
     /// Folds `account.receiving_balance` into `account.spendable_balance`
@@ -247,7 +247,7 @@ pub trait ConfidentialTokenWrapper {
     ///
     /// # Errors
     ///
-    /// * refer to [`storage::merge_no_auth`] errors.
+    /// * refer to [`storage::merge`] errors.
     ///
     /// # Events
     ///
@@ -257,7 +257,7 @@ pub trait ConfidentialTokenWrapper {
         account.require_auth();
 
         Self::Hooks::on_merge(e, &account);
-        storage::merge_no_auth(e, &account);
+        storage::merge(e, &account);
     }
 
     /// Withdraws `amount` units to the public SEP-41 address `to` from the
@@ -274,7 +274,7 @@ pub trait ConfidentialTokenWrapper {
     /// # Errors
     ///
     /// * refer to [`storage::decode_data`] errors.
-    /// * refer to [`storage::withdraw_no_auth`] errors.
+    /// * refer to [`storage::withdraw`] errors.
     ///
     /// # Events
     ///
@@ -286,7 +286,7 @@ pub trait ConfidentialTokenWrapper {
 
         let decoded: WithdrawData = storage::decode_data(e, &data);
         Self::Hooks::on_withdraw(e, &from, &to, amount, decoded.payload.clone().into_val(e));
-        storage::withdraw_no_auth(e, &from, &to, amount, &decoded.payload, &decoded.proof);
+        storage::withdraw(e, &from, &to, amount, &decoded.payload, &decoded.proof);
     }
 
     /// Sends a confidential transfer from `from` to `to`.
@@ -301,7 +301,7 @@ pub trait ConfidentialTokenWrapper {
     /// # Errors
     ///
     /// * refer to [`storage::decode_data`] errors.
-    /// * refer to [`storage::confidential_transfer_no_auth`] errors.
+    /// * refer to [`storage::confidential_transfer`] errors.
     ///
     /// # Events
     ///
@@ -313,7 +313,7 @@ pub trait ConfidentialTokenWrapper {
 
         let decoded: TransferData = storage::decode_data(e, &data);
         Self::Hooks::on_transfer(e, &from, &to, decoded.payload.clone().into_val(e));
-        storage::confidential_transfer_no_auth(e, &from, &to, &decoded.payload, &decoded.proof);
+        storage::confidential_transfer(e, &from, &to, &decoded.payload, &decoded.proof);
     }
 
     /// Spends from `from`'s allowance escrowed to `operator`, transferring
@@ -332,7 +332,7 @@ pub trait ConfidentialTokenWrapper {
     /// # Errors
     ///
     /// * refer to [`storage::decode_data`] errors.
-    /// * refer to [`storage::confidential_transfer_from_no_auth`] errors.
+    /// * refer to [`storage::confidential_transfer_from`] errors.
     ///
     /// # Events
     ///
@@ -356,7 +356,7 @@ pub trait ConfidentialTokenWrapper {
             &to,
             decoded.payload.clone().into_val(e),
         );
-        storage::confidential_transfer_from_no_auth(
+        storage::confidential_transfer_from(
             e,
             &operator,
             &from,
@@ -384,7 +384,7 @@ pub trait ConfidentialTokenWrapper {
     /// # Errors
     ///
     /// * refer to [`storage::decode_data`] errors.
-    /// * refer to [`storage::set_operator_no_auth`] errors.
+    /// * refer to [`storage::set_operator`] errors.
     ///
     /// # Events
     ///
@@ -408,7 +408,7 @@ pub trait ConfidentialTokenWrapper {
             expiration_ledger,
             decoded.payload.clone().into_val(e),
         );
-        storage::set_operator_no_auth(
+        storage::set_operator(
             e,
             &account,
             &operator,
@@ -432,7 +432,7 @@ pub trait ConfidentialTokenWrapper {
     /// # Errors
     ///
     /// * refer to [`storage::decode_data`] errors.
-    /// * refer to [`storage::revoke_operator_no_auth`] errors.
+    /// * refer to [`storage::revoke_operator`] errors.
     ///
     /// # Events
     ///
@@ -448,7 +448,7 @@ pub trait ConfidentialTokenWrapper {
             &operator,
             decoded.payload.clone().into_val(e),
         );
-        storage::revoke_operator_no_auth(e, &account, &operator, &decoded.payload, &decoded.proof);
+        storage::revoke_operator(e, &account, &operator, &decoded.payload, &decoded.proof);
     }
 
     /// Returns the [`ConfidentialAccount`] stored under `account`.

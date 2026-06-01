@@ -405,7 +405,7 @@ pub fn delegation_exists(e: &Env, owner: &Address, operator: &Address) -> bool {
 /// **IMPORTANT**: This function bypasses authorization checks. Use only from
 /// trait-level entry points that have already called `account.require_auth()`,
 /// or from admin paths with their own gating.
-pub fn register_no_auth(
+pub fn register(
     e: &Env,
     account: &Address,
     auditor_id: u32,
@@ -479,7 +479,7 @@ pub fn register_no_auth(
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
 /// entry point is responsible for calling `from.require_auth()`.
-pub fn deposit_no_auth(e: &Env, from: &Address, to: &Address, amount: i128) {
+pub fn deposit(e: &Env, from: &Address, to: &Address, amount: i128) {
     if amount < 0 {
         panic_with_error!(e, WrapperError::NegativeAmount);
     }
@@ -516,7 +516,7 @@ pub fn deposit_no_auth(e: &Env, from: &Address, to: &Address, amount: i128) {
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
 /// entry point is responsible for calling `account.require_auth()`.
-pub fn merge_no_auth(e: &Env, account: &Address) {
+pub fn merge(e: &Env, account: &Address) {
     let mut data = get_account(e, account);
     data.spendable_balance = Grumpkin::add(e, &data.spendable_balance, &data.receiving_balance);
     data.receiving_balance = Grumpkin::identity(e);
@@ -566,7 +566,7 @@ pub fn merge_no_auth(e: &Env, account: &Address) {
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
 /// entry point is responsible for calling `from.require_auth()`.
-pub fn withdraw_no_auth(
+pub fn withdraw(
     e: &Env,
     from: &Address,
     to: &Address,
@@ -645,7 +645,7 @@ pub fn withdraw_no_auth(
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
 /// entry point is responsible for calling `from.require_auth()`.
-pub fn confidential_transfer_no_auth(
+pub fn confidential_transfer(
     e: &Env,
     from: &Address,
     to: &Address,
@@ -734,7 +734,7 @@ pub fn confidential_transfer_no_auth(
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
 /// entry point is responsible for calling `operator.require_auth()`.
-pub fn confidential_transfer_from_no_auth(
+pub fn confidential_transfer_from(
     e: &Env,
     operator: &Address,
     from: &Address,
@@ -840,7 +840,7 @@ pub fn confidential_transfer_from_no_auth(
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
 /// entry point is responsible for calling `account.require_auth()`.
-pub fn set_operator_no_auth(
+pub fn set_operator(
     e: &Env,
     account: &Address,
     operator: &Address,
@@ -936,7 +936,7 @@ pub fn set_operator_no_auth(
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
 /// entry point is responsible for calling `account.require_auth()`.
-pub fn revoke_operator_no_auth(
+pub fn revoke_operator(
     e: &Env,
     account: &Address,
     operator: &Address,
@@ -990,8 +990,8 @@ pub fn revoke_operator_no_auth(
 /// This function is **single-shot**: it reverts on any call after the first.
 /// The token address is the reserve identity backing every confidential
 /// balance; changing it after construction would break the link between the
-/// on-chain reserves and the credits issued by [`deposit_no_auth`] /
-/// [`withdraw_no_auth`]. The intended caller is the contract's
+/// on-chain reserves and the credits issued by [`deposit`] /
+/// [`withdraw`]. The intended caller is the contract's
 /// `__constructor`.
 ///
 /// # Arguments
@@ -1018,7 +1018,7 @@ pub fn revoke_operator_no_auth(
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn set_token_no_auth(e: &Env, token: &Address) {
+pub fn set_token(e: &Env, token: &Address) {
     if e.storage().instance().has(&WrapperStorageKey::Token) {
         panic_with_error!(e, WrapperError::TokenAlreadySet);
     }
@@ -1028,7 +1028,7 @@ pub fn set_token_no_auth(e: &Env, token: &Address) {
 
 /// Sets the confidential verifier contract address.
 ///
-/// Unlike [`set_token_no_auth`] and [`set_wrap_no_auth`], this function has
+/// Unlike [`set_token`] and [`set_wrap`], this function has
 /// no single-shot guard: rotating the verifier is a legitimate operation
 /// (e.g. when a new circuit version ships or the verifier contract is
 /// patched). Contract authors who need to rotate the verifier post-deployment
@@ -1055,14 +1055,14 @@ pub fn set_token_no_auth(e: &Env, token: &Address) {
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn set_verifier_no_auth(e: &Env, verifier: &Address) {
+pub fn set_verifier(e: &Env, verifier: &Address) {
     e.storage().instance().set(&WrapperStorageKey::Verifier, verifier);
     emit_verifier_set(e, verifier);
 }
 
 /// Sets the auditor registry contract address.
 ///
-/// Unlike [`set_token_no_auth`] and [`set_wrap_no_auth`], this function has
+/// Unlike [`set_token`] and [`set_wrap`], this function has
 /// no single-shot guard: rotating the auditor registry is a legitimate
 /// operation (e.g. when auditor key custody changes or the registry contract
 /// is patched). Contract authors who need to rotate the auditor
@@ -1089,7 +1089,7 @@ pub fn set_verifier_no_auth(e: &Env, verifier: &Address) {
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn set_auditor_no_auth(e: &Env, auditor: &Address) {
+pub fn set_auditor(e: &Env, auditor: &Address) {
     e.storage().instance().set(&WrapperStorageKey::Auditor, auditor);
     emit_auditor_set(e, auditor);
 }
@@ -1129,7 +1129,7 @@ pub fn set_auditor_no_auth(e: &Env, auditor: &Address) {
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn set_wrap_no_auth(e: &Env) {
+pub fn set_wrap(e: &Env) {
     if e.storage().instance().has(&WrapperStorageKey::Wrap) {
         panic_with_error!(e, WrapperError::WrapAlreadySet);
     }

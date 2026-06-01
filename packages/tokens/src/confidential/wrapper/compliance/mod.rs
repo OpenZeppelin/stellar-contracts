@@ -62,7 +62,7 @@ pub trait Policy {
 ///    a manual identity check, or by attaching `#[only_owner]` / `#[only_role]`
 ///    to the override (in which case the `admin` parameter is passed through as
 ///    the documented caller).
-/// 2. Delegates to the matching `*_no_auth` helper in [`storage`].
+/// 2. Delegates to the matching helper in [`storage`].
 #[contracttrait]
 pub trait ConfidentialCompliance: ConfidentialTokenWrapper {
     /// Marks `account` as frozen.
@@ -75,7 +75,7 @@ pub trait ConfidentialCompliance: ConfidentialTokenWrapper {
     ///
     /// # Errors
     ///
-    /// * refer to [`storage::freeze_no_auth`] errors.
+    /// * refer to [`storage::freeze`] errors.
     ///
     /// # Events
     ///
@@ -85,7 +85,7 @@ pub trait ConfidentialCompliance: ConfidentialTokenWrapper {
     /// # Security Warning
     ///
     /// Implementations MUST authorize `admin` before calling
-    /// [`storage::freeze_no_auth`]. The trait cannot provide a default body
+    /// [`storage::freeze`]. The trait cannot provide a default body
     /// — see the trait-level docstring for the rationale.
     fn freeze(e: &Env, account: Address, admin: Address);
 
@@ -99,7 +99,7 @@ pub trait ConfidentialCompliance: ConfidentialTokenWrapper {
     ///
     /// # Errors
     ///
-    /// * refer to [`storage::unfreeze_no_auth`] errors.
+    /// * refer to [`storage::unfreeze`] errors.
     ///
     /// # Events
     ///
@@ -109,14 +109,14 @@ pub trait ConfidentialCompliance: ConfidentialTokenWrapper {
     /// # Security Warning
     ///
     /// Implementations MUST authorize `admin` before calling
-    /// [`storage::unfreeze_no_auth`]. The trait cannot provide a default
+    /// [`storage::unfreeze`]. The trait cannot provide a default
     /// body — see the trait-level docstring for the rationale.
     fn unfreeze(e: &Env, account: Address, admin: Address);
 
     /// Atomically replaces the compliance configuration with `config`. The
     /// intended deployment-time call is from the contract's
     /// `__constructor` (which may invoke
-    /// [`storage::set_compliance_config_no_auth`] directly); subsequent
+    /// [`storage::set_compliance_config`] directly); subsequent
     /// rotations flow through this method.
     ///
     /// # Arguments
@@ -133,7 +133,7 @@ pub trait ConfidentialCompliance: ConfidentialTokenWrapper {
     /// # Security Warning
     ///
     /// Implementations MUST authorize `admin` before calling
-    /// [`storage::set_compliance_config_no_auth`]. The trait cannot provide a
+    /// [`storage::set_compliance_config`]. The trait cannot provide a
     /// default body — see the trait-level docstring for the rationale.
     fn set_compliance_config(e: &Env, config: ComplianceConfig, admin: Address);
 
@@ -271,7 +271,7 @@ impl Hooks for ComplianceHooks {
 #[repr(u32)]
 pub enum ComplianceError {
     /// Indicates an admin operation was invoked before
-    /// [`storage::set_compliance_config_no_auth`] established a configuration.
+    /// [`storage::set_compliance_config`] established a configuration.
     NotConfigured = 3600,
     /// Indicates the target account is frozen.
     AccountFrozen = 3601,

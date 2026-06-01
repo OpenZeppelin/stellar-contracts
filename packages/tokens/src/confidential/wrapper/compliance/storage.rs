@@ -89,7 +89,7 @@ pub fn is_frozen(e: &Env, account: &Address) -> bool {
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn set_compliance_config_no_auth(e: &Env, config: &ComplianceConfig) {
+pub fn set_compliance_config(e: &Env, config: &ComplianceConfig) {
     e.storage().instance().set(&ComplianceStorageKey::Config, config);
     emit_compliance_config_changed(e, &config.policy, config.sac_passthrough);
 }
@@ -120,7 +120,7 @@ pub fn set_compliance_config_no_auth(e: &Env, config: &ComplianceConfig) {
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn freeze_no_auth(e: &Env, account: &Address) {
+pub fn freeze(e: &Env, account: &Address) {
     if compliance_config(e).is_none() {
         panic_with_error!(e, ComplianceError::NotConfigured);
     }
@@ -154,7 +154,7 @@ pub fn freeze_no_auth(e: &Env, account: &Address) {
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn unfreeze_no_auth(e: &Env, account: &Address) {
+pub fn unfreeze(e: &Env, account: &Address) {
     if compliance_config(e).is_none() {
         panic_with_error!(e, ComplianceError::NotConfigured);
     }

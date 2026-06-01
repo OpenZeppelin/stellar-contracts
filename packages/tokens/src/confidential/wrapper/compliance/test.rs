@@ -13,14 +13,11 @@ use crate::confidential::{
     verifier::CircuitType,
     wrapper::{
         compliance::{
-            storage::{
-                compliance_config, freeze_no_auth, is_frozen, set_compliance_config_no_auth,
-                unfreeze_no_auth,
-            },
+            storage::{compliance_config, freeze, is_frozen, set_compliance_config, unfreeze},
             ComplianceConfig, ComplianceHooks, ConfidentialCompliance,
             ConfidentialComplianceClient, Policy,
         },
-        storage::{set_auditor_no_auth, set_token_no_auth, set_verifier_no_auth, set_wrap_no_auth},
+        storage::{set_auditor, set_token, set_verifier, set_wrap},
         ConfidentialAccount, ConfidentialTokenWrapper, ConfidentialTokenWrapperClient, Hooks,
         OperatorDelegation, RegisterData, RegisterPayload,
     },
@@ -34,10 +31,10 @@ struct WrapperHost;
 #[contractimpl]
 impl WrapperHost {
     pub fn __constructor(e: &Env, token: Address, verifier: Address, auditor: Address) {
-        set_token_no_auth(e, &token);
-        set_verifier_no_auth(e, &verifier);
-        set_auditor_no_auth(e, &auditor);
-        set_wrap_no_auth(e);
+        set_token(e, &token);
+        set_verifier(e, &verifier);
+        set_auditor(e, &auditor);
+        set_wrap(e);
     }
 }
 
@@ -50,17 +47,17 @@ impl ConfidentialTokenWrapper for WrapperHost {
 impl ConfidentialCompliance for WrapperHost {
     fn freeze(e: &Env, account: Address, admin: Address) {
         admin.require_auth();
-        freeze_no_auth(e, &account);
+        freeze(e, &account);
     }
 
     fn unfreeze(e: &Env, account: Address, admin: Address) {
         admin.require_auth();
-        unfreeze_no_auth(e, &account);
+        unfreeze(e, &account);
     }
 
     fn set_compliance_config(e: &Env, config: ComplianceConfig, admin: Address) {
         admin.require_auth();
-        set_compliance_config_no_auth(e, &config);
+        set_compliance_config(e, &config);
     }
 }
 
@@ -209,7 +206,7 @@ fn hooks_short_circuit_without_config() {
 fn freeze_without_config_panics_not_configured() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    h.e.as_contract(&h.host, || freeze_no_auth(&h.e, &alice));
+    h.e.as_contract(&h.host, || freeze(&h.e, &alice));
 }
 
 #[test]
@@ -217,7 +214,7 @@ fn freeze_without_config_panics_not_configured() {
 fn unfreeze_without_config_panics_not_configured() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    h.e.as_contract(&h.host, || unfreeze_no_auth(&h.e, &alice));
+    h.e.as_contract(&h.host, || unfreeze(&h.e, &alice));
 }
 
 // ################## FREEZE FLOW ##################
@@ -227,13 +224,13 @@ fn freeze_then_unfreeze_round_trip() {
     let h = setup();
     let alice = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
+        set_compliance_config(&h.e, &base_config());
         assert!(!is_frozen(&h.e, &alice));
 
-        freeze_no_auth(&h.e, &alice);
+        freeze(&h.e, &alice);
         assert!(is_frozen(&h.e, &alice));
 
-        unfreeze_no_auth(&h.e, &alice);
+        unfreeze(&h.e, &alice);
         assert!(!is_frozen(&h.e, &alice));
     });
 
@@ -247,8 +244,8 @@ fn on_merge_panics_when_frozen() {
     let h = setup();
     let alice = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
-        freeze_no_auth(&h.e, &alice);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &alice);
         ComplianceHooks::on_merge(&h.e, &alice);
     });
 }
@@ -260,8 +257,8 @@ fn on_transfer_panics_when_sender_frozen() {
     let alice = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
-        freeze_no_auth(&h.e, &alice);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &alice);
         ComplianceHooks::on_transfer(&h.e, &alice, &bob, void_val(&h.e));
     });
 }
@@ -273,8 +270,8 @@ fn on_transfer_panics_when_recipient_frozen() {
     let alice = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
-        freeze_no_auth(&h.e, &bob);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &bob);
         ComplianceHooks::on_transfer(&h.e, &alice, &bob, void_val(&h.e));
     });
 }
@@ -287,8 +284,8 @@ fn on_operator_transfer_panics_when_operator_frozen() {
     let bob = Address::generate(&h.e);
     let op = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
-        freeze_no_auth(&h.e, &op);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &op);
         ComplianceHooks::on_operator_transfer(&h.e, &op, &alice, &bob, void_val(&h.e));
     });
 }
@@ -300,8 +297,8 @@ fn on_withdraw_panics_when_sender_frozen() {
     let alice = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
-        freeze_no_auth(&h.e, &alice);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &alice);
         ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, void_val(&h.e));
     });
 }
@@ -313,8 +310,8 @@ fn on_withdraw_panics_when_recipient_frozen() {
     let alice = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
-        freeze_no_auth(&h.e, &bob);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &bob);
         ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, void_val(&h.e));
     });
 }
@@ -326,8 +323,8 @@ fn on_set_operator_panics_when_account_frozen() {
     let alice = Address::generate(&h.e);
     let op = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
-        freeze_no_auth(&h.e, &alice);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &alice);
         ComplianceHooks::on_set_operator(&h.e, &alice, &op, 0, void_val(&h.e));
     });
 }
@@ -339,8 +336,8 @@ fn on_set_operator_panics_when_operator_frozen() {
     let alice = Address::generate(&h.e);
     let op = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
-        freeze_no_auth(&h.e, &op);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &op);
         ComplianceHooks::on_set_operator(&h.e, &alice, &op, 0, void_val(&h.e));
     });
 }
@@ -352,8 +349,8 @@ fn on_revoke_operator_panics_when_account_frozen() {
     let alice = Address::generate(&h.e);
     let op = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
-        freeze_no_auth(&h.e, &alice);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &alice);
         ComplianceHooks::on_revoke_operator(&h.e, &alice, &op, void_val(&h.e));
     });
 }
@@ -365,8 +362,8 @@ fn on_revoke_operator_panics_when_operator_frozen() {
     let alice = Address::generate(&h.e);
     let op = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
-        freeze_no_auth(&h.e, &op);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &op);
         ComplianceHooks::on_revoke_operator(&h.e, &alice, &op, void_val(&h.e));
     });
 }
@@ -378,8 +375,8 @@ fn on_register_skips_freeze_check() {
     let h = setup();
     let alice = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
-        freeze_no_auth(&h.e, &alice);
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &alice);
         // No panic: register predates the account entry, so the freeze
         // gate is intentionally skipped.
         ComplianceHooks::on_register(&h.e, &alice, void_val(&h.e));
@@ -394,10 +391,7 @@ fn passes_with_allowing_policy() {
     let policy = h.e.register(AllowPolicy, ());
     let alice = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(
-            &h.e,
-            &ComplianceConfig { policy: Some(policy), ..base_config() },
-        );
+        set_compliance_config(&h.e, &ComplianceConfig { policy: Some(policy), ..base_config() });
         ComplianceHooks::on_merge(&h.e, &alice);
     });
 }
@@ -409,10 +403,7 @@ fn panics_when_policy_denies() {
     let policy = h.e.register(DenyPolicy, ());
     let alice = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(
-            &h.e,
-            &ComplianceConfig { policy: Some(policy), ..base_config() },
-        );
+        set_compliance_config(&h.e, &ComplianceConfig { policy: Some(policy), ..base_config() });
         ComplianceHooks::on_merge(&h.e, &alice);
     });
 }
@@ -423,12 +414,9 @@ fn rotating_policy_to_none_skips_policy_gate() {
     let policy = h.e.register(DenyPolicy, ());
     let alice = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(
-            &h.e,
-            &ComplianceConfig { policy: Some(policy), ..base_config() },
-        );
+        set_compliance_config(&h.e, &ComplianceConfig { policy: Some(policy), ..base_config() });
         // Rotate the policy off; now the deny-everything policy is gone.
-        set_compliance_config_no_auth(&h.e, &base_config());
+        set_compliance_config(&h.e, &base_config());
         ComplianceHooks::on_merge(&h.e, &alice);
     });
 }
@@ -442,10 +430,7 @@ fn passes_when_sac_authorized() {
     let h = setup();
     let alice = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(
-            &h.e,
-            &ComplianceConfig { sac_passthrough: true, ..base_config() },
-        );
+        set_compliance_config(&h.e, &ComplianceConfig { sac_passthrough: true, ..base_config() });
         ComplianceHooks::on_merge(&h.e, &alice);
     });
 }
@@ -458,10 +443,7 @@ fn panics_when_sac_unauthorized() {
     // Flip the SAC `authorized` flag to false for `alice`.
     h.sac.set_authorized(&alice, &false);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(
-            &h.e,
-            &ComplianceConfig { sac_passthrough: true, ..base_config() },
-        );
+        set_compliance_config(&h.e, &ComplianceConfig { sac_passthrough: true, ..base_config() });
         ComplianceHooks::on_merge(&h.e, &alice);
     });
 }
@@ -474,7 +456,7 @@ fn sac_passthrough_disabled_skips_sac_call() {
     let alice = Address::generate(&h.e);
     h.sac.set_authorized(&alice, &false);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(&h.e, &base_config());
+        set_compliance_config(&h.e, &base_config());
         ComplianceHooks::on_merge(&h.e, &alice);
     });
 }
@@ -489,10 +471,7 @@ fn on_deposit_rejects_policy_denied_from() {
     let bob = Address::generate(&h.e);
     let policy = h.e.register(DenyOnePolicy, (alice.clone(),));
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(
-            &h.e,
-            &ComplianceConfig { policy: Some(policy), ..base_config() },
-        );
+        set_compliance_config(&h.e, &ComplianceConfig { policy: Some(policy), ..base_config() });
         ComplianceHooks::on_deposit(&h.e, &alice, &bob, 0);
     });
 }
@@ -505,10 +484,7 @@ fn on_deposit_rejects_policy_denied_to() {
     let bob = Address::generate(&h.e);
     let policy = h.e.register(DenyOnePolicy, (alice.clone(),));
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(
-            &h.e,
-            &ComplianceConfig { policy: Some(policy), ..base_config() },
-        );
+        set_compliance_config(&h.e, &ComplianceConfig { policy: Some(policy), ..base_config() });
         ComplianceHooks::on_deposit(&h.e, &bob, &alice, 0);
     });
 }
@@ -521,13 +497,13 @@ fn set_compliance_config_overwrites_atomically() {
     let policy_a = h.e.register(AllowPolicy, ());
     let policy_b = h.e.register(DenyPolicy, ());
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(
+        set_compliance_config(
             &h.e,
             &ComplianceConfig { policy: Some(policy_a.clone()), sac_passthrough: false },
         );
 
         let new_config = ComplianceConfig { policy: Some(policy_b.clone()), sac_passthrough: true };
-        set_compliance_config_no_auth(&h.e, &new_config);
+        set_compliance_config(&h.e, &new_config);
 
         let stored = compliance_config(&h.e).unwrap();
         assert_eq!(stored.policy, Some(policy_b));
@@ -546,7 +522,7 @@ fn all_three_gates_pass_together() {
     let policy = h.e.register(AllowPolicy, ());
     let alice = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
-        set_compliance_config_no_auth(
+        set_compliance_config(
             &h.e,
             &ComplianceConfig { policy: Some(policy), sac_passthrough: true },
         );
@@ -675,7 +651,7 @@ fn storage_keys_isolated_from_wrapper_keys() {
     let h = setup();
     h.e.as_contract(&h.host, || {
         let before = crate::confidential::wrapper::storage::get_token(&h.e);
-        set_compliance_config_no_auth(&h.e, &base_config());
+        set_compliance_config(&h.e, &base_config());
         let after = crate::confidential::wrapper::storage::get_token(&h.e);
         assert_eq!(before, after);
         assert_eq!(after, h.sac_addr);
