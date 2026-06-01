@@ -1133,26 +1133,12 @@ pub fn set_wrap(e: &Env) {
     if e.storage().instance().has(&WrapperStorageKey::Wrap) {
         panic_with_error!(e, WrapperError::WrapAlreadySet);
     }
-    let computed = compute_wrap(e, &e.current_contract_address());
+    let computed = address_to_field(e, &e.current_contract_address());
     e.storage().instance().set(&WrapperStorageKey::Wrap, &computed);
     emit_wrap_set(e, &computed);
 }
 
 // ################## LOW-LEVEL HELPERS ##################
-
-/// Computes `wrap = Poseidon2(δ_addr, lo, hi)` over `addr`'s 56-byte strkey,
-/// as a canonical 32-byte big-endian `Bn254Fr` representative.
-///
-/// Intended for use in `__constructor` against
-/// `env.current_contract_address()` and then stored via [`set_wrap`].
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `addr` - The address to compress.
-pub fn compute_wrap(e: &Env, addr: &Address) -> BytesN<32> {
-    address_to_field(e, addr)
-}
 
 /// Overwrites `account.spendable_balance` with `c_spend_new`.
 ///

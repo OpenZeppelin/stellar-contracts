@@ -79,10 +79,10 @@ use soroban_sdk::{
     contracterror, contractevent, contracttrait, Address, Bytes, BytesN, Env, IntoVal, Val,
 };
 pub use storage::{
-    compute_wrap, ConfidentialAccount, OperatorDelegation, OperatorTransferData,
-    OperatorTransferPayload, RegisterData, RegisterPayload, RevokeOperatorData,
-    RevokeOperatorPayload, SetOperatorData, SetOperatorPayload, TransferData, TransferPayload,
-    WithdrawData, WithdrawPayload, WrapperStorageKey,
+    ConfidentialAccount, OperatorDelegation, OperatorTransferData, OperatorTransferPayload,
+    RegisterData, RegisterPayload, RevokeOperatorData, RevokeOperatorPayload, SetOperatorData,
+    SetOperatorPayload, TransferData, TransferPayload, WithdrawData, WithdrawPayload,
+    WrapperStorageKey,
 };
 
 /// Lifecycle hooks invoked by [`ConfidentialTokenWrapper`] at each
