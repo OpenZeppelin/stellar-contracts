@@ -174,7 +174,7 @@ fn setup<'a>() -> Harness<'a> {
 }
 
 fn base_config() -> ComplianceConfig {
-    ComplianceConfig { policy: None, sac_passthrough: false, permit_unregistered_deposit: false }
+    ComplianceConfig { policy: None, sac_passthrough: false }
 }
 
 fn void_val(e: &Env) -> Val {
@@ -479,74 +479,19 @@ fn sac_passthrough_disabled_skips_sac_call() {
     });
 }
 
-// ################## UNREGISTERED DEPOSIT CARVE-OUT ##################
+// ################## DEPOSIT GATING ##################
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3602)")]
-fn on_deposit_rejects_unregistered_from_by_default() {
+fn on_deposit_rejects_policy_denied_from() {
     let h = setup();
     let alice = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
     let policy = h.e.register(DenyOnePolicy, (alice.clone(),));
     h.e.as_contract(&h.host, || {
-        // Register only `bob` so `alice` exercises the unregistered path.
-        register_minimal_account(&h.e, &bob);
         set_compliance_config_no_auth(
             &h.e,
-            &ComplianceConfig {
-                policy: Some(policy),
-                permit_unregistered_deposit: false,
-                ..base_config()
-            },
-        );
-        // `permit=false` → unregistered `alice` is still policy-checked
-        // and is rejected.
-        ComplianceHooks::on_deposit(&h.e, &alice, &bob, 0);
-    });
-}
-
-#[test]
-fn on_deposit_permits_unregistered_from_when_flag_set() {
-    let h = setup();
-    let alice = Address::generate(&h.e);
-    let bob = Address::generate(&h.e);
-    let policy = h.e.register(DenyOnePolicy, (alice.clone(),));
-    h.e.as_contract(&h.host, || {
-        // `alice` is NOT registered → the carve-out applies.
-        register_minimal_account(&h.e, &bob);
-        set_compliance_config_no_auth(
-            &h.e,
-            &ComplianceConfig {
-                policy: Some(policy),
-                permit_unregistered_deposit: true,
-                ..base_config()
-            },
-        );
-        // Policy would reject `alice` if consulted; the carve-out
-        // suppresses both the freeze and policy checks on `from`.
-        ComplianceHooks::on_deposit(&h.e, &alice, &bob, 0);
-    });
-}
-
-#[test]
-#[should_panic(expected = "Error(Contract, #3602)")]
-fn on_deposit_carveout_does_not_apply_to_registered_from() {
-    // When `from` IS registered, the carve-out does not fire and the
-    // policy gate runs as usual.
-    let h = setup();
-    let alice = Address::generate(&h.e);
-    let bob = Address::generate(&h.e);
-    let policy = h.e.register(DenyOnePolicy, (alice.clone(),));
-    h.e.as_contract(&h.host, || {
-        register_minimal_account(&h.e, &alice);
-        register_minimal_account(&h.e, &bob);
-        set_compliance_config_no_auth(
-            &h.e,
-            &ComplianceConfig {
-                policy: Some(policy),
-                permit_unregistered_deposit: true,
-                ..base_config()
-            },
+            &ComplianceConfig { policy: Some(policy), ..base_config() },
         );
         ComplianceHooks::on_deposit(&h.e, &alice, &bob, 0);
     });
@@ -554,23 +499,15 @@ fn on_deposit_carveout_does_not_apply_to_registered_from() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3602)")]
-fn on_deposit_to_side_always_checked() {
-    // Even with the carve-out enabled and `from` unregistered, the
-    // recipient `to` must still pass the policy gate.
+fn on_deposit_rejects_policy_denied_to() {
     let h = setup();
     let alice = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
     let policy = h.e.register(DenyOnePolicy, (alice.clone(),));
     h.e.as_contract(&h.host, || {
-        // `alice` (the policy-rejected address) is the recipient now.
-        register_minimal_account(&h.e, &alice);
         set_compliance_config_no_auth(
             &h.e,
-            &ComplianceConfig {
-                policy: Some(policy),
-                permit_unregistered_deposit: true,
-                ..base_config()
-            },
+            &ComplianceConfig { policy: Some(policy), ..base_config() },
         );
         ComplianceHooks::on_deposit(&h.e, &bob, &alice, 0);
     });
@@ -586,24 +523,15 @@ fn set_compliance_config_overwrites_atomically() {
     h.e.as_contract(&h.host, || {
         set_compliance_config_no_auth(
             &h.e,
-            &ComplianceConfig {
-                policy: Some(policy_a.clone()),
-                sac_passthrough: false,
-                permit_unregistered_deposit: false,
-            },
+            &ComplianceConfig { policy: Some(policy_a.clone()), sac_passthrough: false },
         );
 
-        let new_config = ComplianceConfig {
-            policy: Some(policy_b.clone()),
-            sac_passthrough: true,
-            permit_unregistered_deposit: true,
-        };
+        let new_config = ComplianceConfig { policy: Some(policy_b.clone()), sac_passthrough: true };
         set_compliance_config_no_auth(&h.e, &new_config);
 
         let stored = compliance_config(&h.e).unwrap();
         assert_eq!(stored.policy, Some(policy_b));
         assert!(stored.sac_passthrough);
-        assert!(stored.permit_unregistered_deposit);
     });
 
     // 2 ComplianceConfigChanged events.
@@ -620,11 +548,7 @@ fn all_three_gates_pass_together() {
     h.e.as_contract(&h.host, || {
         set_compliance_config_no_auth(
             &h.e,
-            &ComplianceConfig {
-                policy: Some(policy),
-                sac_passthrough: true,
-                permit_unregistered_deposit: false,
-            },
+            &ComplianceConfig { policy: Some(policy), sac_passthrough: true },
         );
         ComplianceHooks::on_merge(&h.e, &alice);
     });
@@ -638,8 +562,7 @@ fn trait_set_compliance_config_writes_and_reads_back() {
     let h = setup();
     let client = ConfidentialComplianceClient::new(&h.e, &h.host);
 
-    let config =
-        ComplianceConfig { policy: None, sac_passthrough: true, permit_unregistered_deposit: true };
+    let config = ComplianceConfig { policy: None, sac_passthrough: true };
     client.set_compliance_config(&config, &h.admin);
 
     let stored = client.compliance_config().unwrap();

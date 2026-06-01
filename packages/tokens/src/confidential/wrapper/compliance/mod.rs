@@ -1,10 +1,10 @@
 //! # Confidential Wrapper Compliance Extension
 //!
 //! Deployer-configurable controls layered on top of the
-//! [`ConfidentialTokenWrapper`](super::ConfidentialTokenWrapper): per-account
-//! freezing, SAC `authorized()` passthrough, a pluggable external
-//! authorization policy, and an unregistered-deposit carve-out. See
-//! [`docs/COMPLIANCE.github.md`] for the specification.
+//! [`ConfidentialTokenWrapper`]: per-account freezing,
+//! SAC `authorized()` passthrough, and a pluggable external
+//! authorization policy. See [`docs/COMPLIANCE.github.md`] for the
+//! specification.
 //!
 //! ## Surface
 //!
@@ -29,7 +29,7 @@ mod test;
 use soroban_sdk::{contractclient, contracterror, contractevent, contracttrait, Address, Env, Val};
 pub use storage::{ComplianceConfig, ComplianceStorageKey};
 
-use crate::confidential::wrapper::{storage::account_exists, ConfidentialTokenWrapper, Hooks};
+use crate::confidential::wrapper::{ConfidentialTokenWrapper, Hooks};
 
 // ################## POLICY ##################
 
@@ -128,8 +128,7 @@ pub trait ConfidentialCompliance: ConfidentialTokenWrapper {
     /// # Events
     ///
     /// * topics - `["compliance_config_changed"]`
-    /// * data - `[policy: Option<Address>, sac_passthrough: bool,
-    ///   permit_unregistered_deposit: bool]`
+    /// * data - `[policy: Option<Address>, sac_passthrough: bool]`
     ///
     /// # Security Warning
     ///
@@ -178,15 +177,13 @@ pub trait ConfidentialCompliance: ConfidentialTokenWrapper {
 ///
 /// Special cases:
 ///
-/// * [`on_register`](Hooks::on_register) skips the freeze branch (no slot
-///   exists yet) but still applies policy and SAC.
-/// * [`on_deposit`](Hooks::on_deposit) applies the unregistered-deposit
-///   carve-out from COMPLIANCE.md §4: when `permit_unregistered_deposit` is set
-///   and `from` is not registered with the wrapper, only the SAC check runs on
-///   `from`. The recipient `to` is always fully gated.
+/// * [`on_register`](Hooks::on_register) skips the freeze branch but still
+///   applies policy and SAC.
 ///
 /// Deployments that need additional behaviour (audit mirroring, rate
-/// limiting) can write a custom `Hooks` impl that calls the same primitives.
+/// limiting, or alternative deposit semantics — see
+/// [`docs/COMPLIANCE.github.md`] §4) can write a custom `Hooks` impl that
+/// calls the same primitives.
 pub struct ComplianceHooks;
 
 impl Hooks for ComplianceHooks {
@@ -202,14 +199,7 @@ impl Hooks for ComplianceHooks {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
-        if config.permit_unregistered_deposit && !account_exists(e, from) {
-            // Carve-out: skip freeze and policy on an unregistered depositor.
-            // SAC passthrough still runs — the underlying SEP-41 transfer
-            // would fail anyway if the SAC has unauthorized `from`.
-            storage::check_sac(e, from, &config);
-        } else {
-            storage::gate_account(e, from, &config);
-        }
+        storage::gate_account(e, from, &config);
         storage::gate_account(e, to, &config);
     }
 
@@ -334,20 +324,9 @@ pub fn emit_unfrozen(e: &Env, account: &Address) {
 pub struct ComplianceConfigChanged {
     pub policy: Option<Address>,
     pub sac_passthrough: bool,
-    pub permit_unregistered_deposit: bool,
 }
 
 /// Emits a [`ComplianceConfigChanged`] event.
-pub fn emit_compliance_config_changed(
-    e: &Env,
-    policy: &Option<Address>,
-    sac_passthrough: bool,
-    permit_unregistered_deposit: bool,
-) {
-    ComplianceConfigChanged {
-        policy: policy.clone(),
-        sac_passthrough,
-        permit_unregistered_deposit,
-    }
-    .publish(e);
+pub fn emit_compliance_config_changed(e: &Env, policy: &Option<Address>, sac_passthrough: bool) {
+    ComplianceConfigChanged { policy: policy.clone(), sac_passthrough }.publish(e);
 }

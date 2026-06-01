@@ -2,7 +2,7 @@
 
 ## Abstract
 
-This document specifies optional, deployer-configurable controls layered on top of the core Confidential Token Wrapper (see [DESIGN.md](DESIGN.md)). It covers account freezing, SAC authorization passthrough, pluggable authorization policies, unregistered-deposit handling, and the pooled-custody clawback flow.
+This document specifies optional, deployer-configurable controls layered on top of the core Confidential Token Wrapper (see [DESIGN.md](DESIGN.md)). It covers account freezing, SAC authorization passthrough, pluggable authorization policies, customization patterns for the `Hooks` extension surface, and the pooled-custody clawback flow.
 
 All controls are configured at construction time through a single `compliance: Option<ComplianceConfig>` entry. A vanilla deployment leaves the entry empty and pays no compliance overhead. Regulated deployments populate the slot once; subsequent state changes (freeze toggles, admin rotation, policy swap) flow through admin-gated entry points.
 
@@ -12,9 +12,8 @@ All controls are configured at construction time through a single `compliance: O
 
 ```rust
 struct ComplianceConfig {
-    policy: Option<Address>,           // §3
-    sac_passthrough: bool,             // §2
-    permit_unregistered_deposit: bool, // §4
+    policy: Option<Address>, // §3
+    sac_passthrough: bool,   // §2
 }
 ```
 
@@ -22,7 +21,6 @@ struct ComplianceConfig {
 |:---|:---|
 | `policy` | Optional external authorization contract (§3). `None` means no policy gate. |
 | `sac_passthrough` | When `true`, every state-modifying operation additionally consults the underlying SAC's `authorized()` check (§2). |
-| `permit_unregistered_deposit` | When `true`, `deposit` skips policy and freeze checks on an unregistered `from` (§4). |
 
 The constructor takes `compliance: Option<ComplianceConfig>`. When `None`, the wrapper behaves exactly as `DESIGN.md` specifies: no pre-checks run, and the admin-gated entry points in §6 revert with `NotConfigured`.
 
@@ -88,16 +86,54 @@ The policy address is rotatable via `set_compliance_config` (§6) under admin au
 
 ---
 
-## 4. Unregistered Deposits
+## 4. Customizing the Hooks Trait
 
-`deposit` is the one operation where `from` may legitimately be an address that has never registered with the wrapper (the depositor only needs to hold the underlying SEP-41). Two cases:
+The compliance surface in §§2–3 is delivered as `ComplianceHooks`, a turnkey implementation of the wrapper's `Hooks` trait (see [DESIGN.md](DESIGN.md) for the lifecycle hooks the wrapper exposes at each entry point). Deployments that need behaviour beyond the default gating — for example, the deposit-side policies sketched below — replace `ComplianceHooks` with a bespoke `Hooks` impl. The custom impl typically delegates to the same primitives the default uses (`storage::gate_account`, `storage::check_policy`, `storage::check_sac`) and only overrides the callbacks that require non-default semantics.
 
-1. **`permit_unregistered_deposit = false` (default).** Unregistered `from` fails the policy check by default (most policy contracts will not list addresses they have not seen). The operation reverts.
-2. **`permit_unregistered_deposit = true`.** When `from` is unregistered, the wrapper skips the policy and freeze checks on `from` and proceeds with the deposit. Checks on `to` (the registered recipient) are unaffected.
+`deposit` is the canonical entry point for customization because it is the only operation where `from` may legitimately be an address that has never registered with the wrapper (the depositor only needs to hold the underlying SEP-41). The default `ComplianceHooks::on_deposit` gates both `from` and `to` unconditionally, which means every depositor must first register and pass the policy gate. Deployments that need other semantics override `on_deposit`.
 
-This carve-out lets regulated deployments accept inbound payments from non-listed external counterparties (e.g., an exchange wallet depositing into a payroll pool) while keeping the recipient-side guarantees intact. Deployments that need a stricter posture leave the flag `false` and force every depositor through registration first.
+### 4.1 Permit Unregistered Deposits
 
-The flag is set at construction and rotatable via `set_compliance_config` (§6) under admin auth.
+```rust
+impl Hooks for PermissiveDepositHooks {
+    fn on_deposit(e: &Env, from: &Address, to: &Address, _amount: i128) {
+        let Some(config) = storage::compliance_config(e) else {
+            return;
+        };
+        if account_exists(e, from) {
+            storage::gate_account(e, from, &config);
+        } else if config.sac_passthrough {
+            // SAC `authorized` still runs — the underlying SEP-41 transfer
+            // would fail anyway when the SAC has the depositor unauthorized.
+            storage::check_sac(e, from, &config);
+        }
+        storage::gate_account(e, to, &config);
+    }
+
+    // …other callbacks delegate to ComplianceHooks defaults…
+}
+```
+
+When `from` is not registered with the wrapper, the freeze and policy gates are skipped; checks on `to` (the registered recipient) are unaffected. This pattern fits regulated deployments that accept inbound payments from non-listed external counterparties (e.g., an exchange wallet depositing into a payroll pool) while keeping recipient-side guarantees intact.
+
+### 4.2 Permit Deposits Only For Oneself
+
+```rust
+impl Hooks for SelfDepositOnlyHooks {
+    fn on_deposit(e: &Env, from: &Address, to: &Address, amount: i128) {
+        if from != to {
+            panic_with_error!(e, ComplianceError::NotAuthorizedByPolicy);
+        }
+        ComplianceHooks::on_deposit(e, from, to, amount);
+    }
+
+    // …other callbacks delegate to ComplianceHooks defaults…
+}
+```
+
+The depositor is required to be the recipient — no one can deposit on someone else's behalf. This pattern fits deployments where each account must self-fund its confidential balance and inbound deposits from third parties are not a desired flow (e.g., to prevent unsolicited "dustings" that complicate auditor bookkeeping).
+
+These two examples are illustrative; the same surface accommodates per-deposit rate limits, allowlists keyed off the deposit amount, mirror writes to an audit log, or any other synchronous policy. The wrapper's only contract with the `Hooks` impl is that callbacks revert (via `panic_with_error!`) when the operation must be rejected.
 
 ---
 
@@ -174,6 +210,6 @@ impl Wrapper {
 | Event | Fields |
 |:---|:---|
 | `Frozen`, `Unfrozen` | `account` |
-| `ComplianceConfigChanged` | `policy`, `sac_passthrough`, `permit_unregistered_deposit` |
+| `ComplianceConfigChanged` | `policy`, `sac_passthrough` |
 
 Clawback-related events are specified alongside the clawback flow in the follow-up revision.

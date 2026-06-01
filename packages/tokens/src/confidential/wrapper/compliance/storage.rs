@@ -21,9 +21,6 @@ pub struct ComplianceConfig {
     /// When `true`, the gates additionally consult the underlying SAC's
     /// `authorized()` view.
     pub sac_passthrough: bool,
-    /// When `true`, `deposit` skips the freeze and policy checks on an
-    /// unregistered `from`.
-    pub permit_unregistered_deposit: bool,
 }
 
 /// Storage keys for the confidential wrapper compliance extension.
@@ -81,8 +78,7 @@ pub fn is_frozen(e: &Env, account: &Address) -> bool {
 /// # Events
 ///
 /// * topics - `["compliance_config_changed"]`
-/// * data - `[policy: Option<Address>, sac_passthrough: bool,
-///   permit_unregistered_deposit: bool]`
+/// * data - `[policy: Option<Address>, sac_passthrough: bool]`
 ///
 /// # Security Warning
 ///
@@ -95,12 +91,7 @@ pub fn is_frozen(e: &Env, account: &Address) -> bool {
 /// security risks as it could allow unauthorized modifications.
 pub fn set_compliance_config_no_auth(e: &Env, config: &ComplianceConfig) {
     e.storage().instance().set(&ComplianceStorageKey::Config, config);
-    emit_compliance_config_changed(
-        e,
-        &config.policy,
-        config.sac_passthrough,
-        config.permit_unregistered_deposit,
-    );
+    emit_compliance_config_changed(e, &config.policy, config.sac_passthrough);
 }
 
 /// Marks `account` as frozen.
