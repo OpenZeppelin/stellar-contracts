@@ -245,7 +245,7 @@ impl Hooks for ComplianceHooks {
         e: &Env,
         account: &Address,
         operator: &Address,
-        _expiration_ledger: u32,
+        _live_until_ledger: u32,
         _payload: Val,
     ) {
         let Some(config) = storage::compliance_config(e) else {

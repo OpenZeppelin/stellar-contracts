@@ -442,7 +442,7 @@ OperatorDelegation {
     encrypted_allowance:  BytesN<32>,   // Poseidon-encrypted allowance scalar
     escrowed_dvk:         BytesN<64>,   // ECDH escrow of dvk_i under operator key
     allowance_salt:       BytesN<32>,
-    expiration_ledger:    u32,
+    live_until_ledger:    u32,
 }
 ```
 
@@ -464,11 +464,11 @@ Per-delegation salt for allowance randomness derivation, encoded as `BytesN<32>`
 
 **Dual role.** In operator transfers, $\sigma_a$ also serves as the nonce for the recipient ECDH encryption (O7, O9) and the auditor channel sponges (O\_a2 and O\_a6, which absorb $\sigma_a$ alongside the channel shared scalar). This is safe because ECDH confidentiality derives from the shared secret $S.x$ (or $S_{a,r}.x$, $S_{a,s}.x$), not from $\sigma_a$ being secret. However, this couples the allowance salt to the transfer event: the event must emit $\sigma_a$ so that the recipient and auditor can decrypt. Any change to how the salt is stored or exposed must preserve this invariant.
 
-**`expiration_ledger`**
+**`live_until_ledger`**
 
-Ledger sequence number after which the delegation is no longer valid. Checked on every `confidential_transfer_from`. The delegation persists in storage until explicitly revoked (if it were in temporary storage automatic cleanup would destroy escrowed funds).
+The ledger number at which the delegation expires. The delegation is live while `ledger.sequence() <= live_until_ledger` and expired once `ledger.sequence() > live_until_ledger`. Checked on every `confidential_transfer_from`. The delegation persists in storage until explicitly revoked (if it were in temporary storage automatic cleanup would destroy escrowed funds).
 
-**Single-slot semantics.** The `(owner, operator)` slot holds at most one delegation. `set_operator` (Section 7.7) reverts if a delegation already exists for that pair, regardless of whether the existing delegation is past `expiration_ledger`. Expiry only prevents the operator from spending; the escrowed value persists on-chain until `revoke_operator` (Section 7.9) folds it back into the owner's spendable balance. Re-delegating to the same operator therefore requires the sequence: `revoke_operator` then `set_operator`. This rule is what keeps the balance-conservation invariant (Section 9.3) ranging cleanly over stored delegations: every delegation is either active, expired-pending-revoke, or absent, and the escrowed value is never silently dropped.
+**Single-slot semantics.** The `(owner, operator)` slot holds at most one delegation. `set_operator` (Section 7.7) reverts if a delegation already exists for that pair, regardless of whether the existing delegation is past `live_until_ledger`. Expiry only prevents the operator from spending; the escrowed value persists on-chain until `revoke_operator` (Section 7.9) folds it back into the owner's spendable balance. Re-delegating to the same operator therefore requires the sequence: `revoke_operator` then `set_operator`. This rule is what keeps the balance-conservation invariant (Section 9.3) ranging cleanly over stored delegations: every delegation is either active, expired-pending-revoke, or absent, and the escrowed value is never silently dropped.
 
 ---
 
@@ -737,7 +737,7 @@ The operator transfers from the owner's escrowed allowance to a recipient.
 
 **Private witnesses:** $sk_{\text{op}}$, $dvk_i$, $v_a$, $r_a$ (single-limb $\mathbb{F}_r$; pinned by O3 to $\text{Poseidon}(\delta_{\text{allow\\\_r}}, dvk_i, \sigma_a)$), $v_{\text{tx}}$, $r_e$.
 
-**Post-verification:** The contract checks `ledger.sequence() <= expiration_ledger`, updates `allowance_commitment`, `encrypted_allowance`, stores `new_allowance_salt`, and adds $C_{\text{tx}}$ to the recipient's `receiving_balance`. Emits event with $(R_e, \tilde{v}, \sigma_a, \tilde{v}_{\text{aud,r}}, \tilde{r}_{\text{aud,r}}, \tilde{v}_{\text{aud,s}}, \tilde{a}_{\text{aud,s}})$.
+**Post-verification:** The contract checks `ledger.sequence() <= live_until_ledger`, updates `allowance_commitment`, `encrypted_allowance`, stores `new_allowance_salt`, and adds $C_{\text{tx}}$ to the recipient's `receiving_balance`. Emits event with $(R_e, \tilde{v}, \sigma_a, \tilde{v}_{\text{aud,r}}, \tilde{r}_{\text{aud,r}}, \tilde{v}_{\text{aud,s}}, \tilde{a}_{\text{aud,s}})$.
 
 **Recipient uniformity.** The recipient processes the incoming transfer identically to a direct transfer: compute $S = vk \cdot R_e$, derive amount and blinding. The decryption flow is independent of whether the sender was the owner or an operator.
 
@@ -807,7 +807,7 @@ The $r_e$ here is the same scalar S\_a1 commits to ($R_e = r_e \cdot H$), so the
 
 ### 7.12 Expiry and Revert Safety
 
-Delegations use persistent storage and persist until explicitly revoked. `expiration_ledger` is checked on every operator transfer. Allowance randomness includes `allowance_salt` to prevent deterministic-randomness reuse after reverted transactions.
+Delegations use persistent storage and persist until explicitly revoked. `live_until_ledger` is checked on every operator transfer. Allowance randomness includes `allowance_salt` to prevent deterministic-randomness reuse after reverted transactions.
 
 ---
 
@@ -1181,7 +1181,7 @@ trait ConfidentialTokenWrapper {
                                    from: Address, to: Address, data: Bytes);
 
     fn set_operator(e: Env, account: Address, operator: Address,
-                    expiration_ledger: u32, data: Bytes);
+                    live_until_ledger: u32, data: Bytes);
 
     fn revoke_operator(e: Env, account: Address, operator: Address,
                        data: Bytes);
@@ -1219,7 +1219,7 @@ Soroban `address.require_auth()` proves that the named principal authorized the 
 | `withdraw(from, to, amount, data)` | `from` |
 | `confidential_transfer(from, to, data)` | `from` |
 | `confidential_transfer_from(operator, from, to, data)` | `operator` (not `from`) |
-| `set_operator(account, operator, expiration_ledger, data)` | `account` |
+| `set_operator(account, operator, live_until_ledger, data)` | `account` |
 | `revoke_operator(account, operator, data)` | `account` |
 | `confidential_balance`, `is_operator`, `get_operator` | none (read-only) |
 
@@ -1241,7 +1241,7 @@ Each state-modifying operation emits a structured event. Events carry the data n
 | `Withdraw` | `from`, `to`, `amount`, $R_e$, $\sigma$, $\tilde{b}$, $\tilde{b}_{\text{aud,s}}$ |
 | `Transfer` | `from`, `to`, $R_e$, $\tilde{v}$, $\sigma$, $\tilde{b}$, $\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ |
 | `OperatorTransfer` | `operator`, `from`, `to`, $R_e$, $\tilde{v}$, $\sigma_a$, $\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{a}_{\text{aud,s}}$ |
-| `SetOperator` | `account`, `operator`, `expiration_ledger`, $R_e$, $\sigma$, $\tilde{b}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ |
+| `SetOperator` | `account`, `operator`, `live_until_ledger`, $R_e$, $\sigma$, $\tilde{b}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ |
 | `RevokeOperator` | `account`, `operator`, $R_e$, $\sigma$, $\tilde{b}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ |
 
 Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
@@ -1256,15 +1256,15 @@ Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
 
 **`confidential_balance(account) -> Bytes`.** Returns the XDR-serialized `ConfidentialAccount` struct for the given account (§6.1), i.e. the tuple `(spending_key, viewing_public_key, spendable_balance, receiving_balance, auditor_id)`. Reverts if `account` is not registered. Wallets bootstrap from this call (single round-trip to obtain both Pedersen commitments plus the keys needed to identify the account and its bound auditor); indexers use it to verify consistency between their replayed accumulators and on-chain state (§5.2 "Consistency check").
 
-**`is_operator(account, operator) -> bool`.** Returns `true` iff a delegation entry exists for `(account, operator)` **and** `ledger.sequence() <= expiration_ledger`. Returns `false` for:
+**`is_operator(account, operator) -> bool`.** Returns `true` iff a delegation entry exists for `(account, operator)` **and** `ledger.sequence() <= live_until_ledger`. Returns `false` for:
 
 - pairs with no delegation entry,
-- pairs whose entry has `ledger.sequence() > expiration_ledger` (expired-but-not-yet-revoked: the escrowed value still resides on-chain in $C_a$ until `revoke_operator` reclaims it -- §6.2 *Single-slot semantics* -- but the operator can no longer spend),
+- pairs whose entry has `ledger.sequence() > live_until_ledger` (expired-but-not-yet-revoked: the escrowed value still resides on-chain in $C_a$ until `revoke_operator` reclaims it -- §6.2 *Single-slot semantics* -- but the operator can no longer spend),
 - pairs whose entry was revoked (deleted) by `revoke_operator`.
 
 The function returns the *spending-authority* state, not the *escrow-existence* state. Consumers that need to distinguish "no delegation" from "expired delegation" inspect `get_operator` (below) or replay `SetOperator` / `RevokeOperator` events.
 
-**`get_operator(account, operator) -> Bytes`.** Returns the XDR-serialized `OperatorDelegation` struct (§6.2) for the `(account, operator)` pair, i.e. `(allowance_commitment, encrypted_allowance, escrowed_dvk, allowance_salt, expiration_ledger)`. Reverts if no delegation entry exists for the pair. Unlike `is_operator`, this surfaces the raw on-chain delegation state without applying the expiry filter, so callers can distinguish "no delegation" (revert) from "active delegation" (`ledger.sequence() <= expiration_ledger`) from "expired-but-not-yet-revoked delegation" (`ledger.sequence() > expiration_ledger`, escrowed value still pending reclaim). Primary consumers:
+**`get_operator(account, operator) -> Bytes`.** Returns the XDR-serialized `OperatorDelegation` struct (§6.2) for the `(account, operator)` pair, i.e. `(allowance_commitment, encrypted_allowance, escrowed_dvk, allowance_salt, live_until_ledger)`. Reverts if no delegation entry exists for the pair. Unlike `is_operator`, this surfaces the raw on-chain delegation state without applying the expiry filter, so callers can distinguish "no delegation" (revert) from "active delegation" (`ledger.sequence() <= live_until_ledger`) from "expired-but-not-yet-revoked delegation" (`ledger.sequence() > live_until_ledger`, escrowed value still pending reclaim). Primary consumers:
 
 - **Operator wallet:** fetches `allowance_commitment`, `encrypted_allowance`, `escrowed_dvk`, and `allowance_salt` to recover $dvk_i$ via §7.11 decryption, then reads the current allowance via $\tilde{a} = v_a + \text{Poseidon}(\delta_{\text{enc\\\_allow}}, dvk_i, \sigma_a)$ to construct the next `confidential_transfer_from` witness.
 - **Owner wallet:** reads the same fields after losing local state, or before calling `revoke_operator`, to confirm the on-chain entry matches its records.

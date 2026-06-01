@@ -489,8 +489,8 @@ fn set_operator_stores_delegation() {
     h.wrapper.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
     EventAssertion::new(&h.e, h.wrapper_addr.clone()).assert_event_count(1);
 
-    let delegation = h.wrapper.get_operator(&alice, &operator);
-    assert_eq!(delegation.expiration_ledger, 1_000);
+    let delegation = h.wrapper.get_operator_delegation(&alice, &operator);
+    assert_eq!(delegation.live_until_ledger, 1_000);
     assert!(h.wrapper.is_operator(&alice, &operator));
 }
 
@@ -535,11 +535,11 @@ fn revoke_unknown_operator_panics() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3504)")]
-fn get_operator_unknown_panics() {
+fn get_operator_delegation_unknown_panics() {
     let h = setup();
     let alice = Address::generate(&h.e);
     let operator = Address::generate(&h.e);
-    h.wrapper.get_operator(&alice, &operator);
+    h.wrapper.get_operator_delegation(&alice, &operator);
 }
 
 // ################## OPERATOR TRANSFER ##################
@@ -560,7 +560,7 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
     EventAssertion::new(&h.e, h.wrapper_addr.clone()).assert_event_count(1);
 
     // Delegation allowance commitment was rotated.
-    let delegation = h.wrapper.get_operator(&alice, &operator);
+    let delegation = h.wrapper.get_operator_delegation(&alice, &operator);
     assert_eq!(delegation.allowance_commitment, fixture_point(&h.e));
     // Bob's receiving balance accumulated.
     let bob_acc = h.wrapper.confidential_balance(&bob);
@@ -631,7 +631,7 @@ fn is_operator_returns_false_for_missing_and_expired() {
     assert!(!h.wrapper.is_operator(&alice, &operator));
 
     // But the entry still exists (DESIGN §6.2).
-    let _ = h.wrapper.get_operator(&alice, &operator);
+    let _ = h.wrapper.get_operator_delegation(&alice, &operator);
 }
 
 // ################## INSTANCE SETTERS ##################
@@ -712,6 +712,6 @@ fn delegation_type_export_compiles() {
         encrypted_allowance: fixture_field(&e, 0),
         escrowed_dvk: fixture_point(&e),
         allowance_salt: fixture_field(&e, 0),
-        expiration_ledger: 0,
+        live_until_ledger: 0,
     });
 }

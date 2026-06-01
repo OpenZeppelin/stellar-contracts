@@ -142,7 +142,7 @@ pub trait Hooks {
         e: &Env,
         account: &Address,
         operator: &Address,
-        expiration_ledger: u32,
+        live_until_ledger: u32,
         payload: Val,
     ) {
     }
@@ -376,8 +376,9 @@ pub trait ConfidentialTokenWrapper {
     /// * `account` - The delegating owner.
     /// * `operator` - The delegated operator. Must be a registered confidential
     ///   account so its spending key is available for the `dvk` escrow ECDH.
-    /// * `expiration_ledger` - Ledger sequence at which the delegation stops
-    ///   authorizing spending. The escrowed value persists until
+    /// * `live_until_ledger` - The ledger number at which the delegation
+    ///   expires. Spending is authorized while `ledger.sequence() <=
+    ///   live_until_ledger`. The escrowed value persists until
     ///   `revoke_operator`.
     /// * `data` - XDR-encoded [`SetOperatorData`].
     ///
@@ -389,13 +390,13 @@ pub trait ConfidentialTokenWrapper {
     /// # Events
     ///
     /// * topics - `["set_operator", account: Address, operator: Address]`
-    /// * data - `[expiration_ledger: u32, r_e, sigma, b_tilde, v_aud_s,
+    /// * data - `[live_until_ledger: u32, r_e, sigma, b_tilde, v_aud_s,
     ///   b_aud_s]`
     fn set_operator(
         e: &Env,
         account: Address,
         operator: Address,
-        expiration_ledger: u32,
+        live_until_ledger: u32,
         data: Bytes,
     ) {
         account.require_auth();
@@ -405,14 +406,14 @@ pub trait ConfidentialTokenWrapper {
             e,
             &account,
             &operator,
-            expiration_ledger,
+            live_until_ledger,
             decoded.payload.clone().into_val(e),
         );
         storage::set_operator(
             e,
             &account,
             &operator,
-            expiration_ledger,
+            live_until_ledger,
             &decoded.payload,
             &decoded.proof,
         );
@@ -466,8 +467,7 @@ pub trait ConfidentialTokenWrapper {
     }
 
     /// Returns `true` iff a delegation exists for `(account, operator)`
-    /// and the current ledger sequence does not exceed its
-    /// `expiration_ledger`.
+    /// and is still live (`ledger.sequence() <= live_until_ledger`).
     ///
     /// # Arguments
     ///
@@ -512,7 +512,7 @@ pub enum WrapperError {
     /// Indicates no delegation exists for `(account, operator)`.
     DelegationNotFound = 3504,
     /// Indicates the delegation has expired
-    /// (`ledger.sequence() > expiration_ledger`).
+    /// (`ledger.sequence() > live_until_ledger`).
     DelegationExpired = 3505,
     /// Indicates the verifier rejected the accompanying proof.
     InvalidProof = 3506,
@@ -741,7 +741,7 @@ pub struct SetOperator {
     pub account: Address,
     #[topic]
     pub operator: Address,
-    pub expiration_ledger: u32,
+    pub live_until_ledger: u32,
     pub r_e: BytesN<64>,
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
@@ -755,7 +755,7 @@ pub fn emit_set_operator(
     e: &Env,
     account: &Address,
     operator: &Address,
-    expiration_ledger: u32,
+    live_until_ledger: u32,
     r_e: &BytesN<64>,
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
@@ -765,7 +765,7 @@ pub fn emit_set_operator(
     SetOperator {
         account: account.clone(),
         operator: operator.clone(),
-        expiration_ledger,
+        live_until_ledger,
         r_e: r_e.clone(),
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),

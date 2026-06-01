@@ -35,7 +35,7 @@ pub enum WrapperStorageKey {
     /// Persistent storage.
     Account(Address),
     /// Per-`(owner, operator)` `OperatorDelegation` entry. Persistent storage.
-    /// Persists until explicitly revoked even when `expiration_ledger` has
+    /// Persists until explicitly revoked even when `live_until_ledger` has
     /// passed.
     Delegation(Address, Address),
 }
@@ -78,9 +78,9 @@ pub struct OperatorDelegation {
     pub escrowed_dvk: Point,
     /// Per-delegation salt `σ_a`.
     pub allowance_salt: BytesN<32>,
-    /// Ledger sequence after which the delegation no longer authorizes
-    /// spending.
-    pub expiration_ledger: u32,
+    /// The ledger number at which the delegation expires. Spending is
+    /// authorized while `ledger.sequence() <= live_until_ledger`.
+    pub live_until_ledger: u32,
 }
 
 // ################## DATA PAYLOADS ##################
@@ -332,8 +332,8 @@ pub fn get_operator_delegation(e: &Env, owner: &Address, operator: &Address) -> 
     .unwrap_or_else(|| panic_with_error!(e, WrapperError::DelegationNotFound))
 }
 
-/// Returns `true` iff a delegation exists for `(owner, operator)` and the
-/// current ledger sequence does not exceed its `expiration_ledger`.
+/// Returns `true` iff a delegation exists for `(owner, operator)` and is
+/// still live (`ledger.sequence() <= live_until_ledger`).
 ///
 /// Returns `false` for missing entries and for expired-but-not-revoked
 /// entries.
@@ -348,7 +348,7 @@ pub fn is_operator(e: &Env, owner: &Address, operator: &Address) -> bool {
         e,
         &WrapperStorageKey::Delegation(owner.clone(), operator.clone()),
     ) {
-        Some(d) => e.ledger().sequence() <= d.expiration_ledger,
+        Some(d) => e.ledger().sequence() <= d.live_until_ledger,
         None => false,
     }
 }
@@ -743,7 +743,7 @@ pub fn confidential_transfer_from(
     proof: &Bytes,
 ) {
     let delegation = get_operator_delegation(e, from, operator);
-    if e.ledger().sequence() > delegation.expiration_ledger {
+    if e.ledger().sequence() > delegation.live_until_ledger {
         panic_with_error!(e, WrapperError::DelegationExpired);
     }
 
@@ -816,8 +816,8 @@ pub fn confidential_transfer_from(
 /// * `account` - The delegating owner.
 /// * `operator` - The delegated operator. Must be a registered confidential
 ///   account so its spending key is available for the `dvk` escrow ECDH.
-/// * `expiration_ledger` - Ledger sequence at which the delegation stops
-///   authorizing spending.
+/// * `live_until_ledger` - The ledger number at which the delegation expires.
+///   Spending is authorized while `ledger.sequence() <= live_until_ledger`.
 /// * `payload` - The decoded [`SetOperatorPayload`].
 /// * `proof` - The raw UltraHonk proof bytes.
 ///
@@ -834,7 +834,7 @@ pub fn confidential_transfer_from(
 /// # Events
 ///
 /// * topics - `["set_operator", account: Address, operator: Address]`
-/// * data - `[expiration_ledger: u32, r_e, sigma, b_tilde, v_aud_s, b_aud_s]`
+/// * data - `[live_until_ledger: u32, r_e, sigma, b_tilde, v_aud_s, b_aud_s]`
 ///
 /// # Security Warning
 ///
@@ -844,7 +844,7 @@ pub fn set_operator(
     e: &Env,
     account: &Address,
     operator: &Address,
-    expiration_ledger: u32,
+    live_until_ledger: u32,
     payload: &SetOperatorPayload,
     proof: &Bytes,
 ) {
@@ -889,7 +889,7 @@ pub fn set_operator(
             encrypted_allowance: payload.a_tilde.clone(),
             escrowed_dvk: payload.escrowed_dvk.clone(),
             allowance_salt: payload.sigma_a.clone(),
-            expiration_ledger,
+            live_until_ledger,
         },
     );
 
@@ -897,7 +897,7 @@ pub fn set_operator(
         e,
         account,
         operator,
-        expiration_ledger,
+        live_until_ledger,
         &payload.r_e,
         &payload.sigma,
         &payload.b_tilde,
