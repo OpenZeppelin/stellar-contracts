@@ -489,9 +489,9 @@ pub trait ConfidentialTokenWrapper {
     ///
     /// # Errors
     ///
-    /// * refer to [`storage::get_delegation`] errors.
-    fn get_operator(e: &Env, account: Address, operator: Address) -> OperatorDelegation {
-        storage::get_delegation(e, &account, &operator)
+    /// * refer to [`storage::get_operator_delegation`] errors.
+    fn get_operator_delegation(e: &Env, account: Address, operator: Address) -> OperatorDelegation {
+        storage::get_operator_delegation(e, &account, &operator)
     }
 }
 

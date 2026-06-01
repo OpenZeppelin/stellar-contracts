@@ -324,7 +324,7 @@ pub fn get_account(e: &Env, account: &Address) -> ConfidentialAccount {
 ///
 /// * [`WrapperError::DelegationNotFound`] - When no delegation exists for the
 ///   pair.
-pub fn get_delegation(e: &Env, owner: &Address, operator: &Address) -> OperatorDelegation {
+pub fn get_operator_delegation(e: &Env, owner: &Address, operator: &Address) -> OperatorDelegation {
     get_persistent_entry::<OperatorDelegation>(
         e,
         &WrapperStorageKey::Delegation(owner.clone(), operator.clone()),
@@ -742,7 +742,7 @@ pub fn confidential_transfer_from(
     payload: &OperatorTransferPayload,
     proof: &Bytes,
 ) {
-    let delegation = get_delegation(e, from, operator);
+    let delegation = get_operator_delegation(e, from, operator);
     if e.ledger().sequence() > delegation.expiration_ledger {
         panic_with_error!(e, WrapperError::DelegationExpired);
     }
@@ -944,7 +944,7 @@ pub fn revoke_operator(
     proof: &Bytes,
 ) {
     let owner = get_account(e, account);
-    let delegation = get_delegation(e, account, operator);
+    let delegation = get_operator_delegation(e, account, operator);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_s = auditor.get_key(&owner.auditor_id);
     let wrap = get_wrap(e);
@@ -1220,7 +1220,7 @@ fn update_delegation(
     a_tilde_new: &BytesN<32>,
     sigma_a_new: &BytesN<32>,
 ) {
-    let mut delegation = get_delegation(e, owner, operator);
+    let mut delegation = get_operator_delegation(e, owner, operator);
     delegation.allowance_commitment = c_a_new.clone();
     delegation.encrypted_allowance = a_tilde_new.clone();
     delegation.allowance_salt = sigma_a_new.clone();
