@@ -136,11 +136,12 @@ pub fn can_receive(e: &Env, account: &Address, amount: i128, token: &Address) ->
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
 /// * refer to [`can_receive`] errors.
 pub fn can_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &Address) -> bool {
-    if from == to {
+    require_non_negative_amount(e, amount);
+
+    let irs = get_irs_client(e, token);
+    if irs.stored_identity(from) == irs.stored_identity(to) {
         return true;
     }
-
-    require_non_negative_amount(e, amount);
 
     can_receive(e, to, amount, token)
 }
@@ -319,15 +320,15 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 ///
 /// This helper performs no authorization checks.
 pub fn on_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &Address) {
-    if from == to {
-        return;
-    }
-
     require_non_negative_amount(e, amount);
 
     let irs = get_irs_client(e, token);
     let id_from = irs.stored_identity(from);
     let id_to = irs.stored_identity(to);
+
+    if id_from == id_to {
+        return;
+    }
 
     debit_identity(e, token, &id_from, amount);
     credit_identity(e, token, &id_to, amount);
