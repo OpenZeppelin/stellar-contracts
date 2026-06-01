@@ -21,7 +21,7 @@ mod tests;
 //                              sigma_a)                     Allowance
 //                                                           randomness matches
 //                                                           stored state (the
-//                                                           wrapper-binding
+//                                                           contract-binding
 //                                                           anchor, see below).
 //   O4  v_a, v_tx, v_a - v_tx in [0, 2^127)                 Range validity
 //                                                           (Section 2.6); the
@@ -96,16 +96,16 @@ mod tests;
 //                                                           post-transfer
 //                                                           allowance.
 //
-// Wrapper binding (Section 7.8 final paragraph)
+// Contract binding (Section 7.8 final paragraph)
 // ---------------------------------------------
 // Unlike owner-initiated circuits, OperatorTransfer does NOT constrain the vk
-// derivation -- the operator has no access to the owner's sk. Wrapper binding
+// derivation -- the operator has no access to the owner's sk. Contract binding
 // is inherited indirectly through the allowance commitment chain: SetOperator
-// derived `dvk_i` from the wrapper-specific `vk` (S2, S5), which determined
+// derived `dvk_i` from the contract-specific `vk` (S2, S5), which determined
 // `r_a` (S6) and thus `C_a` (S7). Here O3 verifies the operator's claimed
 // `dvk_i` against the on-chain `C_a` via `sigma_a`. Because `C_a` is a public
-// input and was constructed with wrapper-specific randomness, a proof
-// generated against one wrapper's `C_a` cannot verify against another's.
+// input and was constructed with contract-specific randomness, a proof
+// generated against one contract's `C_a` cannot verify against another's.
 //
 // Channel-nonce reuse (Section 6.2 *Dual role*)
 // ---------------------------------------------
@@ -123,7 +123,7 @@ mod tests;
 // multi_scalar_mul outputs (O1, O2, O11, O8, O6, O5, O_a1, O_a5) and are
 // therefore on-curve by construction -- no explicit check needed.
 // PVK_recipient was constrained on-curve when the recipient registered (R3,
-// Section 7.2) and is loaded by the wrapper from trusted storage, so it is
+// Section 7.2) and is loaded by the contract from trusted storage, so it is
 // path (2) of Section 10.8 and the circuit consumes it without re-checking.
 // K_aud_r and K_aud_s are public-input keys with no proof constraint at
 // insertion (path (3)) -- the verifier doesn't check curve membership and
@@ -229,7 +229,7 @@ fn main(
     assert(y_op_derived.x == y_op_x);
     assert(y_op_derived.y == y_op_y);
 
-    // O3 -- runs before O2 so the wrapper-binding check (r_a is pinned to
+    // O3 -- runs before O2 so the contract-binding check (r_a is pinned to
     // dvk_i, sigma_a) is in scope before O2 uses r_a as the blinding under
     // the Pedersen commitment.
     let r_a_derived = derive_allow_r(dvk_i, sigma_a);

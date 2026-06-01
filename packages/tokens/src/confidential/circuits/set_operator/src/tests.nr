@@ -7,7 +7,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 // Canonical fixture inputs.
 //
-// SK / WRAP / SIGMA / V / R / R_E reuse the lib's pinned vectors (lib/testdata)
+// SK / ADDR_F / SIGMA / V / R / R_E reuse the lib's pinned vectors (lib/testdata)
 // so that Y, C_spend, vk, r_new, b_tilde, R_e, and the owner-channel masks
 // are all derivable from -- and pinned by -- the lib's `fixtures_match_testdata`
 // test. V_A = 300 keeps the happy path on a non-trivial v - v_a while still
@@ -19,9 +19,9 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 // `set_operator_fixtures_match_lib`. K_AUD_S_SCALAR matches the withdraw
 // fixture's auditor scalar so the two circuits share the same owner-auditor
 // key in cross-circuit tooling. OP_I is a placeholder address-as-field; the
-// wrapper computes it off-circuit via `address_to_field` (Section 2.7).
+// contract computes it off-circuit via `address_to_field` (Section 2.7).
 global SK: Field = 0xdead;
-global WRAP: Field = 0xbeef;
+global ADDR_F: Field = 0xbeef;
 global SIGMA: Field = 0x01;
 global SIGMA_A: Field = 0x02;
 global V: Field = 1000;
@@ -92,7 +92,7 @@ fn print_fixtures() {
     // fixture tuple. Run with
     // `nargo test --package circuit_set_operator print_fixtures --show-output`
     // and paste the values into the globals above.
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let r_a = derive_allow_r(dvk, SIGMA_A);
     let c_a = commit(V_A, r_a);
@@ -142,7 +142,7 @@ fn print_fixtures() {
 
 #[test]
 fn set_operator_fixtures_match_lib() {
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let r_a = derive_allow_r(dvk, SIGMA_A);
     let c_a = commit(V_A, r_a);
@@ -170,7 +170,7 @@ fn set_operator_fixtures_match_lib() {
 
 #[test]
 fn set_operator_auditor_fixtures_match_lib() {
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let y_op = scalar_mul(SK_OP, H);
     let s_esc = ecdh(R_E, y_op);
@@ -207,7 +207,7 @@ fn run_main(
     y_op_x_in: Field,
     y_op_y_in: Field,
     op_i_in: Field,
-    wrap_in: Field,
+    addr_f_in: Field,
     k_aud_s_x_in: Field,
     k_aud_s_y_in: Field,
     c_spend_new_x_in: Field,
@@ -238,7 +238,7 @@ fn run_main(
         y_op_x_in,
         y_op_y_in,
         op_i_in,
-        wrap_in,
+        addr_f_in,
         k_aud_s_x_in,
         k_aud_s_y_in,
         c_spend_new_x_in,
@@ -272,7 +272,7 @@ fn run_fixture() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -303,7 +303,7 @@ fn full_allowance_escrow() {
     // is a valid commitment to zero. b_tilde and b_tilde_aud_s both bind to 0
     // (plus mask) so the owner's auditor sees the post-escrow spendable
     // balance reach zero. C_a binds to the full v.
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let r_a = derive_allow_r(dvk, SIGMA_A);
     let c_a = commit(V, r_a);
@@ -330,7 +330,7 @@ fn full_allowance_escrow() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         c_new.x,
@@ -356,7 +356,7 @@ fn rejects_under_funded_escrow() {
     // Every downstream public is recomputed against v_a_too_large so the
     // single firing constraint is S4's v_new range check.
     let v_a_too_large: Field = V + 1;
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let r_a = derive_allow_r(dvk, SIGMA_A);
     let c_a_invalid = commit(v_a_too_large, r_a);
@@ -383,7 +383,7 @@ fn rejects_under_funded_escrow() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         c_new_invalid.x,
@@ -414,7 +414,7 @@ fn rejects_v_out_of_range() {
     // cannot coincidentally fire.
     let v_huge: Field = 0x80000000000000000000000000000000;
     let v_new_huge: Field = v_huge - V_A;
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let c_spend = commit(v_huge, R);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(v_new_huge, r_new);
@@ -435,7 +435,7 @@ fn rejects_v_out_of_range() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         c_new.x,
@@ -465,7 +465,7 @@ fn rejects_v_a_out_of_range() {
     // are S4's two range sub-checks.
     let v_a_huge: Field = 0x80000000000000000000000000000000;
     let v_new_huge: Field = V - v_a_huge;
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let r_a = derive_allow_r(dvk, SIGMA_A);
     let c_a = commit(v_a_huge, r_a);
@@ -492,7 +492,7 @@ fn rejects_v_a_out_of_range() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         c_new.x,
@@ -515,12 +515,12 @@ fn rejects_v_a_out_of_range() {
 #[test(should_fail)]
 fn rejects_wrong_sk() {
     // sk + 1 != sk: S1 fails because scalar_mul(sk+1, H) no longer matches Y.
-    // vk is rebound to (sk+1, wrap) and every vk-dependent public
+    // vk is rebound to (sk+1, addr_f) and every vk-dependent public
     // (c_spend_new, b_tilde, c_a, a_tilde, escrowed_dvk_cipher) is recomputed
     // under the new vk so S10 / S11 / S7 / S8 / S12(c) cannot fire alongside
     // S1. The auditor block does not depend on vk so its canonical values
     // still satisfy S_a4 / S_a5.
-    let vk_bad = vk_from_sk(SK + 1, WRAP);
+    let vk_bad = vk_from_sk(SK + 1, ADDR_F);
     let dvk_bad = dvk_from_vk_op(vk_bad, OP_I);
     let r_a_bad = derive_allow_r(dvk_bad, SIGMA_A);
     let c_a_bad = commit(V_A, r_a_bad);
@@ -544,7 +544,7 @@ fn rejects_wrong_sk() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         c_new_bad.x,
@@ -572,7 +572,7 @@ fn rejects_wrong_balance_opening() {
     // so only S3 fires.
     let v_bad: Field = V + 1;
     let v_new_bad: Field = v_bad - V_A;
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new_bad = commit(v_new_bad, r_new);
     let b_tilde_bad = encrypt_balance(v_new_bad, vk, SIGMA);
@@ -592,7 +592,7 @@ fn rejects_wrong_balance_opening() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         c_new_bad.x,
@@ -613,17 +613,17 @@ fn rejects_wrong_balance_opening() {
 }
 
 #[test(should_fail)]
-fn rejects_wrong_wrap() {
-    // The circuit binds vk to wrap via S2 but doesn't assert wrap directly;
+fn rejects_wrong_addr_f() {
+    // The circuit binds vk to addr_f via S2 but doesn't assert addr_f directly;
     // the binding is visible only through vk-derived publics (S10, S11, S7,
-    // S8, S12(c)). With wrap_bad, recompute c_spend_new and c_a from the new
+    // S8, S12(c)). With addr_f_bad, recompute c_spend_new and c_a from the new
     // vk_bad so S10 / S7 pass -- leaving b_tilde canonical, where the
-    // wrap-binding catches the mismatch via S11. (Recomputing everything,
+    // addr_f-binding catches the mismatch via S11. (Recomputing everything,
     // as in `rejects_wrong_sk`, would make the proof verify: S1 is the
-    // load-bearing wrap-independent check there, and no such constraint
+    // load-bearing addr_f-independent check there, and no such constraint
     // exists here.)
-    let wrap_bad: Field = 0xcafe;
-    let vk_bad = vk_from_sk(SK, wrap_bad);
+    let addr_f_bad: Field = 0xcafe;
+    let vk_bad = vk_from_sk(SK, addr_f_bad);
     let dvk_bad = dvk_from_vk_op(vk_bad, OP_I);
     let r_a_bad = derive_allow_r(dvk_bad, SIGMA_A);
     let c_a_bad = commit(V_A, r_a_bad);
@@ -642,7 +642,7 @@ fn rejects_wrong_wrap() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        wrap_bad,
+        addr_f_bad,
         K_AUD_S_X,
         K_AUD_S_Y,
         c_new_bad.x,
@@ -683,7 +683,7 @@ fn rejects_wrong_op_i() {
         Y_OP_X,
         Y_OP_Y,
         op_i_bad,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -719,7 +719,7 @@ fn rejects_tampered_c_a() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -756,7 +756,7 @@ fn rejects_tampered_a_tilde() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -792,7 +792,7 @@ fn rejects_tampered_c_spend_new() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X + 1,
@@ -828,7 +828,7 @@ fn rejects_tampered_b_tilde() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -867,7 +867,7 @@ fn rejects_tampered_escrowed_dvk_r_x() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -904,7 +904,7 @@ fn rejects_tampered_escrowed_dvk_cipher() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -930,7 +930,7 @@ fn rejects_wrong_y_op() {
     // own Y, which is valid on-curve). s_esc = r_e * Y_op changes, so
     // escrowed_dvk_cipher under the canonical dvk no longer matches and
     // S12(c) fails. (Y_op is path (2) of Section 10.8: trusted on read from
-    // the wrapper, so the in-circuit consequence of swapping it is purely
+    // the contract, so the in-circuit consequence of swapping it is purely
     // through the escrow-cipher mask.)
     run_main(
         SK,
@@ -945,7 +945,7 @@ fn rejects_wrong_y_op() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -975,7 +975,7 @@ fn rejects_r_e_zero() {
     // s_a_s_x = 0) is recomputed so the `assert(r_e != 0)` check is the only
     // constraint that can catch this -- removing S13 would let the proof
     // verify.
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let y_op = EmbeddedCurvePoint { x: Y_OP_X, y: Y_OP_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
@@ -996,7 +996,7 @@ fn rejects_r_e_zero() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -1027,7 +1027,7 @@ fn rejects_wrong_r_e() {
     // matching the public R_e -- the only catchable mismatch is S_a1's
     // derived point.
     let r_e_bad: Field = R_E + 1;
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let y_op = EmbeddedCurvePoint { x: Y_OP_X, y: Y_OP_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
@@ -1048,7 +1048,7 @@ fn rejects_wrong_r_e() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -1085,7 +1085,7 @@ fn rejects_off_curve_k_aud_s() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         1,
         2,
         C_SPEND_NEW_X,
@@ -1122,7 +1122,7 @@ fn rejects_identity_k_aud_s() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         0,
         0,
         C_SPEND_NEW_X,
@@ -1159,7 +1159,7 @@ fn rejects_wrong_k_aud_s() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         Y_X,
         Y_Y,
         C_SPEND_NEW_X,
@@ -1195,7 +1195,7 @@ fn rejects_tampered_v_tilde_aud_s() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -1231,7 +1231,7 @@ fn rejects_tampered_b_tilde_aud_s() {
         Y_OP_X,
         Y_OP_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,

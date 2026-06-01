@@ -473,16 +473,16 @@ fn rejects_wrong_sk_op() {
 }
 
 #[test(should_fail)]
-fn rejects_wrong_dvk_against_wrapper() {
-    // Wrapper-binding regression. The OperatorTransfer circuit does NOT carry
+fn rejects_wrong_dvk_against_contract() {
+    // Contract-binding regression. The OperatorTransfer circuit does NOT carry
     // a vk derivation -- the operator never sees the owner's sk -- so a naive
     // reading might worry that an operator could reuse a proof's witness
-    // across wrappers. The defense lives in O3.
+    // across contracts. The defense lives in O3.
     //
     // Mechanism (Section 7.8 final paragraph):
-    //   * SetOperator derived dvk_i from a wrapper-specific vk: S2/S5 chain
-    //     vk = Poseidon2(VK, sk_owner, wrap), then dvk_i = Poseidon2(DVK, vk,
-    //     op_i). A different `wrap` produces a different vk, and therefore a
+    //   * SetOperator derived dvk_i from a contract-specific vk: S2/S5 chain
+    //     vk = Poseidon2(VK, sk_owner, addr_f), then dvk_i = Poseidon2(DVK, vk,
+    //     op_i). A different `addr_f` produces a different vk, and therefore a
     //     different dvk_i.
     //   * That dvk_i then determined r_a (S6: r_a = Poseidon2(ALLOW_R, dvk_i,
     //     sigma_a)) and thereby C_a (S7).
@@ -490,14 +490,14 @@ fn rejects_wrong_dvk_against_wrapper() {
     //     O3 forces the prover's witness dvk_i to satisfy r_a ==
     //     Poseidon2(ALLOW_R, dvk_i, sigma_a), and O2 then forces commit(v_a,
     //     r_a) == C_a. The combination pins dvk_i: only the dvk_i that
-    //     SetOperator produced under that wrapper's vk admits an opening of
+    //     SetOperator produced under that contract's vk admits an opening of
     //     C_a.
     //
     // This test exercises the failure mode. We keep every public input
-    // canonical (so C_a, sigma_a, Y_op come from the original wrapper) but
-    // hand the prover a `dvk_i` from a DIFFERENT wrapper -- i.e., one that
-    // would have been produced if vk had been derived under wrap_bad rather
-    // than wrap. With a different dvk_i, derive_allow_r(dvk_i_bad, SIGMA_A)
+    // canonical (so C_a, sigma_a, Y_op come from the original contract) but
+    // hand the prover a `dvk_i` from a DIFFERENT contract -- i.e., one that
+    // would have been produced if vk had been derived under addr_f_bad rather
+    // than addr_f. With a different dvk_i, derive_allow_r(dvk_i_bad, SIGMA_A)
     // yields a different r_a, so the prover-supplied R_A (also derived from
     // dvk_i_bad and supplied to keep O3 internally consistent) no longer
     // opens C_a under commit(V_A, R_A) -- O2 fails. Alternatively if we
@@ -506,10 +506,10 @@ fn rejects_wrong_dvk_against_wrapper() {
     // triggers O3 immediately (r_a_derived != R_A).
     //
     // Why O3 is the load-bearing constraint: O3 is the *only* in-circuit
-    // tie between the wrapper-specific dvk_i (chosen at SetOperator) and
+    // tie between the contract-specific dvk_i (chosen at SetOperator) and
     // the rest of the OperatorTransfer witness. Without it the operator
     // could substitute any dvk_i, satisfying O2 with a re-randomization of
-    // r_a, and verify a proof against a C_a from a different wrapper.
+    // r_a, and verify a proof against a C_a from a different contract.
     let dvk_i_bad: Field = DVK_I + 1;
     run_main(
         SK_OP,

@@ -13,7 +13,7 @@ mod tests;
 // Sender state (balance conservation + ownership)
 //   T1  Y_A         = sk_A * H                              Sender key
 //                                                           ownership.
-//   T2  vk_A        = Poseidon2(delta_vk, sk_A, wrap)       Wrapper-bound
+//   T2  vk_A        = Poseidon2(delta_vk, sk_A, addr_f)       Contract-bound
 //                                                           viewing key.
 //   T3  C_spend^A   = v_A * G + r_A * H                     Opening of the
 //                                                           sender's current
@@ -83,8 +83,8 @@ mod tests;
 // multi_scalar_mul outputs (T1, T11, T8, T6, T5, T_a1, T_a5) and are therefore
 // on-curve by construction -- no explicit check needed. PVK_B was constrained
 // on-curve when the recipient registered (R3, Section 7.2) and is loaded by
-// the wrapper from trusted storage, so it is path (2) of Section 10.8 and the
-// wrapper trusts it on read. K_aud_r and K_aud_s are public-input keys
+// the contract from trusted storage, so it is path (2) of Section 10.8 and the
+// contract trusts it on read. K_aud_r and K_aud_s are public-input keys
 // consumed by ECDH multiplications (path (3)); the verifier doesn't check
 // curve membership and an off-curve auditor key would break the soundness of
 // T_a1 / T_a5, so this file explicitly validates both on-curve AND
@@ -100,7 +100,7 @@ mod tests;
 //   3    y_y              Y_A.y
 //   4    pvk_b_x          PVK_B.x         Loaded from `to.viewing_public_key`.
 //   5    pvk_b_y          PVK_B.y           Recipient must be registered.
-//   6    wrap             wrap            `env.current_contract_address()`.
+//   6    addr_f             addr_f            `env.current_contract_address()`.
 //   7    k_aud_r_x        K_aud_r.x       Fetched from the auditor contract by
 //   8    k_aud_r_y        K_aud_r.y         `to.auditor_id`.
 //   9    k_aud_s_x        K_aud_s.x       Fetched from the auditor contract by
@@ -148,7 +148,7 @@ fn main(
     y_y: pub Field,
     pvk_b_x: pub Field,
     pvk_b_y: pub Field,
-    wrap: pub Field,
+    addr_f: pub Field,
     k_aud_r_x: pub Field,
     k_aud_r_y: pub Field,
     k_aud_s_x: pub Field,
@@ -177,7 +177,7 @@ fn main(
     assert(y_derived.y == y_y);
 
     // T2
-    let vk = vk_from_sk(sk, wrap);
+    let vk = vk_from_sk(sk, addr_f);
 
     // T3
     let c_spend_derived = commit(v, r);

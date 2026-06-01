@@ -14,7 +14,7 @@ mod tests;
 // Owner balance split (ownership + new spendable balance)
 //   S1  Y          = sk * H                              Owner key
 //                                                        ownership.
-//   S2  vk         = Poseidon2(delta_vk, sk, wrap)       Wrapper-bound
+//   S2  vk         = Poseidon2(delta_vk, sk, addr_f)       Contract-bound
 //                                                        viewing key.
 //   S3  C_spend    = v * G + r * H                       Opening of current
 //                                                        spendable balance.
@@ -36,7 +36,7 @@ mod tests;
 //                                                        scalar (emitted).
 // Delegation + allowance (per-operator escrow)
 //   S5  dvk_i      = Poseidon2(delta_dvk, vk, op_i)      Delegation viewing
-//                                                        key; wrapper-bound
+//                                                        key; contract-bound
 //                                                        via vk.
 //   S6  r_a        = Poseidon2(delta_allow_r, dvk_i,
 //                              sigma_a)                  Deterministic
@@ -89,8 +89,8 @@ mod tests;
 // multi_scalar_mul outputs (S1, S3, S10, S7, S_a1, S_a2) and are therefore
 // on-curve by construction -- no explicit check needed. Y_op was constrained
 // on-curve when the operator registered (R1, Section 7.2) and is loaded by
-// the wrapper from trusted storage, so it is path (2) of Section 10.8 and the
-// wrapper trusts it on read. K_aud_s is a public-input key consumed by an
+// the contract from trusted storage, so it is path (2) of Section 10.8 and the
+// contract trusts it on read. K_aud_s is a public-input key consumed by an
 // ECDH multiplication (path (3)); the verifier doesn't check curve membership
 // and an off-curve K_aud_s would break the soundness of S_a2, so this file
 // explicitly validates it on-curve AND non-identity before the auditor block
@@ -109,8 +109,8 @@ mod tests;
 //                                                Operator must be registered.
 //   6    op_i                 op_i              address_to_field(`operator`),
 //                                                computed off-circuit by the
-//                                                wrapper (Section 2.7).
-//   7    wrap                 wrap              `env.current_contract_address()`.
+//                                                contract (Section 2.7).
+//   7    addr_f                 addr_f              `env.current_contract_address()`.
 //   8    k_aud_s_x            K_aud_s.x         Fetched from the auditor
 //   9    k_aud_s_y            K_aud_s.y           contract by `from.auditor_id`.
 //   10   c_spend_new_x        C_spend'.x        Prover-supplied; written to
@@ -163,7 +163,7 @@ fn main(
     y_op_x: pub Field,
     y_op_y: pub Field,
     op_i: pub Field,
-    wrap: pub Field,
+    addr_f: pub Field,
     k_aud_s_x: pub Field,
     k_aud_s_y: pub Field,
     c_spend_new_x: pub Field,
@@ -192,7 +192,7 @@ fn main(
     assert(y_derived.y == y_y);
 
     // S2
-    let vk = vk_from_sk(sk, wrap);
+    let vk = vk_from_sk(sk, addr_f);
 
     // S3
     let c_spend_derived = commit(v, r);
@@ -246,7 +246,7 @@ fn main(
     assert(escrowed_dvk_r_x == r_e_x);
 
     // Y_op is path (2) of Section 10.8: bound to scalar_mul(sk_op, H) when
-    // the operator registered (R1), trusted on read from the wrapper.
+    // the operator registered (R1), trusted on read from the contract.
     let y_op = EmbeddedCurvePoint { x: y_op_x, y: y_op_y, is_infinite: false };
 
     // S12(b)

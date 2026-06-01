@@ -7,7 +7,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 // Canonical fixture inputs.
 //
-// SK / WRAP / SIGMA / SIGMA_A / OP_I / V_S / R_S / V_A / R_E reuse the lib's
+// SK / ADDR_F / SIGMA / SIGMA_A / OP_I / V_S / R_S / V_A / R_E reuse the lib's
 // pinned vectors (lib/testdata) so that Y, C_spend, C_a, vk, dvk_i, r_a, r_new,
 // and b_tilde are derivable from -- and pinned by -- the lib's
 // `fixtures_match_testdata` test. V_S + V_A = 1500 is well below 2^127 so the
@@ -15,7 +15,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 // K_AUD_S are local to this circuit (no auditor-side primitives in lib's
 // fixtures).
 global SK: Field = 0xdead;
-global WRAP: Field = 0xbeef;
+global ADDR_F: Field = 0xbeef;
 global SIGMA: Field = 0x01;
 global SIGMA_A: Field = 0x02;
 global OP_I: Field = 0xabcd;
@@ -80,7 +80,7 @@ fn print_fixtures() {
     // v_tilde_aud_s, b_tilde_aud_s for the chosen fixture tuple. Run with
     // `nargo test --package circuit_revoke_operator print_fixtures --show-output`
     // and paste the values into the globals above.
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let dvk_i = dvk_from_vk_op(vk, OP_I);
     let r_a = derive_allow_r(dvk_i, SIGMA_A);
     let c_a = commit(V_A, r_a);
@@ -121,7 +121,7 @@ fn revoke_operator_fixtures_match_lib() {
     // to the lib primitives. If lib derivations or fixture values drift, this
     // test catches it before `matches_fixture` reports a less informative
     // failure deep in `main`.
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let dvk_i = dvk_from_vk_op(vk, OP_I);
     let r_a = derive_allow_r(dvk_i, SIGMA_A);
     let c_a = commit(V_A, r_a);
@@ -176,7 +176,7 @@ fn matches_fixture() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -204,7 +204,7 @@ fn alternate_opening() {
     let sigma_a_alt: Field = 0x09;
 
     let c_spend_alt = commit(v_s_alt, r_s_alt);
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let dvk_i = dvk_from_vk_op(vk, OP_I);
     let r_a_alt = derive_allow_r(dvk_i, sigma_a_alt);
     let c_a_alt = commit(v_a_alt, r_a_alt);
@@ -232,7 +232,7 @@ fn alternate_opening() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         c_new.x,
@@ -264,7 +264,7 @@ fn rejects_wrong_sk() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -279,8 +279,8 @@ fn rejects_wrong_sk() {
 }
 
 #[test(should_fail)]
-fn rejects_wrong_wrap() {
-    // V2 binds vk to wrap. A bogus wrap derives a different vk, which
+fn rejects_wrong_addr_f() {
+    // V2 binds vk to addr_f. A bogus addr_f derives a different vk, which
     // propagates to V6 (r'), V7 (C_spend'), and V8 (b_tilde). The earliest
     // assertion that observes the mismatch (C_spend' mismatch) fires.
     main(
@@ -331,7 +331,7 @@ fn rejects_wrong_dvk_op_i() {
         Y_X,
         Y_Y,
         OP_I + 1,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -364,7 +364,7 @@ fn rejects_bad_allowance_opening_value() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -397,7 +397,7 @@ fn rejects_bad_allowance_opening_randomness() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -430,7 +430,7 @@ fn rejects_wrong_sigma_a() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -463,7 +463,7 @@ fn rejects_bad_spend_opening() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -500,7 +500,7 @@ fn rejects_v_s_out_of_range() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -536,7 +536,7 @@ fn rejects_v_a_out_of_range() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -552,7 +552,7 @@ fn rejects_v_a_out_of_range() {
 
 #[test(should_fail)]
 fn rejects_v_sum_overflow() {
-    // SOUNDNESS-CRITICAL: the only line of defense against a wrap that lets
+    // SOUNDNESS-CRITICAL: the only line of defense against a addr_f that lets
     // the owner mint tokens out of nothing on the reclaim path.
     //
     // Witnesses chosen so that the individual range checks on v_s and v_a
@@ -575,7 +575,7 @@ fn rejects_v_sum_overflow() {
     let v_new_overflow: Field = v_s_huge + v_a_one; // 2^127
     let c_spend = commit(v_s_huge, R_S);
     let c_a = commit(v_a_one, R_A);
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(v_new_overflow, r_new);
     let b_tilde = encrypt_balance(v_new_overflow, vk, SIGMA);
@@ -599,7 +599,7 @@ fn rejects_v_sum_overflow() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         c_new.x,
@@ -632,7 +632,7 @@ fn rejects_r_e_zero() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -665,7 +665,7 @@ fn rejects_wrong_r_e() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -698,7 +698,7 @@ fn rejects_off_curve_k_aud_s() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         1,
         2,
         C_SPEND_NEW_X,
@@ -731,7 +731,7 @@ fn rejects_identity_k_aud_s() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         0,
         0,
         C_SPEND_NEW_X,
@@ -764,7 +764,7 @@ fn rejects_tampered_b_tilde() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -797,7 +797,7 @@ fn rejects_tampered_c_spend_new() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X + 1,
@@ -830,7 +830,7 @@ fn rejects_tampered_v_tilde_aud_s() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -864,7 +864,7 @@ fn rejects_tampered_b_tilde_aud_s() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         C_SPEND_NEW_X,
@@ -898,7 +898,7 @@ fn rejects_wrong_k_aud_s() {
         Y_X,
         Y_Y,
         OP_I,
-        WRAP,
+        ADDR_F,
         Y_X,
         Y_Y,
         C_SPEND_NEW_X,

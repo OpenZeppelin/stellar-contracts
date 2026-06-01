@@ -1,4 +1,4 @@
-//! # Confidential Token Wrapper -- Noir Primitives
+//! # Confidential Token -- Noir Primitives
 //!
 //! Shared cryptographic primitives consumed by the six circuits described in
 //! Section 7 of the design document (Register, Withdraw, Transfer, OperatorTransfer,
@@ -92,10 +92,10 @@ global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
 pub mod domain {
     /// Soroban Address compression into a single `F_r` Field:
     /// `address_to_field(a) = Poseidon2(ADDRESS, lo(a), hi(a))`.
-    /// Section 2.7 (`delta_addr`). The wrapper computes `wrap` and `op_i`
+    /// Section 2.7 (`delta_addr`). The contract computes `addr_f` and `op_i`
     /// off-circuit via this tag; circuits consume the resulting Field directly.
     pub global ADDRESS: Field = 1;
-    /// Viewing-key derivation: `vk = Poseidon2(VIEWING_KEY, sk, wrap)`.
+    /// Viewing-key derivation: `vk = Poseidon2(VIEWING_KEY, sk, addr_f)`.
     /// Section 4.2 (`delta_vk`).
     pub global VIEWING_KEY: Field = 2;
     /// Delegation viewing-key derivation:
@@ -178,7 +178,7 @@ pub fn assert_range_128(x: Field) {
 /// Soundness: the verifier doesn't check point validity on its own -- if an
 /// off-curve `(x, y)` reaches `multi_scalar_mul`, the proof still verifies but
 /// the resulting commitment has no binding guarantee. This helper closes that
-/// gap in-circuit, on top of the wrapper contract's own validation. Cost: ~3
+/// gap in-circuit, on top of the contract contract's own validation. Cost: ~3
 /// mul gates per point, negligible vs. one scalar multiplication.
 pub fn assert_on_curve(p: EmbeddedCurvePoint) {
     let inf_as_field = p.is_infinite as Field;
@@ -248,14 +248,14 @@ pub fn poseidon_with_domain<let N: u32>(d: Field, inputs: [Field; N]) -> Field {
 
 // ################## KEY DERIVATION ##################
 
-/// Viewing key. Section 4.2. `vk = Poseidon2(VK, sk, wrap)`.
+/// Viewing key. Section 4.2. `vk = Poseidon2(VK, sk, addr_f)`.
 ///
-/// The `wrap` parameter (the wrapper contract's address as a `Field`) binds the
+/// The `addr_f` parameter (the contract contract's address as a `Field`) binds the
 /// viewing key -- and therefore every proof that constrains `vk` (R2/W2/T2/S2/V2)
-/// -- to a specific deployed wrapper. Dropping `wrap` here would let a proof for
-/// one wrapper verify against another's verifier.
-pub fn vk_from_sk(sk: Field, wrap: Field) -> Field {
-    poseidon_with_domain(domain::VIEWING_KEY, [sk, wrap])
+/// -- to a specific deployed contract. Dropping `addr_f` here would let a proof for
+/// one contract verify against another's verifier.
+pub fn vk_from_sk(sk: Field, addr_f: Field) -> Field {
+    poseidon_with_domain(domain::VIEWING_KEY, [sk, addr_f])
 }
 
 /// Public viewing key `PVK = vk*H`. Section 4.3. The recipient's ECDH long-term key

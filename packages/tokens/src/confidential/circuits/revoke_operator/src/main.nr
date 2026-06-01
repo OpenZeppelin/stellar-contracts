@@ -12,7 +12,7 @@ mod tests;
 // -----------
 // Main block (owner ownership + delegation opening + balance reclaim)
 //   V1  Y          = sk * H                              Owner key ownership.
-//   V2  vk         = Poseidon2(delta_vk, sk, wrap)       Wrapper-bound viewing
+//   V2  vk         = Poseidon2(delta_vk, sk, addr_f)       Contract-bound viewing
 //                                                        key.
 //   V3  dvk_i      = Poseidon2(delta_dvk, vk, op_i)      Delegation viewing
 //                                                        key for this operator.
@@ -29,7 +29,7 @@ mod tests;
 //                                                        sum check is the
 //                                                        soundness-critical
 //                                                        line of defense
-//                                                        against a wrap that
+//                                                        against a addr_f that
 //                                                        would let the owner
 //                                                        mint via field
 //                                                        overflow.
@@ -91,7 +91,7 @@ mod tests;
 //   6    y_y              Y.y
 //   7    op_i             op_i           `address_to_field(operator)`,
 //                                          computed per-call (Section 2.7).
-//   8    wrap             wrap           `env.current_contract_address()`.
+//   8    addr_f             addr_f           `env.current_contract_address()`.
 //   9    k_aud_s_x        K_aud_s.x      Fetched from the auditor contract
 //   10   k_aud_s_y        K_aud_s.y        by owner's `auditor_id`.
 //   11   c_spend_new_x    C_spend'.x     Prover-supplied; written to
@@ -135,7 +135,7 @@ fn main(
     y_x: pub Field,
     y_y: pub Field,
     op_i: pub Field,
-    wrap: pub Field,
+    addr_f: pub Field,
     k_aud_s_x: pub Field,
     k_aud_s_y: pub Field,
     c_spend_new_x: pub Field,
@@ -157,7 +157,7 @@ fn main(
     assert(y_derived.y == y_y);
 
     // V2
-    let vk = vk_from_sk(sk, wrap);
+    let vk = vk_from_sk(sk, addr_f);
 
     // V3
     let dvk_i = dvk_from_vk_op(vk, op_i);

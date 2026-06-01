@@ -140,10 +140,10 @@ fn range_128_rejects_2_pow_128() {
 }
 
 #[test]
-fn vk_wrap_binding() {
+fn vk_addr_f_binding() {
     // vk_from_sk(sk, w1) != vk_from_sk(sk, w2). This is the property that
-    // makes R2/W2/T2/S2/V2 wrapper-bound -- if it ever fails, a proof made
-    // against one wrapper could verify against another.
+    // makes R2/W2/T2/S2/V2 contract-bound -- if it ever fails, a proof made
+    // against one contract could verify against another.
     let sk: Field = 0xdeadbeef;
     let vk_a = vk_from_sk(sk, 0x111);
     let vk_b = vk_from_sk(sk, 0x222);
@@ -154,8 +154,8 @@ fn vk_wrap_binding() {
 fn key_derivation_chain() {
     // sk -> vk -> PVK -> dvk all derive non-trivially and consistently.
     let sk: Field = 12345;
-    let wrap: Field = 0xc0ffee;
-    let vk = vk_from_sk(sk, wrap);
+    let addr_f: Field = 0xc0ffee;
+    let vk = vk_from_sk(sk, addr_f);
     let pvk = pvk_from_vk(vk);
     let y = scalar_mul(sk, H);
     let dvk = dvk_from_vk_op(vk, 0xabcd);
@@ -166,7 +166,7 @@ fn key_derivation_chain() {
     assert(dvk != 0);
 
     // Re-derivation is deterministic.
-    assert(vk == vk_from_sk(sk, wrap));
+    assert(vk == vk_from_sk(sk, addr_f));
     assert(dvk == dvk_from_vk_op(vk, 0xabcd));
 }
 
@@ -298,7 +298,7 @@ fn sponge_squeeze_channel_separation() {
 fn print_fixtures() {
     // Inputs (fixed). Any change here invalidates testdata/*.json.
     let sk: Field = 0xdead;
-    let wrap: Field = 0xbeef;
+    let addr_f: Field = 0xbeef;
     let sigma: Field = 0x01;
     let sigma_a: Field = 0x02;
     let op_i: Field = 0xabcd;
@@ -327,8 +327,8 @@ fn print_fixtures() {
     let e = ecdh(r_e, H);
     println(f"ecdh = {e}");
 
-    // vk_from_sk(sk, wrap)
-    let vk = vk_from_sk(sk, wrap);
+    // vk_from_sk(sk, addr_f)
+    let vk = vk_from_sk(sk, addr_f);
     println(f"vk_from_sk = {vk}");
 
     // pvk_from_vk(vk)
@@ -392,8 +392,8 @@ fn print_fixtures() {
     println(f"sponge_squeeze_2_AUDITOR_RECIPIENT_0 = {ss2_r0}");
     println(f"sponge_squeeze_2_AUDITOR_RECIPIENT_1 = {ss2_r1}");
 
-    // poseidon_with_domain(VK, [sk, wrap]) -- direct funnel access, equals vk_from_sk
-    let pwd = poseidon_with_domain(domain::VIEWING_KEY, [sk, wrap]);
+    // poseidon_with_domain(VK, [sk, addr_f]) -- direct funnel access, equals vk_from_sk
+    let pwd = poseidon_with_domain(domain::VIEWING_KEY, [sk, addr_f]);
     println(f"poseidon_with_domain_VK_2 = {pwd}");
 }
 
@@ -405,7 +405,7 @@ fn print_fixtures() {
 #[test]
 fn fixtures_match_testdata() {
     let sk: Field = 0xdead;
-    let wrap: Field = 0xbeef;
+    let addr_f: Field = 0xbeef;
     let sigma: Field = 0x01;
     let sigma_a: Field = 0x02;
     let op_i: Field = 0xabcd;
@@ -428,7 +428,7 @@ fn fixtures_match_testdata() {
         ecdh(r_e, H) == 0x114ed4fcf2c57014eb678c577aa02f30ef590b713d7a6a5e87702d1c7f71957f,
     );
 
-    let vk = vk_from_sk(sk, wrap);
+    let vk = vk_from_sk(sk, addr_f);
     assert(vk == 0x208fbdb70d2faacf04f987b54f12aeeaeb432acc29d650c86ce0f6275b958eb8);
 
     let pvk = pvk_from_vk(vk);
@@ -493,7 +493,7 @@ fn fixtures_match_testdata() {
     assert(ss2_s[0] == sponge_squeeze_1(domain::AUDITOR_SENDER, s_ecdh, sigma));
 
     // poseidon_with_domain funnel is the same operation that backs vk_from_sk.
-    assert(poseidon_with_domain(domain::VIEWING_KEY, [sk, wrap]) == vk);
+    assert(poseidon_with_domain(domain::VIEWING_KEY, [sk, addr_f]) == vk);
 }
 
 // Sponge fixture outputs -- pinned by `print_fixtures` and mirrored in

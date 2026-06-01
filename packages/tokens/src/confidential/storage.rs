@@ -25,10 +25,8 @@ pub enum ConfidentialTokenStorageKey {
     Verifier,
     /// Confidential auditor contract used for `get_key`. Instance storage.
     Auditor,
-    /// `wrap = address_to_field(env.current_contract_address())` (DESIGN §2.7,
-    /// §3.5), bound into every owner-initiated circuit's `vk` derivation.
-    /// Stored as a canonical 32-byte big-endian `Bn254Fr` representative.
-    /// Instance storage.
+    /// The current contract address as a 32-byte big-endian `Bn254Fr`
+    /// representative. Instance storage.
     AddressAsField,
     /// Per-account `ConfidentialAccount` entry, keyed by the owner address.
     /// Persistent storage.
@@ -91,7 +89,7 @@ pub struct OperatorDelegation {
 // while keeping a single `data: Bytes` wire-format parameter at the trait
 // surface.
 
-/// Payload for [`super::ConfidentialToken::register`].
+/// Payload for [`crate::confidential::ConfidentialToken::register`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegisterPayload {
@@ -100,7 +98,7 @@ pub struct RegisterPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialToken::register`].
+/// [`crate::confidential::ConfidentialToken::register`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegisterData {
@@ -108,7 +106,7 @@ pub struct RegisterData {
     pub proof: Bytes,
 }
 
-/// Payload for [`super::ConfidentialToken::withdraw`].
+/// Payload for [`crate::confidential::ConfidentialToken::withdraw`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WithdrawPayload {
@@ -120,7 +118,7 @@ pub struct WithdrawPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialToken::withdraw`].
+/// [`crate::confidential::ConfidentialToken::withdraw`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WithdrawData {
@@ -128,7 +126,8 @@ pub struct WithdrawData {
     pub proof: Bytes,
 }
 
-/// Payload for [`super::ConfidentialToken::confidential_transfer`].
+/// Payload for
+/// [`crate::confidential::ConfidentialToken::confidential_transfer`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferPayload {
@@ -145,7 +144,7 @@ pub struct TransferPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialToken::confidential_transfer`].
+/// [`crate::confidential::ConfidentialToken::confidential_transfer`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferData {
@@ -154,7 +153,7 @@ pub struct TransferData {
 }
 
 /// Payload for
-/// [`super::ConfidentialToken::confidential_transfer_from`].
+/// [`crate::confidential::ConfidentialToken::confidential_transfer_from`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OperatorTransferPayload {
@@ -171,7 +170,7 @@ pub struct OperatorTransferPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialToken::confidential_transfer_from`].
+/// [`crate::confidential::ConfidentialToken::confidential_transfer_from`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OperatorTransferData {
@@ -179,7 +178,7 @@ pub struct OperatorTransferData {
     pub proof: Bytes,
 }
 
-/// Payload for [`super::ConfidentialToken::set_operator`].
+/// Payload for [`crate::confidential::ConfidentialToken::set_operator`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SetOperatorPayload {
@@ -196,7 +195,7 @@ pub struct SetOperatorPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialToken::set_operator`].
+/// [`crate::confidential::ConfidentialToken::set_operator`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SetOperatorData {
@@ -204,7 +203,7 @@ pub struct SetOperatorData {
     pub proof: Bytes,
 }
 
-/// Payload for [`super::ConfidentialToken::revoke_operator`].
+/// Payload for [`crate::confidential::ConfidentialToken::revoke_operator`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RevokeOperatorPayload {
@@ -217,7 +216,7 @@ pub struct RevokeOperatorPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialToken::revoke_operator`].
+/// [`crate::confidential::ConfidentialToken::revoke_operator`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RevokeOperatorData {
@@ -278,7 +277,7 @@ pub fn get_auditor(e: &Env) -> Address {
         .unwrap_or_else(|| panic_with_error!(e, ConfidentialTokenError::AuditorNotSet))
 }
 
-/// Returns the contract's compressed `wrap` Field, the
+/// Returns the contract's address as a field element, the
 /// `address_to_field(env.current_contract_address())` value computed once at
 /// construction.
 ///
@@ -427,13 +426,13 @@ pub fn register(
 ) {
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let _k_aud = auditor.get_key(&auditor_id);
-    let wrap = get_address_as_field_element(e);
+    let addr_f = get_address_as_field_element(e);
 
-    // PI order (DESIGN §7.2): Y, PVK, wrap.
+    // PI order (DESIGN §7.2): Y, PVK, addr_f.
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &payload.y);
     append_point(&mut pi, &payload.pvk);
-    append_field(&mut pi, &wrap);
+    append_field(&mut pi, &addr_f);
 
     verify(e, CircuitType::Register, &pi, proof);
 
@@ -597,15 +596,15 @@ pub fn withdraw(
     let account = get_account(e, from);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_s = auditor.get_key(&account.auditor_id);
-    let wrap = get_address_as_field_element(e);
+    let addr_f = get_address_as_field_element(e);
 
     // PI order (DESIGN §7.5):
-    //   C_spend, Y, wrap, K_aud_s, a,
+    //   C_spend, Y, addr_f, K_aud_s, a,
     //   C_spend', sigma, b_tilde, R_e, b_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &account.spendable_balance);
     append_point(&mut pi, &account.spending_key);
-    append_field(&mut pi, &wrap);
+    append_field(&mut pi, &addr_f);
     append_point(&mut pi, &k_aud_s);
     append_amount(&mut pi, e, amount);
     append_point(&mut pi, &payload.c_spend_new);
@@ -674,17 +673,17 @@ pub fn confidential_transfer(
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_r = auditor.get_key(&recipient.auditor_id);
     let k_aud_s = auditor.get_key(&sender.auditor_id);
-    let wrap = get_address_as_field_element(e);
+    let addr_f = get_address_as_field_element(e);
 
     // PI order (DESIGN §7.6):
-    //   C_spend_A, Y_A, PVK_B, wrap, K_aud_r, K_aud_s,
+    //   C_spend_A, Y_A, PVK_B, addr_f, K_aud_r, K_aud_s,
     //   C_spend', C_tx, R_e, v_tilde, b_tilde, sigma,
     //   v_aud_r, r_aud_r, v_aud_s, b_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &sender.spendable_balance);
     append_point(&mut pi, &sender.spending_key);
     append_point(&mut pi, &recipient.viewing_public_key);
-    append_field(&mut pi, &wrap);
+    append_field(&mut pi, &addr_f);
     append_point(&mut pi, &k_aud_r);
     append_point(&mut pi, &k_aud_s);
     append_point(&mut pi, &payload.c_spend_new);
@@ -872,11 +871,11 @@ pub fn set_operator(
     let operator_account = get_account(e, operator);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_s = auditor.get_key(&owner.auditor_id);
-    let wrap = get_address_as_field_element(e);
+    let addr_f = get_address_as_field_element(e);
     let op_i = address_to_field(e, operator);
 
     // PI order (DESIGN §7.7):
-    //   C_spend, Y, Y_op, op_i, wrap, K_aud_s,
+    //   C_spend, Y, Y_op, op_i, addr_f, K_aud_s,
     //   C_spend', C_a, escrowed_dvk, b_tilde, a_tilde,
     //   sigma, sigma_a, R_e, v_aud_s, b_aud_s
     let mut pi = Bytes::new(e);
@@ -884,7 +883,7 @@ pub fn set_operator(
     append_point(&mut pi, &owner.spending_key);
     append_point(&mut pi, &operator_account.spending_key);
     append_field(&mut pi, &op_i);
-    append_field(&mut pi, &wrap);
+    append_field(&mut pi, &addr_f);
     append_point(&mut pi, &k_aud_s);
     append_point(&mut pi, &payload.c_spend_new);
     append_point(&mut pi, &payload.c_a);
@@ -969,11 +968,11 @@ pub fn revoke_operator(
     let delegation = get_operator_delegation(e, account, operator);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_s = auditor.get_key(&owner.auditor_id);
-    let wrap = get_address_as_field_element(e);
+    let addr_f = get_address_as_field_element(e);
     let op_i = address_to_field(e, operator);
 
     // PI order (DESIGN §7.9):
-    //   C_spend, C_a, sigma_a, Y, op_i, wrap, K_aud_s,
+    //   C_spend, C_a, sigma_a, Y, op_i, addr_f, K_aud_s,
     //   C_spend', b_tilde, sigma, R_e, v_aud_s, b_aud_s
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &owner.spendable_balance);
@@ -981,7 +980,7 @@ pub fn revoke_operator(
     append_field(&mut pi, &delegation.allowance_salt);
     append_point(&mut pi, &owner.spending_key);
     append_field(&mut pi, &op_i);
-    append_field(&mut pi, &wrap);
+    append_field(&mut pi, &addr_f);
     append_point(&mut pi, &k_aud_s);
     append_point(&mut pi, &payload.c_spend_new);
     append_field(&mut pi, &payload.b_tilde);
@@ -1116,15 +1115,15 @@ pub fn set_auditor(e: &Env, auditor: &Address) {
     emit_auditor_set(e, auditor);
 }
 
-/// Stores the contract's compressed `wrap` Field in instance storage.
+/// Stores the contract's address as a Field element in instance storage.
 ///
-/// `wrap` is the Poseidon2 compression of the contract's own address. It is
+/// The Poseidon2 compression of the contract's own address. It is
 /// bound into every owner-initiated circuit's viewing-key derivation, so it
 /// must be computed once over `env.current_contract_address()` at
 /// construction and never re-derived.
 ///
 /// This function is **single-shot**: it reverts on any call after the first.
-/// Changing `wrap` after construction would invalidate every previously
+/// Changing it after construction would invalidate every previously
 /// registered account, since their `vk` derivations are bound to the
 /// original value. The intended caller is the contract's `__constructor`.
 ///
@@ -1134,7 +1133,7 @@ pub fn set_auditor(e: &Env, auditor: &Address) {
 ///
 /// # Errors
 ///
-/// * [`ConfidentialTokenError::AddressAsFieldAlreadySet`] - When the `wrap`
+/// * [`ConfidentialTokenError::AddressAsFieldAlreadySet`] - When the address
 ///   field has already been set.
 ///
 /// # Events

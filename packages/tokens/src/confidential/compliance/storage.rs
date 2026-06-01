@@ -15,8 +15,9 @@ use crate::confidential::{
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ComplianceConfig {
-    /// Optional external authorization policy (see [`super::Policy`]). `None`
-    /// disables the policy gate.
+    /// Optional external authorization policy (see
+    /// [`crate::confidential::compliance::Policy`]). `None` disables the
+    /// policy gate.
     pub policy: Option<Address>,
     /// When `true`, the gates additionally consult the underlying SAC's
     /// `authorized()` view.

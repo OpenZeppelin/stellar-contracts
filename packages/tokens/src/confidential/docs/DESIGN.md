@@ -24,7 +24,7 @@ This project is composed of the following documents:
 
 Confidential transfers on blockchain require balances and amounts to be hidden from public observers while remaining verifiable by the contract. The standard approach uses additively homomorphic encryption - the contract operates on ciphertexts (adding deposits, subtracting transfers) without learning the underlying values, and zero-knowledge proofs guarantee that operations are valid (sufficient funds, consistent encryption, non-negative balances).
 
-This document defines a standalone Soroban contract that wraps any SEP-41 token to provide confidential balances and transfers. It is not an extension to the fungible token standard; it is a separate contract that holds tokens on behalf of users and manages encrypted state independently. The wrapping approach is chosen over native token integration for three reasons: it works with existing assets, it can evolve independently of the token standard, and it keeps confidentiality complexity separate from the underlying token.
+This document defines a Soroban contracts suite that provides confidential balances and transfers features on top of SEP-41 tokens. It is not an extension to the fungible token standard; it defines a separate contract that holds tokens on behalf of users and manages encrypted state independently. The wrapping approach is chosen over native token integration for three reasons: it works with existing assets, it can evolve independently of the token standard, and it keeps confidentiality complexity separate from the underlying token.
 
 ### 1.2 Design Goals
 
@@ -119,7 +119,7 @@ The system uses **Poseidon2**, the algebraic hash function native to Noir's stan
 
 **Usage in this system:**
 
-- Key derivation: $vk = \text{Poseidon2}(\delta_{\text{vk}}, sk, \text{wrap})$
+- Key derivation: $vk = \text{Poseidon2}(\delta_{\text{vk}}, sk, \text{addr_f})$
 - Randomness derivation: $r = \text{Poseidon2}(\delta_{\text{spend\\\_r}}, vk, \sigma)$
 - Symmetric encryption: $\tilde{v} = v + \text{Poseidon2}(\delta_{\text{tx\\\_amount}}, s, \sigma)$
 - Domain separation: each invocation includes a leading constant $\delta$ to prevent cross-context collisions
@@ -188,7 +188,7 @@ The contract, the SDK, the wallet, and any indexer reproduce the same Field valu
 
 | Site | When computed | Storage |
 |:---|:---|:---|
-| $\text{wrap}$ | Once, by the contract's `__constructor` over `env.current_contract_address()` | Stored as a single Field in the contract's **instance storage** (§3.5); read on every proof verification |
+| $\text{addr_f}$ | Once, by the contract's `__constructor` over `env.current_contract_address()` | Stored as a single Field in the contract's **instance storage** (§3.5); read on every proof verification |
 | $\text{op}_i$ | Per-call, by the contract at `set_operator` and `revoke_operator` over the `operator` argument | Not stored; recomputed each call. The circuit binds it via S5 / V3 |
 
 ---
@@ -236,7 +236,7 @@ i.e., the total committed value across all confidential accounts never exceeds t
 
 ### 3.5 Governance and Upgradeability
 
-The constructor binds the contract to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores $\text{wrap} = \text{address\\\_to\\\_field}(\text{env.current\\\_contract\\\_address}())$ (§2.7) in **instance storage** as a single canonical $\mathbb{F}_r$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2 / V2. The compressed `wrap` Field is computed once at construction (not recomputed per call) to ensure all proofs across the contract's lifetime bind to the same Field representative of the contract's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in operator structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
+The constructor binds the contract to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores $\text{addr_f} = \text{address\\\_to\\\_field}(\text{env.current\\\_contract\\\_address}())$ (§2.7) in **instance storage** as a single canonical $\mathbb{F}_r$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2 / V2. The compressed `addr_f` Field is computed once at construction (not recomputed per call) to ensure all proofs across the contract's lifetime bind to the same Field representative of the contract's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in operator structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
 
 Questions an implementer must answer:
 
@@ -261,15 +261,15 @@ The spending public key is stored on-chain at registration. Knowledge of $sk$ is
 
 ### 4.2 Viewing Key
 
-$$vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$$
+$$vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$$
 
-A scalar in $\mathbb{F}_r$, unique per $(sk, \text{wrap})$ pair. Enables balance decryption without spending authority. Cannot recover $sk$ (Poseidon preimage resistance). Because $\text{wrap}$ is bound into the derivation, proofs that constrain $vk$ (R2, W2, T2, S2, V2) are inherently bound to the contract contract, eliminating the need for explicit per-circuit context binding.
+A scalar in $\mathbb{F}_r$, unique per $(sk, \text{addr_f})$ pair. Enables balance decryption without spending authority. Cannot recover $sk$ (Poseidon preimage resistance). Because $\text{addr_f}$ is bound into the derivation, proofs that constrain $vk$ (R2, W2, T2, S2, V2) are inherently bound to the contract contract, eliminating the need for explicit per-circuit context binding.
 
 ### 4.3 Public Viewing Key
 
 $$\text{PVK} = vk \cdot H$$
 
-A Grumpkin point stored on-chain at registration. Serves as the recipient's ECDH public key for incoming transfers. The registration proof constrains $\text{PVK} = vk \cdot H$ where $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$ and $Y = sk \cdot H$, preventing a user from registering an unrelated $\text{PVK}$.
+A Grumpkin point stored on-chain at registration. Serves as the recipient's ECDH public key for incoming transfers. The registration proof constrains $\text{PVK} = vk \cdot H$ where $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ and $Y = sk \cdot H$, preventing a user from registering an unrelated $\text{PVK}$.
 
 ### 4.4 Delegation Viewing Key
 
@@ -468,7 +468,7 @@ Per-delegation salt for allowance randomness derivation, encoded as `BytesN<32>`
 
 The ledger number at which the delegation expires. The delegation is live while `ledger.sequence() <= live_until_ledger` and expired once `ledger.sequence() > live_until_ledger`. Checked on every `confidential_transfer_from`. The delegation persists in storage until explicitly revoked (if it were in temporary storage automatic cleanup would destroy escrowed funds).
 
-**Single-slot semantics.** The `(owner, operator)` slot holds at most one delegation. `set_operator` (Section 7.7) reverts if a delegation already exists for that pair, regardless of whether the existing delegation is past `live_until_ledger`. Expiry only prevents the operator from spending; the escrowed value persists on-chain until `revoke_operator` (Section 7.9) folds it back into the owner's spendable balance. Re-delegating to the same operator therefore requires the sequence: `revoke_operator` then `set_operator`. This rule is what keeps the balance-conservation invariant (Section 9.3) ranging cleanly over stored delegations: every delegation is either active, expired-pending-revoke, or absent, and the escrowed value is never silently dropped.
+The `(owner, operator)` storage entry holds at most one delegation. `set_operator` (Section 7.7) reverts if a delegation already exists for that pair, regardless of whether the existing delegation is past `live_until_ledger`. Expiry only prevents the operator from spending; the escrowed value persists on-chain until `revoke_operator` (Section 7.9) folds it back into the owner's spendable balance. Re-delegating to the same operator therefore requires the sequence: `revoke_operator` then `set_operator`. This rule is what keeps the balance-conservation invariant (Section 9.3) ranging cleanly over stored delegations: every delegation is either active, expired-pending-revoke, or absent, and the escrowed value is never silently dropped.
 
 ---
 
@@ -491,7 +491,7 @@ An account provides a Grumpkin spending key $Y$, a public viewing key $\text{PVK
 | # | Constraint |
 |:--|:---|
 | R1 | $Y = sk \cdot H$ (spending key well-formed) |
-| R2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$ (viewing key correctly derived, binds proof to contract) |
+| R2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (viewing key correctly derived, binds proof to contract) |
 | R3 | $\text{PVK} = vk \cdot H$ (public viewing key matches $vk$) |
 | R4 | $sk \neq 0$ (rules out $Y = \mathcal{O}$) |
 | R5 | $vk \neq 0$ (rules out $\text{PVK} = \mathcal{O}$, which would collapse every incoming-transfer ECDH) |
@@ -501,7 +501,7 @@ An account provides a Grumpkin spending key $Y$, a public viewing key $\text{PVK
 | Input | Notes |
 |:---|:---|
 | $Y$, $\text{PVK}$ | Prover-supplied; written to `account.spending_key` and `account.viewing_public_key` on success |
-| $\text{wrap}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 
 **Private witnesses:** $sk$.
 
@@ -517,7 +517,7 @@ and adds it to the recipient's receiving balance:
 
 $$C_{\text{receive}} \leftarrow C_{\text{receive}} + C_{\text{dep}}$$
 
-No proof required. The recipient `to` **must** be registered: the receiving-balance update writes into `to`'s `ConfidentialAccount` slot and the contract reverts if no slot exists. The depositor `from` does **not** need a registered confidential account; only the SEP-41 `token.transfer(from, self, a)` authorization is required. The recipient's off-chain state updates: $v_{\text{receive}} \mathrel{+}= a$, $r_{\text{receive}} \mathrel{+}= 0$.
+No proof required. The recipient `to` **must** be registered: the receiving-balance update writes into `to`'s `ConfidentialAccount` storage entry. The depositor `from` does **not** need a registered confidential account; only the SEP-41 `token.transfer(from, self, a)` authorization is required. The recipient's off-chain state updates: $v_{\text{receive}} \mathrel{+}= a$, $r_{\text{receive}} \mathrel{+}= 0$.
 
 ### 7.4 Merge
 
@@ -552,7 +552,7 @@ The owner withdraws a public amount $a$ (typed `i128`) from their spendable bala
 | # | Constraint |
 |:--|:---|
 | W1 | $Y = sk \cdot H$ (owner key ownership) |
-| W2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$ (binds proof to contract) |
+| W2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (binds proof to contract) |
 | W3 | The prover knows the opening $(v, r)$ of $C_{\text{spend}}$: $C_{\text{spend}} = v \cdot G + r \cdot H$ |
 | W4 | $v \in [0, 2^{127})$, $a \in [0, 2^{127})$, $v - a \in [0, 2^{127})$ (range validity, Section 2.6) |
 | W5 | $r' = \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk, \sigma)$ (deterministic randomness for new balance) |
@@ -570,7 +570,7 @@ The owner withdraws a public amount $a$ (typed `i128`) from their spendable bala
 |:---|:---|
 | $C_{\text{spend}}$ | Loaded from `from.spendable_balance` |
 | $Y$ | Loaded from `from.spending_key` |
-| $\text{wrap}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using `from.auditor_id` |
 | $a$ | Public withdrawal amount from invocation inputs |
 | $C_{\text{spend}}'$, $\sigma$, $\tilde{b}$, $R_e$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to `from.spendable_balance`, the rest emitted in event |
@@ -609,7 +609,7 @@ The sender (account $A$, spending key $sk_A$) transfers a hidden amount $v_{\tex
 | # | Constraint |
 |:--|:---|
 | T1 | $Y_A = sk_A \cdot H$ (sender key ownership) |
-| T2 | $vk_A = \text{Poseidon}(\delta_{\text{vk}}, sk_A, \text{wrap})$ (binds proof to contract) |
+| T2 | $vk_A = \text{Poseidon}(\delta_{\text{vk}}, sk_A, \text{addr_f})$ (binds proof to contract) |
 | T3 | Prover knows opening $(v_A, r_A)$ of $C_{\text{spend}}^A$ |
 | T4 | $v_A \in [0, 2^{127})$, $v_{\text{tx}} \in [0, 2^{127})$, $v_A - v_{\text{tx}} \in [0, 2^{127})$ (range validity, Section 2.6) |
 | T5 | $S = r_e \cdot \text{PVK}_B$ (ECDH correctly computed) |
@@ -637,7 +637,7 @@ The sender (account $A$, spending key $sk_A$) transfers a hidden amount $v_{\tex
 | $C_{\text{spend}}^A$ | Loaded from sender's `spendable_balance` |
 | $Y_A$ | Loaded from sender's `spending_key` |
 | $\text{PVK}_B$ | Loaded from recipient's `viewing_public_key`. Recipient must be registered. |
-| $\text{wrap}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,r}}$ | Fetched from the auditor contract using recipient's `auditor_id` |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using sender's `auditor_id` |
 | $C_{\text{spend}}'$, $C_{\text{tx}}$, $R_e$, $\tilde{v}$, $\tilde{b}$, $\sigma$, $\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to sender's `spendable_balance`, $C_{\text{tx}}$ added to recipient's `receiving_balance`, the rest emitted in event |
@@ -660,7 +660,7 @@ The owner locks funds from their spendable balance into a per-operator escrow. T
 | # | Constraint |
 |:--|:---|
 | S1 | $Y = sk \cdot H$ (owner key ownership) |
-| S2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$ (binds proof to contract) |
+| S2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (binds proof to contract) |
 | S3 | Prover knows opening $(v, r)$ of $C_{\text{spend}}$ |
 | S4 | $v \in [0, 2^{127})$, $v_a \in [0, 2^{127})$, $v - v_a \in [0, 2^{127})$ (range validity, Section 2.6) |
 | S5 | $dvk_i = \text{Poseidon}(\delta_{\text{dvk}}, vk, \text{op}_i)$ (delegation key derivation; contract-bound via $vk$) |
@@ -686,7 +686,7 @@ The owner locks funds from their spendable balance into a per-operator escrow. T
 | $Y$ | Loaded from owner's `spending_key` |
 | $Y_{\text{op}}$ | Loaded from operator account's `spending_key`. Operator must be registered. |
 | $\text{op}_i$ | $\text{address\\\_to\\\_field}$(`operator` argument), computed per-call by the contract (§2.7) |
-| $\text{wrap}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using owner's `auditor_id` |
 | $C_{\text{spend}}'$, $C_a$, escrowed\_dvk, $\tilde{b}$, $\tilde{a}$, $\sigma$, $\sigma_a$, $R_e$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to owner's `spendable_balance`, the delegation fields written to storage, the rest emitted in event |
 
@@ -752,7 +752,7 @@ The owner reclaims the remaining escrowed allowance.
 | # | Constraint |
 |:--|:---|
 | V1 | $Y = sk \cdot H$ (owner key ownership) |
-| V2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$ (binds proof to contract) |
+| V2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (binds proof to contract) |
 | V3 | $dvk_i = \text{Poseidon}(\delta_{\text{dvk}}, vk, \text{op}_i)$ |
 | V4 | Prover knows opening $(v_a, r_a)$ of $C_a$, with $r_a = \text{Poseidon}(\delta_{\text{allow\\\_r}}, dvk_i, \sigma_a)$ (allowance randomness matches stored state, mirrors O3) |
 | V5 | Prover knows opening $(v_s, r_s)$ of $C_{\text{spend}}$ |
@@ -775,7 +775,7 @@ The owner reclaims the remaining escrowed allowance.
 | $C_a$, $\sigma_a$ | Loaded from the `(account, operator)` delegation entry |
 | $Y$ | Loaded from owner's `spending_key` |
 | $\text{op}_i$ | $\text{address\\\_to\\\_field}$(`operator` argument), computed per-call by the contract (§2.7) |
-| $\text{wrap}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using owner's `auditor_id` |
 | $C_{\text{spend}}'$, $\tilde{b}$, $\sigma$, $R_e$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to owner's `spendable_balance`, delegation entry deleted, the rest emitted in event |
 
@@ -933,7 +933,7 @@ Incoming transfers modify only $C_{\text{receive}}^A$, which does not appear in 
 
 $$\sum_{j} d_j - \sum_{k} w_k = v_{\text{spend}} + v_{\text{receive}} + \sum_{i} v_{\text{allowance}_i}$$
 
-where $d_j$ are deposits, $w_k$ are withdrawals, and the right-hand side sums committed values across the spendable balance, the receiving balance, and every stored (not-yet-revoked) operator allowance. Expired-but-not-revoked allowances are included: expiration prevents the operator from spending the allowance, but the escrowed value still resides on-chain in $C_a$ until `revoke_operator` reclaims it (Section 6.2, Single-slot semantics).
+where $d_j$ are deposits, $w_k$ are withdrawals, and the right-hand side sums committed values across the spendable balance, the receiving balance, and every stored (not-yet-revoked) operator allowance. Expired-but-not-revoked allowances are included: expiration prevents the operator from spending the allowance, but the escrowed value still resides on-chain in $C_a$ until `revoke_operator` reclaims it (Section 6.2).
 
 This invariant is maintained by:
 - **Deposits** increase $v_{\text{receive}}$ by $d_j$ (Section 7.3).
@@ -1223,7 +1223,7 @@ Soroban `address.require_auth()` proves that the named principal authorized the 
 | `revoke_operator(account, operator, data)` | `account` |
 | `confidential_balance`, `is_operator`, `get_operator` | none (read-only) |
 
-**`register` is single-use.** It reverts if `account` is already registered. Combined with `account.require_auth()`, this prevents a third party from binding attacker-controlled $(Y, \text{PVK})$ to `account`'s `ConfidentialAccount` slot.
+**`register` is single-use.** It reverts if `account` is already registered. Combined with `account.require_auth()`, this prevents a third party from binding attacker-controlled $(Y, \text{PVK})$ to `account`'s `ConfidentialAccount` storage entry.
 
 **`set_operator` rejects replacement.** It reverts if a non-revoked delegation already exists for `(account, operator)` -- see §6.2.
 
@@ -1259,7 +1259,7 @@ Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
 **`is_operator(account, operator) -> bool`.** Returns `true` iff a delegation entry exists for `(account, operator)` **and** `ledger.sequence() <= live_until_ledger`. Returns `false` for:
 
 - pairs with no delegation entry,
-- pairs whose entry has `ledger.sequence() > live_until_ledger` (expired-but-not-yet-revoked: the escrowed value still resides on-chain in $C_a$ until `revoke_operator` reclaims it -- §6.2 *Single-slot semantics* -- but the operator can no longer spend),
+- pairs whose entry has `ledger.sequence() > live_until_ledger` (expired-but-not-yet-revoked: the escrowed value still resides on-chain in $C_a$ until `revoke_operator` reclaims it, but the operator can no longer spend),
 - pairs whose entry was revoked (deleted) by `revoke_operator`.
 
 The function returns the *spending-authority* state, not the *escrow-existence* state. Consumers that need to distinguish "no delegation" from "expired delegation" inspect `get_operator` (below) or replay `SetOperator` / `RevokeOperator` events.

@@ -7,7 +7,7 @@ mod tests;
 // Constraints
 // -----------
 //   R1   Y   = sk * H                          spending key well-formed
-//   R2   vk  = Poseidon2(delta_vk, sk, wrap)   wrapper-bound viewing key
+//   R2   vk  = Poseidon2(delta_vk, sk, addr_f)   contract-bound viewing key
 //   R3   PVK = vk * H                          public viewing key matches vk
 //   R4   sk != 0                               rules out Y = O
 //   R5   vk != 0                               rules out PVK = O (would
@@ -29,8 +29,8 @@ mod tests;
 //   1    y_y    Y.y       to `account.spending_key` on success.
 //   2    pvk_x  PVK.x   Prover-supplied public viewing key. Written
 //   3    pvk_y  PVK.y     to `account.viewing_public_key` on success.
-//   4    wrap   wrap    `env.current_contract_address()` - binds the
-//                         proof to a specific wrapper instance.
+//   4    addr_f   addr_f    `env.current_contract_address()` - binds the
+//                         proof to a specific contract instance.
 //
 // Private witness
 // ---------------
@@ -41,7 +41,7 @@ fn main(
     y_y: pub Field,
     pvk_x: pub Field,
     pvk_y: pub Field,
-    wrap: pub Field,
+    addr_f: pub Field,
 ) {
     // R4
     assert(sk != 0);
@@ -52,7 +52,7 @@ fn main(
     assert(y_derived.y == y_y);
 
     // R2
-    let vk = vk_from_sk(sk, wrap);
+    let vk = vk_from_sk(sk, addr_f);
 
     // R5
     assert(vk != 0);

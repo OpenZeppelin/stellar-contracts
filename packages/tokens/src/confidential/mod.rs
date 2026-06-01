@@ -1,7 +1,7 @@
 //! # Confidential Token
 //!
-//! Core contract that wraps a SEP-41 token to provide confidential balances
-//! and transfers. Balances are stored as Pedersen commitments on the Grumpkin
+//! Core token contract that provides confidential balances and transfers for
+//! SEP-41 assets. Balances are stored as Pedersen commitments on the Grumpkin
 //! curve; every state-changing operation that consumes private state is
 //! accompanied by an UltraHonk proof that the contract verifies via a separate
 //! verifier contract. Auditor keys are read from a separate registry contract
@@ -41,7 +41,7 @@
 //!
 //! ## Contract Binding
 //!
-//! Every owner-initiated proof references a `wrap` field, computed once at
+//! Every owner-initiated proof references a `addr_f` field, computed once at
 //! construction as `Poseidon2(δ_addr, lo, hi)` over the contract's own
 //! address (DESIGN §2.7, §3.5) and stored in instance storage.
 //!
@@ -530,10 +530,10 @@ pub enum ConfidentialTokenError {
     /// Indicates the contract has not been constructed: the auditor
     /// registry address is missing.
     AuditorNotSet = 3510,
-    /// Indicates the contract has not been constructed: the `wrap` field is
+    /// Indicates the contract has not been constructed: the `addr_f` field is
     /// missing.
     AddressAsFieldNotSet = 3511,
-    /// Indicates the `wrap` field has already been set; re-initialization is
+    /// Indicates the `addr_f` field has already been set; re-initialization is
     /// forbidden.
     AddressAsFieldAlreadySet = 3512,
     /// Indicates the SEP-41 token address has already been set;
@@ -855,7 +855,7 @@ pub fn emit_auditor_set(e: &Env, auditor: &Address) {
     AuditorSet { auditor: auditor.clone() }.publish(e);
 }
 
-/// Event emitted when the contract's compressed `wrap` field is computed and
+/// Event emitted when the contract's compressed `addr_f` field is computed and
 /// stored. Expected to fire exactly once, from the contract's constructor.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
