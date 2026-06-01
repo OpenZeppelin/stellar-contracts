@@ -11,7 +11,7 @@ use crate::confidential::wrapper::{
 // ################## TYPES ##################
 
 /// Compliance configuration written once at construction and rotatable under
-/// admin auth thereafter. Stored as a single instance-storage slot.
+/// admin auth thereafter. Stored as an instance storage entry.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ComplianceConfig {

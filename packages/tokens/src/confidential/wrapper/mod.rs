@@ -60,21 +60,14 @@
 //! credit a higher amount than was actually received, or pay out less than
 //! was debited.
 //!
-//! Supported token implementations:
+//! Tokens that are SEP-41 compliant are supported, for example:
 //!
-//! - the Stellar Asset Contract (SAC), and
-//! - OpenZeppelin's [`fungible`](crate::fungible) token (which preserves SEP-41
-//!   exact-transfer semantics).
+//! - the Stellar Asset Contract (SAC), or
+//! - OpenZeppelin's [`fungible`](crate::fungible) token.
 //!
 //! Deploying the wrapper over any other token implementation is the
 //! deployer's responsibility — verify that `transfer` does not skim a fee
 //! or otherwise diverge from exact-transfer semantics before doing so.
-//!
-//! ## Storage
-//!
-//! Singleton configuration (`token`, `verifier`, `auditor`, `wrap`) lives in
-//! instance storage. Per-account state lives in persistent storage; reads
-//! extend TTL, writes do not (CLAUDE.md storage convention).
 
 pub mod compliance;
 pub mod storage;
@@ -241,7 +234,7 @@ pub trait ConfidentialTokenWrapper {
     }
 
     /// Folds `account.receiving_balance` into `account.spendable_balance`
-    /// and resets the receiving slot to the identity.
+    /// and resets the receiving storage entry to the identity.
     ///
     /// No proof is required; correctness follows from the homomorphic
     /// property of Pedersen commitments. Only the account holder can
@@ -373,9 +366,9 @@ pub trait ConfidentialTokenWrapper {
         );
     }
 
-    /// Escrows an allowance from `account`'s spendable balance into a
-    /// `(account, operator)` delegation slot. Reverts if a delegation already
-    /// exists for the pair (single-slot semantics).
+    /// Escrows an allowance from `account`'s spendable balance and delegates it
+    /// to `operator`. Reverts if a delegation already exists for the `(account,
+    /// operator)` pair.
     ///
     /// # Arguments
     ///
@@ -426,9 +419,8 @@ pub trait ConfidentialTokenWrapper {
     }
 
     /// Revokes the `(account, operator)` delegation and folds the
-    /// remaining escrowed allowance back into `account`'s spendable balance
-    ///. Works for both active and expired-but-not-revoked
-    /// delegations.
+    /// remaining escrowed allowance back into `account`'s spendable balance.
+    /// Works for both active and expired-but-not-revoked delegations.
     ///
     /// # Arguments
     ///
@@ -487,8 +479,7 @@ pub trait ConfidentialTokenWrapper {
     }
 
     /// Returns the [`OperatorDelegation`] stored under `(account,
-    /// operator)`. Does not apply the expiry filter; callers that need
-    /// spending-authority state should call [`Self::is_operator`].
+    /// operator)`.
     ///
     /// # Arguments
     ///
@@ -516,8 +507,7 @@ pub enum WrapperError {
     AccountNotRegistered = 3501,
     /// Indicates a public amount argument is negative.
     NegativeAmount = 3502,
-    /// Indicates a delegation already exists for `(account, operator)`
-    ///.
+    /// Indicates a delegation already exists for `(account, operator)`.
     DelegationAlreadyExists = 3503,
     /// Indicates no delegation exists for `(account, operator)`.
     DelegationNotFound = 3504,

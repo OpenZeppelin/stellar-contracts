@@ -630,7 +630,7 @@ fn is_operator_returns_false_for_missing_and_expired() {
     h.e.ledger().set_sequence_number(100);
     assert!(!h.wrapper.is_operator(&alice, &operator));
 
-    // But the entry still exists (single-slot semantics, DESIGN §6.2).
+    // But the entry still exists (DESIGN §6.2).
     let _ = h.wrapper.get_operator(&alice, &operator);
 }
 
@@ -639,7 +639,7 @@ fn is_operator_returns_false_for_missing_and_expired() {
 #[test]
 #[should_panic(expected = "Error(Contract, #3513)")]
 fn set_token_twice_panics() {
-    // `__constructor` already populated the slot; calling `set_token` again
+    // `__constructor` already populated the entry; calling `set_token` again
     // must trip `TokenAlreadySet`.
     let h = setup();
     let other_token = Address::generate(&h.e);
@@ -651,7 +651,7 @@ fn set_token_twice_panics() {
 #[test]
 #[should_panic(expected = "Error(Contract, #3512)")]
 fn set_wrap_twice_panics() {
-    // `__constructor` already populated the slot; calling `set_wrap` again
+    // `__constructor` already populated the entry; calling `set_wrap` again
     // must trip `WrapAlreadySet`.
     let h = setup();
     h.e.as_contract(&h.wrapper_addr, || {

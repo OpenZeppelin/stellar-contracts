@@ -31,10 +31,10 @@ pub enum WrapperStorageKey {
     /// Stored as a canonical 32-byte big-endian `Bn254Fr` representative.
     /// Instance storage.
     Wrap,
-    /// Per-account `ConfidentialAccount` slot, keyed by the owner address.
+    /// Per-account `ConfidentialAccount` entry, keyed by the owner address.
     /// Persistent storage.
     Account(Address),
-    /// Per-`(owner, operator)` `OperatorDelegation` slot. Persistent storage.
+    /// Per-`(owner, operator)` `OperatorDelegation` entry. Persistent storage.
     /// Persists until explicitly revoked even when `expiration_ledger` has
     /// passed.
     Delegation(Address, Address),
@@ -298,8 +298,6 @@ pub fn get_wrap(e: &Env) -> BytesN<32> {
 
 /// Returns the [`ConfidentialAccount`] stored under `account`.
 ///
-/// Extends the entry's persistent TTL on a hit.
-///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
@@ -315,10 +313,6 @@ pub fn get_account(e: &Env, account: &Address) -> ConfidentialAccount {
 }
 
 /// Returns the [`OperatorDelegation`] stored under `(owner, operator)`.
-///
-/// Extends the entry's persistent TTL on a hit. Does not apply the expiry
-/// filter; callers that want the spending-authority view should use
-/// [`is_operator`] instead.
 ///
 /// # Arguments
 ///
@@ -342,7 +336,7 @@ pub fn get_delegation(e: &Env, owner: &Address, operator: &Address) -> OperatorD
 /// current ledger sequence does not exceed its `expiration_ledger`.
 ///
 /// Returns `false` for missing entries and for expired-but-not-revoked
-/// entries. Extends the entry's persistent TTL on a hit.
+/// entries.
 ///
 /// # Arguments
 ///
@@ -369,7 +363,7 @@ pub fn account_exists(e: &Env, account: &Address) -> bool {
     e.storage().persistent().has(&WrapperStorageKey::Account(account.clone()))
 }
 
-/// Returns whether a delegation slot is occupied for `(owner, operator)`,
+/// Returns whether a delegation entry exists for `(owner, operator)`,
 /// without applying the expiry filter.
 ///
 /// # Arguments
@@ -384,10 +378,6 @@ pub fn delegation_exists(e: &Env, owner: &Address, operator: &Address) -> bool {
 // ################## CHANGE STATE ##################
 
 /// Registers a confidential account under `account`.
-///
-/// Fetches the auditor key, verifies the proof, persists the new account
-/// slot, and emits a `Register` event. Does NOT call `require_auth` — the
-/// caller (typically the trait entry point) is responsible.
 ///
 /// # Arguments
 ///
@@ -506,7 +496,7 @@ pub fn deposit_no_auth(e: &Env, from: &Address, to: &Address, amount: i128) {
 }
 
 /// Folds `account.receiving_balance` into `account.spendable_balance` and
-/// resets the receiving slot to the identity.
+/// resets the receiving storage entry to the identity.
 ///
 /// # Arguments
 ///
@@ -816,9 +806,9 @@ pub fn confidential_transfer_from_no_auth(
     );
 }
 
-/// Escrows an allowance from `account`'s spendable balance into a
-/// `(account, operator)` delegation slot. Reverts if a
-/// delegation already exists for the pair (single-slot semantics).
+/// Escrows an allowance from `account`'s spendable balance and delegates it
+/// to `operator`. Reverts if a delegation already exists for the `(account,
+/// operator)` pair.
 ///
 /// # Arguments
 ///
@@ -835,8 +825,8 @@ pub fn confidential_transfer_from_no_auth(
 ///
 /// * [`WrapperError::AccountNotRegistered`] - When `account` or `operator` is
 ///   not registered.
-/// * [`WrapperError::DelegationAlreadyExists`] - When the `(account, operator)`
-///   slot is already occupied.
+/// * [`WrapperError::DelegationAlreadyExists`] - When a delegation already
+///   exists for the `(account, operator)` pair.
 /// * [`WrapperError::InvalidProof`] - When the proof fails verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
 ///   errors.
@@ -1210,8 +1200,8 @@ fn add_to_receiving(e: &Env, account: &Address, c_tx: &Point) {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::DelegationAlreadyExists`] - When the `(owner, operator)`
-///   slot is already occupied.
+/// * [`WrapperError::DelegationAlreadyExists`] - When a delegation already
+///   exists for the `(owner, operator)` pair.
 fn set_delegation(e: &Env, owner: &Address, operator: &Address, delegation: &OperatorDelegation) {
     let key = WrapperStorageKey::Delegation(owner.clone(), operator.clone());
     if e.storage().persistent().has(&key) {

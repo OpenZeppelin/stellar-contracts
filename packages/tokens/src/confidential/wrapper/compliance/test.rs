@@ -373,14 +373,14 @@ fn on_revoke_operator_panics_when_operator_frozen() {
 
 #[test]
 fn on_register_skips_freeze_check() {
-    // Even if a registration slot doesn't exist yet, the user can be
+    // Even if a registration entry doesn't exist yet, the user can be
     // "pre-frozen" — on_register intentionally skips the freeze branch.
     let h = setup();
     let alice = Address::generate(&h.e);
     h.e.as_contract(&h.host, || {
         set_compliance_config_no_auth(&h.e, &base_config());
         freeze_no_auth(&h.e, &alice);
-        // No panic: register predates the account slot, so the freeze
+        // No panic: register predates the account entry, so the freeze
         // gate is intentionally skipped.
         ComplianceHooks::on_register(&h.e, &alice, void_val(&h.e));
     });
