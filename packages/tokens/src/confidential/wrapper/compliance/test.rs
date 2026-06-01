@@ -277,8 +277,7 @@ fn on_transfer_panics_when_recipient_frozen() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3601)")]
-fn on_operator_transfer_panics_when_operator_frozen() {
+fn on_operator_transfer_when_operator_frozen() {
     let h = setup();
     let alice = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
@@ -330,8 +329,7 @@ fn on_set_operator_panics_when_account_frozen() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3601)")]
-fn on_set_operator_panics_when_operator_frozen() {
+fn on_set_operator_when_operator_frozen() {
     let h = setup();
     let alice = Address::generate(&h.e);
     let op = Address::generate(&h.e);
@@ -356,8 +354,7 @@ fn on_revoke_operator_panics_when_account_frozen() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #3601)")]
-fn on_revoke_operator_panics_when_operator_frozen() {
+fn on_revoke_operator_when_operator_frozen() {
     let h = setup();
     let alice = Address::generate(&h.e);
     let op = Address::generate(&h.e);

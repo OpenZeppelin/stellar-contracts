@@ -168,7 +168,8 @@ pub trait ConfidentialCompliance: ConfidentialTokenWrapper {
 /// Each callback follows the same three-stage sequence when a configuration
 /// is present:
 ///
-/// 1. Reverts [`ComplianceError::AccountFrozen`] if the address is frozen.
+/// 1. Reverts [`ComplianceError::AccountFrozen`] if the address is frozen (with
+///    the exception for `operator`).
 /// 2. When `config.policy = Some(p)`, calls `p.is_authorized` and reverts
 ///    [`ComplianceError::NotAuthorizedByPolicy`] on `false`.
 /// 3. When `config.sac_passthrough = true`, calls the underlying SEP-41 token's
@@ -228,7 +229,7 @@ impl Hooks for ComplianceHooks {
 
     fn on_operator_transfer(
         e: &Env,
-        operator: &Address,
+        _operator: &Address,
         from: &Address,
         to: &Address,
         _payload: Val,
@@ -236,7 +237,8 @@ impl Hooks for ComplianceHooks {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
-        storage::gate_account(e, operator, &config);
+        // Gate `from` and `to` only, consistent with the fungible and rwa allowance
+        // models.
         storage::gate_account(e, from, &config);
         storage::gate_account(e, to, &config);
     }
@@ -244,7 +246,7 @@ impl Hooks for ComplianceHooks {
     fn on_set_operator(
         e: &Env,
         account: &Address,
-        operator: &Address,
+        _operator: &Address,
         _live_until_ledger: u32,
         _payload: Val,
     ) {
@@ -252,15 +254,13 @@ impl Hooks for ComplianceHooks {
             return;
         };
         storage::gate_account(e, account, &config);
-        storage::gate_account(e, operator, &config);
     }
 
-    fn on_revoke_operator(e: &Env, account: &Address, operator: &Address, _payload: Val) {
+    fn on_revoke_operator(e: &Env, account: &Address, _operator: &Address, _payload: Val) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };
         storage::gate_account(e, account, &config);
-        storage::gate_account(e, operator, &config);
     }
 }
 
