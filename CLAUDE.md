@@ -72,6 +72,13 @@ For the full checklist see `.claude/skills/code-quality.md`.
       Default::default()
   }
   ```
+
+  or, if we are not going to use the value:
+  ```rust
+  if e.storage().persistent().has(&key) {
+      e.storage().persistent().extend_ttl(&key, FOO_TTL_THRESHOLD, FOO_EXTEND_AMOUNT);
+  }
+  ```
   Argument order is always `(&key, TTL_THRESHOLD, EXTEND_AMOUNT)`.
 - `instance` TTL is the **contract developer's** responsibility, not the
   library's. Libraries expose `INSTANCE_TTL_THRESHOLD` and

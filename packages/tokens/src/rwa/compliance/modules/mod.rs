@@ -268,10 +268,6 @@ pub trait ComplianceModule {
 
 // ################## ERRORS ##################
 
-/// Error codes shared by all compliance modules.
-///
-/// Compliance module errors occupy the 390–398 range, following the RWA
-/// error numbering convention.
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]

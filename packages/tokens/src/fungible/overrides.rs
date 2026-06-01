@@ -106,7 +106,7 @@ impl ContractOverrides for Base {}
 ///
 /// Trait for overriding `burn` and `burn_from` functions.
 /// The behavior of `burn` and `burn_from` changes across implementations,
-/// i.e. enumerable, consecutive, hence the need for an abstraction
+/// i.e. blocklist, allowlist, hence the need for an abstraction
 pub trait BurnableOverrides {
     fn burn(e: &Env, from: &Address, amount: i128) {
         Base::burn(e, from, amount);
