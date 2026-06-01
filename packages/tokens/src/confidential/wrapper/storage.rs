@@ -360,7 +360,7 @@ pub fn is_operator(e: &Env, owner: &Address, operator: &Address) -> bool {
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The owner address.
 pub fn account_exists(e: &Env, account: &Address) -> bool {
-    e.storage().persistent().has(&WrapperStorageKey::Account(account.clone()))
+    get_persistent_entry::<ConfidentialAccount>(e, &WrapperStorageKey::Account(account.clone())).is_some()
 }
 
 /// Returns whether a delegation entry exists for `(owner, operator)`,
@@ -372,7 +372,8 @@ pub fn account_exists(e: &Env, account: &Address) -> bool {
 /// * `owner` - The delegating account.
 /// * `operator` - The delegated operator.
 pub fn delegation_exists(e: &Env, owner: &Address, operator: &Address) -> bool {
-    e.storage().persistent().has(&WrapperStorageKey::Delegation(owner.clone(), operator.clone()))
+    get_persistent_entry::<OperatorDelegation>(e, &WrapperStorageKey::Delegation(owner.clone(), operator.clone()))
+        .is_some()
 }
 
 // ################## CHANGE STATE ##################
