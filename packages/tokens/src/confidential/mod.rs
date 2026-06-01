@@ -6,7 +6,7 @@
 //! accompanied by an UltraHonk proof that the contract verifies via a separate
 //! verifier contract. Auditor keys are read from a separate registry contract
 //! and dual auditor ciphertexts are emitted in each transfer event. See
-//! [`docs/DESIGN.github.md`] for the full specification.
+//! [`docs/DESIGN.md`] for the full specification.
 //!
 //! # ⚠️ Not Production Ready
 //!

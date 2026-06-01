@@ -3,7 +3,7 @@
 //! Deployer-configurable controls layered on top of the
 //! [`ConfidentialToken`]: per-account freezing,
 //! SAC `authorized()` passthrough, and a pluggable external
-//! authorization policy. See [`docs/COMPLIANCE.github.md`] for the
+//! authorization policy. See [`docs/COMPLIANCE.md`] for the
 //! specification.
 //!
 //! ## Surface
@@ -182,7 +182,7 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 ///
 /// Deployments that need additional behaviour (audit mirroring, rate
 /// limiting, or alternative deposit semantics — see
-/// [`docs/COMPLIANCE.github.md`] §4) can write a custom `Hooks` impl that
+/// [`docs/COMPLIANCE.md`] §4) can write a custom `Hooks` impl that
 /// calls the same primitives.
 pub struct ComplianceHooks;
 
