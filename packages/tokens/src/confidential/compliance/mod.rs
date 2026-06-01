@@ -1,7 +1,7 @@
-//! # Confidential Wrapper Compliance Extension
+//! # Confidential Token Compliance Extension
 //!
 //! Deployer-configurable controls layered on top of the
-//! [`ConfidentialTokenWrapper`]: per-account freezing,
+//! [`ConfidentialToken`]: per-account freezing,
 //! SAC `authorized()` passthrough, and a pluggable external
 //! authorization policy. See [`docs/COMPLIANCE.github.md`] for the
 //! specification.
@@ -9,9 +9,8 @@
 //! ## Surface
 //!
 //! 1. [`ComplianceHooks`] — a turnkey [`Hooks`] implementation that gates every
-//!    wrapper entry point against the active configuration. Wire as `type Hooks
-//!    = ComplianceHooks;` on a contract that implements
-//!    [`ConfidentialTokenWrapper`].
+//!    token entry point against the active configuration. Wire as `type Hooks =
+//!    ComplianceHooks;` on a contract that implements [`ConfidentialToken`].
 //! 2. [`ConfidentialCompliance`] — the admin-facing trait.
 //! 3. [`Policy`] — the cross-contract interface for an external allowlist /
 //!    denylist / KYC / sanctions registry.
@@ -29,26 +28,26 @@ mod test;
 use soroban_sdk::{contractclient, contracterror, contractevent, contracttrait, Address, Env, Val};
 pub use storage::{ComplianceConfig, ComplianceStorageKey};
 
-use crate::confidential::wrapper::{ConfidentialTokenWrapper, Hooks};
+use crate::confidential::{ConfidentialToken, Hooks};
 
 // ################## POLICY ##################
 
 /// External authorization policy interface. Contracts implementing this
 /// trait become pluggable allowlist / denylist / KYC / sanctions registries.
 ///
-/// The wrapper passes its own address as `wrapper` so a single registry can
-/// serve multiple wrappers and apply per-wrapper rules where needed.
+/// The token contract passes its own address as `token` so a single registry
+/// can serve multiple tokens and apply per-token rules where needed.
 #[contractclient(name = "PolicyClient")]
 pub trait Policy {
     /// Returns `true` iff `account` is authorized to interact with
-    /// `wrapper`.
-    fn is_authorized(e: Env, account: Address, wrapper: Address) -> bool;
+    /// `token`.
+    fn is_authorized(e: Env, account: Address, token: Address) -> bool;
 }
 
 // ################## COMPLIANCE TRAIT ##################
 
 /// Admin-facing compliance interface layered on top of
-/// [`ConfidentialTokenWrapper`]. Exposes freeze/unfreeze, configuration
+/// [`ConfidentialToken`]. Exposes freeze/unfreeze, configuration
 /// rotation, and the matching read accessors.
 ///
 /// ## Why the write methods have no default body
@@ -64,7 +63,7 @@ pub trait Policy {
 ///    the documented caller).
 /// 2. Delegates to the matching helper in [`storage`].
 #[contracttrait]
-pub trait ConfidentialCompliance: ConfidentialTokenWrapper {
+pub trait ConfidentialCompliance: ConfidentialToken {
     /// Marks `account` as frozen.
     ///
     /// # Arguments
@@ -161,9 +160,9 @@ pub trait ConfidentialCompliance: ConfidentialTokenWrapper {
 
 // ################## HOOKS IMPL ##################
 
-/// [`Hooks`] implementation that gates every wrapper callback against
+/// [`Hooks`] implementation that gates every token callback against
 /// the active [`ComplianceConfig`]. Wire as `type Hooks = ComplianceHooks;`
-/// on a contract that implements [`ConfidentialTokenWrapper`].
+/// on a contract that implements [`ConfidentialToken`].
 ///
 /// Each callback follows the same three-stage sequence when a configuration
 /// is present:

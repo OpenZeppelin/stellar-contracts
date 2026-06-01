@@ -10,41 +10,39 @@ use soroban_sdk::{
 use stellar_event_assertion::EventAssertion;
 
 use crate::confidential::{
-    verifier::CircuitType,
-    wrapper::{
-        compliance::{
-            storage::{compliance_config, freeze, is_frozen, set_compliance_config, unfreeze},
-            ComplianceConfig, ComplianceHooks, ConfidentialCompliance,
-            ConfidentialComplianceClient, Policy,
-        },
-        storage::{set_auditor, set_token, set_verifier, set_wrap},
-        ConfidentialAccount, ConfidentialTokenWrapper, ConfidentialTokenWrapperClient, Hooks,
-        OperatorDelegation, RegisterData, RegisterPayload,
+    compliance::{
+        storage::{compliance_config, freeze, is_frozen, set_compliance_config, unfreeze},
+        ComplianceConfig, ComplianceHooks, ConfidentialCompliance, ConfidentialComplianceClient,
+        Policy,
     },
+    storage::{set_address_as_field_element, set_auditor, set_underlying_asset, set_verifier},
+    verifier::CircuitType,
+    ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, Hooks, OperatorDelegation,
+    RegisterData, RegisterPayload,
 };
 
 // ################## MOCK CONTRACTS ##################
 
 #[contract]
-struct WrapperHost;
+struct TokenHost;
 
 #[contractimpl]
-impl WrapperHost {
+impl TokenHost {
     pub fn __constructor(e: &Env, token: Address, verifier: Address, auditor: Address) {
-        set_token(e, &token);
+        set_underlying_asset(e, &token);
         set_verifier(e, &verifier);
         set_auditor(e, &auditor);
-        set_wrap(e);
+        set_address_as_field_element(e);
     }
 }
 
 #[contractimpl(contracttrait)]
-impl ConfidentialTokenWrapper for WrapperHost {
+impl ConfidentialToken for TokenHost {
     type Hooks = ComplianceHooks;
 }
 
 #[contractimpl(contracttrait)]
-impl ConfidentialCompliance for WrapperHost {
+impl ConfidentialCompliance for TokenHost {
     fn freeze(e: &Env, account: Address, admin: Address) {
         admin.require_auth();
         freeze(e, &account);
@@ -66,7 +64,7 @@ struct AllowPolicy;
 
 #[contractimpl]
 impl Policy for AllowPolicy {
-    fn is_authorized(_e: Env, _account: Address, _wrapper: Address) -> bool {
+    fn is_authorized(_e: Env, _account: Address, _token: Address) -> bool {
         true
     }
 }
@@ -76,7 +74,7 @@ struct DenyPolicy;
 
 #[contractimpl]
 impl Policy for DenyPolicy {
-    fn is_authorized(_e: Env, _account: Address, _wrapper: Address) -> bool {
+    fn is_authorized(_e: Env, _account: Address, _token: Address) -> bool {
         false
     }
 }
@@ -93,7 +91,7 @@ impl DenyOnePolicy {
 
 #[contractimpl]
 impl Policy for DenyOnePolicy {
-    fn is_authorized(e: Env, account: Address, _wrapper: Address) -> bool {
+    fn is_authorized(e: Env, account: Address, _token: Address) -> bool {
         let blocked: Address = e.storage().instance().get(&0u32).unwrap();
         account != blocked
     }
@@ -164,7 +162,7 @@ fn setup<'a>() -> Harness<'a> {
 
     let verifier = e.register(MockVerifier, ());
     let auditor = e.register(MockAuditor, ());
-    let host = e.register(WrapperHost, (sac_addr.clone(), verifier, auditor));
+    let host = e.register(TokenHost, (sac_addr.clone(), verifier, auditor));
     let admin = Address::generate(&e);
 
     Harness { e, host, sac_addr, sac: sac_client, admin }
@@ -448,7 +446,7 @@ fn panics_when_sac_unauthorized() {
 #[test]
 fn sac_passthrough_disabled_skips_sac_call() {
     // With `sac_passthrough=false`, an unauthorized SAC account passes the
-    // wrapper-level check.
+    // token-level check.
     let h = setup();
     let alice = Address::generate(&h.e);
     h.sac.set_authorized(&alice, &false);
@@ -579,8 +577,8 @@ fn trait_is_frozen_returns_false_without_config() {
 #[test]
 #[should_panic(expected = "Error(Contract, #3601)")]
 fn compliance_hooks_blocks_deposit_to_frozen_recipient() {
-    // Wires ComplianceHooks via WrapperHost::type Hooks; calling deposit
-    // through the wrapper client routes the on_deposit callback to the
+    // Wires ComplianceHooks via TokenHost::type Hooks; calling deposit
+    // through the token client routes the on_deposit callback to the
     // hooks impl, which reverts AccountFrozen on the frozen recipient.
     let h = setup();
     let alice = Address::generate(&h.e);
@@ -592,8 +590,8 @@ fn compliance_hooks_blocks_deposit_to_frozen_recipient() {
     admin_client.freeze(&alice, &h.admin);
 
     h.sac.mint(&depositor, &100);
-    let wrapper = ConfidentialTokenWrapperClient::new(&h.e, &h.host);
-    wrapper.deposit(&depositor, &alice, &50);
+    let token = ConfidentialTokenClient::new(&h.e, &h.host);
+    token.deposit(&depositor, &alice, &50);
 }
 
 #[test]
@@ -607,8 +605,8 @@ fn compliance_hooks_allows_deposit_without_config() {
     h.e.as_contract(&h.host, || register_minimal_account(&h.e, &alice));
     h.sac.mint(&depositor, &100);
 
-    let wrapper = ConfidentialTokenWrapperClient::new(&h.e, &h.host);
-    wrapper.deposit(&depositor, &alice, &50);
+    let token = ConfidentialTokenClient::new(&h.e, &h.host);
+    token.deposit(&depositor, &alice, &50);
 }
 
 #[test]
@@ -626,9 +624,9 @@ fn compliance_hooks_blocks_register_via_policy() {
         &h.admin,
     );
 
-    // Trigger on_register via the wrapper client; expect
+    // Trigger on_register via the token client; expect
     // NotAuthorizedByPolicy (#3602).
-    let wrapper = ConfidentialTokenWrapperClient::new(&h.e, &h.host);
+    let token = ConfidentialTokenClient::new(&h.e, &h.host);
     let register_data = RegisterData {
         payload: RegisterPayload {
             y: BytesN::from_array(&h.e, &[0u8; 64]),
@@ -637,19 +635,19 @@ fn compliance_hooks_blocks_register_via_policy() {
         proof: Bytes::new(&h.e),
     }
     .to_xdr(&h.e);
-    wrapper.register(&alice, &1u32, &register_data);
+    token.register(&alice, &1u32, &register_data);
 }
 
 #[test]
-fn storage_keys_isolated_from_wrapper_keys() {
+fn storage_keys_isolated_from_token_keys() {
     // ComplianceStorageKey discriminants do not collide with
-    // WrapperStorageKey ones: writing the compliance config does not
-    // disturb the wrapper's stored token address.
+    // ConfidentialTokenStorageKey ones: writing the compliance config does not
+    // disturb the token's stored SAC address.
     let h = setup();
     h.e.as_contract(&h.host, || {
-        let before = crate::confidential::wrapper::storage::get_token(&h.e);
+        let before = crate::confidential::storage::get_underlying_asset(&h.e);
         set_compliance_config(&h.e, &base_config());
-        let after = crate::confidential::wrapper::storage::get_token(&h.e);
+        let after = crate::confidential::storage::get_underlying_asset(&h.e);
         assert_eq!(before, after);
         assert_eq!(after, h.sac_addr);
     });
@@ -662,7 +660,7 @@ fn register_minimal_account(e: &Env, account: &Address) {
     // `account_exists` to return true for selected addresses.
     use stellar_contract_utils::crypto::grumpkin::Grumpkin;
 
-    use crate::confidential::wrapper::{ConfidentialAccount, WrapperStorageKey};
+    use crate::confidential::{ConfidentialAccount, ConfidentialTokenStorageKey};
     let identity = Grumpkin::identity(e);
     let acc = ConfidentialAccount {
         spending_key: identity.clone(),
@@ -671,5 +669,5 @@ fn register_minimal_account(e: &Env, account: &Address) {
         receiving_balance: identity,
         auditor_id: 0,
     };
-    e.storage().persistent().set(&WrapperStorageKey::Account(account.clone()), &acc);
+    e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &acc);
 }

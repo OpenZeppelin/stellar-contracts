@@ -7,20 +7,19 @@ use stellar_contract_utils::crypto::grumpkin::{Grumpkin, Point};
 
 use crate::confidential::{
     auditor::ConfidentialAuditorClient,
+    emit_address_as_field_set, emit_auditor_set, emit_deposit, emit_merge, emit_operator_transfer,
+    emit_register, emit_revoke_operator, emit_set_operator, emit_transfer,
+    emit_underlying_asset_set, emit_verifier_set, emit_withdraw,
     verifier::{CircuitType, ConfidentialVerifierClient},
-    wrapper::{
-        emit_auditor_set, emit_deposit, emit_merge, emit_operator_transfer, emit_register,
-        emit_revoke_operator, emit_set_operator, emit_token_set, emit_transfer, emit_verifier_set,
-        emit_withdraw, emit_wrap_set, WrapperError, ACCOUNT_EXTEND_AMOUNT, ACCOUNT_TTL_THRESHOLD,
-        DELEGATION_EXTEND_AMOUNT, DELEGATION_TTL_THRESHOLD, DELTA_ADDR,
-    },
+    ConfidentialTokenError, ACCOUNT_EXTEND_AMOUNT, ACCOUNT_TTL_THRESHOLD, DELEGATION_EXTEND_AMOUNT,
+    DELEGATION_TTL_THRESHOLD, DELTA_ADDR,
 };
 
-/// Storage keys for the confidential token wrapper.
+/// Storage keys for the confidential token.
 #[contracttype]
-pub enum WrapperStorageKey {
-    /// SEP-41 token whose balances back the wrapper. Instance storage.
-    Token,
+pub enum ConfidentialTokenStorageKey {
+    /// SEP-41 token whose balances back the contract. Instance storage.
+    UnderlyingAsset,
     /// Confidential verifier contract used for `verify_proof`. Instance
     /// storage.
     Verifier,
@@ -30,7 +29,7 @@ pub enum WrapperStorageKey {
     /// §3.5), bound into every owner-initiated circuit's `vk` derivation.
     /// Stored as a canonical 32-byte big-endian `Bn254Fr` representative.
     /// Instance storage.
-    Wrap,
+    AddressAsField,
     /// Per-account `ConfidentialAccount` entry, keyed by the owner address.
     /// Persistent storage.
     Account(Address),
@@ -92,7 +91,7 @@ pub struct OperatorDelegation {
 // while keeping a single `data: Bytes` wire-format parameter at the trait
 // surface.
 
-/// Payload for [`super::ConfidentialTokenWrapper::register`].
+/// Payload for [`super::ConfidentialToken::register`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegisterPayload {
@@ -101,7 +100,7 @@ pub struct RegisterPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialTokenWrapper::register`].
+/// [`super::ConfidentialToken::register`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegisterData {
@@ -109,7 +108,7 @@ pub struct RegisterData {
     pub proof: Bytes,
 }
 
-/// Payload for [`super::ConfidentialTokenWrapper::withdraw`].
+/// Payload for [`super::ConfidentialToken::withdraw`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WithdrawPayload {
@@ -121,7 +120,7 @@ pub struct WithdrawPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialTokenWrapper::withdraw`].
+/// [`super::ConfidentialToken::withdraw`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WithdrawData {
@@ -129,7 +128,7 @@ pub struct WithdrawData {
     pub proof: Bytes,
 }
 
-/// Payload for [`super::ConfidentialTokenWrapper::confidential_transfer`].
+/// Payload for [`super::ConfidentialToken::confidential_transfer`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferPayload {
@@ -146,7 +145,7 @@ pub struct TransferPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialTokenWrapper::confidential_transfer`].
+/// [`super::ConfidentialToken::confidential_transfer`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferData {
@@ -155,7 +154,7 @@ pub struct TransferData {
 }
 
 /// Payload for
-/// [`super::ConfidentialTokenWrapper::confidential_transfer_from`].
+/// [`super::ConfidentialToken::confidential_transfer_from`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OperatorTransferPayload {
@@ -172,7 +171,7 @@ pub struct OperatorTransferPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialTokenWrapper::confidential_transfer_from`].
+/// [`super::ConfidentialToken::confidential_transfer_from`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OperatorTransferData {
@@ -180,7 +179,7 @@ pub struct OperatorTransferData {
     pub proof: Bytes,
 }
 
-/// Payload for [`super::ConfidentialTokenWrapper::set_operator`].
+/// Payload for [`super::ConfidentialToken::set_operator`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SetOperatorPayload {
@@ -197,7 +196,7 @@ pub struct SetOperatorPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialTokenWrapper::set_operator`].
+/// [`super::ConfidentialToken::set_operator`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SetOperatorData {
@@ -205,7 +204,7 @@ pub struct SetOperatorData {
     pub proof: Bytes,
 }
 
-/// Payload for [`super::ConfidentialTokenWrapper::revoke_operator`].
+/// Payload for [`super::ConfidentialToken::revoke_operator`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RevokeOperatorPayload {
@@ -218,7 +217,7 @@ pub struct RevokeOperatorPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`super::ConfidentialTokenWrapper::revoke_operator`].
+/// [`super::ConfidentialToken::revoke_operator`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RevokeOperatorData {
@@ -236,12 +235,13 @@ pub struct RevokeOperatorData {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::TokenNotSet`] - When the wrapper has not been constructed.
-pub fn get_token(e: &Env) -> Address {
+/// * [`ConfidentialTokenError::UnderlyingAssetNotSet`] - When the contract has
+///   not been constructed.
+pub fn get_underlying_asset(e: &Env) -> Address {
     e.storage()
         .instance()
-        .get(&WrapperStorageKey::Token)
-        .unwrap_or_else(|| panic_with_error!(e, WrapperError::TokenNotSet))
+        .get(&ConfidentialTokenStorageKey::UnderlyingAsset)
+        .unwrap_or_else(|| panic_with_error!(e, ConfidentialTokenError::UnderlyingAssetNotSet))
 }
 
 /// Returns the confidential verifier contract address bound at construction.
@@ -252,13 +252,13 @@ pub fn get_token(e: &Env) -> Address {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::VerifierNotSet`] - When the wrapper has not been
-///   constructed.
+/// * [`ConfidentialTokenError::VerifierNotSet`] - When the contract has not
+///   been constructed.
 pub fn get_verifier(e: &Env) -> Address {
     e.storage()
         .instance()
-        .get(&WrapperStorageKey::Verifier)
-        .unwrap_or_else(|| panic_with_error!(e, WrapperError::VerifierNotSet))
+        .get(&ConfidentialTokenStorageKey::Verifier)
+        .unwrap_or_else(|| panic_with_error!(e, ConfidentialTokenError::VerifierNotSet))
 }
 
 /// Returns the auditor registry contract address bound at construction.
@@ -269,16 +269,16 @@ pub fn get_verifier(e: &Env) -> Address {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::AuditorNotSet`] - When the wrapper has not been
+/// * [`ConfidentialTokenError::AuditorNotSet`] - When the contract has not been
 ///   constructed.
 pub fn get_auditor(e: &Env) -> Address {
     e.storage()
         .instance()
-        .get(&WrapperStorageKey::Auditor)
-        .unwrap_or_else(|| panic_with_error!(e, WrapperError::AuditorNotSet))
+        .get(&ConfidentialTokenStorageKey::Auditor)
+        .unwrap_or_else(|| panic_with_error!(e, ConfidentialTokenError::AuditorNotSet))
 }
 
-/// Returns the wrapper's compressed `wrap` Field, the
+/// Returns the contract's compressed `wrap` Field, the
 /// `address_to_field(env.current_contract_address())` value computed once at
 /// construction.
 ///
@@ -288,12 +288,13 @@ pub fn get_auditor(e: &Env) -> Address {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::WrapNotSet`] - When the wrapper has not been constructed.
-pub fn get_wrap(e: &Env) -> BytesN<32> {
+/// * [`ConfidentialTokenError::AddressAsFieldNotSet`] - When the contract has
+///   not been constructed.
+pub fn get_address_as_field_element(e: &Env) -> BytesN<32> {
     e.storage()
         .instance()
-        .get(&WrapperStorageKey::Wrap)
-        .unwrap_or_else(|| panic_with_error!(e, WrapperError::WrapNotSet))
+        .get(&ConfidentialTokenStorageKey::AddressAsField)
+        .unwrap_or_else(|| panic_with_error!(e, ConfidentialTokenError::AddressAsFieldNotSet))
 }
 
 /// Returns the [`ConfidentialAccount`] stored under `account`.
@@ -305,11 +306,14 @@ pub fn get_wrap(e: &Env) -> BytesN<32> {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::AccountNotRegistered`] - When no account is stored under
-///   `account`.
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When no account is
+///   stored under `account`.
 pub fn get_account(e: &Env, account: &Address) -> ConfidentialAccount {
-    get_persistent_entry::<ConfidentialAccount>(e, &WrapperStorageKey::Account(account.clone()))
-        .unwrap_or_else(|| panic_with_error!(e, WrapperError::AccountNotRegistered))
+    get_persistent_entry::<ConfidentialAccount>(
+        e,
+        &ConfidentialTokenStorageKey::Account(account.clone()),
+    )
+    .unwrap_or_else(|| panic_with_error!(e, ConfidentialTokenError::AccountNotRegistered))
 }
 
 /// Returns the [`OperatorDelegation`] stored under `(owner, operator)`.
@@ -322,14 +326,14 @@ pub fn get_account(e: &Env, account: &Address) -> ConfidentialAccount {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::DelegationNotFound`] - When no delegation exists for the
-///   pair.
+/// * [`ConfidentialTokenError::DelegationNotFound`] - When no delegation exists
+///   for the pair.
 pub fn get_operator_delegation(e: &Env, owner: &Address, operator: &Address) -> OperatorDelegation {
     get_persistent_entry::<OperatorDelegation>(
         e,
-        &WrapperStorageKey::Delegation(owner.clone(), operator.clone()),
+        &ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone()),
     )
-    .unwrap_or_else(|| panic_with_error!(e, WrapperError::DelegationNotFound))
+    .unwrap_or_else(|| panic_with_error!(e, ConfidentialTokenError::DelegationNotFound))
 }
 
 /// Returns `true` iff a delegation exists for `(owner, operator)` and is
@@ -346,7 +350,7 @@ pub fn get_operator_delegation(e: &Env, owner: &Address, operator: &Address) -> 
 pub fn is_operator(e: &Env, owner: &Address, operator: &Address) -> bool {
     match get_persistent_entry::<OperatorDelegation>(
         e,
-        &WrapperStorageKey::Delegation(owner.clone(), operator.clone()),
+        &ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone()),
     ) {
         Some(d) => e.ledger().sequence() <= d.live_until_ledger,
         None => false,
@@ -360,8 +364,11 @@ pub fn is_operator(e: &Env, owner: &Address, operator: &Address) -> bool {
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The owner address.
 pub fn account_exists(e: &Env, account: &Address) -> bool {
-    get_persistent_entry::<ConfidentialAccount>(e, &WrapperStorageKey::Account(account.clone()))
-        .is_some()
+    get_persistent_entry::<ConfidentialAccount>(
+        e,
+        &ConfidentialTokenStorageKey::Account(account.clone()),
+    )
+    .is_some()
 }
 
 /// Returns whether a delegation entry exists for `(owner, operator)`,
@@ -375,7 +382,7 @@ pub fn account_exists(e: &Env, account: &Address) -> bool {
 pub fn delegation_exists(e: &Env, owner: &Address, operator: &Address) -> bool {
     get_persistent_entry::<OperatorDelegation>(
         e,
-        &WrapperStorageKey::Delegation(owner.clone(), operator.clone()),
+        &ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone()),
     )
     .is_some()
 }
@@ -394,9 +401,10 @@ pub fn delegation_exists(e: &Env, owner: &Address, operator: &Address) -> bool {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::AccountAlreadyRegistered`] - When `account` is already
-///   registered.
-/// * [`WrapperError::InvalidProof`] - When the proof fails verification.
+/// * [`ConfidentialTokenError::AccountAlreadyRegistered`] - When `account` is
+///   already registered.
+/// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
+///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
 ///   errors.
 ///
@@ -419,7 +427,7 @@ pub fn register(
 ) {
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let _k_aud = auditor.get_key(&auditor_id);
-    let wrap = get_wrap(e);
+    let wrap = get_address_as_field_element(e);
 
     // PI order (DESIGN §7.2): Y, PVK, wrap.
     let mut pi = Bytes::new(e);
@@ -429,9 +437,9 @@ pub fn register(
 
     verify(e, CircuitType::Register, &pi, proof);
 
-    let key = WrapperStorageKey::Account(account.clone());
+    let key = ConfidentialTokenStorageKey::Account(account.clone());
     if e.storage().persistent().has(&key) {
-        panic_with_error!(e, WrapperError::AccountAlreadyRegistered);
+        panic_with_error!(e, ConfidentialTokenError::AccountAlreadyRegistered);
     }
     e.storage().persistent().set(
         &key,
@@ -462,9 +470,9 @@ pub fn register(
 ///
 /// # Errors
 ///
-/// * [`WrapperError::NegativeAmount`] - When `amount < 0`.
-/// * [`WrapperError::AccountNotRegistered`] - When `to` is not a registered
-///   confidential account.
+/// * [`ConfidentialTokenError::NegativeAmount`] - When `amount < 0`.
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `to` is not a
+///   registered confidential account.
 ///
 /// # Events
 ///
@@ -475,7 +483,7 @@ pub fn register(
 ///
 /// This function credits `amount · G` to `to`'s confidential receiving
 /// balance immediately after invoking `transfer` on the underlying token,
-/// without re-measuring the wrapper's balance. The underlying token MUST
+/// without re-measuring the contract's balance. The underlying token MUST
 /// therefore have exact-transfer semantics (no fee-on-transfer, no
 /// rebasing). See the [module-level constraint](super) for the list of
 /// supported token implementations.
@@ -486,13 +494,13 @@ pub fn register(
 /// entry point is responsible for calling `from.require_auth()`.
 pub fn deposit(e: &Env, from: &Address, to: &Address, amount: i128) {
     if amount < 0 {
-        panic_with_error!(e, WrapperError::NegativeAmount);
+        panic_with_error!(e, ConfidentialTokenError::NegativeAmount);
     }
     if !account_exists(e, to) {
-        panic_with_error!(e, WrapperError::AccountNotRegistered);
+        panic_with_error!(e, ConfidentialTokenError::AccountNotRegistered);
     }
 
-    let token = token::TokenClient::new(e, &get_token(e));
+    let token = token::TokenClient::new(e, &get_underlying_asset(e));
     token.transfer(from, e.current_contract_address(), &amount);
 
     let c_dep = Grumpkin::mul(e, &Grumpkin::generator(e), amount as u128);
@@ -510,7 +518,8 @@ pub fn deposit(e: &Env, from: &Address, to: &Address, amount: i128) {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::AccountNotRegistered`] - When `account` is not registered.
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` is not
+///   registered.
 ///
 /// # Events
 ///
@@ -525,7 +534,7 @@ pub fn merge(e: &Env, account: &Address) {
     let mut data = get_account(e, account);
     data.spendable_balance = Grumpkin::add(e, &data.spendable_balance, &data.receiving_balance);
     data.receiving_balance = Grumpkin::identity(e);
-    e.storage().persistent().set(&WrapperStorageKey::Account(account.clone()), &data);
+    e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &data);
 
     emit_merge(e, account);
 }
@@ -544,9 +553,11 @@ pub fn merge(e: &Env, account: &Address) {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::NegativeAmount`] - When `amount < 0`.
-/// * [`WrapperError::AccountNotRegistered`] - When `from` is not registered.
-/// * [`WrapperError::InvalidProof`] - When the proof fails verification.
+/// * [`ConfidentialTokenError::NegativeAmount`] - When `amount < 0`.
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from` is not
+///   registered.
+/// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
+///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
 ///   errors.
 ///
@@ -580,13 +591,13 @@ pub fn withdraw(
     proof: &Bytes,
 ) {
     if amount < 0 {
-        panic_with_error!(e, WrapperError::NegativeAmount);
+        panic_with_error!(e, ConfidentialTokenError::NegativeAmount);
     }
 
     let account = get_account(e, from);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_s = auditor.get_key(&account.auditor_id);
-    let wrap = get_wrap(e);
+    let wrap = get_address_as_field_element(e);
 
     // PI order (DESIGN §7.5):
     //   C_spend, Y, wrap, K_aud_s, a,
@@ -607,7 +618,7 @@ pub fn withdraw(
 
     set_spendable(e, from, &payload.c_spend_new);
 
-    let token = token::TokenClient::new(e, &get_token(e));
+    let token = token::TokenClient::new(e, &get_underlying_asset(e));
     token.transfer(&e.current_contract_address(), to, &amount);
 
     emit_withdraw(
@@ -634,9 +645,10 @@ pub fn withdraw(
 ///
 /// # Errors
 ///
-/// * [`WrapperError::AccountNotRegistered`] - When `from` or `to` is not
-///   registered.
-/// * [`WrapperError::InvalidProof`] - When the proof fails verification.
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from` or `to` is
+///   not registered.
+/// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
+///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
 ///   errors.
 ///
@@ -662,7 +674,7 @@ pub fn confidential_transfer(
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_r = auditor.get_key(&recipient.auditor_id);
     let k_aud_s = auditor.get_key(&sender.auditor_id);
-    let wrap = get_wrap(e);
+    let wrap = get_address_as_field_element(e);
 
     // PI order (DESIGN §7.6):
     //   C_spend_A, Y_A, PVK_B, wrap, K_aud_r, K_aud_s,
@@ -720,12 +732,14 @@ pub fn confidential_transfer(
 ///
 /// # Errors
 ///
-/// * [`WrapperError::AccountNotRegistered`] - When `from`, `operator`, or `to`
-///   is not registered.
-/// * [`WrapperError::DelegationNotFound`] - When `(from, operator)` has no
-///   delegation.
-/// * [`WrapperError::DelegationExpired`] - When the delegation has expired.
-/// * [`WrapperError::InvalidProof`] - When the proof fails verification.
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from`,
+///   `operator`, or `to` is not registered.
+/// * [`ConfidentialTokenError::DelegationNotFound`] - When `(from, operator)`
+///   has no delegation.
+/// * [`ConfidentialTokenError::DelegationExpired`] - When the delegation has
+///   expired.
+/// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
+///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
 ///   errors.
 ///
@@ -749,7 +763,7 @@ pub fn confidential_transfer_from(
 ) {
     let delegation = get_operator_delegation(e, from, operator);
     if e.ledger().sequence() > delegation.live_until_ledger {
-        panic_with_error!(e, WrapperError::DelegationExpired);
+        panic_with_error!(e, ConfidentialTokenError::DelegationExpired);
     }
 
     let owner = get_account(e, from);
@@ -828,11 +842,12 @@ pub fn confidential_transfer_from(
 ///
 /// # Errors
 ///
-/// * [`WrapperError::AccountNotRegistered`] - When `account` or `operator` is
-///   not registered.
-/// * [`WrapperError::DelegationAlreadyExists`] - When a delegation already
-///   exists for the `(account, operator)` pair.
-/// * [`WrapperError::InvalidProof`] - When the proof fails verification.
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` or
+///   `operator` is not registered.
+/// * [`ConfidentialTokenError::DelegationAlreadyExists`] - When a delegation
+///   already exists for the `(account, operator)` pair.
+/// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
+///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
 ///   errors.
 ///
@@ -857,7 +872,7 @@ pub fn set_operator(
     let operator_account = get_account(e, operator);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_s = auditor.get_key(&owner.auditor_id);
-    let wrap = get_wrap(e);
+    let wrap = get_address_as_field_element(e);
     let op_i = address_to_field(e, operator);
 
     // PI order (DESIGN §7.7):
@@ -925,10 +940,12 @@ pub fn set_operator(
 ///
 /// # Errors
 ///
-/// * [`WrapperError::AccountNotRegistered`] - When `account` is not registered.
-/// * [`WrapperError::DelegationNotFound`] - When `(account, operator)` has no
-///   delegation.
-/// * [`WrapperError::InvalidProof`] - When the proof fails verification.
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` is not
+///   registered.
+/// * [`ConfidentialTokenError::DelegationNotFound`] - When `(account,
+///   operator)` has no delegation.
+/// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
+///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
 ///   errors.
 ///
@@ -952,7 +969,7 @@ pub fn revoke_operator(
     let delegation = get_operator_delegation(e, account, operator);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_s = auditor.get_key(&owner.auditor_id);
-    let wrap = get_wrap(e);
+    let wrap = get_address_as_field_element(e);
     let op_i = address_to_field(e, operator);
 
     // PI order (DESIGN §7.9):
@@ -1002,17 +1019,17 @@ pub fn revoke_operator(
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `token` - The SEP-41 token contract.
+/// * `underlying_asset` - The SEP-41 token contract.
 ///
 /// # Errors
 ///
-/// * [`WrapperError::TokenAlreadySet`] - When the token address has already
-///   been set.
+/// * [`ConfidentialTokenError::UnderlyingAssetAlreadySet`] - When the token
+///   address has already been set.
 ///
 /// # Events
 ///
-/// * topics - `["token_set"]`
-/// * data - `[token: Address]`
+/// * topics - `["underlying_asset_set"]`
+/// * data - `[underlying_asset: Address]`
 ///
 /// # Security Warning
 ///
@@ -1023,23 +1040,23 @@ pub fn revoke_operator(
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn set_token(e: &Env, token: &Address) {
-    if e.storage().instance().has(&WrapperStorageKey::Token) {
-        panic_with_error!(e, WrapperError::TokenAlreadySet);
+pub fn set_underlying_asset(e: &Env, underlying_asset: &Address) {
+    if e.storage().instance().has(&ConfidentialTokenStorageKey::UnderlyingAsset) {
+        panic_with_error!(e, ConfidentialTokenError::UnderlyingAssetAlreadySet);
     }
-    e.storage().instance().set(&WrapperStorageKey::Token, token);
-    emit_token_set(e, token);
+    e.storage().instance().set(&ConfidentialTokenStorageKey::UnderlyingAsset, underlying_asset);
+    emit_underlying_asset_set(e, underlying_asset);
 }
 
 /// Sets the confidential verifier contract address.
 ///
-/// Unlike [`set_token`] and [`set_wrap`], this function has
-/// no single-shot guard: rotating the verifier is a legitimate operation
-/// (e.g. when a new circuit version ships or the verifier contract is
+/// Unlike [`set_underlying_asset`] and [`set_address_as_field_element`], this
+/// function has no single-shot guard: rotating the verifier is a legitimate
+/// operation (e.g. when a new circuit version ships or the verifier contract is
 /// patched). Contract authors who need to rotate the verifier post-deployment
 /// should expose the operation behind an admin-gated entry point — typically
 /// owned by a multisig or timelock — since changing the verifier changes the
-/// set of proofs the wrapper will accept.
+/// set of proofs the contract will accept.
 ///
 /// # Arguments
 ///
@@ -1061,16 +1078,16 @@ pub fn set_token(e: &Env, token: &Address) {
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
 pub fn set_verifier(e: &Env, verifier: &Address) {
-    e.storage().instance().set(&WrapperStorageKey::Verifier, verifier);
+    e.storage().instance().set(&ConfidentialTokenStorageKey::Verifier, verifier);
     emit_verifier_set(e, verifier);
 }
 
 /// Sets the auditor registry contract address.
 ///
-/// Unlike [`set_token`] and [`set_wrap`], this function has
-/// no single-shot guard: rotating the auditor registry is a legitimate
-/// operation (e.g. when auditor key custody changes or the registry contract
-/// is patched). Contract authors who need to rotate the auditor
+/// Unlike [`set_underlying_asset`] and [`set_address_as_field_element`], this
+/// function has no single-shot guard: rotating the auditor registry is a
+/// legitimate operation (e.g. when auditor key custody changes or the registry
+/// contract is patched). Contract authors who need to rotate the auditor
 /// post-deployment should expose the operation behind an admin-gated entry
 /// point — typically owned by a multisig or timelock — since the registry
 /// controls which keys auditor ciphertexts are encrypted under.
@@ -1095,13 +1112,13 @@ pub fn set_verifier(e: &Env, verifier: &Address) {
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
 pub fn set_auditor(e: &Env, auditor: &Address) {
-    e.storage().instance().set(&WrapperStorageKey::Auditor, auditor);
+    e.storage().instance().set(&ConfidentialTokenStorageKey::Auditor, auditor);
     emit_auditor_set(e, auditor);
 }
 
-/// Stores the wrapper's compressed `wrap` Field in instance storage.
+/// Stores the contract's compressed `wrap` Field in instance storage.
 ///
-/// `wrap` is the Poseidon2 compression of the wrapper's own address. It is
+/// `wrap` is the Poseidon2 compression of the contract's own address. It is
 /// bound into every owner-initiated circuit's viewing-key derivation, so it
 /// must be computed once over `env.current_contract_address()` at
 /// construction and never re-derived.
@@ -1117,13 +1134,13 @@ pub fn set_auditor(e: &Env, auditor: &Address) {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::WrapAlreadySet`] - When the `wrap` field has already been
-///   set.
+/// * [`ConfidentialTokenError::AddressAsFieldAlreadySet`] - When the `wrap`
+///   field has already been set.
 ///
 /// # Events
 ///
-/// * topics - `["wrap_set"]`
-/// * data - `[wrap: BytesN<32>]`
+/// * topics - `["address_as_field_set"]`
+/// * data - `[address_as_field: BytesN<32>]`
 ///
 /// # Security Warning
 ///
@@ -1134,13 +1151,13 @@ pub fn set_auditor(e: &Env, auditor: &Address) {
 ///
 /// Using this function in public-facing methods may create significant
 /// security risks as it could allow unauthorized modifications.
-pub fn set_wrap(e: &Env) {
-    if e.storage().instance().has(&WrapperStorageKey::Wrap) {
-        panic_with_error!(e, WrapperError::WrapAlreadySet);
+pub fn set_address_as_field_element(e: &Env) {
+    if e.storage().instance().has(&ConfidentialTokenStorageKey::AddressAsField) {
+        panic_with_error!(e, ConfidentialTokenError::AddressAsFieldAlreadySet);
     }
     let computed = address_to_field(e, &e.current_contract_address());
-    e.storage().instance().set(&WrapperStorageKey::Wrap, &computed);
-    emit_wrap_set(e, &computed);
+    e.storage().instance().set(&ConfidentialTokenStorageKey::AddressAsField, &computed);
+    emit_address_as_field_set(e, &computed);
 }
 
 // ################## LOW-LEVEL HELPERS ##################
@@ -1155,11 +1172,12 @@ pub fn set_wrap(e: &Env) {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::AccountNotRegistered`] - When `account` is not registered.
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` is not
+///   registered.
 fn set_spendable(e: &Env, account: &Address, c_spend_new: &Point) {
     let mut data = get_account(e, account);
     data.spendable_balance = c_spend_new.clone();
-    e.storage().persistent().set(&WrapperStorageKey::Account(account.clone()), &data);
+    e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &data);
 }
 
 /// Adds `c_tx` to `account.receiving_balance` via Grumpkin homomorphic
@@ -1173,11 +1191,12 @@ fn set_spendable(e: &Env, account: &Address, c_spend_new: &Point) {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::AccountNotRegistered`] - When `account` is not registered.
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` is not
+///   registered.
 fn add_to_receiving(e: &Env, account: &Address, c_tx: &Point) {
     let mut data = get_account(e, account);
     data.receiving_balance = Grumpkin::add(e, &data.receiving_balance, c_tx);
-    e.storage().persistent().set(&WrapperStorageKey::Account(account.clone()), &data);
+    e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &data);
 }
 
 /// Stores a fresh [`OperatorDelegation`] under `(owner, operator)`.
@@ -1191,12 +1210,12 @@ fn add_to_receiving(e: &Env, account: &Address, c_tx: &Point) {
 ///
 /// # Errors
 ///
-/// * [`WrapperError::DelegationAlreadyExists`] - When a delegation already
-///   exists for the `(owner, operator)` pair.
+/// * [`ConfidentialTokenError::DelegationAlreadyExists`] - When a delegation
+///   already exists for the `(owner, operator)` pair.
 fn set_delegation(e: &Env, owner: &Address, operator: &Address, delegation: &OperatorDelegation) {
-    let key = WrapperStorageKey::Delegation(owner.clone(), operator.clone());
+    let key = ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone());
     if e.storage().persistent().has(&key) {
-        panic_with_error!(e, WrapperError::DelegationAlreadyExists);
+        panic_with_error!(e, ConfidentialTokenError::DelegationAlreadyExists);
     }
     e.storage().persistent().set(&key, delegation);
 }
@@ -1215,8 +1234,8 @@ fn set_delegation(e: &Env, owner: &Address, operator: &Address, delegation: &Ope
 ///
 /// # Errors
 ///
-/// * [`WrapperError::DelegationNotFound`] - When no delegation exists for the
-///   pair.
+/// * [`ConfidentialTokenError::DelegationNotFound`] - When no delegation exists
+///   for the pair.
 fn update_delegation(
     e: &Env,
     owner: &Address,
@@ -1229,9 +1248,10 @@ fn update_delegation(
     delegation.allowance_commitment = c_a_new.clone();
     delegation.encrypted_allowance = a_tilde_new.clone();
     delegation.allowance_salt = sigma_a_new.clone();
-    e.storage()
-        .persistent()
-        .set(&WrapperStorageKey::Delegation(owner.clone(), operator.clone()), &delegation);
+    e.storage().persistent().set(
+        &ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone()),
+        &delegation,
+    );
 }
 
 /// Deletes the `(owner, operator)` delegation entry (revoke path).
@@ -1244,23 +1264,28 @@ fn update_delegation(
 ///
 /// # Errors
 ///
-/// * [`WrapperError::DelegationNotFound`] - When no delegation exists for the
-///   pair.
+/// * [`ConfidentialTokenError::DelegationNotFound`] - When no delegation exists
+///   for the pair.
 fn delete_delegation(e: &Env, owner: &Address, operator: &Address) {
-    let key = WrapperStorageKey::Delegation(owner.clone(), operator.clone());
+    let key = ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone());
     if !e.storage().persistent().has(&key) {
-        panic_with_error!(e, WrapperError::DelegationNotFound);
+        panic_with_error!(e, ConfidentialTokenError::DelegationNotFound);
     }
     e.storage().persistent().remove(&key);
 }
 
 /// Tries to retrieve a persistent storage value and extend its TTL if the
 /// entry exists.
-fn get_persistent_entry<T: TryFromVal<Env, Val>>(e: &Env, key: &WrapperStorageKey) -> Option<T> {
+fn get_persistent_entry<T: TryFromVal<Env, Val>>(
+    e: &Env,
+    key: &ConfidentialTokenStorageKey,
+) -> Option<T> {
     e.storage().persistent().get::<_, T>(key).inspect(|_| {
         let (threshold, extend) = match key {
-            WrapperStorageKey::Account(_) => (ACCOUNT_TTL_THRESHOLD, ACCOUNT_EXTEND_AMOUNT),
-            WrapperStorageKey::Delegation(_, _) => {
+            ConfidentialTokenStorageKey::Account(_) => {
+                (ACCOUNT_TTL_THRESHOLD, ACCOUNT_EXTEND_AMOUNT)
+            }
+            ConfidentialTokenStorageKey::Delegation(_, _) => {
                 (DELEGATION_TTL_THRESHOLD, DELEGATION_EXTEND_AMOUNT)
             }
             _ => return,
@@ -1274,21 +1299,23 @@ fn get_persistent_entry<T: TryFromVal<Env, Val>>(e: &Env, key: &WrapperStorageKe
 ///
 /// # Errors
 ///
-/// * [`WrapperError::InvalidData`] - When `data` is not a valid XDR encoding of
-///   `T`.
+/// * [`ConfidentialTokenError::InvalidData`] - When `data` is not a valid XDR
+///   encoding of `T`.
 pub fn decode_data<T>(e: &Env, data: &Bytes) -> T
 where
     T: FromXdr,
 {
-    T::from_xdr(e, data).unwrap_or_else(|_| panic_with_error!(e, WrapperError::InvalidData))
+    T::from_xdr(e, data)
+        .unwrap_or_else(|_| panic_with_error!(e, ConfidentialTokenError::InvalidData))
 }
 
 /// Cross-contract proof verification through [`ConfidentialVerifierClient`].
-/// Panics with [`WrapperError::InvalidProof`] if the verifier returns `false`.
+/// Panics with [`ConfidentialTokenError::InvalidProof`] if the verifier returns
+/// `false`.
 fn verify(e: &Env, circuit_type: CircuitType, public_inputs: &Bytes, proof: &Bytes) {
     let verifier = ConfidentialVerifierClient::new(e, &get_verifier(e));
     if !verifier.verify_proof(&circuit_type, public_inputs, proof) {
-        panic_with_error!(e, WrapperError::InvalidProof);
+        panic_with_error!(e, ConfidentialTokenError::InvalidProof);
     }
 }
 
@@ -1340,5 +1367,5 @@ fn le_bytes_to_u256(e: &Env, le: &[u8]) -> U256 {
 /// Returns the canonical 32-byte big-endian encoding of a `U256`.
 fn u256_to_bytes_n_32(e: &Env, u: &U256) -> BytesN<32> {
     BytesN::<32>::try_from(u.to_be_bytes())
-        .unwrap_or_else(|_| panic_with_error!(e, WrapperError::InvalidData))
+        .unwrap_or_else(|_| panic_with_error!(e, ConfidentialTokenError::InvalidData))
 }

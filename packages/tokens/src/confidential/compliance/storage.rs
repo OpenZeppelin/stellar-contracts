@@ -1,11 +1,11 @@
 use soroban_sdk::{contracttype, panic_with_error, token, Address, Env};
 
-use crate::confidential::wrapper::{
+use crate::confidential::{
     compliance::{
         emit_compliance_config_changed, emit_frozen, emit_unfrozen, ComplianceError, PolicyClient,
         FROZEN_EXTEND_AMOUNT, FROZEN_TTL_THRESHOLD,
     },
-    storage::get_token,
+    storage::get_underlying_asset,
 };
 
 // ################## TYPES ##################
@@ -23,7 +23,7 @@ pub struct ComplianceConfig {
     pub sac_passthrough: bool,
 }
 
-/// Storage keys for the confidential wrapper compliance extension.
+/// Storage keys for the confidential token compliance extension.
 #[contracttype]
 pub enum ComplianceStorageKey {
     /// Singleton [`ComplianceConfig`]. Instance storage.
@@ -188,7 +188,7 @@ pub fn gate_account(e: &Env, account: &Address, config: &ComplianceConfig) {
 }
 
 /// Asserts that the configured external policy authorizes `account` for the
-/// current wrapper. A no-op when `config.policy` is `None`.
+/// current token contract. A no-op when `config.policy` is `None`.
 ///
 /// # Arguments
 ///
@@ -224,7 +224,7 @@ pub fn check_policy(e: &Env, account: &Address, config: &ComplianceConfig) {
 ///   returns `false` for `account`.
 pub fn check_sac(e: &Env, account: &Address, config: &ComplianceConfig) {
     if config.sac_passthrough {
-        let sac = token::StellarAssetClient::new(e, &get_token(e));
+        let sac = token::StellarAssetClient::new(e, &get_underlying_asset(e));
         if !sac.authorized(account) {
             panic_with_error!(e, ComplianceError::NotAuthorizedBySac);
         }
