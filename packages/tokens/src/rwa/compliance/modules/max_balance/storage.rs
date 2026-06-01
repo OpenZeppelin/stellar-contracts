@@ -64,7 +64,7 @@ pub fn get_id_balance(e: &Env, token: &Address, identity: &Address) -> i128 {
 /// * `token` - The token address.
 pub fn is_preset_completed(e: &Env, token: &Address) -> bool {
     let key = MaxBalanceStorageKey::PresetCompleted(token.clone());
-    if e.storage().persistent().get::<_, ()>(&key).is_some() {
+    if e.storage().persistent().has(&key) {
         e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
         true
     } else {
@@ -136,11 +136,12 @@ pub fn can_receive(e: &Env, account: &Address, amount: i128, token: &Address) ->
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
 /// * refer to [`can_receive`] errors.
 pub fn can_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &Address) -> bool {
-    require_non_negative_amount(e, amount);
-    let irs = get_irs_client(e, token);
-    if irs.stored_identity(from) == irs.stored_identity(to) {
+    if from == to {
         return true;
     }
+
+    require_non_negative_amount(e, amount);
+
     can_receive(e, to, amount, token)
 }
 
@@ -318,13 +319,16 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 ///
 /// This helper performs no authorization checks.
 pub fn on_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &Address) {
+    if from == to {
+        return;
+    }
+
     require_non_negative_amount(e, amount);
+
     let irs = get_irs_client(e, token);
     let id_from = irs.stored_identity(from);
     let id_to = irs.stored_identity(to);
-    if id_from == id_to {
-        return;
-    }
+
     debit_identity(e, token, &id_from, amount);
     credit_identity(e, token, &id_to, amount);
 }
