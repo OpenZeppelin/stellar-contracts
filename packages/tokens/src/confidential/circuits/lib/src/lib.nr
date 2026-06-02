@@ -164,36 +164,6 @@ pub fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> Field {
     scalar_mul(scalar, point).x
 }
 
-/// Range check `x in [0, 2^128)` via Noir's native `u128` cast (Section 2.6). The
-/// `as u128` lowers to 128 boolean constraints plus one recomposition check.
-pub fn assert_range_128(x: Field) {
-    let x_u128: u128 = x as u128;
-    assert(x_u128 as Field == x);
-}
-
-/// Asserts `p` lies on Grumpkin (`y^2 = x^3 - 17`), allowing the point at
-/// infinity. Use this on every public-input *commitment* that enters a circuit
-/// (Section 7.1: balance and transfer commitments may equal the identity).
-///
-/// Soundness: the verifier doesn't check point validity on its own -- if an
-/// off-curve `(x, y)` reaches `multi_scalar_mul`, the proof still verifies but
-/// the resulting commitment has no binding guarantee. This helper closes that
-/// gap in-circuit, on top of the contract contract's own validation. Cost: ~3
-/// mul gates per point, negligible vs. one scalar multiplication.
-pub fn assert_on_curve(p: EmbeddedCurvePoint) {
-    let inf_as_field = p.is_infinite as Field;
-
-    // Canonical identity encoding (Section 7.1 point 2): if is_infinite then
-    // x == 0 and y == 0.
-    assert(inf_as_field * p.x == 0);
-    assert(inf_as_field * p.y == 0);
-
-    // Affine branch (is_infinite = 0): y^2 == x^3 - 17 must hold.
-    // Identity branch (is_infinite = 1): constraint becomes 0 == 0, free pass.
-    let curve_eq = p.y * p.y - p.x * p.x * p.x + 17;
-    assert((1 - inf_as_field) * curve_eq == 0);
-}
-
 /// Asserts `p` is on Grumpkin AND not the identity. Use this for every
 /// public-input *key* (Section 7.1 point 4: `R_e`, `Y`, `PVK`, `K_aud` must all
 /// satisfy `P != O`). The identity element collapses ECDH (`S = O` regardless
@@ -315,18 +285,6 @@ pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
 
 // ################## AUDITOR-CHANNEL SPONGE ##################
 
-/// Poseidon2 sponge with a single squeeze. Absorbs `(d, s_x, sigma)` and
-/// returns the first rate-element of the post-permutation state.
-///
-/// Equivalent to `poseidon_with_domain(d, [s_x, sigma])` -- the alias exists so
-/// design-doc constraints written as `m = SpongeSqueeze_1(delta, S.x, sigma)`
-/// (Section 2.5) translate 1:1 to source. The single-squeeze case is the
-/// sender-auditor channel for Withdraw (W_a3), RevokeOperator (V_a3), and
-/// SetOperator (S_a3), which need only the balance/allowance mask.
-pub fn sponge_squeeze_1(d: Field, s_x: Field, sigma: Field) -> Field {
-    poseidon_with_domain(d, [s_x, sigma])
-}
-
 /// Poseidon2 sponge with two squeezes. Absorbs `(d, s_x, sigma)` and returns
 /// the first two rate-elements of the post-permutation state in order.
 ///
@@ -348,10 +306,10 @@ pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
 /// auditor block emits a single ciphertext (Withdraw W_a3/W_a4, RevokeOperator
 /// V_a3/V_a5, SetOperator S_a3/S_a5).
 ///
-/// `b_tilde_aud_s = v_new + SpongeSqueeze_1(AUDITOR_SENDER, s_a_s_x, sigma)`.
+/// `b_tilde_aud_s = v_new + Poseidon2(AUDITOR_SENDER, s_a_s_x, sigma)`.
 /// The two-squeeze sender-channel form (Transfer T_a6-T_a8, OperatorTransfer
 /// O_a6-O_a8) is a different composition that callers spell out directly with
 /// `sponge_squeeze_2`.
 pub fn encrypt_auditor_sender_balance(v_new: Field, s_a_s_x: Field, sigma: Field) -> Field {
-    v_new + sponge_squeeze_1(domain::AUDITOR_SENDER, s_a_s_x, sigma)
+    v_new + poseidon_with_domain(domain::AUDITOR_SENDER, [s_a_s_x, sigma])
 }

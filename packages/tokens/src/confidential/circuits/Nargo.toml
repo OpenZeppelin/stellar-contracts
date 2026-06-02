@@ -12,7 +12,6 @@ members = [
     "gadgets/ecdh",
     "gadgets/vk_from_sk",
     "gadgets/encrypt_amount",
-    "gadgets/range_128",
     "gadgets/poseidon_with_domain",
     "gadgets/sponge_squeeze_2",
 ]
