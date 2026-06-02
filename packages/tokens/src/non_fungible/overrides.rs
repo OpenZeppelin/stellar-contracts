@@ -1,77 +1,32 @@
 use soroban_sdk::{Address, Env, String};
 
-/// Based on the extension, some default behavior of
-/// [`crate::non_fungible::NonFungibleToken`] might have to be overridden. This
-/// is a helper trait that provides this override mechanism in a
-/// developer-friendly way.
+/// Internal override hook for [`crate::non_fungible::NonFungibleToken`].
 ///
-/// The `NonFungibleToken` trait can also be overridden directly, but this
-/// helper trait exists to provide the default implementations in a simpler way.
+/// # Note
 ///
-/// The way to provide different default implementations for different
-/// extensions is by implementing the trait for different types (unit structs).
-/// The problem is, `NonFungibleToken` trait has to be implemented for the smart
-/// contract (which is another struct). Therefore, a level of abstraction is
-/// needed by introducing an associated type, which grants
-/// `NonFungibleToken` trait the ability to switch between different default
-/// implementations by calling the methods on this associated type.
+/// This trait is internal plumbing of the library. As a contract author there
+/// is no need to implement it, name it, or import it. It is documented here
+/// only to explain how behavior is routed under the hood.
 ///
-/// This abstraction allows every method of the `NonFungibleToken` trait to be
-/// implemented using
-/// `Self::ContractType::{function_name}`, which will in turn use either the
-/// overridden or the base variant according to the extension, provided by the
-/// `ContractOverrides` trait implementation for the respective `ContractType`.
+/// Some extensions need to change the default behavior of `NonFungibleToken`
+/// (for example, `Enumerable` and `Consecutive` keep extra bookkeeping).
+/// Instead of forcing every contract to re-wire those methods by hand, the
+/// behavior is keyed off the `ContractType` associated type: each
+/// `NonFungibleToken` method delegates to
+/// `Self::ContractType::{function_name}`, and this trait's implementation for
+/// that type decides whether to run the base logic or an override. The
+/// library ships implementations for its contract types (`Base`,
+/// `Enumerable`, `Consecutive`, ...).
 ///
-/// Example:
-///
-/// ```rust
-/// impl NonFungibleToken for ExampleContract {
-///     type ContractType = Consecutive;
-///
-///     fn balance(e: &Env, owner: &Address) -> u32 {
-///         Self::ContractType::balance(e, owner)
-///     }
-///
-///     fn owner_of(e: &Env, token_id: u32) -> &Address {
-///         Self::ContractType::owner_of(e, token_id)
-///     }
-///
-///     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-///         Self::ContractType::transfer(e, from, to, token_id);
-///     }
-///
-///     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
-///         Self::ContractType::transfer_from(e, spender, from, to, token_id);
-///     }
-///
-///     /* and so on */
-/// }
-/// ```
-///
-/// or the type can be used directly (in this case `Consecutive`)
-/// instead of referring to it as `Self::ContractType`:
+/// From a contract author's point of view this is invisible. A `ContractType`
+/// is picked on the `NonFungibleToken` implementation and the bodies are left
+/// empty; the `#[contractimpl(contracttrait)]` macro fills them in and the
+/// correct behavior is selected automatically:
 ///
 /// ```rust
+/// #[contractimpl(contracttrait)]
 /// impl NonFungibleToken for ExampleContract {
 ///     type ContractType = Consecutive;
-///
-///     fn balance(e: &Env, owner: &Address) -> u32 {
-///         Consecutive::balance(e, owner)
-///     }
-///
-///     fn owner_of(e: &Env, token_id: u32) -> &Address {
-///         Consecutive::owner_of(e, token_id)
-///     }
-///
-///     fn transfer(e: &Env, from: &Address, to: &Address, token_id: u32) {
-///         Consecutive:transfer(e, from, to, token_id);
-///     }
-///
-///     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, token_id: u32) {
-///         Consecutive::transfer_from(e, spender, from, to, token_id);
-///     }
-///
-///     /* and so on */
 /// }
 /// ```
 pub trait ContractOverrides {
@@ -132,11 +87,17 @@ pub struct Base;
 // No override required for the `Base` contract type.
 impl ContractOverrides for Base {}
 
-/// Burnable functionality
+/// Internal override hook for `burn` and `burn_from`.
 ///
-/// Trait for overriding `burn` and `burn_from` functions.
-/// The behavior of `burn` and `burn_from` changes across implementations,
-/// i.e. enumerable, consecutive, hence the need for an abstraction
+/// # Note
+///
+/// Like [`ContractOverrides`], this trait is internal plumbing of the
+/// library. There is no need to implement or import it: implementing
+/// [`crate::non_fungible::burnable::NonFungibleBurnable`] with an empty body is
+/// enough, and the right burn behavior is picked based on the contract's
+/// `ContractType`. The behavior of `burn` and `burn_from` changes across
+/// implementations (e.g. enumerable, consecutive), hence the need for this
+/// abstraction.
 pub trait BurnableOverrides {
     fn burn(e: &Env, from: &Address, token_id: u32) {
         Base::burn(e, from, token_id);

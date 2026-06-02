@@ -20,6 +20,23 @@ use crate::fungible::{overrides::BurnableOverrides, FungibleToken};
 /// Excluding the `burn` functionality from the `[FungibleToken]` trait
 /// is a deliberate design choice to accommodate flexibility and customization
 /// for various smart contract use cases.
+///
+/// # Usage
+///
+/// No method bodies have to be written. An empty implementation is enough,
+/// and the macro fills in the rest:
+///
+/// ```rust
+/// #[contractimpl(contracttrait)]
+/// impl FungibleBurnable for ExampleContract {}
+/// ```
+///
+/// The burn logic is selected automatically based on the `ContractType` set
+/// on the `FungibleToken` implementation. If the contract uses
+/// `type ContractType = AllowList`, burning checks the allowlist; with
+/// `type ContractType = Base` it uses the vanilla behavior, and so on. There
+/// is no need to interact with the override machinery, it works in the
+/// background.
 #[contracttrait]
 pub trait FungibleBurnable: FungibleToken<ContractType: BurnableOverrides> {
     /// Destroys `amount` of tokens from `from`. Updates the total

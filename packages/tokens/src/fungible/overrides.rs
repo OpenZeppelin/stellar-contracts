@@ -1,61 +1,31 @@
 use soroban_sdk::{Address, Env, MuxedAddress, String};
 
-/// Based on the extension, some default behavior of
-/// [`crate::fungible::FungibleToken`] might have to be overridden. This is a
-/// helper trait that provides this override mechanism in a developer-friendly
-/// way.
+/// Internal override hook for [`crate::fungible::FungibleToken`].
 ///
-/// The `FungibleToken` trait can also be overridden directly, but this helper
-/// trait exists to provide the default implementations in a simpler way.
+/// # Note
 ///
-/// The way to provide different default implementations for different
-/// extensions is by implementing the trait for different types (unit structs).
-/// The problem is, `FungibleToken` trait has to be implemented for the smart
-/// contract (which is another struct). Therefore, a level of abstraction is
-/// needed by introducing an associated type, which grants
-/// `FungibleToken` trait the ability to switch between different default
-/// implementations by calling the methods on this associated type.
+/// This trait is internal plumbing of the library. As a contract author there
+/// is no need to implement it, name it, or import it. It is documented here
+/// only to explain how behavior is routed under the hood.
 ///
-/// This abstraction allows every method of the `FungibleToken` trait to be
-/// implemented using
-/// `Self::ContractType::{function_name}`, which will in turn use either the
-/// overridden or the base variant according to the extension, provided by the
-/// `ContractOverrides` trait implementation for the respective `ContractType`.
+/// Some extensions need to change the default behavior of `FungibleToken`
+/// (for example, `AllowList` and `BlockList` gate transfers). Instead of
+/// forcing every contract to re-wire those methods by hand, the behavior is
+/// keyed off the `ContractType` associated type: each `FungibleToken` method
+/// delegates to `Self::ContractType::{function_name}`, and this trait's
+/// implementation for that type decides whether to run the base logic or an
+/// override. The library ships implementations for its contract types
+/// (`Base`, `AllowList`, `BlockList`, `RWA`, `Vault`, ...).
 ///
-/// Example:
+/// From a contract author's point of view this is invisible. A `ContractType`
+/// is picked on the `FungibleToken` implementation and the bodies are left
+/// empty; the `#[contractimpl(contracttrait)]` macro fills them in and the
+/// correct behavior is selected automatically:
 ///
 /// ```rust
+/// #[contractimpl(contracttrait)]
 /// impl FungibleToken for ExampleContract {
 ///     type ContractType = Base;
-///
-///     fn balance(e: &Env, account: Address) -> i128 {
-///         Self::ContractType::balance(e, &account)
-///     }
-///
-///     fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
-///         Self::ContractType::transfer(e, &from, &to, amount);
-///     }
-///
-///     /* and so on */
-/// }
-/// ```
-///
-/// or the type can be used directly (in this case `Base`)
-/// instead of referring to it as `Self::ContractType`:
-///
-/// ```rust
-/// impl FungibleToken for ExampleContract {
-///     type ContractType = Base;
-///
-///     fn balance(e: &Env, account: Address) -> i128 {
-///         Base::balance(e, &account)
-///     }
-///
-///     fn transfer(e: &Env, from: Address, to: MuxedAddress, amount: i128) {
-///         Base::transfer(e, &from, &to, amount);
-///     }
-///
-///     /* and so on */
 /// }
 /// ```
 pub trait ContractOverrides {
@@ -102,11 +72,17 @@ pub struct Base;
 // No override required for the `Base` contract type.
 impl ContractOverrides for Base {}
 
-/// Burnable functionality
+/// Internal override hook for `burn` and `burn_from`.
 ///
-/// Trait for overriding `burn` and `burn_from` functions.
-/// The behavior of `burn` and `burn_from` changes across implementations,
-/// i.e. blocklist, allowlist, hence the need for an abstraction
+/// # Note
+///
+/// Like [`ContractOverrides`], this trait is internal plumbing of the
+/// library. There is no need to implement or import it: implementing
+/// [`crate::fungible::burnable::FungibleBurnable`] with an empty body is
+/// enough, and the right burn behavior is picked based on the contract's
+/// `ContractType`. The behavior of `burn` and `burn_from` changes across
+/// implementations (e.g. blocklist, allowlist), hence the need for this
+/// abstraction.
 pub trait BurnableOverrides {
     fn burn(e: &Env, from: &Address, amount: i128) {
         Base::burn(e, from, amount);

@@ -24,7 +24,7 @@ The `fungible` module provides functionalities for fungible tokens: balance mana
 
 ```rust
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
-use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, ContractOverrides, FungibleToken};
+use stellar_tokens::fungible::{burnable::FungibleBurnable, Base, FungibleToken};
 use stellar_access::ownable::{self as ownable, Ownable};
 use stellar_macros::{only_owner};
 
@@ -70,6 +70,13 @@ impl FungibleToken for MyContract {
 impl FungibleBurnable for MyContract {}
 ```
 
+Notice the empty trait bodies. Only a `ContractType` has to be picked (here
+`Base`, but it could be `AllowList`, `BlockList`, `RWA`, ...) and the
+`#[contractimpl(contracttrait)]` macro fills in every method, routing it to the
+behavior that matches that `ContractType`. The override machinery that makes
+this work (`ContractOverrides`, `BurnableOverrides`) operates in the
+background. There is no need to implement or import it.
+
 #### Extensions
 
 - **Burnable**: Allow token holders to destroy their tokens
@@ -94,7 +101,7 @@ The `non_fungible` module implements non-fungible token functionality:
 use soroban_sdk::{contract, contractimpl, Address, Env, String};
 use stellar_tokens::non_fungible::{
     burnable::NonFungibleBurnable,
-    Base, ContractOverrides, NonFungibleToken,
+    Base, NonFungibleToken,
 };
 
 #[contract]
