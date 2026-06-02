@@ -23,7 +23,7 @@
 //! ## Why a Separate Contract
 //!
 //! Verification keys are referenced by the confidential token on every
-//! state-changing operation (register, withdraw, transfer, operator flows).
+//! state-changing operation (register, withdraw, transfer, spender flows).
 //! Keeping them in a separate registry allows:
 //!
 //! - **Isolation**: VK-management privileges are scoped to the verifier admin,
@@ -100,9 +100,9 @@ pub enum CircuitType {
     Register = 0,
     Withdraw = 1,
     Transfer = 2,
-    OperatorTransfer = 3,
-    SetOperator = 4,
-    RevokeOperator = 5,
+    SpenderTransfer = 3,
+    SetSpender = 4,
+    RevokeSpender = 5,
 }
 
 /// Trait for managing UltraHonk verification keys used by the confidential

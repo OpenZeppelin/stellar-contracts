@@ -53,14 +53,14 @@ pub trait Policy {
 /// ## Why the write methods have no default body
 ///
 /// The write methods ([`freeze`], [`unfreeze`], [`set_compliance_config`])
-/// accept an `admin: Address` and intentionally ship without a default
+/// accept an `operator: Address` and intentionally ship without a default
 /// implementation. Because the choice of access-control module is the contract
 /// author's, the trait forces an explicit override. The override typically:
 ///
-/// 1. Performs the authorization check — either via `admin.require_auth()` plus
-///    a manual identity check, or by attaching `#[only_owner]` / `#[only_role]`
-///    to the override (in which case the `admin` parameter is passed through as
-///    the documented caller).
+/// 1. Performs the authorization check — either via `operator.require_auth()`
+///    plus a manual identity check, or by attaching `#[only_owner]` /
+///    `#[only_role]` to the override (in which case the `operator` parameter is
+///    passed through as the documented caller).
 /// 2. Delegates to the matching helper in [`storage`].
 #[contracttrait]
 pub trait ConfidentialCompliance: ConfidentialToken {
@@ -70,7 +70,7 @@ pub trait ConfidentialCompliance: ConfidentialToken {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to freeze.
-    /// * `admin` - The address whose authorization gates this operation.
+    /// * `operator` - The address whose authorization gates this operation.
     ///
     /// # Errors
     ///
@@ -83,10 +83,10 @@ pub trait ConfidentialCompliance: ConfidentialToken {
     ///
     /// # Security Warning
     ///
-    /// Implementations MUST authorize `admin` before calling
+    /// Implementations MUST authorize `operator` before calling
     /// [`storage::freeze`]. The trait cannot provide a default body
     /// — see the trait-level docstring for the rationale.
-    fn freeze(e: &Env, account: Address, admin: Address);
+    fn freeze(e: &Env, account: Address, operator: Address);
 
     /// Clears the frozen flag on `account`.
     ///
@@ -94,7 +94,7 @@ pub trait ConfidentialCompliance: ConfidentialToken {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The address to unfreeze.
-    /// * `admin` - The address whose authorization gates this operation.
+    /// * `operator` - The address whose authorization gates this operation.
     ///
     /// # Errors
     ///
@@ -107,10 +107,10 @@ pub trait ConfidentialCompliance: ConfidentialToken {
     ///
     /// # Security Warning
     ///
-    /// Implementations MUST authorize `admin` before calling
+    /// Implementations MUST authorize `operator` before calling
     /// [`storage::unfreeze`]. The trait cannot provide a default
     /// body — see the trait-level docstring for the rationale.
-    fn unfreeze(e: &Env, account: Address, admin: Address);
+    fn unfreeze(e: &Env, account: Address, operator: Address);
 
     /// Atomically replaces the compliance configuration with `config`. The
     /// intended deployment-time call is from the contract's
@@ -122,7 +122,7 @@ pub trait ConfidentialCompliance: ConfidentialToken {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `config` - The new [`ComplianceConfig`].
-    /// * `admin` - The address whose authorization gates this operation.
+    /// * `operator` - The address whose authorization gates this operation.
     ///
     /// # Events
     ///
@@ -131,10 +131,10 @@ pub trait ConfidentialCompliance: ConfidentialToken {
     ///
     /// # Security Warning
     ///
-    /// Implementations MUST authorize `admin` before calling
+    /// Implementations MUST authorize `operator` before calling
     /// [`storage::set_compliance_config`]. The trait cannot provide a
     /// default body — see the trait-level docstring for the rationale.
-    fn set_compliance_config(e: &Env, config: ComplianceConfig, admin: Address);
+    fn set_compliance_config(e: &Env, config: ComplianceConfig, operator: Address);
 
     /// Returns whether `account` is currently frozen. Returns `false` when
     /// compliance has not been configured.
@@ -168,7 +168,7 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 /// is present:
 ///
 /// 1. Reverts [`ComplianceError::AccountFrozen`] if the address is frozen (with
-///    the exception for `operator`).
+///    the exception for `spender`).
 /// 2. When `config.policy = Some(p)`, calls `p.is_authorized` and reverts
 ///    [`ComplianceError::NotAuthorizedByPolicy`] on `false`.
 /// 3. When `config.sac_passthrough = true`, calls the underlying SEP-41 token's
@@ -226,9 +226,9 @@ impl Hooks for ComplianceHooks {
         storage::gate_account(e, to, &config);
     }
 
-    fn on_operator_transfer(
+    fn on_spender_transfer(
         e: &Env,
-        _operator: &Address,
+        _spender: &Address,
         from: &Address,
         to: &Address,
         _payload: Val,
@@ -242,10 +242,10 @@ impl Hooks for ComplianceHooks {
         storage::gate_account(e, to, &config);
     }
 
-    fn on_set_operator(
+    fn on_set_spender(
         e: &Env,
         account: &Address,
-        _operator: &Address,
+        _spender: &Address,
         _live_until_ledger: u32,
         _payload: Val,
     ) {
@@ -255,7 +255,7 @@ impl Hooks for ComplianceHooks {
         storage::gate_account(e, account, &config);
     }
 
-    fn on_revoke_operator(e: &Env, account: &Address, _operator: &Address, _payload: Val) {
+    fn on_revoke_spender(e: &Env, account: &Address, _spender: &Address, _payload: Val) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };

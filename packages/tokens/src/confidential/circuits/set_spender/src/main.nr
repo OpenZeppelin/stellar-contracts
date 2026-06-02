@@ -7,7 +7,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 mod tests;
 
-// SetOperator circuit -- design doc Section 7.7.
+// SetSpender circuit -- design doc Section 7.7.
 //
 // Constraints
 // -----------
@@ -34,7 +34,7 @@ mod tests;
 //                      + Poseidon2(delta_enc_bal, vk, sigma)
 //                                                        Encrypted balance
 //                                                        scalar (emitted).
-// Delegation + allowance (per-operator escrow)
+// Delegation + allowance (per-spender escrow)
 //   S5  dvk_i      = Poseidon2(delta_dvk, vk, op_i)      Delegation viewing
 //                                                        key; contract-bound
 //                                                        via vk.
@@ -53,12 +53,12 @@ mod tests;
 //                                                        auditor block
 //                                                        (S_a1), forced
 //                                                        equal here.
-//         (b) s_esc        = (r_e * Y_op).x              Operator-handoff
+//         (b) s_esc        = (r_e * Y_op).x              Spender-handoff
 //                                                        ECDH shared secret.
 //         (c) dvk_cipher   = dvk_i
 //                              + Poseidon2(delta_esc_dvk, s_esc, op_i)
 //                                                        Masked dvk_i for the
-//                                                        operator.
+//                                                        spender.
 //   S13 r_e != 0                                         Rules out R_e = O,
 //                                                        S_{a,s} = O, and a
 //                                                        trivial escrow
@@ -88,7 +88,7 @@ mod tests;
 // Y, C_spend, C_spend', C_a, R_e, and S_{a,s} are bound to in-circuit
 // multi_scalar_mul outputs (S1, S3, S10, S7, S_a1, S_a2) and are therefore
 // on-curve by construction -- no explicit check needed. Y_op was constrained
-// on-curve when the operator registered (R1, Section 7.2) and is loaded by
+// on-curve when the spender registered (R1, Section 7.2) and is loaded by
 // the contract from trusted storage, so it is path (2) of Section 10.8 and the
 // contract trusts it on read. K_aud_s is a public-input key consumed by an
 // ECDH multiplication (path (3)); the verifier doesn't check curve membership
@@ -104,10 +104,10 @@ mod tests;
 //   1    c_spend_y            C_spend.y           `from.spendable_balance`.
 //   2    y_x                  Y.x               Loaded from
 //   3    y_y                  Y.y                 `from.spending_key`.
-//   4    y_op_x               Y_op.x            Loaded from operator
+//   4    y_op_x               Y_op.x            Loaded from spender
 //   5    y_op_y               Y_op.y              account's `spending_key`.
-//                                                Operator must be registered.
-//   6    op_i                 op_i              address_to_field(`operator`),
+//                                                Spender must be registered.
+//   6    op_i                 op_i              address_to_field(`spender`),
 //                                                computed off-circuit by the
 //                                                contract (Section 2.7).
 //   7    addr_f                 addr_f              `env.current_contract_address()`.
@@ -146,7 +146,7 @@ mod tests;
 //   sk   Owner spending secret scalar.
 //   v    Plaintext spendable-balance value.
 //   r    Plaintext blinding factor for C_spend.
-//   v_a  Plaintext per-operator allowance.
+//   v_a  Plaintext per-spender allowance.
 //   r_e  Ephemeral scalar for the auditor + escrow ECDH; must satisfy
 //        r_e != 0 (S13).
 
@@ -246,7 +246,7 @@ fn main(
     assert(escrowed_dvk_r_x == r_e_x);
 
     // Y_op is path (2) of Section 10.8: bound to scalar_mul(sk_op, H) when
-    // the operator registered (R1), trusted on read from the contract.
+    // the spender registered (R1), trusted on read from the contract.
     let y_op = EmbeddedCurvePoint { x: y_op_x, y: y_op_y, is_infinite: false };
 
     // S12(b)

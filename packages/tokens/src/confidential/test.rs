@@ -13,10 +13,10 @@ use crate::confidential::{
     auditor::{storage as auditor_storage, ConfidentialAuditor},
     storage as token_storage,
     verifier::{CircuitType, ConfidentialVerifier},
-    ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, NoHooks, OperatorDelegation,
-    OperatorTransferData, OperatorTransferPayload, RegisterData, RegisterPayload,
-    RevokeOperatorData, RevokeOperatorPayload, SetOperatorData, SetOperatorPayload, TransferData,
-    TransferPayload, WithdrawData, WithdrawPayload,
+    ConfidentialAccount, ConfidentialToken, ConfidentialTokenClient, NoHooks, RegisterData,
+    RegisterPayload, RevokeSpenderData, RevokeSpenderPayload, SetSpenderData, SetSpenderPayload,
+    SpenderDelegation, SpenderTransferData, SpenderTransferPayload, TransferData, TransferPayload,
+    WithdrawData, WithdrawPayload,
 };
 
 // ################## TEST FIXTURES ##################
@@ -194,9 +194,9 @@ fn transfer_data(e: &Env) -> Bytes {
     .to_xdr(e)
 }
 
-fn set_operator_data(e: &Env) -> Bytes {
-    SetOperatorData {
-        payload: SetOperatorPayload {
+fn set_spender_data(e: &Env) -> Bytes {
+    SetSpenderData {
+        payload: SetSpenderPayload {
             c_spend_new: fixture_point(e),
             c_a: fixture_point(e),
             escrowed_dvk: fixture_point(e),
@@ -213,9 +213,9 @@ fn set_operator_data(e: &Env) -> Bytes {
     .to_xdr(e)
 }
 
-fn operator_transfer_data(e: &Env) -> Bytes {
-    OperatorTransferData {
-        payload: OperatorTransferPayload {
+fn spender_transfer_data(e: &Env) -> Bytes {
+    SpenderTransferData {
+        payload: SpenderTransferPayload {
             c_a_new: fixture_point(e),
             c_tx: fixture_point(e),
             r_e: fixture_point(e),
@@ -232,9 +232,9 @@ fn operator_transfer_data(e: &Env) -> Bytes {
     .to_xdr(e)
 }
 
-fn revoke_operator_data(e: &Env) -> Bytes {
-    RevokeOperatorData {
-        payload: RevokeOperatorPayload {
+fn revoke_spender_data(e: &Env) -> Bytes {
+    RevokeSpenderData {
+        payload: RevokeSpenderPayload {
             c_spend_new: fixture_point(e),
             b_tilde: fixture_field(e, 0x41),
             r_e: fixture_point(e),
@@ -473,92 +473,92 @@ fn confidential_transfer_updates_both_sides() {
     assert_ne!(bob_acc.receiving_balance.to_array(), [0u8; 64]);
 }
 
-// ################## SET / REVOKE OPERATOR ##################
+// ################## SET / REVOKE SPENDER ##################
 
 #[test]
-fn set_operator_stores_delegation() {
+fn set_spender_stores_delegation() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    let operator = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
 
     h.token.register(&alice, &1u32, &register_data(&h.e));
-    h.token.register(&operator, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
 
-    h.token.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
     EventAssertion::new(&h.e, h.token_addr.clone()).assert_event_count(1);
 
-    let delegation = h.token.get_operator_delegation(&alice, &operator);
+    let delegation = h.token.get_spender_delegation(&alice, &spender);
     assert_eq!(delegation.live_until_ledger, 1_000);
-    assert!(h.token.is_operator(&alice, &operator));
+    assert!(h.token.is_spender(&alice, &spender));
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3503)")]
-fn set_operator_twice_panics() {
+fn set_spender_twice_panics() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    let operator = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
 
     h.token.register(&alice, &1u32, &register_data(&h.e));
-    h.token.register(&operator, &1u32, &register_data(&h.e));
-    h.token.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
-    h.token.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
 }
 
 #[test]
-fn revoke_operator_deletes_delegation() {
+fn revoke_spender_deletes_delegation() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    let operator = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
 
     h.token.register(&alice, &1u32, &register_data(&h.e));
-    h.token.register(&operator, &1u32, &register_data(&h.e));
-    h.token.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
 
-    h.token.revoke_operator(&alice, &operator, &revoke_operator_data(&h.e));
+    h.token.revoke_spender(&alice, &spender, &revoke_spender_data(&h.e));
     EventAssertion::new(&h.e, h.token_addr.clone()).assert_event_count(1);
 
-    assert!(!h.token.is_operator(&alice, &operator));
+    assert!(!h.token.is_spender(&alice, &spender));
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3504)")]
-fn revoke_unknown_operator_panics() {
+fn revoke_unknown_spender_panics() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    let operator = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
     h.token.register(&alice, &1u32, &register_data(&h.e));
-    h.token.revoke_operator(&alice, &operator, &revoke_operator_data(&h.e));
+    h.token.revoke_spender(&alice, &spender, &revoke_spender_data(&h.e));
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #3504)")]
-fn get_operator_delegation_unknown_panics() {
+fn get_spender_delegation_unknown_panics() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    let operator = Address::generate(&h.e);
-    h.token.get_operator_delegation(&alice, &operator);
+    let spender = Address::generate(&h.e);
+    h.token.get_spender_delegation(&alice, &spender);
 }
 
-// ################## OPERATOR TRANSFER ##################
+// ################## SPENDER TRANSFER ##################
 
 #[test]
 fn confidential_transfer_from_updates_delegation_and_recipient() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    let operator = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
 
     h.token.register(&alice, &1u32, &register_data(&h.e));
-    h.token.register(&operator, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
     h.token.register(&bob, &1u32, &register_data(&h.e));
-    h.token.set_operator(&alice, &operator, &1_000u32, &set_operator_data(&h.e));
+    h.token.set_spender(&alice, &spender, &1_000u32, &set_spender_data(&h.e));
 
-    h.token.confidential_transfer_from(&operator, &alice, &bob, &operator_transfer_data(&h.e));
+    h.token.confidential_transfer_from(&spender, &alice, &bob, &spender_transfer_data(&h.e));
     EventAssertion::new(&h.e, h.token_addr.clone()).assert_event_count(1);
 
     // Delegation allowance commitment was rotated.
-    let delegation = h.token.get_operator_delegation(&alice, &operator);
+    let delegation = h.token.get_spender_delegation(&alice, &spender);
     assert_eq!(delegation.allowance_commitment, fixture_point(&h.e));
     // Bob's receiving balance accumulated.
     let bob_acc = h.token.confidential_balance(&bob);
@@ -570,18 +570,18 @@ fn confidential_transfer_from_updates_delegation_and_recipient() {
 fn confidential_transfer_from_expired_panics() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    let operator = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
 
     h.token.register(&alice, &1u32, &register_data(&h.e));
-    h.token.register(&operator, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
     h.token.register(&bob, &1u32, &register_data(&h.e));
-    h.token.set_operator(&alice, &operator, &10u32, &set_operator_data(&h.e));
+    h.token.set_spender(&alice, &spender, &10u32, &set_spender_data(&h.e));
 
     // Advance past the delegation's expiration.
     h.e.ledger().set_sequence_number(100);
 
-    h.token.confidential_transfer_from(&operator, &alice, &bob, &operator_transfer_data(&h.e));
+    h.token.confidential_transfer_from(&spender, &alice, &bob, &spender_transfer_data(&h.e));
 }
 
 #[test]
@@ -589,14 +589,14 @@ fn confidential_transfer_from_expired_panics() {
 fn confidential_transfer_from_no_delegation_panics() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    let operator = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
     let bob = Address::generate(&h.e);
 
     h.token.register(&alice, &1u32, &register_data(&h.e));
-    h.token.register(&operator, &1u32, &register_data(&h.e));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
     h.token.register(&bob, &1u32, &register_data(&h.e));
 
-    h.token.confidential_transfer_from(&operator, &alice, &bob, &operator_transfer_data(&h.e));
+    h.token.confidential_transfer_from(&spender, &alice, &bob, &spender_transfer_data(&h.e));
 }
 
 // ################## READ METHODS ##################
@@ -610,26 +610,26 @@ fn confidential_balance_unknown_panics() {
 }
 
 #[test]
-fn is_operator_returns_false_for_missing_and_expired() {
+fn is_spender_returns_false_for_missing_and_expired() {
     let h = setup();
     let alice = Address::generate(&h.e);
-    let operator = Address::generate(&h.e);
+    let spender = Address::generate(&h.e);
 
     // Missing.
-    assert!(!h.token.is_operator(&alice, &operator));
+    assert!(!h.token.is_spender(&alice, &spender));
 
     // Active.
     h.token.register(&alice, &1u32, &register_data(&h.e));
-    h.token.register(&operator, &1u32, &register_data(&h.e));
-    h.token.set_operator(&alice, &operator, &50u32, &set_operator_data(&h.e));
-    assert!(h.token.is_operator(&alice, &operator));
+    h.token.register(&spender, &1u32, &register_data(&h.e));
+    h.token.set_spender(&alice, &spender, &50u32, &set_spender_data(&h.e));
+    assert!(h.token.is_spender(&alice, &spender));
 
     // Expired.
     h.e.ledger().set_sequence_number(100);
-    assert!(!h.token.is_operator(&alice, &operator));
+    assert!(!h.token.is_spender(&alice, &spender));
 
     // But the entry still exists (DESIGN §6.2).
-    let _ = h.token.get_operator_delegation(&alice, &operator);
+    let _ = h.token.get_spender_delegation(&alice, &spender);
 }
 
 // ################## INSTANCE SETTERS ##################
@@ -700,12 +700,12 @@ fn set_address_as_field_element_emits_event() {
     });
 }
 
-// Silence the otherwise-unused `OperatorDelegation` import.
+// Silence the otherwise-unused `SpenderDelegation` import.
 #[test]
 fn delegation_type_export_compiles() {
     fn _used<T>(_: T) {}
     let e = Env::default();
-    _used::<OperatorDelegation>(OperatorDelegation {
+    _used::<SpenderDelegation>(SpenderDelegation {
         allowance_commitment: fixture_point(&e),
         encrypted_allowance: fixture_field(&e, 0),
         escrowed_dvk: fixture_point(&e),

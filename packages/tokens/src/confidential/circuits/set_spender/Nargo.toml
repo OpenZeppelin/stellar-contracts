@@ -1,5 +1,5 @@
 [package]
-name = "circuit_revoke_operator"
+name = "circuit_set_spender"
 type = "bin"
 authors = ["OpenZeppelin"]
 compiler_version = ">=0.30.0"

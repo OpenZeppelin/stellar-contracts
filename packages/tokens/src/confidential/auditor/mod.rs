@@ -7,8 +7,8 @@
 //! ## Why a Separate Contract
 //!
 //! Auditor keys are referenced by the confidential token on every operation
-//! that produces an auditor ciphertext (withdraw, transfer, operator transfer,
-//! set/revoke operator). Keeping them in a separate registry allows:
+//! that produces an auditor ciphertext (withdraw, transfer, spender transfer,
+//! set/revoke spender). Keeping them in a separate registry allows:
 //!
 //! - **Reuse**: one registry can serve many confidential tokens;
 //! - **Lifecycle**: registration and rotation can evolve (e.g. versioned keys,
@@ -50,8 +50,8 @@ pub use storage::{get_key, register_key, rotate_key, AuditorStorageKey};
 /// token.
 ///
 /// The confidential token queries [`ConfidentialAuditor::get_key`] on every
-/// operation that produces an auditor ciphertext (withdraw, transfer, operator
-/// transfer, set/revoke operator). [`ConfidentialAuditor::register_key`] and
+/// operation that produces an auditor ciphertext (withdraw, transfer, spender
+/// transfer, set/revoke spender). [`ConfidentialAuditor::register_key`] and
 /// [`ConfidentialAuditor::rotate_key`] are privileged operations expected to be
 /// gated by the implementor's access-control scheme.
 #[contracttrait]

@@ -6,7 +6,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 mod tests;
 
-// RevokeOperator circuit -- design doc Section 7.9.
+// RevokeSpender circuit -- design doc Section 7.9.
 //
 // Constraints
 // -----------
@@ -15,7 +15,7 @@ mod tests;
 //   V2  vk         = Poseidon2(delta_vk, sk, addr_f)       Contract-bound viewing
 //                                                        key.
 //   V3  dvk_i      = Poseidon2(delta_dvk, vk, op_i)      Delegation viewing
-//                                                        key for this operator.
+//                                                        key for this spender.
 //   V4  C_a        = v_a * G + r_a * H, with
 //        r_a       = Poseidon2(delta_allow_r, dvk_i, sigma_a)
 //                                                        Opening of the
@@ -83,13 +83,13 @@ mod tests;
 //   ---  -----            ------         -------------------------------------
 //   0    c_spend_x        C_spend.x      Loaded from owner's
 //   1    c_spend_y        C_spend.y        `spendable_balance`.
-//   2    c_a_x            C_a.x          Loaded from the (account, operator)
+//   2    c_a_x            C_a.x          Loaded from the (account, spender)
 //   3    c_a_y            C_a.y            delegation entry.
 //   4    sigma_a          sigma_a        Loaded from the delegation entry
 //                                          (`allowance_salt`).
 //   5    y_x              Y.x            Loaded from owner's `spending_key`.
 //   6    y_y              Y.y
-//   7    op_i             op_i           `address_to_field(operator)`,
+//   7    op_i             op_i           `address_to_field(spender)`,
 //                                          computed per-call (Section 2.7).
 //   8    addr_f             addr_f           `env.current_contract_address()`.
 //   9    k_aud_s_x        K_aud_s.x      Fetched from the auditor contract

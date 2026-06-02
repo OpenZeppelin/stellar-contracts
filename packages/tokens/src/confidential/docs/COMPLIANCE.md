@@ -34,7 +34,7 @@ Deployments that need separation of duties (distinct freeze, policy, and clawbac
 
 ## 2. Contract-Level Freeze
 
-The contract maintains a `frozen(account) -> bool` entry per account. Before applying any state change, every state-modifying operation runs `check_not_frozen` against each account it names (sender, recipient, operator). A frozen account cannot send, receive, deposit, withdraw, or participate as an operator. The check reverts at the contract boundary.
+The contract maintains a `frozen(account) -> bool` entry per account. Before applying any state change, every state-modifying operation runs `check_not_frozen` against each account it names (sender, recipient, spender). A frozen account cannot send, receive, deposit, withdraw, or participate as an spender. The check reverts at the contract boundary.
 
 Full freeze (rather than outbound-only) keeps semantics clean: no further accumulation is possible after the freeze takes effect.
 
@@ -150,7 +150,7 @@ The challenge is that the contract does not know the targeted account's balance.
 The clawback flow requires cooperation between two roles:
 
 - **Admin** authorizes the action on-chain: freezes the target, calls the clawback entry point, and settles the recovered amount to the issuer.
-- **Auditor** unlocks knowledge of the target's balance. Two halves of the target's confidential position are covered by the two auditor channels (see `DESIGN.md` §8.1, §8.2). The **sender-auditor** decrypts the spendable-balance checkpoint $\tilde{b}_{\text{aud,s}}$ from the target's most recent owner-initiated event, recovering $v_s$. The **recipient-auditor** decrypts the per-transfer pairs $(v_{\text{tx},i}, r_{\text{tx},i})$ from every inbound transfer and operator-transfer since the last merge, recovering the full Pedersen opening $(v_r, r_r)$ of the target's `receiving_balance`. The auditor then produces a zero-knowledge proof bounding the clawback amount by $v_s + v_r$, without revealing either summand.
+- **Auditor** unlocks knowledge of the target's balance. Two halves of the target's confidential position are covered by the two auditor channels (see `DESIGN.md` §8.1, §8.2). The **sender-auditor** decrypts the spendable-balance checkpoint $\tilde{b}_{\text{aud,s}}$ from the target's most recent owner-initiated event, recovering $v_s$. The **recipient-auditor** decrypts the per-transfer pairs $(v_{\text{tx},i}, r_{\text{tx},i})$ from every inbound transfer and spender-transfer since the last merge, recovering the full Pedersen opening $(v_r, r_r)$ of the target's `receiving_balance`. The auditor then produces a zero-knowledge proof bounding the clawback amount by $v_s + v_r$, without revealing either summand.
 
 Neither party can act alone: the admin cannot produce the proof, and the auditor cannot freeze the account or move funds. This is the same trust separation present in the core protocol (admin governs state transitions, auditor governs visibility) extended to a write surface.
 

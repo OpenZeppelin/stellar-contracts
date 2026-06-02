@@ -17,7 +17,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 // withdraw/transfer (sk_op = 0xdead, K_aud_s/r and pvk scalars identical to
 // transfer) so the three circuits share an ecosystem of pinned curve points
 // for cross-circuit tooling. DVK_I is a placeholder field; in production it
-// comes from S5 of SetOperator and the operator decrypts it from
+// comes from S5 of SetSpender and the spender decrypts it from
 // `escrowed_dvk` (Section 7.11).
 global SK_OP: Field = 0xdead;
 global DVK_I: Field = 0x44767669; // ASCII "Dvki"
@@ -40,8 +40,8 @@ global K_AUD_S_SCALAR: Field = 0xc0ffee;
 global Y_OP_X: Field = 0x1b46b003b88a6c34549dc74115f088f4b231a151397526bc10cbf1d15b457646;
 global Y_OP_Y: Field = 0x29116280600c10ead1fdbd9ab4b571896030679bf554d7f1ebf681e5147de21b;
 
-// All values below are pinned by `operator_transfer_fixtures_match_lib` and
-// `operator_transfer_auditor_fixtures_match_lib`, which re-derive them from
+// All values below are pinned by `spender_transfer_fixtures_match_lib` and
+// `spender_transfer_auditor_fixtures_match_lib`, which re-derive them from
 // the lib primitives and assert the values declared here -- if either side
 // drifts the test fails immediately. They are emitted by `print_fixtures`.
 global R_A: Field = 0x1528d8006892ad6b484d6f18381c687304d6b4cb9a215992918dd601ad4acf9d;
@@ -77,7 +77,7 @@ global A_TILDE_AUD_S: Field =
 fn print_fixtures() {
     // One-shot harness: prints every derived public input for the chosen
     // fixture tuple. Run with
-    // `nargo test --package circuit_operator_transfer print_fixtures --show-output`
+    // `nargo test --package circuit_spender_transfer print_fixtures --show-output`
     // and paste the values into the globals above.
     let y_op = scalar_mul(SK_OP, H);
     let r_a = derive_allow_r(DVK_I, SIGMA_A);
@@ -149,7 +149,7 @@ fn print_fixtures() {
 }
 
 #[test]
-fn operator_transfer_fixtures_match_lib() {
+fn spender_transfer_fixtures_match_lib() {
     let y_op = scalar_mul(SK_OP, H);
     let r_a = derive_allow_r(DVK_I, SIGMA_A);
     let c_a = commit(V_A, r_a);
@@ -178,7 +178,7 @@ fn operator_transfer_fixtures_match_lib() {
 }
 
 #[test]
-fn operator_transfer_auditor_fixtures_match_lib() {
+fn spender_transfer_auditor_fixtures_match_lib() {
     let k_aud_r = scalar_mul(K_AUD_R_SCALAR, H);
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
@@ -316,7 +316,7 @@ fn matches_fixture() {
 #[test]
 fn second_transfer_against_same_allowance() {
     // Second happy-path point: same C_a (= same dvk_i, same v_a, same
-    // sigma_a) with a different v_tx. Exercises the case where the operator
+    // sigma_a) with a different v_tx. Exercises the case where the spender
     // hasn't yet rotated the allowance commitment but produces a fresh
     // sigma_a_new and a fresh r_e on every call. The transfer-side ECDH
     // chain (O5..O9) is fully rederived; only O11/O12 share dvk_i + the new
@@ -384,7 +384,7 @@ fn full_allowance_transfer() {
     // which is a valid commitment to zero. a_tilde' and a_tilde_aud_s both
     // bind to 0 (plus mask) so the owner's auditor sees the post-transfer
     // allowance reach zero. The delegation entry isn't deleted (that's
-    // revoke_operator's job, Section 7.9) -- it now escrows zero value.
+    // revoke_spender's job, Section 7.9) -- it now escrows zero value.
     let pvk_recipient =
         EmbeddedCurvePoint { x: PVK_RECIPIENT_X, y: PVK_RECIPIENT_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
@@ -474,23 +474,23 @@ fn rejects_wrong_sk_op() {
 
 #[test(should_fail)]
 fn rejects_wrong_dvk_against_contract() {
-    // Contract-binding regression. The OperatorTransfer circuit does NOT carry
-    // a vk derivation -- the operator never sees the owner's sk -- so a naive
-    // reading might worry that an operator could reuse a proof's witness
+    // Contract-binding regression. The SpenderTransfer circuit does NOT carry
+    // a vk derivation -- the spender never sees the owner's sk -- so a naive
+    // reading might worry that an spender could reuse a proof's witness
     // across contracts. The defense lives in O3.
     //
     // Mechanism (Section 7.8 final paragraph):
-    //   * SetOperator derived dvk_i from a contract-specific vk: S2/S5 chain
+    //   * SetSpender derived dvk_i from a contract-specific vk: S2/S5 chain
     //     vk = Poseidon2(VK, sk_owner, addr_f), then dvk_i = Poseidon2(DVK, vk,
     //     op_i). A different `addr_f` produces a different vk, and therefore a
     //     different dvk_i.
     //   * That dvk_i then determined r_a (S6: r_a = Poseidon2(ALLOW_R, dvk_i,
     //     sigma_a)) and thereby C_a (S7).
-    //   * On the OperatorTransfer side, C_a and sigma_a are PUBLIC inputs.
+    //   * On the SpenderTransfer side, C_a and sigma_a are PUBLIC inputs.
     //     O3 forces the prover's witness dvk_i to satisfy r_a ==
     //     Poseidon2(ALLOW_R, dvk_i, sigma_a), and O2 then forces commit(v_a,
     //     r_a) == C_a. The combination pins dvk_i: only the dvk_i that
-    //     SetOperator produced under that contract's vk admits an opening of
+    //     SetSpender produced under that contract's vk admits an opening of
     //     C_a.
     //
     // This test exercises the failure mode. We keep every public input
@@ -506,8 +506,8 @@ fn rejects_wrong_dvk_against_contract() {
     // triggers O3 immediately (r_a_derived != R_A).
     //
     // Why O3 is the load-bearing constraint: O3 is the *only* in-circuit
-    // tie between the contract-specific dvk_i (chosen at SetOperator) and
-    // the rest of the OperatorTransfer witness. Without it the operator
+    // tie between the contract-specific dvk_i (chosen at SetSpender) and
+    // the rest of the SpenderTransfer witness. Without it the spender
     // could substitute any dvk_i, satisfying O2 with a re-randomization of
     // r_a, and verify a proof against a C_a from a different contract.
     let dvk_i_bad: Field = DVK_I + 1;

@@ -30,7 +30,7 @@ That test (in `lib/src/tests.nr`) feeds a fixed input set through every primitiv
 | `addr_f` | `0xbeef` | contract address as a field element |
 | `sigma` | `0x01` | salt for owner-side derivations |
 | `sigma_a` | `0x02` | salt for allowance-side derivations |
-| `op_i` | `0xabcd` | operator address (as `Field`) |
+| `op_i` | `0xabcd` | spender address (as `Field`) |
 | `v` | `1000` (`0x3e8`) | balance value |
 | `r` | `42` (`0x2a`) | balance randomness |
 | `v_tx` | `100` (`0x64`) | transfer amount |

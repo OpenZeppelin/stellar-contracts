@@ -43,13 +43,13 @@ global C_SPEND_Y: Field =
 // r_a = derive_allow_r(dvk_i, sigma_a) (= lib fixture).
 global R_A: Field = 0x0afda20e062a277afc0c86e31ea22597ee2c094b1b9cd08b8d8a2a212a8af1ee;
 
-// C_a = commit(V_A, R_A). Pinned by `revoke_operator_fixtures_match_lib`.
+// C_a = commit(V_A, R_A). Pinned by `revoke_spender_fixtures_match_lib`.
 global C_A_X: Field =
     0x008a13da4a758b5119439c631f9ec3d32936432549b48ec3ccfb9febe3e33cd1;
 global C_A_Y: Field =
     0x233c5490e39ce0276b467a503d4216304c901a08ff6af827d12b28d3376f8e06;
 
-// C_spend' and b_tilde are pinned by `revoke_operator_fixtures_match_lib`,
+// C_spend' and b_tilde are pinned by `revoke_spender_fixtures_match_lib`,
 // which re-derives them from the lib primitives and asserts the values
 // declared here -- if either side drifts the test fails immediately.
 global C_SPEND_NEW_X: Field =
@@ -59,7 +59,7 @@ global C_SPEND_NEW_Y: Field =
 global B_TILDE: Field =
     0x04d1659db899a50a94dcfc54a18b8adaf6e9e8e3046bd11893fbd4a86a7c5990;
 
-// Auditor-block fixtures. Pinned by `revoke_operator_auditor_fixtures_match_lib`.
+// Auditor-block fixtures. Pinned by `revoke_spender_auditor_fixtures_match_lib`.
 // R_E_X (= (R_E * H).x) matches the lib's `ecdh` fixture (`ecdh(r_e, H)` for
 // the same r_e), pinning the cross-circuit relationship between R_e and the
 // lib's scalar-mul output.
@@ -78,7 +78,7 @@ global B_TILDE_AUD_S: Field =
 fn print_fixtures() {
     // One-shot harness: prints C_a, C_spend', b_tilde, K_aud_s, R_e,
     // v_tilde_aud_s, b_tilde_aud_s for the chosen fixture tuple. Run with
-    // `nargo test --package circuit_revoke_operator print_fixtures --show-output`
+    // `nargo test --package circuit_revoke_spender print_fixtures --show-output`
     // and paste the values into the globals above.
     let vk = vk_from_sk(SK, ADDR_F);
     let dvk_i = dvk_from_vk_op(vk, OP_I);
@@ -116,7 +116,7 @@ fn print_fixtures() {
 }
 
 #[test]
-fn revoke_operator_fixtures_match_lib() {
+fn revoke_spender_fixtures_match_lib() {
     // Pins the main-block fixtures (C_a, C_spend', b_tilde, Y, C_spend, R_A)
     // to the lib primitives. If lib derivations or fixture values drift, this
     // test catches it before `matches_fixture` reports a less informative
@@ -144,7 +144,7 @@ fn revoke_operator_fixtures_match_lib() {
 }
 
 #[test]
-fn revoke_operator_auditor_fixtures_match_lib() {
+fn revoke_spender_auditor_fixtures_match_lib() {
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
     let r_e_pt = scalar_mul(R_E, H);
     let s_a_s_x = ecdh(R_E, k_aud_s);

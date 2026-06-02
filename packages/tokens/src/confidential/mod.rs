@@ -20,11 +20,11 @@
 //! ## What This Crate Provides
 //!
 //! - The [`ConfidentialToken`] trait — eleven entry points (register, deposit,
-//!   merge, withdraw, two transfer variants, two operator management methods,
+//!   merge, withdraw, two transfer variants, two spender management methods,
 //!   and three read methods) with default bodies that delegate to the matching
 //!   free functions in [`storage`].
 //! - The on-chain account state types [`ConfidentialAccount`] and
-//!   [`OperatorDelegation`] (DESIGN §6).
+//!   [`SpenderDelegation`] (DESIGN §6).
 //! - The six XDR payload types carried in the `data: Bytes` parameter (DESIGN
 //!   §11).
 //! - Storage helpers and operation-level orchestration under [`storage`].
@@ -81,10 +81,10 @@ use soroban_sdk::{
     contracterror, contractevent, contracttrait, Address, Bytes, BytesN, Env, IntoVal, Val,
 };
 pub use storage::{
-    ConfidentialAccount, ConfidentialTokenStorageKey, OperatorDelegation, OperatorTransferData,
-    OperatorTransferPayload, RegisterData, RegisterPayload, RevokeOperatorData,
-    RevokeOperatorPayload, SetOperatorData, SetOperatorPayload, TransferData, TransferPayload,
-    WithdrawData, WithdrawPayload,
+    ConfidentialAccount, ConfidentialTokenStorageKey, RegisterData, RegisterPayload,
+    RevokeSpenderData, RevokeSpenderPayload, SetSpenderData, SetSpenderPayload, SpenderDelegation,
+    SpenderTransferData, SpenderTransferPayload, TransferData, TransferPayload, WithdrawData,
+    WithdrawPayload,
 };
 
 /// Lifecycle hooks invoked by [`ConfidentialToken`] at each
@@ -128,30 +128,24 @@ pub trait Hooks {
     fn on_transfer(e: &Env, from: &Address, to: &Address, payload: Val) {}
 
     /// Invoked after `confidential_transfer_from`'s auth and decode.
-    /// `payload: Val` carries an [`OperatorTransferPayload`].
-    fn on_operator_transfer(
-        e: &Env,
-        operator: &Address,
-        from: &Address,
-        to: &Address,
-        payload: Val,
-    ) {
+    /// `payload: Val` carries an [`SpenderTransferPayload`].
+    fn on_spender_transfer(e: &Env, spender: &Address, from: &Address, to: &Address, payload: Val) {
     }
 
-    /// Invoked after `set_operator`'s auth and decode. `payload: Val`
-    /// carries a [`SetOperatorPayload`].
-    fn on_set_operator(
+    /// Invoked after `set_spender`'s auth and decode. `payload: Val`
+    /// carries a [`SetSpenderPayload`].
+    fn on_set_spender(
         e: &Env,
         account: &Address,
-        operator: &Address,
+        spender: &Address,
         live_until_ledger: u32,
         payload: Val,
     ) {
     }
 
-    /// Invoked after `revoke_operator`'s auth and decode. `payload: Val`
-    /// carries a [`RevokeOperatorPayload`].
-    fn on_revoke_operator(e: &Env, account: &Address, operator: &Address, payload: Val) {}
+    /// Invoked after `revoke_spender`'s auth and decode. `payload: Val`
+    /// carries a [`RevokeSpenderPayload`].
+    fn on_revoke_spender(e: &Env, account: &Address, spender: &Address, payload: Val) {}
 }
 
 /// Zero-cost [`Hooks`] implementation whose every callback is an empty
@@ -318,18 +312,18 @@ pub trait ConfidentialToken {
         storage::confidential_transfer(e, &from, &to, &decoded.payload, &decoded.proof);
     }
 
-    /// Spends from `from`'s allowance escrowed to `operator`, transferring
+    /// Spends from `from`'s allowance escrowed to `spender`, transferring
     /// confidentially to `to`. The owner's authorization was
-    /// granted at `set_operator` and persists in the on-chain delegation
-    /// entry; only the operator authorizes this call.
+    /// granted at `set_spender` and persists in the on-chain delegation
+    /// entry; only the spender authorizes this call.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `operator` - The delegated operator (the auth principal).
+    /// * `spender` - The delegated spender (the auth principal).
     /// * `from` - The owner whose allowance is being spent.
     /// * `to` - The recipient.
-    /// * `data` - XDR-encoded [`OperatorTransferData`].
+    /// * `data` - XDR-encoded [`SpenderTransferData`].
     ///
     /// # Errors
     ///
@@ -338,29 +332,29 @@ pub trait ConfidentialToken {
     ///
     /// # Events
     ///
-    /// * topics - `["operator_transfer", operator: Address, from: Address, to:
+    /// * topics - `["spender_transfer", spender: Address, from: Address, to:
     ///   Address]`
     /// * data - `[r_e, v_tilde, sigma_a, v_aud_r, r_aud_r, v_aud_s, a_aud_s]`
     fn confidential_transfer_from(
         e: &Env,
-        operator: Address,
+        spender: Address,
         from: Address,
         to: Address,
         data: Bytes,
     ) {
-        operator.require_auth();
+        spender.require_auth();
 
-        let decoded: OperatorTransferData = storage::decode_data(e, &data);
-        Self::Hooks::on_operator_transfer(
+        let decoded: SpenderTransferData = storage::decode_data(e, &data);
+        Self::Hooks::on_spender_transfer(
             e,
-            &operator,
+            &spender,
             &from,
             &to,
             decoded.payload.clone().into_val(e),
         );
         storage::confidential_transfer_from(
             e,
-            &operator,
+            &spender,
             &from,
             &to,
             &decoded.payload,
@@ -369,59 +363,59 @@ pub trait ConfidentialToken {
     }
 
     /// Escrows an allowance from `account`'s spendable balance and delegates it
-    /// to `operator`. Reverts if a delegation already exists for the `(account,
-    /// operator)` pair.
+    /// to `spender`. Reverts if a delegation already exists for the `(account,
+    /// spender)` pair.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The delegating owner.
-    /// * `operator` - The delegated operator. Must be a registered confidential
+    /// * `spender` - The delegated spender. Must be a registered confidential
     ///   account so its spending key is available for the `dvk` escrow ECDH.
     /// * `live_until_ledger` - The ledger number at which the delegation
     ///   expires. Spending is authorized while `ledger.sequence() <=
     ///   live_until_ledger`. The escrowed value persists until
-    ///   `revoke_operator`.
-    /// * `data` - XDR-encoded [`SetOperatorData`].
+    ///   `revoke_spender`.
+    /// * `data` - XDR-encoded [`SetSpenderData`].
     ///
     /// # Errors
     ///
     /// * refer to [`storage::decode_data`] errors.
-    /// * refer to [`storage::set_operator`] errors.
+    /// * refer to [`storage::set_spender`] errors.
     ///
     /// # Events
     ///
-    /// * topics - `["set_operator", account: Address, operator: Address]`
+    /// * topics - `["set_spender", account: Address, spender: Address]`
     /// * data - `[live_until_ledger: u32, r_e, sigma, b_tilde, v_aud_s,
     ///   b_aud_s]`
-    fn set_operator(
+    fn set_spender(
         e: &Env,
         account: Address,
-        operator: Address,
+        spender: Address,
         live_until_ledger: u32,
         data: Bytes,
     ) {
         account.require_auth();
 
-        let decoded: SetOperatorData = storage::decode_data(e, &data);
-        Self::Hooks::on_set_operator(
+        let decoded: SetSpenderData = storage::decode_data(e, &data);
+        Self::Hooks::on_set_spender(
             e,
             &account,
-            &operator,
+            &spender,
             live_until_ledger,
             decoded.payload.clone().into_val(e),
         );
-        storage::set_operator(
+        storage::set_spender(
             e,
             &account,
-            &operator,
+            &spender,
             live_until_ledger,
             &decoded.payload,
             &decoded.proof,
         );
     }
 
-    /// Revokes the `(account, operator)` delegation and folds the
+    /// Revokes the `(account, spender)` delegation and folds the
     /// remaining escrowed allowance back into `account`'s spendable balance.
     /// Works for both active and expired-but-not-revoked delegations.
     ///
@@ -429,29 +423,24 @@ pub trait ConfidentialToken {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The owner reclaiming the allowance.
-    /// * `operator` - The previously-delegated operator.
-    /// * `data` - XDR-encoded [`RevokeOperatorData`].
+    /// * `spender` - The previously-delegated spender.
+    /// * `data` - XDR-encoded [`RevokeSpenderData`].
     ///
     /// # Errors
     ///
     /// * refer to [`storage::decode_data`] errors.
-    /// * refer to [`storage::revoke_operator`] errors.
+    /// * refer to [`storage::revoke_spender`] errors.
     ///
     /// # Events
     ///
-    /// * topics - `["revoke_operator", account: Address, operator: Address]`
+    /// * topics - `["revoke_spender", account: Address, spender: Address]`
     /// * data - `[r_e, sigma, b_tilde, v_aud_s, b_aud_s]`
-    fn revoke_operator(e: &Env, account: Address, operator: Address, data: Bytes) {
+    fn revoke_spender(e: &Env, account: Address, spender: Address, data: Bytes) {
         account.require_auth();
 
-        let decoded: RevokeOperatorData = storage::decode_data(e, &data);
-        Self::Hooks::on_revoke_operator(
-            e,
-            &account,
-            &operator,
-            decoded.payload.clone().into_val(e),
-        );
-        storage::revoke_operator(e, &account, &operator, &decoded.payload, &decoded.proof);
+        let decoded: RevokeSpenderData = storage::decode_data(e, &data);
+        Self::Hooks::on_revoke_spender(e, &account, &spender, decoded.payload.clone().into_val(e));
+        storage::revoke_spender(e, &account, &spender, &decoded.payload, &decoded.proof);
     }
 
     /// Returns the [`ConfidentialAccount`] stored under `account`.
@@ -468,32 +457,32 @@ pub trait ConfidentialToken {
         storage::get_account(e, &account)
     }
 
-    /// Returns `true` iff a delegation exists for `(account, operator)`
+    /// Returns `true` iff a delegation exists for `(account, spender)`
     /// and is still live (`ledger.sequence() <= live_until_ledger`).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The delegating account.
-    /// * `operator` - The delegated operator.
-    fn is_operator(e: &Env, account: Address, operator: Address) -> bool {
-        storage::is_operator(e, &account, &operator)
+    /// * `spender` - The delegated spender.
+    fn is_spender(e: &Env, account: Address, spender: Address) -> bool {
+        storage::is_spender(e, &account, &spender)
     }
 
-    /// Returns the [`OperatorDelegation`] stored under `(account,
-    /// operator)`.
+    /// Returns the [`SpenderDelegation`] stored under `(account,
+    /// spender)`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `account` - The delegating account.
-    /// * `operator` - The delegated operator.
+    /// * `spender` - The delegated spender.
     ///
     /// # Errors
     ///
-    /// * refer to [`storage::get_operator_delegation`] errors.
-    fn get_operator_delegation(e: &Env, account: Address, operator: Address) -> OperatorDelegation {
-        storage::get_operator_delegation(e, &account, &operator)
+    /// * refer to [`storage::get_spender_delegation`] errors.
+    fn get_spender_delegation(e: &Env, account: Address, spender: Address) -> SpenderDelegation {
+        storage::get_spender_delegation(e, &account, &spender)
     }
 }
 
@@ -509,9 +498,9 @@ pub enum ConfidentialTokenError {
     AccountNotRegistered = 3501,
     /// Indicates a public amount argument is negative.
     NegativeAmount = 3502,
-    /// Indicates a delegation already exists for `(account, operator)`.
+    /// Indicates a delegation already exists for `(account, spender)`.
     DelegationAlreadyExists = 3503,
-    /// Indicates no delegation exists for `(account, operator)`.
+    /// Indicates no delegation exists for `(account, spender)`.
     DelegationNotFound = 3504,
     /// Indicates the delegation has expired
     /// (`ledger.sequence() > live_until_ledger`).
@@ -686,12 +675,12 @@ pub fn emit_transfer(
     .publish(e);
 }
 
-/// Event emitted on an operator transfer.
+/// Event emitted on an spender transfer.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct OperatorTransfer {
+pub struct SpenderTransfer {
     #[topic]
-    pub operator: Address,
+    pub spender: Address,
     #[topic]
     pub from: Address,
     #[topic]
@@ -705,11 +694,11 @@ pub struct OperatorTransfer {
     pub a_aud_s: BytesN<32>,
 }
 
-/// Emits an `OperatorTransfer` event.
+/// Emits an `SpenderTransfer` event.
 #[allow(clippy::too_many_arguments)]
-pub fn emit_operator_transfer(
+pub fn emit_spender_transfer(
     e: &Env,
-    operator: &Address,
+    spender: &Address,
     from: &Address,
     to: &Address,
     r_e: &BytesN<64>,
@@ -720,8 +709,8 @@ pub fn emit_operator_transfer(
     v_aud_s: &BytesN<32>,
     a_aud_s: &BytesN<32>,
 ) {
-    OperatorTransfer {
-        operator: operator.clone(),
+    SpenderTransfer {
+        spender: spender.clone(),
         from: from.clone(),
         to: to.clone(),
         r_e: r_e.clone(),
@@ -735,14 +724,14 @@ pub fn emit_operator_transfer(
     .publish(e);
 }
 
-/// Event emitted when an operator is set up.
+/// Event emitted when an spender is set up.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SetOperator {
+pub struct SetSpender {
     #[topic]
     pub account: Address,
     #[topic]
-    pub operator: Address,
+    pub spender: Address,
     pub live_until_ledger: u32,
     pub r_e: BytesN<64>,
     pub sigma: BytesN<32>,
@@ -751,12 +740,12 @@ pub struct SetOperator {
     pub b_aud_s: BytesN<32>,
 }
 
-/// Emits a `SetOperator` event.
+/// Emits a `SetSpender` event.
 #[allow(clippy::too_many_arguments)]
-pub fn emit_set_operator(
+pub fn emit_set_spender(
     e: &Env,
     account: &Address,
-    operator: &Address,
+    spender: &Address,
     live_until_ledger: u32,
     r_e: &BytesN<64>,
     sigma: &BytesN<32>,
@@ -764,9 +753,9 @@ pub fn emit_set_operator(
     v_aud_s: &BytesN<32>,
     b_aud_s: &BytesN<32>,
 ) {
-    SetOperator {
+    SetSpender {
         account: account.clone(),
-        operator: operator.clone(),
+        spender: spender.clone(),
         live_until_ledger,
         r_e: r_e.clone(),
         sigma: sigma.clone(),
@@ -777,14 +766,14 @@ pub fn emit_set_operator(
     .publish(e);
 }
 
-/// Event emitted when an operator is revoked.
+/// Event emitted when an spender is revoked.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RevokeOperator {
+pub struct RevokeSpender {
     #[topic]
     pub account: Address,
     #[topic]
-    pub operator: Address,
+    pub spender: Address,
     pub r_e: BytesN<64>,
     pub sigma: BytesN<32>,
     pub b_tilde: BytesN<32>,
@@ -792,21 +781,21 @@ pub struct RevokeOperator {
     pub b_aud_s: BytesN<32>,
 }
 
-/// Emits a `RevokeOperator` event.
+/// Emits a `RevokeSpender` event.
 #[allow(clippy::too_many_arguments)]
-pub fn emit_revoke_operator(
+pub fn emit_revoke_spender(
     e: &Env,
     account: &Address,
-    operator: &Address,
+    spender: &Address,
     r_e: &BytesN<64>,
     sigma: &BytesN<32>,
     b_tilde: &BytesN<32>,
     v_aud_s: &BytesN<32>,
     b_aud_s: &BytesN<32>,
 ) {
-    RevokeOperator {
+    RevokeSpender {
         account: account.clone(),
-        operator: operator.clone(),
+        spender: spender.clone(),
         r_e: r_e.clone(),
         sigma: sigma.clone(),
         b_tilde: b_tilde.clone(),

@@ -7,8 +7,8 @@ use stellar_contract_utils::crypto::grumpkin::{Grumpkin, Point};
 
 use crate::confidential::{
     auditor::ConfidentialAuditorClient,
-    emit_address_as_field_set, emit_auditor_set, emit_deposit, emit_merge, emit_operator_transfer,
-    emit_register, emit_revoke_operator, emit_set_operator, emit_transfer,
+    emit_address_as_field_set, emit_auditor_set, emit_deposit, emit_merge, emit_register,
+    emit_revoke_spender, emit_set_spender, emit_spender_transfer, emit_transfer,
     emit_underlying_asset_set, emit_verifier_set, emit_withdraw,
     verifier::{CircuitType, ConfidentialVerifierClient},
     ConfidentialTokenError, ACCOUNT_EXTEND_AMOUNT, ACCOUNT_TTL_THRESHOLD, DELEGATION_EXTEND_AMOUNT,
@@ -31,7 +31,7 @@ pub enum ConfidentialTokenStorageKey {
     /// Per-account `ConfidentialAccount` entry, keyed by the owner address.
     /// Persistent storage.
     Account(Address),
-    /// Per-`(owner, operator)` `OperatorDelegation` entry. Persistent storage.
+    /// Per-`(owner, spender)` `SpenderDelegation` entry. Persistent storage.
     /// Persists until explicitly revoked even when `live_until_ledger` has
     /// passed.
     Delegation(Address, Address),
@@ -63,15 +63,15 @@ pub struct ConfidentialAccount {
     pub auditor_id: u32,
 }
 
-/// On-chain operator delegation record.
+/// On-chain spender delegation record.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct OperatorDelegation {
+pub struct SpenderDelegation {
     /// Allowance commitment `C_a = Com(v_a, r_a)`.
     pub allowance_commitment: Point,
     /// Poseidon-encrypted allowance scalar `ã`.
     pub encrypted_allowance: BytesN<32>,
-    /// ECDH escrow of `dvk_i` under the operator's spending key.
+    /// ECDH escrow of `dvk_i` under the spender's spending key.
     pub escrowed_dvk: Point,
     /// Per-delegation salt `σ_a`.
     pub allowance_salt: BytesN<32>,
@@ -156,7 +156,7 @@ pub struct TransferData {
 /// [`crate::confidential::ConfidentialToken::confidential_transfer_from`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct OperatorTransferPayload {
+pub struct SpenderTransferPayload {
     pub c_a_new: Point,
     pub c_tx: Point,
     pub r_e: Point,
@@ -173,15 +173,15 @@ pub struct OperatorTransferPayload {
 /// [`crate::confidential::ConfidentialToken::confidential_transfer_from`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct OperatorTransferData {
-    pub payload: OperatorTransferPayload,
+pub struct SpenderTransferData {
+    pub payload: SpenderTransferPayload,
     pub proof: Bytes,
 }
 
-/// Payload for [`crate::confidential::ConfidentialToken::set_operator`].
+/// Payload for [`crate::confidential::ConfidentialToken::set_spender`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SetOperatorPayload {
+pub struct SetSpenderPayload {
     pub c_spend_new: Point,
     pub c_a: Point,
     pub escrowed_dvk: Point,
@@ -195,18 +195,18 @@ pub struct SetOperatorPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`crate::confidential::ConfidentialToken::set_operator`].
+/// [`crate::confidential::ConfidentialToken::set_spender`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SetOperatorData {
-    pub payload: SetOperatorPayload,
+pub struct SetSpenderData {
+    pub payload: SetSpenderPayload,
     pub proof: Bytes,
 }
 
-/// Payload for [`crate::confidential::ConfidentialToken::revoke_operator`].
+/// Payload for [`crate::confidential::ConfidentialToken::revoke_spender`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RevokeOperatorPayload {
+pub struct RevokeSpenderPayload {
     pub c_spend_new: Point,
     pub b_tilde: BytesN<32>,
     pub r_e: Point,
@@ -216,11 +216,11 @@ pub struct RevokeOperatorPayload {
 }
 
 /// Envelope decoded from the `data: Bytes` argument of
-/// [`crate::confidential::ConfidentialToken::revoke_operator`].
+/// [`crate::confidential::ConfidentialToken::revoke_spender`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RevokeOperatorData {
-    pub payload: RevokeOperatorPayload,
+pub struct RevokeSpenderData {
+    pub payload: RevokeSpenderPayload,
     pub proof: Bytes,
 }
 
@@ -315,27 +315,27 @@ pub fn get_account(e: &Env, account: &Address) -> ConfidentialAccount {
     .unwrap_or_else(|| panic_with_error!(e, ConfidentialTokenError::AccountNotRegistered))
 }
 
-/// Returns the [`OperatorDelegation`] stored under `(owner, operator)`.
+/// Returns the [`SpenderDelegation`] stored under `(owner, spender)`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - The delegating account.
-/// * `operator` - The delegated operator.
+/// * `spender` - The delegated spender.
 ///
 /// # Errors
 ///
 /// * [`ConfidentialTokenError::DelegationNotFound`] - When no delegation exists
 ///   for the pair.
-pub fn get_operator_delegation(e: &Env, owner: &Address, operator: &Address) -> OperatorDelegation {
-    get_persistent_entry::<OperatorDelegation>(
+pub fn get_spender_delegation(e: &Env, owner: &Address, spender: &Address) -> SpenderDelegation {
+    get_persistent_entry::<SpenderDelegation>(
         e,
-        &ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone()),
+        &ConfidentialTokenStorageKey::Delegation(owner.clone(), spender.clone()),
     )
     .unwrap_or_else(|| panic_with_error!(e, ConfidentialTokenError::DelegationNotFound))
 }
 
-/// Returns `true` iff a delegation exists for `(owner, operator)` and is
+/// Returns `true` iff a delegation exists for `(owner, spender)` and is
 /// still live (`ledger.sequence() <= live_until_ledger`).
 ///
 /// Returns `false` for missing entries and for expired-but-not-revoked
@@ -345,11 +345,11 @@ pub fn get_operator_delegation(e: &Env, owner: &Address, operator: &Address) -> 
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - The delegating account.
-/// * `operator` - The delegated operator.
-pub fn is_operator(e: &Env, owner: &Address, operator: &Address) -> bool {
-    match get_persistent_entry::<OperatorDelegation>(
+/// * `spender` - The delegated spender.
+pub fn is_spender(e: &Env, owner: &Address, spender: &Address) -> bool {
+    match get_persistent_entry::<SpenderDelegation>(
         e,
-        &ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone()),
+        &ConfidentialTokenStorageKey::Delegation(owner.clone(), spender.clone()),
     ) {
         Some(d) => e.ledger().sequence() <= d.live_until_ledger,
         None => false,
@@ -370,18 +370,18 @@ pub fn account_exists(e: &Env, account: &Address) -> bool {
     .is_some()
 }
 
-/// Returns whether a delegation entry exists for `(owner, operator)`,
+/// Returns whether a delegation entry exists for `(owner, spender)`,
 /// without applying the expiry filter.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - The delegating account.
-/// * `operator` - The delegated operator.
-pub fn delegation_exists(e: &Env, owner: &Address, operator: &Address) -> bool {
-    get_persistent_entry::<OperatorDelegation>(
+/// * `spender` - The delegated spender.
+pub fn delegation_exists(e: &Env, owner: &Address, spender: &Address) -> bool {
+    get_persistent_entry::<SpenderDelegation>(
         e,
-        &ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone()),
+        &ConfidentialTokenStorageKey::Delegation(owner.clone(), spender.clone()),
     )
     .is_some()
 }
@@ -717,23 +717,23 @@ pub fn confidential_transfer(
     );
 }
 
-/// Spends from `from`'s allowance escrowed to `operator`, transferring
+/// Spends from `from`'s allowance escrowed to `spender`, transferring
 /// confidentially to `to`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `operator` - The delegated operator (the auth principal).
+/// * `spender` - The delegated spender (the auth principal).
 /// * `from` - The owner whose allowance is being spent.
 /// * `to` - The recipient.
-/// * `payload` - The decoded [`OperatorTransferPayload`].
+/// * `payload` - The decoded [`SpenderTransferPayload`].
 /// * `proof` - The raw UltraHonk proof bytes.
 ///
 /// # Errors
 ///
-/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from`,
-///   `operator`, or `to` is not registered.
-/// * [`ConfidentialTokenError::DelegationNotFound`] - When `(from, operator)`
+/// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from`, `spender`,
+///   or `to` is not registered.
+/// * [`ConfidentialTokenError::DelegationNotFound`] - When `(from, spender)`
 ///   has no delegation.
 /// * [`ConfidentialTokenError::DelegationExpired`] - When the delegation has
 ///   expired.
@@ -744,33 +744,33 @@ pub fn confidential_transfer(
 ///
 /// # Events
 ///
-/// * topics - `["operator_transfer", operator: Address, from: Address, to:
+/// * topics - `["spender_transfer", spender: Address, from: Address, to:
 ///   Address]`
 /// * data - `[r_e, v_tilde, sigma_a, v_aud_r, r_aud_r, v_aud_s, a_aud_s]`
 ///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
-/// entry point is responsible for calling `operator.require_auth()`.
+/// entry point is responsible for calling `spender.require_auth()`.
 pub fn confidential_transfer_from(
     e: &Env,
-    operator: &Address,
+    spender: &Address,
     from: &Address,
     to: &Address,
-    payload: &OperatorTransferPayload,
+    payload: &SpenderTransferPayload,
     proof: &Bytes,
 ) {
-    let delegation = get_operator_delegation(e, from, operator);
+    let delegation = get_spender_delegation(e, from, spender);
     if e.ledger().sequence() > delegation.live_until_ledger {
         panic_with_error!(e, ConfidentialTokenError::DelegationExpired);
     }
 
     let owner = get_account(e, from);
-    let operator_account = get_account(e, operator);
+    let spender_account = get_account(e, spender);
     let recipient = get_account(e, to);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_r = auditor.get_key(&recipient.auditor_id);
-    // Sender-auditor key is the OWNER's auditor, not the operator's (DESIGN
+    // Sender-auditor key is the OWNER's auditor, not the spender's (DESIGN
     // §7.8 — visibility points balance/allowance ciphertexts at the funds'
     // owner).
     let k_aud_s = auditor.get_key(&owner.auditor_id);
@@ -782,7 +782,7 @@ pub fn confidential_transfer_from(
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &delegation.allowance_commitment);
     append_field(&mut pi, &delegation.allowance_salt);
-    append_point(&mut pi, &operator_account.spending_key);
+    append_point(&mut pi, &spender_account.spending_key);
     append_point(&mut pi, &recipient.viewing_public_key);
     append_point(&mut pi, &k_aud_r);
     append_point(&mut pi, &k_aud_s);
@@ -797,21 +797,21 @@ pub fn confidential_transfer_from(
     append_field(&mut pi, &payload.v_aud_s);
     append_field(&mut pi, &payload.a_aud_s);
 
-    verify(e, CircuitType::OperatorTransfer, &pi, proof);
+    verify(e, CircuitType::SpenderTransfer, &pi, proof);
 
     update_delegation(
         e,
         from,
-        operator,
+        spender,
         &payload.c_a_new,
         &payload.a_tilde_new,
         &payload.sigma_a_new,
     );
     add_to_receiving(e, to, &payload.c_tx);
 
-    emit_operator_transfer(
+    emit_spender_transfer(
         e,
-        operator,
+        spender,
         from,
         to,
         &payload.r_e,
@@ -825,26 +825,26 @@ pub fn confidential_transfer_from(
 }
 
 /// Escrows an allowance from `account`'s spendable balance and delegates it
-/// to `operator`. Reverts if a delegation already exists for the `(account,
-/// operator)` pair.
+/// to `spender`. Reverts if a delegation already exists for the `(account,
+/// spender)` pair.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The delegating owner.
-/// * `operator` - The delegated operator. Must be a registered confidential
+/// * `spender` - The delegated spender. Must be a registered confidential
 ///   account so its spending key is available for the `dvk` escrow ECDH.
 /// * `live_until_ledger` - The ledger number at which the delegation expires.
 ///   Spending is authorized while `ledger.sequence() <= live_until_ledger`.
-/// * `payload` - The decoded [`SetOperatorPayload`].
+/// * `payload` - The decoded [`SetSpenderPayload`].
 /// * `proof` - The raw UltraHonk proof bytes.
 ///
 /// # Errors
 ///
 /// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` or
-///   `operator` is not registered.
+///   `spender` is not registered.
 /// * [`ConfidentialTokenError::DelegationAlreadyExists`] - When a delegation
-///   already exists for the `(account, operator)` pair.
+///   already exists for the `(account, spender)` pair.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -852,27 +852,27 @@ pub fn confidential_transfer_from(
 ///
 /// # Events
 ///
-/// * topics - `["set_operator", account: Address, operator: Address]`
+/// * topics - `["set_spender", account: Address, spender: Address]`
 /// * data - `[live_until_ledger: u32, r_e, sigma, b_tilde, v_aud_s, b_aud_s]`
 ///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
 /// entry point is responsible for calling `account.require_auth()`.
-pub fn set_operator(
+pub fn set_spender(
     e: &Env,
     account: &Address,
-    operator: &Address,
+    spender: &Address,
     live_until_ledger: u32,
-    payload: &SetOperatorPayload,
+    payload: &SetSpenderPayload,
     proof: &Bytes,
 ) {
     let owner = get_account(e, account);
-    let operator_account = get_account(e, operator);
+    let spender_account = get_account(e, spender);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_s = auditor.get_key(&owner.auditor_id);
     let addr_f = get_address_as_field_element(e);
-    let op_i = address_to_field(e, operator);
+    let op_i = address_to_field(e, spender);
 
     // PI order (DESIGN §7.7):
     //   C_spend, Y, Y_op, op_i, addr_f, K_aud_s,
@@ -881,7 +881,7 @@ pub fn set_operator(
     let mut pi = Bytes::new(e);
     append_point(&mut pi, &owner.spendable_balance);
     append_point(&mut pi, &owner.spending_key);
-    append_point(&mut pi, &operator_account.spending_key);
+    append_point(&mut pi, &spender_account.spending_key);
     append_field(&mut pi, &op_i);
     append_field(&mut pi, &addr_f);
     append_point(&mut pi, &k_aud_s);
@@ -896,14 +896,14 @@ pub fn set_operator(
     append_field(&mut pi, &payload.v_aud_s);
     append_field(&mut pi, &payload.b_aud_s);
 
-    verify(e, CircuitType::SetOperator, &pi, proof);
+    verify(e, CircuitType::SetSpender, &pi, proof);
 
     set_spendable(e, account, &payload.c_spend_new);
     set_delegation(
         e,
         account,
-        operator,
-        &OperatorDelegation {
+        spender,
+        &SpenderDelegation {
             allowance_commitment: payload.c_a.clone(),
             encrypted_allowance: payload.a_tilde.clone(),
             escrowed_dvk: payload.escrowed_dvk.clone(),
@@ -912,10 +912,10 @@ pub fn set_operator(
         },
     );
 
-    emit_set_operator(
+    emit_set_spender(
         e,
         account,
-        operator,
+        spender,
         live_until_ledger,
         &payload.r_e,
         &payload.sigma,
@@ -925,7 +925,7 @@ pub fn set_operator(
     );
 }
 
-/// Revokes the `(account, operator)` delegation and folds the remaining
+/// Revokes the `(account, spender)` delegation and folds the remaining
 /// escrowed allowance back into `account`'s spendable balance.
 /// Works for both active and expired-but-not-revoked delegations.
 ///
@@ -933,16 +933,16 @@ pub fn set_operator(
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The owner reclaiming the allowance.
-/// * `operator` - The previously-delegated operator.
-/// * `payload` - The decoded [`RevokeOperatorPayload`].
+/// * `spender` - The previously-delegated spender.
+/// * `payload` - The decoded [`RevokeSpenderPayload`].
 /// * `proof` - The raw UltraHonk proof bytes.
 ///
 /// # Errors
 ///
 /// * [`ConfidentialTokenError::AccountNotRegistered`] - When `account` is not
 ///   registered.
-/// * [`ConfidentialTokenError::DelegationNotFound`] - When `(account,
-///   operator)` has no delegation.
+/// * [`ConfidentialTokenError::DelegationNotFound`] - When `(account, spender)`
+///   has no delegation.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -950,26 +950,26 @@ pub fn set_operator(
 ///
 /// # Events
 ///
-/// * topics - `["revoke_operator", account: Address, operator: Address]`
+/// * topics - `["revoke_spender", account: Address, spender: Address]`
 /// * data - `[r_e, sigma, b_tilde, v_aud_s, b_aud_s]`
 ///
 /// # Security Warning
 ///
 /// **IMPORTANT**: This function bypasses authorization checks. The trait
 /// entry point is responsible for calling `account.require_auth()`.
-pub fn revoke_operator(
+pub fn revoke_spender(
     e: &Env,
     account: &Address,
-    operator: &Address,
-    payload: &RevokeOperatorPayload,
+    spender: &Address,
+    payload: &RevokeSpenderPayload,
     proof: &Bytes,
 ) {
     let owner = get_account(e, account);
-    let delegation = get_operator_delegation(e, account, operator);
+    let delegation = get_spender_delegation(e, account, spender);
     let auditor = ConfidentialAuditorClient::new(e, &get_auditor(e));
     let k_aud_s = auditor.get_key(&owner.auditor_id);
     let addr_f = get_address_as_field_element(e);
-    let op_i = address_to_field(e, operator);
+    let op_i = address_to_field(e, spender);
 
     // PI order (DESIGN §7.9):
     //   C_spend, C_a, sigma_a, Y, op_i, addr_f, K_aud_s,
@@ -989,15 +989,15 @@ pub fn revoke_operator(
     append_field(&mut pi, &payload.v_aud_s);
     append_field(&mut pi, &payload.b_aud_s);
 
-    verify(e, CircuitType::RevokeOperator, &pi, proof);
+    verify(e, CircuitType::RevokeSpender, &pi, proof);
 
     set_spendable(e, account, &payload.c_spend_new);
-    delete_delegation(e, account, operator);
+    delete_delegation(e, account, spender);
 
-    emit_revoke_operator(
+    emit_revoke_spender(
         e,
         account,
-        operator,
+        spender,
         &payload.r_e,
         &payload.sigma,
         &payload.b_tilde,
@@ -1198,21 +1198,21 @@ fn add_to_receiving(e: &Env, account: &Address, c_tx: &Point) {
     e.storage().persistent().set(&ConfidentialTokenStorageKey::Account(account.clone()), &data);
 }
 
-/// Stores a fresh [`OperatorDelegation`] under `(owner, operator)`.
+/// Stores a fresh [`SpenderDelegation`] under `(owner, spender)`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - The delegating account.
-/// * `operator` - The delegated operator.
+/// * `spender` - The delegated spender.
 /// * `delegation` - The delegation entry.
 ///
 /// # Errors
 ///
 /// * [`ConfidentialTokenError::DelegationAlreadyExists`] - When a delegation
-///   already exists for the `(owner, operator)` pair.
-fn set_delegation(e: &Env, owner: &Address, operator: &Address, delegation: &OperatorDelegation) {
-    let key = ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone());
+///   already exists for the `(owner, spender)` pair.
+fn set_delegation(e: &Env, owner: &Address, spender: &Address, delegation: &SpenderDelegation) {
+    let key = ConfidentialTokenStorageKey::Delegation(owner.clone(), spender.clone());
     if e.storage().persistent().has(&key) {
         panic_with_error!(e, ConfidentialTokenError::DelegationAlreadyExists);
     }
@@ -1220,13 +1220,13 @@ fn set_delegation(e: &Env, owner: &Address, operator: &Address, delegation: &Ope
 }
 
 /// Updates a delegation's allowance commitment, encrypted allowance, and
-/// salt after an operator transfer.
+/// salt after an spender transfer.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - The delegating account.
-/// * `operator` - The delegated operator.
+/// * `spender` - The delegated spender.
 /// * `c_a_new` - New allowance commitment.
 /// * `a_tilde_new` - New encrypted allowance scalar.
 /// * `sigma_a_new` - New allowance salt.
@@ -1238,35 +1238,34 @@ fn set_delegation(e: &Env, owner: &Address, operator: &Address, delegation: &Ope
 fn update_delegation(
     e: &Env,
     owner: &Address,
-    operator: &Address,
+    spender: &Address,
     c_a_new: &Point,
     a_tilde_new: &BytesN<32>,
     sigma_a_new: &BytesN<32>,
 ) {
-    let mut delegation = get_operator_delegation(e, owner, operator);
+    let mut delegation = get_spender_delegation(e, owner, spender);
     delegation.allowance_commitment = c_a_new.clone();
     delegation.encrypted_allowance = a_tilde_new.clone();
     delegation.allowance_salt = sigma_a_new.clone();
-    e.storage().persistent().set(
-        &ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone()),
-        &delegation,
-    );
+    e.storage()
+        .persistent()
+        .set(&ConfidentialTokenStorageKey::Delegation(owner.clone(), spender.clone()), &delegation);
 }
 
-/// Deletes the `(owner, operator)` delegation entry (revoke path).
+/// Deletes the `(owner, spender)` delegation entry (revoke path).
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `owner` - The delegating account.
-/// * `operator` - The delegated operator.
+/// * `spender` - The delegated spender.
 ///
 /// # Errors
 ///
 /// * [`ConfidentialTokenError::DelegationNotFound`] - When no delegation exists
 ///   for the pair.
-fn delete_delegation(e: &Env, owner: &Address, operator: &Address) {
-    let key = ConfidentialTokenStorageKey::Delegation(owner.clone(), operator.clone());
+fn delete_delegation(e: &Env, owner: &Address, spender: &Address) {
+    let key = ConfidentialTokenStorageKey::Delegation(owner.clone(), spender.clone());
     if !e.storage().persistent().has(&key) {
         panic_with_error!(e, ConfidentialTokenError::DelegationNotFound);
     }

@@ -1,5 +1,5 @@
 [package]
-name = "circuit_operator_transfer"
+name = "circuit_spender_transfer"
 type = "bin"
 authors = ["OpenZeppelin"]
 compiler_version = ">=0.30.0"

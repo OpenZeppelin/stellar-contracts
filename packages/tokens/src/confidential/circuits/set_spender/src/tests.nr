@@ -16,7 +16,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 // distinct salt so the allowance channel is independent of the owner channel.
 // SK_OP / K_AUD_S_SCALAR are placeholder secret scalars used to materialize
 // on-curve Y_op / K_aud_s; any non-zero scalar would do, these are pinned by
-// `set_operator_fixtures_match_lib`. K_AUD_S_SCALAR matches the withdraw
+// `set_spender_fixtures_match_lib`. K_AUD_S_SCALAR matches the withdraw
 // fixture's auditor scalar so the two circuits share the same owner-auditor
 // key in cross-circuit tooling. OP_I is a placeholder address-as-field; the
 // contract computes it off-circuit via `address_to_field` (Section 2.7).
@@ -31,7 +31,7 @@ global V_NEW: Field = 700;
 global R_E: Field = 0xfeedface;
 global OP_I: Field = 0xfee1;
 
-// Placeholder operator secret scalar; Y_op = SK_OP * H.
+// Placeholder spender secret scalar; Y_op = SK_OP * H.
 global SK_OP: Field = 0xbabe;
 // Placeholder owner-auditor secret scalar; K_aud_s = scalar * H. Matches the
 // withdraw fixture so cross-circuit tooling sees the same K_aud_s.
@@ -61,7 +61,7 @@ global R_E_Y: Field = 0x07a70cf826350d4f438c7a3c5e8761b0ae6cb63de757f0c96815f405
 // the owner-block randomness (vk, sigma) is identical, so both spendable-
 // balance ciphertexts collapse to the withdraw values. Pinned by
 // `withdraw_fixtures_match_lib` and re-asserted by
-// `set_operator_fixtures_match_lib`.
+// `set_spender_fixtures_match_lib`.
 global C_SPEND_NEW_X: Field =
     0x22f167015ee0e4b33dcb278cdc824c336c919dc4cd06f391850305d5083336e6;
 global C_SPEND_NEW_Y: Field =
@@ -69,8 +69,8 @@ global C_SPEND_NEW_Y: Field =
 global B_TILDE: Field =
     0x04d1659db899a50a94dcfc54a18b8adaf6e9e8e3046bd11893fbd4a86a7c5670;
 
-// New values pinned by `set_operator_fixtures_match_lib` and
-// `set_operator_auditor_fixtures_match_lib` (re-derived from the lib
+// New values pinned by `set_spender_fixtures_match_lib` and
+// `set_spender_auditor_fixtures_match_lib` (re-derived from the lib
 // primitives -- if either side drifts the test fails immediately). Emitted by
 // `print_fixtures`.
 global Y_OP_X: Field = 0x08a500f1d05ebcba6cdbe9c246475e406f28ee2285fdfa4ed9781013ebb1571e;
@@ -90,7 +90,7 @@ global B_TILDE_AUD_S: Field =
 fn print_fixtures() {
     // One-shot harness: prints every derived public input for the chosen
     // fixture tuple. Run with
-    // `nargo test --package circuit_set_operator print_fixtures --show-output`
+    // `nargo test --package circuit_set_spender print_fixtures --show-output`
     // and paste the values into the globals above.
     let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
@@ -141,7 +141,7 @@ fn print_fixtures() {
 }
 
 #[test]
-fn set_operator_fixtures_match_lib() {
+fn set_spender_fixtures_match_lib() {
     let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let r_a = derive_allow_r(dvk, SIGMA_A);
@@ -169,7 +169,7 @@ fn set_operator_fixtures_match_lib() {
 }
 
 #[test]
-fn set_operator_auditor_fixtures_match_lib() {
+fn set_spender_auditor_fixtures_match_lib() {
     let vk = vk_from_sk(SK, ADDR_F);
     let dvk = dvk_from_vk_op(vk, OP_I);
     let y_op = scalar_mul(SK_OP, H);

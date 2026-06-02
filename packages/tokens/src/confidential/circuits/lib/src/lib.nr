@@ -1,8 +1,8 @@
 //! # Confidential Token -- Noir Primitives
 //!
 //! Shared cryptographic primitives consumed by the six circuits described in
-//! Section 7 of the design document (Register, Withdraw, Transfer, OperatorTransfer,
-//! SetOperator, RevokeOperator).
+//! Section 7 of the design document (Register, Withdraw, Transfer, SpenderTransfer,
+//! SetSpender, RevokeSpender).
 //!
 //! Every constraint that involves a Pedersen commitment, a Poseidon2 hash with
 //! domain separation, an ECDH derivation, or a 128-bit range check funnels
@@ -118,11 +118,11 @@ pub mod domain {
     /// `a_tilde = v_a + Poseidon2(ENCRYPTED_ALLOWANCE, dvk, sigma_a)`.
     /// Constraints S8/O12 (`delta_enc_allow`).
     pub global ENCRYPTED_ALLOWANCE: Field = 8;
-    /// Deterministic randomness for the operator allowance:
+    /// Deterministic randomness for the spender allowance:
     /// `r_a = Poseidon2(ALLOWANCE_RANDOMNESS, dvk, sigma_a)`.
     /// Constraints S6/O3/O10 (`delta_allow_r`).
     pub global ALLOWANCE_RANDOMNESS: Field = 9;
-    /// Delegation-key escrow mask (operator ECDH):
+    /// Delegation-key escrow mask (spender ECDH):
     /// `Poseidon2(ESCROWED_DELEGATION_VIEWING_KEY, s, op_i)`.
     /// Constraint S12, Section 7.11 (`delta_esc_dvk`).
     pub global ESCROWED_DELEGATION_VIEWING_KEY: Field = 10;
@@ -245,7 +245,7 @@ pub fn derive_spend_r(vk: Field, sigma: Field) -> Field {
     poseidon_with_domain(domain::SPEND_RANDOMNESS, [vk, sigma])
 }
 
-/// Deterministic randomness for the operator allowance commitment.
+/// Deterministic randomness for the spender allowance commitment.
 /// Constraints S6 / O3 / O10.
 pub fn derive_allow_r(dvk: Field, sigma_a: Field) -> Field {
     poseidon_with_domain(domain::ALLOWANCE_RANDOMNESS, [dvk, sigma_a])
@@ -271,13 +271,13 @@ pub fn encrypt_balance(v_new: Field, vk: Field, sigma: Field) -> Field {
     v_new + poseidon_with_domain(domain::ENCRYPTED_BALANCE, [vk, sigma])
 }
 
-/// Encrypts the operator allowance under the delegation viewing key.
+/// Encrypts the spender allowance under the delegation viewing key.
 /// Constraints S8 / O12. `a_tilde = v_a + Poseidon2(ENC_ALLOW, dvk, sigma_a)`.
 pub fn encrypt_allowance(v_a: Field, dvk: Field, sigma_a: Field) -> Field {
     v_a + poseidon_with_domain(domain::ENCRYPTED_ALLOWANCE, [dvk, sigma_a])
 }
 
-/// Delegation-key escrow mask for the operator handoff at `set_operator`. Section 7.11.
+/// Delegation-key escrow mask for the spender handoff at `set_spender`. Section 7.11.
 /// `escrowed_dvk = dvk + Poseidon2(ESC_DVK, s, op_i)` where `s = (r_e * Y_op).x`.
 pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
     dvk + poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, op_i])
@@ -295,7 +295,7 @@ pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
 /// cost is exactly one Poseidon2 permutation per call.
 ///
 /// Used by: Transfer (T_a2 recipient-auditor amount + randomness, T_a6
-/// sender-auditor amount + balance) and OperatorTransfer (O_a2, O_a6).
+/// sender-auditor amount + balance) and SpenderTransfer (O_a2, O_a6).
 pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
     let iv: Field = 3 * POSEIDON2_IV_BASE;
     let state = poseidon2_permutation([d, s_x, sigma, iv], 4);
@@ -303,11 +303,11 @@ pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
 }
 
 /// Sender-auditor encrypted balance/allowance checkpoint for circuits whose
-/// auditor block emits a single ciphertext (Withdraw W_a3/W_a4, RevokeOperator
-/// V_a3/V_a5, SetOperator S_a3/S_a5).
+/// auditor block emits a single ciphertext (Withdraw W_a3/W_a4, RevokeSpender
+/// V_a3/V_a5, SetSpender S_a3/S_a5).
 ///
 /// `b_tilde_aud_s = v_new + Poseidon2(AUDITOR_SENDER, s_a_s_x, sigma)`.
-/// The two-squeeze sender-channel form (Transfer T_a6-T_a8, OperatorTransfer
+/// The two-squeeze sender-channel form (Transfer T_a6-T_a8, SpenderTransfer
 /// O_a6-O_a8) is a different composition that callers spell out directly with
 /// `sponge_squeeze_2`.
 pub fn encrypt_auditor_sender_balance(v_new: Field, s_a_s_x: Field, sigma: Field) -> Field {
