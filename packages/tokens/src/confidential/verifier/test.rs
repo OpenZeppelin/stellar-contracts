@@ -43,9 +43,9 @@ fn register_each_circuit_round_trips() {
             CircuitType::Register,
             CircuitType::Withdraw,
             CircuitType::Transfer,
-            CircuitType::OperatorTransfer,
-            CircuitType::SetOperator,
-            CircuitType::RevokeOperator,
+            CircuitType::SpenderTransfer,
+            CircuitType::SetSpender,
+            CircuitType::RevokeSpender,
         ]
         .into_iter()
         .enumerate()
@@ -103,7 +103,7 @@ fn update_unregistered_panics_with_not_registered() {
     let address = e.register(MockContract, ());
 
     e.as_contract(&address, || {
-        update_verification_key(&e, CircuitType::SetOperator, &vk_bytes(&e, 0xff));
+        update_verification_key(&e, CircuitType::SetSpender, &vk_bytes(&e, 0xff));
     });
 }
 
@@ -116,8 +116,8 @@ fn update_emits_update_event() {
         let old = vk_bytes(&e, 0x10);
         let new = vk_bytes(&e, 0x20);
 
-        register_verification_key(&e, CircuitType::OperatorTransfer, &old);
-        update_verification_key(&e, CircuitType::OperatorTransfer, &new);
+        register_verification_key(&e, CircuitType::SpenderTransfer, &old);
+        update_verification_key(&e, CircuitType::SpenderTransfer, &new);
 
         // 2 events: VerificationKeyRegistered + VerificationKeyUpdated.
         EventAssertion::new(&e, address.clone()).assert_event_count(2);
@@ -131,12 +131,12 @@ fn storage_key_round_trip() {
 
     e.as_contract(&address, || {
         let vk = vk_bytes(&e, 0x77);
-        register_verification_key(&e, CircuitType::RevokeOperator, &vk);
+        register_verification_key(&e, CircuitType::RevokeSpender, &vk);
 
         let stored: Bytes = e
             .storage()
             .instance()
-            .get(&VerifierStorageKey::Vk(CircuitType::RevokeOperator))
+            .get(&VerifierStorageKey::Vk(CircuitType::RevokeSpender))
             .unwrap();
         assert_eq!(stored, vk);
     });

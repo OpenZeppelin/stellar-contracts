@@ -6,12 +6,12 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 mod tests;
 
-// OperatorTransfer circuit -- design doc Section 7.8.
+// SpenderTransfer circuit -- design doc Section 7.8.
 //
 // Constraints
 // -----------
-// Operator key ownership
-//   O1  Y_op       = sk_op * H                              Operator key
+// Spender key ownership
+//   O1  Y_op       = sk_op * H                              Spender key
 //                                                           ownership.
 // Allowance state (current)
 //   O2  C_a        = v_a * G + r_a * H                      Opening of the
@@ -21,7 +21,7 @@ mod tests;
 //                              sigma_a)                     Allowance
 //                                                           randomness matches
 //                                                           stored state (the
-//                                                           wrapper-binding
+//                                                           contract-binding
 //                                                           anchor, see below).
 //   O4  v_a, v_tx, v_a - v_tx in [0, 2^127)                 Range validity
 //                                                           (Section 2.6); the
@@ -83,7 +83,7 @@ mod tests;
 //                                                           visibility points
 //                                                           at the funds'
 //                                                           OWNER, not the
-//                                                           operator (Section
+//                                                           spender (Section
 //                                                           8.4).
 //   O_a6 (m_v_s, m_a_s)
 //                  = SpongeSqueeze_2(delta_aud_s,
@@ -96,16 +96,16 @@ mod tests;
 //                                                           post-transfer
 //                                                           allowance.
 //
-// Wrapper binding (Section 7.8 final paragraph)
+// Contract binding (Section 7.8 final paragraph)
 // ---------------------------------------------
-// Unlike owner-initiated circuits, OperatorTransfer does NOT constrain the vk
-// derivation -- the operator has no access to the owner's sk. Wrapper binding
-// is inherited indirectly through the allowance commitment chain: SetOperator
-// derived `dvk_i` from the wrapper-specific `vk` (S2, S5), which determined
-// `r_a` (S6) and thus `C_a` (S7). Here O3 verifies the operator's claimed
+// Unlike owner-initiated circuits, SpenderTransfer does NOT constrain the vk
+// derivation -- the spender has no access to the owner's sk. Contract binding
+// is inherited indirectly through the allowance commitment chain: SetSpender
+// derived `dvk_i` from the contract-specific `vk` (S2, S5), which determined
+// `r_a` (S6) and thus `C_a` (S7). Here O3 verifies the spender's claimed
 // `dvk_i` against the on-chain `C_a` via `sigma_a`. Because `C_a` is a public
-// input and was constructed with wrapper-specific randomness, a proof
-// generated against one wrapper's `C_a` cannot verify against another's.
+// input and was constructed with contract-specific randomness, a proof
+// generated against one contract's `C_a` cannot verify against another's.
 //
 // Channel-nonce reuse (Section 6.2 *Dual role*)
 // ---------------------------------------------
@@ -123,7 +123,7 @@ mod tests;
 // multi_scalar_mul outputs (O1, O2, O11, O8, O6, O5, O_a1, O_a5) and are
 // therefore on-curve by construction -- no explicit check needed.
 // PVK_recipient was constrained on-curve when the recipient registered (R3,
-// Section 7.2) and is loaded by the wrapper from trusted storage, so it is
+// Section 7.2) and is loaded by the contract from trusted storage, so it is
 // path (2) of Section 10.8 and the circuit consumes it without re-checking.
 // K_aud_r and K_aud_s are public-input keys with no proof constraint at
 // insertion (path (3)) -- the verifier doesn't check curve membership and
@@ -136,12 +136,12 @@ mod tests;
 //   Idx  Param                Symbol            Source / Note
 //   ---  -----                ------            -------------------------------
 //   0    c_a_x                C_a.x             Loaded from the
-//   1    c_a_y                C_a.y               `(from, operator)` delegation
+//   1    c_a_y                C_a.y               `(from, spender)` delegation
 //                                                 entry's allowance_commitment.
 //   2    sigma_a              sigma_a           Loaded from the delegation
 //                                                 entry's allowance_salt.
 //   3    y_op_x               Y_op.x            Loaded from
-//   4    y_op_y               Y_op.y              `operator.spending_key`;
+//   4    y_op_y               Y_op.y              `spender.spending_key`;
 //                                                 matches the auth principal.
 //   5    pvk_recipient_x      PVK_recipient.x   Loaded from
 //   6    pvk_recipient_y      PVK_recipient.y     `to.viewing_public_key`.
@@ -151,7 +151,7 @@ mod tests;
 //   9    k_aud_s_x            K_aud_s.x         Fetched from the auditor
 //   10   k_aud_s_y            K_aud_s.y           contract by the OWNER's
 //                                                 `auditor_id`, not the
-//                                                 operator's (Section 7.8).
+//                                                 spender's (Section 7.8).
 //   11   c_a_new_x            C_a'.x            Prover-supplied; written to
 //   12   c_a_new_y            C_a'.y              the delegation entry's new
 //                                                 allowance_commitment.
@@ -179,8 +179,8 @@ mod tests;
 //
 // Private witnesses
 // -----------------
-//   sk_op   Operator's spending secret scalar.
-//   dvk_i   Delegation viewing key for this (owner, operator) pair, pinned by
+//   sk_op   Spender's spending secret scalar.
+//   dvk_i   Delegation viewing key for this (owner, spender) pair, pinned by
 //           O3 to Poseidon2(delta_allow_r, dvk_i, sigma_a) = r_a.
 //   v_a     Plaintext current allowance value.
 //   r_a     Plaintext blinding factor for C_a (single-limb F_r; pinned by O3).
@@ -229,7 +229,7 @@ fn main(
     assert(y_op_derived.x == y_op_x);
     assert(y_op_derived.y == y_op_y);
 
-    // O3 -- runs before O2 so the wrapper-binding check (r_a is pinned to
+    // O3 -- runs before O2 so the contract-binding check (r_a is pinned to
     // dvk_i, sigma_a) is in scope before O2 uses r_a as the blinding under
     // the Pedersen commitment.
     let r_a_derived = derive_allow_r(dvk_i, sigma_a);

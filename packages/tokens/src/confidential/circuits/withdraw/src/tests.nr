@@ -7,14 +7,14 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 // Canonical fixture inputs.
 //
-// SK / WRAP / SIGMA / V / R reuse the lib's pinned vectors (lib/testdata)
+// SK / ADDR_F / SIGMA / V / R reuse the lib's pinned vectors (lib/testdata)
 // so that Y, C_spend, vk, r_new, and b_tilde are derivable from -- and
 // pinned by -- the lib's `fixtures_match_testdata` test. A is chosen
 // strictly less than V so the happy path exercises a non-trivial
 // `v_new = v - a` while still satisfying W4. R_E and K_AUD_S are local
 // to this circuit (no auditor-side primitives in lib's fixtures).
 global SK: Field = 0xdead;
-global WRAP: Field = 0xbeef;
+global ADDR_F: Field = 0xbeef;
 global SIGMA: Field = 0x01;
 global V: Field = 1000;
 global R: Field = 42;
@@ -66,7 +66,7 @@ fn print_fixtures() {
     // for the chosen fixture tuple. Run with
     // `nargo test --package circuit_withdraw print_fixtures --show-output`
     // and paste the values into the globals above.
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(V_NEW, r_new);
     let b_tilde = encrypt_balance(V_NEW, vk, SIGMA);
@@ -92,7 +92,7 @@ fn print_fixtures() {
 
 #[test]
 fn withdraw_fixtures_match_lib() {
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(V_NEW, r_new);
     let b_tilde = encrypt_balance(V_NEW, vk, SIGMA);
@@ -132,7 +132,7 @@ fn matches_fixture() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         A,
@@ -151,7 +151,7 @@ fn full_withdrawal() {
     // Boundary: a = v, so v_new = 0. C_spend' commits to (0, r_new) which is
     // a valid commitment to zero. b_tilde and b_tilde_aud_s both bind to 0
     // (plus mask) so the auditor sees the post-withdrawal balance reach zero.
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(0, r_new);
     let b_tilde = encrypt_balance(0, vk, SIGMA);
@@ -167,7 +167,7 @@ fn full_withdrawal() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         V,
@@ -185,7 +185,7 @@ fn full_withdrawal() {
 fn rejects_under_funded_withdrawal() {
     // a > v: v - a underflows in the field to a value >= 2^128. W4 fires.
     let a_too_large: Field = V + 1;
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new_invalid = commit(V - a_too_large, r_new);
     let b_tilde_invalid = encrypt_balance(V - a_too_large, vk, SIGMA);
@@ -201,7 +201,7 @@ fn rejects_under_funded_withdrawal() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         a_too_large,
@@ -233,7 +233,7 @@ fn rejects_v_out_of_range() {
         c_spend.y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         A,
@@ -260,7 +260,7 @@ fn rejects_a_out_of_range() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         a_huge,
@@ -285,7 +285,7 @@ fn rejects_wrong_sk() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         A,
@@ -310,7 +310,7 @@ fn rejects_wrong_balance_opening() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         A,
@@ -325,7 +325,7 @@ fn rejects_wrong_balance_opening() {
 }
 
 #[test(should_fail)]
-fn rejects_wrong_wrap() {
+fn rejects_wrong_addr_f() {
     main(
         SK,
         V,
@@ -360,7 +360,7 @@ fn rejects_tampered_b_tilde() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         A,
@@ -385,7 +385,7 @@ fn rejects_tampered_c_spend_new() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         A,
@@ -412,7 +412,7 @@ fn rejects_r_e_zero() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         A,
@@ -439,7 +439,7 @@ fn rejects_wrong_r_e() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         A,
@@ -466,7 +466,7 @@ fn rejects_off_curve_k_aud_s() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         1,
         2,
         A,
@@ -493,7 +493,7 @@ fn rejects_identity_k_aud_s() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         0,
         0,
         A,
@@ -522,7 +522,7 @@ fn rejects_tampered_b_tilde_aud_s() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         K_AUD_S_X,
         K_AUD_S_Y,
         A,
@@ -550,7 +550,7 @@ fn rejects_wrong_k_aud_s() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         Y_X,
         Y_Y,
         A,

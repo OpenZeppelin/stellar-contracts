@@ -7,7 +7,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 
 // Canonical fixture inputs.
 //
-// SK / WRAP / SIGMA / V / R / V_TX / R_E reuse the lib's pinned vectors
+// SK / ADDR_F / SIGMA / V / R / V_TX / R_E reuse the lib's pinned vectors
 // (lib/testdata) so that Y, C_spend, vk, r_new, b_tilde, r_tx, v_tilde, and
 // the recipient/sender-channel masks are all derivable from -- and pinned by
 // -- the lib's `fixtures_match_testdata` test. V_NEW = V - V_TX = 900 keeps
@@ -16,7 +16,7 @@ use std::embedded_curve_ops::EmbeddedCurvePoint;
 // to materialize on-curve PVK_B / K_aud_r / K_aud_s points; any non-zero
 // scalar would do, these are pinned by `transfer_fixtures_match_lib`.
 global SK: Field = 0xdead;
-global WRAP: Field = 0xbeef;
+global ADDR_F: Field = 0xbeef;
 global SIGMA: Field = 0x01;
 global V: Field = 1000;
 global R: Field = 42;
@@ -78,7 +78,7 @@ fn print_fixtures() {
     // fixture tuple. Run with
     // `nargo test --package circuit_transfer print_fixtures --show-output`
     // and paste the values into the globals above.
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let pvk_b = scalar_mul(VK_B, H);
     let k_aud_r = scalar_mul(K_AUD_R_SCALAR, H);
     let k_aud_s = scalar_mul(K_AUD_S_SCALAR, H);
@@ -137,7 +137,7 @@ fn print_fixtures() {
 
 #[test]
 fn transfer_fixtures_match_lib() {
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new = commit(V_NEW, r_new);
     let b_tilde = encrypt_balance(V_NEW, vk, SIGMA);
@@ -203,7 +203,7 @@ fn run_main(
     c_spend_y_in: Field,
     y_x_in: Field,
     y_y_in: Field,
-    wrap_in: Field,
+    addr_f_in: Field,
     pvk_b_x_in: Field,
     pvk_b_y_in: Field,
     k_aud_r_x_in: Field,
@@ -236,7 +236,7 @@ fn run_main(
         y_y_in,
         pvk_b_x_in,
         pvk_b_y_in,
-        wrap_in,
+        addr_f_in,
         k_aud_r_x_in,
         k_aud_r_y_in,
         k_aud_s_x_in,
@@ -268,7 +268,7 @@ fn run_fixture() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -302,7 +302,7 @@ fn full_balance_transfer() {
     // is a valid commitment to zero. b_tilde and b_tilde_aud_s both bind to 0
     // (plus mask) so the sender's auditor sees the post-transfer balance
     // reach zero.
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let pvk_b = EmbeddedCurvePoint { x: PVK_B_X, y: PVK_B_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
@@ -327,7 +327,7 @@ fn full_balance_transfer() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -356,7 +356,7 @@ fn rejects_under_funded_transfer() {
     // Every downstream public is recomputed against v_tx_too_large so the
     // single firing constraint is T4's v_new range check.
     let v_tx_too_large: Field = V + 1;
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let pvk_b = EmbeddedCurvePoint { x: PVK_B_X, y: PVK_B_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
@@ -381,7 +381,7 @@ fn rejects_under_funded_transfer() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -415,7 +415,7 @@ fn rejects_v_out_of_range() {
     // cannot coincidentally fire.
     let v_huge: Field = 0x80000000000000000000000000000000;
     let v_new_huge: Field = v_huge - V_TX;
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let c_spend = commit(v_huge, R);
     let r_new = derive_spend_r(vk, SIGMA);
@@ -433,7 +433,7 @@ fn rejects_v_out_of_range() {
         c_spend.y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -466,7 +466,7 @@ fn rejects_v_tx_out_of_range() {
     // fail are T4's two range sub-checks.
     let v_tx_huge: Field = 0x80000000000000000000000000000000;
     let v_new_huge: Field = V - v_tx_huge;
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let pvk_b = EmbeddedCurvePoint { x: PVK_B_X, y: PVK_B_Y, is_infinite: false };
     let k_aud_r = EmbeddedCurvePoint { x: K_AUD_R_X, y: K_AUD_R_Y, is_infinite: false };
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
@@ -491,7 +491,7 @@ fn rejects_v_tx_out_of_range() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -517,11 +517,11 @@ fn rejects_v_tx_out_of_range() {
 #[test(should_fail)]
 fn rejects_wrong_sk() {
     // sk + 1 != sk: T1 fails because scalar_mul(sk+1, H) no longer matches Y.
-    // vk is rebound to (sk+1, wrap) and the vk-dependent publics
+    // vk is rebound to (sk+1, addr_f) and the vk-dependent publics
     // (c_spend_new, b_tilde) are recomputed under the new vk so T11 / T12
     // cannot fire alongside T1. b_tilde_aud_s does not depend on vk so its
     // canonical value still satisfies T_a8.
-    let vk_bad = vk_from_sk(SK + 1, WRAP);
+    let vk_bad = vk_from_sk(SK + 1, ADDR_F);
     let r_new_bad = derive_spend_r(vk_bad, SIGMA);
     let c_new_bad = commit(V_NEW, r_new_bad);
     let b_tilde_bad = encrypt_balance(V_NEW, vk_bad, SIGMA);
@@ -535,7 +535,7 @@ fn rejects_wrong_sk() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -565,7 +565,7 @@ fn rejects_wrong_balance_opening() {
     // against v_new = 901 so only T3 fires.
     let v_bad: Field = V + 1;
     let v_new_bad: Field = v_bad - V_TX;
-    let vk = vk_from_sk(SK, WRAP);
+    let vk = vk_from_sk(SK, ADDR_F);
     let k_aud_s = EmbeddedCurvePoint { x: K_AUD_S_X, y: K_AUD_S_Y, is_infinite: false };
     let r_new = derive_spend_r(vk, SIGMA);
     let c_new_bad = commit(v_new_bad, r_new);
@@ -582,7 +582,7 @@ fn rejects_wrong_balance_opening() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -606,16 +606,16 @@ fn rejects_wrong_balance_opening() {
 }
 
 #[test(should_fail)]
-fn rejects_wrong_wrap() {
-    // The circuit binds vk to wrap via T2 but doesn't assert wrap directly;
+fn rejects_wrong_addr_f() {
+    // The circuit binds vk to addr_f via T2 but doesn't assert addr_f directly;
     // the binding is visible only through vk-derived publics (T11, T12). With
-    // wrap_bad, recompute c_spend_new from vk_bad so T11 passes -- leaving
-    // b_tilde canonical, where the wrap-binding catches the mismatch via T12.
+    // addr_f_bad, recompute c_spend_new from vk_bad so T11 passes -- leaving
+    // b_tilde canonical, where the addr_f-binding catches the mismatch via T12.
     // (Recomputing both, as in `rejects_wrong_sk`, would make the proof
-    // verify: T1 is the load-bearing wrap-independent check there, and no
+    // verify: T1 is the load-bearing addr_f-independent check there, and no
     // such constraint exists here.)
-    let wrap_bad: Field = 0xcafe;
-    let vk_bad = vk_from_sk(SK, wrap_bad);
+    let addr_f_bad: Field = 0xcafe;
+    let vk_bad = vk_from_sk(SK, addr_f_bad);
     let r_new_bad = derive_spend_r(vk_bad, SIGMA);
     let c_new_bad = commit(V_NEW, r_new_bad);
     run_main(
@@ -628,7 +628,7 @@ fn rejects_wrong_wrap() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        wrap_bad,
+        addr_f_bad,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -666,7 +666,7 @@ fn rejects_wrong_recipient_pvk() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         Y_X,
         Y_Y,
         K_AUD_R_X,
@@ -710,7 +710,7 @@ fn rejects_poisoned_c_tx() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -746,7 +746,7 @@ fn rejects_tampered_v_tilde() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -782,7 +782,7 @@ fn rejects_tampered_b_tilde() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -818,7 +818,7 @@ fn rejects_tampered_c_spend_new() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -871,7 +871,7 @@ fn rejects_r_e_zero() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -923,7 +923,7 @@ fn rejects_wrong_r_e() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -960,7 +960,7 @@ fn rejects_off_curve_k_aud_r() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         1,
@@ -997,7 +997,7 @@ fn rejects_identity_k_aud_r() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         0,
@@ -1032,7 +1032,7 @@ fn rejects_off_curve_k_aud_s() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -1067,7 +1067,7 @@ fn rejects_identity_k_aud_s() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -1104,7 +1104,7 @@ fn rejects_wrong_k_aud_r() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         Y_X,
@@ -1141,7 +1141,7 @@ fn rejects_wrong_k_aud_s() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -1177,7 +1177,7 @@ fn rejects_tampered_v_tilde_aud_r() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -1213,7 +1213,7 @@ fn rejects_tampered_r_tilde_aud_r() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -1249,7 +1249,7 @@ fn rejects_tampered_v_tilde_aud_s() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,
@@ -1285,7 +1285,7 @@ fn rejects_tampered_b_tilde_aud_s() {
         C_SPEND_Y,
         Y_X,
         Y_Y,
-        WRAP,
+        ADDR_F,
         PVK_B_X,
         PVK_B_Y,
         K_AUD_R_X,

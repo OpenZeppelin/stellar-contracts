@@ -25,9 +25,9 @@ CIRCUITS=(
     "register"
     "withdraw"
     "transfer"
-    "set_operator"
-    "operator_transfer"
-    "revoke_operator"
+    "set_spender"
+    "spender_transfer"
+    "revoke_spender"
 )
 
 OUT_DIR="vks"

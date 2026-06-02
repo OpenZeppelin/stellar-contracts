@@ -1,18 +1,18 @@
 //! # Auditor Key Registry
 //!
-//! Stores Grumpkin public keys used by the confidential token wrapper to
+//! Stores Grumpkin public keys used by the confidential token to
 //! produce auditor ECDH ciphertexts. Each key is indexed by a `u32`
-//! `auditor_id` and a single deployment can serve multiple wrapped tokens.
+//! `auditor_id` and a single deployment can serve multiple confidential tokens.
 //!
 //! ## Why a Separate Contract
 //!
-//! Auditor keys are referenced by the wrapper on every operation that produces
-//! an auditor ciphertext (withdraw, transfer, operator transfer, set/revoke
-//! operator). Keeping them in a separate registry allows:
+//! Auditor keys are referenced by the confidential token on every operation
+//! that produces an auditor ciphertext (withdraw, transfer, spender transfer,
+//! set/revoke spender). Keeping them in a separate registry allows:
 //!
-//! - **Reuse**: one registry can serve many wrapped tokens;
+//! - **Reuse**: one registry can serve many confidential tokens;
 //! - **Lifecycle**: registration and rotation can evolve (e.g. versioned keys,
-//!   activation ledgers) without redeploying the wrapper;
+//!   activation ledgers) without redeploying the confidential token;
 //! - **Isolation**: key-management privileges are scoped to the registry admin,
 //!   distinct from token admin powers.
 //!
@@ -47,11 +47,11 @@ use soroban_sdk::{contracterror, contractevent, contracttrait, Address, BytesN, 
 pub use storage::{get_key, register_key, rotate_key, AuditorStorageKey};
 
 /// Trait for managing Grumpkin auditor public keys used by the confidential
-/// token wrapper.
+/// token.
 ///
-/// The wrapper queries [`ConfidentialAuditor::get_key`] on every operation that
-/// produces an auditor ciphertext (withdraw, transfer, operator transfer,
-/// set/revoke operator). [`ConfidentialAuditor::register_key`] and
+/// The confidential token queries [`ConfidentialAuditor::get_key`] on every
+/// operation that produces an auditor ciphertext (withdraw, transfer, spender
+/// transfer, set/revoke spender). [`ConfidentialAuditor::register_key`] and
 /// [`ConfidentialAuditor::rotate_key`] are privileged operations expected to be
 /// gated by the implementor's access-control scheme.
 #[contracttrait]

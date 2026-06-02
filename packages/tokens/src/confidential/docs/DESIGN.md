@@ -1,8 +1,8 @@
-# Confidential Token Wrapper
+# Confidential Token
 
 ## Abstract
 
-We present a confidential token wrapper for Soroban that adds private balances and transfers to any SEP-41 token. Balances are stored as unchunked Pedersen commitments as single elliptic curve points, and updated homomorphically by the contract without decryption. Zero-knowledge proofs (Noir/UltraHonk) accompany each spending operation to prove correctness without revealing amounts. Transfer recipients and auditors recover amounts and blinding factors via per-transfer ephemeral ECDH key agreement over Grumpkin. A dual-balance model (spendable/receiving) prevents griefing: incoming transfers accumulate in a receiving commitment that third parties cannot use to invalidate in-flight spend proofs. A dual-auditor model provides per-account audit visibility: each transfer produces ciphertexts under two auditor keys, giving the recipient's auditor the transfer amount and the sender's auditor the transfer amount plus the sender's post-transfer balance (or post-transfer allowance for operator transfers), enabling real-time auditing. Account owners can delegate spending to time-limited operators via escrowed allowances with derived delegation viewing keys. The system uses 6 Noir circuits, and works seamlessly with Soroban's BN254 host functions (leveraging the recently added CAP-80), and requires approximately 288 bytes of on-chain storage per account.
+We present a confidential token for Soroban that adds private balances and transfers to any SEP-41 token. Balances are stored as unchunked Pedersen commitments as single elliptic curve points, and updated homomorphically by the contract without decryption. Zero-knowledge proofs (Noir/UltraHonk) accompany each spending operation to prove correctness without revealing amounts. Transfer recipients and auditors recover amounts and blinding factors via per-transfer ephemeral ECDH key agreement over Grumpkin. A dual-balance model (spendable/receiving) prevents griefing: incoming transfers accumulate in a receiving commitment that third parties cannot use to invalidate in-flight spend proofs. A dual-auditor model provides per-account audit visibility: each transfer produces ciphertexts under two auditor keys, giving the recipient's auditor the transfer amount and the sender's auditor the transfer amount plus the sender's post-transfer balance (or post-transfer allowance for spender transfers), enabling real-time auditing. Account owners can delegate spending to time-limited spenders via escrowed allowances with derived delegation viewing keys. The system uses 6 Noir circuits, and works seamlessly with Soroban's BN254 host functions (leveraging the recently added CAP-80), and requires approximately 288 bytes of on-chain storage per account.
 
 ---
 
@@ -10,9 +10,9 @@ We present a confidential token wrapper for Soroban that adds private balances a
 
 This project is composed of the following documents:
 
-- Confidential Token Wrapper (this document)
-- Confidential Token Wrapper: [Compliance Extensions](./COMPLIANCE.md)
-- Confidential Token Wrapper: User Flows Overview (to be added)
+- Confidential Token (this document)
+- Confidential Token: [Compliance Extensions](./COMPLIANCE.md)
+- Confidential Token: User Flows Overview (to be added)
 - Indexing and Off-Chain State Recovery (to be added)
 - SDK (to be added)
 
@@ -24,7 +24,7 @@ This project is composed of the following documents:
 
 Confidential transfers on blockchain require balances and amounts to be hidden from public observers while remaining verifiable by the contract. The standard approach uses additively homomorphic encryption - the contract operates on ciphertexts (adding deposits, subtracting transfers) without learning the underlying values, and zero-knowledge proofs guarantee that operations are valid (sufficient funds, consistent encryption, non-negative balances).
 
-This document defines a standalone Soroban contract that wraps any SEP-41 token to provide confidential balances and transfers. It is not an extension to the fungible token standard; it is a separate contract that holds tokens on behalf of users and manages encrypted state independently. The wrapper path is chosen over native token integration for three reasons: it works with existing assets, it can evolve independently of the token standard, and it keeps confidentiality complexity separate from the token layer.
+This document defines a Soroban contracts suite that provides confidential balances and transfers features on top of SEP-41 tokens. It is not an extension to the fungible token standard; it defines a separate contract that holds tokens on behalf of users and manages encrypted state independently. The wrapping approach is chosen over native token integration for three reasons: it works with existing assets, it can evolve independently of the token standard, and it keeps confidentiality complexity separate from the underlying token.
 
 ### 1.2 Design Goals
 
@@ -36,7 +36,7 @@ This document defines a standalone Soroban contract that wraps any SEP-41 token 
 
 **Selective auditing.** Each account selects an auditor at registration. Each transfer produces ciphertexts under two auditor keys: the recipient's auditor receives the transfer amount, while the sender's auditor receives the transfer amount and sender's post-transfer balance. This dual-auditor model enables real-time visibility for both parties' auditors without granting access to uninvolved accounts' historical balances.
 
-**Delegated spending.** Account owners can authorize operators (separate addresses) to spend from escrowed allowances, enabling use cases like automated market makers and custodial services without sharing the owner's secret key.
+**Delegated spending.** Account owners can authorize spenders (separate addresses) to spend from escrowed allowances, enabling use cases like automated market makers and custodial services without sharing the owner's secret key.
 
 ### 1.3 Approach
 
@@ -48,7 +48,7 @@ The design is built on three interlocking mechanisms:
 
 3. **Proof-less merge.** Incoming funds accumulate in a receiving balance that is separate from the spendable balance. To make received funds spendable, the owner authorizes a merge - no ZK proof is required. Since merge requires owner authorization and incoming transfers touch only the receiving balance, neither the spend path nor the merge path can be front-run by a third party.
 
-Six Noir/UltraHonk circuits cover registration, withdrawal, confidential transfer, operator transfer, operator delegation, and operator revocation. The proof system leverages the Grumpkin–BN254 curve cycle: Grumpkin point arithmetic is native inside Noir circuits (no field emulation), while Soroban natively supports BN254 operations for UltraHonk proof verification.
+Six Noir/UltraHonk circuits cover registration, withdrawal, confidential transfer, spender transfer, spender delegation, and spender revocation. The proof system leverages the Grumpkin–BN254 curve cycle: Grumpkin point arithmetic is native inside Noir circuits (no field emulation), while Soroban natively supports BN254 operations for UltraHonk proof verification.
 
 ---
 
@@ -98,7 +98,7 @@ In this design both $v$ and $r$ are drawn from $\mathbb{F}_r \subset \mathbb{F}_
 
 **Homomorphism.** $\text{Com}(v_1, r_1) + \text{Com}(v_2, r_2) = \text{Com}(v_1 + v_2, r_1 + r_2)$. Scalar addition in the commitment relation is over $\mathbb{F}_q^{\text{BN254}}$ -- the scalar field of $\mathbb{G}$, equivalently the order of the Grumpkin group. Since every committed value is bounded by $2^{127}$ (§2.6) and the number of additions across the lifetime of any one commitment is far below $2^{127}$, the value component never wraps in $\mathbb{F}_q$ and the homomorphic relation holds in $\mathbb{Z}$ for values. The blinding component is added in $\mathbb{F}_q$ and may reduce mod $q$ on accumulation; the only place this has operational consequences is the wallet's post-merge spend witness, where the canonical $\mathbb{F}_q$ representative of $r_s + r_r$ can land in $[r, q)$ with probability bounded at $(q-r)/q \approx 2^{-127}$ per merge (see §10.4 *Post-merge witness availability*).
 
-**Generators.** $G$ and $H$ are inherited from Barretenberg's standard Grumpkin Pedersen instantiation (the same generators that the toolchain's `pedersen_commitment` and `pedersen_hash` primitives use). Their provenance is part of the toolchain's audited surface, so the wrapper inherits both the generators and the soundness assumption that $\log_G H$ is unknown. The Noir circuits import them as `embedded_curve_ops::generator()`.
+**Generators.** $G$ and $H$ are inherited from Barretenberg's standard Grumpkin Pedersen instantiation (the same generators that the toolchain's `pedersen_commitment` and `pedersen_hash` primitives use). Their provenance is part of the toolchain's audited surface, so the contract inherits both the generators and the soundness assumption that $\log_G H$ is unknown. The Noir circuits import them as `embedded_curve_ops::generator()`.
 
 ### 2.4 Elliptic Curve Diffie-Hellman
 
@@ -119,7 +119,7 @@ The system uses **Poseidon2**, the algebraic hash function native to Noir's stan
 
 **Usage in this system:**
 
-- Key derivation: $vk = \text{Poseidon2}(\delta_{\text{vk}}, sk, \text{wrap})$
+- Key derivation: $vk = \text{Poseidon2}(\delta_{\text{vk}}, sk, \text{addr_f})$
 - Randomness derivation: $r = \text{Poseidon2}(\delta_{\text{spend\\\_r}}, vk, \sigma)$
 - Symmetric encryption: $\tilde{v} = v + \text{Poseidon2}(\delta_{\text{tx\\\_amount}}, s, \sigma)$
 - Domain separation: each invocation includes a leading constant $\delta$ to prevent cross-context collisions
@@ -155,7 +155,7 @@ value.assert_max_bit_size::<127>();
 
 then $v_A - v_{\text{tx}}$ is a non-negative integer less than $2^{127}$, which is only possible if the integer subtraction did not underflow. This is because $v_A < 2^{127}$ and $v_{\text{tx}} < 2^{127}$, so if $v_A < v_{\text{tx}}$ as integers, then $v_A - v_{\text{tx}} \pmod{r}$ would be $r - (v_{\text{tx}} - v_A)$, which is at least $r - 2^{127} \gg 2^{127}$, failing constraint (3).
 
-**Value capacity.** Both balances and transfer amounts are constrained to $[0, 2^{127})$. These bounds are enforced in every circuit that manipulates values. The bound is exactly the SEP-41 non-negative `i128` range, so the wrapper's value domain matches the underlying token's domain by construction. The gap between $2^{127}$ and $|\mathbb{F}_r| \approx 2^{254}$ ensures that modular wrap-around is detectable by the range check.
+**Value capacity.** Both balances and transfer amounts are constrained to $[0, 2^{127})$. These bounds are enforced in every circuit that manipulates values. The bound is exactly the SEP-41 non-negative `i128` range, so the contract's value domain matches the underlying token's domain by construction. The gap between $2^{127}$ and $|\mathbb{F}_r| \approx 2^{254}$ ensures that modular wrap-around is detectable by the range check.
 
 **Receiving balance (unproven accumulation).** The receiving balance $C_{\text{receive}}$ is updated by contract-side point addition without any proof from the recipient. Therefore, the receiving balance's committed value $v_r$ is never directly range-checked by any circuit.
 
@@ -163,14 +163,14 @@ This is safe because $v_r$ is *indirectly* bounded:
 
 1. Each deposit adds a public `i128` amount validated by the contract ($\ge 0$, hence $< 2^{127}$).
 2. Each incoming transfer adds a commitment whose sender circuit proved $v_{\text{tx}} \in [0, 2^{127})$ (constraint T4 / O4).
-3. All tokens in the wrapper entered through deposits, so the sum of all committed values is bounded by the underlying token's total supply ($< 2^{127}$). No single account can receive more than the total supply.
+3. All tokens in the contract entered through deposits, so the sum of all committed values is bounded by the underlying token's total supply ($< 2^{127}$). No single account can receive more than the total supply.
 4. For the field-arithmetic concern (could $v_r$ reach $r$ and wrap around), that would require $r / 2^{127} > 2^{127}$ incoming transfers, which is computationally infeasible.
 
 When the owner spends after a merge, the spend proof constrains the full post-merge opening: $v_s + v_r \in [0, 2^{127})$ (via constraint W4 or T4 on the spendable balance). This provides an implicit range check at the next spend boundary.
 
 ### 2.7 Address-to-Field Encoding
 
-In Soroban, the SDK's `Address` host type covers exactly the two `ScAddressType` variants the wrapper interacts with as actors: `Account` (Stellar ed25519 account) and `Contract` (Soroban contract instance). The protocol encodes those addresses via their **canonical Stellar strkey** (SEP-23) representation:
+In Soroban, the SDK's `Address` host type covers exactly the two `ScAddressType` variants the contract interacts with as actors: `Account` (Stellar ed25519 account) and `Contract` (Soroban contract instance). The protocol encodes those addresses via their **canonical Stellar strkey** (SEP-23) representation:
 
 $$\text{enc}(a) \;=\; \text{Address::to\\\_string}(a)\text{.to\\\_bytes}() \;\in\; \{\text{ASCII}\}^{56}$$
 
@@ -182,14 +182,14 @@ $$\text{address\\\_to\\\_field}(a) \;=\; \text{Poseidon2}\big(\delta_{\text{addr
 
 where $\text{lo}(a) = \sum_{i=0}^{27} 256^{\,i} \cdot \text{enc}(a)[i]$ and $\text{hi}(a) = \sum_{i=0}^{27} 256^{\,i} \cdot \text{enc}(a)[28 + i]$ interpret the lower and upper 28 bytes of the strkey in little-endian byte order.
 
-The wrapper, the SDK, the wallet, and any indexer reproduce the same Field value from the same Address by running their language's stellar-strkey encoder over the same `(version, payload)` pair and applying the same limb decomposition. No implementation needs to handle `ScAddress` XDR or the inner `AccountID` / `ContractID` union nesting.
+The contract, the SDK, the wallet, and any indexer reproduce the same Field value from the same Address by running their language's stellar-strkey encoder over the same `(version, payload)` pair and applying the same limb decomposition. No implementation needs to handle `ScAddress` XDR or the inner `AccountID` / `ContractID` union nesting.
 
 **Usage sites.**
 
 | Site | When computed | Storage |
 |:---|:---|:---|
-| $\text{wrap}$ | Once, by the wrapper's `__constructor` over `env.current_contract_address()` | Stored as a single Field in the wrapper's **instance storage** (§3.5); read on every proof verification |
-| $\text{op}_i$ | Per-call, by the wrapper at `set_operator` and `revoke_operator` over the `operator` argument | Not stored; recomputed each call. The circuit binds it via S5 / V3 |
+| $\text{addr_f}$ | Once, by the contract's `__constructor` over `env.current_contract_address()` | Stored as a single Field in the contract's **instance storage** (§3.5); read on every proof verification |
+| $\text{op}_i$ | Per-call, by the contract at `set_spender` and `revoke_spender` over the `spender` argument | Not stored; recomputed each call. The circuit binds it via S5 / V3 |
 
 ---
 
@@ -199,11 +199,11 @@ The wrapper, the SDK, the wallet, and any indexer reproduce the same Field value
 
 The system comprises three contracts deployed on Soroban:
 
-**Wrapper contract.** Holds SEP-41 token balances, manages encrypted account state, and delegates proof verification via cross-contract calls. Performs Grumpkin point arithmetic through $\mathbb{F}_r$ host operations for homomorphic balance updates.
+**Token contract.** Holds SEP-41 token balances, manages encrypted account state, and delegates proof verification via cross-contract calls. Performs Grumpkin point arithmetic through $\mathbb{F}_r$ host operations for homomorphic balance updates.
 
 **Verifier contract.** A modified [UltraHonk verifier](https://github.com/indextree/ultrahonk_soroban_contract) storing one verification key per circuit type. Accepts a circuit identifier, serialized public inputs, and a proof blob; returns success or failure.
 
-**Auditor contract.** Manages auditor encryption keys independently of the wrapper. One auditor contract serves multiple token wrappers. Stores Grumpkin public keys as full affine points $(x, y)$ indexed by `auditor_id`. The contract validates that stored keys are non-identity curve points; a zero or identity key would make ECDH-derived ciphertexts trivially decryptable (since $\sigma$ is public). The wrapper fetches the active auditor key at operation time and passes it as a public input to the relevant circuit.
+**Auditor contract.** Manages auditor encryption keys independently of the contract. One auditor contract serves multiple token contracts. Stores Grumpkin public keys as full affine points $(x, y)$ indexed by `auditor_id`. The contract validates that stored keys are non-identity curve points; a zero or identity key would make ECDH-derived ciphertexts trivially decryptable (since $\sigma$ is public). The contract fetches the active auditor key at operation time and passes it as a public input to the relevant circuit.
 
 ### 3.2 Threat Model
 
@@ -215,28 +215,28 @@ The system comprises three contracts deployed on Soroban:
 
 ### 3.3 Trust Assumptions
 
-The wrapper, verifier, and auditor contracts are trusted code. Users trust that the verification keys embedded in the verifier correspond to the correct circuits and were derived from a honestly generated Structured Reference String (Section 10.6). The auditor is trusted to protect its decryption key and exercise access only upon legitimate regulatory request.
+The contract, verifier, and auditor contracts are trusted code. Users trust that the verification keys embedded in the verifier correspond to the correct circuits and were derived from a honestly generated Structured Reference String (Section 10.6). The auditor is trusted to protect its decryption key and exercise access only upon legitimate regulatory request.
 
 ### 3.4 Underlying Token Assumptions
 
-The wrapper holds units of an underlying SEP-41 token on behalf of its users. The confidential accounting invariant (Section 9.3) implicitly assumes:
+The contract holds units of an underlying SEP-41 token on behalf of its users. The confidential accounting invariant (Section 9.3) implicitly assumes:
 
-$$\sum_i v_{\text{committed},i} \;\le\; \text{token.balance}(\text{wrapper})$$
+$$\sum_i v_{\text{committed},i} \;\le\; \text{token.balance}(\text{contract})$$
 
-i.e., the total committed value across all confidential accounts never exceeds the public token balance held by the wrapper. The deployer's choice of underlying token determines whether that invariant is actually preserved over time. The wrapper itself does not, and cannot, defend against every misbehavior of the wrapped asset.
+i.e., the total committed value across all confidential accounts never exceeds the public token balance held by the contract. The deployer's choice of underlying token determines whether that invariant is actually preserved over time. The contract itself does not, and cannot, defend against every misbehavior of the wrapped asset.
 
 **Required properties of the underlying token.**
 
-- *Non-rebasing.* The token's balance attributed to the wrapper address changes only as a result of explicit operations that the wrapper itself originated. Tokens whose balances change as a function of supply, oracle data, or external triggers break the accounting invariant and are unsupported.
-- *No fee-on-transfer.* `token.transfer(from, to, amount)` MUST move exactly `amount` units. A fee deducted in transit would leave the wrapper's confidential accounting larger than its public backing.
-- *Deterministic revert.* A failed `token.transfer` MUST cause the enclosing wrapper invocation (`deposit` or `withdraw`) to revert atomically, so confidential state is never updated against a token transfer that did not happen.
-- *Underlying clawback / freeze / deauthorization.* If the underlying SEP-41 (especially a Stellar Asset Contract) supports issuer-level clawback or freeze that can reduce or block the wrapper's holdings, confidential accounting at the wrapper layer may temporarily or permanently exceed the wrapper's accessible backing. This is an operational risk borne by the deployer's choice of underlying token. The wrapper layer offers its own freeze and per-account clawback flows that operate inside the confidential surface; see [COMPLIANCE.md](./COMPLIANCE.md) §2 (wrapper-level freeze) and §5 (admin + auditor clawback). [COMPLIANCE.md](./COMPLIANCE.md) §2.2 additionally specifies SAC authorization passthrough, which composes the wrapper's freeze with the issuer's freeze without requiring the admin to mirror state.
+- *Non-rebasing.* The token's balance attributed to the contract address changes only as a result of explicit operations that the contract itself originated. Tokens whose balances change as a function of supply, oracle data, or external triggers break the accounting invariant and are unsupported.
+- *No fee-on-transfer.* `token.transfer(from, to, amount)` MUST move exactly `amount` units. A fee deducted in transit would leave the contract's confidential accounting larger than its public backing.
+- *Deterministic revert.* A failed `token.transfer` MUST cause the enclosing contract invocation (`deposit` or `withdraw`) to revert atomically, so confidential state is never updated against a token transfer that did not happen.
+- *Underlying clawback / freeze / deauthorization.* If the underlying SEP-41 (especially a Stellar Asset Contract) supports issuer-level clawback or freeze that can reduce or block the contract's holdings, confidential accounting at the contract layer may temporarily or permanently exceed the contract's accessible backing. This is an operational risk borne by the deployer's choice of underlying token. The token layer offers its own freeze and per-account clawback flows that operate inside the confidential surface; see [COMPLIANCE.md](./COMPLIANCE.md) §2 (contract-level freeze) and §5 (admin + auditor clawback). [COMPLIANCE.md](./COMPLIANCE.md) §2.2 additionally specifies SAC authorization passthrough, which composes the contract's freeze with the issuer's freeze without requiring the admin to mirror state.
 
-**Non-negativity check.** The wrapper's public interface uses `i128` end-to-end, matching SEP-41. Every entrypoint that accepts a public amount (`deposit`, `withdraw`) MUST reject `amount < 0` and revert. The in-circuit range constraint (Section 2.6) bounds the same value at $2^{127}$ from above; together they pin the wrapper's value domain to $[0, 2^{127}) = [0, \text{i128::MAX}]$, matching SEP-41 exactly. No conversion at the SEP-41 boundary is needed.
+**Non-negativity check.** The contract's public interface uses `i128` end-to-end, matching SEP-41. Every entrypoint that accepts a public amount (`deposit`, `withdraw`) MUST reject `amount < 0` and revert. The in-circuit range constraint (Section 2.6) bounds the same value at $2^{127}$ from above; together they pin the contract's value domain to $[0, 2^{127}) = [0, \text{i128::MAX}]$, matching SEP-41 exactly. No conversion at the SEP-41 boundary is needed.
 
 ### 3.5 Governance and Upgradeability
 
-The constructor binds the wrapper to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores $\text{wrap} = \text{address\\\_to\\\_field}(\text{env.current\\\_contract\\\_address}())$ (§2.7) in **instance storage** as a single canonical $\mathbb{F}_r$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2 / V2. The compressed `wrap` Field is computed once at construction (not recomputed per call) to ensure all proofs across the wrapper's lifetime bind to the same Field representative of the wrapper's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in operator structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
+The constructor binds the contract to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores $\text{addr_f} = \text{address\\\_to\\\_field}(\text{env.current\\\_contract\\\_address}())$ (§2.7) in **instance storage** as a single canonical $\mathbb{F}_r$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2 / V2. The compressed `addr_f` Field is computed once at construction (not recomputed per call) to ensure all proofs across the contract's lifetime bind to the same Field representative of the contract's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in spender structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
 
 Questions an implementer must answer:
 
@@ -257,28 +257,28 @@ All keys derive from a single spending secret $sk \in \mathbb{F}_r$.
 
 $$Y = sk \cdot H$$
 
-The spending public key is stored on-chain at registration. Knowledge of $sk$ is required to authorize transfers, withdrawals, operator delegations, and merges.
+The spending public key is stored on-chain at registration. Knowledge of $sk$ is required to authorize transfers, withdrawals, spender delegations, and merges.
 
 ### 4.2 Viewing Key
 
-$$vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$$
+$$vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$$
 
-A scalar in $\mathbb{F}_r$, unique per $(sk, \text{wrap})$ pair. Enables balance decryption without spending authority. Cannot recover $sk$ (Poseidon preimage resistance). Because $\text{wrap}$ is bound into the derivation, proofs that constrain $vk$ (R2, W2, T2, S2, V2) are inherently bound to the wrapper contract, eliminating the need for explicit per-circuit context binding.
+A scalar in $\mathbb{F}_r$, unique per $(sk, \text{addr_f})$ pair. Enables balance decryption without spending authority. Cannot recover $sk$ (Poseidon preimage resistance). Because $\text{addr_f}$ is bound into the derivation, proofs that constrain $vk$ (R2, W2, T2, S2, V2) are inherently bound to the contract contract, eliminating the need for explicit per-circuit context binding.
 
 ### 4.3 Public Viewing Key
 
 $$\text{PVK} = vk \cdot H$$
 
-A Grumpkin point stored on-chain at registration. Serves as the recipient's ECDH public key for incoming transfers. The registration proof constrains $\text{PVK} = vk \cdot H$ where $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$ and $Y = sk \cdot H$, preventing a user from registering an unrelated $\text{PVK}$.
+A Grumpkin point stored on-chain at registration. Serves as the recipient's ECDH public key for incoming transfers. The registration proof constrains $\text{PVK} = vk \cdot H$ where $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ and $Y = sk \cdot H$, preventing a user from registering an unrelated $\text{PVK}$.
 
 ### 4.4 Delegation Viewing Key
 
-For operator $i$ with address $\text{op}_i$, the owner derives:
+For spender $i$ with address $\text{op}_i$, the owner derives:
 
 $$dvk_i = \text{Poseidon}(\delta_{\text{dvk}}, vk, \text{op}_i)$$
 
 Properties:
-- $dvk_i$ reveals only this operator's allowance state in this wrapper context ($vk$ is wrapper-specific, Section 4.2).
+- $dvk_i$ reveals only this spender's allowance state in this contract's context ($vk$ is contract-specific, Section 4.2).
 - $dvk_i$ cannot recover $vk$ (preimage resistance).
 - Different $(vk, \text{op}_i)$ tuples yield independent keys.
 
@@ -332,8 +332,8 @@ $$W_{\text{receive}} = (v_r, r_r) \quad \text{such that} \quad C_{\text{receive}
 | Incoming transfer with event $(R_e, \tilde{v}, \sigma)$ | Compute $S = vk \cdot R_e$, $s = S.x$; derive $v_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta_{\text{tx\\\_amount}}, s, \sigma)$ and $r_{\text{tx}} = \text{Poseidon}(\delta_{\text{tx\\\_blind}}, s, \sigma)$. Then $W_{\text{receive}} \mathrel{+}= (v_{\text{tx}}, r_{\text{tx}})$ |
 | Outgoing transfer/withdrawal of amount $a$ | Proof outputs new commitment with deterministic randomness. $W_{\text{spend}} \leftarrow (v_s - a, \; \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk, \sigma))$ |
 | Merge | $W_{\text{spend}} \leftarrow (v_s + v_r, \; r_s + r_r)$; $W_{\text{receive}} \leftarrow (0, 0)$ |
-| Set operator (escrow amount $a$) | Proof outputs new commitment. $W_{\text{spend}} \leftarrow (v_s - a, \; \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk, \sigma))$ |
-| Revoke operator (reclaim amount $a$) | Proof outputs new commitment. $W_{\text{spend}} \leftarrow (v_s + a, \; \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk, \sigma))$ |
+| Set spender (escrow amount $a$) | Proof outputs new commitment. $W_{\text{spend}} \leftarrow (v_s - a, \; \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk, \sigma))$ |
+| Revoke spender (reclaim amount $a$) | Proof outputs new commitment. $W_{\text{spend}} \leftarrow (v_s + a, \; \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk, \sigma))$ |
 
 The Merge row uses exact integer addition; $W_{\text{spend}}.r$ is not reduced modulo $r$ or $q$ as merges accumulate. At proof-construction time the wallet reduces $W_{\text{spend}}.r$ modulo $q$ and encodes the canonical $\mathbb{F}_q$ representative as a single $\mathbb{F}_r$ `Field`. This encoding succeeds when the representative lies in $[0, r)$, with probability $\geq 1 - 2^{-127}$ per merge; the complementary case is acknowledged in §10.4 *Post-merge witness availability*.
 
@@ -341,9 +341,9 @@ After every owner-initiated operation that produces a proof, $r_s$ resets to a d
 
 **Consistency check.** At any time, the wallet can verify its state: $C_{\text{spend}} \stackrel{?}{=} v_s \cdot G + r_s \cdot H$ and $C_{\text{receive}} \stackrel{?}{=} v_r \cdot G + r_r \cdot H$, where $C_{\text{spend}}$ and $C_{\text{receive}}$ are read from on-chain state.
 
-**Recovery.** If the wallet loses local state, it recovers from the **last checkpoint**: the most recent owner-initiated proof operation (`withdraw`, `confidential_transfer`, `set_operator`, or `revoke_operator`), which emitted both $\tilde{b}$ and $\sigma$ in its event. By construction, only deposits, incoming transfers, and merges can occur after this event; any later owner-initiated proof operation would itself become the new checkpoint. Steps 1-4 recover the spendable balance using $\tilde{b}$, $\sigma$ (both from the event), and $vk$. Event replay (steps 5-6) folds in the bounded post-checkpoint activity:
+**Recovery.** If the wallet loses local state, it recovers from the **last checkpoint**: the most recent owner-initiated proof operation (`withdraw`, `confidential_transfer`, `set_spender`, or `revoke_spender`), which emitted both $\tilde{b}$ and $\sigma$ in its event. By construction, only deposits, incoming transfers, and merges can occur after this event; any later owner-initiated proof operation would itself become the new checkpoint. Steps 1-4 recover the spendable balance using $\tilde{b}$, $\sigma$ (both from the event), and $vk$. Event replay (steps 5-6) folds in the bounded post-checkpoint activity:
 
-1. Fetch $(\tilde{b}, \sigma)$ from the most recent **checkpoint event** for this account, where a checkpoint event is exactly one of `Withdraw`, `Transfer` (where the account is the `from`), `SetOperator`, or `RevokeOperator` -- the four event types that carry a proof-bound $(\tilde{b}, \sigma)$ for the account's spendable balance. `Deposit`, `Transfer` (where the account is the `to`), `OperatorTransfer` (recipient side), and `Merge` are explicitly **not** checkpoints: they either carry no $(\tilde{b}, \sigma)$ at all or carry one that is bound to a different account's spendable balance. **No-checkpoint case:** if the account has no checkpoint event since `Register`, initialize $W_{\text{spend}} \leftarrow (0, 0)$ and skip to step 5 with the replay window starting at the `Register` event.
+1. Fetch $(\tilde{b}, \sigma)$ from the most recent **checkpoint event** for this account, where a checkpoint event is exactly one of `Withdraw`, `Transfer` (where the account is the `from`), `SetSpender`, or `RevokeSpender` -- the four event types that carry a proof-bound $(\tilde{b}, \sigma)$ for the account's spendable balance. `Deposit`, `Transfer` (where the account is the `to`), `SpenderTransfer` (recipient side), and `Merge` are explicitly **not** checkpoints: they either carry no $(\tilde{b}, \sigma)$ at all or carry one that is bound to a different account's spendable balance. **No-checkpoint case:** if the account has no checkpoint event since `Register`, initialize $W_{\text{spend}} \leftarrow (0, 0)$ and skip to step 5 with the replay window starting at the `Register` event.
 2. Recover the spendable balance value: $v_s = \tilde{b} - \text{Poseidon}(\delta_{\text{enc\\\_bal}}, vk, \sigma)$.
 3. Recover the spendable balance blinding: $r_s = \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk, \sigma)$.
 4. Set $W_{\text{spend}} \leftarrow (v_s, r_s)$ and $W_{\text{receive}} \leftarrow (0, 0)$.
@@ -355,7 +355,7 @@ After every owner-initiated operation that produces a proof, $r_s$ resets to a d
 
 Steps 1-3 require $(\tilde{b}, \sigma)$ from the latest owner event and $vk$. No full event replay is needed. Step 5 replays only events since the last checkpoint and correctly handles any number of interleaved deposits, transfers, and merges. A wallet that spends regularly produces frequent checkpoints, bounding the replay window. In the worst case (funds received but never spent), the replay window extends back to registration.
 
-**Event durability requirement.** Recovery depends on the wallet being able to retrieve every event since the last checkpoint, plus the checkpoint event itself, in ledger order. Stellar RPC retains event history for a 7-days window only, so a wallet that loses local state after that window cannot recover from RPC alone. The protocol therefore assumes a durable event archive that retains the full per-account history of `Withdraw`, `Transfer` (both directions), `OperatorTransfer` (recipient side), `Deposit`, `Merge`, `SetOperator`, and `RevokeOperator` events forever. The data model, ingestion contract, retention obligations, and recommended API surface for that archive are specified in [INDEXER.md](INDEXER.md). Wallets and SDKs MUST consume an indexer that meets that contract for recovery.
+**Event durability requirement.** Recovery depends on the wallet being able to retrieve every event since the last checkpoint, plus the checkpoint event itself, in ledger order. Stellar RPC retains event history for a 7-days window only, so a wallet that loses local state after that window cannot recover from RPC alone. The protocol therefore assumes a durable event archive that retains the full per-account history of `Withdraw`, `Transfer` (both directions), `SpenderTransfer` (recipient side), `Deposit`, `Merge`, `SetSpender`, and `RevokeSpender` events forever. The data model, ingestion contract, retention obligations, and recommended API surface for that archive are specified in [INDEXER.md](INDEXER.md). Wallets and SDKs MUST consume an indexer that meets that contract for recovery.
 
 ### 5.3 ECDH-Derived Blinding
 
@@ -373,9 +373,9 @@ where $v_{\text{tx}}$ is the transfer amount. The transfer commitment is $C_{\te
 
 Since $vk_B \cdot R_e = r_e \cdot \text{PVK}_B = S$ by ECDH commutativity, both sender and recipient can independently derive $r_{\text{tx}}$ and decrypt $v_{\text{tx}} = \tilde{v} - \text{Poseidon}(\delta_{\text{tx\\\_amount}}, s, \sigma)$, provided they know $\sigma$ emitted with the event. The auditor decrypts the transfer amount via a separate ECDH channel (Section 8.1).
 
-**Note.** Each transfer involves two auditor ECDH exchanges: one with the recipient's auditor key ($S_{a,r} = r_e \cdot K_{\text{aud,r}}$) and one with the sender's auditor key ($S_{a,s} = r_e \cdot K_{\text{aud,s}}$). Both reuse the ephemeral scalar $r_e$, as does the $dvk_i$ escrow ECDH in `set_operator` (§7.11) when one is present. Neither auditor recovers any account's viewing key.
+**Note.** Each transfer involves two auditor ECDH exchanges: one with the recipient's auditor key ($S_{a,r} = r_e \cdot K_{\text{aud,r}}$) and one with the sender's auditor key ($S_{a,s} = r_e \cdot K_{\text{aud,s}}$). Both reuse the ephemeral scalar $r_e$, as does the $dvk_i$ escrow ECDH in `set_spender` (§7.11) when one is present. Neither auditor recovers any account's viewing key.
 
-**Why reusing $r_e$ is safe.** Each ECDH channel keyed from the same $r_e$ produces a distinct shared scalar because the counterparty public keys are distinct ($\text{PVK}_B$, $K_{\text{aud,r}}$, $K_{\text{aud,s}}$, $Y_{\text{op}}$ are independent Grumpkin points, none derivable from one another). Each channel further uses a distinct Poseidon domain tag ($\delta_{\text{tx\\\_blind}}/\delta_{\text{tx\\\_amount}}$ for the recipient channel, $\delta_{\text{aud\\\_r}}$ and $\delta_{\text{aud\\\_s}}$ for the two auditor channels, $\delta_{\text{esc\\\_dvk}}$ for the operator escrow), so masks across channels are independent under the PRF assumption on Poseidon (§3.2). The channel masks are used as one-time pads against fresh per-transfer randomness ($\sigma$ or $\sigma_a$), and each per-channel sponge re-absorbs that nonce, so a given mask is never reused even for the same counterparty across two operations. Together these three properties (distinct shared scalars, distinct domains, fresh per-operation nonce) close the standard ECDH key-reuse attack surface; the wrapper's enumeration of channels in §13 satisfies the domain-distinctness condition.
+**Why reusing $r_e$ is safe.** Each ECDH channel keyed from the same $r_e$ produces a distinct shared scalar because the counterparty public keys are distinct ($\text{PVK}_B$, $K_{\text{aud,r}}$, $K_{\text{aud,s}}$, $Y_{\text{op}}$ are independent Grumpkin points, none derivable from one another). Each channel further uses a distinct Poseidon domain tag ($\delta_{\text{tx\\\_blind}}/\delta_{\text{tx\\\_amount}}$ for the recipient channel, $\delta_{\text{aud\\\_r}}$ and $\delta_{\text{aud\\\_s}}$ for the two auditor channels, $\delta_{\text{esc\\\_dvk}}$ for the spender escrow), so masks across channels are independent under the PRF assumption on Poseidon (§3.2). The channel masks are used as one-time pads against fresh per-transfer randomness ($\sigma$ or $\sigma_a$), and each per-channel sponge re-absorbs that nonce, so a given mask is never reused even for the same counterparty across two operations. Together these three properties (distinct shared scalars, distinct domains, fresh per-operation nonce) close the standard ECDH key-reuse attack surface; the contract's enumeration of channels in §13 satisfies the domain-distinctness condition.
 
 ### 5.4 Anti-Poisoning Constraint
 
@@ -421,7 +421,7 @@ $\text{PVK} = vk \cdot H$. Set once at registration. Used by senders for ECDH ke
 
 **`spendable_balance`**
 
-The commitment the owner can spend from. Modified only by owner-authorized operations: transfers out, withdrawals, merge, `set_operator`, `revoke_operator`. Encoded as a single Grumpkin affine point (64 bytes).
+The commitment the owner can spend from. Modified only by owner-authorized operations: transfers out, withdrawals, merge, `set_spender`, `revoke_spender`. Encoded as a single Grumpkin affine point (64 bytes).
 
 
 **`receiving_balance`**
@@ -430,45 +430,45 @@ Accumulates incoming deposits and transfers via homomorphic addition. The contra
 
 **`auditor_id`**
 
-Index into the auditor contract's key store. Set once at registration. Used by the wrapper to fetch the correct auditor public key when building transfer public inputs. For incoming transfers, the recipient's `auditor_id` determines the key under which the transfer amount is encrypted. For outgoing transfers (and operator transfers), the sender's (or owner's) `auditor_id` determines the key under which the transfer amount and post-transfer balance (or allowance) are encrypted.
+Index into the auditor contract's key store. Set once at registration. Used by the contract to fetch the correct auditor public key when building transfer public inputs. For incoming transfers, the recipient's `auditor_id` determines the key under which the transfer amount is encrypted. For outgoing transfers (and spender transfers), the sender's (or owner's) `auditor_id` determines the key under which the transfer amount and post-transfer balance (or allowance) are encrypted.
 
-### 6.2 Operator Delegation
+### 6.2 Spender Delegation
 
-Operator delegations are stored in persistent storage, keyed by `(owner, operator)`:
+Spender delegations are stored in persistent storage, keyed by `(owner, spender)`:
 
 ```rust
-OperatorDelegation {
+SpenderDelegation {
     allowance_commitment: BytesN<64>,   // Single Pedersen commitment
     encrypted_allowance:  BytesN<32>,   // Poseidon-encrypted allowance scalar
-    escrowed_dvk:         BytesN<64>,   // ECDH escrow of dvk_i under operator key
+    escrowed_dvk:         BytesN<64>,   // ECDH escrow of dvk_i under spender key
     allowance_salt:       BytesN<32>,
-    expiration_ledger:    u32,
+    live_until_ledger:    u32,
 }
 ```
 
 **`allowance_commitment`**
 
-The operator's remaining escrowed allowance, a single Pedersen commitment: $C_a = \text{Com}(v_a, r_a)$ where $r_a = \text{Poseidon}(\delta_{\text{allow\\\_r}}, dvk_i, \sigma_a)$. One Grumpkin point (64 bytes).
+The spender's remaining escrowed allowance, a single Pedersen commitment: $C_a = \text{Com}(v_a, r_a)$ where $r_a = \text{Poseidon}(\delta_{\text{allow\\\_r}}, dvk_i, \sigma_a)$. One Grumpkin point (64 bytes).
 
 **`encrypted_allowance`**
 
-Poseidon-encrypted allowance scalar: $\tilde{a} = v_a + \text{Poseidon}(\delta_{\text{enc\\\_allow}}, dvk_i, \sigma_a)$. Enables the operator (who holds $dvk_i$ via `escrowed_dvk`) to read the current allowance without DLP when constructing an `OperatorTransfer` witness. The owner can also read it via $vk \rightarrow dvk_i$. The auditor does not consume this field; allowance visibility for the auditor is provided by the per-event ciphertexts (Section 8.5).
+Poseidon-encrypted allowance scalar: $\tilde{a} = v_a + \text{Poseidon}(\delta_{\text{enc\\\_allow}}, dvk_i, \sigma_a)$. Enables the spender (who holds $dvk_i$ via `escrowed_dvk`) to read the current allowance without DLP when constructing an `SpenderTransfer` witness. The owner can also read it via $vk \rightarrow dvk_i$. The auditor does not consume this field; allowance visibility for the auditor is provided by the per-event ciphertexts (Section 8.5).
 
 **`escrowed_dvk`**
 
-$dvk_i$ encrypted under the operator's spending key via ECDH. (64 bytes)
+$dvk_i$ encrypted under the spender's spending key via ECDH. (64 bytes)
 
 **`allowance_salt`**
 
-Per-delegation salt for allowance randomness derivation, encoded as `BytesN<32>` (canonical $\mathbb{F}_r$ representative). $\sigma_a$ is sampled by the rejection sampling procedure of §2.2 (same as $\sigma$) and is the sole freshness input to all allowance Poseidon derivations. Set by the owner at `set_operator` and replaced by the operator on every `confidential_transfer_from` (the operator samples a fresh `new_allowance_salt` and that becomes the stored value alongside the updated `allowance_commitment`). The salt is bound to the current commitment: when the commitment changes, the salt changes with it. It is stored on-chain so the owner can decrypt the allowance at revocation without depending on event history.
+Per-delegation salt for allowance randomness derivation, encoded as `BytesN<32>` (canonical $\mathbb{F}_r$ representative). $\sigma_a$ is sampled by the rejection sampling procedure of §2.2 (same as $\sigma$) and is the sole freshness input to all allowance Poseidon derivations. Set by the owner at `set_spender` and replaced by the spender on every `confidential_transfer_from` (the spender samples a fresh `new_allowance_salt` and that becomes the stored value alongside the updated `allowance_commitment`). The salt is bound to the current commitment: when the commitment changes, the salt changes with it. It is stored on-chain so the owner can decrypt the allowance at revocation without depending on event history.
 
-**Dual role.** In operator transfers, $\sigma_a$ also serves as the nonce for the recipient ECDH encryption (O7, O9) and the auditor channel sponges (O\_a2 and O\_a6, which absorb $\sigma_a$ alongside the channel shared scalar). This is safe because ECDH confidentiality derives from the shared secret $S.x$ (or $S_{a,r}.x$, $S_{a,s}.x$), not from $\sigma_a$ being secret. However, this couples the allowance salt to the transfer event: the event must emit $\sigma_a$ so that the recipient and auditor can decrypt. Any change to how the salt is stored or exposed must preserve this invariant.
+**Dual role.** In spender transfers, $\sigma_a$ also serves as the nonce for the recipient ECDH encryption (O7, O9) and the auditor channel sponges (O\_a2 and O\_a6, which absorb $\sigma_a$ alongside the channel shared scalar). This is safe because ECDH confidentiality derives from the shared secret $S.x$ (or $S_{a,r}.x$, $S_{a,s}.x$), not from $\sigma_a$ being secret. However, this couples the allowance salt to the transfer event: the event must emit $\sigma_a$ so that the recipient and auditor can decrypt. Any change to how the salt is stored or exposed must preserve this invariant.
 
-**`expiration_ledger`**
+**`live_until_ledger`**
 
-Ledger sequence number after which the delegation is no longer valid. Checked on every `confidential_transfer_from`. The delegation persists in storage until explicitly revoked (if it were in temporary storage automatic cleanup would destroy escrowed funds).
+The ledger number at which the delegation expires. The delegation is live while `ledger.sequence() <= live_until_ledger` and expired once `ledger.sequence() > live_until_ledger`. Checked on every `confidential_transfer_from`. The delegation persists in storage until explicitly revoked (if it were in temporary storage automatic cleanup would destroy escrowed funds).
 
-**Single-slot semantics.** The `(owner, operator)` slot holds at most one delegation. `set_operator` (Section 7.7) reverts if a delegation already exists for that pair, regardless of whether the existing delegation is past `expiration_ledger`. Expiry only prevents the operator from spending; the escrowed value persists on-chain until `revoke_operator` (Section 7.9) folds it back into the owner's spendable balance. Re-delegating to the same operator therefore requires the sequence: `revoke_operator` then `set_operator`. This rule is what keeps the balance-conservation invariant (Section 9.3) ranging cleanly over stored delegations: every delegation is either active, expired-pending-revoke, or absent, and the escrowed value is never silently dropped.
+The `(owner, spender)` storage entry holds at most one delegation. `set_spender` (Section 7.7) reverts if a delegation already exists for that pair, regardless of whether the existing delegation is past `live_until_ledger`. Expiry only prevents the spender from spending; the escrowed value persists on-chain until `revoke_spender` (Section 7.9) folds it back into the owner's spendable balance. Re-delegating to the same spender therefore requires the sequence: `revoke_spender` then `set_spender`. This rule is what keeps the balance-conservation invariant (Section 9.3) ranging cleanly over stored delegations: every delegation is either active, expired-pending-revoke, or absent, and the escrowed value is never silently dropped.
 
 ---
 
@@ -476,11 +476,11 @@ Ledger sequence number after which the delegation is no longer valid. Checked on
 
 ### 7.1 Public Input Sources
 
-UltraHonk verifies the relation between a proof and its public-input vector. The verifier sees only field elements -- it has no knowledge of which account, wrapper, or auditor those values are supposed to describe. Binding each public input to the correct provenance is the wrapper's responsibility. If the wrapper takes a value that should come from trusted state (e.g. the sender's `spending_key`) and instead reads it from caller-controlled invocation inputs, a soundly proven statement can verify for the wrong account.
+UltraHonk verifies the relation between a proof and its public-input vector. The verifier sees only field elements -- it has no knowledge of which account, contract, or auditor those values are supposed to describe. Binding each public input to the correct provenance is the contract's responsibility. If the contract takes a value that should come from trusted state (e.g. the sender's `spending_key`) and instead reads it from caller-controlled invocation inputs, a soundly proven statement can verify for the wrong account.
 
-Each operation below lists, for every public input, where the wrapper loads it from -- persistent account storage, the delegation entry, the wrapper's own contract address, an auditor-contract lookup, an invocation argument, or a prover-supplied value that the circuit binds.
+Each operation below lists, for every public input, where the contract loads it from -- persistent account storage, the delegation entry, the contract's own contract address, an auditor-contract lookup, an invocation argument, or a prover-supplied value that the circuit binds.
 
-**Trust-boundary rule.** Public inputs that derive from trusted state (account storage, delegation storage, the current contract address, or auditor-contract lookups) MUST be loaded by the wrapper itself. The wrapper MUST NOT accept these values from the caller's `data` payload. Only invocation arguments (which are bound under `require_auth()` per §11.1) and prover-supplied values (which the circuit binds to its constraints) may originate from the caller. Violating this rule breaks soundness even with a perfectly sound circuit.
+**Trust-boundary rule.** Public inputs that derive from trusted state (account storage, delegation storage, the current contract address, or auditor-contract lookups) MUST be loaded by the contract itself. The contract MUST NOT accept these values from the caller's `data` payload. Only invocation arguments (which are bound under `require_auth()` per §11.1) and prover-supplied values (which the circuit binds to its constraints) may originate from the caller. Violating this rule breaks soundness even with a perfectly sound circuit.
 
 ### 7.2 Registration
 
@@ -491,7 +491,7 @@ An account provides a Grumpkin spending key $Y$, a public viewing key $\text{PVK
 | # | Constraint |
 |:--|:---|
 | R1 | $Y = sk \cdot H$ (spending key well-formed) |
-| R2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$ (viewing key correctly derived, binds proof to wrapper) |
+| R2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (viewing key correctly derived, binds proof to contract) |
 | R3 | $\text{PVK} = vk \cdot H$ (public viewing key matches $vk$) |
 | R4 | $sk \neq 0$ (rules out $Y = \mathcal{O}$) |
 | R5 | $vk \neq 0$ (rules out $\text{PVK} = \mathcal{O}$, which would collapse every incoming-transfer ECDH) |
@@ -501,7 +501,7 @@ An account provides a Grumpkin spending key $Y$, a public viewing key $\text{PVK
 | Input | Notes |
 |:---|:---|
 | $Y$, $\text{PVK}$ | Prover-supplied; written to `account.spending_key` and `account.viewing_public_key` on success |
-| $\text{wrap}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 
 **Private witnesses:** $sk$.
 
@@ -509,7 +509,7 @@ An account provides a Grumpkin spending key $Y$, a public viewing key $\text{PVK
 
 ### 7.3 Deposit
 
-Transparent tokens flow from the depositor to the wrapper via `token.transfer(from, self, amount)`. The amount $a$ is public and typed as `i128`. The wrapper checks $a \ge 0$ at the entrypoint and reverts on violation (Section 3.4). The contract then computes the deposit commitment with zero blinding:
+Transparent tokens flow from the depositor to the contract via `token.transfer(from, self, amount)`. The amount $a$ is public and typed as `i128`. The contract checks $a \ge 0$ at the entrypoint and reverts on violation (Section 3.4). The contract then computes the deposit commitment with zero blinding:
 
 $$C_{\text{dep}} = a \cdot G + 0 \cdot H = a \cdot G$$
 
@@ -517,7 +517,7 @@ and adds it to the recipient's receiving balance:
 
 $$C_{\text{receive}} \leftarrow C_{\text{receive}} + C_{\text{dep}}$$
 
-No proof required. The recipient `to` **must** be registered: the receiving-balance update writes into `to`'s `ConfidentialAccount` slot and the wrapper reverts if no slot exists. The depositor `from` does **not** need a registered confidential account; only the SEP-41 `token.transfer(from, self, a)` authorization is required. The recipient's off-chain state updates: $v_{\text{receive}} \mathrel{+}= a$, $r_{\text{receive}} \mathrel{+}= 0$.
+No proof required. The recipient `to` **must** be registered: the receiving-balance update writes into `to`'s `ConfidentialAccount` storage entry. The depositor `from` does **not** need a registered confidential account; only the SEP-41 `token.transfer(from, self, a)` authorization is required. The recipient's off-chain state updates: $v_{\text{receive}} \mathrel{+}= a$, $r_{\text{receive}} \mathrel{+}= 0$.
 
 ### 7.4 Merge
 
@@ -545,14 +545,14 @@ No value is created or destroyed. $\square$
 
 ### 7.5 Withdrawal
 
-The owner withdraws a public amount $a$ (typed `i128`) from their spendable balance. The W4 range constraint bounds $a$ at $2^{127}$ in-circuit; the wrapper additionally checks $a \ge 0$ at the entrypoint (Section 3.4).
+The owner withdraws a public amount $a$ (typed `i128`) from their spendable balance. The W4 range constraint bounds $a$ at $2^{127}$ in-circuit; the contract additionally checks $a \ge 0$ at the entrypoint (Section 3.4).
 
 **Circuit constraints (Withdraw):**
 
 | # | Constraint |
 |:--|:---|
 | W1 | $Y = sk \cdot H$ (owner key ownership) |
-| W2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$ (binds proof to wrapper) |
+| W2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (binds proof to contract) |
 | W3 | The prover knows the opening $(v, r)$ of $C_{\text{spend}}$: $C_{\text{spend}} = v \cdot G + r \cdot H$ |
 | W4 | $v \in [0, 2^{127})$, $a \in [0, 2^{127})$, $v - a \in [0, 2^{127})$ (range validity, Section 2.6) |
 | W5 | $r' = \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk, \sigma)$ (deterministic randomness for new balance) |
@@ -570,7 +570,7 @@ The owner withdraws a public amount $a$ (typed `i128`) from their spendable bala
 |:---|:---|
 | $C_{\text{spend}}$ | Loaded from `from.spendable_balance` |
 | $Y$ | Loaded from `from.spending_key` |
-| $\text{wrap}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using `from.auditor_id` |
 | $a$ | Public withdrawal amount from invocation inputs |
 | $C_{\text{spend}}'$, $\sigma$, $\tilde{b}$, $R_e$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to `from.spendable_balance`, the rest emitted in event |
@@ -609,7 +609,7 @@ The sender (account $A$, spending key $sk_A$) transfers a hidden amount $v_{\tex
 | # | Constraint |
 |:--|:---|
 | T1 | $Y_A = sk_A \cdot H$ (sender key ownership) |
-| T2 | $vk_A = \text{Poseidon}(\delta_{\text{vk}}, sk_A, \text{wrap})$ (binds proof to wrapper) |
+| T2 | $vk_A = \text{Poseidon}(\delta_{\text{vk}}, sk_A, \text{addr_f})$ (binds proof to contract) |
 | T3 | Prover knows opening $(v_A, r_A)$ of $C_{\text{spend}}^A$ |
 | T4 | $v_A \in [0, 2^{127})$, $v_{\text{tx}} \in [0, 2^{127})$, $v_A - v_{\text{tx}} \in [0, 2^{127})$ (range validity, Section 2.6) |
 | T5 | $S = r_e \cdot \text{PVK}_B$ (ECDH correctly computed) |
@@ -637,7 +637,7 @@ The sender (account $A$, spending key $sk_A$) transfers a hidden amount $v_{\tex
 | $C_{\text{spend}}^A$ | Loaded from sender's `spendable_balance` |
 | $Y_A$ | Loaded from sender's `spending_key` |
 | $\text{PVK}_B$ | Loaded from recipient's `viewing_public_key`. Recipient must be registered. |
-| $\text{wrap}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,r}}$ | Fetched from the auditor contract using recipient's `auditor_id` |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using sender's `auditor_id` |
 | $C_{\text{spend}}'$, $C_{\text{tx}}$, $R_e$, $\tilde{v}$, $\tilde{b}$, $\sigma$, $\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to sender's `spendable_balance`, $C_{\text{tx}}$ added to recipient's `receiving_balance`, the rest emitted in event |
@@ -649,21 +649,21 @@ The sender (account $A$, spending key $sk_A$) transfers a hidden amount $v_{\tex
 - Adds to recipient: $B$`.receiving_balance` $\mathrel{+}= C_{\text{tx}}$
 - Emits event with $(R_e, \tilde{v}, \sigma, \tilde{b}, \tilde{v}_{\text{aud,r}}, \tilde{r}_{\text{aud,r}}, \tilde{v}_{\text{aud,s}}, \tilde{b}_{\text{aud,s}})$
 
-**Recipient processing.** Upon observing the event, the recipient computes $S = vk \cdot R_e$, derives amount and blinding. The decryption flow is independent of whether the sender was the owner or an operator.
+**Recipient processing.** Upon observing the event, the recipient computes $S = vk \cdot R_e$, derives amount and blinding. The decryption flow is independent of whether the sender was the owner or an spender.
 
-### 7.7 Set Operator
+### 7.7 Set Spender
 
-The owner locks funds from their spendable balance into a per-operator escrow. The operator must be a registered account in the wrapper, so that $Y_{\text{op}}$ (needed for $dvk_i$ escrow) can be looked up from the operator's stored `spending_key`.
+The owner locks funds from their spendable balance into a per-spender escrow. The spender must be a registered account in the contract, so that $Y_{\text{op}}$ (needed for $dvk_i$ escrow) can be looked up from the spender's stored `spending_key`.
 
-**Circuit constraints (SetOperator):**
+**Circuit constraints (SetSpender):**
 
 | # | Constraint |
 |:--|:---|
 | S1 | $Y = sk \cdot H$ (owner key ownership) |
-| S2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$ (binds proof to wrapper) |
+| S2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (binds proof to contract) |
 | S3 | Prover knows opening $(v, r)$ of $C_{\text{spend}}$ |
 | S4 | $v \in [0, 2^{127})$, $v_a \in [0, 2^{127})$, $v - v_a \in [0, 2^{127})$ (range validity, Section 2.6) |
-| S5 | $dvk_i = \text{Poseidon}(\delta_{\text{dvk}}, vk, \text{op}_i)$ (delegation key derivation; wrapper-bound via $vk$) |
+| S5 | $dvk_i = \text{Poseidon}(\delta_{\text{dvk}}, vk, \text{op}_i)$ (delegation key derivation; contract-bound via $vk$) |
 | S6 | $r_a = \text{Poseidon}(\delta_{\text{allow\\\_r}}, dvk_i, \sigma_a)$ (allowance blinding) |
 | S7 | $C_a = v_a \cdot G + r_a \cdot H$ (allowance commitment) |
 | S8 | $\tilde{a} = v_a + \text{Poseidon}(\delta_{\text{enc\\\_allow}}, dvk_i, \sigma_a)$ (encrypted allowance) |
@@ -684,25 +684,25 @@ The owner locks funds from their spendable balance into a per-operator escrow. T
 |:---|:---|
 | $C_{\text{spend}}$ | Loaded from owner's `spendable_balance` |
 | $Y$ | Loaded from owner's `spending_key` |
-| $Y_{\text{op}}$ | Loaded from operator account's `spending_key`. Operator must be registered. |
-| $\text{op}_i$ | $\text{address\\\_to\\\_field}$(`operator` argument), computed per-call by the wrapper (§2.7) |
-| $\text{wrap}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $Y_{\text{op}}$ | Loaded from spender account's `spending_key`. Spender must be registered. |
+| $\text{op}_i$ | $\text{address\\\_to\\\_field}$(`spender` argument), computed per-call by the contract (§2.7) |
+| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using owner's `auditor_id` |
 | $C_{\text{spend}}'$, $C_a$, escrowed\_dvk, $\tilde{b}$, $\tilde{a}$, $\sigma$, $\sigma_a$, $R_e$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to owner's `spendable_balance`, the delegation fields written to storage, the rest emitted in event |
 
 **Private witnesses:** $sk$, $vk$, $v$, $r$, $v_a$, $r_e$.
 
-**Post-verification:** The contract verifies the proof, sets `spendable_balance` $= C_{\text{spend}}'$ and stores the `OperatorDelegation`. Emits event with $(R_e, \sigma, \tilde{b}, \tilde{v}_{\text{aud,s}}, \tilde{b}_{\text{aud,s}})$.
+**Post-verification:** The contract verifies the proof, sets `spendable_balance` $= C_{\text{spend}}'$ and stores the `SpenderDelegation`. Emits event with $(R_e, \sigma, \tilde{b}, \tilde{v}_{\text{aud,s}}, \tilde{b}_{\text{aud,s}})$.
 
-### 7.8 Operator Transfer
+### 7.8 Spender Transfer
 
-The operator transfers from the owner's escrowed allowance to a recipient.
+The spender transfers from the owner's escrowed allowance to a recipient.
 
-**Circuit constraints (OperatorTransfer):**
+**Circuit constraints (SpenderTransfer):**
 
 | # | Constraint |
 |:--|:---|
-| O1 | $Y_{\text{op}} = sk_{\text{op}} \cdot H$ (operator key ownership) |
+| O1 | $Y_{\text{op}} = sk_{\text{op}} \cdot H$ (spender key ownership) |
 | O2 | Prover knows $dvk_i$ and the opening $(v_a, r_a)$ of $C_a$ |
 | O3 | $r_a = \text{Poseidon}(\delta_{\text{allow\\\_r}}, dvk_i, \sigma_a)$ (allowance randomness matches stored state) |
 | O4 | $v_a \in [0, 2^{127})$, $v_{\text{tx}} \in [0, 2^{127})$, $v_a - v_{\text{tx}} \in [0, 2^{127})$ (range validity, Section 2.6) |
@@ -728,31 +728,31 @@ The operator transfers from the owner's escrowed allowance to a recipient.
 
 | Input | Notes |
 |:---|:---|
-| $C_a$, $\sigma_a$ | Loaded from the `(from, operator)` delegation entry |
-| $Y_{\text{op}}$ | Loaded from operator's `spending_key`; matches the auth principal |
+| $C_a$, $\sigma_a$ | Loaded from the `(from, spender)` delegation entry |
+| $Y_{\text{op}}$ | Loaded from spender's `spending_key`; matches the auth principal |
 | $\text{PVK}_{\text{recipient}}$ | Loaded from recipient's `viewing_public_key` |
 | $K_{\text{aud,r}}$ | Fetched from the auditor contract using recipient's `auditor_id` |
-| $K_{\text{aud,s}}$ | Fetched from the auditor contract using **owner's** `auditor_id`, not operator's. The visibility model points balance- and allowance-checkpoint ciphertexts at the funds' owner. |
+| $K_{\text{aud,s}}$ | Fetched from the auditor contract using **owner's** `auditor_id`, not spender's. The visibility model points balance- and allowance-checkpoint ciphertexts at the funds' owner. |
 | $C_a'$, $C_{\text{tx}}$, $R_e$, $\tilde{v}$, $\tilde{a}'$, $\sigma_a'$, $\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{a}_{\text{aud,s}}$ | Prover-supplied; allowance fields written to delegation storage, $C_{\text{tx}}$ added to recipient's `receiving_balance`, the rest emitted in event |
 
 **Private witnesses:** $sk_{\text{op}}$, $dvk_i$, $v_a$, $r_a$ (single-limb $\mathbb{F}_r$; pinned by O3 to $\text{Poseidon}(\delta_{\text{allow\\\_r}}, dvk_i, \sigma_a)$), $v_{\text{tx}}$, $r_e$.
 
-**Post-verification:** The contract checks `ledger.sequence() <= expiration_ledger`, updates `allowance_commitment`, `encrypted_allowance`, stores `new_allowance_salt`, and adds $C_{\text{tx}}$ to the recipient's `receiving_balance`. Emits event with $(R_e, \tilde{v}, \sigma_a, \tilde{v}_{\text{aud,r}}, \tilde{r}_{\text{aud,r}}, \tilde{v}_{\text{aud,s}}, \tilde{a}_{\text{aud,s}})$.
+**Post-verification:** The contract checks `ledger.sequence() <= live_until_ledger`, updates `allowance_commitment`, `encrypted_allowance`, stores `new_allowance_salt`, and adds $C_{\text{tx}}$ to the recipient's `receiving_balance`. Emits event with $(R_e, \tilde{v}, \sigma_a, \tilde{v}_{\text{aud,r}}, \tilde{r}_{\text{aud,r}}, \tilde{v}_{\text{aud,s}}, \tilde{a}_{\text{aud,s}})$.
 
-**Recipient uniformity.** The recipient processes the incoming transfer identically to a direct transfer: compute $S = vk \cdot R_e$, derive amount and blinding. The decryption flow is independent of whether the sender was the owner or an operator.
+**Recipient uniformity.** The recipient processes the incoming transfer identically to a direct transfer: compute $S = vk \cdot R_e$, derive amount and blinding. The decryption flow is independent of whether the sender was the owner or an spender.
 
-**Wrapper binding.** Unlike owner-initiated circuits, the OperatorTransfer circuit does not constrain the $vk$ derivation (the operator has no access to the owner's $sk$). Wrapper binding is instead inherited indirectly through the allowance commitment chain: the SetOperator circuit derives $dvk_i$ from the wrapper-specific $vk$ (S2, S5), which determines $r_a$ (S6) and thus $C_a$ (S7). The OperatorTransfer circuit verifies $dvk_i$ against $C_a$ via $\sigma_a$ (O3). Since $C_a$ is a public input and was constructed with wrapper-specific randomness, a proof generated against one wrapper's $C_a$ cannot verify against another's.
+**Contract binding.** Unlike owner-initiated circuits, the SpenderTransfer circuit does not constrain the $vk$ derivation (the spender has no access to the owner's $sk$). Contract binding is instead inherited indirectly through the allowance commitment chain: the SetSpender circuit derives $dvk_i$ from the contract-specific $vk$ (S2, S5), which determines $r_a$ (S6) and thus $C_a$ (S7). The SpenderTransfer circuit verifies $dvk_i$ against $C_a$ via $\sigma_a$ (O3). Since $C_a$ is a public input and was constructed with contract-specific randomness, a proof generated against one contract's $C_a$ cannot verify against another's.
 
-### 7.9 Revoke Operator
+### 7.9 Revoke Spender
 
 The owner reclaims the remaining escrowed allowance.
 
-**Circuit constraints (RevokeOperator):**
+**Circuit constraints (RevokeSpender):**
 
 | # | Constraint |
 |:--|:---|
 | V1 | $Y = sk \cdot H$ (owner key ownership) |
-| V2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{wrap})$ (binds proof to wrapper) |
+| V2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (binds proof to contract) |
 | V3 | $dvk_i = \text{Poseidon}(\delta_{\text{dvk}}, vk, \text{op}_i)$ |
 | V4 | Prover knows opening $(v_a, r_a)$ of $C_a$, with $r_a = \text{Poseidon}(\delta_{\text{allow\\\_r}}, dvk_i, \sigma_a)$ (allowance randomness matches stored state, mirrors O3) |
 | V5 | Prover knows opening $(v_s, r_s)$ of $C_{\text{spend}}$ |
@@ -772,10 +772,10 @@ The owner reclaims the remaining escrowed allowance.
 | Input | Notes |
 |:---|:---|
 | $C_{\text{spend}}$ | Loaded from owner's `spendable_balance` |
-| $C_a$, $\sigma_a$ | Loaded from the `(account, operator)` delegation entry |
+| $C_a$, $\sigma_a$ | Loaded from the `(account, spender)` delegation entry |
 | $Y$ | Loaded from owner's `spending_key` |
-| $\text{op}_i$ | $\text{address\\\_to\\\_field}$(`operator` argument), computed per-call by the wrapper (§2.7) |
-| $\text{wrap}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{op}_i$ | $\text{address\\\_to\\\_field}$(`spender` argument), computed per-call by the contract (§2.7) |
+| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using owner's `auditor_id` |
 | $C_{\text{spend}}'$, $\tilde{b}$, $\sigma$, $R_e$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to owner's `spendable_balance`, delegation entry deleted, the rest emitted in event |
 
@@ -783,21 +783,21 @@ The owner reclaims the remaining escrowed allowance.
 
 **Post-verification:** The contract verifies the proof, sets `spendable_balance` $= C_{\text{spend}}'$ and deletes the delegation. Emits event with $(R_e, \sigma, \tilde{b}, \tilde{v}_{\text{aud,s}}, \tilde{b}_{\text{aud,s}})$.
 
-### 7.10 Owner Operations with Active Operators
+### 7.10 Owner Operations with Active Spenders
 
-Owner transfers, withdrawals, and merges proceed identically to the no-operator case. Operator allowances are independently escrowed - no synchronization is needed. The owner's spendable balance and operator allowances are fully isolated.
+Owner transfers, withdrawals, and merges proceed identically to the no-spender case. Spender allowances are independently escrowed - no synchronization is needed. The owner's spendable balance and spender allowances are fully isolated.
 
 ### 7.11 Delegation Key Escrow
 
-At `set_operator`, the owner escrows $dvk_i$ to the operator on-chain via ECDH, eliminating off-chain key sharing:
+At `set_spender`, the owner escrows $dvk_i$ to the spender on-chain via ECDH, eliminating off-chain key sharing:
 
-1. Owner picks ephemeral $r_e$ (reused from the `set_operator` proof's outer ECDH; see §5.3 <em>Why reusing $r_e$ is safe</em>) and computes $R = r_e \cdot H$.
+1. Owner picks ephemeral $r_e$ (reused from the `set_spender` proof's outer ECDH; see §5.3 <em>Why reusing $r_e$ is safe</em>) and computes $R = r_e \cdot H$.
 2. Shared secret: $s = (r_e \cdot Y_{\text{op}}).x$
 3. Escrowed key: $\text{escrowed\\\_dvk} = (R.x, \; \text{Poseidon}(\delta_{\text{esc\\\_dvk}}, s, \text{op}_i) + dvk_i)$
 
-**Encoding.** `escrowed_dvk` is a `BytesN<64>` consisting of two 32-byte $\mathbb{F}_r$ representatives: `R_x` (the $x$-coordinate of $R$) followed by `dvk_cipher` (the masked $dvk_i$). $R.y$ is **not** stored. This is sound because ECDH on Grumpkin recovers only the $x$-coordinate of the shared secret: $\pm R$ both have $x = R.x$, and $sk_{\text{op}} \cdot R$ and $sk_{\text{op}} \cdot (-R)$ are inverse points with the same $x$-coordinate. The operator reconstructs the curve point by solving $y^2 = R.x^3 - 17$ in $\mathbb{F}_r$, picks either root, and proceeds; both choices produce the same $s = (sk_{\text{op}} \cdot R).x$ and therefore the same Poseidon mask.
+**Encoding.** `escrowed_dvk` is a `BytesN<64>` consisting of two 32-byte $\mathbb{F}_r$ representatives: `R_x` (the $x$-coordinate of $R$) followed by `dvk_cipher` (the masked $dvk_i$). $R.y$ is **not** stored. This is sound because ECDH on Grumpkin recovers only the $x$-coordinate of the shared secret: $\pm R$ both have $x = R.x$, and $sk_{\text{op}} \cdot R$ and $sk_{\text{op}} \cdot (-R)$ are inverse points with the same $x$-coordinate. The spender reconstructs the curve point by solving $y^2 = R.x^3 - 17$ in $\mathbb{F}_r$, picks either root, and proceeds; both choices produce the same $s = (sk_{\text{op}} \cdot R).x$ and therefore the same Poseidon mask.
 
-The operator decrypts using $sk_{\text{op}}$. The `set_operator` proof enforces escrow correctness via constraint S12, which expands to three sub-constraints over the prover-supplied `escrowed_dvk = (R_x, dvk_cipher)`:
+The spender decrypts using $sk_{\text{op}}$. The `set_spender` proof enforces escrow correctness via constraint S12, which expands to three sub-constraints over the prover-supplied `escrowed_dvk = (R_x, dvk_cipher)`:
 
 - $R_x = (r_e \cdot H).x$
 - $s_{\text{esc}} = (r_e \cdot Y_{\text{op}}).x$
@@ -807,7 +807,7 @@ The $r_e$ here is the same scalar S\_a1 commits to ($R_e = r_e \cdot H$), so the
 
 ### 7.12 Expiry and Revert Safety
 
-Delegations use persistent storage and persist until explicitly revoked. `expiration_ledger` is checked on every operator transfer. Allowance randomness includes `allowance_salt` to prevent deterministic-randomness reuse after reverted transactions.
+Delegations use persistent storage and persist until explicitly revoked. `live_until_ledger` is checked on every spender transfer. Allowance randomness includes `allowance_salt` to prevent deterministic-randomness reuse after reverted transactions.
 
 ---
 
@@ -829,7 +829,7 @@ $$S_{a,s} = r_e \cdot K_{\text{aud,s}}, \qquad s_{a,s} = S_{a,s}.x$$
 $$(m_{v,s}, m_{b,s}) = \text{SpongeSqueeze}_2(\delta_{\text{aud\\\_s}}, s_{a,s}, \sigma)$$
 $$\tilde{v}_{\text{aud,s}} = v_{\text{tx}} + m_{v,s}, \qquad \tilde{b}_{\text{aud,s}} = (v_A - v_{\text{tx}}) + m_{b,s}$$
 
-The transfer circuit (constraints T\_a1--T\_a8) enforces correct computation. The wrapper fetches both auditor keys from the auditor contract using the respective account `auditor_id` fields; neither the sender nor the recipient can substitute a different key.
+The transfer circuit (constraints T\_a1--T\_a8) enforces correct computation. The contract fetches both auditor keys from the auditor contract using the respective account `auditor_id` fields; neither the sender nor the recipient can substitute a different key.
 
 Each auditor decrypts using their secret key $k$. For example, the sender's auditor:
 
@@ -843,7 +843,7 @@ where $R_e$ and $\sigma$ are published in the Transfer event. The recipient's au
 
 $$v_r = \sum_i v_{\text{tx},i} + \sum_j a_j, \qquad r_r = \sum_i r_{\text{tx},i}$$
 
-where $i$ ranges over inbound transfers and operator-transfers since the last merge and $j$ ranges over deposits. This is a full Pedersen *opening* of $C_{\text{receive}}$: both the value and the blinding are reconstructed by the auditor.
+where $i$ ranges over inbound transfers and spender-transfers since the last merge and $j$ ranges over deposits. This is a full Pedersen *opening* of $C_{\text{receive}}$: both the value and the blinding are reconstructed by the auditor.
 
 The opening capability does not extend to $C_{\text{spend}}$. The auditor knows the *value* $v_s$ at every spend boundary via $\tilde{b}_{\text{aud,s}}$ (Section 5.5), and can extend that with the known $v_r$ contribution at each merge. This bounded opening is what enables the clawback flow specified in [COMPLIANCE.md](./COMPLIANCE.md) §5: the recipient-auditor is the seize-enabling party for inbound flows while $C_{\text{receive}}$ has not yet been merged. After merge the auditor still tracks $C_{\text{spend}}$'s value via $\tilde{b}_{\text{aud,s}}$ updates.
 
@@ -855,18 +855,18 @@ The opening capability does not extend to $C_{\text{spend}}$. The auditor knows 
 
 - **Outgoing transfer**: auditor decrypts post-transfer balance $(v_A - v_{\text{tx}})$ from $\tilde{b}_{\text{aud,s}}$ (constraints T\_a5--T\_a8).
 - **Withdrawal**: auditor decrypts post-withdrawal balance $(v - a)$ from $\tilde{b}_{\text{aud,s}}$ (constraints W\_a1--W\_a4). The withdrawal amount $a$ is also visible as a public input.
-- **Set operator**: auditor decrypts escrowed amount $v_a$ from $\tilde{v}_{\text{aud,s}}$ and post-escrow balance $(v - v_a)$ from $\tilde{b}_{\text{aud,s}}$ (constraints S\_a1--S\_a5).
-- **Revoke operator**: auditor decrypts reclaimed amount $v_a$ from $\tilde{v}_{\text{aud,s}}$ and post-reclaim balance $(v_s + v_a)$ from $\tilde{b}_{\text{aud,s}}$ (constraints V\_a1--V\_a5).
+- **Set spender**: auditor decrypts escrowed amount $v_a$ from $\tilde{v}_{\text{aud,s}}$ and post-escrow balance $(v - v_a)$ from $\tilde{b}_{\text{aud,s}}$ (constraints S\_a1--S\_a5).
+- **Revoke spender**: auditor decrypts reclaimed amount $v_a$ from $\tilde{v}_{\text{aud,s}}$ and post-reclaim balance $(v_s + v_a)$ from $\tilde{b}_{\text{aud,s}}$ (constraints V\_a1--V\_a5).
 
 The recipient's auditor does not see the sender's balance in any of these operations.
 
-**Per-transfer Pedersen randomness (recipient-auditor only).** Beyond the transfer amount, the recipient's auditor also decrypts the per-transfer Pedersen blinding $r_{\text{tx}}$ from $\tilde{r}_{\text{aud,r}}$ on every confidential transfer and operator-transfer (constraints T\_a4 and O\_a4). Combined with $v_{\text{tx}}$ this is a full Pedersen opening of each $C_{\text{tx},i}$ and, by homomorphism, of the recipient's `receiving_balance` $C_{\text{receive}}$ between merges (Section 8.1). The sender's auditor does not see $r_{\text{tx}}$.
+**Per-transfer Pedersen randomness (recipient-auditor only).** Beyond the transfer amount, the recipient's auditor also decrypts the per-transfer Pedersen blinding $r_{\text{tx}}$ from $\tilde{r}_{\text{aud,r}}$ on every confidential transfer and spender-transfer (constraints T\_a4 and O\_a4). Combined with $v_{\text{tx}}$ this is a full Pedersen opening of each $C_{\text{tx},i}$ and, by homomorphism, of the recipient's `receiving_balance` $C_{\text{receive}}$ between merges (Section 8.1). The sender's auditor does not see $r_{\text{tx}}$.
 
 **Key rotation.** When the auditor contract sets a new key under the account's `auditor_id` (§8.3), the new key sees the balance checkpoint at the next owner-initiated operation, with no event replay or bootstrapping required. The balance checkpoint is self-contained: it depends only on the auditor's ECDH secret key and the published $(R_e, \sigma)$. Note that `auditor_id` itself is immutable per account (§6.1); only the key under that `auditor_id` rotates.
 
 **No viewing-key escrow on the sender side.** The sender-auditor does not hold any account's viewing key, and compromise of a sender-auditor key exposes only per-operation amounts and balance checkpoints from operations that occurred while the compromised key was active. Historical balances under prior keys, and the recipient's `spendable_balance` (whose blinding derives from $vk_A$, not from any auditor channel), remain opaque.
 
-**Recipient-side opening capability.** The recipient-auditor additionally learns the per-transfer Pedersen randomness $r_{\text{tx}}$ for every inbound transfer and operator-transfer. This is capability-equivalent to holding the opening of every $C_{\text{tx},i}$ and, by summation, of $C_{\text{receive}}$. The capability is bounded in two ways:
+**Recipient-side opening capability.** The recipient-auditor additionally learns the per-transfer Pedersen randomness $r_{\text{tx}}$ for every inbound transfer and spender-transfer. This is capability-equivalent to holding the opening of every $C_{\text{tx},i}$ and, by summation, of $C_{\text{receive}}$. The capability is bounded in two ways:
 
 - **Forward-only.** Only events emitted while the auditor key was active are decryptable.
 - **Receiving-side only (opening).** The full $(v_r, r_r)$ opening covers `receiving_balance`. It does not extend to a full opening of `spendable_balance`, whose blinding $r_s = \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk_A, \sigma)$ depends on $vk_A$ and is not derivable from any auditor key. The auditor still knows the *value* $v_s$ of `spendable_balance` at every spend boundary via $\tilde{b}_{\text{aud,s}}$.
@@ -877,15 +877,15 @@ This is the trust position that supports the clawback flow in [COMPLIANCE.md](./
 
 The auditor contract stores Grumpkin public keys as full affine points $(x, y)$ indexed by `auditor_id`. The contract validates that every inserted key is canonical, on-curve ($y^2 \equiv x^3 - 17 \pmod{r}$), and non-identity at insertion time (Section 3.1, Section 10.8). Each `auditor_id` MAY maintain a sequence of versions, each carrying its activation ledger. Rotation appends a new entry rather than overwriting the previous one.
 
-When building public inputs for any operation that produces auditor ciphertexts (transfers, withdrawals, set/revoke operator), the wrapper fetches the relevant auditor keys for the recipient's and/or sender's `auditor_id`. The wrapper passes the full Grumpkin point as a public input; the circuit constrains the ECDH ciphertexts against that exact point. The wrapper and the circuit are version-agnostic: they verify against whichever key the auditor contract currently exposes.
+When building public inputs for any operation that produces auditor ciphertexts (transfers, withdrawals, set/revoke spender), the contract fetches the relevant auditor keys for the recipient's and/or sender's `auditor_id`. The contract passes the full Grumpkin point as a public input; the circuit constrains the ECDH ciphertexts against that exact point. The contract and the circuit are version-agnostic: they verify against whichever key the auditor contract currently exposes.
 
-**In-flight proofs across rotation.** A proof constructed against version $v$ becomes unverifiable the instant the auditor contract activates version $v+1$. The $K_{\text{aud}}$ public input the wrapper fetches at verification no longer matches the value the prover committed to, so UltraHonk verification fails and the invocation **reverts at the proof-verification boundary**. The caller (sender, owner, or operator) reconstructs the proof against the new $K_{\text{aud}}$ and resubmits. The rejection is benign: the wrapper's spendable balance, receiving balance, and delegation state are unchanged by the reverted call, $\sigma$ is freshly sampled on retry (Section 9.6), and an observer cannot correlate the rejected attempt with the resubmission.
+**In-flight proofs across rotation.** A proof constructed against version $v$ becomes unverifiable the instant the auditor contract activates version $v+1$. The $K_{\text{aud}}$ public input the contract fetches at verification no longer matches the value the prover committed to, so UltraHonk verification fails and the invocation **reverts at the proof-verification boundary**. The caller (sender, owner, or spender) reconstructs the proof against the new $K_{\text{aud}}$ and resubmits. The rejection is benign: the contract's spendable balance, receiving balance, and delegation state are unchanged by the reverted call, $\sigma$ is freshly sampled on retry (Section 9.6), and an observer cannot correlate the rejected attempt with the resubmission.
 
 **Auditor's off-chain obligation.** The auditor MUST retain the secret key for every historical version it has issued. To decrypt an event at ledger $L$, the auditor queries the auditor contract for the version of its `auditor_id` whose activation ledger is the largest value not exceeding $L$, then uses the corresponding off-chain secret key against the $R_e$ and $\sigma$ (or $\sigma_a$) emitted in the event.
 
-### 8.4 Operator Transfer Auditing
+### 8.4 Spender Transfer Auditing
 
-Each operator transfer produces auditor ciphertexts under two keys (constraints O\_a1--O\_a8), following the same dual-auditor sponge model as owner transfers. The recipient's auditor decrypts the transfer amount and the per-transfer Pedersen randomness:
+Each spender transfer produces auditor ciphertexts under two keys (constraints O\_a1--O\_a8), following the same dual-auditor sponge model as owner transfers. The recipient's auditor decrypts the transfer amount and the per-transfer Pedersen randomness:
 
 $$(m_{v,r}, m_{r,r}) = \text{SpongeSqueeze}_2(\delta_{\text{aud\\\_r}}, s_{a,r}, \sigma_a)$$
 $$v_{\text{tx}} = \tilde{v}_{\text{aud,r}} - m_{v,r}, \qquad r_{\text{tx}} = \tilde{r}_{\text{aud,r}} - m_{r,r}$$
@@ -895,11 +895,11 @@ The owner's auditor decrypts the transfer amount and post-transfer allowance:
 $$(m_{v,s}, m_{a,s}) = \text{SpongeSqueeze}_2(\delta_{\text{aud\\\_s}}, s_{a,s}, \sigma_a)$$
 $$v_{\text{tx}} = \tilde{v}_{\text{aud,s}} - m_{v,s}, \qquad v_a' = \tilde{a}_{\text{aud,s}} - m_{a,s}$$
 
-where $s_{a,r}$, $s_{a,s}$, and $\sigma_a$ are recovered from the event as in Section 8.1. The recipient-auditor opening capability stated in Section 8.1 extends to operator-transfer inbound flows: $r_{\text{tx}}$ from operator-transfers contributes to $r_r$ in $C_{\text{receive}}$ identically to owner-transfer inbound flows.
+where $s_{a,r}$, $s_{a,s}$, and $\sigma_a$ are recovered from the event as in Section 8.1. The recipient-auditor opening capability stated in Section 8.1 extends to spender-transfer inbound flows: $r_{\text{tx}}$ from spender-transfers contributes to $r_r$ in $C_{\text{receive}}$ identically to owner-transfer inbound flows.
 
-### 8.5 Operator Allowance Auditing
+### 8.5 Spender Allowance Auditing
 
-The auditor tracks each allowance's current value through the per-event ciphertexts produced at every state-changing operation: `set_operator` reveals the escrowed amount $v_a$ (Section 8.2), `confidential_transfer_from` reveals the transfer amount and post-transfer allowance $v_a'$ (Section 8.4), and `revoke_operator` reveals the reclaimed amount (Section 8.2).
+The auditor tracks each allowance's current value through the per-event ciphertexts produced at every state-changing operation: `set_spender` reveals the escrowed amount $v_a$ (Section 8.2), `confidential_transfer_from` reveals the transfer amount and post-transfer allowance $v_a'$ (Section 8.4), and `revoke_spender` reveals the reclaimed amount (Section 8.2).
 
 **Key rotation.** Visibility is forward-only at the event level, matching the spendable-balance model (§8.2). A new key under the account's existing `auditor_id` sees an allowance at the next state-changing operation, when a fresh ciphertext is produced under the new key.
 
@@ -912,7 +912,7 @@ The auditor tracks each allowance's current value through the per-event cipherte
 **Proposition 2** (Spend-proof stability). *No third party can invalidate an honest owner's in-flight spend proof.*
 
 *Proof.* A spend proof (Section 7.6) references $C_{\text{spend}}^A$ as a public input. The contract modifies $C_{\text{spend}}^A$ only through:
-1. Owner-initiated operations (transfer, withdrawal, `set_operator`, `revoke_operator`) - all require `account.require_auth()`.
+1. Owner-initiated operations (transfer, withdrawal, `set_spender`, `revoke_spender`) - all require `account.require_auth()`.
 2. Merge - requires `account.require_auth()`.
 
 Incoming transfers modify only $C_{\text{receive}}^A$, which does not appear in the spend proof's public inputs. Therefore, between proof construction and submission, no third-party action can alter $C_{\text{spend}}^A$. The proof remains valid. $\square$
@@ -933,15 +933,15 @@ Incoming transfers modify only $C_{\text{receive}}^A$, which does not appear in 
 
 $$\sum_{j} d_j - \sum_{k} w_k = v_{\text{spend}} + v_{\text{receive}} + \sum_{i} v_{\text{allowance}_i}$$
 
-where $d_j$ are deposits, $w_k$ are withdrawals, and the right-hand side sums committed values across the spendable balance, the receiving balance, and every stored (not-yet-revoked) operator allowance. Expired-but-not-revoked allowances are included: expiration prevents the operator from spending the allowance, but the escrowed value still resides on-chain in $C_a$ until `revoke_operator` reclaims it (Section 6.2, Single-slot semantics).
+where $d_j$ are deposits, $w_k$ are withdrawals, and the right-hand side sums committed values across the spendable balance, the receiving balance, and every stored (not-yet-revoked) spender allowance. Expired-but-not-revoked allowances are included: expiration prevents the spender from spending the allowance, but the escrowed value still resides on-chain in $C_a$ until `revoke_spender` reclaims it (Section 6.2).
 
 This invariant is maintained by:
 - **Deposits** increase $v_{\text{receive}}$ by $d_j$ (Section 7.3).
 - **Withdrawals** decrease $v_{\text{spend}}$ by $w_k$, enforced by circuit constraint W4.
 - **Transfers** decrease sender's $v_{\text{spend}}$ and increase recipient's $v_{\text{receive}}$ by the same $v_{\text{tx}}$, enforced by circuit constraints T3–T8.
 - **Merge** moves value from $v_{\text{receive}}$ to $v_{\text{spend}}$ (Proposition 1); the sum is unchanged.
-- **Set operator** moves value from $v_{\text{spend}}$ to $v_{\text{allowance}_i}$; enforced by S3–S7.
-- **Operator transfer** decreases $v_{\text{allowance}_i}$ and increases recipient's $v_{\text{receive}}$ by $v_{\text{tx}}$; enforced by O2–O8.
+- **Set spender** moves value from $v_{\text{spend}}$ to $v_{\text{allowance}_i}$; enforced by S3–S7.
+- **Spender transfer** decreases $v_{\text{allowance}_i}$ and increases recipient's $v_{\text{receive}}$ by $v_{\text{tx}}$; enforced by O2–O8.
 - **Revoke** moves remaining $v_{\text{allowance}_i}$ back to $v_{\text{spend}}$; enforced by V4–V7.
 
 ### 9.4 Privacy Properties
@@ -952,17 +952,17 @@ This invariant is maintained by:
 
 **Sender-recipient linkage.** Sender and recipient addresses are visible on-chain. The system provides amount and balance confidentiality, not anonymity.
 
-**Viewing key compromise.** Since $vk$ is wrapper-specific (Section 4.2), compromise of one wrapper's viewing key does not affect the owner's accounts in other wrappers. Within the compromised wrapper, the attacker can: read all spendable balance snapshots (via $\tilde{b}$ emitted in spend-boundary events), decrypt all incoming transfer amounts (via ECDH with $R_e$ from events), and derive all $dvk_i$ to read operator allowances. The attacker **cannot** authorize any spending operation (requires $sk$, and $vk$ cannot recover $sk$ by Poseidon preimage resistance).
+**Viewing key compromise.** Since $vk$ is contract-specific (Section 4.2), compromise of one contract's viewing key does not affect the owner's accounts in other deployments. Within the compromised contract, the attacker can: read all spendable balance snapshots (via $\tilde{b}$ emitted in spend-boundary events), decrypt all incoming transfer amounts (via ECDH with $R_e$ from events), and derive all $dvk_i$ to read spender allowances. The attacker **cannot** authorize any spending operation (requires $sk$, and $vk$ cannot recover $sk$ by Poseidon preimage resistance).
 
-**Auditor key compromise.** If a sender's auditor key is compromised, the attacker can decrypt amounts and balance checkpoints ($\tilde{b}_{\text{aud,s}}$) for all operations (transfers, withdrawals, set/revoke operator) from accounts that used the compromised key, but cannot construct openings of any commitment. If a recipient's auditor key is compromised, the attacker recovers both the transfer amount and the per-transfer Pedersen randomness ($\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$) for every incoming transfer to accounts that used the compromised key. This is capability-equivalent to holding the opening of every $C_{\text{tx},i}$ and, by summation, of the receiving-balance commitment $C_{\text{receive}}$; see Section 8.2 for the bounded scope (forward-only, receiving-side only). Merge folds $r_r$ into the spendable-balance randomness ($r_{\text{spend}}' = r_s + r_r$, Section 7.4) and emits no checkpoint, so the recipient-auditor's $r_r$ knowledge does not extend to a post-merge opening of $C_{\text{spend}}$: $r_s$ depends on $vk_A$ and is not derivable from any auditor key. In neither case can the attacker recover viewing keys, post-merge spendable-balance openings, historical data from before the key was active, or authorize any spending. After key rotation, new operations are protected by the new key.
+**Auditor key compromise.** If a sender's auditor key is compromised, the attacker can decrypt amounts and balance checkpoints ($\tilde{b}_{\text{aud,s}}$) for all operations (transfers, withdrawals, set/revoke spender) from accounts that used the compromised key, but cannot construct openings of any commitment. If a recipient's auditor key is compromised, the attacker recovers both the transfer amount and the per-transfer Pedersen randomness ($\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$) for every incoming transfer to accounts that used the compromised key. This is capability-equivalent to holding the opening of every $C_{\text{tx},i}$ and, by summation, of the receiving-balance commitment $C_{\text{receive}}$; see Section 8.2 for the bounded scope (forward-only, receiving-side only). Merge folds $r_r$ into the spendable-balance randomness ($r_{\text{spend}}' = r_s + r_r$, Section 7.4) and emits no checkpoint, so the recipient-auditor's $r_r$ knowledge does not extend to a post-merge opening of $C_{\text{spend}}$: $r_s$ depends on $vk_A$ and is not derivable from any auditor key. In neither case can the attacker recover viewing keys, post-merge spendable-balance openings, historical data from before the key was active, or authorize any spending. After key rotation, new operations are protected by the new key.
 
 ### 9.5 State Recovery
 
 The recovery model is built around **checkpoints**: each owner-initiated operation that produces a proof emits $(\tilde{b}, \sigma)$ in its event, creating a point from which the full spendable balance opening is recoverable using $\tilde{b}$, $\sigma$, and $vk$. Event replay is bounded to the window between the most recent checkpoint and the current ledger.
 
-A checkpoint is concretely an event of type `Withdraw`, `Transfer` (as sender), `SetOperator`, or `RevokeOperator`: exactly the events that carry $(\tilde{b}, \sigma)$ for the owner's spendable balance. `Deposit`, incoming `Transfer`, and `OperatorTransfer` do not touch the owner's spendable balance and are therefore not checkpoints. `Merge` does update the spendable balance ($C_{\text{spend}} \leftarrow C_{\text{spend}} + C_{\text{receive}}$, Section 7.4) but is not a checkpoint either: it carries no proof and emits no $(\tilde{b}, \sigma)$, so consistency between $\tilde{b}$ and the post-merge commitment cannot be enforced. Any merge activity is absorbed into the next owner-initiated proof operation, which issues a fresh checkpoint.
+A checkpoint is concretely an event of type `Withdraw`, `Transfer` (as sender), `SetSpender`, or `RevokeSpender`: exactly the events that carry $(\tilde{b}, \sigma)$ for the owner's spendable balance. `Deposit`, incoming `Transfer`, and `SpenderTransfer` do not touch the owner's spendable balance and are therefore not checkpoints. `Merge` does update the spendable balance ($C_{\text{spend}} \leftarrow C_{\text{spend}} + C_{\text{receive}}$, Section 7.4) but is not a checkpoint either: it carries no proof and emits no $(\tilde{b}, \sigma)$, so consistency between $\tilde{b}$ and the post-merge commitment cannot be enforced. Any merge activity is absorbed into the next owner-initiated proof operation, which issues a fresh checkpoint.
 
-**Checkpoint recovery (one event lookup).** At every spend boundary, the spendable balance has deterministic randomness: $r = \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk, \sigma)$. The owner fetches $(\tilde{b}, \sigma)$ from the most recent checkpoint event for their account (`Withdraw`, sender-side `Transfer`, `SetOperator`, or `RevokeOperator`), then recovers $v = \tilde{b} - \text{Poseidon}(\delta_{\text{enc\\\_bal}}, vk, \sigma)$. Consistency is verifiable: $C_{\text{spend}} \stackrel{?}{=} v \cdot G + r \cdot H$.
+**Checkpoint recovery (one event lookup).** At every spend boundary, the spendable balance has deterministic randomness: $r = \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk, \sigma)$. The owner fetches $(\tilde{b}, \sigma)$ from the most recent checkpoint event for their account (`Withdraw`, sender-side `Transfer`, `SetSpender`, or `RevokeSpender`), then recovers $v = \tilde{b} - \text{Poseidon}(\delta_{\text{enc\\\_bal}}, vk, \sigma)$. Consistency is verifiable: $C_{\text{spend}} \stackrel{?}{=} v \cdot G + r \cdot H$.
 
 **Post-checkpoint recovery (bounded event replay).** Between a checkpoint and the next spend, the receiving balance may have accumulated incoming transfers and deposits, and a merge may have folded them into the spendable balance. The owner reconstructs the current state by replaying only events since the last checkpoint:
 
@@ -986,7 +986,7 @@ Because $\sigma$ is sampled fresh via CSPRNG for every operation, a retry after 
 
 **Proposition 5** (Proof non-replayability). *A valid proof cannot be replayed to execute the same operation twice.*
 
-*Proof.* Every spending proof includes the current on-chain commitment ($C_{\text{spend}}$ or $C_a$) as a public input. Upon successful verification, the contract replaces this commitment with the proof's output commitment ($C_{\text{spend}}'$ or $C_a'$). A replayed proof references the old commitment, which no longer matches the stored state, so verification fails. The same argument applies to operator transfers via $C_a$. $\square$
+*Proof.* Every spending proof includes the current on-chain commitment ($C_{\text{spend}}$ or $C_a$) as a public input. Upon successful verification, the contract replaces this commitment with the proof's output commitment ($C_{\text{spend}}'$ or $C_a'$). A replayed proof references the old commitment, which no longer matches the stored state, so verification fails. The same argument applies to spender transfers via $C_a$. $\square$
 
 **Corollary.** No explicit nullifier or nonce is needed. State binding through commitment chaining provides replay protection as an inherent property of the protocol.
 
@@ -1005,9 +1005,9 @@ pub enum CircuitType {
     Register = 0,
     Withdraw = 1,
     Transfer = 2,
-    OperatorTransfer = 3,
-    SetOperator = 4,
-    RevokeOperator = 5,
+    SpenderTransfer = 3,
+    SetSpender = 4,
+    RevokeSpender = 5,
 }
 ```
 
@@ -1015,18 +1015,18 @@ pub enum CircuitType {
 
 | Circuit | What it proves |
 |:---|:---|
-| `Register` | Spending key well-formedness; wrapper-bound viewing key derivation from $sk$; public viewing key consistency with the derived $vk$ |
+| `Register` | Spending key well-formedness; contract-bound viewing key derivation from $sk$; public viewing key consistency with the derived $vk$ |
 | `Withdraw` | Balance sufficiency; new spendable commitment with deterministic randomness; encrypted balance scalar; sender-auditor ECDH ciphertext (balance checkpoint); owner key ownership |
 | `Transfer` | Balance conservation; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; sender auditor: amount + balance); deterministic randomness for new sender balance; encrypted balance scalar; sender key ownership; range validity (balance $\in [0, 2^{127})$, amount $\in [0, 2^{127})$) |
-| `OperatorTransfer` | Allowance sufficiency; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; owner auditor: amount + allowance); deterministic randomness for new allowance; encrypted allowance scalar; operator key ownership; wrapper-bound indirectly via $C_a$ chain (Section 7.8) |
-| `SetOperator` | Balance split; $dvk_i$ derivation; ECDH escrow of $dvk_i$; allowance commitment with deterministic randomness; encrypted balance and allowance scalars; owner-auditor ECDH ciphertexts (escrow amount + balance checkpoint); owner key ownership; wrapper-bound via $vk$ derivation |
-| `RevokeOperator` | Allowance decryption via $dvk_i$; balance merge; deterministic randomness for new balance; encrypted balance scalar; owner-auditor ECDH ciphertexts (reclaimed amount + balance checkpoint); owner key ownership; wrapper-bound via $vk$ derivation |
+| `SpenderTransfer` | Allowance sufficiency; ECDH-derived blinding and encrypted amount for recipient; dual-auditor channel sponges (recipient auditor: amount + per-transfer Pedersen randomness; owner auditor: amount + allowance); deterministic randomness for new allowance; encrypted allowance scalar; spender key ownership; contract-bound indirectly via $C_a$ chain (Section 7.8) |
+| `SetSpender` | Balance split; $dvk_i$ derivation; ECDH escrow of $dvk_i$; allowance commitment with deterministic randomness; encrypted balance and allowance scalars; owner-auditor ECDH ciphertexts (escrow amount + balance checkpoint); owner key ownership; contract-bound via $vk$ derivation |
+| `RevokeSpender` | Allowance decryption via $dvk_i$; balance merge; deterministic randomness for new balance; encrypted balance scalar; owner-auditor ECDH ciphertexts (reclaimed amount + balance checkpoint); owner key ownership; contract-bound via $vk$ derivation |
 
 ### 10.3 Circuit Cost Analysis
 
 The dominant cost in Noir circuits is elliptic curve scalar multiplication. With Barretenberg's native Grumpkin support via `multi_scalar_mul`, each scalar multiplication costs approximately 64 UltraPlonk-equivalent constraints (with ECC VM) or 4,700–6,250 without.
 
-The Transfer circuit requires approximately 7 scalar multiplications: spending key verification, spendable balance opening, recipient ECDH shared secret, ephemeral key derivation, transfer commitment construction, recipient-auditor ECDH shared secret, and sender-auditor ECDH shared secret. The OperatorTransfer circuit requires approximately 7 scalar multiplications: operator key verification, allowance commitment opening, recipient ECDH shared secret, ephemeral key derivation, transfer commitment construction, recipient-auditor ECDH shared secret, and owner-auditor ECDH shared secret. The Withdraw, SetOperator, and RevokeOperator circuits each require 2 additional scalar multiplications for auditor ECDH (ephemeral key derivation + auditor shared secret), bringing their totals to approximately 4, 6, and 5 respectively. The ECDH computations add scalar multiplications compared to a random-blinding scheme, but the unchunked design eliminates all per-chunk constraints (which, in a chunked scheme, would involve 8+ scalar multiplications for balance chunks and per-chunk range proofs).
+The Transfer circuit requires approximately 7 scalar multiplications: spending key verification, spendable balance opening, recipient ECDH shared secret, ephemeral key derivation, transfer commitment construction, recipient-auditor ECDH shared secret, and sender-auditor ECDH shared secret. The SpenderTransfer circuit requires approximately 7 scalar multiplications: spender key verification, allowance commitment opening, recipient ECDH shared secret, ephemeral key derivation, transfer commitment construction, recipient-auditor ECDH shared secret, and owner-auditor ECDH shared secret. The Withdraw, SetSpender, and RevokeSpender circuits each require 2 additional scalar multiplications for auditor ECDH (ephemeral key derivation + auditor shared secret), bringing their totals to approximately 4, 6, and 5 respectively. The ECDH computations add scalar multiplications compared to a random-blinding scheme, but the unchunked design eliminates all per-chunk constraints (which, in a chunked scheme, would involve 8+ scalar multiplications for balance chunks and per-chunk range proofs).
 
 ### 10.4 Noir Primitives
 
@@ -1076,17 +1076,17 @@ fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> EmbeddedCurvePoint {
 }
 ```
 
-**Post-merge witness availability.** Every opening witnessed in any circuit is encoded as a single $\mathbb{F}_r$ `Field` via the same `commit` primitive. After a `Merge` (§7.4), the spendable-balance blinding is $r_s + r_r$ over $\mathbb{F}_q$. Its canonical $\mathbb{F}_q$ representative lies in $[0, r)$ -- representable as a Noir `Field` -- with probability $\geq 1 - (q - r)/q \approx 1 - 2^{-127}$ per merge (§2.3). With the complementary probability $\approx 2^{-127}$ it lies in $[r, q)$. In that case the on-chain state remains well-formed (the commitment is a valid Grumpkin point), but the wallet's local opening witness is unencodable as a `Field`, so no spend / transfer / set-operator / revoke-operator proof can be constructed against the affected $C_{\text{spend}}$ until further accumulation shifts the blinding back into $\mathbb{F}_r$.
+**Post-merge witness availability.** Every opening witnessed in any circuit is encoded as a single $\mathbb{F}_r$ `Field` via the same `commit` primitive. After a `Merge` (§7.4), the spendable-balance blinding is $r_s + r_r$ over $\mathbb{F}_q$. Its canonical $\mathbb{F}_q$ representative lies in $[0, r)$ -- representable as a Noir `Field` -- with probability $\geq 1 - (q - r)/q \approx 1 - 2^{-127}$ per merge (§2.3). With the complementary probability $\approx 2^{-127}$ it lies in $[r, q)$. In that case the on-chain state remains well-formed (the commitment is a valid Grumpkin point), but the wallet's local opening witness is unencodable as a `Field`, so no spend / transfer / set-spender / revoke-spender proof can be constructed against the affected $C_{\text{spend}}$ until further accumulation shifts the blinding back into $\mathbb{F}_r$.
 
-**Soft recovery.** Every subsequent inbound confidential transfer or operator transfer, once merged, adds a fresh $\mathbb{F}_r$-derived blinding. For each transfer-derived addend, the new canonical $\mathbb{F}_q$ representative falls in $[0, r)$ with probability $\geq 1 - 2^{-127}$ regardless of the current stuck value (worst case: the current value sits at the lower edge of $[r, q)$, requiring the new $\mathbb{F}_r$ addend to cross the mod-$q$ boundary; the probability of failing to do so is bounded by $(q - r)/r \approx 2^{-127}$). For accounts that continue to receive confidential transfers, the unspendable window is self-resolving at the next merge with overwhelming probability; accounts whose only inflows are deposits remain stuck until a confidential transfer arrives.
+**Soft recovery.** Every subsequent inbound confidential transfer or spender transfer, once merged, adds a fresh $\mathbb{F}_r$-derived blinding. For each transfer-derived addend, the new canonical $\mathbb{F}_q$ representative falls in $[0, r)$ with probability $\geq 1 - 2^{-127}$ regardless of the current stuck value (worst case: the current value sits at the lower edge of $[r, q)$, requiring the new $\mathbb{F}_r$ addend to cross the mod-$q$ boundary; the probability of failing to do so is bounded by $(q - r)/r \approx 2^{-127}$). For accounts that continue to receive confidential transfers, the unspendable window is self-resolving at the next merge with overwhelming probability; accounts whose only inflows are deposits remain stuck until a confidential transfer arrives.
 
 ### 10.5 Verification Flow
 
-1. Wrapper reads on-chain state (commitments, public keys)
+1. Contract reads on-chain state (commitments, public keys)
 2. Encodes state as public inputs: Grumpkin point coordinates as 32-byte $\mathbb{F}_r$ values
 3. Cross-contract call: `verifier.verify_proof(circuit_type, public_inputs, proof)`
 4. Verifier deserializes stored VK, runs UltraHonk verification (BN254 G1/G2 pairings, Fiat-Shamir, sumcheck)
-5. Wrapper applies homomorphic balance updates (Grumpkin point arithmetic via $\mathbb{F}_r$ ops)
+5. Contract applies homomorphic balance updates (Grumpkin point arithmetic via $\mathbb{F}_r$ ops)
 
 ### 10.6 Structured Reference String {#srs}
 
@@ -1115,7 +1115,7 @@ where $[x]_1 = x \cdot G_1$ and $[x]_2 = x \cdot G_2$ are BN254 group elements. 
 
 ### 10.8 On-Chain Point Arithmetic
 
-The wrapper performs Grumpkin affine point addition and subtraction for homomorphic balance updates. Since Grumpkin coordinates are $\mathbb{F}_r^{\text{BN254}}$ elements, these reduce to Fr field operations.
+The contract performs Grumpkin affine point addition and subtraction for homomorphic balance updates. Since Grumpkin coordinates are $\mathbb{F}_r^{\text{BN254}}$ elements, these reduce to Fr field operations.
 
 **Curve coefficients.** Grumpkin $y^2 = x^3 - 17$ (Section 2.2) is in short Weierstrass form $y^2 = x^3 + a x + b$ with $a = 0$ and $b = -17$. Only $a$ enters the point arithmetic slope formulas below; $b$ enters only the on-curve check.
 
@@ -1146,13 +1146,13 @@ Requires `bn254_fr_{add, sub, mul, inv}` host calls (CAP-80, Section 10.7).
 
 **Point subtraction** $P_3 = P_1 - P_2$: if $P_2 = \mathcal{O}$ set $-P_2 = \mathcal{O}$, else $-P_2 = (x_2, -y_2 \bmod r)$; then apply the addition cases above. Subtraction of a point from itself yields $\mathcal{O}$ via the inverse case, never the doubling branch.
 
-**Point validation.** Grumpkin points enter the system through three boundaries; on-curve and non-identity checks live at the boundary that owns each one. The wrapper itself performs no per-call on-curve check.
+**Point validation.** Grumpkin points enter the system through three boundaries; on-curve and non-identity checks live at the boundary that owns each one. The contract itself performs no per-call on-curve check.
 
 1. **Proof-constrained points (the dominant case).** Every public input that the corresponding circuit also derives via `multi_scalar_mul` is on-curve by construction -- Noir's embedded-curve operations cannot produce an off-curve Grumpkin point. This covers $Y$ (R1), $\text{PVK}$ (R3), $R_e$ (T6, O6, W_a1, S_a1, V_a1), $C_{\text{tx}}$ (T8, O8), $C_{\text{spend}}'$ (T11, W6, S10, V7), $C_a$ / $C_a'$ (S7, O11), and the ECDH shared secrets. Non-identity is enforced *in-circuit* by explicit nonzero-scalar constraints: $sk \neq 0$ and $vk \neq 0$ at registration (R4, R5), and $r_e \neq 0$ in every circuit that produces an ephemeral key (W8, T13, S13, O13, V10). Without these constraints an adversary could publish $Y = \mathcal{O}$, $\text{PVK} = \mathcal{O}$, or $R_e = \mathcal{O}$ and collapse ECDH (every shared secret becomes $\mathcal{O}$, every Poseidon mask becomes a constant function of $\sigma$, every ciphertext becomes trivially decryptable).
-2. **Points read from prior on-chain state.** $C_{\text{spend}}$, $C_{\text{receive}}$, stored $Y$ / $\text{PVK}$, and allowance commitments were validated through path (1) when first written. The wrapper trusts them on subsequent reads.
-3. **Auditor keys (the only proof-less entry point).** $K_{\text{aud}}$ is registered in the auditor contract by the auditor itself, with no accompanying proof. The auditor contract performs canonical encoding, on-curve ($y^2 \equiv x^3 - 17 \pmod{r}$), and non-identity checks at insertion (Section 3.1); the wrapper trusts the fetched value.
+2. **Points read from prior on-chain state.** $C_{\text{spend}}$, $C_{\text{receive}}$, stored $Y$ / $\text{PVK}$, and allowance commitments were validated through path (1) when first written. The contract trusts them on subsequent reads.
+3. **Auditor keys (the only proof-less entry point).** $K_{\text{aud}}$ is registered in the auditor contract by the auditor itself, with no accompanying proof. The auditor contract performs canonical encoding, on-curve ($y^2 \equiv x^3 - 17 \pmod{r}$), and non-identity checks at insertion (Section 3.1); the contract trusts the fetched value.
 
-**Canonical encoding** ($x, y \in [0, r)$ as 32-byte representatives) is enforced at the XDR / Soroban host boundary when bytes are deserialized into `BnScalar`; no additional check is needed inside the wrapper.
+**Canonical encoding** ($x, y \in [0, r)$ as 32-byte representatives) is enforced at the XDR / Soroban host boundary when bytes are deserialized into `BnScalar`; no additional check is needed inside the contract.
 
 ---
 
@@ -1160,10 +1160,10 @@ Requires `bn254_fr_{add, sub, mul, inv}` host calls (CAP-80, Section 10.7).
 
 Based on [EIP-7984](https://eips.ethereum.org/EIPS/eip-7984), adapted for Soroban. The `data: Bytes` parameter carries XDR-encoded proof payloads.
 
-**Canonical encoding.** The `data` payloads are `#[contracttype]` structs and enums declared in the wrapper crate. Their on-chain byte representation is fixed by Soroban's XDR rules, which are canonical: every value has exactly one valid byte encoding. Named struct fields are serialised as an `ScMap` in declaration order; unnamed fields and tuple-enum variants as an `ScVec` in declaration order; map keys are host-enforced into a canonical sorted form. As a consequence, independent implementations that compile against the same `#[contracttype]` definitions produce byte-identical `data` payloads. The authoritative schemas for the underlying `ScVal`, `ScMap`, `ScVec` live in the [stellar/stellar-xdr](https://github.com/stellar/stellar-xdr) repository; the encoding rules are summarised in the [Stellar XDR documentation](https://developers.stellar.org/docs/learn/fundamentals/data-format/xdr) and the [`#[contracttype]` mapping reference](https://developers.stellar.org/docs/learn/fundamentals/contract-development/types/custom-types).
+**Canonical encoding.** The `data` payloads are `#[contracttype]` structs and enums declared in the contract crate. Their on-chain byte representation is fixed by Soroban's XDR rules, which are canonical: every value has exactly one valid byte encoding. Named struct fields are serialised as an `ScMap` in declaration order; unnamed fields and tuple-enum variants as an `ScVec` in declaration order; map keys are host-enforced into a canonical sorted form. As a consequence, independent implementations that compile against the same `#[contracttype]` definitions produce byte-identical `data` payloads. The authoritative schemas for the underlying `ScVal`, `ScMap`, `ScVec` live in the [stellar/stellar-xdr](https://github.com/stellar/stellar-xdr) repository; the encoding rules are summarised in the [Stellar XDR documentation](https://developers.stellar.org/docs/learn/fundamentals/data-format/xdr) and the [`#[contracttype]` mapping reference](https://developers.stellar.org/docs/learn/fundamentals/contract-development/types/custom-types).
 
 ```rust
-trait ConfidentialTokenWrapper {
+trait ConfidentialToken {
     fn __constructor(e: Env, admin: Address, token: Address,
                      verifier: Address, auditor: Address);
 
@@ -1177,24 +1177,24 @@ trait ConfidentialTokenWrapper {
 
     fn confidential_transfer(e: Env, from: Address, to: Address, data: Bytes);
 
-    fn confidential_transfer_from(e: Env, operator: Address,
+    fn confidential_transfer_from(e: Env, spender: Address,
                                    from: Address, to: Address, data: Bytes);
 
-    fn set_operator(e: Env, account: Address, operator: Address,
-                    expiration_ledger: u32, data: Bytes);
+    fn set_spender(e: Env, account: Address, spender: Address,
+                    live_until_ledger: u32, data: Bytes);
 
-    fn revoke_operator(e: Env, account: Address, operator: Address,
+    fn revoke_spender(e: Env, account: Address, spender: Address,
                        data: Bytes);
 
     fn confidential_balance(e: Env, account: Address) -> Bytes;
 
-    fn is_operator(e: Env, account: Address, operator: Address) -> bool;
+    fn is_spender(e: Env, account: Address, spender: Address) -> bool;
 
-    fn get_operator(e: Env, account: Address, operator: Address) -> Bytes;
+    fn get_spender(e: Env, account: Address, spender: Address) -> Bytes;
 }
 ```
 
-This table is authoritative: every entry is exactly the set of prover-supplied public inputs from the corresponding Section 7 operation (the wrapper loads the remaining public inputs from trusted state per §7.1), plus the `proof` blob. Names map directly to the Section 7 symbols.
+This table is authoritative: every entry is exactly the set of prover-supplied public inputs from the corresponding Section 7 operation (the contract loads the remaining public inputs from trusted state per §7.1), plus the `proof` blob. Names map directly to the Section 7 symbols.
 
 | Operation | `data` contents |
 |:---|:---|
@@ -1202,14 +1202,14 @@ This table is authoritative: every entry is exactly the set of prover-supplied p
 | `withdraw` | $C_{\text{spend}}'$, $\tilde{b}$, $R_e$, $\sigma$, $\tilde{b}_{\text{aud,s}}$, `proof` |
 | `confidential_transfer` | $C_{\text{spend}}'$, $C_{\text{tx}}$, $R_e$, $\tilde{v}$, $\tilde{b}$, $\sigma$, $\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$, `proof` |
 | `confidential_transfer_from` | $C_a'$, $C_{\text{tx}}$, $R_e$, $\tilde{v}$, $\tilde{a}'$, $\sigma_a'$, $\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{a}_{\text{aud,s}}$, `proof` |
-| `set_operator` | $C_{\text{spend}}'$, $C_a$, $\text{escrowed\\\_dvk}$, $\tilde{b}$, $\tilde{a}$, $R_e$, $\sigma$, $\sigma_a$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$, `proof` |
-| `revoke_operator` | $C_{\text{spend}}'$, $\tilde{b}$, $R_e$, $\sigma$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$, `proof` |
+| `set_spender` | $C_{\text{spend}}'$, $C_a$, $\text{escrowed\\\_dvk}$, $\tilde{b}$, $\tilde{a}$, $R_e$, $\sigma$, $\sigma_a$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$, `proof` |
+| `revoke_spender` | $C_{\text{spend}}'$, $\tilde{b}$, $R_e$, $\sigma$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$, `proof` |
 
-For `confidential_transfer_from`, the stored allowance salt $\sigma_a$ is **not** carried in `data`: the wrapper loads it from the `(from, operator)` delegation entry (§7.8 public-input table). Only the prover-chosen replacement $\sigma_a'$ travels in `data`, gets bound by constraint O10, and is then written back to the delegation entry as the new `allowance_salt` (§6.2). This keeps the trust-boundary rule of §7.1 intact: caller-controlled bytes never overwrite the live $\sigma_a$ used to verify the proof. `set_operator`, by contrast, has no prior delegation entry to load from, so its $\sigma_a$ is prover-supplied and bound by S6.
+For `confidential_transfer_from`, the stored allowance salt $\sigma_a$ is **not** carried in `data`: the contract loads it from the `(from, spender)` delegation entry (§7.8 public-input table). Only the prover-chosen replacement $\sigma_a'$ travels in `data`, gets bound by constraint O10, and is then written back to the delegation entry as the new `allowance_salt` (§6.2). This keeps the trust-boundary rule of §7.1 intact: caller-controlled bytes never overwrite the live $\sigma_a$ used to verify the proof. `set_spender`, by contrast, has no prior delegation entry to load from, so its $\sigma_a$ is prover-supplied and bound by S6.
 
 ### 11.1 Authorization Model
 
-Soroban `address.require_auth()` proves that the named principal authorized the current invocation; it binds the full invocation (function name and all arguments) by default. ZK proof verification proves that the prover knows a witness satisfying the circuit's constraints over public inputs the wrapper itself supplies. The two are complementary: every state-changing operation requires **both** the appropriate `require_auth()` and (where applicable) a valid proof.
+Soroban `address.require_auth()` proves that the named principal authorized the current invocation; it binds the full invocation (function name and all arguments) by default. ZK proof verification proves that the prover knows a witness satisfying the circuit's constraints over public inputs the contract itself supplies. The two are complementary: every state-changing operation requires **both** the appropriate `require_auth()` and (where applicable) a valid proof.
 
 | Operation | `require_auth()` principal |
 |:---|:---|
@@ -1218,16 +1218,16 @@ Soroban `address.require_auth()` proves that the named principal authorized the 
 | `merge(account)` | `account` |
 | `withdraw(from, to, amount, data)` | `from` |
 | `confidential_transfer(from, to, data)` | `from` |
-| `confidential_transfer_from(operator, from, to, data)` | `operator` (not `from`) |
-| `set_operator(account, operator, expiration_ledger, data)` | `account` |
-| `revoke_operator(account, operator, data)` | `account` |
-| `confidential_balance`, `is_operator`, `get_operator` | none (read-only) |
+| `confidential_transfer_from(spender, from, to, data)` | `spender` (not `from`) |
+| `set_spender(account, spender, live_until_ledger, data)` | `account` |
+| `revoke_spender(account, spender, data)` | `account` |
+| `confidential_balance`, `is_spender`, `get_spender` | none (read-only) |
 
-**`register` is single-use.** It reverts if `account` is already registered. Combined with `account.require_auth()`, this prevents a third party from binding attacker-controlled $(Y, \text{PVK})$ to `account`'s `ConfidentialAccount` slot.
+**`register` is single-use.** It reverts if `account` is already registered. Combined with `account.require_auth()`, this prevents a third party from binding attacker-controlled $(Y, \text{PVK})$ to `account`'s `ConfidentialAccount` storage entry.
 
-**`set_operator` rejects replacement.** It reverts if a non-revoked delegation already exists for `(account, operator)` -- see §6.2.
+**`set_spender` rejects replacement.** It reverts if a non-revoked delegation already exists for `(account, spender)` -- see §6.2.
 
-**`confidential_transfer_from` is operator-authorized.** The owner's authorization was granted out-of-band at `set_operator` and persists in the on-chain delegation entry until expiry or revocation. The operator's `require_auth()` binds `from`, `to`, and `data`.
+**`confidential_transfer_from` is spender-authorized.** The owner's authorization was granted out-of-band at `set_spender` and persists in the on-chain delegation entry until expiry or revocation. The spender's `require_auth()` binds `from`, `to`, and `data`.
 
 ### 11.2 Event Schema
 
@@ -1240,15 +1240,15 @@ Each state-modifying operation emits a structured event. Events carry the data n
 | `Merge` | `account` |
 | `Withdraw` | `from`, `to`, `amount`, $R_e$, $\sigma$, $\tilde{b}$, $\tilde{b}_{\text{aud,s}}$ |
 | `Transfer` | `from`, `to`, $R_e$, $\tilde{v}$, $\sigma$, $\tilde{b}$, $\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ |
-| `OperatorTransfer` | `operator`, `from`, `to`, $R_e$, $\tilde{v}$, $\sigma_a$, $\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{a}_{\text{aud,s}}$ |
-| `SetOperator` | `account`, `operator`, `expiration_ledger`, $R_e$, $\sigma$, $\tilde{b}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ |
-| `RevokeOperator` | `account`, `operator`, $R_e$, $\sigma$, $\tilde{b}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ |
+| `SpenderTransfer` | `spender`, `from`, `to`, $R_e$, $\tilde{v}$, $\sigma_a$, $\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{a}_{\text{aud,s}}$ |
+| `SetSpender` | `account`, `spender`, `live_until_ledger`, $R_e$, $\sigma$, $\tilde{b}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ |
+| `RevokeSpender` | `account`, `spender`, $R_e$, $\sigma$, $\tilde{b}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ |
 
 Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
 
 **Usage by consumers:**
 
-- **Recipient wallet**: processes `Transfer` and `OperatorTransfer` events using $(R_e, \tilde{v}, \sigma)$ to derive $v_{\text{tx}}$ and $r_{\text{tx}}$ (Section 5.3).
+- **Recipient wallet**: processes `Transfer` and `SpenderTransfer` events using $(R_e, \tilde{v}, \sigma)$ to derive $v_{\text{tx}}$ and $r_{\text{tx}}$ (Section 5.3).
 - **Owner wallet**: processes all events for recovery (Section 5.2). The $(\tilde{b}, \sigma)$ pair from the most recent owner-initiated event forms a checkpoint.
 - **Auditor**: processes events containing $R_e$ to compute ECDH shared secrets and decrypt amounts and balance checkpoints (Section 8.1, 8.2).
 
@@ -1256,18 +1256,18 @@ Amount fields in `Deposit` and `Withdraw` are typed `i128`, matching SEP-41.
 
 **`confidential_balance(account) -> Bytes`.** Returns the XDR-serialized `ConfidentialAccount` struct for the given account (§6.1), i.e. the tuple `(spending_key, viewing_public_key, spendable_balance, receiving_balance, auditor_id)`. Reverts if `account` is not registered. Wallets bootstrap from this call (single round-trip to obtain both Pedersen commitments plus the keys needed to identify the account and its bound auditor); indexers use it to verify consistency between their replayed accumulators and on-chain state (§5.2 "Consistency check").
 
-**`is_operator(account, operator) -> bool`.** Returns `true` iff a delegation entry exists for `(account, operator)` **and** `ledger.sequence() <= expiration_ledger`. Returns `false` for:
+**`is_spender(account, spender) -> bool`.** Returns `true` iff a delegation entry exists for `(account, spender)` **and** `ledger.sequence() <= live_until_ledger`. Returns `false` for:
 
 - pairs with no delegation entry,
-- pairs whose entry has `ledger.sequence() > expiration_ledger` (expired-but-not-yet-revoked: the escrowed value still resides on-chain in $C_a$ until `revoke_operator` reclaims it -- §6.2 *Single-slot semantics* -- but the operator can no longer spend),
-- pairs whose entry was revoked (deleted) by `revoke_operator`.
+- pairs whose entry has `ledger.sequence() > live_until_ledger` (expired-but-not-yet-revoked: the escrowed value still resides on-chain in $C_a$ until `revoke_spender` reclaims it, but the spender can no longer spend),
+- pairs whose entry was revoked (deleted) by `revoke_spender`.
 
-The function returns the *spending-authority* state, not the *escrow-existence* state. Consumers that need to distinguish "no delegation" from "expired delegation" inspect `get_operator` (below) or replay `SetOperator` / `RevokeOperator` events.
+The function returns the *spending-authority* state, not the *escrow-existence* state. Consumers that need to distinguish "no delegation" from "expired delegation" inspect `get_spender` (below) or replay `SetSpender` / `RevokeSpender` events.
 
-**`get_operator(account, operator) -> Bytes`.** Returns the XDR-serialized `OperatorDelegation` struct (§6.2) for the `(account, operator)` pair, i.e. `(allowance_commitment, encrypted_allowance, escrowed_dvk, allowance_salt, expiration_ledger)`. Reverts if no delegation entry exists for the pair. Unlike `is_operator`, this surfaces the raw on-chain delegation state without applying the expiry filter, so callers can distinguish "no delegation" (revert) from "active delegation" (`ledger.sequence() <= expiration_ledger`) from "expired-but-not-yet-revoked delegation" (`ledger.sequence() > expiration_ledger`, escrowed value still pending reclaim). Primary consumers:
+**`get_spender(account, spender) -> Bytes`.** Returns the XDR-serialized `SpenderDelegation` struct (§6.2) for the `(account, spender)` pair, i.e. `(allowance_commitment, encrypted_allowance, escrowed_dvk, allowance_salt, live_until_ledger)`. Reverts if no delegation entry exists for the pair. Unlike `is_spender`, this surfaces the raw on-chain delegation state without applying the expiry filter, so callers can distinguish "no delegation" (revert) from "active delegation" (`ledger.sequence() <= live_until_ledger`) from "expired-but-not-yet-revoked delegation" (`ledger.sequence() > live_until_ledger`, escrowed value still pending reclaim). Primary consumers:
 
-- **Operator wallet:** fetches `allowance_commitment`, `encrypted_allowance`, `escrowed_dvk`, and `allowance_salt` to recover $dvk_i$ via §7.11 decryption, then reads the current allowance via $\tilde{a} = v_a + \text{Poseidon}(\delta_{\text{enc\\\_allow}}, dvk_i, \sigma_a)$ to construct the next `confidential_transfer_from` witness.
-- **Owner wallet:** reads the same fields after losing local state, or before calling `revoke_operator`, to confirm the on-chain entry matches its records.
+- **Spender wallet:** fetches `allowance_commitment`, `encrypted_allowance`, `escrowed_dvk`, and `allowance_salt` to recover $dvk_i$ via §7.11 decryption, then reads the current allowance via $\tilde{a} = v_a + \text{Poseidon}(\delta_{\text{enc\\\_allow}}, dvk_i, \sigma_a)$ to construct the next `confidential_transfer_from` witness.
+- **Owner wallet:** reads the same fields after losing local state, or before calling `revoke_spender`, to confirm the on-chain entry matches its records.
 - **Indexers:** verify their replayed delegation state against the live commitment, in the same way `confidential_balance` is used for account state (§5.2 "Consistency check").
 
 The auditor's allowance tracking does **not** use this method: per-event allowance ciphertexts (§8.5) are the auditor's data path; `encrypted_allowance` is keyed to $dvk_i$ and is unreadable without it.
@@ -1296,18 +1296,18 @@ Each $\delta$ is a small positive integer in $\mathbb{F}_r$, fixed for the proto
 | $\delta$ | Value | Context |
 |:---|:---:|:---|
 | $\delta_{\text{addr}}$ | 1 | Soroban Address compression into a single $\mathbb{F}_r$ Field (§2.7) |
-| $\delta_{\text{vk}}$ | 2 | Viewing key derivation from spending key and wrapper address (§4.2) |
+| $\delta_{\text{vk}}$ | 2 | Viewing key derivation from spending key and contract address (§4.2) |
 | $\delta_{\text{dvk}}$ | 3 | Delegation viewing key derivation (§4.4) |
 | $\delta_{\text{spend\\\_r}}$ | 4 | Deterministic randomness for spendable balance commitments (§5.2 *Update rules*) |
 | $\delta_{\text{tx\\\_blind}}$ | 5 | ECDH-derived transfer blinding factor (§5.3 Definition 1) |
 | $\delta_{\text{tx\\\_amount}}$ | 6 | ECDH-derived transfer amount encryption (§5.3 Definition 1) |
 | $\delta_{\text{enc\\\_bal}}$ | 7 | Encrypted balance scalar masking (§5.5) |
 | $\delta_{\text{enc\\\_allow}}$ | 8 | Encrypted allowance scalar masking (§6.2 *encrypted\_allowance*) |
-| $\delta_{\text{allow\\\_r}}$ | 9 | Deterministic randomness for operator allowance commitments (§6.2 *allowance\_commitment*) |
-| $\delta_{\text{esc\\\_dvk}}$ | 10 | Delegation key escrow (operator ECDH) (§7.11) |
+| $\delta_{\text{allow\\\_r}}$ | 9 | Deterministic randomness for spender allowance commitments (§6.2 *allowance\_commitment*) |
+| $\delta_{\text{esc\\\_dvk}}$ | 10 | Delegation key escrow (spender ECDH) (§7.11) |
 | $\delta_{\text{aud\\\_s}}$ | 11 | Sender / owner-auditor channel sponge (§2.5, §8.1) |
 | $\delta_{\text{aud\\\_r}}$ | 12 | Recipient-auditor channel sponge (§2.5, §8.1) |
 
 **Provenance.** Sequential small integers are the simplest assignment that satisfies the requirement of *distinctness* across all Poseidon2 invocations in this protocol -- Poseidon2 is collision-resistant under the assumption of §3.2, so any two distinct leading inputs (independent of size) produce independent outputs. The values themselves carry no semantic meaning; the binding is purely positional and the table is the only authoritative source. Implementations MUST hardcode these exact numeric values; deviations break cross-implementation derivation of $vk$, $dvk_i$, $\tilde{v}$, $\tilde{b}$, $\tilde{a}$, $r_{\text{tx}}$, $r_a$, and all auditor masks.
 
-**Cross-protocol collision.** Future protocols that share Grumpkin / BN254 / Poseidon2 with this wrapper -- e.g. an unrelated payments protocol that uses small-integer Poseidon2 domains -- could in principle pick the same numeric values for unrelated purposes. The protocol assumes that the surrounding inputs to Poseidon2 (key material, structural witnesses) sufficiently disambiguate even in such a case; no Poseidon2 invocation in this protocol is keyed solely on a $\delta$ value. If stronger isolation is desired, implementers may instead use the alternate scheme $\delta_X = \text{Poseidon2}(0, \text{ASCII}(\text{"openzeppelin/confidential-token-wrapper/v1:X"}))$, but this is a deployment-time choice that must be applied uniformly and disclosed in the deployment's circuit-binding documentation.
+**Cross-protocol collision.** Future protocols that share Grumpkin / BN254 / Poseidon2 with this protocol -- e.g. an unrelated payments protocol that uses small-integer Poseidon2 domains -- could in principle pick the same numeric values for unrelated purposes. The protocol assumes that the surrounding inputs to Poseidon2 (key material, structural witnesses) sufficiently disambiguate even in such a case; no Poseidon2 invocation in this protocol is keyed solely on a $\delta$ value. If stronger isolation is desired, implementers may instead use the alternate scheme $\delta_X = \text{Poseidon2}(0, \text{ASCII}(\text{"openzeppelin/confidential-token/v1:X"}))$, but this is a deployment-time choice that must be applied uniformly and disclosed in the deployment's circuit-binding documentation.

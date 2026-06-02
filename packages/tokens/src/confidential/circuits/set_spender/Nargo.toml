@@ -1,8 +1,8 @@
 [package]
-name = "gadget_range_128"
+name = "circuit_set_spender"
 type = "bin"
 authors = ["OpenZeppelin"]
 compiler_version = ">=0.30.0"
 
 [dependencies]
-stellar_confidential_lib = { path = "../../lib" }
+stellar_confidential_lib = { path = "../lib" }

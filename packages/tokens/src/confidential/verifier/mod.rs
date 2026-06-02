@@ -1,12 +1,12 @@
 //! # Confidential Verifier Registry
 //!
-//! Stores UltraHonk verification keys used by the confidential token wrapper to
+//! Stores UltraHonk verification keys used by the confidential token to
 //! verify zero-knowledge proofs accompanying every state-changing operation.
 //! Each key is indexed by [`CircuitType`]. A single deployment can serve
-//! multiple token wrappers: wrapper-specific binding is enforced inside the
-//! circuit via the `wrap` field (DESIGN §2.7, §4.2), not by the verifier, so
-//! the same VK set is reusable across every wrapper that targets the same
-//! protocol version.
+//! multiple confidential tokens: per-token binding is enforced inside the
+//! circuit via the `addr_f` field (DESIGN §2.7, §4.2), not by the verifier, so
+//! the same VK set is reusable across every confidential token that targets the
+//! same protocol version.
 //!
 //! # ⚠️ Not Production Ready
 //!
@@ -17,20 +17,20 @@
 //! contract built on this trait to mainnet or any environment that handles
 //! real value. The trait surface, the [`VerifierStorageKey`] layout, and the
 //! VK-management helpers in [`storage`] are stable enough for the confidential
-//! token wrapper to scaffold against, and they are the only part of this
+//! token to scaffold against, and they are the only part of this
 //! module that is intended to be relied upon today.
 //!
 //! ## Why a Separate Contract
 //!
-//! Verification keys are referenced by the wrapper on every state-changing
-//! operation (register, withdraw, transfer, operator flows). Keeping them in a
-//! separate registry allows:
+//! Verification keys are referenced by the confidential token on every
+//! state-changing operation (register, withdraw, transfer, spender flows).
+//! Keeping them in a separate registry allows:
 //!
 //! - **Isolation**: VK-management privileges are scoped to the verifier admin,
 //!   distinct from token admin powers.
 //! - **Lifecycle**: per-circuit VKs can be rotated (e.g. when a circuit is
-//!   patched) without redeploying the wrapper, subject to the deployer's
-//!   governance posture (see DESIGN §3.5).
+//!   patched) without redeploying the confidential token, subject to the
+//!   deployer's governance posture (see DESIGN §3.5).
 //!
 //! ## VK Encoding
 //!
@@ -44,9 +44,9 @@
 //!
 //! Verification keys live in **instance** storage: there is exactly one VK per
 //! [`CircuitType`] for the lifetime of the verifier contract, and they are
-//! consulted on every wrapper invocation. Per the workspace conventions,
-//! instance-TTL management is the contract developer's responsibility — this
-//! module's helpers never call `instance().extend_ttl()`.
+//! consulted on every confidential token invocation. Per the workspace
+//! conventions, instance-TTL management is the contract developer's
+//! responsibility — this module's helpers never call `instance().extend_ttl()`.
 //!
 //! ## Updating a Verification Key Is a Last Resort
 //!
@@ -100,17 +100,17 @@ pub enum CircuitType {
     Register = 0,
     Withdraw = 1,
     Transfer = 2,
-    OperatorTransfer = 3,
-    SetOperator = 4,
-    RevokeOperator = 5,
+    SpenderTransfer = 3,
+    SetSpender = 4,
+    RevokeSpender = 5,
 }
 
 /// Trait for managing UltraHonk verification keys used by the confidential
-/// token wrapper.
+/// token.
 ///
-/// The wrapper calls [`ConfidentialVerifier::verify_proof`] on every
-/// state-changing operation, passing the [`CircuitType`] that identifies the
-/// circuit, the serialized public inputs, and the proof blob.
+/// The confidential token calls [`ConfidentialVerifier::verify_proof`] on
+/// every state-changing operation, passing the [`CircuitType`] that identifies
+/// the circuit, the serialized public inputs, and the proof blob.
 /// [`ConfidentialVerifier::register_verification_key`] and
 /// [`ConfidentialVerifier::update_verification_key`] are privileged operations
 /// expected to be gated by the implementor's access-control scheme.

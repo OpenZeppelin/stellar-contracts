@@ -1,8 +1,8 @@
-//! # Confidential Token Wrapper -- Noir Primitives
+//! # Confidential Token -- Noir Primitives
 //!
 //! Shared cryptographic primitives consumed by the six circuits described in
-//! Section 7 of the design document (Register, Withdraw, Transfer, OperatorTransfer,
-//! SetOperator, RevokeOperator).
+//! Section 7 of the design document (Register, Withdraw, Transfer, SpenderTransfer,
+//! SetSpender, RevokeSpender).
 //!
 //! Every constraint that involves a Pedersen commitment, a Poseidon2 hash with
 //! domain separation, an ECDH derivation, or a 128-bit range check funnels
@@ -92,10 +92,10 @@ global POSEIDON2_IV_BASE: Field = 18446744073709551616; // 2^64
 pub mod domain {
     /// Soroban Address compression into a single `F_r` Field:
     /// `address_to_field(a) = Poseidon2(ADDRESS, lo(a), hi(a))`.
-    /// Section 2.7 (`delta_addr`). The wrapper computes `wrap` and `op_i`
+    /// Section 2.7 (`delta_addr`). The contract computes `addr_f` and `op_i`
     /// off-circuit via this tag; circuits consume the resulting Field directly.
     pub global ADDRESS: Field = 1;
-    /// Viewing-key derivation: `vk = Poseidon2(VIEWING_KEY, sk, wrap)`.
+    /// Viewing-key derivation: `vk = Poseidon2(VIEWING_KEY, sk, addr_f)`.
     /// Section 4.2 (`delta_vk`).
     pub global VIEWING_KEY: Field = 2;
     /// Delegation viewing-key derivation:
@@ -118,11 +118,11 @@ pub mod domain {
     /// `a_tilde = v_a + Poseidon2(ENCRYPTED_ALLOWANCE, dvk, sigma_a)`.
     /// Constraints S8/O12 (`delta_enc_allow`).
     pub global ENCRYPTED_ALLOWANCE: Field = 8;
-    /// Deterministic randomness for the operator allowance:
+    /// Deterministic randomness for the spender allowance:
     /// `r_a = Poseidon2(ALLOWANCE_RANDOMNESS, dvk, sigma_a)`.
     /// Constraints S6/O3/O10 (`delta_allow_r`).
     pub global ALLOWANCE_RANDOMNESS: Field = 9;
-    /// Delegation-key escrow mask (operator ECDH):
+    /// Delegation-key escrow mask (spender ECDH):
     /// `Poseidon2(ESCROWED_DELEGATION_VIEWING_KEY, s, op_i)`.
     /// Constraint S12, Section 7.11 (`delta_esc_dvk`).
     pub global ESCROWED_DELEGATION_VIEWING_KEY: Field = 10;
@@ -162,36 +162,6 @@ pub fn scalar_mul(scalar: Field, point: EmbeddedCurvePoint) -> EmbeddedCurvePoin
 /// reach for `scalar_mul` directly.
 pub fn ecdh(scalar: Field, point: EmbeddedCurvePoint) -> Field {
     scalar_mul(scalar, point).x
-}
-
-/// Range check `x in [0, 2^128)` via Noir's native `u128` cast (Section 2.6). The
-/// `as u128` lowers to 128 boolean constraints plus one recomposition check.
-pub fn assert_range_128(x: Field) {
-    let x_u128: u128 = x as u128;
-    assert(x_u128 as Field == x);
-}
-
-/// Asserts `p` lies on Grumpkin (`y^2 = x^3 - 17`), allowing the point at
-/// infinity. Use this on every public-input *commitment* that enters a circuit
-/// (Section 7.1: balance and transfer commitments may equal the identity).
-///
-/// Soundness: the verifier doesn't check point validity on its own -- if an
-/// off-curve `(x, y)` reaches `multi_scalar_mul`, the proof still verifies but
-/// the resulting commitment has no binding guarantee. This helper closes that
-/// gap in-circuit, on top of the wrapper contract's own validation. Cost: ~3
-/// mul gates per point, negligible vs. one scalar multiplication.
-pub fn assert_on_curve(p: EmbeddedCurvePoint) {
-    let inf_as_field = p.is_infinite as Field;
-
-    // Canonical identity encoding (Section 7.1 point 2): if is_infinite then
-    // x == 0 and y == 0.
-    assert(inf_as_field * p.x == 0);
-    assert(inf_as_field * p.y == 0);
-
-    // Affine branch (is_infinite = 0): y^2 == x^3 - 17 must hold.
-    // Identity branch (is_infinite = 1): constraint becomes 0 == 0, free pass.
-    let curve_eq = p.y * p.y - p.x * p.x * p.x + 17;
-    assert((1 - inf_as_field) * curve_eq == 0);
 }
 
 /// Asserts `p` is on Grumpkin AND not the identity. Use this for every
@@ -248,14 +218,14 @@ pub fn poseidon_with_domain<let N: u32>(d: Field, inputs: [Field; N]) -> Field {
 
 // ################## KEY DERIVATION ##################
 
-/// Viewing key. Section 4.2. `vk = Poseidon2(VK, sk, wrap)`.
+/// Viewing key. Section 4.2. `vk = Poseidon2(VK, sk, addr_f)`.
 ///
-/// The `wrap` parameter (the wrapper contract's address as a `Field`) binds the
+/// The `addr_f` parameter (the contract contract's address as a `Field`) binds the
 /// viewing key -- and therefore every proof that constrains `vk` (R2/W2/T2/S2/V2)
-/// -- to a specific deployed wrapper. Dropping `wrap` here would let a proof for
-/// one wrapper verify against another's verifier.
-pub fn vk_from_sk(sk: Field, wrap: Field) -> Field {
-    poseidon_with_domain(domain::VIEWING_KEY, [sk, wrap])
+/// -- to a specific deployed contract. Dropping `addr_f` here would let a proof for
+/// one contract verify against another's verifier.
+pub fn vk_from_sk(sk: Field, addr_f: Field) -> Field {
+    poseidon_with_domain(domain::VIEWING_KEY, [sk, addr_f])
 }
 
 /// Public viewing key `PVK = vk*H`. Section 4.3. The recipient's ECDH long-term key
@@ -275,7 +245,7 @@ pub fn derive_spend_r(vk: Field, sigma: Field) -> Field {
     poseidon_with_domain(domain::SPEND_RANDOMNESS, [vk, sigma])
 }
 
-/// Deterministic randomness for the operator allowance commitment.
+/// Deterministic randomness for the spender allowance commitment.
 /// Constraints S6 / O3 / O10.
 pub fn derive_allow_r(dvk: Field, sigma_a: Field) -> Field {
     poseidon_with_domain(domain::ALLOWANCE_RANDOMNESS, [dvk, sigma_a])
@@ -301,31 +271,19 @@ pub fn encrypt_balance(v_new: Field, vk: Field, sigma: Field) -> Field {
     v_new + poseidon_with_domain(domain::ENCRYPTED_BALANCE, [vk, sigma])
 }
 
-/// Encrypts the operator allowance under the delegation viewing key.
+/// Encrypts the spender allowance under the delegation viewing key.
 /// Constraints S8 / O12. `a_tilde = v_a + Poseidon2(ENC_ALLOW, dvk, sigma_a)`.
 pub fn encrypt_allowance(v_a: Field, dvk: Field, sigma_a: Field) -> Field {
     v_a + poseidon_with_domain(domain::ENCRYPTED_ALLOWANCE, [dvk, sigma_a])
 }
 
-/// Delegation-key escrow mask for the operator handoff at `set_operator`. Section 7.11.
+/// Delegation-key escrow mask for the spender handoff at `set_spender`. Section 7.11.
 /// `escrowed_dvk = dvk + Poseidon2(ESC_DVK, s, op_i)` where `s = (r_e * Y_op).x`.
 pub fn encrypt_esc_dvk(dvk: Field, s: Field, op_i: Field) -> Field {
     dvk + poseidon_with_domain(domain::ESCROWED_DELEGATION_VIEWING_KEY, [s, op_i])
 }
 
 // ################## AUDITOR-CHANNEL SPONGE ##################
-
-/// Poseidon2 sponge with a single squeeze. Absorbs `(d, s_x, sigma)` and
-/// returns the first rate-element of the post-permutation state.
-///
-/// Equivalent to `poseidon_with_domain(d, [s_x, sigma])` -- the alias exists so
-/// design-doc constraints written as `m = SpongeSqueeze_1(delta, S.x, sigma)`
-/// (Section 2.5) translate 1:1 to source. The single-squeeze case is the
-/// sender-auditor channel for Withdraw (W_a3), RevokeOperator (V_a3), and
-/// SetOperator (S_a3), which need only the balance/allowance mask.
-pub fn sponge_squeeze_1(d: Field, s_x: Field, sigma: Field) -> Field {
-    poseidon_with_domain(d, [s_x, sigma])
-}
 
 /// Poseidon2 sponge with two squeezes. Absorbs `(d, s_x, sigma)` and returns
 /// the first two rate-elements of the post-permutation state in order.
@@ -337,7 +295,7 @@ pub fn sponge_squeeze_1(d: Field, s_x: Field, sigma: Field) -> Field {
 /// cost is exactly one Poseidon2 permutation per call.
 ///
 /// Used by: Transfer (T_a2 recipient-auditor amount + randomness, T_a6
-/// sender-auditor amount + balance) and OperatorTransfer (O_a2, O_a6).
+/// sender-auditor amount + balance) and SpenderTransfer (O_a2, O_a6).
 pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
     let iv: Field = 3 * POSEIDON2_IV_BASE;
     let state = poseidon2_permutation([d, s_x, sigma, iv], 4);
@@ -345,13 +303,13 @@ pub fn sponge_squeeze_2(d: Field, s_x: Field, sigma: Field) -> [Field; 2] {
 }
 
 /// Sender-auditor encrypted balance/allowance checkpoint for circuits whose
-/// auditor block emits a single ciphertext (Withdraw W_a3/W_a4, RevokeOperator
-/// V_a3/V_a5, SetOperator S_a3/S_a5).
+/// auditor block emits a single ciphertext (Withdraw W_a3/W_a4, RevokeSpender
+/// V_a3/V_a5, SetSpender S_a3/S_a5).
 ///
-/// `b_tilde_aud_s = v_new + SpongeSqueeze_1(AUDITOR_SENDER, s_a_s_x, sigma)`.
-/// The two-squeeze sender-channel form (Transfer T_a6-T_a8, OperatorTransfer
+/// `b_tilde_aud_s = v_new + Poseidon2(AUDITOR_SENDER, s_a_s_x, sigma)`.
+/// The two-squeeze sender-channel form (Transfer T_a6-T_a8, SpenderTransfer
 /// O_a6-O_a8) is a different composition that callers spell out directly with
 /// `sponge_squeeze_2`.
 pub fn encrypt_auditor_sender_balance(v_new: Field, s_a_s_x: Field, sigma: Field) -> Field {
-    v_new + sponge_squeeze_1(domain::AUDITOR_SENDER, s_a_s_x, sigma)
+    v_new + poseidon_with_domain(domain::AUDITOR_SENDER, [s_a_s_x, sigma])
 }

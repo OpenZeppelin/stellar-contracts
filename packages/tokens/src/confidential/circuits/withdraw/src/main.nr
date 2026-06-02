@@ -12,7 +12,7 @@ mod tests;
 // -----------
 // Main block (balance conservation + ownership)
 //   W1 Y         = sk * H                              Owner key ownership.
-//   W2 vk        = Poseidon2(delta_vk, sk, wrap)       Wrapper-bound viewing
+//   W2 vk        = Poseidon2(delta_vk, sk, addr_f)       Contract-bound viewing
 //                                                      key.
 //   W3 C_spend   = v * G + r * H                       Opening of current
 //                                                      spendable balance.
@@ -67,10 +67,10 @@ mod tests;
 //   1    c_spend_y      C_spend.y
 //   2    y_x            Y.x           Loaded from `from.spending_key`.
 //   3    y_y            Y.y
-//   4    wrap           wrap          `env.current_contract_address()`.
+//   4    addr_f           addr_f          `env.current_contract_address()`.
 //   5    k_aud_s_x      K_aud_s.x     Fetched from the auditor contract by
 //   6    k_aud_s_y     K_aud_s.y       `from.auditor_id`.
-//   7    a              a             Public withdrawal amount; the wrapper
+//   7    a              a             Public withdrawal amount; the contract
 //                                     pre-checks a >= 0 at the entrypoint
 //                                     (Section 3.4), W4 then closes
 //                                     a < 2^127 in-circuit.
@@ -101,7 +101,7 @@ fn main(
     c_spend_y: pub Field,
     y_x: pub Field,
     y_y: pub Field,
-    wrap: pub Field,
+    addr_f: pub Field,
     k_aud_s_x: pub Field,
     k_aud_s_y: pub Field,
     a: pub Field,
@@ -123,7 +123,7 @@ fn main(
     assert(y_derived.y == y_y);
 
     // W2
-    let vk = vk_from_sk(sk, wrap);
+    let vk = vk_from_sk(sk, addr_f);
 
     // W3
     let c_spend_derived = commit(v, r);

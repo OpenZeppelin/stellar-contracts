@@ -1,8 +1,0 @@
-[package]
-name = "circuit_operator_transfer"
-type = "bin"
-authors = ["OpenZeppelin"]
-compiler_version = ">=0.30.0"
-
-[dependencies]
-stellar_confidential_lib = { path = "../lib" }
