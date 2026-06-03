@@ -39,6 +39,46 @@
 //! (no length prefix); any divergence from the order the prover used will
 //! cause verification to fail.
 //!
+//! ### Encoding Validation
+//!
+//! Each 32-byte chunk of the public-input blob is deserialised into a
+//! `Bn254Fr` by the Soroban host's `bn254_fr_from_u256val`. The host
+//! silently reduces values `≥ r` modulo `r` rather than rejecting them. Two
+//! distinct byte strings (`x` and `x + r`) therefore deserialise to the same
+//! field element, the verifier accepts both for a proof generated against `x`,
+//! and the contract would persist whichever bytes the caller supplied —
+//! breaking byte-uniqueness for stored state and emitted events.
+//!
+//! The contract closes this gap at the verifier boundary. The append
+//! helpers in [`storage`] (`append_field`, `append_point`) call
+//! [`Grumpkin::is_canonical_field`] / [`Grumpkin::is_canonical_point`]. By the
+//! time `verify_proof` is invoked, every caller-supplied scalar and Grumpkin
+//! coordinate is guaranteed to be the unique canonical big-endian
+//! representative of its field element, and values the contract subsequently
+//! persists are byte-unique per logical value.
+//!
+//! The check is by deliberate design **not** an on-curve check. Prover-
+//! supplied points are constrained on-curve in-circuit by their
+//! `multi_scalar_mul` derivation and pinned to `≠ O` by explicit
+//! nonzero-scalar constraints (DESIGN §10.8: R4/R5, W8, T13, S13, O13, V10).
+//! The only proof-less Grumpkin entry point is the auditor key, which the
+//! auditor contract validates canonical-encoding, on-curve, and non-identity
+//! at insertion via [`auditor::storage::validate_point`].
+//!
+//! Together these three boundaries discharge the trust-boundary rule of
+//! DESIGN §7.1: the canonical-encoding guard at the verifier boundary keeps
+//! caller bytes byte-unique, the in-circuit constraints keep prover-supplied
+//! points on-curve, and the auditor registry's insertion-time validation
+//! covers the lone proof-less point input.
+//!
+//! **Operational implication for verifier implementations.** Future verifier
+//! backends (UltraHonk, Groth16, or otherwise) MUST consume the
+//! `public_inputs` blob through a deserialiser equivalent to the host's
+//! `bn254_fr_from_u256val`. The canonical-encoding precondition is now an
+//! invariant of every chunk in that blob; an implementation that re-validates
+//! internally is welcome to do so, but the contract layer already guarantees
+//! the precondition on entry.
+//!
 //! ## Contract Binding
 //!
 //! Every owner-initiated proof references a `addr_f` field, computed once at
@@ -528,6 +568,13 @@ pub enum ConfidentialTokenError {
     /// Indicates the SEP-41 token address has already been set;
     /// re-initialization is forbidden.
     UnderlyingAssetAlreadySet = 3513,
+    /// Indicates a prover-supplied 32-byte field representative or Grumpkin
+    /// coordinate is not a canonical `Bn254Fr` value (`≥ r`). The Soroban
+    /// host's `bn254_fr_*` deserialiser silently reduces non-canonical
+    /// encodings, so the contract enforces canonicality at the verifier
+    /// boundary to keep stored state and emitted events byte-unique per
+    /// logical value.
+    NonCanonicalEncoding = 3514,
 }
 
 // ################## CONSTANTS ##################

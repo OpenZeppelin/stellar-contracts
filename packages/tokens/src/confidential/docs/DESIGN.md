@@ -82,7 +82,9 @@ A Grumpkin point is a pair $(x, y) \in \mathbb{F}_r^2$. Noir's native `Field` ty
 2. Mask the top 2 bits to zero, yielding a 254-bit candidate $x \in [0, 2^{254})$.
 3. If $x \geq r$, reject and return to step 1.
 4. If the call site requires $x \neq 0$ and $x = 0$, reject and return to step 1.
-5. Output $x$ in its canonical form -- as a Noir `Field` for in-circuit use, or as 32 big-endian bytes (`BytesN<32>`) for storage and event emission. Per §10.8 / §11 this canonical encoding is what the Soroban host's `bn254_fr_*` deserialization accepts; non-canonical values (i.e. $x \geq r$) are rejected at the host boundary.
+5. Output $x$ in its canonical form -- as a Noir `Field` for in-circuit use, or as 32 big-endian bytes (`BytesN<32>`) for storage and event emission.
+
+**Host deserialiser caveat.** The Soroban host's `bn254_fr_from_u256val` (the underlying primitive of `Bn254Fr::from_bytes`) accepts any 32-byte representative and *silently reduces* values $x \geq r$ modulo $r$ rather than rejecting them. Two distinct byte strings ($x$ and $x + r$) therefore deserialise to the same $\mathbb{F}_r$ element, which means a verifier alone cannot distinguish canonical from non-canonical inputs. To keep stored state and emitted events byte-unique per logical value, the contract layer enforces canonicality on every prover-supplied $\mathbb{F}_r$ representative *before* the bytes reach the verifier.
 
 ### 2.3 Pedersen Commitments
 
@@ -1152,7 +1154,7 @@ Requires `bn254_fr_{add, sub, mul, inv}` host calls (CAP-80, Section 10.7).
 2. **Points read from prior on-chain state.** $C_{\text{spend}}$, $C_{\text{receive}}$, stored $Y$ / $\text{PVK}$, and allowance commitments were validated through path (1) when first written. The contract trusts them on subsequent reads.
 3. **Auditor keys (the only proof-less entry point).** $K_{\text{aud}}$ is registered in the auditor contract by the auditor itself, with no accompanying proof. The auditor contract performs canonical encoding, on-curve ($y^2 \equiv x^3 - 17 \pmod{r}$), and non-identity checks at insertion (Section 3.1); the contract trusts the fetched value.
 
-**Canonical encoding** ($x, y \in [0, r)$ as 32-byte representatives) is enforced at the XDR / Soroban host boundary when bytes are deserialized into `BnScalar`; no additional check is needed inside the contract.
+**Canonical encoding** ($x, y \in [0, r)$ as 32-byte representatives) is enforced **by the contract** at the verifier boundary, not by the Soroban host. The host's `bn254_fr_from_u256val` reduces non-canonical inputs modulo $r$ rather than rejecting them (§2.2 *Host deserialiser caveat*), so the same logical point $(x, y)$ admits multiple byte encodings ($\text{be}(x) \mathbin\| \text{be}(y)$ and $\text{be}(x+r) \mathbin\| \text{be}(y)$, etc.) if the contract does not pre-validate. Every prover-supplied scalar and coordinate that reaches the verifier — and therefore every byte string that gets persisted or emitted downstream — is the unique canonical representative of its field element.
 
 ---
 

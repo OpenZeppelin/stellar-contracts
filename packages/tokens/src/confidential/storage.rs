@@ -1286,13 +1286,39 @@ fn verify(e: &Env, circuit_type: CircuitType, public_inputs: &Bytes, proof: &Byt
     }
 }
 
-/// Appends a Grumpkin point (`x || y`, 64 bytes) to the public-input blob.
+/// Appends a Grumpkin point (`x || y`, 64 bytes) to the public-input blob,
+/// after asserting both coordinates are canonical `Bn254Fr` representatives.
+///
+/// The Soroban host's `bn254_fr_from_u256val` reduces non-canonical 32-byte
+/// inputs modulo `r` instead of rejecting them, so caller-supplied bytes
+/// `x` and `x + r` would deserialise to the same field element and both
+/// satisfy the same proof. This check enforces byte-uniqueness on every
+/// chunk before the verifier sees it; see the
+/// [module-level "Encoding Validation" docs](super) for the rationale.
+///
+/// # Errors
+///
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When either coordinate
+///   is `≥ r`.
 fn append_point(pi: &mut Bytes, p: &Point) {
+    if !Grumpkin::is_canonical_point(p) {
+        panic_with_error!(pi.env(), ConfidentialTokenError::NonCanonicalEncoding);
+    }
     pi.append(&Bytes::from(p));
 }
 
-/// Appends a 32-byte field element to the public-input blob.
+/// Appends a 32-byte field element to the public-input blob, after
+/// asserting it is a canonical `Bn254Fr` representative. See
+/// [`append_point`] for the rationale.
+///
+/// # Errors
+///
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When the value is `≥
+///   r`.
 fn append_field(pi: &mut Bytes, f: &BytesN<32>) {
+    if !Grumpkin::is_canonical_field(f) {
+        panic_with_error!(pi.env(), ConfidentialTokenError::NonCanonicalEncoding);
+    }
     pi.append(&Bytes::from(f));
 }
 
