@@ -760,7 +760,7 @@ pub fn confidential_transfer_from(
     payload: &SpenderTransferPayload,
     proof: &Bytes,
 ) {
-    let delegation = get_spender_delegation(e, from, spender);
+    let mut delegation = get_spender_delegation(e, from, spender);
     if e.ledger().sequence() > delegation.live_until_ledger {
         panic_with_error!(e, ConfidentialTokenError::DelegationExpired);
     }
@@ -775,6 +775,8 @@ pub fn confidential_transfer_from(
     // owner).
     let k_aud_s = auditor.get_key(&owner.auditor_id);
 
+    // Capture it here to emit in the event below.
+    let sigma_a = delegation.allowance_salt.clone();
     // PI order (DESIGN §7.8):
     //   C_a, sigma_a, Y_op, PVK_recipient, K_aud_r, K_aud_s,
     //   C_a', C_tx, R_e, v_tilde, a_tilde', sigma_a',
@@ -799,14 +801,14 @@ pub fn confidential_transfer_from(
 
     verify(e, CircuitType::SpenderTransfer, &pi, proof);
 
-    update_delegation(
-        e,
-        from,
-        spender,
-        &payload.c_a_new,
-        &payload.a_tilde_new,
-        &payload.sigma_a_new,
-    );
+    // Update delegation.
+    delegation.allowance_commitment = payload.c_a_new.clone();
+    delegation.encrypted_allowance = payload.a_tilde_new.clone();
+    delegation.allowance_salt = payload.sigma_a_new.clone();
+    e.storage()
+        .persistent()
+        .set(&ConfidentialTokenStorageKey::Delegation(from.clone(), spender.clone()), &delegation);
+
     add_to_receiving(e, to, &payload.c_tx);
 
     emit_spender_transfer(
@@ -816,7 +818,7 @@ pub fn confidential_transfer_from(
         to,
         &payload.r_e,
         &payload.v_tilde,
-        &payload.sigma_a_new,
+        &sigma_a,
         &payload.v_aud_r,
         &payload.r_aud_r,
         &payload.v_aud_s,
@@ -1217,39 +1219,6 @@ fn set_delegation(e: &Env, owner: &Address, spender: &Address, delegation: &Spen
         panic_with_error!(e, ConfidentialTokenError::DelegationAlreadyExists);
     }
     e.storage().persistent().set(&key, delegation);
-}
-
-/// Updates a delegation's allowance commitment, encrypted allowance, and
-/// salt after an spender transfer.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `owner` - The delegating account.
-/// * `spender` - The delegated spender.
-/// * `c_a_new` - New allowance commitment.
-/// * `a_tilde_new` - New encrypted allowance scalar.
-/// * `sigma_a_new` - New allowance salt.
-///
-/// # Errors
-///
-/// * [`ConfidentialTokenError::DelegationNotFound`] - When no delegation exists
-///   for the pair.
-fn update_delegation(
-    e: &Env,
-    owner: &Address,
-    spender: &Address,
-    c_a_new: &Point,
-    a_tilde_new: &BytesN<32>,
-    sigma_a_new: &BytesN<32>,
-) {
-    let mut delegation = get_spender_delegation(e, owner, spender);
-    delegation.allowance_commitment = c_a_new.clone();
-    delegation.encrypted_allowance = a_tilde_new.clone();
-    delegation.allowance_salt = sigma_a_new.clone();
-    e.storage()
-        .persistent()
-        .set(&ConfidentialTokenStorageKey::Delegation(owner.clone(), spender.clone()), &delegation);
 }
 
 /// Deletes the `(owner, spender)` delegation entry (revoke path).
