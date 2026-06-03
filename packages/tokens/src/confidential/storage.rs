@@ -402,6 +402,8 @@ pub fn delegation_exists(e: &Env, owner: &Address, spender: &Address) -> bool {
 ///
 /// * [`ConfidentialTokenError::AccountAlreadyRegistered`] - When `account` is
 ///   already registered.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -555,6 +557,8 @@ pub fn merge(e: &Env, account: &Address) {
 /// * [`ConfidentialTokenError::NegativeAmount`] - When `amount < 0`.
 /// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from` is not
 ///   registered.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -646,6 +650,8 @@ pub fn withdraw(
 ///
 /// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from` or `to` is
 ///   not registered.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -737,6 +743,8 @@ pub fn confidential_transfer(
 ///   has no delegation.
 /// * [`ConfidentialTokenError::DelegationExpired`] - When the delegation has
 ///   expired.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -847,6 +855,8 @@ pub fn confidential_transfer_from(
 ///   `spender` is not registered.
 /// * [`ConfidentialTokenError::DelegationAlreadyExists`] - When a delegation
 ///   already exists for the `(account, spender)` pair.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -945,6 +955,8 @@ pub fn set_spender(
 ///   registered.
 /// * [`ConfidentialTokenError::DelegationNotFound`] - When `(account, spender)`
 ///   has no delegation.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
