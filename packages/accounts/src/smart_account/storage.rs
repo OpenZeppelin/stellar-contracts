@@ -723,8 +723,7 @@ pub fn add_context_rule(
 /// # Events
 ///
 /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-/// * data - `[name: String, context_type: ContextRuleType, valid_until:
-///   Option<u32>]`
+/// * data - `[name: String, valid_until: Option<u32>]`
 ///
 /// # Security Warning
 ///
@@ -774,8 +773,7 @@ pub fn update_context_rule_name(e: &Env, id: u32, name: &String) -> ContextRule 
 /// # Events
 ///
 /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-/// * data - `[name: String, context_type: ContextRuleType, valid_until:
-///   Option<u32>]`
+/// * data - `[name: String, valid_until: Option<u32>]`
 ///
 /// # Security Warning
 ///
