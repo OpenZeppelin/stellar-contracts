@@ -48,15 +48,19 @@ pub fn compliance_config(e: &Env) -> Option<ComplianceConfig> {
 
 /// Returns whether `account` is currently frozen.
 ///
-/// Returns `false` when compliance is not configured.
+/// Returns `false` when compliance is not configured, ignoring any stale
+/// `Frozen` entry left over from a prior configuration.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `account` - The address to query.
 pub fn is_frozen(e: &Env, account: &Address) -> bool {
+    if compliance_config(e).is_none() {
+        return false;
+    }
     let key = ComplianceStorageKey::Frozen(account.clone());
-    if e.storage().persistent().get::<_, bool>(&key).is_some() {
+    if e.storage().persistent().has(&key) {
         e.storage().persistent().extend_ttl(&key, FROZEN_TTL_THRESHOLD, FROZEN_EXTEND_AMOUNT);
         true
     } else {
