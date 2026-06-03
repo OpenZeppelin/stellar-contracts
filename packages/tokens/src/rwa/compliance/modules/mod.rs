@@ -9,9 +9,12 @@
 
 pub mod country_allow;
 pub mod country_restrict;
+pub mod initial_lockup_period;
 pub mod max_balance;
 pub mod storage;
 pub mod supply_limit;
+pub mod time_transfers_limits;
+pub mod transfer_restrict;
 
 #[cfg(test)]
 mod test;
@@ -293,6 +296,18 @@ pub enum ComplianceModuleError {
     /// No authorized compliance dispatcher has been bound for the given
     /// token.
     ComplianceNotSet = 398,
+    /// A transfer or burn would consume more unlocked tokens than the sender
+    /// holds.
+    InsufficientUnlockedBalance = 399,
+    /// The aggregate locked amount in a preset exceeds the provided balance.
+    LockedAmountExceedsBalance = 400,
+    /// A transfer would push the sender identity's cumulative volume above a
+    /// configured time-window limit.
+    TransferLimitExceeded = 401,
+    /// Adding another time-window limit would exceed the per-token bound.
+    LimitBoundExceeded = 402,
+    /// No time-window limit exists for the given window duration.
+    LimitNotFound = 403,
 }
 
 // ################## CONSTANTS ##################
