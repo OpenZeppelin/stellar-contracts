@@ -264,8 +264,7 @@ pub trait SmartAccount: CustomAccountInterface {
     /// # Events
     ///
     /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-    /// * data - `[name: String, context_type: ContextRuleType, valid_until:
-    ///   Option<u32>]`
+    /// * data - `[name: String, valid_until: Option<u32>]`
     ///
     /// # Notes
     ///
@@ -297,8 +296,7 @@ pub trait SmartAccount: CustomAccountInterface {
     /// # Events
     ///
     /// * topics - `["context_rule_meta_updated", context_rule_id: u32]`
-    /// * data - `[name: String, context_type: ContextRuleType, valid_until:
-    ///   Option<u32>]`
+    /// * data - `[name: String, valid_until: Option<u32>]`
     ///
     /// # Notes
     ///
