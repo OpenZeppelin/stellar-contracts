@@ -22,21 +22,22 @@ use soroban_sdk::{contractevent, contracttrait, Address, Env};
 /// `Enumerable`, `Consecutive`), the overrides of the `NonFungibleBurnable`
 /// trait methods can be found in their respective `storage.rs` file.
 ///
-/// This approach lets us to implement the `NonFungibleBurnable` trait in a very
-/// flexible way based on the `ContractType` associated type from
-/// `NonFungibleToken`:
+/// # Usage
 ///
-/// ```ignore
-/// impl NonFungibleBurnable for ExampleContract {
-///     fn burn(e: &Env, from: Address, token_id: u32) {
-///         Self::ContractType::burn(e, &from, token_id);
-///     }
+/// No method bodies have to be written. An empty implementation is enough,
+/// and the macro fills in the rest:
 ///
-///     fn burn_from(e: &Env, spender: Address, from: Address, token_id: u32) {
-///         Self::ContractType::burn_from(e, &spender, &from, token_id);
-///     }
-/// }
+/// ```rust
+/// #[contractimpl(contracttrait)]
+/// impl NonFungibleBurnable for ExampleContract {}
 /// ```
+///
+/// The burn logic is selected automatically based on the `ContractType` set
+/// on the `NonFungibleToken` implementation. If the contract uses
+/// `type ContractType = Consecutive`, burning uses the consecutive bookkeeping;
+/// with `type ContractType = Base` it uses the vanilla behavior, and so on.
+/// There is no need to interact with the override machinery, it works in the
+/// background.
 #[contracttrait]
 pub trait NonFungibleBurnable: NonFungibleToken<ContractType: BurnableOverrides> {
     /// Destroys the token with `token_id` from `from`.

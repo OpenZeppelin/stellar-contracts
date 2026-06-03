@@ -95,6 +95,13 @@ impl NonFungibleEnumerable for MyContract {
 
 #### Override Mechanism Through ContractOverrides
 
+> **Note:** `ContractOverrides` (and its siblings such as `BurnableOverrides`)
+> are internal plumbing of the library. Contract
+> authors do not need to implement, name, or import them. A `ContractType` is
+> selected on the token trait, the method bodies can be left empty, and the
+> `#[contractimpl(contracttrait)]` macro routes each call to the right behavior.
+> The mechanism below is described only to explain what happens under the hood.
+
 The `ContractOverrides` trait provides the actual implementations that vary by contract type:
 
 ```rust
@@ -193,8 +200,9 @@ pub struct MyToken;
 
 #[contractimpl(contracttrait)]
 impl FungibleToken for MyToken {
-    ContractType = Base;
-    // Custom overrides here (optional)
+    type ContractType = Base;
+    // The macro fills in every method body, no manual overrides needed.
+    // Alternatively, custom overrides can be provided here (optional)
 }
 ```
 
@@ -203,7 +211,7 @@ impl FungibleToken for MyToken {
 ```rust
 #[contractimpl(contracttrait)]
 impl FungibleBurnable for MyToken {
-    // Burning functionality
+    // Empty body: burn / burn_from are provided by the macro.
 }
 
 #[contractimpl(contracttrait)]
@@ -311,12 +319,12 @@ The `main.nr` files in `gadgets/` and `<operation>/` are both Noir circuit entry
 
 ### Commands
 
-| Task | Command (run from `packages/tokens/src/<kind>/circuits/`) |
-|:--|:--|
-| Type-check the workspace | `nargo check` |
-| Run all tests | `nargo test` |
-| Per-primitive constraint counts | `nargo info` |
-| Compile a single circuit | `nargo compile --package <name>` |
+| Task                            | Command (run from `packages/tokens/src/<kind>/circuits/`) |
+| :------------------------------ | :-------------------------------------------------------- |
+| Type-check the workspace        | `nargo check`                                             |
+| Run all tests                   | `nargo test`                                              |
+| Per-primitive constraint counts | `nargo info`                                              |
+| Compile a single circuit        | `nargo compile --package <name>`                          |
 
 Compiled ACIR and proving artifacts are gitignored; `testdata/*.json` is the only Noir-side artifact committed to the repo.
 
