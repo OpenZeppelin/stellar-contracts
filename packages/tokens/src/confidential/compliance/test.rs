@@ -189,7 +189,7 @@ fn hooks_short_circuit_without_config() {
         ComplianceHooks::on_merge(&h.e, &alice);
         ComplianceHooks::on_transfer(&h.e, &alice, &bob, void_val(&h.e));
         ComplianceHooks::on_deposit(&h.e, &alice, &bob, 0);
-        ComplianceHooks::on_register(&h.e, &alice, void_val(&h.e));
+        ComplianceHooks::on_register(&h.e, &alice, 0, void_val(&h.e));
         ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, void_val(&h.e));
         ComplianceHooks::on_spender_transfer(&h.e, &op, &alice, &bob, void_val(&h.e));
         ComplianceHooks::on_set_spender(&h.e, &alice, &op, 0, void_val(&h.e));
@@ -393,7 +393,7 @@ fn on_register_skips_freeze_check() {
         freeze(&h.e, &alice);
         // No panic: register predates the account entry, so the freeze
         // gate is intentionally skipped.
-        ComplianceHooks::on_register(&h.e, &alice, void_val(&h.e));
+        ComplianceHooks::on_register(&h.e, &alice, 0, void_val(&h.e));
     });
 }
 

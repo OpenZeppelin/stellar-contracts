@@ -149,8 +149,10 @@ pub use storage::{
 #[allow(unused_variables)]
 pub trait Hooks {
     /// Invoked after `register`'s auth and payload decode, before account
-    /// creation. `payload: Val` carries a [`RegisterPayload`].
-    fn on_register(e: &Env, account: &Address, payload: Val) {}
+    /// creation. `payload: Val` carries a [`RegisterPayload`]. `auditor_id`
+    /// is the caller-selected auditor key index — forwarded so the hook
+    /// can enforce an approved-auditor policy.
+    fn on_register(e: &Env, account: &Address, auditor_id: u32, payload: Val) {}
 
     /// Invoked after `deposit`'s auth, before SEP-41 transfer and balance
     /// update.
@@ -235,7 +237,7 @@ pub trait ConfidentialToken {
         account.require_auth();
 
         let decoded: RegisterData = storage::decode_data(e, &data);
-        Self::Hooks::on_register(e, &account, decoded.payload.clone().into_val(e));
+        Self::Hooks::on_register(e, &account, auditor_id, decoded.payload.clone().into_val(e));
         storage::register(e, &account, auditor_id, &decoded.payload, &decoded.proof);
     }
 
