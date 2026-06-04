@@ -110,6 +110,42 @@ impl Grumpkin {
         !Self::is_identity(p)
     }
 
+    /// Returns `true` iff `f` is a canonical 32-byte big-endian `Bn254Fr`
+    /// representative, i.e. its value as a 256-bit big-endian integer is
+    /// strictly less than the field modulus `r`.
+    ///
+    /// Required at any trust boundary that feeds bytes to the Soroban host's
+    /// `Bn254Fr` deserialiser. The host's `bn254_fr_from_u256val` (and the
+    /// SDK's `Bn254Fr::from_bytes` that wraps it) accepts any 32-byte
+    /// representative and silently reduces values `≥ r` modulo `r` rather
+    /// than rejecting them, so multiple distinct byte strings deserialise to
+    /// the same field element. Callers that persist or emit raw bytes (event
+    /// data, on-chain commitments) must enforce canonicality themselves to
+    /// keep state and events byte-unique per logical value.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - The 32-byte field representative.
+    pub fn is_canonical_field(f: &BytesN<32>) -> bool {
+        is_canonical_coord(&f.to_array())
+    }
+
+    /// Returns `true` iff both coordinates of `p` are canonical 32-byte
+    /// big-endian `Bn254Fr` representatives. See [`Self::is_canonical_field`]
+    /// for the rationale and host-deserialiser caveat.
+    ///
+    /// Performs no on-curve or non-identity check; combine with
+    /// [`Self::is_on_curve`] / [`Self::is_not_identity`] when those are also
+    /// required.
+    ///
+    /// # Arguments
+    ///
+    /// * `p` - The 64-byte point encoding.
+    pub fn is_canonical_point(p: &Point) -> bool {
+        let bytes = p.to_array();
+        is_canonical_coord(&bytes[..32]) && is_canonical_coord(&bytes[32..])
+    }
+
     /// Returns `true` iff `(x, y)` satisfies Grumpkin's curve equation
     /// `y² ≡ x³ - 17 (mod r)` **and** each coordinate is a canonical
     /// `Bn254Fr` representative (`< r` as a 32-byte big-endian integer).
@@ -129,8 +165,7 @@ impl Grumpkin {
     /// * `e` - Access to the Soroban environment.
     /// * `p` - The point to validate.
     pub fn is_on_curve(e: &Env, p: &Point) -> bool {
-        let bytes = p.to_array();
-        if !is_canonical_coord(&bytes[..32]) || !is_canonical_coord(&bytes[32..]) {
+        if !Self::is_canonical_point(p) {
             return false;
         }
         let (x, y) = Self::coordinates(e, p);

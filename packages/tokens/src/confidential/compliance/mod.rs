@@ -187,7 +187,7 @@ pub trait ConfidentialCompliance: ConfidentialToken {
 pub struct ComplianceHooks;
 
 impl Hooks for ComplianceHooks {
-    fn on_register(e: &Env, account: &Address, _payload: Val) {
+    fn on_register(e: &Env, account: &Address, _auditor_id: u32, _payload: Val) {
         let Some(config) = storage::compliance_config(e) else {
             return;
         };

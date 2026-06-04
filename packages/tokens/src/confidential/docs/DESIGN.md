@@ -82,7 +82,9 @@ A Grumpkin point is a pair $(x, y) \in \mathbb{F}_r^2$. Noir's native `Field` ty
 2. Mask the top 2 bits to zero, yielding a 254-bit candidate $x \in [0, 2^{254})$.
 3. If $x \geq r$, reject and return to step 1.
 4. If the call site requires $x \neq 0$ and $x = 0$, reject and return to step 1.
-5. Output $x$ in its canonical form -- as a Noir `Field` for in-circuit use, or as 32 big-endian bytes (`BytesN<32>`) for storage and event emission. Per §10.8 / §11 this canonical encoding is what the Soroban host's `bn254_fr_*` deserialization accepts; non-canonical values (i.e. $x \geq r$) are rejected at the host boundary.
+5. Output $x$ in its canonical form -- as a Noir `Field` for in-circuit use, or as 32 big-endian bytes (`BytesN<32>`) for storage and event emission.
+
+**Host deserialiser caveat.** The Soroban host's `bn254_fr_from_u256val` (the underlying primitive of `Bn254Fr::from_bytes`) accepts any 32-byte representative and *silently reduces* values $x \geq r$ modulo $r$ rather than rejecting them. Two distinct byte strings ($x$ and $x + r$) therefore deserialise to the same $\mathbb{F}_r$ element, which means a verifier alone cannot distinguish canonical from non-canonical inputs. To keep stored state and emitted events byte-unique per logical value, the contract layer enforces canonicality on every prover-supplied $\mathbb{F}_r$ representative *before* the bytes reach the verifier.
 
 ### 2.3 Pedersen Commitments
 
@@ -170,7 +172,7 @@ When the owner spends after a merge, the spend proof constrains the full post-me
 
 ### 2.7 Address-to-Field Encoding
 
-In Soroban, the SDK's `Address` host type covers exactly the two `ScAddressType` variants the contract interacts with as actors: `Account` (Stellar ed25519 account) and `Contract` (Soroban contract instance). The protocol encodes those addresses via their **canonical Stellar strkey** (SEP-23) representation:
+In Soroban, the host's `address_to_strkey` function is defined for the two `ScAddressType` variants the contract interacts with as actors -- `Account` (Stellar ed25519 account) and `Contract` (Soroban contract instance) -- and errors on every other variant the SDK's `Address` type can wrap. The protocol encodes those addresses via their **canonical Stellar strkey** (SEP-23) representation:
 
 $$\text{enc}(a) \;=\; \text{Address::to\\\_string}(a)\text{.to\\\_bytes}() \;\in\; \{\text{ASCII}\}^{56}$$
 
@@ -230,7 +232,7 @@ i.e., the total committed value across all confidential accounts never exceeds t
 - *Non-rebasing.* The token's balance attributed to the contract address changes only as a result of explicit operations that the contract itself originated. Tokens whose balances change as a function of supply, oracle data, or external triggers break the accounting invariant and are unsupported.
 - *No fee-on-transfer.* `token.transfer(from, to, amount)` MUST move exactly `amount` units. A fee deducted in transit would leave the contract's confidential accounting larger than its public backing.
 - *Deterministic revert.* A failed `token.transfer` MUST cause the enclosing contract invocation (`deposit` or `withdraw`) to revert atomically, so confidential state is never updated against a token transfer that did not happen.
-- *Underlying clawback / freeze / deauthorization.* If the underlying SEP-41 (especially a Stellar Asset Contract) supports issuer-level clawback or freeze that can reduce or block the contract's holdings, confidential accounting at the contract layer may temporarily or permanently exceed the contract's accessible backing. This is an operational risk borne by the deployer's choice of underlying token. The token layer offers its own freeze and per-account clawback flows that operate inside the confidential surface; see [COMPLIANCE.md](./COMPLIANCE.md) §2 (contract-level freeze) and §5 (admin + auditor clawback). [COMPLIANCE.md](./COMPLIANCE.md) §2.2 additionally specifies SAC authorization passthrough, which composes the contract's freeze with the issuer's freeze without requiring the admin to mirror state.
+- *Underlying clawback / freeze / deauthorization.* These are surfaces of the Stellar Asset Contract (`StellarAssetInterface`), not the generic SEP-41 (`TokenInterface`). If the underlying token is a SAC whose issuer can clawback, freeze, or deauthorize the contract's holdings, confidential accounting at the contract layer may temporarily or permanently exceed the contract's accessible backing. This is an operational risk borne by the deployer's choice of underlying token. The token layer offers its own freeze and per-account clawback flows that operate inside the confidential surface; see [COMPLIANCE.md](./COMPLIANCE.md) §2 (contract-level freeze) and §5 (admin + auditor clawback). [COMPLIANCE.md](./COMPLIANCE.md) §2.2 additionally specifies SAC authorization passthrough, which composes the contract's freeze with the issuer's freeze without requiring the admin to mirror state.
 
 **Non-negativity check.** The contract's public interface uses `i128` end-to-end, matching SEP-41. Every entrypoint that accepts a public amount (`deposit`, `withdraw`) MUST reject `amount < 0` and revert. The in-circuit range constraint (Section 2.6) bounds the same value at $2^{127}$ from above; together they pin the contract's value domain to $[0, 2^{127}) = [0, \text{i128::MAX}]$, matching SEP-41 exactly. No conversion at the SEP-41 boundary is needed.
 
@@ -1108,10 +1110,10 @@ where $[x]_1 = x \cdot G_1$ and $[x]_2 = x \cdot G_2$ are BN254 group elements. 
 
 ### 10.7 Dependency: CAP-80
 
-[CAP-80](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0080.md) introduces host functions required for efficient UltraHonk verification and on-chain Grumpkin point arithmetic:
+[CAP-80](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0080.md) introduces the host functions required for efficient UltraHonk verification and on-chain Grumpkin point arithmetic. The rollout spans two protocols; both are required, so **protocol 26 is the effective minimum**.
 
-- `bn254_g1_msm`: Batched scalar-point multiplication on BN254 G1.
-- `bn254_fr_{add, sub, mul, inv, pow}`: $\mathbb{F}_r$ scalar arithmetic.
+- **Protocol 25:** `bn254_g1_{add, mul}`, `bn254_multi_pairing_check`.
+- **Protocol 26:** `bn254_g1_msm`, `bn254_g1_is_on_curve`, `bn254_fr_{add, sub, mul, inv, pow}` -- the $\mathbb{F}_r$ scalar arithmetic underpinning Grumpkin point operations.
 
 ### 10.8 On-Chain Point Arithmetic
 
@@ -1152,7 +1154,7 @@ Requires `bn254_fr_{add, sub, mul, inv}` host calls (CAP-80, Section 10.7).
 2. **Points read from prior on-chain state.** $C_{\text{spend}}$, $C_{\text{receive}}$, stored $Y$ / $\text{PVK}$, and allowance commitments were validated through path (1) when first written. The contract trusts them on subsequent reads.
 3. **Auditor keys (the only proof-less entry point).** $K_{\text{aud}}$ is registered in the auditor contract by the auditor itself, with no accompanying proof. The auditor contract performs canonical encoding, on-curve ($y^2 \equiv x^3 - 17 \pmod{r}$), and non-identity checks at insertion (Section 3.1); the contract trusts the fetched value.
 
-**Canonical encoding** ($x, y \in [0, r)$ as 32-byte representatives) is enforced at the XDR / Soroban host boundary when bytes are deserialized into `BnScalar`; no additional check is needed inside the contract.
+**Canonical encoding** ($x, y \in [0, r)$ as 32-byte representatives) is enforced **by the contract** at the verifier boundary, not by the Soroban host. The host's `bn254_fr_from_u256val` reduces non-canonical inputs modulo $r$ rather than rejecting them (§2.2 *Host deserialiser caveat*), so the same logical point $(x, y)$ admits multiple byte encodings ($\text{be}(x) \mathbin\| \text{be}(y)$ and $\text{be}(x+r) \mathbin\| \text{be}(y)$, etc.) if the contract does not pre-validate. Every prover-supplied scalar and coordinate that reaches the verifier — and therefore every byte string that gets persisted or emitted downstream — is the unique canonical representative of its field element.
 
 ---
 
@@ -1278,8 +1280,8 @@ The auditor's allowance tracking does **not** use this method: per-event allowan
 
 | Dependency | Status | Impact |
 |:---|:---|:---|
-| **Protocol 25** (BN254 native support) | Available | `bn254.g1_add()`, `g1_mul()`, `pairing_check()`, `BnScalar` Fr arithmetic |
-| **CAP-80** (BN254 host functions) | Available | Required for efficient UltraHonk verification and Grumpkin point arithmetic |
+| **Protocol 25** (BN254 G1 + pairing) | Available | `bn254_g1_{add, mul}`, `bn254_multi_pairing_check` |
+| **Protocol 26 / CAP-80** (BN254 Fr + MSM) | Available | `bn254_g1_msm`, `bn254_g1_is_on_curve`, `bn254_fr_{add, sub, mul, inv, pow}` -- required for UltraHonk verification and on-chain Grumpkin point arithmetic |
 | **Modified UltraHonk verifier** | To be built | Multi-VK support (one per circuit type) |
 | **Noir circuits** | To be built | 6 circuits using `std::embedded_curve_ops` for Grumpkin |
 | **Grumpkin point arithmetic library** | To be built | On-chain point add/sub using BN254 Fr ops, identity handling |

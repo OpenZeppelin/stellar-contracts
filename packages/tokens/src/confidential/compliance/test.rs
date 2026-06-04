@@ -12,8 +12,8 @@ use stellar_event_assertion::EventAssertion;
 use crate::confidential::{
     compliance::{
         storage::{compliance_config, freeze, is_frozen, set_compliance_config, unfreeze},
-        ComplianceConfig, ComplianceHooks, ConfidentialCompliance, ConfidentialComplianceClient,
-        Policy,
+        ComplianceConfig, ComplianceHooks, ComplianceStorageKey, ConfidentialCompliance,
+        ConfidentialComplianceClient, Policy,
     },
     storage::{set_address_as_field_element, set_auditor, set_underlying_asset, set_verifier},
     verifier::CircuitType,
@@ -189,7 +189,7 @@ fn hooks_short_circuit_without_config() {
         ComplianceHooks::on_merge(&h.e, &alice);
         ComplianceHooks::on_transfer(&h.e, &alice, &bob, void_val(&h.e));
         ComplianceHooks::on_deposit(&h.e, &alice, &bob, 0);
-        ComplianceHooks::on_register(&h.e, &alice, void_val(&h.e));
+        ComplianceHooks::on_register(&h.e, &alice, 0, void_val(&h.e));
         ComplianceHooks::on_withdraw(&h.e, &alice, &bob, 0, void_val(&h.e));
         ComplianceHooks::on_spender_transfer(&h.e, &op, &alice, &bob, void_val(&h.e));
         ComplianceHooks::on_set_spender(&h.e, &alice, &op, 0, void_val(&h.e));
@@ -213,6 +213,25 @@ fn unfreeze_without_config_panics_not_configured() {
     let h = setup();
     let alice = Address::generate(&h.e);
     h.e.as_contract(&h.host, || unfreeze(&h.e, &alice));
+}
+
+#[test]
+fn is_frozen_ignores_stale_flag_when_config_removed() {
+    // Freeze alice under an active config, then simulate the config being
+    // wiped (e.g. via a storage migration or instance-entry rotation). The
+    // persistent Frozen flag survives, but is_frozen must report false
+    // because compliance is no longer configured.
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    h.e.as_contract(&h.host, || {
+        set_compliance_config(&h.e, &base_config());
+        freeze(&h.e, &alice);
+        assert!(is_frozen(&h.e, &alice));
+
+        h.e.storage().instance().remove(&ComplianceStorageKey::Config);
+        assert!(compliance_config(&h.e).is_none());
+        assert!(!is_frozen(&h.e, &alice));
+    });
 }
 
 // ################## FREEZE FLOW ##################
@@ -374,7 +393,7 @@ fn on_register_skips_freeze_check() {
         freeze(&h.e, &alice);
         // No panic: register predates the account entry, so the freeze
         // gate is intentionally skipped.
-        ComplianceHooks::on_register(&h.e, &alice, void_val(&h.e));
+        ComplianceHooks::on_register(&h.e, &alice, 0, void_val(&h.e));
     });
 }
 
