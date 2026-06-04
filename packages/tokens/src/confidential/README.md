@@ -35,7 +35,7 @@ confidential/
 
 A single deployment is **three contracts** wired together:
 
-1. A `ConfidentialToken` contract (wraps one SEP-41 asset).
+1. A `ConfidentialToken` contract.
 2. A `ConfidentialAuditor` registry (Grumpkin public keys, indexed by
    `auditor_id`; reusable across multiple tokens).
 3. A `ConfidentialVerifier` registry (one UltraHonk VK per
