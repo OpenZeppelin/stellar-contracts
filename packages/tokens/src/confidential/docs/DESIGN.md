@@ -172,7 +172,7 @@ When the owner spends after a merge, the spend proof constrains the full post-me
 
 ### 2.7 Address-to-Field Encoding
 
-In Soroban, the SDK's `Address` host type covers exactly the two `ScAddressType` variants the contract interacts with as actors: `Account` (Stellar ed25519 account) and `Contract` (Soroban contract instance). The protocol encodes those addresses via their **canonical Stellar strkey** (SEP-23) representation:
+In Soroban, the host's `address_to_strkey` function is defined for the two `ScAddressType` variants the contract interacts with as actors -- `Account` (Stellar ed25519 account) and `Contract` (Soroban contract instance) -- and errors on every other variant the SDK's `Address` type can wrap. The protocol encodes those addresses via their **canonical Stellar strkey** (SEP-23) representation:
 
 $$\text{enc}(a) \;=\; \text{Address::to\\\_string}(a)\text{.to\\\_bytes}() \;\in\; \{\text{ASCII}\}^{56}$$
 
@@ -232,7 +232,7 @@ i.e., the total committed value across all confidential accounts never exceeds t
 - *Non-rebasing.* The token's balance attributed to the contract address changes only as a result of explicit operations that the contract itself originated. Tokens whose balances change as a function of supply, oracle data, or external triggers break the accounting invariant and are unsupported.
 - *No fee-on-transfer.* `token.transfer(from, to, amount)` MUST move exactly `amount` units. A fee deducted in transit would leave the contract's confidential accounting larger than its public backing.
 - *Deterministic revert.* A failed `token.transfer` MUST cause the enclosing contract invocation (`deposit` or `withdraw`) to revert atomically, so confidential state is never updated against a token transfer that did not happen.
-- *Underlying clawback / freeze / deauthorization.* If the underlying SEP-41 (especially a Stellar Asset Contract) supports issuer-level clawback or freeze that can reduce or block the contract's holdings, confidential accounting at the contract layer may temporarily or permanently exceed the contract's accessible backing. This is an operational risk borne by the deployer's choice of underlying token. The token layer offers its own freeze and per-account clawback flows that operate inside the confidential surface; see [COMPLIANCE.md](./COMPLIANCE.md) §2 (contract-level freeze) and §5 (admin + auditor clawback). [COMPLIANCE.md](./COMPLIANCE.md) §2.2 additionally specifies SAC authorization passthrough, which composes the contract's freeze with the issuer's freeze without requiring the admin to mirror state.
+- *Underlying clawback / freeze / deauthorization.* These are surfaces of the Stellar Asset Contract (`StellarAssetInterface`), not the generic SEP-41 (`TokenInterface`). If the underlying token is a SAC whose issuer can clawback, freeze, or deauthorize the contract's holdings, confidential accounting at the contract layer may temporarily or permanently exceed the contract's accessible backing. This is an operational risk borne by the deployer's choice of underlying token. The token layer offers its own freeze and per-account clawback flows that operate inside the confidential surface; see [COMPLIANCE.md](./COMPLIANCE.md) §2 (contract-level freeze) and §5 (admin + auditor clawback). [COMPLIANCE.md](./COMPLIANCE.md) §2.2 additionally specifies SAC authorization passthrough, which composes the contract's freeze with the issuer's freeze without requiring the admin to mirror state.
 
 **Non-negativity check.** The contract's public interface uses `i128` end-to-end, matching SEP-41. Every entrypoint that accepts a public amount (`deposit`, `withdraw`) MUST reject `amount < 0` and revert. The in-circuit range constraint (Section 2.6) bounds the same value at $2^{127}$ from above; together they pin the contract's value domain to $[0, 2^{127}) = [0, \text{i128::MAX}]$, matching SEP-41 exactly. No conversion at the SEP-41 boundary is needed.
 
@@ -1110,10 +1110,10 @@ where $[x]_1 = x \cdot G_1$ and $[x]_2 = x \cdot G_2$ are BN254 group elements. 
 
 ### 10.7 Dependency: CAP-80
 
-[CAP-80](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0080.md) introduces host functions required for efficient UltraHonk verification and on-chain Grumpkin point arithmetic:
+[CAP-80](https://github.com/stellar/stellar-protocol/blob/master/core/cap-0080.md) introduces the host functions required for efficient UltraHonk verification and on-chain Grumpkin point arithmetic. The rollout spans two protocols; both are required, so **protocol 26 is the effective minimum**.
 
-- `bn254_g1_msm`: Batched scalar-point multiplication on BN254 G1.
-- `bn254_fr_{add, sub, mul, inv, pow}`: $\mathbb{F}_r$ scalar arithmetic.
+- **Protocol 25:** `bn254_g1_{add, mul}`, `bn254_multi_pairing_check`.
+- **Protocol 26:** `bn254_g1_msm`, `bn254_g1_is_on_curve`, `bn254_fr_{add, sub, mul, inv, pow}` -- the $\mathbb{F}_r$ scalar arithmetic underpinning Grumpkin point operations.
 
 ### 10.8 On-Chain Point Arithmetic
 
@@ -1280,8 +1280,8 @@ The auditor's allowance tracking does **not** use this method: per-event allowan
 
 | Dependency | Status | Impact |
 |:---|:---|:---|
-| **Protocol 25** (BN254 native support) | Available | `bn254.g1_add()`, `g1_mul()`, `pairing_check()`, `BnScalar` Fr arithmetic |
-| **CAP-80** (BN254 host functions) | Available | Required for efficient UltraHonk verification and Grumpkin point arithmetic |
+| **Protocol 25** (BN254 G1 + pairing) | Available | `bn254_g1_{add, mul}`, `bn254_multi_pairing_check` |
+| **Protocol 26 / CAP-80** (BN254 Fr + MSM) | Available | `bn254_g1_msm`, `bn254_g1_is_on_curve`, `bn254_fr_{add, sub, mul, inv, pow}` -- required for UltraHonk verification and on-chain Grumpkin point arithmetic |
 | **Modified UltraHonk verifier** | To be built | Multi-VK support (one per circuit type) |
 | **Noir circuits** | To be built | 6 circuits using `std::embedded_curve_ops` for Grumpkin |
 | **Grumpkin point arithmetic library** | To be built | On-chain point add/sub using BN254 Fr ops, identity handling |
