@@ -20,7 +20,7 @@ real value.
 
 ## Layout
 
-```
+```text
 confidential/
 ├── mod.rs          # ConfidentialToken trait + Hooks + events
 ├── storage.rs      # operation-level orchestration, public-input assembly
