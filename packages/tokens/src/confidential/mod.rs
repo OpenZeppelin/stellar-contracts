@@ -71,14 +71,6 @@
 //! points on-curve, and the auditor registry's insertion-time validation
 //! covers the lone proof-less point input.
 //!
-//! **Operational implication for verifier implementations.** Future verifier
-//! backends (UltraHonk, Groth16, or otherwise) MUST consume the
-//! `public_inputs` blob through a deserialiser equivalent to the host's
-//! `bn254_fr_from_u256val`. The canonical-encoding precondition is now an
-//! invariant of every chunk in that blob; an implementation that re-validates
-//! internally is welcome to do so, but the contract layer already guarantees
-//! the precondition on entry.
-//!
 //! ## Contract Binding
 //!
 //! Every owner-initiated proof references a `addr_f` field, computed once at
