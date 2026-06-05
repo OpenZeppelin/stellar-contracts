@@ -38,7 +38,7 @@ fn test_checked_mul_div_zero_denominator() {
 #[test]
 fn test_checked_mul_div_div_overflow_returns_none() {
     let env = Env::default();
-    let i256_min = I256::from_parts(&env, i64::MIN, 0, 0, 0);
+    let i256_min = I256::min_value(&env);
     let one = I256::from_i128(&env, 1);
     let neg_one = I256::from_i128(&env, -1);
 
@@ -535,6 +535,29 @@ fn test_checked_mul_div_floor_negative_with_remainder() {
     let result = checked_mul_div_floor(&x, &y, &z).unwrap();
 
     assert_eq!(result, I256::from_i128(&env, -24));
+}
+
+#[test]
+fn test_checked_mul_div_mul_overflow_returns_none() {
+    let env = Env::default();
+    // x * y = I256::MAX * 2 overflows I256, so the checked variants must return
+    // None rather than panicking like their unchecked counterparts.
+    let x: I256 = I256::max_value(&env);
+    let y: I256 = I256::from_i128(&env, 2);
+    let denominator: I256 = I256::from_i128(&env, 2);
+
+    assert_eq!(checked_mul_div(&x, &y, &denominator), None);
+    assert_eq!(checked_mul_div_floor(&x, &y, &denominator), None);
+    assert_eq!(checked_mul_div_ceil(&x, &y, &denominator), None);
+    assert_eq!(
+        checked_mul_div_with_rounding(x.clone(), y.clone(), denominator.clone(), Rounding::Floor),
+        None
+    );
+    assert_eq!(
+        checked_mul_div_with_rounding(x.clone(), y.clone(), denominator.clone(), Rounding::Ceil),
+        None
+    );
+    assert_eq!(checked_mul_div_with_rounding(x, y, denominator, Rounding::Truncate), None);
 }
 
 // ################## MULDIV TESTS ##################

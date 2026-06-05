@@ -402,6 +402,8 @@ pub fn delegation_exists(e: &Env, owner: &Address, spender: &Address) -> bool {
 ///
 /// * [`ConfidentialTokenError::AccountAlreadyRegistered`] - When `account` is
 ///   already registered.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -555,6 +557,8 @@ pub fn merge(e: &Env, account: &Address) {
 /// * [`ConfidentialTokenError::NegativeAmount`] - When `amount < 0`.
 /// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from` is not
 ///   registered.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -646,6 +650,8 @@ pub fn withdraw(
 ///
 /// * [`ConfidentialTokenError::AccountNotRegistered`] - When `from` or `to` is
 ///   not registered.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -737,6 +743,8 @@ pub fn confidential_transfer(
 ///   has no delegation.
 /// * [`ConfidentialTokenError::DelegationExpired`] - When the delegation has
 ///   expired.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -760,7 +768,7 @@ pub fn confidential_transfer_from(
     payload: &SpenderTransferPayload,
     proof: &Bytes,
 ) {
-    let delegation = get_spender_delegation(e, from, spender);
+    let mut delegation = get_spender_delegation(e, from, spender);
     if e.ledger().sequence() > delegation.live_until_ledger {
         panic_with_error!(e, ConfidentialTokenError::DelegationExpired);
     }
@@ -775,6 +783,8 @@ pub fn confidential_transfer_from(
     // owner).
     let k_aud_s = auditor.get_key(&owner.auditor_id);
 
+    // Capture it here to emit in the event below.
+    let sigma_a = delegation.allowance_salt.clone();
     // PI order (DESIGN §7.8):
     //   C_a, sigma_a, Y_op, PVK_recipient, K_aud_r, K_aud_s,
     //   C_a', C_tx, R_e, v_tilde, a_tilde', sigma_a',
@@ -799,14 +809,14 @@ pub fn confidential_transfer_from(
 
     verify(e, CircuitType::SpenderTransfer, &pi, proof);
 
-    update_delegation(
-        e,
-        from,
-        spender,
-        &payload.c_a_new,
-        &payload.a_tilde_new,
-        &payload.sigma_a_new,
-    );
+    // Update delegation.
+    delegation.allowance_commitment = payload.c_a_new.clone();
+    delegation.encrypted_allowance = payload.a_tilde_new.clone();
+    delegation.allowance_salt = payload.sigma_a_new.clone();
+    e.storage()
+        .persistent()
+        .set(&ConfidentialTokenStorageKey::Delegation(from.clone(), spender.clone()), &delegation);
+
     add_to_receiving(e, to, &payload.c_tx);
 
     emit_spender_transfer(
@@ -816,7 +826,7 @@ pub fn confidential_transfer_from(
         to,
         &payload.r_e,
         &payload.v_tilde,
-        &payload.sigma_a_new,
+        &sigma_a,
         &payload.v_aud_r,
         &payload.r_aud_r,
         &payload.v_aud_s,
@@ -845,6 +855,8 @@ pub fn confidential_transfer_from(
 ///   `spender` is not registered.
 /// * [`ConfidentialTokenError::DelegationAlreadyExists`] - When a delegation
 ///   already exists for the `(account, spender)` pair.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -943,6 +955,8 @@ pub fn set_spender(
 ///   registered.
 /// * [`ConfidentialTokenError::DelegationNotFound`] - When `(account, spender)`
 ///   has no delegation.
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When point coordinates
+///   or fields from the proof are non-canonical.
 /// * [`ConfidentialTokenError::InvalidProof`] - When the proof fails
 ///   verification.
 /// * refer to [`crate::confidential::auditor::ConfidentialAuditor::get_key`]
@@ -1219,39 +1233,6 @@ fn set_delegation(e: &Env, owner: &Address, spender: &Address, delegation: &Spen
     e.storage().persistent().set(&key, delegation);
 }
 
-/// Updates a delegation's allowance commitment, encrypted allowance, and
-/// salt after an spender transfer.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `owner` - The delegating account.
-/// * `spender` - The delegated spender.
-/// * `c_a_new` - New allowance commitment.
-/// * `a_tilde_new` - New encrypted allowance scalar.
-/// * `sigma_a_new` - New allowance salt.
-///
-/// # Errors
-///
-/// * [`ConfidentialTokenError::DelegationNotFound`] - When no delegation exists
-///   for the pair.
-fn update_delegation(
-    e: &Env,
-    owner: &Address,
-    spender: &Address,
-    c_a_new: &Point,
-    a_tilde_new: &BytesN<32>,
-    sigma_a_new: &BytesN<32>,
-) {
-    let mut delegation = get_spender_delegation(e, owner, spender);
-    delegation.allowance_commitment = c_a_new.clone();
-    delegation.encrypted_allowance = a_tilde_new.clone();
-    delegation.allowance_salt = sigma_a_new.clone();
-    e.storage()
-        .persistent()
-        .set(&ConfidentialTokenStorageKey::Delegation(owner.clone(), spender.clone()), &delegation);
-}
-
 /// Deletes the `(owner, spender)` delegation entry (revoke path).
 ///
 /// # Arguments
@@ -1317,13 +1298,39 @@ fn verify(e: &Env, circuit_type: CircuitType, public_inputs: &Bytes, proof: &Byt
     }
 }
 
-/// Appends a Grumpkin point (`x || y`, 64 bytes) to the public-input blob.
+/// Appends a Grumpkin point (`x || y`, 64 bytes) to the public-input blob,
+/// after asserting both coordinates are canonical `Bn254Fr` representatives.
+///
+/// The Soroban host's `bn254_fr_from_u256val` reduces non-canonical 32-byte
+/// inputs modulo `r` instead of rejecting them, so caller-supplied bytes
+/// `x` and `x + r` would deserialise to the same field element and both
+/// satisfy the same proof. This check enforces byte-uniqueness on every
+/// chunk before the verifier sees it; see the
+/// [module-level "Encoding Validation" docs](super) for the rationale.
+///
+/// # Errors
+///
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When either coordinate
+///   is `≥ r`.
 fn append_point(pi: &mut Bytes, p: &Point) {
+    if !Grumpkin::is_canonical_point(p) {
+        panic_with_error!(pi.env(), ConfidentialTokenError::NonCanonicalEncoding);
+    }
     pi.append(&Bytes::from(p));
 }
 
-/// Appends a 32-byte field element to the public-input blob.
+/// Appends a 32-byte field element to the public-input blob, after
+/// asserting it is a canonical `Bn254Fr` representative. See
+/// [`append_point`] for the rationale.
+///
+/// # Errors
+///
+/// * [`ConfidentialTokenError::NonCanonicalEncoding`] - When the value is `≥
+///   r`.
 fn append_field(pi: &mut Bytes, f: &BytesN<32>) {
+    if !Grumpkin::is_canonical_field(f) {
+        panic_with_error!(pi.env(), ConfidentialTokenError::NonCanonicalEncoding);
+    }
     pi.append(&Bytes::from(f));
 }
 

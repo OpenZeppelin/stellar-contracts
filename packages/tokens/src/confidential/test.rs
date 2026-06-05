@@ -39,7 +39,13 @@ fn fixture_point(e: &Env) -> BytesN<64> {
 }
 
 fn fixture_field(e: &Env, byte: u8) -> BytesN<32> {
-    BytesN::from_array(e, &[byte; 32])
+    let mut bytes = [byte; 32];
+    // Zero the top byte so the 256-bit value is bounded by 2^248 - 1,
+    // well below the BN254 scalar field modulus r ≈ 2^254. Lets the tests
+    // keep using arbitrary sentinel bytes without tripping the
+    // canonical-encoding check in `append_field` / `append_point`.
+    bytes[0] = 0;
+    BytesN::from_array(e, &bytes)
 }
 
 // ################## MOCK CONTRACTS ##################
@@ -293,6 +299,56 @@ fn register_invalid_proof_panics() {
     let h = setup_with_failing_verifier();
     let alice = Address::generate(&h.e);
     h.token.register(&alice, &1u32, &register_data(&h.e));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3514)")]
+fn withdraw_non_canonical_scalar_panics() {
+    // Sigma supplied as raw `[0xff; 32]` exceeds the BN254 scalar field
+    // modulus r. The append helper must revert with `NonCanonicalEncoding`
+    // before the bytes reach the verifier (which would otherwise silently
+    // reduce them mod r and accept malleable encodings).
+    let h = setup();
+    let alice = Address::generate(&h.e);
+    h.token.register(&alice, &1u32, &register_data(&h.e));
+
+    let payload = WithdrawData {
+        payload: WithdrawPayload {
+            c_spend_new: fixture_point(&h.e),
+            b_tilde: fixture_field(&h.e, 0x11),
+            r_e: fixture_point(&h.e),
+            sigma: BytesN::from_array(&h.e, &[0xff; 32]),
+            b_aud_s: fixture_field(&h.e, 0x12),
+        },
+        proof: Bytes::new(&h.e),
+    }
+    .to_xdr(&h.e);
+
+    h.token.withdraw(&alice, &Address::generate(&h.e), &0i128, &payload);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3514)")]
+fn register_non_canonical_point_coord_panics() {
+    // A point whose x-coordinate exceeds r. Both coordinates must be
+    // canonical or `append_point` reverts before verification.
+    let h = setup();
+    let alice = Address::generate(&h.e);
+
+    let mut non_canonical = [0u8; 64];
+    non_canonical[..32].copy_from_slice(&[0xff; 32]);
+    // y stays at zero; only x triggers the revert.
+
+    let payload = RegisterData {
+        payload: RegisterPayload {
+            y: BytesN::from_array(&h.e, &non_canonical),
+            pvk: fixture_point(&h.e),
+        },
+        proof: Bytes::new(&h.e),
+    }
+    .to_xdr(&h.e);
+
+    h.token.register(&alice, &1u32, &payload);
 }
 
 #[test]
