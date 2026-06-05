@@ -1,13 +1,13 @@
 use soroban_sdk::{contracttype, Address, Env, Vec};
 
 use crate::rwa::compliance::modules::{
-    transfer_restrict::{emit_user_allowed, emit_user_disallowed},
+    transfer_allow::{emit_user_allowed, emit_user_disallowed},
     MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
 };
 
 #[contracttype]
 #[derive(Clone)]
-pub enum TransferRestrictStorageKey {
+pub enum TransferAllowStorageKey {
     /// Per-(token, user) allowlist membership entry.
     AllowedUser(Address, Address),
 }
@@ -22,7 +22,7 @@ pub enum TransferRestrictStorageKey {
 /// * `token` - The token address.
 /// * `user` - The address to check.
 pub fn is_user_allowed(e: &Env, token: &Address, user: &Address) -> bool {
-    let key = TransferRestrictStorageKey::AllowedUser(token.clone(), user.clone());
+    let key = TransferAllowStorageKey::AllowedUser(token.clone(), user.clone());
     if e.storage().persistent().has(&key) {
         e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
         true
@@ -31,8 +31,8 @@ pub fn is_user_allowed(e: &Env, token: &Address, user: &Address) -> bool {
     }
 }
 
-/// Returns `true` if the sender is allowlisted or, failing that, the
-/// recipient is.
+/// Returns `true` when at least one of the two parties, sender or
+/// recipient, is on the allowlist.
 ///
 /// The transfer amount has no effect on the decision and is intentionally
 /// ignored.
@@ -49,39 +49,6 @@ pub fn can_transfer(e: &Env, from: &Address, to: &Address, _amount: i128, token:
 }
 
 // ################## CHANGE STATE ##################
-
-/// Records `user` as allowed in persistent storage.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token address.
-/// * `user` - The address to allow.
-///
-/// # Security Warning
-///
-/// This helper performs no authorization checks.
-pub fn set_user_allowed(e: &Env, token: &Address, user: &Address) {
-    let key = TransferRestrictStorageKey::AllowedUser(token.clone(), user.clone());
-    e.storage().persistent().set(&key, &());
-}
-
-/// Removes `user` from the allowlist in persistent storage.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token address.
-/// * `user` - The address to disallow.
-///
-/// # Security Warning
-///
-/// This helper performs no authorization checks.
-pub fn remove_user_allowed(e: &Env, token: &Address, user: &Address) {
-    e.storage()
-        .persistent()
-        .remove(&TransferRestrictStorageKey::AllowedUser(token.clone(), user.clone()));
-}
 
 /// Adds `user` to the transfer allowlist for `token`. If `user` is already
 /// allowed, the call is a no-op (no event emitted, no error raised).
@@ -188,4 +155,41 @@ pub fn batch_disallow_users(e: &Env, token: &Address, users: &Vec<Address>) {
     for user in users.iter() {
         disallow_user(e, token, &user);
     }
+}
+
+// ################## LOW-LEVEL HELPERS ##################
+
+/// Records `user` as allowed in persistent storage, without the
+/// existence check or the event of [`allow_user`].
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token address.
+/// * `user` - The address to allow.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
+pub fn set_user_allowed(e: &Env, token: &Address, user: &Address) {
+    let key = TransferAllowStorageKey::AllowedUser(token.clone(), user.clone());
+    e.storage().persistent().set(&key, &());
+}
+
+/// Removes `user` from the allowlist in persistent storage, without the
+/// existence check or the event of [`disallow_user`].
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token address.
+/// * `user` - The address to disallow.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks.
+pub fn remove_user_allowed(e: &Env, token: &Address, user: &Address) {
+    e.storage()
+        .persistent()
+        .remove(&TransferAllowStorageKey::AllowedUser(token.clone(), user.clone()));
 }

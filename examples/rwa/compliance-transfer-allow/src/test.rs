@@ -2,15 +2,15 @@ extern crate std;
 
 use soroban_sdk::{testutils::Address as _, vec, Address, Env, String};
 
-use crate::contract::{TransferRestrictContract, TransferRestrictContractClient};
+use crate::contract::{TransferAllowContract, TransferAllowContractClient};
 
 fn create_client<'a>(
     e: &Env,
     admin: &Address,
     manager: &Address,
-) -> TransferRestrictContractClient<'a> {
-    let address = e.register(TransferRestrictContract, (admin, manager));
-    TransferRestrictContractClient::new(e, &address)
+) -> TransferAllowContractClient<'a> {
+    let address = e.register(TransferAllowContract, (admin, manager));
+    TransferAllowContractClient::new(e, &address)
 }
 
 #[test]
@@ -92,7 +92,7 @@ fn name_returns_module_identifier() {
     let manager = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    assert_eq!(client.name(), String::from_str(&e, "TransferRestrictModule"));
+    assert_eq!(client.name(), String::from_str(&e, "TransferAllowModule"));
 }
 
 #[test]

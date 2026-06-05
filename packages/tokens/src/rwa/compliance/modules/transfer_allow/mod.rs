@@ -1,9 +1,13 @@
-//! Transfer-restriction compliance module — Stellar port of T-REX
+//! Transfer-allowlist compliance module — Stellar port of T-REX
 //! [`TransferRestrictModule.sol`][trex-src].
 //!
-//! Maintains a per-token address allowlist. A transfer passes when the
-//! sender is allowlisted; otherwise the recipient must be allowlisted.
-//! Mints and burns are not restricted by this module.
+//! Maintains a per-token address allowlist. A transfer passes when at least
+//! one of the two parties, sender or recipient, is on the allowlist. Mints
+//! and burns are not restricted by this module.
+//!
+//! The upstream Solidity module is named `TransferRestrictModule`; this
+//! port is named after the allowlist it maintains, matching the polarity of
+//! its sibling [`crate::rwa::compliance::modules::country_allow`].
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/main/contracts/compliance/modular/modules/TransferRestrictModule.sol
 
@@ -16,15 +20,15 @@ use soroban_sdk::{contractevent, contracttrait, Address, Env, Vec};
 
 use crate::rwa::compliance::modules::ComplianceModule;
 
-/// Transfer Restriction Compliance Module Trait
+/// Transfer Allowlist Compliance Module Trait
 ///
-/// The `TransferRestrict` trait extends the [`ComplianceModule`] trait to
+/// The `TransferAllow` trait extends the [`ComplianceModule`] trait to
 /// provide a per-token address allowlist. When this module is registered on
 /// a token's modular compliance contract, transfers are permitted only when
-/// the sender is on the allowlist or, failing that, the recipient is. A
-/// typical use case is restricting secondary trading to a known set of
-/// venues: allowlisting an exchange lets anyone trade with it, while
-/// transfers between two unlisted wallets stay blocked.
+/// at least one of the two parties, sender or recipient, is on the
+/// allowlist. A typical use case is restricting secondary trading to a
+/// known set of venues: allowlisting an exchange lets anyone trade with it,
+/// while transfers between two unlisted wallets stay blocked.
 ///
 /// Mints and burns are intentionally not restricted.
 ///
@@ -37,7 +41,7 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// This trait is designed to be used in conjunction with the
 /// [`ComplianceModule`] trait.
 #[contracttrait]
-pub trait TransferRestrict: ComplianceModule {
+pub trait TransferAllow: ComplianceModule {
     /// Adds `user` to the transfer allowlist for `token`. If `user` is
     /// already allowed, the call is a no-op (no event emitted, no error
     /// raised).

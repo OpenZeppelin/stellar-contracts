@@ -13,7 +13,7 @@ pub mod max_balance;
 pub mod storage;
 pub mod supply_limit;
 pub mod time_transfers_limits;
-pub mod transfer_restrict;
+pub mod transfer_allow;
 
 #[cfg(test)]
 mod test;

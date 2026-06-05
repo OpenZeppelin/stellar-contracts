@@ -1,5 +1,5 @@
 [package]
-name = "compliance-transfer-restrict"
+name = "compliance-transfer-allow"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

@@ -6,18 +6,18 @@ use soroban_sdk::{
     vec, Address, Env,
 };
 
-use crate::rwa::compliance::modules::transfer_restrict::storage::{
+use crate::rwa::compliance::modules::transfer_allow::storage::{
     allow_user, batch_allow_users, batch_disallow_users, can_transfer, disallow_user,
     is_user_allowed, remove_user_allowed, set_user_allowed,
 };
 
 #[contract]
-struct TestTransferRestrictContract;
+struct TestTransferAllowContract;
 
 #[test]
 fn set_user_allowed_persists_membership() {
     let e = Env::default();
-    let module_id = e.register(TestTransferRestrictContract, ());
+    let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
     let user = Address::generate(&e);
 
@@ -35,7 +35,7 @@ fn set_user_allowed_persists_membership() {
 #[test]
 fn can_transfer_allows_allowlisted_sender() {
     let e = Env::default();
-    let module_id = e.register(TestTransferRestrictContract, ());
+    let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
     let from = Address::generate(&e);
     let to = Address::generate(&e);
@@ -50,7 +50,7 @@ fn can_transfer_allows_allowlisted_sender() {
 #[test]
 fn can_transfer_allows_allowlisted_recipient() {
     let e = Env::default();
-    let module_id = e.register(TestTransferRestrictContract, ());
+    let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
     let from = Address::generate(&e);
     let to = Address::generate(&e);
@@ -65,7 +65,7 @@ fn can_transfer_allows_allowlisted_recipient() {
 #[test]
 fn can_transfer_rejects_when_neither_party_allowlisted() {
     let e = Env::default();
-    let module_id = e.register(TestTransferRestrictContract, ());
+    let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
     let from = Address::generate(&e);
     let to = Address::generate(&e);
@@ -78,7 +78,7 @@ fn can_transfer_rejects_when_neither_party_allowlisted() {
 #[test]
 fn allowlist_is_tracked_per_token() {
     let e = Env::default();
-    let module_id = e.register(TestTransferRestrictContract, ());
+    let module_id = e.register(TestTransferAllowContract, ());
     let token_a = Address::generate(&e);
     let token_b = Address::generate(&e);
     let from = Address::generate(&e);
@@ -95,7 +95,7 @@ fn allowlist_is_tracked_per_token() {
 #[test]
 fn allow_user_is_idempotent() {
     let e = Env::default();
-    let module_id = e.register(TestTransferRestrictContract, ());
+    let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
     let user = Address::generate(&e);
 
@@ -113,7 +113,7 @@ fn allow_user_is_idempotent() {
 #[test]
 fn disallow_user_is_noop_when_not_present() {
     let e = Env::default();
-    let module_id = e.register(TestTransferRestrictContract, ());
+    let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
     let user = Address::generate(&e);
 
@@ -130,7 +130,7 @@ fn disallow_user_is_noop_when_not_present() {
 #[test]
 fn disallow_user_revokes_access() {
     let e = Env::default();
-    let module_id = e.register(TestTransferRestrictContract, ());
+    let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
     let from = Address::generate(&e);
     let to = Address::generate(&e);
@@ -147,7 +147,7 @@ fn disallow_user_revokes_access() {
 #[test]
 fn batch_allow_users_adds_all_entries() {
     let e = Env::default();
-    let module_id = e.register(TestTransferRestrictContract, ());
+    let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
     let user_a = Address::generate(&e);
     let user_b = Address::generate(&e);
@@ -163,7 +163,7 @@ fn batch_allow_users_adds_all_entries() {
 #[test]
 fn batch_disallow_users_removes_all_entries() {
     let e = Env::default();
-    let module_id = e.register(TestTransferRestrictContract, ());
+    let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
     let user_a = Address::generate(&e);
     let user_b = Address::generate(&e);
