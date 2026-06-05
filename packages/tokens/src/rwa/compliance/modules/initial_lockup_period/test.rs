@@ -24,8 +24,8 @@ fn set_lockup_period_persists_value() {
     e.as_contract(&module_id, || {
         assert_eq!(get_lockup_period(&e, &token), 0);
 
-        set_lockup_period(&e, &token, 86_400);
-        assert_eq!(get_lockup_period(&e, &token), 86_400);
+        set_lockup_period(&e, &token, 17_280);
+        assert_eq!(get_lockup_period(&e, &token), 17_280);
     });
 }
 
@@ -42,7 +42,7 @@ fn on_created_locks_minted_tokens() {
 
         let details = get_locked_details(&e, &token, &wallet);
         assert_eq!(details.total_locked, 80);
-        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 80, release_timestamp: 100 }]);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 80, release_ledger: 100 }]);
         assert_eq!(get_tracked_balance(&e, &token, &wallet), 80);
         assert_eq!(get_unlocked_balance(&e, &token, &wallet), 0);
     });
@@ -114,7 +114,7 @@ fn can_transfer_allows_free_portion_only() {
             &token,
             &from,
             150,
-            &vec![&e, LockedTokens { amount: 100, release_timestamp: 1_000 }],
+            &vec![&e, LockedTokens { amount: 100, release_ledger: 1_000 }],
         );
 
         assert!(can_transfer(&e, &from, &to, 50, &token));
@@ -135,7 +135,7 @@ fn can_transfer_allows_after_release() {
         on_created(&e, &from, 80, &token);
         assert!(!can_transfer(&e, &from, &to, 80, &token));
 
-        e.ledger().with_mut(|li| li.timestamp = 100);
+        e.ledger().with_mut(|li| li.sequence_number = 100);
         assert!(can_transfer(&e, &from, &to, 80, &token));
     });
 }
@@ -201,12 +201,12 @@ fn on_transfer_consumes_expired_locks() {
         set_lockup_period(&e, &token, 100);
         on_created(&e, &from, 100, &token);
 
-        e.ledger().with_mut(|li| li.timestamp = 100);
+        e.ledger().with_mut(|li| li.sequence_number = 100);
         on_transfer(&e, &from, &to, 60, &token);
 
         let details = get_locked_details(&e, &token, &from);
         assert_eq!(details.total_locked, 40);
-        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 40, release_timestamp: 100 }]);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 40, release_ledger: 100 }]);
         assert_eq!(get_tracked_balance(&e, &token, &from), 40);
         assert_eq!(get_tracked_balance(&e, &token, &to), 60);
     });
@@ -223,16 +223,16 @@ fn on_transfer_consumes_locks_oldest_first() {
     e.as_contract(&module_id, || {
         set_lockup_period(&e, &token, 100);
         on_created(&e, &from, 50, &token); // releases at t=100
-        e.ledger().with_mut(|li| li.timestamp = 10);
+        e.ledger().with_mut(|li| li.sequence_number = 10);
         on_created(&e, &from, 50, &token); // releases at t=110
 
-        e.ledger().with_mut(|li| li.timestamp = 200);
+        e.ledger().with_mut(|li| li.sequence_number = 200);
         on_transfer(&e, &from, &to, 70, &token);
 
         let details = get_locked_details(&e, &token, &from);
         assert_eq!(details.total_locked, 30);
         // The first lock is fully consumed; the second keeps its remainder.
-        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 30, release_timestamp: 110 }]);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 30, release_ledger: 110 }]);
     });
 }
 
@@ -247,16 +247,16 @@ fn on_transfer_keeps_unexpired_locks_intact() {
     e.as_contract(&module_id, || {
         set_lockup_period(&e, &token, 100);
         on_created(&e, &from, 50, &token); // releases at t=100
-        e.ledger().with_mut(|li| li.timestamp = 50);
+        e.ledger().with_mut(|li| li.sequence_number = 50);
         on_created(&e, &from, 50, &token); // releases at t=150
 
         // Only the first lock has expired.
-        e.ledger().with_mut(|li| li.timestamp = 120);
+        e.ledger().with_mut(|li| li.sequence_number = 120);
         on_transfer(&e, &from, &to, 50, &token);
 
         let details = get_locked_details(&e, &token, &from);
         assert_eq!(details.total_locked, 50);
-        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 50, release_timestamp: 150 }]);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 50, release_ledger: 150 }]);
     });
 }
 
@@ -317,7 +317,7 @@ fn on_destroyed_consumes_expired_locks() {
         set_lockup_period(&e, &token, 100);
         on_created(&e, &wallet, 100, &token);
 
-        e.ledger().with_mut(|li| li.timestamp = 100);
+        e.ledger().with_mut(|li| li.sequence_number = 100);
         on_destroyed(&e, &wallet, 60, &token);
 
         assert_eq!(get_locked_details(&e, &token, &wallet).total_locked, 40);
@@ -356,8 +356,8 @@ fn get_unlocked_balance_combines_free_and_expired() {
             100,
             &vec![
                 &e,
-                LockedTokens { amount: 30, release_timestamp: 50 },
-                LockedTokens { amount: 20, release_timestamp: 1_000 },
+                LockedTokens { amount: 30, release_ledger: 50 },
+                LockedTokens { amount: 20, release_ledger: 1_000 },
             ],
         );
 
@@ -365,7 +365,7 @@ fn get_unlocked_balance_combines_free_and_expired() {
         assert_eq!(get_unlocked_balance(&e, &token, &wallet), 50);
 
         // The 30-token lock has expired: free (50) + expired (30).
-        e.ledger().with_mut(|li| li.timestamp = 60);
+        e.ledger().with_mut(|li| li.sequence_number = 60);
         assert_eq!(get_unlocked_balance(&e, &token, &wallet), 80);
     });
 }
@@ -378,7 +378,7 @@ fn preset_lockup_state_writes_state() {
     let wallet = Address::generate(&e);
 
     e.as_contract(&module_id, || {
-        let locks = vec![&e, LockedTokens { amount: 40, release_timestamp: 500 }];
+        let locks = vec![&e, LockedTokens { amount: 40, release_ledger: 500 }];
         preset_lockup_state(&e, &token, &wallet, 100, &locks);
 
         let details = get_locked_details(&e, &token, &wallet);
@@ -403,7 +403,7 @@ fn preset_lockup_state_panics_when_locked_exceeds_balance() {
             &token,
             &wallet,
             100,
-            &vec![&e, LockedTokens { amount: 101, release_timestamp: 500 }],
+            &vec![&e, LockedTokens { amount: 101, release_ledger: 500 }],
         );
     });
 }
@@ -422,7 +422,7 @@ fn preset_lockup_state_panics_on_negative_lock_amount() {
             &token,
             &wallet,
             100,
-            &vec![&e, LockedTokens { amount: -1, release_timestamp: 500 }],
+            &vec![&e, LockedTokens { amount: -1, release_ledger: 500 }],
         );
     });
 }

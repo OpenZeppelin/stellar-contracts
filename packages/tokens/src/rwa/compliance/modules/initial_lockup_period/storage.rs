@@ -9,12 +9,12 @@ use crate::rwa::compliance::modules::{
 };
 
 /// A single mint-created lock: `amount` tokens that release at
-/// `release_timestamp` (ledger timestamp, in seconds).
+/// `release_ledger` (ledger timestamp, in seconds).
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LockedTokens {
     pub amount: i128,
-    pub release_timestamp: u64,
+    pub release_ledger: u64,
 }
 
 /// The lock entries tracked for one `(token, wallet)` pair, together with
@@ -32,7 +32,7 @@ pub struct LockedDetails {
 #[contracttype]
 #[derive(Clone)]
 pub enum InitialLockupPeriodStorageKey {
-    /// Per-token lockup duration in seconds applied to minted tokens.
+    /// Per-token lockup duration in ledgers applied to minted tokens.
     LockupPeriod(Address),
     /// Per-(token, wallet) lock entries and their aggregate.
     LockedDetails(Address, Address),
@@ -45,7 +45,7 @@ pub enum InitialLockupPeriodStorageKey {
 
 // ################## QUERY STATE ##################
 
-/// Returns the configured lockup period for `token`, in seconds. Returns
+/// Returns the configured lockup period for `token`, in ledgers. Returns
 /// `0` when no period has been configured, in which case mints do not
 /// create locks.
 ///
@@ -53,9 +53,9 @@ pub enum InitialLockupPeriodStorageKey {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
-pub fn get_lockup_period(e: &Env, token: &Address) -> u64 {
+pub fn get_lockup_period(e: &Env, token: &Address) -> u32 {
     let key = InitialLockupPeriodStorageKey::LockupPeriod(token.clone());
-    if let Some(value) = e.storage().persistent().get::<_, u64>(&key) {
+    if let Some(value) = e.storage().persistent().get::<_, u32>(&key) {
         e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
         value
     } else {
@@ -160,7 +160,7 @@ pub fn can_transfer(e: &Env, from: &Address, _to: &Address, amount: i128, token:
 
 // ################## CHANGE STATE ##################
 
-/// Sets the lockup period for `token`, in seconds. Affects only locks
+/// Sets the lockup period for `token`, in ledgers. Affects only locks
 /// created by subsequent mints; existing lock entries keep their original
 /// release times.
 ///
@@ -168,18 +168,18 @@ pub fn can_transfer(e: &Env, from: &Address, _to: &Address, amount: i128, token:
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
-/// * `period` - The lockup duration in seconds. `0` disables locking for future
+/// * `period` - The lockup duration in ledgers. `0` disables locking for future
 ///   mints.
 ///
 /// # Events
 ///
 /// * topics - `["lockup_period_set", token: Address]`
-/// * data - `[period: u64]`
+/// * data - `[period: u32]`
 ///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
-pub fn set_lockup_period(e: &Env, token: &Address, period: u64) {
+pub fn set_lockup_period(e: &Env, token: &Address, period: u32) {
     let key = InitialLockupPeriodStorageKey::LockupPeriod(token.clone());
     e.storage().persistent().set(&key, &period);
     emit_lockup_period_set(e, token, period);
@@ -325,7 +325,7 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
         let mut details = get_locked_details(e, token, to);
         details.locks.push_back(LockedTokens {
             amount,
-            release_timestamp: e.ledger().timestamp().saturating_add(period),
+            release_ledger: e.ledger().sequence().saturating_add(period),
         });
         details.total_locked = add_i128_or_panic(e, details.total_locked, amount);
         set_locked_details(e, token, to, &details);
@@ -477,10 +477,10 @@ fn unlocked_balance(e: &Env, token: &Address, wallet: &Address, details: &Locked
 
 /// Returns the sum of lock amounts whose release time has passed.
 fn expired_amount(e: &Env, locks: &Vec<LockedTokens>) -> i128 {
-    let now = e.ledger().timestamp();
+    let now = e.ledger().sequence();
     let mut expired = 0;
     for lock in locks.iter() {
-        if lock.release_timestamp <= now {
+        if lock.release_ledger <= now {
             expired = add_i128_or_panic(e, expired, lock.amount);
         }
     }
@@ -492,18 +492,18 @@ fn expired_amount(e: &Env, locks: &Vec<LockedTokens>) -> i128 {
 /// remainder, and `total_locked` is reduced by `amount`. Panics when the
 /// expired entries cannot cover `amount`.
 fn consume_expired_locks(e: &Env, details: &mut LockedDetails, amount: i128) {
-    let now = e.ledger().timestamp();
+    let now = e.ledger().sequence();
     let mut to_consume = amount;
     let mut remaining = Vec::new(e);
 
     for lock in details.locks.iter() {
-        if to_consume > 0 && lock.release_timestamp <= now {
+        if to_consume > 0 && lock.release_ledger <= now {
             if lock.amount <= to_consume {
                 to_consume -= lock.amount;
             } else {
                 remaining.push_back(LockedTokens {
                     amount: lock.amount - to_consume,
-                    release_timestamp: lock.release_timestamp,
+                    release_ledger: lock.release_ledger,
                 });
                 to_consume = 0;
             }

@@ -28,7 +28,7 @@ impl AccessControl for InitialLockupPeriodContract {}
 #[contractimpl(contracttrait)]
 impl InitialLockupPeriod for InitialLockupPeriodContract {
     #[only_role(operator, "manager")]
-    fn set_lockup_period(e: &Env, token: Address, period: u64, operator: Address) {
+    fn set_lockup_period(e: &Env, token: Address, period: u32, operator: Address) {
         initial_lockup_period::set_lockup_period(e, &token, period);
     }
 

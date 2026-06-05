@@ -28,8 +28,8 @@ fn set_and_get_lockup_period_work() {
 
     assert_eq!(client.get_lockup_period(&token), 0);
 
-    client.set_lockup_period(&token, &86_400_u64, &manager);
-    assert_eq!(client.get_lockup_period(&token), 86_400);
+    client.set_lockup_period(&token, &17_280_u32, &manager);
+    assert_eq!(client.get_lockup_period(&token), 17_280);
 }
 
 #[test]
@@ -44,13 +44,13 @@ fn on_created_locks_minted_tokens() {
     let client = create_client(&e, &admin, &manager);
 
     client.set_compliance_address(&token, &compliance, &admin);
-    client.set_lockup_period(&token, &100_u64, &manager);
+    client.set_lockup_period(&token, &100_u32, &manager);
 
     client.on_created(&wallet, &80_i128, &token);
 
     let details = client.get_locked_details(&token, &wallet);
     assert_eq!(details.total_locked, 80);
-    assert_eq!(details.locks, vec![&e, LockedTokens { amount: 80, release_timestamp: 100 }]);
+    assert_eq!(details.locks, vec![&e, LockedTokens { amount: 80, release_ledger: 100 }]);
     assert_eq!(client.get_tracked_balance(&token, &wallet), 80);
     assert_eq!(client.get_unlocked_balance(&token, &wallet), 0);
 }
@@ -68,14 +68,14 @@ fn transfers_are_limited_to_unlocked_tokens() {
     let client = create_client(&e, &admin, &manager);
 
     client.set_compliance_address(&token, &compliance, &admin);
-    client.set_lockup_period(&token, &100_u64, &manager);
+    client.set_lockup_period(&token, &100_u32, &manager);
     client.on_created(&from, &80_i128, &token);
 
     // Everything is still locked.
     assert!(!client.can_transfer(&from, &to, &1_i128, &token));
 
     // After the release time, the full amount is spendable.
-    e.ledger().with_mut(|li| li.timestamp = 100);
+    e.ledger().with_mut(|li| li.sequence_number = 100);
     assert!(client.can_transfer(&from, &to, &80_i128, &token));
 
     client.on_transfer(&from, &to, &30_i128, &token);
@@ -99,7 +99,7 @@ fn on_transfer_panics_when_tokens_still_locked() {
     let client = create_client(&e, &admin, &manager);
 
     client.set_compliance_address(&token, &compliance, &admin);
-    client.set_lockup_period(&token, &100_u64, &manager);
+    client.set_lockup_period(&token, &100_u32, &manager);
     client.on_created(&from, &80_i128, &token);
 
     client.on_transfer(&from, &to, &1_i128, &token);
@@ -117,10 +117,10 @@ fn on_destroyed_consumes_expired_locks() {
     let client = create_client(&e, &admin, &manager);
 
     client.set_compliance_address(&token, &compliance, &admin);
-    client.set_lockup_period(&token, &100_u64, &manager);
+    client.set_lockup_period(&token, &100_u32, &manager);
     client.on_created(&wallet, &100_i128, &token);
 
-    e.ledger().with_mut(|li| li.timestamp = 100);
+    e.ledger().with_mut(|li| li.sequence_number = 100);
     client.on_destroyed(&wallet, &60_i128, &token);
 
     assert_eq!(client.get_locked_details(&token, &wallet).total_locked, 40);
@@ -137,7 +137,7 @@ fn preset_lockup_state_seeds_wallet() {
     let wallet = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    let locks = vec![&e, LockedTokens { amount: 40, release_timestamp: 500 }];
+    let locks = vec![&e, LockedTokens { amount: 40, release_ledger: 500 }];
     client.preset_lockup_state(&token, &wallet, &100_i128, &locks, &manager);
 
     assert_eq!(client.get_tracked_balance(&token, &wallet), 100);
@@ -160,7 +160,7 @@ fn preset_lockup_state_panics_when_locked_exceeds_balance() {
         &token,
         &wallet,
         &100_i128,
-        &vec![&e, LockedTokens { amount: 101, release_timestamp: 500 }],
+        &vec![&e, LockedTokens { amount: 101, release_ledger: 500 }],
         &manager,
     );
 }
@@ -214,7 +214,7 @@ fn set_lockup_period_requires_manager_auth() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    client.set_lockup_period(&token, &100_u64, &manager);
+    client.set_lockup_period(&token, &100_u32, &manager);
 
     let auths = e.auths();
     assert_eq!(auths.len(), 1);

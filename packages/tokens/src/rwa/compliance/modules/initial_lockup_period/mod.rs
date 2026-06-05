@@ -74,7 +74,7 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// [`ComplianceModule`] trait.
 #[contracttrait]
 pub trait InitialLockupPeriod: ComplianceModule {
-    /// Sets the lockup period for `token`, in seconds. Affects only locks
+    /// Sets the lockup period for `token`, in ledgers. Affects only locks
     /// created by subsequent mints; existing lock entries keep their
     /// original release times. A period of `0` disables locking for future
     /// mints.
@@ -83,13 +83,13 @@ pub trait InitialLockupPeriod: ComplianceModule {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose lockup period is being configured.
-    /// * `period` - The lockup duration in seconds.
+    /// * `period` - The lockup duration in ledgers.
     /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Events
     ///
     /// * topics - `["lockup_period_set", token: Address]`
-    /// * data - `[period: u64]`
+    /// * data - `[period: u32]`
     ///
     /// # Notes
     ///
@@ -97,7 +97,7 @@ pub trait InitialLockupPeriod: ComplianceModule {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling [`storage::set_lockup_period`]
     /// for the implementation.
-    fn set_lockup_period(e: &Env, token: Address, period: u64, operator: Address);
+    fn set_lockup_period(e: &Env, token: Address, period: u32, operator: Address);
 
     /// Pre-seeds the lockup state for `wallet` under `token`: the balance
     /// mirror and any pre-existing lock entries.
@@ -167,13 +167,13 @@ pub trait InitialLockupPeriod: ComplianceModule {
     ///   [`storage::mark_preset_completed`] for the implementation.
     fn mark_preset_completed(e: &Env, token: Address, operator: Address);
 
-    /// Returns the configured lockup period for `token`, in seconds.
+    /// Returns the configured lockup period for `token`, in ledgers.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token address.
-    fn get_lockup_period(e: &Env, token: Address) -> u64 {
+    fn get_lockup_period(e: &Env, token: Address) -> u32 {
         storage::get_lockup_period(e, &token)
     }
 
@@ -235,7 +235,7 @@ pub trait InitialLockupPeriod: ComplianceModule {
 pub struct LockupPeriodSet {
     #[topic]
     pub token: Address,
-    pub period: u64,
+    pub period: u32,
 }
 
 /// Emits a [`LockupPeriodSet`] event.
@@ -244,8 +244,8 @@ pub struct LockupPeriodSet {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token whose lockup period changed.
-/// * `period` - The new lockup duration in seconds.
-pub fn emit_lockup_period_set(e: &Env, token: &Address, period: u64) {
+/// * `period` - The new lockup duration in ledgers.
+pub fn emit_lockup_period_set(e: &Env, token: &Address, period: u32) {
     LockupPeriodSet { token: token.clone(), period }.publish(e);
 }
 
