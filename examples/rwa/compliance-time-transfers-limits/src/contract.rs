@@ -82,8 +82,8 @@ impl ComplianceModule for TimeTransfersLimitsContract {
         time_transfers_limits::can_transfer(e, &from, &to, amount, &token)
     }
 
-    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
-        time_transfers_limits::can_create(e, &to, amount, &token)
+    fn can_create(_e: &Env, _to: Address, _amount: i128, _token: Address) -> bool {
+        true
     }
 
     fn name(e: &Env) -> String {

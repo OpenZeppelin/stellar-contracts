@@ -11,8 +11,8 @@ use crate::rwa::{
         storage::set_irs_address,
         time_transfers_limits::{
             storage::{
-                batch_remove_time_transfer_limit, batch_set_time_transfer_limit, can_create,
-                can_transfer, get_time_transfer_limits, get_transfer_counter, on_transfer,
+                batch_remove_time_transfer_limit, batch_set_time_transfer_limit, can_transfer,
+                get_time_transfer_limits, get_transfer_counter, on_transfer,
                 remove_time_transfer_limit, set_time_transfer_limit, TransferCounter,
                 TransferLimit,
             },
@@ -371,18 +371,6 @@ fn can_transfer_allows_again_after_window_elapses() {
 
         e.ledger().with_mut(|li| li.timestamp = 100);
         assert!(can_transfer(&e, &from, &to, 50, &token));
-    });
-}
-
-#[test]
-fn can_create_always_allows() {
-    let e = Env::default();
-    let module_id = e.register(TestTimeTransfersLimitsContract, ());
-    let token = Address::generate(&e);
-    let to = Address::generate(&e);
-
-    e.as_contract(&module_id, || {
-        assert!(can_create(&e, &to, 100, &token));
     });
 }
 

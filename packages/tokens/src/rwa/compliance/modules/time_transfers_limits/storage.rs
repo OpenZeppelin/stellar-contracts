@@ -151,20 +151,6 @@ pub fn can_transfer(e: &Env, from: &Address, _to: &Address, amount: i128, token:
     true
 }
 
-/// Returns `true`. Mints are not counted against the time-window limits,
-/// mirroring the upstream exemption for transfers involving the zero
-/// address.
-///
-/// # Arguments
-///
-/// * `_e` - Access to the Soroban environment.
-/// * `_to` - The recipient address.
-/// * `_amount` - The minted amount.
-/// * `_token` - The token address.
-pub fn can_create(_e: &Env, _to: &Address, _amount: i128, _token: &Address) -> bool {
-    true
-}
-
 // ################## CHANGE STATE ##################
 
 /// Adds or updates a time-window limit for `token`. A limit whose
