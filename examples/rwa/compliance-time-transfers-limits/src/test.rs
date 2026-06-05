@@ -169,7 +169,7 @@ fn batch_set_and_remove_time_transfer_limits_work() {
     );
     assert_eq!(client.get_time_transfer_limits(&token).len(), 2);
 
-    client.batch_remove_time_transfer_limit(&token, &vec![&e, 100_u64, 200_u64], &manager);
+    client.batch_remove_time_transfer_limit(&token, &vec![&e, 100_u32, 200_u32], &manager);
     assert_eq!(client.get_time_transfer_limits(&token).len(), 0);
 }
 
@@ -183,7 +183,7 @@ fn remove_time_transfer_limit_panics_when_missing() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    client.remove_time_transfer_limit(&token, &100_u64, &manager);
+    client.remove_time_transfer_limit(&token, &100_u32, &manager);
 }
 
 #[test]
@@ -196,7 +196,7 @@ fn set_time_transfer_limit_panics_at_bound() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    for limit_duration in 1..=u64::from(MAX_LIMITS) + 1 {
+    for limit_duration in 1..=MAX_LIMITS + 1 {
         client.set_time_transfer_limit(
             &token,
             &TransferLimit { limit_duration, limit_value: 50 },
@@ -236,7 +236,7 @@ fn transfers_accumulate_against_identity_windows() {
     client.on_transfer(&wallet_a, &to, &30_i128, &token);
 
     assert_eq!(
-        client.get_transfer_counter(&token, &identity, &100_u64),
+        client.get_transfer_counter(&token, &identity, &100_u32),
         TransferCounter { value: 30, deadline: 100 }
     );
 
@@ -269,12 +269,12 @@ fn window_elapses_and_counting_restarts() {
     client.on_transfer(&from, &to, &50_i128, &token);
     assert!(!client.can_transfer(&from, &to, &1_i128, &token));
 
-    e.ledger().with_mut(|li| li.timestamp = 100);
+    e.ledger().with_mut(|li| li.sequence_number = 100);
     assert!(client.can_transfer(&from, &to, &50_i128, &token));
 
     client.on_transfer(&from, &to, &10_i128, &token);
     assert_eq!(
-        client.get_transfer_counter(&token, &from, &100_u64),
+        client.get_transfer_counter(&token, &from, &100_u32),
         TransferCounter { value: 10, deadline: 200 }
     );
 }

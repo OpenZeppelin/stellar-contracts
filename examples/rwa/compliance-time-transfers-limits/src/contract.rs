@@ -48,7 +48,7 @@ impl TimeTransfersLimits for TimeTransfersLimitsContract {
     }
 
     #[only_role(operator, "manager")]
-    fn remove_time_transfer_limit(e: &Env, token: Address, limit_duration: u64, operator: Address) {
+    fn remove_time_transfer_limit(e: &Env, token: Address, limit_duration: u32, operator: Address) {
         time_transfers_limits::remove_time_transfer_limit(e, &token, limit_duration);
     }
 
@@ -56,7 +56,7 @@ impl TimeTransfersLimits for TimeTransfersLimitsContract {
     fn batch_remove_time_transfer_limit(
         e: &Env,
         token: Address,
-        limit_durations: Vec<u64>,
+        limit_durations: Vec<u32>,
         operator: Address,
     ) {
         time_transfers_limits::batch_remove_time_transfer_limit(e, &token, &limit_durations);

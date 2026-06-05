@@ -9,20 +9,20 @@ use crate::rwa::compliance::modules::{
 };
 
 /// A single time-window limit configured for a token: at most `limit_value`
-/// tokens may be sent within a window lasting `limit_duration` seconds. A
+/// tokens may be sent within a window lasting `limit_duration` ledgers. A
 /// window opens with the first transfer after the previous one elapsed;
 /// per-identity consumption against the cap is tracked by
 /// [`TransferCounter`].
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferLimit {
-    pub limit_duration: u64,
+    pub limit_duration: u32,
     pub limit_value: i128,
 }
 
 /// The cumulative volume one identity has sent within its currently active
 /// window: `value` accumulates against the matching [`TransferLimit`]'s cap
-/// until the ledger timestamp reaches `deadline` (the moment the window
+/// until the ledger sequence reaches `deadline` (the moment the window
 /// ends), after which the next transfer restarts the counter for a fresh
 /// window.
 ///
@@ -33,7 +33,7 @@ pub struct TransferLimit {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TransferCounter {
     pub value: i128,
-    pub deadline: u64,
+    pub deadline: u32,
 }
 
 /// Storage key fields for a per-(token, identity, window) counter entry.
@@ -42,7 +42,7 @@ pub struct TransferCounter {
 pub struct TransferCounterKey {
     pub token: Address,
     pub identity: Address,
-    pub limit_duration: u64,
+    pub limit_duration: u32,
 }
 
 #[contracttype]
@@ -83,12 +83,12 @@ pub fn get_time_transfer_limits(e: &Env, token: &Address) -> Vec<TransferLimit> 
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `identity` - The identity (on-chain ID) address.
-/// * `limit_duration` - The window duration in seconds.
+/// * `limit_duration` - The window duration in ledgers.
 pub fn get_transfer_counter(
     e: &Env,
     token: &Address,
     identity: &Address,
-    limit_duration: u64,
+    limit_duration: u32,
 ) -> TransferCounter {
     let key = TimeTransfersLimitsStorageKey::Counter(TransferCounterKey {
         token: token.clone(),
@@ -135,7 +135,7 @@ pub fn can_transfer(e: &Env, from: &Address, _to: &Address, amount: i128, token:
     }
 
     let identity = get_irs_client(e, token).stored_identity(from);
-    let now = e.ledger().timestamp();
+    let now = e.ledger().sequence();
     for limit in limits.iter() {
         if amount > limit.limit_value {
             return false;
@@ -164,7 +164,7 @@ pub fn can_transfer(e: &Env, from: &Address, _to: &Address, amount: i128, token:
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
-/// * `limit` - The window duration (in seconds) and the volume cap.
+/// * `limit` - The window duration (in ledgers) and the volume cap.
 ///
 /// # Errors
 ///
@@ -176,7 +176,7 @@ pub fn can_transfer(e: &Env, from: &Address, _to: &Address, amount: i128, token:
 /// # Events
 ///
 /// * topics - `["time_transfer_limit_set", token: Address]`
-/// * data - `[limit_duration: u64, limit_value: i128]`
+/// * data - `[limit_duration: u32, limit_value: i128]`
 ///
 /// # Security Warning
 ///
@@ -213,7 +213,7 @@ pub fn set_time_transfer_limit(e: &Env, token: &Address, limit: &TransferLimit) 
 ///
 /// For each limit:
 /// * topics - `["time_transfer_limit_set", token: Address]`
-/// * data - `[limit_duration: u64, limit_value: i128]`
+/// * data - `[limit_duration: u32, limit_value: i128]`
 ///
 /// # Security Warning
 ///
@@ -230,7 +230,7 @@ pub fn batch_set_time_transfer_limit(e: &Env, token: &Address, limits: &Vec<Tran
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
-/// * `limit_duration` - The window duration (in seconds) to remove.
+/// * `limit_duration` - The window duration (in ledgers) to remove.
 ///
 /// # Errors
 ///
@@ -240,7 +240,7 @@ pub fn batch_set_time_transfer_limit(e: &Env, token: &Address, limits: &Vec<Tran
 /// # Events
 ///
 /// * topics - `["time_transfer_limit_removed", token: Address]`
-/// * data - `[limit_duration: u64]`
+/// * data - `[limit_duration: u32]`
 ///
 /// # Notes
 ///
@@ -251,7 +251,7 @@ pub fn batch_set_time_transfer_limit(e: &Env, token: &Address, limits: &Vec<Tran
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
-pub fn remove_time_transfer_limit(e: &Env, token: &Address, limit_duration: u64) {
+pub fn remove_time_transfer_limit(e: &Env, token: &Address, limit_duration: u32) {
     let mut limits = get_time_transfer_limits(e, token);
     let index = limits
         .iter()
@@ -269,7 +269,7 @@ pub fn remove_time_transfer_limit(e: &Env, token: &Address, limit_duration: u64)
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
-/// * `limit_durations` - The window durations (in seconds) to remove.
+/// * `limit_durations` - The window durations (in ledgers) to remove.
 ///
 /// # Errors
 ///
@@ -279,12 +279,12 @@ pub fn remove_time_transfer_limit(e: &Env, token: &Address, limit_duration: u64)
 ///
 /// For each removed limit:
 /// * topics - `["time_transfer_limit_removed", token: Address]`
-/// * data - `[limit_duration: u64]`
+/// * data - `[limit_duration: u32]`
 ///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
-pub fn batch_remove_time_transfer_limit(e: &Env, token: &Address, limit_durations: &Vec<u64>) {
+pub fn batch_remove_time_transfer_limit(e: &Env, token: &Address, limit_durations: &Vec<u32>) {
     for limit_duration in limit_durations.iter() {
         remove_time_transfer_limit(e, token, limit_duration);
     }
@@ -325,7 +325,7 @@ pub fn on_transfer(e: &Env, from: &Address, _to: &Address, amount: i128, token: 
     }
 
     let identity = get_irs_client(e, token).stored_identity(from);
-    let now = e.ledger().timestamp();
+    let now = e.ledger().sequence();
     for limit in limits.iter() {
         let mut counter = get_transfer_counter(e, token, &identity, limit.limit_duration);
         if counter.deadline <= now {

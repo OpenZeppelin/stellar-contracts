@@ -76,7 +76,7 @@ pub trait TimeTransfersLimits: ComplianceModule {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose limits are updated.
-    /// * `limit` - The window duration (in seconds) and the volume cap.
+    /// * `limit` - The window duration (in ledgers) and the volume cap.
     /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Errors
@@ -89,7 +89,7 @@ pub trait TimeTransfersLimits: ComplianceModule {
     /// # Events
     ///
     /// * topics - `["time_transfer_limit_set", token: Address]`
-    /// * data - `[limit_duration: u64, limit_value: i128]`
+    /// * data - `[limit_duration: u32, limit_value: i128]`
     ///
     /// # Notes
     ///
@@ -117,7 +117,7 @@ pub trait TimeTransfersLimits: ComplianceModule {
     ///
     /// For each limit:
     /// * topics - `["time_transfer_limit_set", token: Address]`
-    /// * data - `[limit_duration: u64, limit_value: i128]`
+    /// * data - `[limit_duration: u32, limit_value: i128]`
     ///
     /// # Notes
     ///
@@ -139,7 +139,7 @@ pub trait TimeTransfersLimits: ComplianceModule {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose limits are updated.
-    /// * `limit_duration` - The window duration (in seconds) to remove.
+    /// * `limit_duration` - The window duration (in ledgers) to remove.
     /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Errors
@@ -150,7 +150,7 @@ pub trait TimeTransfersLimits: ComplianceModule {
     /// # Events
     ///
     /// * topics - `["time_transfer_limit_removed", token: Address]`
-    /// * data - `[limit_duration: u64]`
+    /// * data - `[limit_duration: u32]`
     ///
     /// # Notes
     ///
@@ -158,7 +158,7 @@ pub trait TimeTransfersLimits: ComplianceModule {
     /// operation that requires custom access control. Access control should be
     /// enforced on `operator` before calling
     /// [`storage::remove_time_transfer_limit`] for the implementation.
-    fn remove_time_transfer_limit(e: &Env, token: Address, limit_duration: u64, operator: Address);
+    fn remove_time_transfer_limit(e: &Env, token: Address, limit_duration: u32, operator: Address);
 
     /// Removes multiple time-window limits for `token` in a single call.
     ///
@@ -166,7 +166,7 @@ pub trait TimeTransfersLimits: ComplianceModule {
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose limits are updated.
-    /// * `limit_durations` - The window durations (in seconds) to remove.
+    /// * `limit_durations` - The window durations (in ledgers) to remove.
     /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Errors
@@ -177,7 +177,7 @@ pub trait TimeTransfersLimits: ComplianceModule {
     ///
     /// For each removed limit:
     /// * topics - `["time_transfer_limit_removed", token: Address]`
-    /// * data - `[limit_duration: u64]`
+    /// * data - `[limit_duration: u32]`
     ///
     /// # Notes
     ///
@@ -188,7 +188,7 @@ pub trait TimeTransfersLimits: ComplianceModule {
     fn batch_remove_time_transfer_limit(
         e: &Env,
         token: Address,
-        limit_durations: Vec<u64>,
+        limit_durations: Vec<u32>,
         operator: Address,
     );
 
@@ -210,12 +210,12 @@ pub trait TimeTransfersLimits: ComplianceModule {
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose counter is queried.
     /// * `identity` - The identity address.
-    /// * `limit_duration` - The window duration in seconds.
+    /// * `limit_duration` - The window duration in ledgers.
     fn get_transfer_counter(
         e: &Env,
         token: Address,
         identity: Address,
-        limit_duration: u64,
+        limit_duration: u32,
     ) -> TransferCounter {
         storage::get_transfer_counter(e, &token, &identity, limit_duration)
     }
@@ -236,7 +236,7 @@ pub const MAX_LIMITS: u32 = 8;
 pub struct TimeTransferLimitSet {
     #[topic]
     pub token: Address,
-    pub limit_duration: u64,
+    pub limit_duration: u32,
     pub limit_value: i128,
 }
 
@@ -246,12 +246,12 @@ pub struct TimeTransferLimitSet {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token whose limits changed.
-/// * `limit_duration` - The window duration in seconds.
+/// * `limit_duration` - The window duration in ledgers.
 /// * `limit_value` - The volume cap for the window.
 pub fn emit_time_transfer_limit_set(
     e: &Env,
     token: &Address,
-    limit_duration: u64,
+    limit_duration: u32,
     limit_value: i128,
 ) {
     TimeTransferLimitSet { token: token.clone(), limit_duration, limit_value }.publish(e);
@@ -263,7 +263,7 @@ pub fn emit_time_transfer_limit_set(
 pub struct TimeTransferLimitRemoved {
     #[topic]
     pub token: Address,
-    pub limit_duration: u64,
+    pub limit_duration: u32,
 }
 
 /// Emits a [`TimeTransferLimitRemoved`] event.
@@ -272,7 +272,7 @@ pub struct TimeTransferLimitRemoved {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token whose limits changed.
-/// * `limit_duration` - The window duration in seconds that was removed.
-pub fn emit_time_transfer_limit_removed(e: &Env, token: &Address, limit_duration: u64) {
+/// * `limit_duration` - The window duration in ledgers that was removed.
+pub fn emit_time_transfer_limit_removed(e: &Env, token: &Address, limit_duration: u32) {
     TimeTransferLimitRemoved { token: token.clone(), limit_duration }.publish(e);
 }

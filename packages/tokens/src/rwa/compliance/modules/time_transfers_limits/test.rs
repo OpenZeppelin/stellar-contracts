@@ -168,14 +168,14 @@ fn set_time_transfer_limit_panics_at_bound() {
     let token = Address::generate(&e);
 
     e.as_contract(&module_id, || {
-        for limit_duration in 1..=u64::from(MAX_LIMITS) {
+        for limit_duration in 1..=MAX_LIMITS {
             set_time_transfer_limit(&e, &token, &TransferLimit { limit_duration, limit_value: 50 });
         }
 
         set_time_transfer_limit(
             &e,
             &token,
-            &TransferLimit { limit_duration: u64::from(MAX_LIMITS) + 1, limit_value: 50 },
+            &TransferLimit { limit_duration: MAX_LIMITS + 1, limit_value: 50 },
         );
     });
 }
@@ -187,7 +187,7 @@ fn set_time_transfer_limit_updates_existing_at_bound() {
     let token = Address::generate(&e);
 
     e.as_contract(&module_id, || {
-        for limit_duration in 1..=u64::from(MAX_LIMITS) {
+        for limit_duration in 1..=MAX_LIMITS {
             set_time_transfer_limit(&e, &token, &TransferLimit { limit_duration, limit_value: 50 });
         }
 
@@ -195,14 +195,14 @@ fn set_time_transfer_limit_updates_existing_at_bound() {
         set_time_transfer_limit(
             &e,
             &token,
-            &TransferLimit { limit_duration: u64::from(MAX_LIMITS), limit_value: 99 },
+            &TransferLimit { limit_duration: MAX_LIMITS, limit_value: 99 },
         );
 
         let limits = get_time_transfer_limits(&e, &token);
         assert_eq!(limits.len(), MAX_LIMITS);
         assert_eq!(
             limits.get_unchecked(MAX_LIMITS - 1),
-            TransferLimit { limit_duration: u64::from(MAX_LIMITS), limit_value: 99 }
+            TransferLimit { limit_duration: MAX_LIMITS, limit_value: 99 }
         );
     });
 }
@@ -281,7 +281,7 @@ fn batch_set_and_remove_time_transfer_limits() {
         assert_eq!(get_time_transfer_limits(&e, &token).len(), 2);
 
         let events_before = e.events().all().events().len();
-        batch_remove_time_transfer_limit(&e, &token, &vec![&e, 100_u64, 200_u64]);
+        batch_remove_time_transfer_limit(&e, &token, &vec![&e, 100_u32, 200_u32]);
 
         assert_eq!(get_time_transfer_limits(&e, &token).len(), 0);
         assert_eq!(e.events().all().events().len(), events_before + 2);
@@ -369,7 +369,7 @@ fn can_transfer_allows_again_after_window_elapses() {
         on_transfer(&e, &from, &to, 50, &token);
         assert!(!can_transfer(&e, &from, &to, 1, &token));
 
-        e.ledger().with_mut(|li| li.timestamp = 100);
+        e.ledger().with_mut(|li| li.sequence_number = 100);
         assert!(can_transfer(&e, &from, &to, 50, &token));
     });
 }
@@ -462,7 +462,7 @@ fn on_transfer_restarts_elapsed_window() {
 
         on_transfer(&e, &from, &to, 50, &token);
 
-        e.ledger().with_mut(|li| li.timestamp = 150);
+        e.ledger().with_mut(|li| li.sequence_number = 150);
         on_transfer(&e, &from, &to, 10, &token);
 
         // The elapsed counter restarted instead of accumulating.
