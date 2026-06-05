@@ -71,8 +71,10 @@ impl ComplianceModule for InitialLockupPeriodContract {
         initial_lockup_period::can_transfer(e, &from, &to, amount, &token)
     }
 
-    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
-        initial_lockup_period::can_create(e, &to, amount, &token)
+    // Mints are never blocked by this module: they are the operation that
+    // creates locks.
+    fn can_create(_e: &Env, _to: Address, _amount: i128, _token: Address) -> bool {
+        true
     }
 
     fn name(e: &Env) -> String {

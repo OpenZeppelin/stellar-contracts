@@ -8,13 +8,13 @@ use crate::rwa::compliance::modules::{
     ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
 };
 
-/// A single mint-created lock: `amount` tokens that release at
-/// `release_ledger` (ledger timestamp, in seconds).
+/// A single mint-created lock: `amount` tokens that release once the
+/// ledger sequence reaches `release_ledger`.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LockedTokens {
     pub amount: i128,
-    pub release_ledger: u64,
+    pub release_ledger: u32,
 }
 
 /// The lock entries tracked for one `(token, wallet)` pair, together with

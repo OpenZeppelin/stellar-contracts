@@ -7,9 +7,9 @@ use soroban_sdk::{
 };
 
 use crate::rwa::compliance::modules::initial_lockup_period::storage::{
-    can_create, can_transfer, get_locked_details, get_lockup_period, get_tracked_balance,
-    get_unlocked_balance, is_preset_completed, mark_preset_completed, on_created, on_destroyed,
-    on_transfer, preset_lockup_state, set_lockup_period, LockedTokens,
+    can_transfer, get_locked_details, get_lockup_period, get_tracked_balance, get_unlocked_balance,
+    is_preset_completed, mark_preset_completed, on_created, on_destroyed, on_transfer,
+    preset_lockup_state, set_lockup_period, LockedTokens,
 };
 
 #[contract]
@@ -152,20 +152,6 @@ fn can_transfer_rejects_unseeded_wallet() {
         // The balance mirror is authoritative: a wallet that was never
         // credited (or seeded via preset) has nothing to spend.
         assert!(!can_transfer(&e, &from, &to, 1, &token));
-    });
-}
-
-#[test]
-fn can_create_always_allows() {
-    let e = Env::default();
-    let module_id = e.register(TestInitialLockupPeriodContract, ());
-    let token = Address::generate(&e);
-    let to = Address::generate(&e);
-
-    e.as_contract(&module_id, || {
-        set_lockup_period(&e, &token, 100);
-
-        assert!(can_create(&e, &to, 80, &token));
     });
 }
 
