@@ -26,7 +26,7 @@ pub struct TransferLimit {
 /// ends), after which the next transfer restarts the counter for a fresh
 /// window.
 ///
-/// An identity will will/may have multiple active counters at once if
+/// An identity will/may have multiple active counters at once if
 /// multiple limits are configured for the token, one for each distinct
 /// window duration.
 #[contracttype]
