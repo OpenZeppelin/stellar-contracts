@@ -495,6 +495,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "compliance-transfer-restrict"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "confidential-auditor-example"
 version = "0.7.1"
 dependencies = [

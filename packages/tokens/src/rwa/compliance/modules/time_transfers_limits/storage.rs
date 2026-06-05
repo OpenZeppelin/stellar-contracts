@@ -151,9 +151,7 @@ pub fn can_transfer(e: &Env, from: &Address, _to: &Address, amount: i128, token:
     true
 }
 
-/// Returns `true`. Mints are not counted against the time-window limits,
-/// mirroring the upstream exemption for transfers involving the zero
-/// address.
+/// Returns `true`. Mints are not counted against the time-window limits.
 ///
 /// # Arguments
 ///
