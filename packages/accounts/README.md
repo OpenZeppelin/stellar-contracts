@@ -315,7 +315,7 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-accounts = "=0.7.1"
+stellar-accounts = "=0.7.2"
 ```
 
 ### 2. Implement the Smart Account Trait
@@ -433,7 +433,7 @@ For external signers, there are two options:
   - Maximum policies per context rule: 5
 - Signers and policies are stored in a global registry and deduplicated across rules. The same signer object (identified by its XDR encoding) is stored once regardless of how many rules reference it. Each signer and policy is assigned a stable `u32` ID that is used when removing them from a rule (`remove_signer`, `remove_policy`).
 
-## Migration Guide: from v0.6.0 to 0.7.0
+## Migration Guide: from v0.6.0 to 0.7.x
 
 ### `AuthPayload` struct (breaking change)
 

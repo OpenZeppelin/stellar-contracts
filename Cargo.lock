@@ -679,7 +679,7 @@ checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 
 [[package]]
 name = "fee-forwarder-permissioned-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -690,7 +690,7 @@ dependencies = [
 
 [[package]]
 name = "fee-forwarder-permissionless-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-fee-abstraction",
@@ -734,7 +734,7 @@ checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 
 [[package]]
 name = "fungible-allowlist-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -744,7 +744,7 @@ dependencies = [
 
 [[package]]
 name = "fungible-blocklist-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -754,7 +754,7 @@ dependencies = [
 
 [[package]]
 name = "fungible-capped-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
@@ -762,7 +762,7 @@ dependencies = [
 
 [[package]]
 name = "fungible-governor-contract"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-governance",
@@ -770,7 +770,7 @@ dependencies = [
 
 [[package]]
 name = "fungible-governor-token"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "fungible-governor-contract",
  "soroban-sdk",
@@ -782,7 +782,7 @@ dependencies = [
 
 [[package]]
 name = "fungible-merkle-airdrop-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "hex-literal 1.1.0",
  "soroban-sdk",
@@ -794,7 +794,7 @@ dependencies = [
 
 [[package]]
 name = "fungible-pausable-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-contract-utils",
@@ -804,7 +804,7 @@ dependencies = [
 
 [[package]]
 name = "fungible-vault-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -814,7 +814,7 @@ dependencies = [
 
 [[package]]
 name = "fungible-votes-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -874,7 +874,7 @@ dependencies = [
 
 [[package]]
 name = "governor-timelock-contract"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-governance",
@@ -882,7 +882,7 @@ dependencies = [
 
 [[package]]
 name = "governor-timelock-token"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "governor-timelock-contract",
  "soroban-sdk",
@@ -1143,7 +1143,7 @@ checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
 name = "merkle-voting-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-contract-utils",
@@ -1151,7 +1151,7 @@ dependencies = [
 
 [[package]]
 name = "multisig-account-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-accounts",
@@ -1160,7 +1160,7 @@ dependencies = [
 
 [[package]]
 name = "multisig-ed25519-verifier-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-accounts",
@@ -1168,7 +1168,7 @@ dependencies = [
 
 [[package]]
 name = "multisig-spending-limit-policy-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-accounts",
@@ -1176,7 +1176,7 @@ dependencies = [
 
 [[package]]
 name = "multisig-threshold-policy-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-accounts",
@@ -1184,7 +1184,7 @@ dependencies = [
 
 [[package]]
 name = "multisig-webauthn-verifier-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "hex-literal 1.1.0",
  "p256",
@@ -1194,7 +1194,7 @@ dependencies = [
 
 [[package]]
 name = "multisig-weighted-threshold-policy-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-accounts",
@@ -1202,7 +1202,7 @@ dependencies = [
 
 [[package]]
 name = "nft-access-control-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -1212,7 +1212,7 @@ dependencies = [
 
 [[package]]
 name = "nft-consecutive-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
@@ -1220,7 +1220,7 @@ dependencies = [
 
 [[package]]
 name = "nft-enumerable-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-macros",
@@ -1229,7 +1229,7 @@ dependencies = [
 
 [[package]]
 name = "nft-royalties-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -1239,7 +1239,7 @@ dependencies = [
 
 [[package]]
 name = "nft-sequential-minting-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-macros",
@@ -1299,7 +1299,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "ownable-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -1326,7 +1326,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pausable-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-contract-utils",
@@ -1587,7 +1587,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-claim-issuer-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "ed25519-dalek",
  "soroban-sdk",
@@ -1598,7 +1598,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-claim-topics-and-issuers-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -1608,7 +1608,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-compliance-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -1618,7 +1618,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-identity-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -1628,7 +1628,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-identity-registry-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -1638,7 +1638,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-identity-verifier-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -1648,7 +1648,7 @@ dependencies = [
 
 [[package]]
 name = "rwa-token-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -1665,7 +1665,7 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "sac-admin-generic-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "ed25519-dalek",
  "soroban-sdk",
@@ -1674,7 +1674,7 @@ dependencies = [
 
 [[package]]
 name = "sac-admin-wrapper-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -2099,7 +2099,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "stellar-access"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-event-assertion",
@@ -2107,7 +2107,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-accounts"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "ed25519-dalek",
  "hex-literal 1.1.0",
@@ -2121,7 +2121,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-contract-utils"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "hex-literal 1.1.0",
  "proptest",
@@ -2131,7 +2131,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-event-assertion"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-tokens",
@@ -2139,7 +2139,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-fee-abstraction"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-macros",
@@ -2148,14 +2148,14 @@ dependencies = [
 
 [[package]]
 name = "stellar-governance"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
 ]
 
 [[package]]
 name = "stellar-macros"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2185,7 +2185,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-tokens"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "ed25519-dalek",
  "k256",
@@ -2218,7 +2218,7 @@ dependencies = [
 
 [[package]]
 name = "stellar-zk-email"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
 ]
@@ -2312,7 +2312,7 @@ dependencies = [
 
 [[package]]
 name = "timelock-controller-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",
@@ -2386,7 +2386,7 @@ dependencies = [
 
 [[package]]
 name = "upgrader-example"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "soroban-sdk",
  "stellar-access",

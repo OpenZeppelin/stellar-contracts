@@ -154,9 +154,9 @@ Add this to your `Cargo.toml`:
 ```toml
 [dependencies]
 # We recommend pinning to a specific version, because rapid iterations are expected as the library is in an active development phase.
-stellar-tokens = "=0.7.1"
+stellar-tokens = "=0.7.2"
 # Add this if you want to use macros
-stellar-macros = "=0.7.1"
+stellar-macros = "=0.7.2"
 ```
 
 ## Examples
