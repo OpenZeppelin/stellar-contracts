@@ -1,4 +1,5 @@
 use soroban_sdk::{contracttype, panic_with_error, Bytes, Env};
+use ultrahonk_soroban_verifier::UltraHonkVerifier;
 
 use crate::confidential::verifier::{
     emit_verification_key_registered, emit_verification_key_updated, CircuitType, VerifierError,
@@ -29,6 +30,42 @@ pub fn get_verification_key(e: &Env, circuit_type: CircuitType) -> Bytes {
         .instance()
         .get(&VerifierStorageKey::Vk(circuit_type))
         .unwrap_or_else(|| panic_with_error!(e, VerifierError::VerificationKeyNotRegistered))
+}
+
+/// Verifies an UltraHonk `proof` for `public_inputs` against the verification
+/// key registered under `circuit_type`, returning `true` iff the proof is
+/// valid.
+///
+/// The UltraHonk backend lives in the external
+/// [`ultrahonk_soroban_verifier`](https://github.com/NethermindEth/rs-soroban-ultrahonk)
+/// crate. A malformed proof or mismatched public inputs is not an error here:
+/// the function simply returns `false` and lets the caller decide how to react
+/// (the confidential token reverts with its own `InvalidProof` error).
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `circuit_type` - The circuit the proof was produced against.
+/// * `public_inputs` - The serialized public inputs the prover committed to.
+/// * `proof` - The serialized UltraHonk proof.
+///
+/// # Errors
+///
+/// * [`VerifierError::VerificationKeyNotRegistered`] - When `circuit_type` has
+///   no registered key.
+/// * [`VerifierError::InvalidVerificationKey`] - When the registered key cannot
+///   be parsed as a valid UltraHonk verification key.
+pub fn verify_proof(
+    e: &Env,
+    circuit_type: CircuitType,
+    public_inputs: &Bytes,
+    proof: &Bytes,
+) -> bool {
+    let vk = get_verification_key(e, circuit_type);
+    let verifier = UltraHonkVerifier::new(e, &vk)
+        .unwrap_or_else(|_| panic_with_error!(e, VerifierError::InvalidVerificationKey));
+
+    verifier.verify(e, proof, public_inputs).is_ok()
 }
 
 // ################## CHANGE STATE ##################

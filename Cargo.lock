@@ -496,6 +496,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "confidential-verifier-example"
+version = "0.7.1"
+dependencies = [
+ "soroban-sdk",
+ "stellar-access",
+ "stellar-macros",
+ "stellar-tokens",
+]
+
+[[package]]
 name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2452,6 +2462,7 @@ dependencies = [
  "stellar-contract-utils",
  "stellar-event-assertion",
  "stellar-governance",
+ "ultrahonk_soroban_verifier",
 ]
 
 [[package]]
@@ -2597,6 +2608,14 @@ name = "typenum"
 version = "1.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40ce102ab67701b8526c123c1bab5cbe42d7040ccfd0f64af1a385808d2f43de"
+
+[[package]]
+name = "ultrahonk_soroban_verifier"
+version = "0.1.0"
+source = "git+https://github.com/NethermindEth/rs-soroban-ultrahonk?rev=661db07200f890b1bd9a7349ed787c70a706dd12#661db07200f890b1bd9a7349ed787c70a706dd12"
+dependencies = [
+ "soroban-sdk",
+]
 
 [[package]]
 name = "unarray"

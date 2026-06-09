@@ -69,6 +69,10 @@ p256 = "0.13.2"
 serde = { version = "1", default-features = false }
 serde-json-core = { version = "0.6.0", default-features = false }
 
+# UltraHonk proof-verification backend for the confidential token. Pinned to a
+# specific commit because the upstream crate is pre-release and unaudited.
+ultrahonk-soroban-verifier = { git = "https://github.com/NethermindEth/rs-soroban-ultrahonk", rev = "661db07200f890b1bd9a7349ed787c70a706dd12", package = "ultrahonk_soroban_verifier", default-features = false }
+
 # members
 stellar-access = { path = "packages/access", version = "0.7.1" }
 stellar-accounts = { path = "packages/accounts", version = "0.7.1" }

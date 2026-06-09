@@ -5,7 +5,7 @@ use stellar_event_assertion::EventAssertion;
 
 use crate::confidential::verifier::{
     storage::{
-        get_verification_key, register_verification_key, update_verification_key,
+        get_verification_key, register_verification_key, update_verification_key, verify_proof,
         VerifierStorageKey,
     },
     CircuitType,
@@ -139,5 +139,32 @@ fn storage_key_round_trip() {
             .get(&VerifierStorageKey::Vk(CircuitType::RevokeSpender))
             .unwrap();
         assert_eq!(stored, vk);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3401)")]
+fn verify_proof_unregistered_panics_with_not_registered() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        let empty = Bytes::new(&e);
+        let _ = verify_proof(&e, CircuitType::Register, &empty, &empty);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3403)")]
+fn verify_proof_malformed_vk_panics_with_invalid_vk() {
+    let e = Env::default();
+    let address = e.register(MockContract, ());
+
+    e.as_contract(&address, || {
+        // A 32-byte blob is not a valid UltraHonk verification key, so the
+        // backend rejects it before any proof is examined.
+        register_verification_key(&e, CircuitType::Transfer, &vk_bytes(&e, 0xab));
+        let empty = Bytes::new(&e);
+        let _ = verify_proof(&e, CircuitType::Transfer, &empty, &empty);
     });
 }
