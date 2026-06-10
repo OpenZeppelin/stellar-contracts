@@ -58,14 +58,14 @@ jobs:
         run: cargo +nightly fmt --all -- --check
 
       - name: Check clippy
-        run: cargo clippy --release --locked --all-targets -- -D warnings
+        run: cargo +stable clippy --release --locked --all-targets -- -D warnings
 
       # TODO: re-enable this after we find a stable solution to same name functions across multiple contracts
       # - name: Check build
       #   run: cargo build --target wasm32v1-none --release
 
       - name: Run tests with coverage
-        run: cargo llvm-cov --workspace --lcov --fail-under-lines 90 --output-path lcov.info
+        run: cargo +stable llvm-cov --workspace --lcov --fail-under-lines 90 --output-path lcov.info
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
