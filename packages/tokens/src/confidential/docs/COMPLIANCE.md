@@ -34,7 +34,7 @@ Deployments that need separation of duties (distinct freeze, policy, and clawbac
 
 ## 2. Contract-Level Freeze
 
-The contract maintains a `frozen(account) -> bool` entry per account. Before applying any state change, every state-modifying operation runs `check_not_frozen` against each account it names (sender, recipient, spender). A frozen account cannot send, receive, deposit, withdraw, or participate as an spender. The check reverts at the contract boundary.
+The contract maintains a `frozen(account) -> bool` entry per account. Before applying any state change, every state-modifying operation runs `check_not_frozen` against each account it names (sender, recipient). A frozen account cannot send, receive, deposit, or withdraw. The check reverts at the contract boundary.
 
 Full freeze (rather than outbound-only) keeps semantics clean: no further accumulation is possible after the freeze takes effect.
 

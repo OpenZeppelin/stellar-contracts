@@ -121,7 +121,7 @@ The system uses **Poseidon2**, the algebraic hash function native to Noir's stan
 
 **Usage in this system:**
 
-- Key derivation: $vk = \text{Poseidon2}(\delta_{\text{vk}}, sk, \text{addr_f})$
+- Key derivation: $vk = \text{Poseidon2}(\delta_{\text{vk}}, sk, \text{addr\\\_f})$
 - Randomness derivation: $r = \text{Poseidon2}(\delta_{\text{spend\\\_r}}, vk, \sigma)$
 - Symmetric encryption: $\tilde{v} = v + \text{Poseidon2}(\delta_{\text{tx\\\_amount}}, s, \sigma)$
 - Domain separation: each invocation includes a leading constant $\delta$ to prevent cross-context collisions
@@ -190,7 +190,7 @@ The contract, the SDK, the wallet, and any indexer reproduce the same Field valu
 
 | Site | When computed | Storage |
 |:---|:---|:---|
-| $\text{addr_f}$ | Once, by the contract's `__constructor` over `env.current_contract_address()` | Stored as a single Field in the contract's **instance storage** (§3.5); read on every proof verification |
+| $\text{addr\\\_f}$ | Once, by the contract's `__constructor` over `env.current_contract_address()` | Stored as a single Field in the contract's **instance storage** (§3.5); read on every proof verification |
 | $\text{op}_i$ | Per-call, by the contract at `set_spender` and `revoke_spender` over the `spender` argument | Not stored; recomputed each call. The circuit binds it via S5 / V3 |
 
 ---
@@ -238,7 +238,7 @@ i.e., the total committed value across all confidential accounts never exceeds t
 
 ### 3.5 Governance and Upgradeability
 
-The constructor binds the contract to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores $\text{addr_f} = \text{address\\\_to\\\_field}(\text{env.current\\\_contract\\\_address}())$ (§2.7) in **instance storage** as a single canonical $\mathbb{F}_r$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2 / V2. The compressed `addr_f` Field is computed once at construction (not recomputed per call) to ensure all proofs across the contract's lifetime bind to the same Field representative of the contract's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in spender structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
+The constructor binds the contract to fixed `admin`, `token`, `verifier`, and `auditor` addresses. It additionally computes and stores $\text{addr\\\_f} = \text{address\\\_to\\\_field}(\text{env.current\\\_contract\\\_address}())$ (§2.7) in **instance storage** as a single canonical $\mathbb{F}_r$ Field; this is the value every owner-initiated proof references via constraints R2 / W2 / T2 / S2 / V2. The compressed `addr_f` Field is computed once at construction (not recomputed per call) to ensure all proofs across the contract's lifetime bind to the same Field representative of the contract's address. Beyond that, this specification does not prescribe a governance policy for upgrading these components or for rotating per-circuit verification keys. Concrete deployments differ widely in spender structure, regulatory posture, and emergency-response requirements, so these decisions are deliberately left to implementers.
 
 Questions an implementer must answer:
 
@@ -263,15 +263,15 @@ The spending public key is stored on-chain at registration. Knowledge of $sk$ is
 
 ### 4.2 Viewing Key
 
-$$vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$$
+$$vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr\\\_f})$$
 
-A scalar in $\mathbb{F}_r$, unique per $(sk, \text{addr_f})$ pair. Enables balance decryption without spending authority. Cannot recover $sk$ (Poseidon preimage resistance). Because $\text{addr_f}$ is bound into the derivation, proofs that constrain $vk$ (R2, W2, T2, S2, V2) are inherently bound to the contract contract, eliminating the need for explicit per-circuit context binding.
+A scalar in $\mathbb{F}_r$, unique per $(sk, \text{addr\\\_f})$ pair. Enables balance decryption without spending authority. Cannot recover $sk$ (Poseidon preimage resistance). Because $\text{addr\\\_f}$ is bound into the derivation, proofs that constrain $vk$ (R2, W2, T2, S2, V2) are inherently bound to the contract contract, eliminating the need for explicit per-circuit context binding.
 
 ### 4.3 Public Viewing Key
 
 $$\text{PVK} = vk \cdot H$$
 
-A Grumpkin point stored on-chain at registration. Serves as the recipient's ECDH public key for incoming transfers. The registration proof constrains $\text{PVK} = vk \cdot H$ where $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ and $Y = sk \cdot H$, preventing a user from registering an unrelated $\text{PVK}$.
+A Grumpkin point stored on-chain at registration. Serves as the recipient's ECDH public key for incoming transfers. The registration proof constrains $\text{PVK} = vk \cdot H$ where $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr\\\_f})$ and $Y = sk \cdot H$, preventing a user from registering an unrelated $\text{PVK}$.
 
 ### 4.4 Delegation Viewing Key
 
@@ -493,7 +493,7 @@ An account provides a Grumpkin spending key $Y$, a public viewing key $\text{PVK
 | # | Constraint |
 |:--|:---|
 | R1 | $Y = sk \cdot H$ (spending key well-formed) |
-| R2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (viewing key correctly derived, binds proof to contract) |
+| R2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr\\\_f})$ (viewing key correctly derived, binds proof to contract) |
 | R3 | $\text{PVK} = vk \cdot H$ (public viewing key matches $vk$) |
 | R4 | $sk \neq 0$ (rules out $Y = \mathcal{O}$) |
 | R5 | $vk \neq 0$ (rules out $\text{PVK} = \mathcal{O}$, which would collapse every incoming-transfer ECDH) |
@@ -503,7 +503,7 @@ An account provides a Grumpkin spending key $Y$, a public viewing key $\text{PVK
 | Input | Notes |
 |:---|:---|
 | $Y$, $\text{PVK}$ | Prover-supplied; written to `account.spending_key` and `account.viewing_public_key` on success |
-| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr\\\_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 
 **Private witnesses:** $sk$.
 
@@ -554,7 +554,7 @@ The owner withdraws a public amount $a$ (typed `i128`) from their spendable bala
 | # | Constraint |
 |:--|:---|
 | W1 | $Y = sk \cdot H$ (owner key ownership) |
-| W2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (binds proof to contract) |
+| W2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr\\\_f})$ (binds proof to contract) |
 | W3 | The prover knows the opening $(v, r)$ of $C_{\text{spend}}$: $C_{\text{spend}} = v \cdot G + r \cdot H$ |
 | W4 | $v \in [0, 2^{127})$, $a \in [0, 2^{127})$, $v - a \in [0, 2^{127})$ (range validity, Section 2.6) |
 | W5 | $r' = \text{Poseidon}(\delta_{\text{spend\\\_r}}, vk, \sigma)$ (deterministic randomness for new balance) |
@@ -572,7 +572,7 @@ The owner withdraws a public amount $a$ (typed `i128`) from their spendable bala
 |:---|:---|
 | $C_{\text{spend}}$ | Loaded from `from.spendable_balance` |
 | $Y$ | Loaded from `from.spending_key` |
-| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr\\\_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using `from.auditor_id` |
 | $a$ | Public withdrawal amount from invocation inputs |
 | $C_{\text{spend}}'$, $\sigma$, $\tilde{b}$, $R_e$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to `from.spendable_balance`, the rest emitted in event |
@@ -611,7 +611,7 @@ The sender (account $A$, spending key $sk_A$) transfers a hidden amount $v_{\tex
 | # | Constraint |
 |:--|:---|
 | T1 | $Y_A = sk_A \cdot H$ (sender key ownership) |
-| T2 | $vk_A = \text{Poseidon}(\delta_{\text{vk}}, sk_A, \text{addr_f})$ (binds proof to contract) |
+| T2 | $vk_A = \text{Poseidon}(\delta_{\text{vk}}, sk_A, \text{addr\\\_f})$ (binds proof to contract) |
 | T3 | Prover knows opening $(v_A, r_A)$ of $C_{\text{spend}}^A$ |
 | T4 | $v_A \in [0, 2^{127})$, $v_{\text{tx}} \in [0, 2^{127})$, $v_A - v_{\text{tx}} \in [0, 2^{127})$ (range validity, Section 2.6) |
 | T5 | $S = r_e \cdot \text{PVK}_B$ (ECDH correctly computed) |
@@ -639,7 +639,7 @@ The sender (account $A$, spending key $sk_A$) transfers a hidden amount $v_{\tex
 | $C_{\text{spend}}^A$ | Loaded from sender's `spendable_balance` |
 | $Y_A$ | Loaded from sender's `spending_key` |
 | $\text{PVK}_B$ | Loaded from recipient's `viewing_public_key`. Recipient must be registered. |
-| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr\\\_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,r}}$ | Fetched from the auditor contract using recipient's `auditor_id` |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using sender's `auditor_id` |
 | $C_{\text{spend}}'$, $C_{\text{tx}}$, $R_e$, $\tilde{v}$, $\tilde{b}$, $\sigma$, $\tilde{v}_{\text{aud,r}}$, $\tilde{r}_{\text{aud,r}}$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to sender's `spendable_balance`, $C_{\text{tx}}$ added to recipient's `receiving_balance`, the rest emitted in event |
@@ -662,7 +662,7 @@ The owner locks funds from their spendable balance into a per-spender escrow. Th
 | # | Constraint |
 |:--|:---|
 | S1 | $Y = sk \cdot H$ (owner key ownership) |
-| S2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (binds proof to contract) |
+| S2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr\\\_f})$ (binds proof to contract) |
 | S3 | Prover knows opening $(v, r)$ of $C_{\text{spend}}$ |
 | S4 | $v \in [0, 2^{127})$, $v_a \in [0, 2^{127})$, $v - v_a \in [0, 2^{127})$ (range validity, Section 2.6) |
 | S5 | $dvk_i = \text{Poseidon}(\delta_{\text{dvk}}, vk, \text{op}_i)$ (delegation key derivation; contract-bound via $vk$) |
@@ -688,7 +688,7 @@ The owner locks funds from their spendable balance into a per-spender escrow. Th
 | $Y$ | Loaded from owner's `spending_key` |
 | $Y_{\text{op}}$ | Loaded from spender account's `spending_key`. Spender must be registered. |
 | $\text{op}_i$ | $\text{address\\\_to\\\_field}$(`spender` argument), computed per-call by the contract (§2.7) |
-| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr\\\_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using owner's `auditor_id` |
 | $C_{\text{spend}}'$, $C_a$, escrowed\_dvk, $\tilde{b}$, $\tilde{a}$, $\sigma$, $\sigma_a$, $R_e$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to owner's `spendable_balance`, the delegation fields written to storage, the rest emitted in event |
 
@@ -754,7 +754,7 @@ The owner reclaims the remaining escrowed allowance.
 | # | Constraint |
 |:--|:---|
 | V1 | $Y = sk \cdot H$ (owner key ownership) |
-| V2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr_f})$ (binds proof to contract) |
+| V2 | $vk = \text{Poseidon}(\delta_{\text{vk}}, sk, \text{addr\\\_f})$ (binds proof to contract) |
 | V3 | $dvk_i = \text{Poseidon}(\delta_{\text{dvk}}, vk, \text{op}_i)$ |
 | V4 | Prover knows opening $(v_a, r_a)$ of $C_a$, with $r_a = \text{Poseidon}(\delta_{\text{allow\\\_r}}, dvk_i, \sigma_a)$ (allowance randomness matches stored state, mirrors O3) |
 | V5 | Prover knows opening $(v_s, r_s)$ of $C_{\text{spend}}$ |
@@ -777,7 +777,7 @@ The owner reclaims the remaining escrowed allowance.
 | $C_a$, $\sigma_a$ | Loaded from the `(account, spender)` delegation entry |
 | $Y$ | Loaded from owner's `spending_key` |
 | $\text{op}_i$ | $\text{address\\\_to\\\_field}$(`spender` argument), computed per-call by the contract (§2.7) |
-| $\text{addr_f}$ | Loaded from instance storage; set once at construction (§3.5) |
+| $\text{addr\\\_f}$ | Loaded from instance storage; set once at construction (§3.5) |
 | $K_{\text{aud,s}}$ | Fetched from the auditor contract using owner's `auditor_id` |
 | $C_{\text{spend}}'$, $\tilde{b}$, $\sigma$, $R_e$, $\tilde{v}_{\text{aud,s}}$, $\tilde{b}_{\text{aud,s}}$ | Prover-supplied; $C_{\text{spend}}'$ written to owner's `spendable_balance`, delegation entry deleted, the rest emitted in event |
 

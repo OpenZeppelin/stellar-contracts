@@ -53,7 +53,7 @@ categories = ["no-std", "wasm"]
 version = "0.7.1"
 
 [workspace.dependencies]
-soroban-sdk = { version = "26.0.0", features = [
+soroban-sdk = { version = "26.1.0", features = [
     "experimental_spec_shaking_v2",
 ] }
 soroban-poseidon = "26.0.0"
