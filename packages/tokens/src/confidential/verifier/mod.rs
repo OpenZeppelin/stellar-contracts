@@ -12,7 +12,7 @@
 //!
 //! This module is **unfinished**. [`ConfidentialVerifier::verify_proof`] has no
 //! working default implementation because its UltraHonk backend
-//! ([`Oghma/rs-soroban-ultrahonk`](https://github.com/Oghma/rs-soroban-ultrahonk))
+//! ([`NethermindEth/rs-soroban-ultrahonk`](https://github.com/NethermindEth/rs-soroban-ultrahonk))
 //! is still under development and **has not been audited**. Do **not** deploy a
 //! contract built on this trait to mainnet or any environment that handles
 //! real value. The trait surface, the [`VerifierStorageKey`] layout, and the
@@ -220,7 +220,7 @@ pub trait ConfidentialVerifier {
     /// # Notes
     ///
     /// No default implementation is provided. The UltraHonk verification
-    /// backend lives in `Oghma/rs-soroban-ultrahonk`, which is still
+    /// backend lives in `NethermindEth/rs-soroban-ultrahonk`, which is still
     /// under development and has not been audited (see the module-level
     /// warning). Implementors MUST NOT ship a stub that returns `true`
     /// unconditionally to any environment that handles real value.
