@@ -1,8 +1,14 @@
 extern crate std;
 
 use soroban_sdk::{testutils::Address as _, vec, Address, Env, String};
+use stellar_tokens::rwa::compliance::AccountSnapshot;
 
 use crate::contract::{TransferAllowContract, TransferAllowContractClient};
+
+/// This module ignores balance and frozen amounts, so they are left at zero.
+fn snap(address: &Address) -> AccountSnapshot {
+    AccountSnapshot { address: address.clone(), balance: 0, frozen: 0 }
+}
 
 fn create_client<'a>(
     e: &Env,
@@ -66,9 +72,9 @@ fn can_transfer_checks_sender_then_recipient() {
     client.allow_user(&token, &allowed, &manager);
 
     // Allowlisted sender, allowlisted recipient, neither.
-    assert!(client.can_transfer(&allowed, &other, &10_i128, &token));
-    assert!(client.can_transfer(&other, &allowed, &10_i128, &token));
-    assert!(!client.can_transfer(&other, &other, &10_i128, &token));
+    assert!(client.can_transfer(&snap(&allowed), &snap(&other), &10_i128, &None, &token));
+    assert!(client.can_transfer(&snap(&other), &snap(&allowed), &10_i128, &None, &token));
+    assert!(!client.can_transfer(&snap(&other), &snap(&other), &10_i128, &None, &token));
 }
 
 #[test]
@@ -81,7 +87,7 @@ fn can_create_always_allows() {
     let to = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    assert!(client.can_create(&to, &10_i128, &token));
+    assert!(client.can_create(&snap(&to), &10_i128, &token));
 }
 
 #[test]
