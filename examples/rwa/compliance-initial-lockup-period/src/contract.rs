@@ -1,12 +1,15 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::{only_admin, only_role};
-use stellar_tokens::rwa::compliance::modules::{
-    initial_lockup_period::{
-        storage as initial_lockup_period, InitialLockupPeriod, LockedDetails, LockedTokens,
+use stellar_tokens::rwa::compliance::{
+    modules::{
+        initial_lockup_period::{
+            storage as initial_lockup_period, InitialLockupPeriod, LockedDetails, LockedTokens,
+        },
+        storage::{self as compliance_storage},
+        ComplianceModule,
     },
-    storage::{self as compliance_storage},
-    ComplianceModule,
+    AccountSnapshot,
 };
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -33,15 +36,14 @@ impl InitialLockupPeriod for InitialLockupPeriodContract {
     }
 
     #[only_role(operator, "manager")]
-    fn preset_lockup_state(
+    fn preset_locks(
         e: &Env,
         token: Address,
         wallet: Address,
-        balance: i128,
         locks: Vec<LockedTokens>,
         operator: Address,
     ) {
-        initial_lockup_period::preset_lockup_state(e, &token, &wallet, balance, &locks);
+        initial_lockup_period::preset_locks(e, &token, &wallet, &locks);
     }
 
     #[only_role(operator, "manager")]
@@ -52,28 +54,42 @@ impl InitialLockupPeriod for InitialLockupPeriodContract {
 
 #[contractimpl(contracttrait)]
 impl ComplianceModule for InitialLockupPeriodContract {
-    fn on_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) {
+    fn on_transfer(
+        e: &Env,
+        from: AccountSnapshot,
+        _to: AccountSnapshot,
+        amount: i128,
+        _spender: Option<Address>,
+        token: Address,
+    ) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
-        initial_lockup_period::on_transfer(e, &from, &to, amount, &token);
+        initial_lockup_period::on_transfer(e, &from.address, from.balance, amount, &token);
     }
 
-    fn on_created(e: &Env, to: Address, amount: i128, token: Address) {
+    fn on_created(e: &Env, to: AccountSnapshot, amount: i128, token: Address) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
-        initial_lockup_period::on_created(e, &to, amount, &token);
+        initial_lockup_period::on_created(e, &to.address, amount, &token);
     }
 
-    fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address) {
+    fn on_destroyed(e: &Env, from: AccountSnapshot, amount: i128, token: Address) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
-        initial_lockup_period::on_destroyed(e, &from, amount, &token);
+        initial_lockup_period::on_destroyed(e, &from.address, from.balance, amount, &token);
     }
 
-    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
-        initial_lockup_period::can_transfer(e, &from, &to, amount, &token)
+    fn can_transfer(
+        e: &Env,
+        from: AccountSnapshot,
+        _to: AccountSnapshot,
+        amount: i128,
+        _spender: Option<Address>,
+        token: Address,
+    ) -> bool {
+        initial_lockup_period::can_transfer(e, &from.address, from.balance, amount, &token)
     }
 
     // Mints are never blocked by this module: they are the operation that
     // creates locks.
-    fn can_create(_e: &Env, _to: Address, _amount: i128, _token: Address) -> bool {
+    fn can_create(_e: &Env, _to: AccountSnapshot, _amount: i128, _token: Address) -> bool {
         true
     }
 

@@ -1,13 +1,19 @@
 extern crate std;
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env};
-use stellar_tokens::rwa::compliance::ComplianceHook;
+use stellar_tokens::rwa::compliance::{AccountSnapshot, ComplianceHook};
 
 use crate::contract::{ComplianceContract, ComplianceContractClient};
 
 fn create_client<'a>(e: &Env, admin: &Address, manager: &Address) -> ComplianceContractClient<'a> {
     let address = e.register(ComplianceContract, (admin, manager));
     ComplianceContractClient::new(e, &address)
+}
+
+/// The mock module ignores balance and frozen amounts, so they are left at
+/// zero.
+fn snap(address: &Address) -> AccountSnapshot {
+    AccountSnapshot { address: address.clone(), balance: 0, frozen: 0 }
 }
 
 // ################## MOCK COMPLIANCE MODULE ##################
@@ -18,23 +24,32 @@ struct MockModule;
 
 #[contractimpl]
 impl MockModule {
-    pub fn on_transfer(_e: Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
+    pub fn on_transfer(
+        _e: Env,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
+        _amount: i128,
+        _spender: Option<Address>,
+        _token: Address,
+    ) {
+    }
 
-    pub fn on_created(_e: Env, _to: Address, _amount: i128, _token: Address) {}
+    pub fn on_created(_e: Env, _to: AccountSnapshot, _amount: i128, _token: Address) {}
 
-    pub fn on_destroyed(_e: Env, _from: Address, _amount: i128, _token: Address) {}
+    pub fn on_destroyed(_e: Env, _from: AccountSnapshot, _amount: i128, _token: Address) {}
 
     pub fn can_transfer(
         _e: Env,
-        _from: Address,
-        _to: Address,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
         amount: i128,
+        _spender: Option<Address>,
         _token: Address,
     ) -> bool {
         amount % 2 == 0
     }
 
-    pub fn can_create(_e: Env, _to: Address, amount: i128, _token: Address) -> bool {
+    pub fn can_create(_e: Env, _to: AccountSnapshot, amount: i128, _token: Address) -> bool {
         amount % 2 == 0
     }
 }
@@ -154,7 +169,7 @@ fn can_transfer_no_modules_returns_true() {
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
-    assert!(client.can_transfer(&from, &to, &500, &token));
+    assert!(client.can_transfer(&snap(&from), &snap(&to), &500, &None, &token));
 }
 
 #[test]
@@ -170,7 +185,7 @@ fn can_create_no_modules_returns_true() {
 
     let to = Address::generate(&e);
 
-    assert!(client.can_create(&to, &100, &token));
+    assert!(client.can_create(&snap(&to), &100, &token));
 }
 
 #[test]
@@ -189,8 +204,8 @@ fn can_transfer_module_filters_odd_amounts() {
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
-    assert!(client.can_transfer(&from, &to, &1000, &token));
-    assert!(!client.can_transfer(&from, &to, &1001, &token));
+    assert!(client.can_transfer(&snap(&from), &snap(&to), &1000, &None, &token));
+    assert!(!client.can_transfer(&snap(&from), &snap(&to), &1001, &None, &token));
 }
 
 #[test]
@@ -208,8 +223,8 @@ fn can_create_module_filters_odd_amounts() {
 
     let to = Address::generate(&e);
 
-    assert!(client.can_create(&to, &200, &token));
-    assert!(!client.can_create(&to, &201, &token));
+    assert!(client.can_create(&snap(&to), &200, &token));
+    assert!(!client.can_create(&snap(&to), &201, &token));
 }
 
 #[test]
@@ -228,7 +243,7 @@ fn transferred_hook_executes_modules() {
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
-    client.transferred(&from, &to, &500, &token);
+    client.transferred(&snap(&from), &snap(&to), &500, &None, &token);
 }
 
 #[test]
@@ -246,7 +261,7 @@ fn created_hook_executes_modules() {
 
     let to = Address::generate(&e);
 
-    client.created(&to, &500, &token);
+    client.created(&snap(&to), &500, &token);
 }
 
 #[test]
@@ -264,7 +279,7 @@ fn destroyed_hook_executes_modules() {
 
     let from = Address::generate(&e);
 
-    client.destroyed(&from, &500, &token);
+    client.destroyed(&snap(&from), &500, &token);
 }
 
 #[test]
@@ -279,5 +294,5 @@ fn transferred_unbound_token_panics() {
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
-    client.transferred(&from, &to, &100, &unbound_token);
+    client.transferred(&snap(&from), &snap(&to), &100, &None, &unbound_token);
 }

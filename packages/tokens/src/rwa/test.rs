@@ -9,7 +9,7 @@ use stellar_event_assertion::EventAssertion;
 
 use crate::{
     fungible::ContractOverrides,
-    rwa::{storage::RWAStorageKey, IdentityVerifier, RWAError, RWA},
+    rwa::{compliance::AccountSnapshot, storage::RWAStorageKey, IdentityVerifier, RWAError, RWA},
 };
 
 #[contract]
@@ -53,23 +53,32 @@ struct MockCompliance;
 impl MockCompliance {
     pub fn can_transfer(
         e: Env,
-        _from: Address,
-        _to: Address,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
         _amount: i128,
+        _spender: Option<Address>,
         _contract: Address,
     ) -> bool {
         e.storage().persistent().get(&symbol_short!("tx_ok")).unwrap_or(true)
     }
 
-    pub fn can_create(e: Env, _to: Address, _amount: i128, _contract: Address) -> bool {
+    pub fn can_create(e: Env, _to: AccountSnapshot, _amount: i128, _contract: Address) -> bool {
         e.storage().persistent().get(&symbol_short!("mint_ok")).unwrap_or(true)
     }
 
-    pub fn transferred(_e: Env, _from: Address, _to: Address, _amount: i128, _contract: Address) {}
+    pub fn transferred(
+        _e: Env,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
+        _amount: i128,
+        _spender: Option<Address>,
+        _contract: Address,
+    ) {
+    }
 
-    pub fn created(_e: Env, _to: Address, _amount: i128, _contract: Address) {}
+    pub fn created(_e: Env, _to: AccountSnapshot, _amount: i128, _contract: Address) {}
 
-    pub fn destroyed(_e: Env, _from: Address, _amount: i128, _contract: Address) {}
+    pub fn destroyed(_e: Env, _from: AccountSnapshot, _amount: i128, _contract: Address) {}
 }
 
 #[contract]

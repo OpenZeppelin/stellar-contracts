@@ -36,8 +36,6 @@ pub enum InitialLockupPeriodStorageKey {
     LockupPeriod(Address),
     /// Per-(token, wallet) lock entries and their aggregate.
     LockedDetails(Address, Address),
-    /// Per-(token, wallet) balance mirror maintained by the hooks.
-    Balance(Address, Address),
     /// Per-token flag indicating that the preset migration phase is
     /// finalized.
     PresetCompleted(Address),
@@ -81,26 +79,13 @@ pub fn get_locked_details(e: &Env, token: &Address, wallet: &Address) -> LockedD
     }
 }
 
-/// Returns the balance mirror tracked for `wallet` under `token`. Returns
-/// `0` when no entry exists.
+/// Returns the amount still locked for `wallet` under `token`: the aggregate
+/// of lock entries whose release time has not yet passed. Returns `0` when no
+/// entry exists.
 ///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token address.
-/// * `wallet` - The wallet address.
-pub fn get_tracked_balance(e: &Env, token: &Address, wallet: &Address) -> i128 {
-    let key = InitialLockupPeriodStorageKey::Balance(token.clone(), wallet.clone());
-    if let Some(value) = e.storage().persistent().get::<_, i128>(&key) {
-        e.storage().persistent().extend_ttl(&key, MODULE_TTL_THRESHOLD, MODULE_EXTEND_AMOUNT);
-        value
-    } else {
-        0
-    }
-}
-
-/// Returns the amount `wallet` can currently spend under `token`: the
-/// tracked balance minus lock entries that have not released yet.
+/// This module tracks locks, not balances. A caller that wants the spendable
+/// (unlocked) amount subtracts this from the wallet's token balance:
+/// `unlocked = balance - locked_amount`.
 ///
 /// # Arguments
 ///
@@ -112,9 +97,9 @@ pub fn get_tracked_balance(e: &Env, token: &Address, wallet: &Address) -> i128 {
 ///
 /// * [`ComplianceModuleError::MathOverflow`] - When summing the expired lock
 ///   amounts overflows.
-pub fn get_unlocked_balance(e: &Env, token: &Address, wallet: &Address) -> i128 {
+pub fn get_locked_amount(e: &Env, token: &Address, wallet: &Address) -> i128 {
     let details = get_locked_details(e, token, wallet);
-    unlocked_balance(e, token, wallet, &details)
+    sub_i128_or_panic(e, details.total_locked, expired_amount(e, &details.locks))
 }
 
 /// Returns `true` when the preset phase for `token` has been finalized,
@@ -134,16 +119,17 @@ pub fn is_preset_completed(e: &Env, token: &Address) -> bool {
     }
 }
 
-/// Returns `true` when the sender's unlocked holdings cover `amount`.
+/// Returns `true` when `from`'s unlocked holdings cover `amount`, given its
+/// token `balance` as of before the transfer.
 ///
-/// Only the sender side is consulted: the recipient is intentionally
-/// ignored because incoming transfers never create locks.
+/// Only the sender side is consulted: the recipient is intentionally ignored
+/// because incoming transfers never create locks.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `from` - The sender address.
-/// * `_to` - The recipient address.
+/// * `balance` - The sender's token balance, as of before the transfer.
 /// * `amount` - The transfer amount.
 /// * `token` - The token address.
 ///
@@ -152,10 +138,10 @@ pub fn is_preset_completed(e: &Env, token: &Address) -> bool {
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
 /// * [`ComplianceModuleError::MathOverflow`] - When summing the expired lock
 ///   amounts overflows.
-pub fn can_transfer(e: &Env, from: &Address, _to: &Address, amount: i128, token: &Address) -> bool {
+pub fn can_transfer(e: &Env, from: &Address, balance: i128, amount: i128, token: &Address) -> bool {
     require_non_negative_amount(e, amount);
     let details = get_locked_details(e, token, from);
-    amount <= unlocked_balance(e, token, from, &details)
+    amount <= unlocked_balance(e, balance, &details)
 }
 
 // ################## CHANGE STATE ##################
@@ -185,45 +171,39 @@ pub fn set_lockup_period(e: &Env, token: &Address, period: u32) {
     emit_lockup_period_set(e, token, period);
 }
 
-/// Pre-seeds the lockup state for `wallet` under `token`: the balance
-/// mirror and any pre-existing lock entries. Useful when registering this
-/// module on a token that already has live balances.
+/// Pre-seeds the lock entries for `wallet` under `token`. Useful when
+/// registering this module on a token whose holders must start with locks
+/// already in place.
+///
+/// Unlike the upstream Solidity module, no balance is seeded: each wallet's
+/// balance is read from the token on every hook, so only the lock schedule
+/// needs migrating. Holders with no pre-existing locks need no preset at all.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `wallet` - The wallet address.
-/// * `balance` - The wallet's token balance to mirror.
-/// * `locks` - The lock entries to record for `wallet`.
+/// * `locks` - The lock entries to record.
 ///
 /// # Errors
 ///
-/// * [`ComplianceModuleError::InvalidAmount`] - When `balance` or any lock
-///   amount is negative.
+/// * [`ComplianceModuleError::InvalidAmount`] - When any lock amount is
+///   negative.
 /// * [`ComplianceModuleError::PresetAlreadyCompleted`] - When the preset phase
 ///   has already been finalized.
 /// * [`ComplianceModuleError::MathOverflow`] - When summing the lock amounts
 ///   overflows.
-/// * [`ComplianceModuleError::LockedAmountExceedsBalance`] - When the aggregate
-///   locked amount exceeds `balance`.
 ///
 /// # Events
 ///
 /// * topics - `["lockup_state_preset", token: Address, wallet: Address]`
-/// * data - `[balance: i128, total_locked: i128]`
+/// * data - `[total_locked: i128]`
 ///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
-pub fn preset_lockup_state(
-    e: &Env,
-    token: &Address,
-    wallet: &Address,
-    balance: i128,
-    locks: &Vec<LockedTokens>,
-) {
-    require_non_negative_amount(e, balance);
+pub fn preset_locks(e: &Env, token: &Address, wallet: &Address, locks: &Vec<LockedTokens>) {
     if is_preset_completed(e, token) {
         panic_with_error!(e, ComplianceModuleError::PresetAlreadyCompleted);
     }
@@ -233,17 +213,13 @@ pub fn preset_lockup_state(
         require_non_negative_amount(e, lock.amount);
         total_locked = add_i128_or_panic(e, total_locked, lock.amount);
     }
-    if total_locked > balance {
-        panic_with_error!(e, ComplianceModuleError::LockedAmountExceedsBalance);
-    }
 
-    set_tracked_balance(e, token, wallet, balance);
     set_locked_details(e, token, wallet, &LockedDetails { total_locked, locks: locks.clone() });
-    emit_lockup_state_preset(e, token, wallet, balance, total_locked);
+    emit_lockup_state_preset(e, token, wallet, total_locked);
 }
 
 /// Finalizes the preset phase for `token`. After this call, invoking
-/// [`preset_lockup_state`] will panic with
+/// [`preset_locks`] will panic with
 /// [`ComplianceModuleError::PresetAlreadyCompleted`].
 ///
 /// # Arguments
@@ -265,16 +241,16 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
     emit_preset_completed(e, token);
 }
 
-/// Records a transfer between two wallets: debits the sender (consuming
-/// expired locks when the amount dips into the locked region) and credits
-/// the recipient's balance mirror. Panics when the sender's unlocked
-/// holdings do not cover `amount`.
+/// Records a transfer out of `from`: consumes expired locks when `amount`
+/// dips into the locked region. The recipient is untouched, since incoming
+/// transfers never create locks. Panics when `from`'s unlocked holdings do
+/// not cover `amount`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `from` - The sender wallet.
-/// * `to` - The recipient wallet.
+/// * `balance` - The sender's token balance, as of before the transfer.
 /// * `amount` - The transferred amount.
 /// * `token` - The token address.
 ///
@@ -283,23 +259,18 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
 /// * [`ComplianceModuleError::InsufficientUnlockedBalance`] - When `amount`
 ///   exceeds the sender's unlocked holdings.
-/// * [`ComplianceModuleError::MathUnderflow`] - When the sender's balance
-///   mirror would go negative.
-/// * [`ComplianceModuleError::MathOverflow`] - When the recipient's credit
-///   addition overflows.
 ///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
-pub fn on_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &Address) {
+pub fn on_transfer(e: &Env, from: &Address, balance: i128, amount: i128, token: &Address) {
     require_non_negative_amount(e, amount);
-    debit_unlocked(e, token, from, amount);
-    credit_balance(e, token, to, amount);
+    debit_unlocked(e, token, from, balance, amount);
 }
 
-/// Records a mint to `to`: credits the recipient's balance mirror and, when
-/// a lockup period is configured, appends a lock entry releasing after that
-/// period.
+/// Records a mint to `to`: when a lockup period is configured, appends a lock
+/// entry releasing after that period. The wallet's balance is owned by the
+/// token, so nothing else is tracked.
 ///
 /// # Arguments
 ///
@@ -311,8 +282,8 @@ pub fn on_transfer(e: &Env, from: &Address, to: &Address, amount: i128, token: &
 /// # Errors
 ///
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
-/// * [`ComplianceModuleError::MathOverflow`] - When the lock aggregate or the
-///   credit addition overflows.
+/// * [`ComplianceModuleError::MathOverflow`] - When the lock aggregate
+///   overflows.
 ///
 /// # Security Warning
 ///
@@ -330,18 +301,17 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
         details.total_locked = add_i128_or_panic(e, details.total_locked, amount);
         set_locked_details(e, token, to, &details);
     }
-
-    credit_balance(e, token, to, amount);
 }
 
-/// Records a burn from `from`: debits the wallet, consuming expired locks
-/// when the amount dips into the locked region. Panics when the wallet's
-/// unlocked holdings do not cover `amount`.
+/// Records a burn from `from`: consumes expired locks when `amount` dips into
+/// the locked region. Panics when `from`'s unlocked holdings do not cover
+/// `amount`.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `from` - The wallet whose tokens were burned.
+/// * `balance` - The wallet's token balance, as of before the burn.
 /// * `amount` - The burned amount.
 /// * `token` - The token address.
 ///
@@ -350,15 +320,13 @@ pub fn on_created(e: &Env, to: &Address, amount: i128, token: &Address) {
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
 /// * [`ComplianceModuleError::InsufficientUnlockedBalance`] - When `amount`
 ///   exceeds the wallet's unlocked holdings.
-/// * [`ComplianceModuleError::MathUnderflow`] - When the wallet's balance
-///   mirror would go negative.
 ///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
-pub fn on_destroyed(e: &Env, from: &Address, amount: i128, token: &Address) {
+pub fn on_destroyed(e: &Env, from: &Address, balance: i128, amount: i128, token: &Address) {
     require_non_negative_amount(e, amount);
-    debit_unlocked(e, token, from, amount);
+    debit_unlocked(e, token, from, balance, amount);
 }
 
 // ################## LOW-LEVEL HELPERS ##################
@@ -376,65 +344,25 @@ pub fn on_destroyed(e: &Env, from: &Address, amount: i128, token: &Address) {
 /// # Security Warning
 ///
 /// This helper performs no authorization checks and does not validate that
-/// `total_locked` matches the lock entries or stays within the balance
-/// mirror. Callers must enforce both invariants themselves.
+/// `total_locked` matches the lock entries. Callers must enforce the invariant
+/// themselves.
 pub fn set_locked_details(e: &Env, token: &Address, wallet: &Address, details: &LockedDetails) {
     let key = InitialLockupPeriodStorageKey::LockedDetails(token.clone(), wallet.clone());
     e.storage().persistent().set(&key, details);
 }
 
-/// Writes the balance mirror for `(token, wallet)` directly to persistent
-/// storage, replacing any existing value.
+/// Debits `amount` from `wallet`'s holdings under `token`, given its token
+/// `balance` as of before the operation: when the amount dips into the locked
+/// region, expired lock entries are consumed oldest-first. The wallet's
+/// balance is owned by the token, so nothing is written unless locks are
+/// consumed.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token address.
 /// * `wallet` - The wallet address.
-/// * `balance` - The new balance to record.
-///
-/// # Security Warning
-///
-/// This helper performs no authorization checks and does not validate the
-/// balance against the wallet's locked amounts. Callers must keep the
-/// mirror consistent themselves.
-pub fn set_tracked_balance(e: &Env, token: &Address, wallet: &Address, balance: i128) {
-    let key = InitialLockupPeriodStorageKey::Balance(token.clone(), wallet.clone());
-    e.storage().persistent().set(&key, &balance);
-}
-
-/// Credits `amount` to `wallet`'s balance mirror under `token`.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token address.
-/// * `wallet` - The wallet address.
-/// * `amount` - The amount to credit. Must be non-negative; the caller is
-///   responsible for validating it before calling.
-///
-/// # Errors
-///
-/// * [`ComplianceModuleError::MathOverflow`] - When adding `amount` to the
-///   current balance overflows.
-///
-/// # Security Warning
-///
-/// This helper performs no authorization checks.
-pub fn credit_balance(e: &Env, token: &Address, wallet: &Address, amount: i128) {
-    let balance = get_tracked_balance(e, token, wallet);
-    set_tracked_balance(e, token, wallet, add_i128_or_panic(e, balance, amount));
-}
-
-/// Debits `amount` from `wallet`'s holdings under `token`: when the amount
-/// dips into the locked region, expired lock entries are consumed
-/// oldest-first before the balance mirror is decremented.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `token` - The token address.
-/// * `wallet` - The wallet address.
+/// * `balance` - The wallet's token balance, as of before the operation.
 /// * `amount` - The amount to debit. Must be non-negative; the caller is
 ///   responsible for validating it before calling.
 ///
@@ -442,16 +370,19 @@ pub fn credit_balance(e: &Env, token: &Address, wallet: &Address, amount: i128) 
 ///
 /// * [`ComplianceModuleError::InsufficientUnlockedBalance`] - When `amount`
 ///   exceeds the wallet's unlocked holdings.
-/// * [`ComplianceModuleError::MathUnderflow`] - When the balance mirror would
-///   go negative.
 ///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
-pub fn debit_unlocked(e: &Env, token: &Address, wallet: &Address, amount: i128) {
-    let balance = get_tracked_balance(e, token, wallet);
+pub fn debit_unlocked(e: &Env, token: &Address, wallet: &Address, balance: i128, amount: i128) {
     let mut details = get_locked_details(e, token, wallet);
 
+    if amount > unlocked_balance(e, balance, &details) {
+        panic_with_error!(e, ComplianceModuleError::InsufficientUnlockedBalance);
+    }
+
+    // If the spend reaches past the never-locked portion, consume expired
+    // locks oldest-first to cover the difference.
     if details.total_locked > 0 {
         let free = (balance - details.total_locked).max(0);
         if amount > free {
@@ -459,18 +390,11 @@ pub fn debit_unlocked(e: &Env, token: &Address, wallet: &Address, amount: i128) 
             set_locked_details(e, token, wallet, &details);
         }
     }
-
-    let next = sub_i128_or_panic(e, balance, amount);
-    if next < 0 {
-        panic_with_error!(e, ComplianceModuleError::MathUnderflow);
-    }
-    set_tracked_balance(e, token, wallet, next);
 }
 
-/// Returns the amount `wallet` can currently spend, given its already-read
-/// `details`: the free portion of the balance mirror plus expired locks.
-fn unlocked_balance(e: &Env, token: &Address, wallet: &Address, details: &LockedDetails) -> i128 {
-    let balance = get_tracked_balance(e, token, wallet);
+/// Returns the amount `wallet` can currently spend, given its `balance` and
+/// already-read `details`: the free (never-locked) portion plus expired locks.
+fn unlocked_balance(e: &Env, balance: i128, details: &LockedDetails) -> i128 {
     let free = (balance - details.total_locked).max(0);
     add_i128_or_panic(e, free, expired_amount(e, &details.locks))
 }

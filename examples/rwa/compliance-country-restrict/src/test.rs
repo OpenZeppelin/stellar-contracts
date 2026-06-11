@@ -5,6 +5,7 @@ use soroban_sdk::{
     String, Val, Vec,
 };
 use stellar_tokens::rwa::{
+    compliance::AccountSnapshot,
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
         IndividualCountryRelation, OrganizationCountryRelation,
@@ -13,6 +14,11 @@ use stellar_tokens::rwa::{
 };
 
 use crate::contract::{CountryRestrictContract, CountryRestrictContractClient};
+
+/// This module ignores balance and frozen amounts, so they are left at zero.
+fn snap(address: &Address) -> AccountSnapshot {
+    AccountSnapshot { address: address.clone(), balance: 0, frozen: 0 }
+}
 
 fn create_client<'a>(
     e: &Env,
@@ -284,7 +290,7 @@ fn can_transfer_panics_when_irs_not_configured() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    client.can_transfer(&from, &to, &100_i128, &token);
+    client.can_transfer(&snap(&from), &snap(&to), &100_i128, &None, &token);
 }
 
 #[test]
@@ -311,8 +317,8 @@ fn can_transfer_and_can_create_use_irs_country_entries() {
     client.set_identity_registry_storage(&token, &irs_id, &manager);
     client.add_country_restriction(&token, &276, &manager);
 
-    assert!(client.can_transfer(&from, &allowed_to, &amount, &token));
-    assert!(client.can_create(&allowed_to, &amount, &token));
-    assert!(!client.can_transfer(&from, &restricted_to, &amount, &token));
-    assert!(!client.can_create(&restricted_to, &amount, &token));
+    assert!(client.can_transfer(&snap(&from), &snap(&allowed_to), &amount, &None, &token));
+    assert!(client.can_create(&snap(&allowed_to), &amount, &token));
+    assert!(!client.can_transfer(&snap(&from), &snap(&restricted_to), &amount, &None, &token));
+    assert!(!client.can_create(&snap(&restricted_to), &amount, &token));
 }

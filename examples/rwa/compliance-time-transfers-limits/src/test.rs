@@ -6,12 +6,20 @@ use soroban_sdk::{
     vec, Address, Env, String, Val, Vec,
 };
 use stellar_tokens::rwa::{
-    compliance::modules::time_transfers_limits::{TransferCounter, TransferLimit, MAX_LIMITS},
+    compliance::{
+        modules::time_transfers_limits::{TransferCounter, TransferLimit, MAX_LIMITS},
+        AccountSnapshot,
+    },
     identity_registry_storage::{CountryDataManager, IdentityRegistryStorage},
     utils::token_binder::TokenBinder,
 };
 
 use crate::contract::{TimeTransfersLimitsContract, TimeTransfersLimitsContractClient};
+
+/// This module ignores balance and frozen amounts, so they are left at zero.
+fn snap(address: &Address) -> AccountSnapshot {
+    AccountSnapshot { address: address.clone(), balance: 0, frozen: 0 }
+}
 
 fn create_client<'a>(
     e: &Env,
@@ -233,7 +241,7 @@ fn transfers_accumulate_against_identity_windows() {
         &manager,
     );
 
-    client.on_transfer(&wallet_a, &to, &30_i128, &token);
+    client.on_transfer(&snap(&wallet_a), &snap(&to), &30_i128, &None, &token);
 
     assert_eq!(
         client.get_transfer_counter(&token, &identity, &100_u32),
@@ -241,8 +249,8 @@ fn transfers_accumulate_against_identity_windows() {
     );
 
     // Splitting the volume across wallets does not raise the cap.
-    assert!(client.can_transfer(&wallet_b, &to, &20_i128, &token));
-    assert!(!client.can_transfer(&wallet_b, &to, &21_i128, &token));
+    assert!(client.can_transfer(&snap(&wallet_b), &snap(&to), &20_i128, &None, &token));
+    assert!(!client.can_transfer(&snap(&wallet_b), &snap(&to), &21_i128, &None, &token));
 }
 
 #[test]
@@ -266,13 +274,13 @@ fn window_elapses_and_counting_restarts() {
         &manager,
     );
 
-    client.on_transfer(&from, &to, &50_i128, &token);
-    assert!(!client.can_transfer(&from, &to, &1_i128, &token));
+    client.on_transfer(&snap(&from), &snap(&to), &50_i128, &None, &token);
+    assert!(!client.can_transfer(&snap(&from), &snap(&to), &1_i128, &None, &token));
 
     e.ledger().with_mut(|li| li.sequence_number = 100);
-    assert!(client.can_transfer(&from, &to, &50_i128, &token));
+    assert!(client.can_transfer(&snap(&from), &snap(&to), &50_i128, &None, &token));
 
-    client.on_transfer(&from, &to, &10_i128, &token);
+    client.on_transfer(&snap(&from), &snap(&to), &10_i128, &None, &token);
     assert_eq!(
         client.get_transfer_counter(&token, &from, &100_u32),
         TransferCounter { value: 10, deadline: 200 }
@@ -301,7 +309,7 @@ fn on_transfer_panics_when_limit_exceeded() {
         &manager,
     );
 
-    client.on_transfer(&from, &to, &51_i128, &token);
+    client.on_transfer(&snap(&from), &snap(&to), &51_i128, &None, &token);
 }
 
 #[test]
@@ -316,7 +324,7 @@ fn can_transfer_true_when_no_limits_configured() {
     let client = create_client(&e, &admin, &manager);
 
     // No limits and no IRS: the identity lookup is skipped entirely.
-    assert!(client.can_transfer(&from, &to, &100_i128, &token));
+    assert!(client.can_transfer(&snap(&from), &snap(&to), &100_i128, &None, &token));
 }
 
 #[test]
@@ -329,7 +337,7 @@ fn can_create_always_allows() {
     let to = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    assert!(client.can_create(&to, &100_i128, &token));
+    assert!(client.can_create(&snap(&to), &100_i128, &token));
 }
 
 #[test]

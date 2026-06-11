@@ -21,6 +21,8 @@ mod test;
 
 use soroban_sdk::{contracterror, contracttrait, Address, Env, String};
 
+use crate::rwa::compliance::AccountSnapshot;
+
 /// Trait for compliance modules that can be registered with the modular
 /// compliance system.
 ///
@@ -103,7 +105,7 @@ use soroban_sdk::{contracterror, contracttrait, Address, Env, String};
 /// `require_auth()` on it:
 ///
 /// ```ignore
-/// fn on_transfer(e: &Env, _from: Address, _to: Address, _amount: i128, token: Address) {
+/// fn on_transfer(e: &Env, _from: AccountSnapshot, _to: AccountSnapshot, _amount: i128, _spender: Option<Address>, token: Address) {
 ///     // Only the dispatcher bound to `token` may drive this module's
 ///     // state for that token. A malicious caller passing a forged `token`
 ///     // argument cannot satisfy this auth check because they did not
@@ -136,9 +138,11 @@ pub trait ComplianceModule {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `from` - The address of the sender.
-    /// * `to` - The address of the receiver.
+    /// * `from` - Snapshot of the sender, as of before the transfer.
+    /// * `to` - Snapshot of the receiver, as of before the transfer.
     /// * `amount` - The amount of tokens transferred.
+    /// * `spender` - For a `transfer_from`, the delegate that moved the tokens;
+    ///   `None` for a direct or forced transfer.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
     /// # Notes
@@ -147,14 +151,21 @@ pub trait ComplianceModule {
     /// documentation. If this implementation mutates state, the trait-level
     /// `# Security Note` applies — authenticate the caller via
     /// [`storage::get_compliance_address`].
-    fn on_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address);
+    fn on_transfer(
+        e: &Env,
+        from: AccountSnapshot,
+        to: AccountSnapshot,
+        amount: i128,
+        spender: Option<Address>,
+        token: Address,
+    );
 
     /// Called when tokens are created/minted (for Created hook).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `to` - The address receiving the tokens.
+    /// * `to` - Snapshot of the receiver, as of before the mint.
     /// * `amount` - The amount of tokens created.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
@@ -164,14 +175,14 @@ pub trait ComplianceModule {
     /// documentation. If this implementation mutates state, the trait-level
     /// `# Security Note` applies — authenticate the caller via
     /// [`storage::get_compliance_address`].
-    fn on_created(e: &Env, to: Address, amount: i128, token: Address);
+    fn on_created(e: &Env, to: AccountSnapshot, amount: i128, token: Address);
 
     /// Called when tokens are destroyed/burned (for Destroyed hook).
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `from` - The address from which tokens are burned.
+    /// * `from` - Snapshot of the burned wallet, as of before the burn.
     /// * `amount` - The amount of tokens destroyed.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
@@ -181,7 +192,7 @@ pub trait ComplianceModule {
     /// documentation. If this implementation mutates state, the trait-level
     /// `# Security Note` applies — authenticate the caller via
     /// [`storage::get_compliance_address`].
-    fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address);
+    fn on_destroyed(e: &Env, from: AccountSnapshot, amount: i128, token: Address);
 
     /// Called to check if a transfer should be allowed (for CanTransfer hook).
     /// Returns `true` if the transfer should be allowed, `false` otherwise.
@@ -191,16 +202,25 @@ pub trait ComplianceModule {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `from` - The address of the sender.
-    /// * `to` - The address of the receiver.
+    /// * `from` - Snapshot of the sender, as of before the transfer.
+    /// * `to` - Snapshot of the receiver, as of before the transfer.
     /// * `amount` - The amount of tokens to transfer.
+    /// * `spender` - For a `transfer_from`, the delegate that moved the tokens;
+    ///   `None` for a direct or forced transfer.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
     /// # Notes
     ///
     /// No default implementation is provided; see the trait-level
     /// documentation.
-    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool;
+    fn can_transfer(
+        e: &Env,
+        from: AccountSnapshot,
+        to: AccountSnapshot,
+        amount: i128,
+        spender: Option<Address>,
+        token: Address,
+    ) -> bool;
 
     /// Called to check if a mint operation should be allowed (for CanCreate
     /// hook). Returns `true` if the mint operation should be allowed,
@@ -211,7 +231,7 @@ pub trait ComplianceModule {
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `to` - The address of the receiver.
+    /// * `to` - Snapshot of the receiver, as of before the mint.
     /// * `amount` - The amount of tokens to mint.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
@@ -219,7 +239,7 @@ pub trait ComplianceModule {
     ///
     /// No default implementation is provided; see the trait-level
     /// documentation.
-    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool;
+    fn can_create(e: &Env, to: AccountSnapshot, amount: i128, token: Address) -> bool;
 
     /// Returns the name of the module for identification purposes.
     ///
@@ -299,8 +319,6 @@ pub enum ComplianceModuleError {
     /// A transfer or burn would consume more unlocked tokens than the sender
     /// holds.
     InsufficientUnlockedBalance = 399,
-    /// The aggregate locked amount in a preset exceeds the provided balance.
-    LockedAmountExceedsBalance = 400,
     /// A transfer would push the sender identity's cumulative volume above a
     /// configured time-window limit.
     TransferLimitExceeded = 401,

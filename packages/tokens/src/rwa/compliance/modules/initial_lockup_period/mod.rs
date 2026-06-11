@@ -9,12 +9,13 @@
 //!
 //! The upstream Solidity module reads the sender's live balance from the
 //! token contract during hook execution. Soroban prohibits reentrancy, and
-//! these hooks run while the token contract is still on the call stack, so
-//! a cross-contract `balance()` call is not possible. Instead, this module
-//! maintains its own per-wallet balance mirror, updated by the
-//! [`crate::rwa::compliance::ComplianceHook::Transferred`],
-//! [`crate::rwa::compliance::ComplianceHook::Created`], and
-//! [`crate::rwa::compliance::ComplianceHook::Destroyed`] hooks.
+//! these hooks run while the token contract is still on the call stack, so a
+//! cross-contract `balance()` call is not possible. Instead, the token hands
+//! each hook an [`crate::rwa::compliance::AccountSnapshot`] carrying the
+//! wallet's pre-operation balance, and this module tracks only the lock
+//! schedule: how much of that balance is still locked. The spendable
+//! (unlocked) amount is then `balance - locked`, computed afresh on every
+//! hook. No balance is mirrored.
 //!
 //! [trex-src]: https://github.com/TokenySolutions/T-REX/blob/develop/contracts/compliance/modular/modules/InitialLockupPeriodModule.sol
 
@@ -42,29 +43,30 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// consumed oldest-first and removed. Mints themselves are never blocked by
 /// this module: they are the operation that creates locks.
 ///
-/// The module **maintains its own state**: per-wallet lock entries plus a
-/// balance mirror that tracks each wallet's token balance. Correct
-/// accounting therefore requires the module to be registered on **all** of
+/// The module **maintains its own state**: per-wallet lock entries that
+/// record how much of a wallet's balance is still locked. Correct accounting
+/// requires the module to be registered on **all** of
 /// [`crate::rwa::compliance::ComplianceHook::Transferred`],
 /// [`crate::rwa::compliance::ComplianceHook::Created`], and
 /// [`crate::rwa::compliance::ComplianceHook::Destroyed`] in addition to the
-/// validation hook [`crate::rwa::compliance::ComplianceHook::CanTransfer`].
-/// Missing a state-mutating hook causes the mirror to drift from reality.
+/// validation hook [`crate::rwa::compliance::ComplianceHook::CanTransfer`]:
+/// `Created` appends a lock on every mint, while `Transferred` and
+/// `Destroyed` consume expired locks as the wallet spends, keeping the
+/// recorded total in step with what the wallet actually holds. Missing a
+/// state-mutating hook leaves stale locks on the books.
 ///
-/// The transfer check trusts the mirror alone, never the token's actual
-/// balances: a wallet can spend at most its mirrored balance minus
-/// whatever is still locked. A token that registers this module at launch
-/// needs nothing more, since every wallet's mirror grows from zero through
-/// the hooks and never drifts. A token whose holders already own balances
-/// starts with every mirror at zero instead, leaving those holders unable
-/// to send. For that migration case the trait exposes a one-shot preset
-/// phase: the operator copies each holder's real balance (and any
-/// pre-existing locks) into the module via
-/// [`InitialLockupPeriod::preset_lockup_state`], and, once every holder is
-/// seeded, permanently closes the phase with
-/// [`InitialLockupPeriod::mark_preset_completed`]. Closing the phase is
-/// what makes the seeding trustworthy: afterwards no one, the operator
-/// included, can rewrite a wallet's mirrored state by hand.
+/// The wallet's balance is never mirrored: the token passes it into each
+/// hook via [`crate::rwa::compliance::AccountSnapshot`], and the module
+/// derives the spendable amount as `balance - still_locked` on the spot. A
+/// token that registers this module at launch needs nothing more. A token
+/// whose holders already own locked allocations can seed those locks before
+/// binding the module, through a one-shot preset phase:
+/// [`InitialLockupPeriod::preset_locks`] records each wallet's pre-existing
+/// locks, and [`InitialLockupPeriod::mark_preset_completed`] permanently
+/// closes the phase. Closing it is what makes the seeding trustworthy:
+/// afterwards no one, the operator included, can rewrite a wallet's locks by
+/// hand. Holders with no pre-existing locks need no preset at all, since
+/// tokens received through transfers are never locked.
 ///
 /// Locks are tracked per wallet (not per identity) and per-`token`, so a
 /// single module contract can serve multiple tokens with independent
@@ -99,48 +101,44 @@ pub trait InitialLockupPeriod: ComplianceModule {
     /// for the implementation.
     fn set_lockup_period(e: &Env, token: Address, period: u32, operator: Address);
 
-    /// Pre-seeds the lockup state for `wallet` under `token`: the balance
-    /// mirror and any pre-existing lock entries.
+    /// Pre-seeds the lock entries for `wallet` under `token`.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
     /// * `token` - The token whose lockup state is being seeded.
-    /// * `wallet` - The wallet whose state is being seeded.
-    /// * `balance` - The wallet's token balance to mirror.
+    /// * `wallet` - The wallet whose locks are being seeded.
     /// * `locks` - The lock entries to record for `wallet`.
     /// * `operator` - The address authorized to perform this operation.
     ///
     /// # Errors
     ///
     /// * [`crate::rwa::compliance::modules::ComplianceModuleError::InvalidAmount`] -
-    ///   When `balance` or any lock amount is negative.
+    ///   When any lock amount is negative.
     /// * [`crate::rwa::compliance::modules::ComplianceModuleError::PresetAlreadyCompleted`] -
     ///   When the preset phase has already been finalized.
     /// * [`crate::rwa::compliance::modules::ComplianceModuleError::MathOverflow`] -
     ///   When summing the lock amounts overflows.
-    /// * [`crate::rwa::compliance::modules::ComplianceModuleError::LockedAmountExceedsBalance`] -
-    ///   When the aggregate locked amount exceeds `balance`.
     ///
     /// # Events
     ///
     /// * topics - `["lockup_state_preset", token: Address, wallet: Address]`
-    /// * data - `[balance: i128, total_locked: i128]`
+    /// * data - `[total_locked: i128]`
     ///
     /// # Notes
     ///
     /// * Intended for registering this module on a token whose holders must
     ///   start with locks already in place; only callable before
-    ///   [`InitialLockupPeriod::mark_preset_completed`].
+    ///   [`InitialLockupPeriod::mark_preset_completed`]. Each wallet's balance
+    ///   is read from the token on every hook, so only the locks are seeded.
     /// * No default implementation is provided because this is a privileged
     ///   operation that requires custom access control. Access control should
-    ///   be enforced on `operator` before calling
-    ///   [`storage::preset_lockup_state`] for the implementation.
-    fn preset_lockup_state(
+    ///   be enforced on `operator` before calling [`storage::preset_locks`] for
+    ///   the implementation.
+    fn preset_locks(
         e: &Env,
         token: Address,
         wallet: Address,
-        balance: i128,
         locks: Vec<LockedTokens>,
         operator: Address,
     );
@@ -189,19 +187,12 @@ pub trait InitialLockupPeriod: ComplianceModule {
         storage::get_locked_details(e, &token, &wallet)
     }
 
-    /// Returns the balance mirror tracked for `wallet` under `token`.
+    /// Returns the amount still locked for `wallet` under `token`: the
+    /// aggregate of lock entries whose release time has not yet passed.
     ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `token` - The token address.
-    /// * `wallet` - The wallet address.
-    fn get_tracked_balance(e: &Env, token: Address, wallet: Address) -> i128 {
-        storage::get_tracked_balance(e, &token, &wallet)
-    }
-
-    /// Returns the amount `wallet` can currently spend under `token`: the
-    /// tracked balance minus lock entries that have not released yet.
+    /// This module tracks locks, not balances. Subtract this from the wallet's
+    /// token balance for the spendable amount: `unlocked = balance -
+    /// locked_amount`.
     ///
     /// # Arguments
     ///
@@ -211,9 +202,9 @@ pub trait InitialLockupPeriod: ComplianceModule {
     ///
     /// # Errors
     ///
-    /// * refer to [`storage::get_unlocked_balance`] errors.
-    fn get_unlocked_balance(e: &Env, token: Address, wallet: Address) -> i128 {
-        storage::get_unlocked_balance(e, &token, &wallet)
+    /// * refer to [`storage::get_locked_amount`] errors.
+    fn get_locked_amount(e: &Env, token: Address, wallet: Address) -> i128 {
+        storage::get_locked_amount(e, &token, &wallet)
     }
 
     /// Returns `true` when the preset phase for `token` has been finalized.
@@ -249,8 +240,8 @@ pub fn emit_lockup_period_set(e: &Env, token: &Address, period: u32) {
     LockupPeriodSet { token: token.clone(), period }.publish(e);
 }
 
-/// Emitted when a wallet's lockup state is pre-seeded during the migration
-/// preset phase.
+/// Emitted when a wallet's locks are pre-seeded during the migration preset
+/// phase.
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LockupStatePreset {
@@ -258,7 +249,6 @@ pub struct LockupStatePreset {
     pub token: Address,
     #[topic]
     pub wallet: Address,
-    pub balance: i128,
     pub total_locked: i128,
 }
 
@@ -268,18 +258,10 @@ pub struct LockupStatePreset {
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `token` - The token whose lockup state changed.
-/// * `wallet` - The wallet whose state was seeded.
-/// * `balance` - The mirrored balance recorded for `wallet`.
+/// * `wallet` - The wallet whose locks were seeded.
 /// * `total_locked` - The aggregate locked amount recorded for `wallet`.
-pub fn emit_lockup_state_preset(
-    e: &Env,
-    token: &Address,
-    wallet: &Address,
-    balance: i128,
-    total_locked: i128,
-) {
-    LockupStatePreset { token: token.clone(), wallet: wallet.clone(), balance, total_locked }
-        .publish(e);
+pub fn emit_lockup_state_preset(e: &Env, token: &Address, wallet: &Address, total_locked: i128) {
+    LockupStatePreset { token: token.clone(), wallet: wallet.clone(), total_locked }.publish(e);
 }
 
 /// Emitted when the preset phase for a token is finalized.

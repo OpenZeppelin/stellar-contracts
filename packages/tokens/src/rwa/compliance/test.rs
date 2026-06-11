@@ -9,13 +9,19 @@ use crate::rwa::{
             add_module_to, can_create, can_transfer, created, destroyed, get_modules_for_hook,
             is_module_registered, remove_module_from, transferred,
         },
-        ComplianceHook, MAX_MODULES,
+        AccountSnapshot, ComplianceHook, MAX_MODULES,
     },
     utils::token_binder::bind_token,
 };
 
 #[contract]
 struct MockContract;
+
+/// Builds a snapshot for the hook-execution tests. The mock module ignores
+/// the balance and frozen fields, so they are left at zero.
+fn snapshot(address: &Address) -> AccountSnapshot {
+    AccountSnapshot { address: address.clone(), balance: 0, frozen: 0 }
+}
 
 #[test]
 fn add_module_to_works() {
@@ -325,30 +331,38 @@ struct MockComplianceModule;
 
 #[contractimpl]
 impl MockComplianceModule {
-    pub fn on_transfer(_env: Env, _from: Address, _to: Address, _amount: i128, _contract: Address) {
+    pub fn on_transfer(
+        _env: Env,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
+        _amount: i128,
+        _spender: Option<Address>,
+        _contract: Address,
+    ) {
         // Mock implementation - does nothing but proves it was called
     }
 
-    pub fn on_created(_env: Env, _to: Address, _amount: i128, _contract: Address) {
+    pub fn on_created(_env: Env, _to: AccountSnapshot, _amount: i128, _contract: Address) {
         // Mock implementation - does nothing but proves it was called
     }
 
-    pub fn on_destroyed(_env: Env, _from: Address, _amount: i128, _contract: Address) {
+    pub fn on_destroyed(_env: Env, _from: AccountSnapshot, _amount: i128, _contract: Address) {
         // Mock implementation - does nothing but proves it was called
     }
 
     pub fn can_transfer(
         _env: Env,
-        _from: Address,
-        _to: Address,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
         amount: i128,
+        _spender: Option<Address>,
         _contract: Address,
     ) -> bool {
         // Mock implementation - returns true for even amounts, false for odd amounts
         amount % 2 == 0
     }
 
-    pub fn can_create(_env: Env, _to: Address, amount: i128, _contract: Address) -> bool {
+    pub fn can_create(_env: Env, _to: AccountSnapshot, amount: i128, _contract: Address) -> bool {
         // Mock implementation - returns true for even amounts, false for odd amounts
         amount % 2 == 0
     }
@@ -373,7 +387,14 @@ fn transferred_hook_execution_works() {
         add_module_to(&e, ComplianceHook::Transferred, module_address.clone());
 
         // Execute transferred hook
-        transferred(&e, from.clone(), to.clone(), amount, token_contract_address.clone());
+        transferred(
+            &e,
+            snapshot(&from),
+            snapshot(&to),
+            amount,
+            None,
+            token_contract_address.clone(),
+        );
     });
 }
 
@@ -395,7 +416,7 @@ fn created_hook_execution_works() {
         add_module_to(&e, ComplianceHook::Created, module_address.clone());
 
         // Execute created hook
-        created(&e, to.clone(), amount, token_contract_address.clone());
+        created(&e, snapshot(&to), amount, token_contract_address.clone());
     });
 }
 
@@ -417,7 +438,7 @@ fn destroyed_hook_execution_works() {
         add_module_to(&e, ComplianceHook::Destroyed, module_address.clone());
 
         // Execute destroyed hook
-        destroyed(&e, from.clone(), amount, token_contract_address.clone());
+        destroyed(&e, snapshot(&from), amount, token_contract_address.clone());
     });
 }
 
@@ -434,7 +455,14 @@ fn can_transfer_hook_execution_works() {
 
     e.as_contract(&contract_address, || {
         // Test with no modules registered - should return true
-        assert!(can_transfer(&e, from.clone(), to.clone(), amount, token_contract_address.clone()));
+        assert!(can_transfer(
+            &e,
+            snapshot(&from),
+            snapshot(&to),
+            amount,
+            None,
+            token_contract_address.clone()
+        ));
 
         // Add module to CanTransfer hook
         add_module_to(&e, ComplianceHook::CanTransfer, module_address.clone());
@@ -443,9 +471,10 @@ fn can_transfer_hook_execution_works() {
         let even_amount = 1000i128;
         assert!(can_transfer(
             &e,
-            from.clone(),
-            to.clone(),
+            snapshot(&from),
+            snapshot(&to),
             even_amount,
+            None,
             token_contract_address.clone()
         ));
 
@@ -453,9 +482,10 @@ fn can_transfer_hook_execution_works() {
         let odd_amount = 1001i128;
         assert!(!can_transfer(
             &e,
-            from.clone(),
-            to.clone(),
+            snapshot(&from),
+            snapshot(&to),
             odd_amount,
+            None,
             token_contract_address.clone()
         ));
     });
@@ -477,7 +507,14 @@ fn can_transfer_returns_false_when_module_rejects() {
 
         // Execute can_transfer hook with odd amount - should return false
         let odd_amount = 1001i128;
-        assert!(!can_transfer(&e, from, to, odd_amount, token_contract_address));
+        assert!(!can_transfer(
+            &e,
+            snapshot(&from),
+            snapshot(&to),
+            odd_amount,
+            None,
+            token_contract_address
+        ));
     });
 }
 
@@ -493,18 +530,18 @@ fn can_create_hook_execution_works() {
     e.as_contract(&contract_address, || {
         // Test with no modules registered - should return true
         let amount = 1000i128;
-        assert!(can_create(&e, to.clone(), amount, token_contract_address.clone()));
+        assert!(can_create(&e, snapshot(&to), amount, token_contract_address.clone()));
 
         // Add module to CanCreate hook
         add_module_to(&e, ComplianceHook::CanCreate, module_address.clone());
 
         // Execute can_create hook with even amount - should return true
         let even_amount = 1000i128;
-        assert!(can_create(&e, to.clone(), even_amount, token_contract_address.clone()));
+        assert!(can_create(&e, snapshot(&to), even_amount, token_contract_address.clone()));
 
         // Execute can_create hook with odd amount - should return false
         let odd_amount = 1001i128;
-        assert!(!can_create(&e, to.clone(), odd_amount, token_contract_address.clone()));
+        assert!(!can_create(&e, snapshot(&to), odd_amount, token_contract_address.clone()));
     });
 }
 
@@ -525,10 +562,10 @@ fn can_create_multiple_modules_all_must_pass() {
 
         // Test with even amount - both modules should return true, so result is true
         let even_amount = 1000i128;
-        assert!(can_create(&e, to.clone(), even_amount, token_contract_address.clone()));
+        assert!(can_create(&e, snapshot(&to), even_amount, token_contract_address.clone()));
 
         // Test with odd amount - both modules should return false, so result is false
         let odd_amount = 1001i128;
-        assert!(!can_create(&e, to, odd_amount, token_contract_address));
+        assert!(!can_create(&e, snapshot(&to), odd_amount, token_contract_address));
     });
 }

@@ -2,8 +2,9 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 
 use crate::rwa::{
     compliance::{
-        emit_module_added, emit_module_removed, modules::ComplianceModuleClient, ComplianceError,
-        ComplianceHook, COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
+        emit_module_added, emit_module_removed, modules::ComplianceModuleClient, AccountSnapshot,
+        ComplianceError, ComplianceHook, COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD,
+        MAX_MODULES,
     },
     utils::token_binder::is_token_bound,
 };
@@ -177,12 +178,13 @@ pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `from` - The address that sent the tokens.
-/// * `to` - The address that received the tokens.
+/// * `from` - Snapshot of the sender, as of before the transfer.
+/// * `to` - Snapshot of the receiver, as of before the transfer.
 /// * `amount` - The amount of tokens transferred.
+/// * `spender` - For a `transfer_from`, the delegate that moved the tokens;
+///   `None` for a direct or forced transfer.
 /// * `token` - The address of the token contract that is performing the
 ///   transfer.
-/// *
 ///
 /// # Errors
 ///
@@ -190,15 +192,23 @@ pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
 ///
 /// # Cross-Contract Calls
 ///
-/// Invokes `on_transfer(from, to, amount)` on each registered module.
-pub fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Address) {
+/// Invokes `on_transfer(from, to, amount, spender, token)` on each registered
+/// module.
+pub fn transferred(
+    e: &Env,
+    from: AccountSnapshot,
+    to: AccountSnapshot,
+    amount: i128,
+    spender: Option<Address>,
+    token: Address,
+) {
     require_auth_from_bound_token(e, &token);
 
     let modules = get_modules_for_hook(e, ComplianceHook::Transferred);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        client.on_transfer(&from, &to, &amount, &token);
+        client.on_transfer(&from, &to, &amount, &spender, &token);
     }
 }
 
@@ -210,7 +220,7 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Add
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `to` - The address that received the newly created tokens.
+/// * `to` - Snapshot of the receiver, as of before the mint.
 /// * `amount` - The amount of tokens created.
 /// * `token` - The address of the token contract that is performing the mint.
 ///
@@ -220,8 +230,8 @@ pub fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Add
 ///
 /// # Cross-Contract Calls
 ///
-/// Invokes `on_created(to, amount)` on each registered module.
-pub fn created(e: &Env, to: Address, amount: i128, token: Address) {
+/// Invokes `on_created(to, amount, token)` on each registered module.
+pub fn created(e: &Env, to: AccountSnapshot, amount: i128, token: Address) {
     require_auth_from_bound_token(e, &token);
 
     let modules = get_modules_for_hook(e, ComplianceHook::Created);
@@ -240,7 +250,7 @@ pub fn created(e: &Env, to: Address, amount: i128, token: Address) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `from` - The address from which tokens were destroyed.
+/// * `from` - Snapshot of the burned wallet, as of before the burn.
 /// * `amount` - The amount of tokens destroyed.
 /// * `token` - The address of the token contract that is performing the burn.
 ///
@@ -250,8 +260,8 @@ pub fn created(e: &Env, to: Address, amount: i128, token: Address) {
 ///
 /// # Cross-Contract Calls
 ///
-/// Invokes `on_destroyed(from, amount)` on each registered module.
-pub fn destroyed(e: &Env, from: Address, amount: i128, token: Address) {
+/// Invokes `on_destroyed(from, amount, token)` on each registered module.
+pub fn destroyed(e: &Env, from: AccountSnapshot, amount: i128, token: Address) {
     require_auth_from_bound_token(e, &token);
 
     let modules = get_modules_for_hook(e, ComplianceHook::Destroyed);
@@ -272,9 +282,11 @@ pub fn destroyed(e: &Env, from: Address, amount: i128, token: Address) {
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `from` - The address attempting to send tokens.
-/// * `to` - The address that would receive tokens.
+/// * `from` - Snapshot of the sender, as of before the transfer.
+/// * `to` - Snapshot of the receiver, as of before the transfer.
 /// * `amount` - The amount of tokens to be transferred.
+/// * `spender` - For a `transfer_from`, the delegate that moved the tokens;
+///   `None` for a direct or forced transfer.
 /// * `token` - The address of the token contract that is performing the
 ///   transfer.
 ///
@@ -285,14 +297,22 @@ pub fn destroyed(e: &Env, from: Address, amount: i128, token: Address) {
 ///
 /// # Cross-Contract Calls
 ///
-/// Invokes `can_transfer(from, to, amount)` on each registered module.
-/// Stops execution and returns `false` on the first module that rejects.
-pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
+/// Invokes `can_transfer(from, to, amount, spender, token)` on each registered
+/// module. Stops execution and returns `false` on the first module that
+/// rejects.
+pub fn can_transfer(
+    e: &Env,
+    from: AccountSnapshot,
+    to: AccountSnapshot,
+    amount: i128,
+    spender: Option<Address>,
+    token: Address,
+) -> bool {
     let modules = get_modules_for_hook(e, ComplianceHook::CanTransfer);
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        let result = client.can_transfer(&from, &to, &amount, &token);
+        let result = client.can_transfer(&from, &to, &amount, &spender, &token);
 
         // If any module returns false, the entire check fails
         if !result {
@@ -314,7 +334,7 @@ pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Ad
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `to` - The address that would receive tokens.
+/// * `to` - Snapshot of the receiver, as of before the mint.
 /// * `amount` - The amount of tokens to be transferred.
 /// * `token` - The address of the token contract that is performing the mint.
 ///
@@ -325,9 +345,9 @@ pub fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Ad
 ///
 /// # Cross-Contract Calls
 ///
-/// Invokes `can_create(to, amount)` on each registered module.
+/// Invokes `can_create(to, amount, token)` on each registered module.
 /// Stops execution and returns `false` on the first module that rejects.
-pub fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
+pub fn can_create(e: &Env, to: AccountSnapshot, amount: i128, token: Address) -> bool {
     let modules = get_modules_for_hook(e, ComplianceHook::CanCreate);
 
     for module_address in modules.iter() {

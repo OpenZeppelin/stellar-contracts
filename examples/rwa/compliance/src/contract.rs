@@ -4,7 +4,7 @@ use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, Symbol, Ve
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::only_role;
 use stellar_tokens::rwa::{
-    compliance::{self as compliance, Compliance, ComplianceHook},
+    compliance::{self as compliance, AccountSnapshot, Compliance, ComplianceHook},
     utils::token_binder::{self as binder, TokenBinder},
 };
 

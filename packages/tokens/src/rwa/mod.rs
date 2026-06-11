@@ -42,14 +42,18 @@
 //! modules to be available from external contracts:
 //!
 //! ### Compliance Module:
-//! - `fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token:
-//!   Address) -> bool;`
-//! - `fn can_create(e: &Env, to: Address, amount: i128, token: Address) ->
-//!   bool;`
-//! - `fn created(e: &Env, to: Address, amount: i128, token: Address);`
-//! - `fn destroyed(e: &Env, from: Address, amount: i128, token: Address);`
-//! - `fn transferred(e: &Env, from: Address, to: Address, amount: i128, token:
+//! Each account is passed as an [`compliance::AccountSnapshot`] capturing its
+//! pre-operation `balance` and `frozen` amount, so a module never needs to call
+//! back into the token (reentrancy is impossible in Soroban).
+//! - `fn can_transfer(e: &Env, from: AccountSnapshot, to: AccountSnapshot,
+//!   amount: i128, spender: Address, token: Address) -> bool;`
+//! - `fn can_create(e: &Env, to: AccountSnapshot, amount: i128, token: Address)
+//!   -> bool;`
+//! - `fn created(e: &Env, to: AccountSnapshot, amount: i128, token: Address);`
+//! - `fn destroyed(e: &Env, from: AccountSnapshot, amount: i128, token:
 //!   Address);`
+//! - `fn transferred(e: &Env, from: AccountSnapshot, to: AccountSnapshot,
+//!   amount: i128, spender: Address, token: Address);`
 //!
 //! ### Identity Verifier Module:
 //! - `fn verify_identity(e: &Env, account: &Address);`

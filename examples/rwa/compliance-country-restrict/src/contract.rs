@@ -1,10 +1,13 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::{only_admin, only_role};
-use stellar_tokens::rwa::compliance::modules::{
-    country_restrict::{storage as country_restrict, CountryRestrict},
-    storage::{self as compliance_storage, set_irs_address},
-    ComplianceModule,
+use stellar_tokens::rwa::compliance::{
+    modules::{
+        country_restrict::{storage as country_restrict, CountryRestrict},
+        storage::{self as compliance_storage, set_irs_address},
+        ComplianceModule,
+    },
+    AccountSnapshot,
 };
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -55,22 +58,37 @@ impl CountryRestrict for CountryRestrictContract {
 impl ComplianceModule for CountryRestrictContract {
     // No need to implement logic in these hooks for this module, as the compliance
     // check is only done in the can_transfer and can_create functions.
-    fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
-
-    // No need to implement logic in these hooks for this module, as the compliance
-    // check is only done in the can_transfer and can_create functions.
-    fn on_created(_e: &Env, _to: Address, _amount: i128, _token: Address) {}
-
-    // No need to implement logic in these hooks for this module, as the compliance
-    // check is only done in the can_transfer and can_create functions.
-    fn on_destroyed(_e: &Env, _from: Address, _amount: i128, _token: Address) {}
-
-    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
-        country_restrict::can_transfer(e, &from, &to, amount, &token)
+    fn on_transfer(
+        _e: &Env,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
+        _amount: i128,
+        _spender: Option<Address>,
+        _token: Address,
+    ) {
     }
 
-    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
-        country_restrict::can_create(e, &to, amount, &token)
+    // No need to implement logic in these hooks for this module, as the compliance
+    // check is only done in the can_transfer and can_create functions.
+    fn on_created(_e: &Env, _to: AccountSnapshot, _amount: i128, _token: Address) {}
+
+    // No need to implement logic in these hooks for this module, as the compliance
+    // check is only done in the can_transfer and can_create functions.
+    fn on_destroyed(_e: &Env, _from: AccountSnapshot, _amount: i128, _token: Address) {}
+
+    fn can_transfer(
+        e: &Env,
+        from: AccountSnapshot,
+        to: AccountSnapshot,
+        amount: i128,
+        _spender: Option<Address>,
+        token: Address,
+    ) -> bool {
+        country_restrict::can_transfer(e, &from.address, &to.address, amount, &token)
+    }
+
+    fn can_create(e: &Env, to: AccountSnapshot, amount: i128, token: Address) -> bool {
+        country_restrict::can_create(e, &to.address, amount, &token)
     }
 
     fn name(e: &Env) -> String {
