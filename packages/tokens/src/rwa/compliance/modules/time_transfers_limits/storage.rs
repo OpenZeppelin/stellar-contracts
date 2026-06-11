@@ -1,11 +1,14 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 
-use crate::rwa::compliance::modules::{
-    storage::{add_i128_or_panic, get_irs_client, require_non_negative_amount},
-    time_transfers_limits::{
-        emit_time_transfer_limit_removed, emit_time_transfer_limit_set, MAX_LIMITS,
+use crate::rwa::compliance::{
+    modules::{
+        storage::{add_i128_or_panic, get_irs_client, require_non_negative_amount},
+        time_transfers_limits::{
+            emit_time_transfer_limit_removed, emit_time_transfer_limit_set, MAX_LIMITS,
+        },
+        ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
     },
-    ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+    TransferKind,
 };
 
 /// A single time-window limit configured for a token: at most `limit_value`
@@ -101,54 +104,6 @@ pub fn get_transfer_counter(
     } else {
         TransferCounter { value: 0, deadline: 0 }
     }
-}
-
-/// Returns `true` when sending `amount` satisfies every configured
-/// time-window limit for the sender's identity: the amount alone must not
-/// exceed any window's cap, and within each unexpired window the running
-/// counter plus `amount` must stay at or below the cap.
-///
-/// Only the sender side is consulted; the recipient is intentionally
-/// ignored. The sender's identity is resolved through the token's IRS only
-/// when at least one limit is configured.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `from` - The sender address.
-/// * `_to` - The recipient address.
-/// * `amount` - The transfer amount.
-/// * `token` - The token address.
-///
-/// # Errors
-///
-/// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
-/// * [`ComplianceModuleError::MathOverflow`] - When the projected counter
-///   addition overflows.
-/// * refer to [`get_irs_client`] errors.
-pub fn can_transfer(e: &Env, from: &Address, _to: &Address, amount: i128, token: &Address) -> bool {
-    require_non_negative_amount(e, amount);
-
-    let limits = get_time_transfer_limits(e, token);
-    if limits.is_empty() {
-        return true;
-    }
-
-    let identity = get_irs_client(e, token).stored_identity(from);
-    let now = e.ledger().sequence();
-    for limit in limits.iter() {
-        if amount > limit.limit_value {
-            return false;
-        }
-        let counter = get_transfer_counter(e, token, &identity, limit.limit_duration);
-
-        // if the window is still open && the new counter value would exceed the limit
-        if counter.deadline > now && add_i128_or_panic(e, counter.value, amount) > limit.limit_value
-        {
-            return false;
-        }
-    }
-    true
 }
 
 // ################## CHANGE STATE ##################
@@ -296,12 +251,17 @@ pub fn batch_remove_time_transfer_limit(e: &Env, token: &Address, limit_duration
 /// are incremented. Panics when an increment would push a counter past its
 /// window's cap.
 ///
+/// Forced (admin/recovery) transfers are skipped entirely: they are not
+/// investor activity, so they neither consume the identity's window
+/// allowance nor get rejected by it.
+///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `from` - The sender address.
 /// * `_to` - The recipient address.
 /// * `amount` - The transferred amount.
+/// * `kind` - Who initiated the transfer and under what authority.
 /// * `token` - The token address.
 ///
 /// # Errors
@@ -310,14 +270,26 @@ pub fn batch_remove_time_transfer_limit(e: &Env, token: &Address, limit_duration
 /// * [`ComplianceModuleError::MathOverflow`] - When a counter addition
 ///   overflows.
 /// * [`ComplianceModuleError::TransferLimitExceeded`] - When the new counter
-///   value would exceed a configured window's cap.
+///   value would exceed a configured window's cap and the transfer is not
+///   forced.
 /// * refer to [`get_irs_client`] errors.
 ///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
-pub fn on_transfer(e: &Env, from: &Address, _to: &Address, amount: i128, token: &Address) {
+pub fn on_transfer(
+    e: &Env,
+    from: &Address,
+    _to: &Address,
+    amount: i128,
+    kind: &TransferKind,
+    token: &Address,
+) {
     require_non_negative_amount(e, amount);
+
+    if *kind == TransferKind::Forced {
+        return;
+    }
 
     let limits = get_time_transfer_limits(e, token);
     if limits.is_empty() {

@@ -6,10 +6,13 @@ use soroban_sdk::{
     vec, Address, Env, Vec,
 };
 
-use crate::rwa::compliance::modules::initial_lockup_period::storage::{
-    can_transfer, get_locked_amount, get_locked_details, get_lockup_period, is_preset_completed,
-    mark_preset_completed, on_created, on_destroyed, on_transfer, preset_locks, set_lockup_period,
-    LockedTokens,
+use crate::rwa::compliance::{
+    modules::initial_lockup_period::storage::{
+        debit_forced, get_locked_amount, get_locked_details, get_lockup_period,
+        is_preset_completed, mark_preset_completed, on_created, on_destroyed, on_transfer,
+        preset_locks, set_lockup_period, LockedTokens,
+    },
+    TransferKind,
 };
 
 #[contract]
@@ -81,24 +84,7 @@ fn on_created_zero_amount_creates_no_lock() {
 }
 
 #[test]
-fn can_transfer_rejects_locked_tokens() {
-    let e = Env::default();
-    let module_id = e.register(TestInitialLockupPeriodContract, ());
-    let token = Address::generate(&e);
-    let from = Address::generate(&e);
-
-    e.as_contract(&module_id, || {
-        set_lockup_period(&e, &token, 100);
-        on_created(&e, &from, 80, &token);
-
-        // The wallet holds 80, all of it still locked.
-        assert!(!can_transfer(&e, &from, 80, 1, &token));
-        assert!(can_transfer(&e, &from, 80, 0, &token));
-    });
-}
-
-#[test]
-fn can_transfer_allows_free_portion_only() {
+fn on_transfer_allows_free_portion_only() {
     let e = Env::default();
     let module_id = e.register(TestInitialLockupPeriodContract, ());
     let token = Address::generate(&e);
@@ -113,40 +99,9 @@ fn can_transfer_allows_free_portion_only() {
             &vec![&e, LockedTokens { amount: 100, release_ledger: 1_000 }],
         );
 
-        assert!(can_transfer(&e, &from, 150, 50, &token));
-        assert!(!can_transfer(&e, &from, 150, 51, &token));
-    });
-}
-
-#[test]
-fn can_transfer_allows_after_release() {
-    let e = Env::default();
-    let module_id = e.register(TestInitialLockupPeriodContract, ());
-    let token = Address::generate(&e);
-    let from = Address::generate(&e);
-
-    e.as_contract(&module_id, || {
-        set_lockup_period(&e, &token, 100);
-        on_created(&e, &from, 80, &token);
-        assert!(!can_transfer(&e, &from, 80, 80, &token));
-
-        e.ledger().with_mut(|li| li.sequence_number = 100);
-        assert!(can_transfer(&e, &from, 80, 80, &token));
-    });
-}
-
-#[test]
-fn can_transfer_with_no_locks_allows_full_balance() {
-    let e = Env::default();
-    let module_id = e.register(TestInitialLockupPeriodContract, ());
-    let token = Address::generate(&e);
-    let from = Address::generate(&e);
-
-    e.as_contract(&module_id, || {
-        // No locks recorded: the wallet can spend its whole balance, but not
-        // more than it holds.
-        assert!(can_transfer(&e, &from, 100, 100, &token));
-        assert!(!can_transfer(&e, &from, 100, 101, &token));
+        // Spending the free portion succeeds and leaves the lock untouched.
+        on_transfer(&e, &from, 150, 50, &TransferKind::Standard, &token);
+        assert_eq!(get_locked_details(&e, &token, &from).total_locked, 100);
     });
 }
 
@@ -161,7 +116,7 @@ fn on_transfer_without_locks_succeeds() {
         // No lockup period configured, so the mint creates no lock.
         on_created(&e, &from, 80, &token);
 
-        on_transfer(&e, &from, 80, 30, &token);
+        on_transfer(&e, &from, 80, 30, &TransferKind::Standard, &token);
 
         let details = get_locked_details(&e, &token, &from);
         assert_eq!(details.total_locked, 0);
@@ -182,7 +137,7 @@ fn on_transfer_consumes_expired_locks() {
 
         e.ledger().with_mut(|li| li.sequence_number = 100);
         // Sender holds 100 going into the transfer.
-        on_transfer(&e, &from, 100, 60, &token);
+        on_transfer(&e, &from, 100, 60, &TransferKind::Standard, &token);
 
         let details = get_locked_details(&e, &token, &from);
         assert_eq!(details.total_locked, 40);
@@ -205,7 +160,7 @@ fn on_transfer_consumes_locks_oldest_first() {
 
         e.ledger().with_mut(|li| li.sequence_number = 200);
         // Sender holds 100 going into the transfer.
-        on_transfer(&e, &from, 100, 70, &token);
+        on_transfer(&e, &from, 100, 70, &TransferKind::Standard, &token);
 
         let details = get_locked_details(&e, &token, &from);
         assert_eq!(details.total_locked, 30);
@@ -229,7 +184,7 @@ fn on_transfer_keeps_unexpired_locks_intact() {
 
         // Only the first lock has expired.
         e.ledger().with_mut(|li| li.sequence_number = 120);
-        on_transfer(&e, &from, 100, 50, &token);
+        on_transfer(&e, &from, 100, 50, &TransferKind::Standard, &token);
 
         let details = get_locked_details(&e, &token, &from);
         assert_eq!(details.total_locked, 50);
@@ -249,7 +204,7 @@ fn on_transfer_panics_when_tokens_still_locked() {
         set_lockup_period(&e, &token, 100);
         on_created(&e, &from, 80, &token);
 
-        on_transfer(&e, &from, 80, 1, &token);
+        on_transfer(&e, &from, 80, 1, &TransferKind::Standard, &token);
     });
 }
 
@@ -263,20 +218,99 @@ fn on_transfer_panics_when_balance_insufficient() {
 
     e.as_contract(&module_id, || {
         // No locks, but the spend exceeds the wallet's balance.
-        on_transfer(&e, &from, 5, 10, &token);
+        on_transfer(&e, &from, 5, 10, &TransferKind::Standard, &token);
     });
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #390)")]
-fn on_created_panics_on_negative_amount() {
+fn on_transfer_forced_consumes_active_locks() {
     let e = Env::default();
     let module_id = e.register(TestInitialLockupPeriodContract, ());
     let token = Address::generate(&e);
-    let wallet = Address::generate(&e);
+    let from = Address::generate(&e);
 
     e.as_contract(&module_id, || {
-        on_created(&e, &wallet, -1, &token);
+        set_lockup_period(&e, &token, 100);
+        on_created(&e, &from, 80, &token);
+
+        // Everything is still locked, but a forced transfer (recovery,
+        // seizure) is not rejected: the moved tokens' locks are consumed.
+        on_transfer(&e, &from, 80, 80, &TransferKind::Forced, &token);
+
+        let details = get_locked_details(&e, &token, &from);
+        assert_eq!(details.total_locked, 0);
+        assert_eq!(details.locks.len(), 0);
+    });
+}
+
+#[test]
+fn on_transfer_forced_uses_free_portion_first() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // 100 of the wallet's 150 stay locked until t=1000.
+        preset_locks(
+            &e,
+            &token,
+            &from,
+            &vec![&e, LockedTokens { amount: 100, release_ledger: 1_000 }],
+        );
+
+        // Forcing 70 out: 50 covered by the free portion, 20 consumed from
+        // the active lock.
+        on_transfer(&e, &from, 150, 70, &TransferKind::Forced, &token);
+
+        let details = get_locked_details(&e, &token, &from);
+        assert_eq!(details.total_locked, 80);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 80, release_ledger: 1_000 }]);
+    });
+}
+
+#[test]
+fn debit_forced_consumes_oldest_first_across_expiry() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_lockup_period(&e, &token, 100);
+        on_created(&e, &from, 50, &token); // releases at t=100
+        e.ledger().with_mut(|li| li.sequence_number = 10);
+        on_created(&e, &from, 50, &token); // releases at t=110
+
+        // Neither lock has released; forced debit still consumes
+        // oldest-first.
+        on_transfer(&e, &from, 100, 70, &TransferKind::Forced, &token);
+
+        let details = get_locked_details(&e, &token, &from);
+        assert_eq!(details.total_locked, 30);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 30, release_ledger: 110 }]);
+    });
+}
+
+#[test]
+fn debit_forced_tolerates_lock_shortfall() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // Locks exceed the wallet's actual balance (a mis-seeded preset):
+        // the forced debit consumes what exists and never panics.
+        preset_locks(
+            &e,
+            &token,
+            &from,
+            &vec![&e, LockedTokens { amount: 100, release_ledger: 1_000 }],
+        );
+
+        debit_forced(&e, &token, &from, 50, 50);
+        assert_eq!(get_locked_details(&e, &token, &from).total_locked, 50);
     });
 }
 
@@ -311,6 +345,19 @@ fn on_destroyed_panics_when_tokens_still_locked() {
         on_created(&e, &wallet, 80, &token);
 
         on_destroyed(&e, &wallet, 80, 1, &token);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #390)")]
+fn on_created_panics_on_negative_amount() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let wallet = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        on_created(&e, &wallet, -1, &token);
     });
 }
 

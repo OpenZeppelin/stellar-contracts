@@ -9,7 +9,7 @@ use stellar_tokens::rwa::compliance::{
         storage::{self as compliance_storage},
         ComplianceModule,
     },
-    AccountSnapshot,
+    AccountSnapshot, TransferKind,
 };
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -54,16 +54,19 @@ impl InitialLockupPeriod for InitialLockupPeriodContract {
 
 #[contractimpl(contracttrait)]
 impl ComplianceModule for InitialLockupPeriodContract {
+    // Enforces the lockup: panics with `InsufficientUnlockedBalance` when
+    // the transfer exceeds the sender's unlocked holdings (forced transfers
+    // consume locks instead of being rejected).
     fn on_transfer(
         e: &Env,
         from: AccountSnapshot,
         _to: AccountSnapshot,
         amount: i128,
-        _spender: Option<Address>,
+        kind: TransferKind,
         token: Address,
     ) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
-        initial_lockup_period::on_transfer(e, &from.address, from.balance, amount, &token);
+        initial_lockup_period::on_transfer(e, &from.address, from.balance, amount, &kind, &token);
     }
 
     fn on_created(e: &Env, to: AccountSnapshot, amount: i128, token: Address) {
@@ -74,23 +77,6 @@ impl ComplianceModule for InitialLockupPeriodContract {
     fn on_destroyed(e: &Env, from: AccountSnapshot, amount: i128, token: Address) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
         initial_lockup_period::on_destroyed(e, &from.address, from.balance, amount, &token);
-    }
-
-    fn can_transfer(
-        e: &Env,
-        from: AccountSnapshot,
-        _to: AccountSnapshot,
-        amount: i128,
-        _spender: Option<Address>,
-        token: Address,
-    ) -> bool {
-        initial_lockup_period::can_transfer(e, &from.address, from.balance, amount, &token)
-    }
-
-    // Mints are never blocked by this module: they are the operation that
-    // creates locks.
-    fn can_create(_e: &Env, _to: AccountSnapshot, _amount: i128, _token: Address) -> bool {
-        true
     }
 
     fn name(e: &Env) -> String {

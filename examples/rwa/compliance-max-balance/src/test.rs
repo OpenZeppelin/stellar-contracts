@@ -5,7 +5,7 @@ use soroban_sdk::{
     Vec,
 };
 use stellar_tokens::rwa::{
-    compliance::AccountSnapshot,
+    compliance::{AccountSnapshot, TransferKind},
     identity_registry_storage::{CountryDataManager, IdentityRegistryStorage},
     utils::token_binder::TokenBinder,
 };
@@ -238,32 +238,34 @@ fn set_max_balance_requires_manager_auth() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #396)")]
-fn can_transfer_panics_when_irs_not_configured() {
+fn on_transfer_panics_when_irs_not_configured() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
+    let compliance = Address::generate(&e);
     let from = Address::generate(&e);
     let to = Address::generate(&e);
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
+    client.set_compliance_address(&token, &compliance, &admin);
     client.set_max_balance(&token, &100_i128, &manager);
-    client.can_transfer(&snap(&from), &snap(&to), &10_i128, &None, &token);
+    client.on_transfer(&snap(&from), &snap(&to), &10_i128, &TransferKind::Standard, &token);
 }
 
 #[test]
-fn can_transfer_and_can_create_use_identity_aggregate() {
+#[should_panic(expected = "Error(Contract, #393)")]
+fn cap_applies_to_identity_aggregate() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
-    let from = Address::generate(&e);
+    let compliance = Address::generate(&e);
     let token = Address::generate(&e);
     let wallet_a = Address::generate(&e);
     let wallet_b = Address::generate(&e);
     let shared_id = Address::generate(&e);
-    let amount = 60_i128;
     let client = create_client(&e, &admin, &manager);
     let irs_id = e.register(MockIRSContract, ());
     let irs = MockIRSContractClient::new(&e, &irs_id);
@@ -272,14 +274,15 @@ fn can_transfer_and_can_create_use_identity_aggregate() {
     irs.set_identity(&wallet_a, &shared_id);
     irs.set_identity(&wallet_b, &shared_id);
 
+    client.set_compliance_address(&token, &compliance, &admin);
     client.set_identity_registry_storage(&token, &irs_id, &manager);
     client.set_max_balance(&token, &100_i128, &manager);
     client.preset_id_balance(&token, &shared_id, &50_i128, &manager);
 
-    // shared_id at 50; receiving 60 on either wallet would push to 110.
-    assert!(!client.can_transfer(&snap(&from), &snap(&wallet_a), &amount, &None, &token));
-    assert!(!client.can_create(&snap(&wallet_b), &amount, &token));
-    assert!(client.can_transfer(&snap(&from), &snap(&wallet_a), &30_i128, &None, &token));
+    // shared_id at 50: minting the headroom on one wallet succeeds, one
+    // token more on the other wallet breaches the shared cap.
+    client.on_created(&snap(&wallet_a), &50_i128, &token);
+    client.on_created(&snap(&wallet_b), &1_i128, &token);
 }
 
 #[test]

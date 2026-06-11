@@ -34,17 +34,17 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// transfer after its window elapsed and resets once the window passes.
 ///
 /// Only outgoing transfers are counted and checked. Mints and burns are
-/// exempt. The upstream Solidity module also exempts token agents from
-/// the check; this port has no agent concept, so deployments needing
+/// exempt, as are forced (admin/recovery) transfers: those are not investor
+/// activity, so they neither consume the window allowance nor get rejected
+/// by it. The upstream Solidity module also exempts token agents from the
+/// check; this port has no agent concept, so deployments needing further
 /// exemptions should layer them in their contract's
-/// [`ComplianceModule::can_transfer`] implementation.
+/// [`ComplianceModule::on_transfer`] implementation.
 ///
 /// The module **maintains its own state**: it accumulates sender volume on
-/// every transfer. Correct accounting therefore requires the module to be
-/// registered on [`crate::rwa::compliance::ComplianceHook::Transferred`]
-/// in addition to the validation hook
-/// [`crate::rwa::compliance::ComplianceHook::CanTransfer`]. Missing the
-/// state-mutating hook causes the counters to drift from reality.
+/// every standard transfer. The module must be registered on
+/// [`crate::rwa::compliance::ComplianceHook::Transferred`], which both
+/// enforces the windows (by panicking) and updates the counters.
 ///
 /// This trait is designed to be used in conjunction with the
 /// [`ComplianceModule`] trait.

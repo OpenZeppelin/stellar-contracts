@@ -1,11 +1,14 @@
 use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 
-use crate::rwa::compliance::modules::{
-    initial_lockup_period::{
-        emit_lockup_period_set, emit_lockup_state_preset, emit_preset_completed,
+use crate::rwa::compliance::{
+    modules::{
+        initial_lockup_period::{
+            emit_lockup_period_set, emit_lockup_state_preset, emit_preset_completed,
+        },
+        storage::{add_i128_or_panic, require_non_negative_amount, sub_i128_or_panic},
+        ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
     },
-    storage::{add_i128_or_panic, require_non_negative_amount, sub_i128_or_panic},
-    ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+    TransferKind,
 };
 
 /// A single mint-created lock: `amount` tokens that release once the
@@ -119,31 +122,6 @@ pub fn is_preset_completed(e: &Env, token: &Address) -> bool {
     }
 }
 
-/// Returns `true` when `from`'s unlocked holdings cover `amount`, given its
-/// token `balance` as of before the transfer.
-///
-/// Only the sender side is consulted: the recipient is intentionally ignored
-/// because incoming transfers never create locks.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `from` - The sender address.
-/// * `balance` - The sender's token balance, as of before the transfer.
-/// * `amount` - The transfer amount.
-/// * `token` - The token address.
-///
-/// # Errors
-///
-/// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
-/// * [`ComplianceModuleError::MathOverflow`] - When summing the expired lock
-///   amounts overflows.
-pub fn can_transfer(e: &Env, from: &Address, balance: i128, amount: i128, token: &Address) -> bool {
-    require_non_negative_amount(e, amount);
-    let details = get_locked_details(e, token, from);
-    amount <= unlocked_balance(e, balance, &details)
-}
-
 // ################## CHANGE STATE ##################
 
 /// Sets the lockup period for `token`, in ledgers. Affects only locks
@@ -244,7 +222,12 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 /// Records a transfer out of `from`: consumes expired locks when `amount`
 /// dips into the locked region. The recipient is untouched, since incoming
 /// transfers never create locks. Panics when `from`'s unlocked holdings do
-/// not cover `amount`.
+/// not cover `amount`, unless the transfer is forced: a privileged
+/// operation (forced transfer, recovery) overrides the lockup policy, so
+/// the moved amount is covered by consuming locks oldest-first, expired or
+/// not, instead of rejecting. This keeps the lock schedule consistent with
+/// the wallet's remaining balance and is what allows
+/// `recover_balance` to move a wallet with active locks.
 ///
 /// # Arguments
 ///
@@ -252,20 +235,32 @@ pub fn mark_preset_completed(e: &Env, token: &Address) {
 /// * `from` - The sender wallet.
 /// * `balance` - The sender's token balance, as of before the transfer.
 /// * `amount` - The transferred amount.
+/// * `kind` - Who initiated the transfer and under what authority.
 /// * `token` - The token address.
 ///
 /// # Errors
 ///
 /// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
 /// * [`ComplianceModuleError::InsufficientUnlockedBalance`] - When `amount`
-///   exceeds the sender's unlocked holdings.
+///   exceeds the sender's unlocked holdings and the transfer is not forced.
 ///
 /// # Security Warning
 ///
 /// This helper performs no authorization checks.
-pub fn on_transfer(e: &Env, from: &Address, balance: i128, amount: i128, token: &Address) {
+pub fn on_transfer(
+    e: &Env,
+    from: &Address,
+    balance: i128,
+    amount: i128,
+    kind: &TransferKind,
+    token: &Address,
+) {
     require_non_negative_amount(e, amount);
-    debit_unlocked(e, token, from, balance, amount);
+    if *kind == TransferKind::Forced {
+        debit_forced(e, token, from, balance, amount);
+    } else {
+        debit_unlocked(e, token, from, balance, amount);
+    }
 }
 
 /// Records a mint to `to`: when a lockup period is configured, appends a lock
@@ -392,6 +387,38 @@ pub fn debit_unlocked(e: &Env, token: &Address, wallet: &Address, balance: i128,
     }
 }
 
+/// Debits `amount` from `wallet`'s holdings under `token` for a forced
+/// transfer: when the amount dips into the locked region, lock entries are
+/// consumed oldest-first regardless of whether they have released. The
+/// lockup policy is an investor-facing rule the admin is consciously
+/// overriding, but the lock schedule must still shrink with the departing
+/// tokens or it would exceed the wallet's remaining balance.
+///
+/// # Arguments
+///
+/// * `e` - Access to the Soroban environment.
+/// * `token` - The token address.
+/// * `wallet` - The wallet address.
+/// * `balance` - The wallet's token balance, as of before the operation.
+/// * `amount` - The amount to debit. Must be non-negative; the caller is
+///   responsible for validating it before calling.
+///
+/// # Security Warning
+///
+/// This helper performs no authorization checks and bypasses the unlocked
+/// balance check.
+pub fn debit_forced(e: &Env, token: &Address, wallet: &Address, balance: i128, amount: i128) {
+    let mut details = get_locked_details(e, token, wallet);
+
+    if details.total_locked > 0 {
+        let free = (balance - details.total_locked).max(0);
+        if amount > free {
+            consume_locks_forced(e, &mut details, sub_i128_or_panic(e, amount, free));
+            set_locked_details(e, token, wallet, &details);
+        }
+    }
+}
+
 /// Returns the amount `wallet` can currently spend, given its `balance` and
 /// already-read `details`: the free (never-locked) portion plus expired locks.
 fn unlocked_balance(e: &Env, balance: i128, details: &LockedDetails) -> i128 {
@@ -441,5 +468,38 @@ fn consume_expired_locks(e: &Env, details: &mut LockedDetails, amount: i128) {
     }
 
     details.total_locked = sub_i128_or_panic(e, details.total_locked, amount);
+    details.locks = remaining;
+}
+
+/// Consumes `amount` from the entries in `details` oldest-first, regardless
+/// of release time: fully-consumed entries are dropped, a partially-consumed
+/// entry keeps its remainder, and `total_locked` is reduced by what was
+/// consumed. Used by [`debit_forced`], where the lock schedule must shrink
+/// with the departing tokens rather than block them. Consumption stops when
+/// the entries are exhausted; it never panics on shortfall.
+fn consume_locks_forced(e: &Env, details: &mut LockedDetails, amount: i128) {
+    let mut to_consume = amount;
+    let mut consumed = 0;
+    let mut remaining = Vec::new(e);
+
+    for lock in details.locks.iter() {
+        if to_consume > 0 {
+            if lock.amount <= to_consume {
+                to_consume -= lock.amount;
+                consumed += lock.amount;
+            } else {
+                remaining.push_back(LockedTokens {
+                    amount: lock.amount - to_consume,
+                    release_ledger: lock.release_ledger,
+                });
+                consumed += to_consume;
+                to_consume = 0;
+            }
+        } else {
+            remaining.push_back(lock);
+        }
+    }
+
+    details.total_locked = sub_i128_or_panic(e, details.total_locked, consumed);
     details.locks = remaining;
 }

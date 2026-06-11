@@ -4,7 +4,7 @@ use stellar_contract_utils::pausable::{paused, PausableError};
 use crate::{
     fungible::{emit_transfer, Base, ContractOverrides},
     rwa::{
-        compliance::{AccountSnapshot, ComplianceClient},
+        compliance::{AccountSnapshot, ComplianceClient, TransferKind},
         emit_address_frozen, emit_burn, emit_compliance_set, emit_identity_verifier_set, emit_mint,
         emit_recovery_success, emit_token_onchain_id_updated, emit_tokens_frozen,
         emit_tokens_unfrozen, IdentityVerifierClient, RWAError, FROZEN_EXTEND_AMOUNT,
@@ -259,7 +259,7 @@ impl RWA {
             &from_snapshot,
             &to_snapshot,
             &amount,
-            &None,
+            &TransferKind::Forced,
             &e.current_contract_address(),
         );
 
@@ -280,8 +280,6 @@ impl RWA {
     /// * [`RWAError::AddressFrozen`] - When the recipient address is frozen.
     /// * [`RWAError::ComplianceNotSet`] - When the compliance contract is not
     ///   configured.
-    /// * [`RWAError::MintNotCompliant`] - When the mint operation violates
-    ///   compliance rules.
     /// * refer to [`Base::update`] errors.
     ///
     /// # Events
@@ -321,18 +319,10 @@ impl RWA {
         // Snapshot before the mint so the hook observes the pre-mint balance.
         let to_snapshot = Self::account_snapshot(e, to);
 
-        let compliance_addr = Self::compliance(e);
-        let compliance_client = ComplianceClient::new(e, &compliance_addr);
-
-        let can_create: bool =
-            compliance_client.can_create(&to_snapshot, &amount, &e.current_contract_address());
-
-        if !can_create {
-            panic_with_error!(e, RWAError::MintNotCompliant);
-        }
-
         Base::update(e, None, Some(to), amount);
 
+        let compliance_addr = Self::compliance(e);
+        let compliance_client = ComplianceClient::new(e, &compliance_addr);
         compliance_client.created(&to_snapshot, &amount, &e.current_contract_address());
 
         emit_mint(e, to, amount);
@@ -665,8 +655,6 @@ impl RWA {
     /// * `from` - Snapshot of the sender, as of before the transfer.
     /// * `to` - Snapshot of the receiver, as of before the transfer.
     /// * `amount` - The amount of tokens to transfer.
-    /// * `spender` - For a `transfer_from`, the delegate that moved the tokens;
-    ///   `None` for a direct transfer.
     ///
     /// # Errors
     ///
@@ -676,21 +664,8 @@ impl RWA {
     /// * [`RWAError::InsufficientFreeTokens`] - If the sender does not have
     ///   enough free tokens.
     /// * refer to [`Self::identity_verifier`] errors.
-    /// * refer to [`Self::compliance`] errors.
     /// * refer to [`IdentityVerifierClient::verify_identity`] errors.
-    /// * refer to [`Base::update`] errors.
-    ///
-    /// # Events
-    ///
-    /// * topics - `["transfer", from: Address, to: Address]`
-    /// * data - `["to_muxed_id: Option<u64>, amount: i128"]`
-    pub fn validate_transfer(
-        e: &Env,
-        from: &AccountSnapshot,
-        to: &AccountSnapshot,
-        amount: i128,
-        spender: &Option<Address>,
-    ) {
+    pub fn validate_transfer(e: &Env, from: &AccountSnapshot, to: &AccountSnapshot, amount: i128) {
         // Check if contract is paused
         if paused(e) {
             panic_with_error!(e, PausableError::EnforcedPause);
@@ -710,21 +685,6 @@ impl RWA {
         let identity_verifier_client = IdentityVerifierClient::new(e, &identity_verifier_addr);
         identity_verifier_client.verify_identity(&from.address);
         identity_verifier_client.verify_identity(&to.address);
-
-        // Validate compliance rules for the transfer
-        let compliance_addr = Self::compliance(e);
-        let compliance_client = ComplianceClient::new(e, &compliance_addr);
-        let can_transfer: bool = compliance_client.can_transfer(
-            from,
-            to,
-            &amount,
-            spender,
-            &e.current_contract_address(),
-        );
-
-        if !can_transfer {
-            panic_with_error!(e, RWAError::TransferNotCompliant);
-        }
     }
 
     // ################## OVERRIDDEN FUNCTIONS ##################
@@ -750,13 +710,12 @@ impl RWA {
     pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
         from.require_auth();
 
-        // Snapshot before the update so both hooks observe the pre-transfer
-        // state. A direct transfer has no spender.
+        // Snapshot before the update so the hook observes the pre-transfer
+        // state.
         let from_snapshot = Self::account_snapshot(e, from);
         let to_snapshot = Self::account_snapshot(e, to);
-        let spender: Option<Address> = None;
 
-        Self::validate_transfer(e, &from_snapshot, &to_snapshot, amount, &spender);
+        Self::validate_transfer(e, &from_snapshot, &to_snapshot, amount);
 
         Base::update(e, Some(from), Some(to), amount);
 
@@ -765,7 +724,7 @@ impl RWA {
             &from_snapshot,
             &to_snapshot,
             &amount,
-            &spender,
+            &TransferKind::Standard,
             &e.current_contract_address(),
         );
         emit_transfer(e, from, to, None, amount);
@@ -792,13 +751,12 @@ impl RWA {
     pub fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
         spender.require_auth();
 
-        // Snapshot before the update so both hooks observe the pre-transfer
+        // Snapshot before the update so the hook observes the pre-transfer
         // state. `spender` is the delegate moving the holder's tokens.
         let from_snapshot = Self::account_snapshot(e, from);
         let to_snapshot = Self::account_snapshot(e, to);
-        let spender_opt = Some(spender.clone());
 
-        Self::validate_transfer(e, &from_snapshot, &to_snapshot, amount, &spender_opt);
+        Self::validate_transfer(e, &from_snapshot, &to_snapshot, amount);
 
         Base::spend_allowance(e, from, spender, amount);
 
@@ -809,7 +767,7 @@ impl RWA {
             &from_snapshot,
             &to_snapshot,
             &amount,
-            &spender_opt,
+            &TransferKind::Delegated(spender.clone()),
             &e.current_contract_address(),
         );
         emit_transfer(e, from, to, None, amount);

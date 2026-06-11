@@ -21,7 +21,7 @@ mod test;
 
 use soroban_sdk::{contracterror, contracttrait, Address, Env, String};
 
-use crate::rwa::compliance::AccountSnapshot;
+use crate::rwa::compliance::{AccountSnapshot, TransferKind};
 
 /// Trait for compliance modules that can be registered with the modular
 /// compliance system.
@@ -34,13 +34,14 @@ use crate::rwa::compliance::AccountSnapshot;
 ///
 /// 1. Operator registers compliance modules, using the compliance contract's
 ///    [`crate::rwa::compliance::Compliance::add_module_to`] for specific hooks.
-/// 2. On token operations (`transfer`, `mint`, `burn`):
-///    - **Before**: Token contract calls validation hooks (`can_transfer`,
-///      `can_create`) on the compliance contract.
-///    - **After**: Token contract calls notification hooks (`transferred`,
-///      `created`, `destroyed`) on the compliance contract.
+/// 2. On token operations (`transfer`, `mint`, `burn`), the token contract
+///    calls the matching hook (`transferred`, `created`, `destroyed`) on the
+///    compliance contract, after applying its own state changes but within the
+///    same transaction.
 /// 3. Compliance contract forwards each hook call to all registered modules for
-///    that hook type.
+///    that hook type. A module rejects the operation by panicking, which
+///    reverts the entire transaction; otherwise it updates its own state as
+///    needed.
 ///
 /// ┌─────────────────┐
 /// │  Token Contract │
@@ -54,21 +55,24 @@ use crate::rwa::compliance::AccountSnapshot;
 ///            │ 3. On transfer/mint/burn:
 ///            │
 ///            │    - transferred() / created() / destroyed()
-///            │    - can_transfer() / can_create()
 ///            ▼
 /// ┌─────────────────────────────────────────────────┐
 /// │           Compliance Modules (1..N)             │
 /// ├─────────────────────────────────────────────────┤
-/// │  • on_transfer()    • can_transfer()            │
-/// │  • on_created()     • can_create()              │
+/// │  • on_transfer()                                │
+/// │  • on_created()                                 │
 /// │  • on_destroyed()                               │
 /// └─────────────────────────────────────────────────┘
 ///
 /// # Hook Types
 ///
-///   - Transferred/Created/Destroyed: Potentially state-modifying hooks called
-///     after the token action
-///   - CanTransfer/CanCreate: Validation hooks called before the token action
+/// One hook per token operation (Transferred/Created/Destroyed), called after
+/// the token action within the same transaction. Each hook both enforces
+/// policy (panic to reject; everything reverts atomically) and records
+/// bookkeeping. The transfer hook receives a
+/// [`crate::rwa::compliance::TransferKind`] so a module can exempt
+/// privileged (forced/recovery) operations from its policy while still
+/// keeping its books true.
 ///
 /// # Security Note
 ///
@@ -105,7 +109,7 @@ use crate::rwa::compliance::AccountSnapshot;
 /// `require_auth()` on it:
 ///
 /// ```ignore
-/// fn on_transfer(e: &Env, _from: AccountSnapshot, _to: AccountSnapshot, _amount: i128, _spender: Option<Address>, token: Address) {
+/// fn on_transfer(e: &Env, _from: AccountSnapshot, _to: AccountSnapshot, _amount: i128, _kind: TransferKind, token: Address) {
 ///     // Only the dispatcher bound to `token` may drive this module's
 ///     // state for that token. A malicious caller passing a forged `token`
 ///     // argument cannot satisfy this auth check because they did not
@@ -120,10 +124,10 @@ use crate::rwa::compliance::AccountSnapshot;
 /// dispatchers safely: a dispatcher that didn't bind itself for `token`
 /// cannot drive that token's state.
 ///
-/// Read-only hooks ([`ComplianceModule::can_transfer`],
-/// [`ComplianceModule::can_create`]) do not mutate state, so
-/// unauthenticated calls are harmless — they may return a boolean but
-/// cannot corrupt anything.
+/// A hook implementation that mutates no state (a pure policy rule that
+/// only checks and panics) needs no authentication: an unauthenticated
+/// call can at worst fail the caller's own transaction, it cannot corrupt
+/// anything.
 ///
 /// [`ComplianceModule::get_compliance_address`] has a default
 /// implementation that delegates to the storage layer. Every other method
@@ -133,7 +137,8 @@ use crate::rwa::compliance::AccountSnapshot;
 /// defaults are otherwise impossible.
 #[contracttrait]
 pub trait ComplianceModule {
-    /// Called when tokens are transferred (for Transfer hook).
+    /// Called when tokens are transferred (for Transferred hook). Rejects the
+    /// transfer by panicking; updates module state otherwise.
     ///
     /// # Arguments
     ///
@@ -141,8 +146,10 @@ pub trait ComplianceModule {
     /// * `from` - Snapshot of the sender, as of before the transfer.
     /// * `to` - Snapshot of the receiver, as of before the transfer.
     /// * `amount` - The amount of tokens transferred.
-    /// * `spender` - For a `transfer_from`, the delegate that moved the tokens;
-    ///   `None` for a direct or forced transfer.
+    /// * `kind` - Who initiated the transfer and under what authority; see
+    ///   [`TransferKind`]. Policy modules should generally exempt
+    ///   [`TransferKind::Forced`] from their checks, while still applying any
+    ///   bookkeeping.
     /// * `token` - The address of the token contract that triggered the hook.
     ///
     /// # Notes
@@ -156,11 +163,12 @@ pub trait ComplianceModule {
         from: AccountSnapshot,
         to: AccountSnapshot,
         amount: i128,
-        spender: Option<Address>,
+        kind: TransferKind,
         token: Address,
     );
 
-    /// Called when tokens are created/minted (for Created hook).
+    /// Called when tokens are created/minted (for Created hook). Rejects the
+    /// mint by panicking; updates module state otherwise.
     ///
     /// # Arguments
     ///
@@ -177,7 +185,8 @@ pub trait ComplianceModule {
     /// [`storage::get_compliance_address`].
     fn on_created(e: &Env, to: AccountSnapshot, amount: i128, token: Address);
 
-    /// Called when tokens are destroyed/burned (for Destroyed hook).
+    /// Called when tokens are destroyed/burned (for Destroyed hook). Rejects
+    /// the burn by panicking; updates module state otherwise.
     ///
     /// # Arguments
     ///
@@ -193,53 +202,6 @@ pub trait ComplianceModule {
     /// `# Security Note` applies — authenticate the caller via
     /// [`storage::get_compliance_address`].
     fn on_destroyed(e: &Env, from: AccountSnapshot, amount: i128, token: Address);
-
-    /// Called to check if a transfer should be allowed (for CanTransfer hook).
-    /// Returns `true` if the transfer should be allowed, `false` otherwise.
-    ///
-    /// This is a read-only function and should not modify state.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `from` - Snapshot of the sender, as of before the transfer.
-    /// * `to` - Snapshot of the receiver, as of before the transfer.
-    /// * `amount` - The amount of tokens to transfer.
-    /// * `spender` - For a `transfer_from`, the delegate that moved the tokens;
-    ///   `None` for a direct or forced transfer.
-    /// * `token` - The address of the token contract that triggered the hook.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided; see the trait-level
-    /// documentation.
-    fn can_transfer(
-        e: &Env,
-        from: AccountSnapshot,
-        to: AccountSnapshot,
-        amount: i128,
-        spender: Option<Address>,
-        token: Address,
-    ) -> bool;
-
-    /// Called to check if a mint operation should be allowed (for CanCreate
-    /// hook). Returns `true` if the mint operation should be allowed,
-    /// `false` otherwise.
-    ///
-    /// This is a read-only function and should not modify state.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `to` - Snapshot of the receiver, as of before the mint.
-    /// * `amount` - The amount of tokens to mint.
-    /// * `token` - The address of the token contract that triggered the hook.
-    ///
-    /// # Notes
-    ///
-    /// No default implementation is provided; see the trait-level
-    /// documentation.
-    fn can_create(e: &Env, to: AccountSnapshot, amount: i128, token: Address) -> bool;
 
     /// Returns the name of the module for identification purposes.
     ///
@@ -326,6 +288,12 @@ pub enum ComplianceModuleError {
     LimitBoundExceeded = 402,
     /// No time-window limit exists for the given window duration.
     LimitNotFound = 403,
+    /// The transfer recipient's country is not on the allowlist.
+    CountryNotAllowed = 404,
+    /// The transfer recipient's country is on the restriction list.
+    CountryRestricted = 405,
+    /// Neither transfer party is on the allowlist.
+    UserNotAllowed = 406,
 }
 
 // ################## CONSTANTS ##################

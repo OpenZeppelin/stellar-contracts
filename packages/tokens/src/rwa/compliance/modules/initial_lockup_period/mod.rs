@@ -48,12 +48,14 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// requires the module to be registered on **all** of
 /// [`crate::rwa::compliance::ComplianceHook::Transferred`],
 /// [`crate::rwa::compliance::ComplianceHook::Created`], and
-/// [`crate::rwa::compliance::ComplianceHook::Destroyed`] in addition to the
-/// validation hook [`crate::rwa::compliance::ComplianceHook::CanTransfer`]:
-/// `Created` appends a lock on every mint, while `Transferred` and
-/// `Destroyed` consume expired locks as the wallet spends, keeping the
-/// recorded total in step with what the wallet actually holds. Missing a
-/// state-mutating hook leaves stale locks on the books.
+/// [`crate::rwa::compliance::ComplianceHook::Destroyed`]: `Created` appends
+/// a lock on every mint, while `Transferred` and `Destroyed` enforce the
+/// lockup (by panicking when the spend exceeds the unlocked holdings) and
+/// consume expired locks as the wallet spends, keeping the recorded total
+/// in step with what the wallet actually holds. Missing a hook leaves stale
+/// locks on the books. Forced (admin/recovery) transfers are not rejected:
+/// they consume locks oldest-first, expired or not, so a wallet with active
+/// locks can still be recovered.
 ///
 /// The wallet's balance is never mirrored: the token passes it into each
 /// hook via [`crate::rwa::compliance::AccountSnapshot`], and the module

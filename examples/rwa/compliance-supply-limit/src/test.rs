@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{testutils::Address as _, Address, Env, String};
-use stellar_tokens::rwa::compliance::AccountSnapshot;
+use stellar_tokens::rwa::compliance::{AccountSnapshot, TransferKind};
 
 use crate::contract::{SupplyLimitContract, SupplyLimitContractClient};
 
@@ -93,7 +93,7 @@ fn set_supply_limit_requires_manager_auth() {
 }
 
 #[test]
-fn can_create_reflects_running_supply() {
+fn on_created_allows_minting_up_to_the_limit() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -106,16 +106,15 @@ fn can_create_reflects_running_supply() {
     client.set_compliance_address(&token, &compliance, &admin);
     client.set_supply_limit(&token, &100_i128, &manager);
 
-    assert!(client.can_create(&snap(&to), &100_i128, &token));
-    assert!(!client.can_create(&snap(&to), &101_i128, &token));
-
     client.on_created(&snap(&to), &70_i128, &token);
-    assert!(client.can_create(&snap(&to), &30_i128, &token));
-    assert!(!client.can_create(&snap(&to), &31_i128, &token));
+    // The remaining headroom can still be minted exactly.
+    client.on_created(&snap(&to), &30_i128, &token);
+
+    assert_eq!(client.get_supply_count(&token), 100);
 }
 
 #[test]
-fn can_transfer_is_always_true() {
+fn on_transfer_is_a_noop() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -125,7 +124,9 @@ fn can_transfer_is_always_true() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    assert!(client.can_transfer(&snap(&from), &snap(&to), &9_999_i128, &None, &token));
+    // Transfers do not affect the tracked supply.
+    client.on_transfer(&snap(&from), &snap(&to), &9_999_i128, &TransferKind::Standard, &token);
+    assert_eq!(client.get_supply_count(&token), 0);
 }
 
 #[test]

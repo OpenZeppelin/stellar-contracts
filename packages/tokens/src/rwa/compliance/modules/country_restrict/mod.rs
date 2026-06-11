@@ -24,8 +24,8 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// restriction list.
 ///
 /// Only the recipient's country data is consulted. Although the underlying
-/// compliance hooks ([`ComplianceModule::can_transfer`],
-/// [`ComplianceModule::can_create`]) also receive the sender address and the
+/// compliance hooks ([`ComplianceModule::on_transfer`],
+/// [`ComplianceModule::on_created`]) also receive the sender address and the
 /// transfer amount, this module ignores both: a sender whose own countries
 /// are on the restriction list can still send tokens out, and the size of
 /// the transfer has no effect on the decision. If you need rules that

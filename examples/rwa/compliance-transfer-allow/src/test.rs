@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{testutils::Address as _, vec, Address, Env, String};
-use stellar_tokens::rwa::compliance::AccountSnapshot;
+use stellar_tokens::rwa::compliance::{AccountSnapshot, TransferKind};
 
 use crate::contract::{TransferAllowContract, TransferAllowContractClient};
 
@@ -59,7 +59,7 @@ fn batch_allow_and_disallow_users_work() {
 }
 
 #[test]
-fn can_transfer_checks_sender_then_recipient() {
+fn on_transfer_checks_sender_then_recipient() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -71,14 +71,42 @@ fn can_transfer_checks_sender_then_recipient() {
 
     client.allow_user(&token, &allowed, &manager);
 
-    // Allowlisted sender, allowlisted recipient, neither.
-    assert!(client.can_transfer(&snap(&allowed), &snap(&other), &10_i128, &None, &token));
-    assert!(client.can_transfer(&snap(&other), &snap(&allowed), &10_i128, &None, &token));
-    assert!(!client.can_transfer(&snap(&other), &snap(&other), &10_i128, &None, &token));
+    // Allowlisted sender, then allowlisted recipient: both pass.
+    client.on_transfer(&snap(&allowed), &snap(&other), &10_i128, &TransferKind::Standard, &token);
+    client.on_transfer(&snap(&other), &snap(&allowed), &10_i128, &TransferKind::Standard, &token);
 }
 
 #[test]
-fn can_create_always_allows() {
+#[should_panic(expected = "Error(Contract, #406)")]
+fn on_transfer_panics_when_neither_party_allowlisted() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let token = Address::generate(&e);
+    let other = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    client.on_transfer(&snap(&other), &snap(&other), &10_i128, &TransferKind::Standard, &token);
+}
+
+#[test]
+fn on_transfer_forced_is_exempt_from_policy() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let token = Address::generate(&e);
+    let other = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    // Neither party is allowlisted: a standard transfer would panic, but a
+    // forced one passes through untouched.
+    client.on_transfer(&snap(&other), &snap(&other), &10_i128, &TransferKind::Forced, &token);
+}
+
+#[test]
+fn on_created_always_allows() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -87,7 +115,9 @@ fn can_create_always_allows() {
     let to = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    assert!(client.can_create(&snap(&to), &10_i128, &token));
+    // Mints are not restricted by this module: the hook is a no-op even
+    // for a recipient that is not allowlisted.
+    client.on_created(&snap(&to), &10_i128, &token);
 }
 
 #[test]

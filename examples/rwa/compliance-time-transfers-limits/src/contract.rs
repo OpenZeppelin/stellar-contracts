@@ -9,7 +9,7 @@ use stellar_tokens::rwa::compliance::{
         },
         ComplianceModule,
     },
-    AccountSnapshot,
+    AccountSnapshot, TransferKind,
 };
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -68,16 +68,19 @@ impl TimeTransfersLimits for TimeTransfersLimitsContract {
 
 #[contractimpl(contracttrait)]
 impl ComplianceModule for TimeTransfersLimitsContract {
+    // Enforces the windows: panics with `TransferLimitExceeded` when the
+    // transfer would push the sender identity's volume past a configured
+    // time-window cap (forced transfers are skipped entirely).
     fn on_transfer(
         e: &Env,
         from: AccountSnapshot,
         to: AccountSnapshot,
         amount: i128,
-        _spender: Option<Address>,
+        kind: TransferKind,
         token: Address,
     ) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
-        time_transfers_limits::on_transfer(e, &from.address, &to.address, amount, &token);
+        time_transfers_limits::on_transfer(e, &from.address, &to.address, amount, &kind, &token);
     }
 
     // Mints are not counted against the time-window limits; no bookkeeping
@@ -87,21 +90,6 @@ impl ComplianceModule for TimeTransfersLimitsContract {
     // Burns are not counted against the time-window limits; no bookkeeping
     // needed.
     fn on_destroyed(_e: &Env, _from: AccountSnapshot, _amount: i128, _token: Address) {}
-
-    fn can_transfer(
-        e: &Env,
-        from: AccountSnapshot,
-        to: AccountSnapshot,
-        amount: i128,
-        _spender: Option<Address>,
-        token: Address,
-    ) -> bool {
-        time_transfers_limits::can_transfer(e, &from.address, &to.address, amount, &token)
-    }
-
-    fn can_create(_e: &Env, _to: AccountSnapshot, _amount: i128, _token: Address) -> bool {
-        true
-    }
 
     fn name(e: &Env) -> String {
         String::from_str(e, "TimeTransfersLimitsModule")

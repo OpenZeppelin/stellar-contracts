@@ -48,11 +48,11 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// the module to be registered on **all** of
 /// [`crate::rwa::compliance::ComplianceHook::Transferred`],
 /// [`crate::rwa::compliance::ComplianceHook::Created`], and
-/// [`crate::rwa::compliance::ComplianceHook::Destroyed`] in addition to the
-/// validation hooks
-/// [`crate::rwa::compliance::ComplianceHook::CanTransfer`] and
-/// [`crate::rwa::compliance::ComplianceHook::CanCreate`]. Missing a
-/// state-mutating hook causes the tracked balances to drift from reality.
+/// [`crate::rwa::compliance::ComplianceHook::Destroyed`]: each hook both
+/// enforces the cap (by panicking) and updates the aggregate balances.
+/// Missing a hook causes the tracked balances to drift from reality.
+/// Forced (admin/recovery) transfers are exempt from the cap but still
+/// update the books.
 ///
 /// For migration scenarios, the trait exposes preset functions
 /// ([`MaxBalance::preset_id_balance`],

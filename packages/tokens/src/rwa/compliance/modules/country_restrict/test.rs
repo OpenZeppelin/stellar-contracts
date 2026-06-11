@@ -7,12 +7,15 @@ use soroban_sdk::{
 };
 
 use crate::rwa::{
-    compliance::modules::{
-        country_restrict::storage::{
-            add_country_restriction, can_receive, is_country_restricted,
-            remove_country_restriction, set_country_restricted,
+    compliance::{
+        modules::{
+            country_restrict::storage::{
+                add_country_restriction, can_receive, is_country_restricted, on_created,
+                on_transfer, remove_country_restriction, set_country_restricted,
+            },
+            storage::set_irs_address,
         },
-        storage::set_irs_address,
+        TransferKind,
     },
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
@@ -221,5 +224,86 @@ fn can_receive_allows_when_no_country_is_restricted() {
 
         assert!(can_receive(&e, &empty_to, &token));
         assert!(can_receive(&e, &unrestricted_to, &token));
+    });
+}
+
+#[test]
+fn on_transfer_and_on_created_pass_for_unrestricted_recipient() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryRestrictContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    irs.set_country_data_entries(&to, &vec![&e, individual_country(250)]);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_country_restricted(&e, &token, 408);
+
+        on_transfer(&e, &to, &TransferKind::Standard, &token);
+        on_created(&e, &to, &token);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #405)")]
+fn on_transfer_panics_for_restricted_recipient() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryRestrictContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    irs.set_country_data_entries(&to, &vec![&e, individual_country(408)]);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_country_restricted(&e, &token, 408);
+
+        on_transfer(&e, &to, &TransferKind::Standard, &token);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #405)")]
+fn on_created_panics_for_restricted_recipient() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryRestrictContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    irs.set_country_data_entries(&to, &vec![&e, individual_country(408)]);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_country_restricted(&e, &token, 408);
+
+        on_created(&e, &to, &token);
+    });
+}
+
+#[test]
+fn on_transfer_forced_is_exempt_from_policy() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryRestrictContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    irs.set_country_data_entries(&to, &vec![&e, individual_country(408)]);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_country_restricted(&e, &token, 408);
+
+        // A standard transfer to this recipient would panic; a forced one
+        // passes through untouched.
+        on_transfer(&e, &to, &TransferKind::Forced, &token);
     });
 }

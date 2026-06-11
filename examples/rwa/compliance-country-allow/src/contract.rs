@@ -7,7 +7,7 @@ use stellar_tokens::rwa::compliance::{
         storage::{self as compliance_storage, set_irs_address},
         ComplianceModule,
     },
-    AccountSnapshot,
+    AccountSnapshot, TransferKind,
 };
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -56,40 +56,25 @@ impl CountryAllow for CountryAllowContract {
 
 #[contractimpl(contracttrait)]
 impl ComplianceModule for CountryAllowContract {
-    // No need to implement logic in these hooks for this module, as the compliance
-    // check is only done in the can_transfer and can_create functions.
+    // The hooks mutate no module state (the allowlist check only panics on
+    // violation), so no caller authentication is needed.
     fn on_transfer(
-        _e: &Env,
-        _from: AccountSnapshot,
-        _to: AccountSnapshot,
-        _amount: i128,
-        _spender: Option<Address>,
-        _token: Address,
-    ) {
-    }
-
-    // No need to implement logic in these hooks for this module, as the compliance
-    // check is only done in the can_transfer and can_create functions.
-    fn on_created(_e: &Env, _to: AccountSnapshot, _amount: i128, _token: Address) {}
-
-    // No need to implement logic in these hooks for this module, as the compliance
-    // check is only done in the can_transfer and can_create functions.
-    fn on_destroyed(_e: &Env, _from: AccountSnapshot, _amount: i128, _token: Address) {}
-
-    fn can_transfer(
         e: &Env,
-        from: AccountSnapshot,
+        _from: AccountSnapshot,
         to: AccountSnapshot,
-        amount: i128,
-        _spender: Option<Address>,
+        _amount: i128,
+        kind: TransferKind,
         token: Address,
-    ) -> bool {
-        country_allow::can_transfer(e, &from.address, &to.address, amount, &token)
+    ) {
+        country_allow::on_transfer(e, &to.address, &kind, &token);
     }
 
-    fn can_create(e: &Env, to: AccountSnapshot, amount: i128, token: Address) -> bool {
-        country_allow::can_create(e, &to.address, amount, &token)
+    fn on_created(e: &Env, to: AccountSnapshot, _amount: i128, token: Address) {
+        country_allow::on_created(e, &to.address, &token);
     }
+
+    // Burns are not restricted by this module.
+    fn on_destroyed(_e: &Env, _from: AccountSnapshot, _amount: i128, _token: Address) {}
 
     fn name(e: &Env) -> String {
         String::from_str(e, "CountryAllowModule")

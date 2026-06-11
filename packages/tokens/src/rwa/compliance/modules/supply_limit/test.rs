@@ -4,8 +4,7 @@ use soroban_sdk::{contract, testutils::Address as _, Address, Env};
 use stellar_event_assertion::EventAssertion;
 
 use crate::rwa::compliance::modules::supply_limit::storage::{
-    can_create, can_transfer, get_supply_count, get_supply_limit, on_created, on_destroyed,
-    set_supply_limit,
+    get_supply_count, get_supply_limit, on_created, on_destroyed, set_supply_limit,
 };
 
 #[contract]
@@ -25,23 +24,7 @@ fn set_supply_limit_persists_value() {
 }
 
 #[test]
-fn can_create_allows_under_limit_and_rejects_at_overflow() {
-    let e = Env::default();
-    let module_id = e.register(TestSupplyLimitContract, ());
-    let token = Address::generate(&e);
-    let to = Address::generate(&e);
-
-    e.as_contract(&module_id, || {
-        set_supply_limit(&e, &token, 100);
-
-        assert!(can_create(&e, &to, 100, &token));
-        assert!(can_create(&e, &to, 0, &token));
-        assert!(!can_create(&e, &to, 101, &token));
-    });
-}
-
-#[test]
-fn can_create_accounts_for_running_supply() {
+fn on_created_allows_minting_up_to_the_limit() {
     let e = Env::default();
     let module_id = e.register(TestSupplyLimitContract, ());
     let token = Address::generate(&e);
@@ -50,22 +33,10 @@ fn can_create_accounts_for_running_supply() {
     e.as_contract(&module_id, || {
         set_supply_limit(&e, &token, 100);
         on_created(&e, &to, 70, &token);
+        // The remaining headroom can still be minted exactly.
+        on_created(&e, &to, 30, &token);
 
-        assert!(can_create(&e, &to, 30, &token));
-        assert!(!can_create(&e, &to, 31, &token));
-    });
-}
-
-#[test]
-fn can_transfer_is_always_true() {
-    let e = Env::default();
-    let module_id = e.register(TestSupplyLimitContract, ());
-    let token = Address::generate(&e);
-    let from = Address::generate(&e);
-    let to = Address::generate(&e);
-
-    e.as_contract(&module_id, || {
-        assert!(can_transfer(&e, &from, &to, 9_999, &token));
+        assert_eq!(get_supply_count(&e, &token), 100);
     });
 }
 
@@ -144,13 +115,13 @@ fn set_supply_limit_panics_on_negative_value() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #390)")]
-fn can_create_panics_on_negative_amount() {
+fn on_created_panics_on_negative_amount() {
     let e = Env::default();
     let module_id = e.register(TestSupplyLimitContract, ());
     let token = Address::generate(&e);
     let to = Address::generate(&e);
 
     e.as_contract(&module_id, || {
-        can_create(&e, &to, -1, &token);
+        on_created(&e, &to, -1, &token);
     });
 }

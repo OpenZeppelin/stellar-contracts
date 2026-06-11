@@ -7,7 +7,7 @@ use stellar_tokens::rwa::compliance::{
         supply_limit::{storage as supply_limit, SupplyLimit},
         ComplianceModule,
     },
-    AccountSnapshot,
+    AccountSnapshot, TransferKind,
 };
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -43,11 +43,13 @@ impl ComplianceModule for SupplyLimitContract {
         _from: AccountSnapshot,
         _to: AccountSnapshot,
         _amount: i128,
-        _spender: Option<Address>,
+        _kind: TransferKind,
         _token: Address,
     ) {
     }
 
+    // Enforces the cap: panics with `SupplyLimitExceeded` when the mint
+    // would push the tracked supply past the configured limit.
     fn on_created(e: &Env, to: AccountSnapshot, amount: i128, token: Address) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
         supply_limit::on_created(e, &to.address, amount, &token);
@@ -56,21 +58,6 @@ impl ComplianceModule for SupplyLimitContract {
     fn on_destroyed(e: &Env, from: AccountSnapshot, amount: i128, token: Address) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
         supply_limit::on_destroyed(e, &from.address, amount, &token);
-    }
-
-    fn can_transfer(
-        e: &Env,
-        from: AccountSnapshot,
-        to: AccountSnapshot,
-        amount: i128,
-        _spender: Option<Address>,
-        token: Address,
-    ) -> bool {
-        supply_limit::can_transfer(e, &from.address, &to.address, amount, &token)
-    }
-
-    fn can_create(e: &Env, to: AccountSnapshot, amount: i128, token: Address) -> bool {
-        supply_limit::can_create(e, &to.address, amount, &token)
     }
 
     fn name(e: &Env) -> String {

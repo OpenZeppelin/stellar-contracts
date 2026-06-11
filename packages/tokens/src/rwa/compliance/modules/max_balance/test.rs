@@ -7,13 +7,16 @@ use soroban_sdk::{
 };
 
 use crate::rwa::{
-    compliance::modules::{
-        max_balance::storage::{
-            batch_preset_id_balances, can_create, can_receive, can_transfer, get_id_balance,
-            get_id_balance_of, get_max_balance, is_preset_completed, mark_preset_completed,
-            on_created, on_destroyed, on_transfer, preset_id_balance, set_max_balance,
+    compliance::{
+        modules::{
+            max_balance::storage::{
+                batch_preset_id_balances, get_id_balance, get_id_balance_of, get_max_balance,
+                is_preset_completed, mark_preset_completed, on_created, on_destroyed, on_transfer,
+                preset_id_balance, set_max_balance,
+            },
+            storage::set_irs_address,
         },
-        storage::set_irs_address,
+        TransferKind,
     },
     identity_registry_storage::{CountryDataManager, IdentityRegistryStorage},
     utils::token_binder::TokenBinder,
@@ -133,7 +136,8 @@ fn set_max_balance_persists_value() {
 }
 
 #[test]
-fn can_receive_respects_aggregate_balance_per_identity() {
+#[should_panic(expected = "Error(Contract, #393)")]
+fn cap_applies_to_aggregate_balance_per_identity() {
     let e = Env::default();
     let module_id = e.register(TestMaxBalanceContract, ());
     let irs_id = e.register(MockIRSContract, ());
@@ -151,49 +155,11 @@ fn can_receive_respects_aggregate_balance_per_identity() {
         set_irs_address(&e, &token, &irs_id);
         set_max_balance(&e, &token, 100);
 
-        assert!(can_receive(&e, &wallet_a, 100, &token));
-
-        // Once wallet_a credits the identity, wallet_b is also capped.
+        // Once wallet_a credits the identity, wallet_b is also capped:
+        // crediting the remaining headroom succeeds, one token more panics.
         on_created(&e, &wallet_a, 70, &token);
-        assert!(can_receive(&e, &wallet_b, 30, &token));
-        assert!(!can_receive(&e, &wallet_b, 31, &token));
-    });
-}
-
-#[test]
-fn can_receive_rejects_when_amount_alone_exceeds_max() {
-    let e = Env::default();
-    let module_id = e.register(TestMaxBalanceContract, ());
-    let irs_id = e.register(MockIRSContract, ());
-    let token = Address::generate(&e);
-    let wallet = Address::generate(&e);
-
-    e.as_contract(&module_id, || {
-        set_irs_address(&e, &token, &irs_id);
-        set_max_balance(&e, &token, 50);
-
-        // No identity registered: stored_identity defaults to the account
-        // itself, so the lookup still succeeds.
-        assert!(!can_receive(&e, &wallet, 51, &token));
-    });
-}
-
-#[test]
-fn can_transfer_and_can_create_check_recipient_identity() {
-    let e = Env::default();
-    let module_id = e.register(TestMaxBalanceContract, ());
-    let irs_id = e.register(MockIRSContract, ());
-    let token = Address::generate(&e);
-    let from = Address::generate(&e);
-    let to = Address::generate(&e);
-
-    e.as_contract(&module_id, || {
-        set_irs_address(&e, &token, &irs_id);
-        set_max_balance(&e, &token, 100);
-
-        assert!(can_transfer(&e, &from, &to, 50, &token));
-        assert!(can_create(&e, &to, 100, &token));
-        assert!(!can_transfer(&e, &from, &to, 101, &token));
+        on_created(&e, &wallet_b, 30, &token);
+        on_created(&e, &wallet_b, 1, &token);
     });
 }
 
@@ -217,7 +183,7 @@ fn on_transfer_moves_balance_between_identities() {
         set_max_balance(&e, &token, 100);
         on_created(&e, &alice_wallet, 80, &token);
 
-        on_transfer(&e, &alice_wallet, &bob_wallet, 30, &token);
+        on_transfer(&e, &alice_wallet, &bob_wallet, 30, &TransferKind::Standard, &token);
 
         assert_eq!(get_id_balance(&e, &token, &alice_id), 50);
         assert_eq!(get_id_balance(&e, &token, &bob_id), 30);
@@ -245,9 +211,7 @@ fn same_identity_transfer_is_noop_for_cap_and_balance() {
 
         // Identity is at the cap, but a transfer between two wallets of the
         // same identity must still be permitted.
-        assert!(can_transfer(&e, &wallet_a, &wallet_b, 50, &token));
-
-        on_transfer(&e, &wallet_a, &wallet_b, 50, &token);
+        on_transfer(&e, &wallet_a, &wallet_b, 50, &TransferKind::Standard, &token);
         assert_eq!(get_id_balance(&e, &token, &identity), 100);
     });
 }
@@ -334,7 +298,39 @@ fn on_transfer_panics_when_recipient_exceeds_max() {
 
         // to_id is at 30/50; adding 25 puts the recipient at 55, past
         // the cap. from_id goes 50 -> 25, well within range.
-        on_transfer(&e, &from_wallet, &to_wallet, 25, &token);
+        on_transfer(&e, &from_wallet, &to_wallet, 25, &TransferKind::Standard, &token);
+    });
+}
+
+#[test]
+fn on_transfer_forced_bypasses_cap_but_updates_books() {
+    let e = Env::default();
+    let module_id = e.register(TestMaxBalanceContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let from_wallet = Address::generate(&e);
+    let to_wallet = Address::generate(&e);
+    let from_id = Address::generate(&e);
+    let to_id = Address::generate(&e);
+
+    irs.set_identity(&from_wallet, &from_id);
+    irs.set_identity(&to_wallet, &to_id);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_max_balance(&e, &token, 50);
+
+        preset_id_balance(&e, &token, &from_id, 50);
+        preset_id_balance(&e, &token, &to_id, 30);
+
+        // The same movement that panics as a standard transfer goes through
+        // when forced, and the recipient's aggregate records the over-cap
+        // figure so the books stay true.
+        on_transfer(&e, &from_wallet, &to_wallet, 25, &TransferKind::Forced, &token);
+
+        assert_eq!(get_id_balance(&e, &token, &from_id), 25);
+        assert_eq!(get_id_balance(&e, &token, &to_id), 55);
     });
 }
 

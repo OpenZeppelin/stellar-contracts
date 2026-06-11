@@ -5,7 +5,7 @@ use soroban_sdk::{
     vec, Address, Env, String,
 };
 use stellar_tokens::rwa::compliance::{
-    modules::initial_lockup_period::LockedTokens, AccountSnapshot,
+    modules::initial_lockup_period::LockedTokens, AccountSnapshot, TransferKind,
 };
 
 use crate::contract::{InitialLockupPeriodContract, InitialLockupPeriodContractClient};
@@ -78,14 +78,9 @@ fn transfers_are_limited_to_unlocked_tokens() {
     client.set_lockup_period(&token, &100_u32, &manager);
     client.on_created(&snap(&from, 0), &80_i128, &token);
 
-    // The sender holds 80, all of it still locked.
-    assert!(!client.can_transfer(&snap(&from, 80), &snap(&to, 0), &1_i128, &None, &token));
-
-    // After the release time, the full amount is spendable.
+    // After the release time, the locked tokens become spendable.
     e.ledger().with_mut(|li| li.sequence_number = 100);
-    assert!(client.can_transfer(&snap(&from, 80), &snap(&to, 0), &80_i128, &None, &token));
-
-    client.on_transfer(&snap(&from, 80), &snap(&to, 0), &30_i128, &None, &token);
+    client.on_transfer(&snap(&from, 80), &snap(&to, 0), &30_i128, &TransferKind::Standard, &token);
     // The 80-token lock had released by ledger 100; spending 30 consumed 30 of
     // it, leaving a 50-token (already-released) entry on the books.
     assert_eq!(client.get_locked_details(&token, &from).total_locked, 50);
@@ -110,7 +105,7 @@ fn on_transfer_panics_when_tokens_still_locked() {
     client.set_lockup_period(&token, &100_u32, &manager);
     client.on_created(&snap(&from, 0), &80_i128, &token);
 
-    client.on_transfer(&snap(&from, 80), &snap(&to, 0), &1_i128, &None, &token);
+    client.on_transfer(&snap(&from, 80), &snap(&to, 0), &1_i128, &TransferKind::Standard, &token);
 }
 
 #[test]

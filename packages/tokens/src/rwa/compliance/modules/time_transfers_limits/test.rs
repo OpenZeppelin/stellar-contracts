@@ -7,17 +7,20 @@ use soroban_sdk::{
 };
 
 use crate::rwa::{
-    compliance::modules::{
-        storage::set_irs_address,
-        time_transfers_limits::{
-            storage::{
-                batch_remove_time_transfer_limit, batch_set_time_transfer_limit, can_transfer,
-                get_time_transfer_limits, get_transfer_counter, on_transfer,
-                remove_time_transfer_limit, set_time_transfer_limit, TransferCounter,
-                TransferLimit,
+    compliance::{
+        modules::{
+            storage::set_irs_address,
+            time_transfers_limits::{
+                storage::{
+                    batch_remove_time_transfer_limit, batch_set_time_transfer_limit,
+                    get_time_transfer_limits, get_transfer_counter, on_transfer,
+                    remove_time_transfer_limit, set_time_transfer_limit, TransferCounter,
+                    TransferLimit,
+                },
+                MAX_LIMITS,
             },
-            MAX_LIMITS,
         },
+        TransferKind,
     },
     identity_registry_storage::{CountryDataManager, IdentityRegistryStorage},
     utils::token_binder::TokenBinder,
@@ -289,22 +292,8 @@ fn batch_set_and_remove_time_transfer_limits() {
 }
 
 #[test]
-fn can_transfer_true_when_no_limits_configured() {
-    let e = Env::default();
-    let module_id = e.register(TestTimeTransfersLimitsContract, ());
-    let token = Address::generate(&e);
-    let from = Address::generate(&e);
-    let to = Address::generate(&e);
-
-    e.as_contract(&module_id, || {
-        // No IRS is configured either: the identity lookup must be skipped
-        // entirely when no limits exist.
-        assert!(can_transfer(&e, &from, &to, 100, &token));
-    });
-}
-
-#[test]
-fn can_transfer_rejects_amount_above_cap() {
+#[should_panic(expected = "Error(Contract, #401)")]
+fn on_transfer_panics_when_amount_alone_exceeds_cap() {
     let e = Env::default();
     let module_id = e.register(TestTimeTransfersLimitsContract, ());
     let irs_id = e.register(MockIRSContract, ());
@@ -320,13 +309,12 @@ fn can_transfer_rejects_amount_above_cap() {
             &TransferLimit { limit_duration: 100, limit_value: 50 },
         );
 
-        assert!(can_transfer(&e, &from, &to, 50, &token));
-        assert!(!can_transfer(&e, &from, &to, 51, &token));
+        on_transfer(&e, &from, &to, 51, &TransferKind::Standard, &token);
     });
 }
 
 #[test]
-fn can_transfer_accounts_for_running_counter() {
+fn on_transfer_forced_skips_check_and_counters() {
     let e = Env::default();
     let module_id = e.register(TestTimeTransfersLimitsContract, ());
     let irs_id = e.register(MockIRSContract, ());
@@ -342,35 +330,11 @@ fn can_transfer_accounts_for_running_counter() {
             &TransferLimit { limit_duration: 100, limit_value: 50 },
         );
 
-        on_transfer(&e, &from, &to, 30, &token);
+        // Far above the cap, but forced transfers are not investor
+        // activity: no rejection, and no window allowance consumed.
+        on_transfer(&e, &from, &to, 9_999, &TransferKind::Forced, &token);
 
-        assert!(can_transfer(&e, &from, &to, 20, &token));
-        assert!(!can_transfer(&e, &from, &to, 21, &token));
-    });
-}
-
-#[test]
-fn can_transfer_allows_again_after_window_elapses() {
-    let e = Env::default();
-    let module_id = e.register(TestTimeTransfersLimitsContract, ());
-    let irs_id = e.register(MockIRSContract, ());
-    let token = Address::generate(&e);
-    let from = Address::generate(&e);
-    let to = Address::generate(&e);
-
-    e.as_contract(&module_id, || {
-        set_irs_address(&e, &token, &irs_id);
-        set_time_transfer_limit(
-            &e,
-            &token,
-            &TransferLimit { limit_duration: 100, limit_value: 50 },
-        );
-
-        on_transfer(&e, &from, &to, 50, &token);
-        assert!(!can_transfer(&e, &from, &to, 1, &token));
-
-        e.ledger().with_mut(|li| li.sequence_number = 100);
-        assert!(can_transfer(&e, &from, &to, 50, &token));
+        assert_eq!(get_transfer_counter(&e, &token, &from, 100).value, 0);
     });
 }
 
@@ -396,7 +360,7 @@ fn on_transfer_increments_counters_for_each_window() {
             &TransferLimit { limit_duration: 200, limit_value: 80 },
         );
 
-        on_transfer(&e, &from, &to, 30, &token);
+        on_transfer(&e, &from, &to, 30, &TransferKind::Standard, &token);
 
         // With no identity registered, the wallet acts as its own identity.
         assert_eq!(
@@ -434,12 +398,13 @@ fn on_transfer_aggregates_volume_per_identity() {
             &TransferLimit { limit_duration: 100, limit_value: 50 },
         );
 
-        on_transfer(&e, &wallet_a, &to, 30, &token);
+        on_transfer(&e, &wallet_a, &to, 30, &TransferKind::Standard, &token);
 
-        // Splitting the volume across wallets does not raise the cap.
+        // Splitting the volume across wallets does not raise the cap: the
+        // second wallet's transfer lands on the same identity counter.
         assert_eq!(get_transfer_counter(&e, &token, &identity, 100).value, 30);
-        assert!(can_transfer(&e, &wallet_b, &to, 20, &token));
-        assert!(!can_transfer(&e, &wallet_b, &to, 21, &token));
+        on_transfer(&e, &wallet_b, &to, 20, &TransferKind::Standard, &token);
+        assert_eq!(get_transfer_counter(&e, &token, &identity, 100).value, 50);
     });
 }
 
@@ -460,10 +425,10 @@ fn on_transfer_restarts_elapsed_window() {
             &TransferLimit { limit_duration: 100, limit_value: 50 },
         );
 
-        on_transfer(&e, &from, &to, 50, &token);
+        on_transfer(&e, &from, &to, 50, &TransferKind::Standard, &token);
 
         e.ledger().with_mut(|li| li.sequence_number = 150);
-        on_transfer(&e, &from, &to, 10, &token);
+        on_transfer(&e, &from, &to, 10, &TransferKind::Standard, &token);
 
         // The elapsed counter restarted instead of accumulating.
         assert_eq!(
@@ -483,7 +448,7 @@ fn on_transfer_skips_when_no_limits_configured() {
 
     e.as_contract(&module_id, || {
         // No limits and no IRS: the hook is a no-op rather than a panic.
-        on_transfer(&e, &from, &to, 100, &token);
+        on_transfer(&e, &from, &to, 100, &TransferKind::Standard, &token);
 
         assert_eq!(get_transfer_counter(&e, &token, &from, 100).value, 0);
     });
@@ -507,14 +472,14 @@ fn on_transfer_panics_when_limit_exceeded() {
             &TransferLimit { limit_duration: 100, limit_value: 50 },
         );
 
-        on_transfer(&e, &from, &to, 30, &token);
-        on_transfer(&e, &from, &to, 21, &token);
+        on_transfer(&e, &from, &to, 30, &TransferKind::Standard, &token);
+        on_transfer(&e, &from, &to, 21, &TransferKind::Standard, &token);
     });
 }
 
 #[test]
 #[should_panic(expected = "Error(Contract, #390)")]
-fn can_transfer_panics_on_negative_amount() {
+fn on_transfer_panics_on_negative_amount() {
     let e = Env::default();
     let module_id = e.register(TestTimeTransfersLimitsContract, ());
     let token = Address::generate(&e);
@@ -522,7 +487,7 @@ fn can_transfer_panics_on_negative_amount() {
     let to = Address::generate(&e);
 
     e.as_contract(&module_id, || {
-        can_transfer(&e, &from, &to, -1, &token);
+        on_transfer(&e, &from, &to, -1, &TransferKind::Standard, &token);
     });
 }
 
@@ -550,9 +515,12 @@ fn counters_are_tracked_per_token() {
             &TransferLimit { limit_duration: 100, limit_value: 50 },
         );
 
-        on_transfer(&e, &from, &to, 50, &token_a);
+        on_transfer(&e, &from, &to, 50, &TransferKind::Standard, &token_a);
 
-        assert!(!can_transfer(&e, &from, &to, 1, &token_a));
-        assert!(can_transfer(&e, &from, &to, 50, &token_b));
+        // token_a's window is exhausted, but token_b's is untouched: the
+        // same identity can still move the full cap there.
+        assert_eq!(get_transfer_counter(&e, &token_a, &from, 100).value, 50);
+        on_transfer(&e, &from, &to, 50, &TransferKind::Standard, &token_b);
+        assert_eq!(get_transfer_counter(&e, &token_b, &from, 100).value, 50);
     });
 }

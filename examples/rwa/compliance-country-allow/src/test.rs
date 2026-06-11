@@ -5,7 +5,7 @@ use soroban_sdk::{
     String, Val, Vec,
 };
 use stellar_tokens::rwa::{
-    compliance::AccountSnapshot,
+    compliance::{AccountSnapshot, TransferKind},
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
         IndividualCountryRelation, OrganizationCountryRelation,
@@ -280,7 +280,7 @@ fn add_allowed_country_requires_manager_auth() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #396)")]
-fn can_transfer_panics_when_irs_not_configured() {
+fn on_transfer_panics_when_irs_not_configured() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -290,11 +290,11 @@ fn can_transfer_panics_when_irs_not_configured() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    client.can_transfer(&snap(&from), &snap(&to), &100_i128, &None, &token);
+    client.on_transfer(&snap(&from), &snap(&to), &100_i128, &TransferKind::Standard, &token);
 }
 
 #[test]
-fn can_transfer_and_can_create_use_irs_country_entries() {
+fn hooks_pass_for_allowed_recipient() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -302,7 +302,6 @@ fn can_transfer_and_can_create_use_irs_country_entries() {
     let from = Address::generate(&e);
     let token = Address::generate(&e);
     let allowed_to = Address::generate(&e);
-    let disallowed_to = Address::generate(&e);
     let amount = 100_i128;
     let client = create_client(&e, &admin, &manager);
     let irs_id = e.register(MockIRSContract, ());
@@ -312,13 +311,75 @@ fn can_transfer_and_can_create_use_irs_country_entries() {
         &allowed_to,
         &vec![&e, individual_country(250), organization_country(276)],
     );
+
+    client.set_identity_registry_storage(&token, &irs_id, &manager);
+    client.add_allowed_country(&token, &276, &manager);
+
+    client.on_transfer(&snap(&from), &snap(&allowed_to), &amount, &TransferKind::Standard, &token);
+    client.on_created(&snap(&allowed_to), &amount, &token);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #404)")]
+fn on_transfer_panics_for_disallowed_recipient() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let from = Address::generate(&e);
+    let token = Address::generate(&e);
+    let disallowed_to = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+
     irs.set_country_data_entries(&disallowed_to, &vec![&e, individual_country(250)]);
 
     client.set_identity_registry_storage(&token, &irs_id, &manager);
     client.add_allowed_country(&token, &276, &manager);
 
-    assert!(client.can_transfer(&snap(&from), &snap(&allowed_to), &amount, &None, &token));
-    assert!(client.can_create(&snap(&allowed_to), &amount, &token));
-    assert!(!client.can_transfer(&snap(&from), &snap(&disallowed_to), &amount, &None, &token));
-    assert!(!client.can_create(&snap(&disallowed_to), &amount, &token));
+    client.on_transfer(
+        &snap(&from),
+        &snap(&disallowed_to),
+        &100_i128,
+        &TransferKind::Standard,
+        &token,
+    );
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #404)")]
+fn on_created_panics_for_disallowed_recipient() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let token = Address::generate(&e);
+    let disallowed_to = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+
+    irs.set_country_data_entries(&disallowed_to, &vec![&e, individual_country(250)]);
+
+    client.set_identity_registry_storage(&token, &irs_id, &manager);
+    client.add_allowed_country(&token, &276, &manager);
+
+    client.on_created(&snap(&disallowed_to), &100_i128, &token);
+}
+
+#[test]
+fn on_transfer_forced_is_exempt_from_policy() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+    let token = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+
+    // No IRS configured and no allowlist: a standard transfer would panic,
+    // but a forced one passes through untouched.
+    client.on_transfer(&snap(&from), &snap(&to), &100_i128, &TransferKind::Forced, &token);
 }

@@ -7,7 +7,7 @@ use stellar_tokens::rwa::compliance::{
         storage::{self as compliance_storage, set_irs_address},
         ComplianceModule,
     },
-    AccountSnapshot,
+    AccountSnapshot, TransferKind,
 };
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -68,18 +68,23 @@ impl MaxBalance for MaxBalanceContract {
 
 #[contractimpl(contracttrait)]
 impl ComplianceModule for MaxBalanceContract {
+    // Enforces the cap: panics with `MaxBalanceExceeded` when the recipient
+    // identity's aggregate balance would exceed the configured maximum
+    // (forced transfers bypass the check but still update the books).
     fn on_transfer(
         e: &Env,
         from: AccountSnapshot,
         to: AccountSnapshot,
         amount: i128,
-        _spender: Option<Address>,
+        kind: TransferKind,
         token: Address,
     ) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
-        max_balance::on_transfer(e, &from.address, &to.address, amount, &token);
+        max_balance::on_transfer(e, &from.address, &to.address, amount, &kind, &token);
     }
 
+    // Enforces the cap: panics with `MaxBalanceExceeded` when the mint would
+    // push the recipient identity's aggregate balance past the maximum.
     fn on_created(e: &Env, to: AccountSnapshot, amount: i128, token: Address) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
         max_balance::on_created(e, &to.address, amount, &token);
@@ -88,21 +93,6 @@ impl ComplianceModule for MaxBalanceContract {
     fn on_destroyed(e: &Env, from: AccountSnapshot, amount: i128, token: Address) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
         max_balance::on_destroyed(e, &from.address, amount, &token);
-    }
-
-    fn can_transfer(
-        e: &Env,
-        from: AccountSnapshot,
-        to: AccountSnapshot,
-        amount: i128,
-        _spender: Option<Address>,
-        token: Address,
-    ) -> bool {
-        max_balance::can_transfer(e, &from.address, &to.address, amount, &token)
-    }
-
-    fn can_create(e: &Env, to: AccountSnapshot, amount: i128, token: Address) -> bool {
-        max_balance::can_create(e, &to.address, amount, &token)
     }
 
     fn name(e: &Env) -> String {

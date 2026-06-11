@@ -3,8 +3,8 @@ use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 use crate::rwa::{
     compliance::{
         emit_module_added, emit_module_removed, modules::ComplianceModuleClient, AccountSnapshot,
-        ComplianceError, ComplianceHook, COMPLIANCE_EXTEND_AMOUNT, COMPLIANCE_TTL_THRESHOLD,
-        MAX_MODULES,
+        ComplianceError, ComplianceHook, TransferKind, COMPLIANCE_EXTEND_AMOUNT,
+        COMPLIANCE_TTL_THRESHOLD, MAX_MODULES,
     },
     utils::token_binder::is_token_bound,
 };
@@ -169,11 +169,11 @@ pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
 
 // ################## HOOK EXECUTION ##################
 
-/// Executes all modules registered for the Transfer hook.
+/// Executes all modules registered for the Transferred hook.
 ///
-/// Called after tokens are successfully transferred from one address to
-/// another. Only modules that have registered for the Transfer hook will be
-/// invoked.
+/// Called when tokens are transferred from one address to another. A module
+/// rejects the transfer by panicking, which reverts the whole operation;
+/// only modules registered for the Transferred hook will be invoked.
 ///
 /// # Arguments
 ///
@@ -181,8 +181,8 @@ pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
 /// * `from` - Snapshot of the sender, as of before the transfer.
 /// * `to` - Snapshot of the receiver, as of before the transfer.
 /// * `amount` - The amount of tokens transferred.
-/// * `spender` - For a `transfer_from`, the delegate that moved the tokens;
-///   `None` for a direct or forced transfer.
+/// * `kind` - Who initiated the transfer and under what authority; see
+///   [`TransferKind`].
 /// * `token` - The address of the token contract that is performing the
 ///   transfer.
 ///
@@ -192,14 +192,14 @@ pub fn remove_module_from(e: &Env, hook: ComplianceHook, module: Address) {
 ///
 /// # Cross-Contract Calls
 ///
-/// Invokes `on_transfer(from, to, amount, spender, token)` on each registered
+/// Invokes `on_transfer(from, to, amount, kind, token)` on each registered
 /// module.
 pub fn transferred(
     e: &Env,
     from: AccountSnapshot,
     to: AccountSnapshot,
     amount: i128,
-    spender: Option<Address>,
+    kind: TransferKind,
     token: Address,
 ) {
     require_auth_from_bound_token(e, &token);
@@ -208,7 +208,7 @@ pub fn transferred(
 
     for module_address in modules.iter() {
         let client = ComplianceModuleClient::new(e, &module_address);
-        client.on_transfer(&from, &to, &amount, &spender, &token);
+        client.on_transfer(&from, &to, &amount, &kind, &token);
     }
 }
 
@@ -270,98 +270,6 @@ pub fn destroyed(e: &Env, from: AccountSnapshot, amount: i128, token: Address) {
         let client = ComplianceModuleClient::new(e, &module_address);
         client.on_destroyed(&from, &amount, &token);
     }
-}
-
-/// Executes all modules registered for the CanTransfer hook to validate a
-/// transfer.
-///
-/// Called during transfer validation to check if a transfer should be allowed.
-/// Only modules that have registered for the CanTransfer hook will be invoked.
-/// This is a read-only operation and should not modify state.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `from` - Snapshot of the sender, as of before the transfer.
-/// * `to` - Snapshot of the receiver, as of before the transfer.
-/// * `amount` - The amount of tokens to be transferred.
-/// * `spender` - For a `transfer_from`, the delegate that moved the tokens;
-///   `None` for a direct or forced transfer.
-/// * `token` - The address of the token contract that is performing the
-///   transfer.
-///
-/// # Returns
-///
-/// `true` if all registered modules allow the transfer, `false` if any module
-/// rejects it. Returns `true` if no modules are registered for this hook.
-///
-/// # Cross-Contract Calls
-///
-/// Invokes `can_transfer(from, to, amount, spender, token)` on each registered
-/// module. Stops execution and returns `false` on the first module that
-/// rejects.
-pub fn can_transfer(
-    e: &Env,
-    from: AccountSnapshot,
-    to: AccountSnapshot,
-    amount: i128,
-    spender: Option<Address>,
-    token: Address,
-) -> bool {
-    let modules = get_modules_for_hook(e, ComplianceHook::CanTransfer);
-
-    for module_address in modules.iter() {
-        let client = ComplianceModuleClient::new(e, &module_address);
-        let result = client.can_transfer(&from, &to, &amount, &spender, &token);
-
-        // If any module returns false, the entire check fails
-        if !result {
-            return false;
-        }
-    }
-
-    // All modules passed (or no modules registered)
-    true
-}
-
-/// Executes all modules registered for the CanCreate hook to validate a
-/// mint operation.
-///
-/// Called during mint validation to check if a mint operation should be
-/// allowed. Only modules that have registered for the CanCreate hook will be
-/// invoked. This is a read-only operation and should not modify state.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `to` - Snapshot of the receiver, as of before the mint.
-/// * `amount` - The amount of tokens to be transferred.
-/// * `token` - The address of the token contract that is performing the mint.
-///
-/// # Returns
-///
-/// `true` if all registered modules allow the mint, `false` if any module
-/// rejects it. Returns `true` if no modules are registered for this hook.
-///
-/// # Cross-Contract Calls
-///
-/// Invokes `can_create(to, amount, token)` on each registered module.
-/// Stops execution and returns `false` on the first module that rejects.
-pub fn can_create(e: &Env, to: AccountSnapshot, amount: i128, token: Address) -> bool {
-    let modules = get_modules_for_hook(e, ComplianceHook::CanCreate);
-
-    for module_address in modules.iter() {
-        let client = ComplianceModuleClient::new(e, &module_address);
-        let result = client.can_create(&to, &amount, &token);
-
-        // If any module returns false, the entire check fails
-        if !result {
-            return false;
-        }
-    }
-
-    // All modules passed (or no modules registered)
-    true
 }
 
 // ################## HELPERS ##################
