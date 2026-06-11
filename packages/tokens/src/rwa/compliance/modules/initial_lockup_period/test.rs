@@ -300,7 +300,7 @@ fn debit_forced_tolerates_lock_shortfall() {
     let from = Address::generate(&e);
 
     e.as_contract(&module_id, || {
-        // Locks exceed the wallet's actual balance (a mis-seeded preset):
+        // Locks exceed the wallet's actual balance (a wrongly seeded preset):
         // the forced debit consumes what exists and never panics.
         preset_locks(
             &e,
