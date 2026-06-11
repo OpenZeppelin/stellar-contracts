@@ -9,7 +9,11 @@ use stellar_event_assertion::EventAssertion;
 
 use crate::{
     fungible::ContractOverrides,
-    rwa::{storage::RWAStorageKey, IdentityVerifier, RWAError, RWA},
+    rwa::{
+        compliance::{AccountSnapshot, TransferKind},
+        storage::RWAStorageKey,
+        IdentityVerifier, RWAError, RWA,
+    },
 };
 
 #[contract]
@@ -51,25 +55,26 @@ struct MockCompliance;
 
 #[contractimpl]
 impl MockCompliance {
-    pub fn can_transfer(
+    // Compliance rejects by panicking from the hook. The `tx_ok` / `mint_ok`
+    // flags let tests flip this mock into rejection mode.
+    pub fn transferred(
         e: Env,
-        _from: Address,
-        _to: Address,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
         _amount: i128,
+        _kind: TransferKind,
         _contract: Address,
-    ) -> bool {
-        e.storage().persistent().get(&symbol_short!("tx_ok")).unwrap_or(true)
+    ) {
+        let ok: bool = e.storage().persistent().get(&symbol_short!("tx_ok")).unwrap_or(true);
+        assert!(ok, "compliance rejected transfer");
     }
 
-    pub fn can_create(e: Env, _to: Address, _amount: i128, _contract: Address) -> bool {
-        e.storage().persistent().get(&symbol_short!("mint_ok")).unwrap_or(true)
+    pub fn created(e: Env, _to: AccountSnapshot, _amount: i128, _contract: Address) {
+        let ok: bool = e.storage().persistent().get(&symbol_short!("mint_ok")).unwrap_or(true);
+        assert!(ok, "compliance rejected mint");
     }
 
-    pub fn transferred(_e: Env, _from: Address, _to: Address, _amount: i128, _contract: Address) {}
-
-    pub fn created(_e: Env, _to: Address, _amount: i128, _contract: Address) {}
-
-    pub fn destroyed(_e: Env, _from: Address, _amount: i128, _contract: Address) {}
+    pub fn destroyed(_e: Env, _from: AccountSnapshot, _amount: i128, _contract: Address) {}
 }
 
 #[contract]
@@ -217,7 +222,7 @@ fn mint_without_compliance_fails() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #306)")]
+#[should_panic(expected = "compliance rejected mint")]
 fn mint_fails_when_not_compliant() {
     let e = Env::default();
     let address = e.register(MockRWAContract, ());
@@ -998,7 +1003,7 @@ fn transfer_fails_when_contract_paused() {
 }
 
 #[test]
-#[should_panic(expected = "Error(Contract, #305)")]
+#[should_panic(expected = "compliance rejected transfer")]
 fn transfer_fails_when_not_compliant() {
     let e = Env::default();
     e.mock_all_auths();

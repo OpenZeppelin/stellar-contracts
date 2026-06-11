@@ -6,12 +6,20 @@ use soroban_sdk::{
     vec, Address, Env, String, Val, Vec,
 };
 use stellar_tokens::rwa::{
-    compliance::modules::time_transfers_limits::{TransferCounter, TransferLimit, MAX_LIMITS},
+    compliance::{
+        modules::time_transfers_limits::{TransferCounter, TransferLimit, MAX_LIMITS},
+        AccountSnapshot, TransferKind,
+    },
     identity_registry_storage::{CountryDataManager, IdentityRegistryStorage},
     utils::token_binder::TokenBinder,
 };
 
 use crate::contract::{TimeTransfersLimitsContract, TimeTransfersLimitsContractClient};
+
+/// This module ignores balance and frozen amounts, so they are left at zero.
+fn snap(address: &Address) -> AccountSnapshot {
+    AccountSnapshot { address: address.clone(), balance: 0, frozen: 0 }
+}
 
 fn create_client<'a>(
     e: &Env,
@@ -233,16 +241,17 @@ fn transfers_accumulate_against_identity_windows() {
         &manager,
     );
 
-    client.on_transfer(&wallet_a, &to, &30_i128, &token);
+    client.on_transfer(&snap(&wallet_a), &snap(&to), &30_i128, &TransferKind::Standard, &token);
 
     assert_eq!(
         client.get_transfer_counter(&token, &identity, &100_u32),
         TransferCounter { value: 30, deadline: 100 }
     );
 
-    // Splitting the volume across wallets does not raise the cap.
-    assert!(client.can_transfer(&wallet_b, &to, &20_i128, &token));
-    assert!(!client.can_transfer(&wallet_b, &to, &21_i128, &token));
+    // Splitting the volume across wallets does not raise the cap: the
+    // second wallet's transfer lands on the same identity counter.
+    client.on_transfer(&snap(&wallet_b), &snap(&to), &20_i128, &TransferKind::Standard, &token);
+    assert_eq!(client.get_transfer_counter(&token, &identity, &100_u32).value, 50);
 }
 
 #[test]
@@ -266,13 +275,16 @@ fn window_elapses_and_counting_restarts() {
         &manager,
     );
 
-    client.on_transfer(&from, &to, &50_i128, &token);
-    assert!(!client.can_transfer(&from, &to, &1_i128, &token));
+    client.on_transfer(&snap(&from), &snap(&to), &50_i128, &TransferKind::Standard, &token);
+    assert_eq!(
+        client.get_transfer_counter(&token, &from, &100_u32),
+        TransferCounter { value: 50, deadline: 100 }
+    );
 
+    // After the window elapses, the counter restarts instead of
+    // accumulating.
     e.ledger().with_mut(|li| li.sequence_number = 100);
-    assert!(client.can_transfer(&from, &to, &50_i128, &token));
-
-    client.on_transfer(&from, &to, &10_i128, &token);
+    client.on_transfer(&snap(&from), &snap(&to), &10_i128, &TransferKind::Standard, &token);
     assert_eq!(
         client.get_transfer_counter(&token, &from, &100_u32),
         TransferCounter { value: 10, deadline: 200 }
@@ -301,26 +313,56 @@ fn on_transfer_panics_when_limit_exceeded() {
         &manager,
     );
 
-    client.on_transfer(&from, &to, &51_i128, &token);
+    client.on_transfer(&snap(&from), &snap(&to), &51_i128, &TransferKind::Standard, &token);
 }
 
 #[test]
-fn can_transfer_true_when_no_limits_configured() {
+fn on_transfer_skips_when_no_limits_configured() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
     let manager = Address::generate(&e);
+    let compliance = Address::generate(&e);
     let token = Address::generate(&e);
     let from = Address::generate(&e);
     let to = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
+    client.set_compliance_address(&token, &compliance, &admin);
+
     // No limits and no IRS: the identity lookup is skipped entirely.
-    assert!(client.can_transfer(&from, &to, &100_i128, &token));
+    client.on_transfer(&snap(&from), &snap(&to), &100_i128, &TransferKind::Standard, &token);
 }
 
 #[test]
-fn can_create_always_allows() {
+fn on_transfer_forced_skips_check_and_counters() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let compliance = Address::generate(&e);
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+    let irs_id = e.register(MockIRSContract, ());
+
+    client.set_compliance_address(&token, &compliance, &admin);
+    client.set_identity_registry_storage(&token, &irs_id, &manager);
+    client.set_time_transfer_limit(
+        &token,
+        &TransferLimit { limit_duration: 100, limit_value: 50 },
+        &manager,
+    );
+
+    // Far above the cap, but forced transfers are not investor activity:
+    // no rejection, and no window allowance consumed.
+    client.on_transfer(&snap(&from), &snap(&to), &9_999_i128, &TransferKind::Forced, &token);
+    assert_eq!(client.get_transfer_counter(&token, &from, &100_u32).value, 0);
+}
+
+#[test]
+fn on_created_always_allows() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -329,7 +371,8 @@ fn can_create_always_allows() {
     let to = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    assert!(client.can_create(&to, &100_i128, &token));
+    // Mints are not counted against the time-window limits.
+    client.on_created(&snap(&to), &100_i128, &token);
 }
 
 #[test]

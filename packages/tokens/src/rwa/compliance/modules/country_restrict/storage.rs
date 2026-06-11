@@ -1,9 +1,12 @@
-use soroban_sdk::{contracttype, Address, Env, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 
-use crate::rwa::compliance::modules::{
-    country_restrict::{emit_country_restricted, emit_country_unrestricted},
-    storage::{country_code, get_irs_country_data_entries},
-    MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+use crate::rwa::compliance::{
+    modules::{
+        country_restrict::{emit_country_restricted, emit_country_unrestricted},
+        storage::{country_code, get_irs_country_data_entries},
+        ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+    },
+    TransferKind,
 };
 
 #[contracttype]
@@ -54,46 +57,51 @@ pub fn can_receive(e: &Env, account: &Address, token: &Address) -> bool {
     true
 }
 
-/// Returns `true` if the transfer recipient has no restricted country.
+/// Rejects a transfer whose recipient has a restricted country, by panicking.
 ///
-/// Country restriction checks are recipient-based, so the sender and amount are
-/// intentionally ignored.
+/// Country restriction checks are recipient-based, so the sender and amount
+/// are intentionally ignored. Forced (admin/recovery) transfers are exempt
+/// from the policy, and no bookkeeping exists in this module, so they pass
+/// through untouched.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
-/// * `_from` - The sender address.
 /// * `to` - The recipient address.
-/// * `_amount` - The transfer amount.
+/// * `kind` - Who initiated the transfer and under what authority.
 /// * `token` - The token address.
 ///
 /// # Errors
 ///
+/// * [`ComplianceModuleError::CountryRestricted`] - When the recipient has a
+///   restricted country and the transfer is not forced.
 /// * refer to [`can_receive`] errors.
-pub fn can_transfer(
-    e: &Env,
-    _from: &Address,
-    to: &Address,
-    _amount: i128,
-    token: &Address,
-) -> bool {
-    can_receive(e, to, token)
+pub fn on_transfer(e: &Env, to: &Address, kind: &TransferKind, token: &Address) {
+    if *kind == TransferKind::Forced {
+        return;
+    }
+    if !can_receive(e, to, token) {
+        panic_with_error!(e, ComplianceModuleError::CountryRestricted);
+    }
 }
 
-/// Returns `true` if the mint recipient has no restricted country.
+/// Rejects a mint whose recipient has a restricted country, by panicking.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `to` - The recipient address.
-/// * `_amount` - The minted amount.
 /// * `token` - The token address.
 ///
 /// # Errors
 ///
+/// * [`ComplianceModuleError::CountryRestricted`] - When the recipient has a
+///   restricted country.
 /// * refer to [`can_receive`] errors.
-pub fn can_create(e: &Env, to: &Address, _amount: i128, token: &Address) -> bool {
-    can_receive(e, to, token)
+pub fn on_created(e: &Env, to: &Address, token: &Address) {
+    if !can_receive(e, to, token) {
+        panic_with_error!(e, ComplianceModuleError::CountryRestricted);
+    }
 }
 
 // ################## CHANGE STATE ##################

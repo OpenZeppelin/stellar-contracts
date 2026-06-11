@@ -10,37 +10,76 @@ mod test;
 
 /// Hook types for modular compliance system.
 ///
-/// Each hook type represents a specific event or validation point
-/// where compliance modules can be executed.
+/// One hook exists per token operation, invoked after the operation's state
+/// changes are applied but within the same transaction. A module enforces its
+/// policy by panicking from the hook, which reverts the entire operation
+/// atomically, and records whatever bookkeeping it needs otherwise.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum ComplianceHook {
-    /// Called after tokens are successfully transferred from one wallet to
-    /// another. Modules registered for this hook can update their state
-    /// based on transfer events.
+    /// Called when tokens are transferred from one wallet to another.
+    /// Modules registered for this hook can reject the transfer (by
+    /// panicking) and update their state based on transfer events.
     Transferred,
 
-    /// Called after tokens are successfully created/minted to a wallet.
-    /// Modules registered for this hook can update their state based on minting
-    /// events.
+    /// Called when tokens are created/minted to a wallet. Modules registered
+    /// for this hook can reject the mint (by panicking) and update their
+    /// state based on minting events.
     Created,
 
-    /// Called after tokens are successfully destroyed/burned from a wallet.
-    /// Modules registered for this hook can update their state based on burning
-    /// events.
+    /// Called when tokens are destroyed/burned from a wallet. Modules
+    /// registered for this hook can reject the burn (by panicking) and update
+    /// their state based on burning events.
     Destroyed,
+}
 
-    /// Called during transfer validation to check if a transfer should be
-    /// allowed. Modules registered for this hook can implement transfer
-    /// restrictions. This is a READ-only operation and should not modify
-    /// state.
-    CanTransfer,
+/// Describes who initiated a transfer and under what authority, so each
+/// compliance module can decide whether its policy applies.
+///
+/// Privileged operations (`forced_transfer`, `recover_balance`) deliberately
+/// bypass investor-facing policy: a sanctions rule should not block a
+/// court-ordered seizure or an account recovery the admin is consciously
+/// executing. At the same time, bookkeeping modules must still observe the
+/// movement or their records drift from reality. Passing the kind into the
+/// hook makes that decision explicit and per-module: a policy module exempts
+/// [`TransferKind::Forced`] from its checks, while an accounting module
+/// updates its books for every kind.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TransferKind {
+    /// The holder moves its own tokens.
+    Standard,
+    /// A delegate moves the holder's tokens via `transfer_from`; carries the
+    /// delegate (spender) address.
+    Delegated(Address),
+    /// A privileged operation (forced transfer, account recovery) moves the
+    /// tokens. Policy modules should generally exempt this kind; bookkeeping
+    /// must still be applied.
+    Forced,
+}
 
-    /// Called during mint validation to check if a mint operation should be
-    /// allowed. Modules registered for this hook can implement transfer
-    /// restrictions. This is a READ-only operation and should not modify
-    /// state.
-    CanCreate,
+/// A point-in-time view of one account, captured as of *before* the operation
+/// that triggered the hook.
+///
+/// Soroban forbids reentrancy, and the token contract is still on the call
+/// stack while a hook runs, so a module cannot call back into the token to
+/// read a balance. The snapshot carries that state into the hook instead, so a
+/// module can reason about a wallet's holdings without a balance mirror of its
+/// own.
+///
+/// `balance` and `frozen` are measured at the same instant, before the
+/// operation is applied. `balance - frozen` is the wallet's free (movable)
+/// amount. The hooks run after the operation's state changes, so the snapshot
+/// is what gives a module a stable pre-operation view to validate against.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AccountSnapshot {
+    /// The wallet address this snapshot describes.
+    pub address: Address,
+    /// The wallet's total token balance, before the operation.
+    pub balance: i128,
+    /// The partially-frozen portion of `balance`, before the operation.
+    pub frozen: i128,
 }
 
 /// Trait for implementing custom compliance logic to RWA tokens.
@@ -138,93 +177,62 @@ pub trait Compliance: TokenBinder {
 
     /// Called whenever tokens are transferred from one wallet to another.
     ///
-    /// This function calls all modules registered for the `Transfer` hook.
-    /// Only modules that need to track transfer events will be called.
+    /// This function calls all modules registered for the `Transferred` hook.
+    /// A module rejects the transfer by panicking, which reverts the whole
+    /// operation; otherwise it updates its own state as needed.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `from` - The address of the sender.
-    /// * `to` - The address of the receiver.
+    /// * `from` - Snapshot of the sender, as of before the transfer.
+    /// * `to` - Snapshot of the receiver, as of before the transfer.
     /// * `amount` - The amount of tokens involved in the transfer.
+    /// * `kind` - Who initiated the transfer and under what authority; see
+    ///   [`TransferKind`].
     /// * `token` - The address of the token contract that is performing the
     ///   transfer.
-    fn transferred(e: &Env, from: Address, to: Address, amount: i128, token: Address) {
-        storage::transferred(e, from, to, amount, token)
+    fn transferred(
+        e: &Env,
+        from: AccountSnapshot,
+        to: AccountSnapshot,
+        amount: i128,
+        kind: TransferKind,
+        token: Address,
+    ) {
+        storage::transferred(e, from, to, amount, kind, token)
     }
 
     /// Called whenever tokens are created on a wallet.
     ///
     /// This function calls all modules registered for the `Created` hook.
-    /// Only modules that need to track minting events will be called.
+    /// A module rejects the mint by panicking, which reverts the whole
+    /// operation; otherwise it updates its own state as needed.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `to` - The address of the receiver.
+    /// * `to` - Snapshot of the receiver, as of before the mint.
     /// * `amount` - The amount of tokens involved in the minting.
     /// * `token` - The address of the contract that is performing the minting.
-    fn created(e: &Env, to: Address, amount: i128, token: Address) {
+    fn created(e: &Env, to: AccountSnapshot, amount: i128, token: Address) {
         storage::created(e, to, amount, token)
     }
 
     /// Called whenever tokens are destroyed from a wallet.
     ///
     /// This function calls all modules registered for the `Destroyed` hook.
-    /// Only modules that need to track burning events will be called.
+    /// A module rejects the burn by panicking, which reverts the whole
+    /// operation; otherwise it updates its own state as needed.
     ///
     /// # Arguments
     ///
     /// * `e` - Access to the Soroban environment.
-    /// * `from` - The address on which tokens are burnt.
+    /// * `from` - Snapshot of the burned wallet, as of before the burn.
     /// * `amount` - The amount of tokens involved in the burn.
     /// * `token` - The address of the token contract that is performing the
     ///   burn.
-    fn destroyed(e: &Env, from: Address, amount: i128, token: Address) {
+    fn destroyed(e: &Env, from: AccountSnapshot, amount: i128, token: Address) {
         storage::destroyed(e, from, amount, token)
-    }
-
-    /// Checks whether the transfer is compliant.
-    ///
-    /// This function calls all modules registered for the `CanTransfer` hook.
-    /// If any module returns `false`, the entire check fails.
-    /// This is a READ-only function and should not modify state.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `from` - The address of the sender.
-    /// * `to` - The address of the receiver.
-    /// * `amount` - The amount of tokens involved in the transfer.
-    /// * `token` - The address of the token contract that is performing the
-    ///   transfer.
-    ///
-    /// # Returns
-    ///
-    /// `true` if all registered modules allow the transfer, `false` otherwise.
-    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
-        storage::can_transfer(e, from, to, amount, token)
-    }
-
-    /// Checks whether the mint operation is compliant.
-    ///
-    /// This function calls all modules registered for the `CanCreate` hook.
-    /// If any module returns `false`, the entire check fails.
-    /// This is a READ-only function and should not modify state.
-    ///
-    /// # Arguments
-    ///
-    /// * `e` - Access to the Soroban environment.
-    /// * `to` - The address of the receiver.
-    /// * `amount` - The amount of tokens involved in the transfer.
-    /// * `token` - The address of the token contract that is performing the
-    ///   transfer.
-    ///
-    /// # Returns
-    ///
-    /// `true` if all registered modules allow the transfer, `false` otherwise.
-    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
-        storage::can_create(e, to, amount, token)
     }
 }
 

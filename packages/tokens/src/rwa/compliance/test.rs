@@ -6,16 +6,22 @@ use stellar_event_assertion::EventAssertion;
 use crate::rwa::{
     compliance::{
         storage::{
-            add_module_to, can_create, can_transfer, created, destroyed, get_modules_for_hook,
-            is_module_registered, remove_module_from, transferred,
+            add_module_to, created, destroyed, get_modules_for_hook, is_module_registered,
+            remove_module_from, transferred,
         },
-        ComplianceHook, MAX_MODULES,
+        AccountSnapshot, ComplianceHook, TransferKind, MAX_MODULES,
     },
     utils::token_binder::bind_token,
 };
 
 #[contract]
 struct MockContract;
+
+/// Builds a snapshot for the hook-execution tests. The mock module ignores
+/// the balance and frozen fields, so they are left at zero.
+fn snapshot(address: &Address) -> AccountSnapshot {
+    AccountSnapshot { address: address.clone(), balance: 0, frozen: 0 }
+}
 
 #[test]
 fn add_module_to_works() {
@@ -78,23 +84,19 @@ fn add_module_to_different_hooks_works() {
         // Add same module to different hooks
         add_module_to(&e, ComplianceHook::Transferred, module.clone());
         add_module_to(&e, ComplianceHook::Created, module.clone());
-        add_module_to(&e, ComplianceHook::CanTransfer, module.clone());
 
-        // Verify module is registered for all hooks
+        // Verify module is registered for both hooks
         assert!(is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
         assert!(is_module_registered(&e, ComplianceHook::Created, module.clone()));
-        assert!(is_module_registered(&e, ComplianceHook::CanTransfer, module.clone()));
         assert!(!is_module_registered(&e, ComplianceHook::Destroyed, module.clone()));
 
         // Verify each hook has the module
         let transfer_modules = get_modules_for_hook(&e, ComplianceHook::Transferred);
         let created_modules = get_modules_for_hook(&e, ComplianceHook::Created);
-        let can_transfer_modules = get_modules_for_hook(&e, ComplianceHook::CanTransfer);
         let destroyed_modules = get_modules_for_hook(&e, ComplianceHook::Destroyed);
 
         assert_eq!(transfer_modules.len(), 1);
         assert_eq!(created_modules.len(), 1);
-        assert_eq!(can_transfer_modules.len(), 1);
         assert_eq!(destroyed_modules.len(), 0);
     });
 }
@@ -207,7 +209,6 @@ fn is_module_registered_false_for_unregistered() {
         assert!(!is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
         assert!(!is_module_registered(&e, ComplianceHook::Created, module.clone()));
         assert!(!is_module_registered(&e, ComplianceHook::Destroyed, module.clone()));
-        assert!(!is_module_registered(&e, ComplianceHook::CanTransfer, module.clone()));
     });
 }
 
@@ -226,13 +227,11 @@ fn hook_isolation_works() {
         assert!(is_module_registered(&e, ComplianceHook::Transferred, module.clone()));
         assert!(!is_module_registered(&e, ComplianceHook::Created, module.clone()));
         assert!(!is_module_registered(&e, ComplianceHook::Destroyed, module.clone()));
-        assert!(!is_module_registered(&e, ComplianceHook::CanTransfer, module.clone()));
 
         // Verify only Transfer hook has modules
         assert_eq!(get_modules_for_hook(&e, ComplianceHook::Transferred).len(), 1);
         assert_eq!(get_modules_for_hook(&e, ComplianceHook::Created).len(), 0);
         assert_eq!(get_modules_for_hook(&e, ComplianceHook::Destroyed).len(), 0);
-        assert_eq!(get_modules_for_hook(&e, ComplianceHook::CanTransfer).len(), 0);
     });
 }
 
@@ -274,7 +273,6 @@ fn all_hook_types_work() {
             ComplianceHook::Transferred,
             ComplianceHook::Created,
             ComplianceHook::Destroyed,
-            ComplianceHook::CanTransfer,
         ];
 
         for hook_type in hook_types.iter() {
@@ -325,32 +323,25 @@ struct MockComplianceModule;
 
 #[contractimpl]
 impl MockComplianceModule {
-    pub fn on_transfer(_env: Env, _from: Address, _to: Address, _amount: i128, _contract: Address) {
-        // Mock implementation - does nothing but proves it was called
-    }
-
-    pub fn on_created(_env: Env, _to: Address, _amount: i128, _contract: Address) {
-        // Mock implementation - does nothing but proves it was called
-    }
-
-    pub fn on_destroyed(_env: Env, _from: Address, _amount: i128, _contract: Address) {
-        // Mock implementation - does nothing but proves it was called
-    }
-
-    pub fn can_transfer(
+    // Mock implementations: prove the hook was called and reject odd
+    // amounts by panicking, mirroring how a real module enforces policy.
+    pub fn on_transfer(
         _env: Env,
-        _from: Address,
-        _to: Address,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
         amount: i128,
+        _kind: TransferKind,
         _contract: Address,
-    ) -> bool {
-        // Mock implementation - returns true for even amounts, false for odd amounts
-        amount % 2 == 0
+    ) {
+        assert!(amount % 2 == 0, "mock module rejects odd amounts");
     }
 
-    pub fn can_create(_env: Env, _to: Address, amount: i128, _contract: Address) -> bool {
-        // Mock implementation - returns true for even amounts, false for odd amounts
-        amount % 2 == 0
+    pub fn on_created(_env: Env, _to: AccountSnapshot, amount: i128, _contract: Address) {
+        assert!(amount % 2 == 0, "mock module rejects odd amounts");
+    }
+
+    pub fn on_destroyed(_env: Env, _from: AccountSnapshot, _amount: i128, _contract: Address) {
+        // Mock implementation - does nothing but proves it was called
     }
 }
 
@@ -373,7 +364,14 @@ fn transferred_hook_execution_works() {
         add_module_to(&e, ComplianceHook::Transferred, module_address.clone());
 
         // Execute transferred hook
-        transferred(&e, from.clone(), to.clone(), amount, token_contract_address.clone());
+        transferred(
+            &e,
+            snapshot(&from),
+            snapshot(&to),
+            amount,
+            TransferKind::Standard,
+            token_contract_address.clone(),
+        );
     });
 }
 
@@ -395,7 +393,7 @@ fn created_hook_execution_works() {
         add_module_to(&e, ComplianceHook::Created, module_address.clone());
 
         // Execute created hook
-        created(&e, to.clone(), amount, token_contract_address.clone());
+        created(&e, snapshot(&to), amount, token_contract_address.clone());
     });
 }
 
@@ -417,12 +415,13 @@ fn destroyed_hook_execution_works() {
         add_module_to(&e, ComplianceHook::Destroyed, module_address.clone());
 
         // Execute destroyed hook
-        destroyed(&e, from.clone(), amount, token_contract_address.clone());
+        destroyed(&e, snapshot(&from), amount, token_contract_address.clone());
     });
 }
 
 #[test]
-fn can_transfer_hook_execution_works() {
+#[should_panic(expected = "mock module rejects odd amounts")]
+fn transferred_panics_when_module_rejects() {
     let e = Env::default();
     e.mock_all_auths();
     let token_contract_address = Address::generate(&e);
@@ -430,86 +429,28 @@ fn can_transfer_hook_execution_works() {
     let module_address = e.register(MockComplianceModule, ());
     let from = Address::generate(&e);
     let to = Address::generate(&e);
-    let amount = 1000i128;
 
     e.as_contract(&contract_address, || {
-        // Test with no modules registered - should return true
-        assert!(can_transfer(&e, from.clone(), to.clone(), amount, token_contract_address.clone()));
+        bind_token(&e, &token_contract_address);
+        add_module_to(&e, ComplianceHook::Transferred, module_address);
 
-        // Add module to CanTransfer hook
-        add_module_to(&e, ComplianceHook::CanTransfer, module_address.clone());
-
-        // Execute can_transfer hook with even amount - should return true
-        let even_amount = 1000i128;
-        assert!(can_transfer(
-            &e,
-            from.clone(),
-            to.clone(),
-            even_amount,
-            token_contract_address.clone()
-        ));
-
-        // Execute can_transfer hook with odd amount - should return false
+        // The mock module rejects odd amounts; its panic propagates and
+        // reverts the whole operation.
         let odd_amount = 1001i128;
-        assert!(!can_transfer(
+        transferred(
             &e,
-            from.clone(),
-            to.clone(),
+            snapshot(&from),
+            snapshot(&to),
             odd_amount,
-            token_contract_address.clone()
-        ));
+            TransferKind::Standard,
+            token_contract_address,
+        );
     });
 }
 
 #[test]
-fn can_transfer_returns_false_when_module_rejects() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let token_contract_address = Address::generate(&e);
-    let contract_address = e.register(MockContract, ());
-    let module_address = e.register(MockComplianceModule, ());
-    let from = Address::generate(&e);
-    let to = Address::generate(&e);
-
-    e.as_contract(&contract_address, || {
-        // Add module to CanTransfer hook
-        add_module_to(&e, ComplianceHook::CanTransfer, module_address);
-
-        // Execute can_transfer hook with odd amount - should return false
-        let odd_amount = 1001i128;
-        assert!(!can_transfer(&e, from, to, odd_amount, token_contract_address));
-    });
-}
-
-#[test]
-fn can_create_hook_execution_works() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let token_contract_address = Address::generate(&e);
-    let contract_address = e.register(MockContract, ());
-    let module_address = e.register(MockComplianceModule, ());
-    let to = Address::generate(&e);
-
-    e.as_contract(&contract_address, || {
-        // Test with no modules registered - should return true
-        let amount = 1000i128;
-        assert!(can_create(&e, to.clone(), amount, token_contract_address.clone()));
-
-        // Add module to CanCreate hook
-        add_module_to(&e, ComplianceHook::CanCreate, module_address.clone());
-
-        // Execute can_create hook with even amount - should return true
-        let even_amount = 1000i128;
-        assert!(can_create(&e, to.clone(), even_amount, token_contract_address.clone()));
-
-        // Execute can_create hook with odd amount - should return false
-        let odd_amount = 1001i128;
-        assert!(!can_create(&e, to.clone(), odd_amount, token_contract_address.clone()));
-    });
-}
-
-#[test]
-fn can_create_multiple_modules_all_must_pass() {
+#[should_panic(expected = "mock module rejects odd amounts")]
+fn created_panics_when_any_module_rejects() {
     let e = Env::default();
     e.mock_all_auths();
     let token_contract_address = Address::generate(&e);
@@ -519,16 +460,12 @@ fn can_create_multiple_modules_all_must_pass() {
     let to = Address::generate(&e);
 
     e.as_contract(&contract_address, || {
-        // Add two identical modules to CanCreate hook
-        add_module_to(&e, ComplianceHook::CanCreate, module1);
-        add_module_to(&e, ComplianceHook::CanCreate, module2);
+        bind_token(&e, &token_contract_address);
+        add_module_to(&e, ComplianceHook::Created, module1);
+        add_module_to(&e, ComplianceHook::Created, module2);
 
-        // Test with even amount - both modules should return true, so result is true
-        let even_amount = 1000i128;
-        assert!(can_create(&e, to.clone(), even_amount, token_contract_address.clone()));
-
-        // Test with odd amount - both modules should return false, so result is false
+        // Both modules run; one rejection is enough to revert the mint.
         let odd_amount = 1001i128;
-        assert!(!can_create(&e, to, odd_amount, token_contract_address));
+        created(&e, snapshot(&to), odd_amount, token_contract_address);
     });
 }

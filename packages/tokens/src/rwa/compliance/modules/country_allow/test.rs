@@ -7,12 +7,15 @@ use soroban_sdk::{
 };
 
 use crate::rwa::{
-    compliance::modules::{
-        country_allow::storage::{
-            add_allowed_country, can_receive, is_country_allowed, remove_allowed_country,
-            set_country_allowed,
+    compliance::{
+        modules::{
+            country_allow::storage::{
+                add_allowed_country, can_receive, is_country_allowed, on_created, on_transfer,
+                remove_allowed_country, set_country_allowed,
+            },
+            storage::set_irs_address,
         },
-        storage::set_irs_address,
+        TransferKind,
     },
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
@@ -218,5 +221,73 @@ fn can_receive_rejects_when_no_country_matches() {
 
         assert!(!can_receive(&e, &empty_to, &token));
         assert!(!can_receive(&e, &disallowed_to, &token));
+    });
+}
+
+#[test]
+fn on_transfer_and_on_created_pass_for_allowed_recipient() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryAllowContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+    let token = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    irs.set_country_data_entries(&to, &vec![&e, individual_country(276)]);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_country_allowed(&e, &token, 276);
+
+        on_transfer(&e, &to, &TransferKind::Standard, &token);
+        on_created(&e, &to, &token);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #404)")]
+fn on_transfer_panics_for_disallowed_recipient() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryAllowContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let token = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_country_allowed(&e, &token, 276);
+
+        on_transfer(&e, &to, &TransferKind::Standard, &token);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #404)")]
+fn on_created_panics_for_disallowed_recipient() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryAllowContract, ());
+    let irs_id = e.register(MockIRSContract, ());
+    let token = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        set_irs_address(&e, &token, &irs_id);
+        set_country_allowed(&e, &token, 276);
+
+        on_created(&e, &to, &token);
+    });
+}
+
+#[test]
+fn on_transfer_forced_is_exempt_from_policy() {
+    let e = Env::default();
+    let module_id = e.register(TestCountryAllowContract, ());
+    let token = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // No IRS configured and no allowlist: a standard transfer would
+        // panic, but a forced one passes through untouched.
+        on_transfer(&e, &to, &TransferKind::Forced, &token);
     });
 }

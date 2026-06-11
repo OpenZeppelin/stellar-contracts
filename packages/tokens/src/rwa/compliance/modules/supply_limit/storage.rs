@@ -52,47 +52,6 @@ pub fn get_supply_count(e: &Env, token: &Address) -> i128 {
     }
 }
 
-/// Returns `true` when minting `amount` would leave the tracked supply at
-/// or below the configured limit for `token`.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `_to` - The recipient address. Ignored; the check is global.
-/// * `amount` - The amount to be minted.
-/// * `token` - The token address.
-///
-/// # Errors
-///
-/// * [`ComplianceModuleError::InvalidAmount`] - When `amount` is negative.
-/// * [`ComplianceModuleError::MathOverflow`] - When the projected supply
-///   addition overflows.
-pub fn can_create(e: &Env, _to: &Address, amount: i128, token: &Address) -> bool {
-    require_non_negative_amount(e, amount);
-    let projected = add_i128_or_panic(e, get_supply_count(e, token), amount);
-    projected <= get_supply_limit(e, token)
-}
-
-/// Returns `true`. Transfers do not affect the tracked supply, so this
-/// module imposes no transfer-side restriction.
-///
-/// # Arguments
-///
-/// * `e` - Access to the Soroban environment.
-/// * `_from` - The sender address.
-/// * `_to` - The recipient address.
-/// * `_amount` - The transfer amount.
-/// * `_token` - The token address.
-pub fn can_transfer(
-    _e: &Env,
-    _from: &Address,
-    _to: &Address,
-    _amount: i128,
-    _token: &Address,
-) -> bool {
-    true
-}
-
 // ################## CHANGE STATE ##################
 
 /// Sets the supply cap for `token`.

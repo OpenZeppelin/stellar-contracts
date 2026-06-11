@@ -38,10 +38,10 @@ use crate::rwa::compliance::modules::ComplianceModule;
 /// increments on the [`crate::rwa::compliance::ComplianceHook::Created`]
 /// hook and decrements on the
 /// [`crate::rwa::compliance::ComplianceHook::Destroyed`] hook. Correct
-/// accounting therefore requires the module to be registered on both
-/// state-mutating hooks (Created/Destroyed) in addition to the validation
-/// hook [`crate::rwa::compliance::ComplianceHook::CanCreate`]. Missing a
-/// hook causes the counter to drift away from the actual on-chain supply.
+/// accounting therefore requires the module to be registered on both hooks
+/// (Created/Destroyed): the mint hook both enforces the cap (by panicking)
+/// and increments the counter. Missing a hook causes the counter to drift
+/// away from the actual on-chain supply.
 ///
 /// This trait is designed to be used in conjunction with the
 /// [`ComplianceModule`] trait.

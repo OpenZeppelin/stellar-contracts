@@ -1,7 +1,7 @@
 extern crate std;
 
 use soroban_sdk::{contract, contractimpl, testutils::Address as _, Address, Env};
-use stellar_tokens::rwa::compliance::ComplianceHook;
+use stellar_tokens::rwa::compliance::{AccountSnapshot, ComplianceHook, TransferKind};
 
 use crate::contract::{ComplianceContract, ComplianceContractClient};
 
@@ -10,33 +10,37 @@ fn create_client<'a>(e: &Env, admin: &Address, manager: &Address) -> ComplianceC
     ComplianceContractClient::new(e, &address)
 }
 
+/// The mock module ignores balance and frozen amounts, so they are left at
+/// zero.
+fn snap(address: &Address) -> AccountSnapshot {
+    AccountSnapshot { address: address.clone(), balance: 0, frozen: 0 }
+}
+
 // ################## MOCK COMPLIANCE MODULE ##################
 
-/// A mock compliance module that allows all even amounts and rejects odd ones.
+/// A mock compliance module that allows all even amounts and rejects odd ones
+/// by panicking, mirroring how a real module enforces policy.
 #[contract]
 struct MockModule;
 
 #[contractimpl]
 impl MockModule {
-    pub fn on_transfer(_e: Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
-
-    pub fn on_created(_e: Env, _to: Address, _amount: i128, _token: Address) {}
-
-    pub fn on_destroyed(_e: Env, _from: Address, _amount: i128, _token: Address) {}
-
-    pub fn can_transfer(
+    pub fn on_transfer(
         _e: Env,
-        _from: Address,
-        _to: Address,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
         amount: i128,
+        _kind: TransferKind,
         _token: Address,
-    ) -> bool {
-        amount % 2 == 0
+    ) {
+        assert!(amount % 2 == 0, "mock module rejects odd amounts");
     }
 
-    pub fn can_create(_e: Env, _to: Address, amount: i128, _token: Address) -> bool {
-        amount % 2 == 0
+    pub fn on_created(_e: Env, _to: AccountSnapshot, amount: i128, _token: Address) {
+        assert!(amount % 2 == 0, "mock module rejects odd amounts");
     }
+
+    pub fn on_destroyed(_e: Env, _from: AccountSnapshot, _amount: i128, _token: Address) {}
 }
 
 // ################## MODULES ##################
@@ -68,12 +72,12 @@ fn remove_module_works() {
     let client = create_client(&e, &admin, &manager);
     let module = Address::generate(&e);
 
-    client.add_module_to(&ComplianceHook::CanTransfer, &module, &manager);
-    assert!(client.is_module_registered(&ComplianceHook::CanTransfer, &module));
+    client.add_module_to(&ComplianceHook::Transferred, &module, &manager);
+    assert!(client.is_module_registered(&ComplianceHook::Transferred, &module));
 
-    client.remove_module_from(&ComplianceHook::CanTransfer, &module, &manager);
-    assert!(!client.is_module_registered(&ComplianceHook::CanTransfer, &module));
-    assert!(client.get_modules_for_hook(&ComplianceHook::CanTransfer).is_empty());
+    client.remove_module_from(&ComplianceHook::Transferred, &module, &manager);
+    assert!(!client.is_module_registered(&ComplianceHook::Transferred, &module));
+    assert!(client.get_modules_for_hook(&ComplianceHook::Transferred).is_empty());
 }
 
 #[test]
@@ -141,7 +145,7 @@ fn bind_tokens_batch_works() {
 // ################## HOOKS ##################
 
 #[test]
-fn can_transfer_no_modules_returns_true() {
+fn transferred_no_modules_is_noop() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -154,27 +158,12 @@ fn can_transfer_no_modules_returns_true() {
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
-    assert!(client.can_transfer(&from, &to, &500, &token));
+    client.transferred(&snap(&from), &snap(&to), &500, &TransferKind::Standard, &token);
 }
 
 #[test]
-fn can_create_no_modules_returns_true() {
-    let e = Env::default();
-    e.mock_all_auths();
-    let admin = Address::generate(&e);
-    let manager = Address::generate(&e);
-    let client = create_client(&e, &admin, &manager);
-    let token = Address::generate(&e);
-
-    client.bind_token(&token, &manager);
-
-    let to = Address::generate(&e);
-
-    assert!(client.can_create(&to, &100, &token));
-}
-
-#[test]
-fn can_transfer_module_filters_odd_amounts() {
+#[should_panic(expected = "mock module rejects odd amounts")]
+fn transferred_panics_when_module_rejects() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -184,17 +173,17 @@ fn can_transfer_module_filters_odd_amounts() {
     let module = e.register(MockModule, ());
 
     client.bind_token(&token, &manager);
-    client.add_module_to(&ComplianceHook::CanTransfer, &module, &manager);
+    client.add_module_to(&ComplianceHook::Transferred, &module, &manager);
 
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
-    assert!(client.can_transfer(&from, &to, &1000, &token));
-    assert!(!client.can_transfer(&from, &to, &1001, &token));
+    client.transferred(&snap(&from), &snap(&to), &1001, &TransferKind::Standard, &token);
 }
 
 #[test]
-fn can_create_module_filters_odd_amounts() {
+#[should_panic(expected = "mock module rejects odd amounts")]
+fn created_panics_when_module_rejects() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -204,12 +193,11 @@ fn can_create_module_filters_odd_amounts() {
     let module = e.register(MockModule, ());
 
     client.bind_token(&token, &manager);
-    client.add_module_to(&ComplianceHook::CanCreate, &module, &manager);
+    client.add_module_to(&ComplianceHook::Created, &module, &manager);
 
     let to = Address::generate(&e);
 
-    assert!(client.can_create(&to, &200, &token));
-    assert!(!client.can_create(&to, &201, &token));
+    client.created(&snap(&to), &201, &token);
 }
 
 #[test]
@@ -228,7 +216,7 @@ fn transferred_hook_executes_modules() {
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
-    client.transferred(&from, &to, &500, &token);
+    client.transferred(&snap(&from), &snap(&to), &500, &TransferKind::Standard, &token);
 }
 
 #[test]
@@ -246,7 +234,7 @@ fn created_hook_executes_modules() {
 
     let to = Address::generate(&e);
 
-    client.created(&to, &500, &token);
+    client.created(&snap(&to), &500, &token);
 }
 
 #[test]
@@ -264,7 +252,7 @@ fn destroyed_hook_executes_modules() {
 
     let from = Address::generate(&e);
 
-    client.destroyed(&from, &500, &token);
+    client.destroyed(&snap(&from), &500, &token);
 }
 
 #[test]
@@ -279,5 +267,5 @@ fn transferred_unbound_token_panics() {
     let from = Address::generate(&e);
     let to = Address::generate(&e);
 
-    client.transferred(&from, &to, &100, &unbound_token);
+    client.transferred(&snap(&from), &snap(&to), &100, &TransferKind::Standard, &unbound_token);
 }

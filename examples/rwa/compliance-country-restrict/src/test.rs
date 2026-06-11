@@ -5,6 +5,7 @@ use soroban_sdk::{
     String, Val, Vec,
 };
 use stellar_tokens::rwa::{
+    compliance::{AccountSnapshot, TransferKind},
     identity_registry_storage::{
         CountryData, CountryDataManager, CountryRelation, IdentityRegistryStorage,
         IndividualCountryRelation, OrganizationCountryRelation,
@@ -13,6 +14,11 @@ use stellar_tokens::rwa::{
 };
 
 use crate::contract::{CountryRestrictContract, CountryRestrictContractClient};
+
+/// This module ignores balance and frozen amounts, so they are left at zero.
+fn snap(address: &Address) -> AccountSnapshot {
+    AccountSnapshot { address: address.clone(), balance: 0, frozen: 0 }
+}
 
 fn create_client<'a>(
     e: &Env,
@@ -274,7 +280,7 @@ fn add_country_restriction_requires_manager_auth() {
 
 #[test]
 #[should_panic(expected = "Error(Contract, #396)")]
-fn can_transfer_panics_when_irs_not_configured() {
+fn on_transfer_panics_when_irs_not_configured() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -284,11 +290,11 @@ fn can_transfer_panics_when_irs_not_configured() {
     let token = Address::generate(&e);
     let client = create_client(&e, &admin, &manager);
 
-    client.can_transfer(&from, &to, &100_i128, &token);
+    client.on_transfer(&snap(&from), &snap(&to), &100_i128, &TransferKind::Standard, &token);
 }
 
 #[test]
-fn can_transfer_and_can_create_use_irs_country_entries() {
+fn hooks_pass_for_unrestricted_recipient() {
     let e = Env::default();
     e.mock_all_auths();
     let admin = Address::generate(&e);
@@ -296,13 +302,34 @@ fn can_transfer_and_can_create_use_irs_country_entries() {
     let from = Address::generate(&e);
     let token = Address::generate(&e);
     let allowed_to = Address::generate(&e);
-    let restricted_to = Address::generate(&e);
     let amount = 100_i128;
     let client = create_client(&e, &admin, &manager);
     let irs_id = e.register(MockIRSContract, ());
     let irs = MockIRSContractClient::new(&e, &irs_id);
 
     irs.set_country_data_entries(&allowed_to, &vec![&e, individual_country(250)]);
+
+    client.set_identity_registry_storage(&token, &irs_id, &manager);
+    client.add_country_restriction(&token, &276, &manager);
+
+    client.on_transfer(&snap(&from), &snap(&allowed_to), &amount, &TransferKind::Standard, &token);
+    client.on_created(&snap(&allowed_to), &amount, &token);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #405)")]
+fn on_transfer_panics_for_restricted_recipient() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let from = Address::generate(&e);
+    let token = Address::generate(&e);
+    let restricted_to = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+
     irs.set_country_data_entries(
         &restricted_to,
         &vec![&e, individual_country(250), organization_country(276)],
@@ -311,8 +338,67 @@ fn can_transfer_and_can_create_use_irs_country_entries() {
     client.set_identity_registry_storage(&token, &irs_id, &manager);
     client.add_country_restriction(&token, &276, &manager);
 
-    assert!(client.can_transfer(&from, &allowed_to, &amount, &token));
-    assert!(client.can_create(&allowed_to, &amount, &token));
-    assert!(!client.can_transfer(&from, &restricted_to, &amount, &token));
-    assert!(!client.can_create(&restricted_to, &amount, &token));
+    client.on_transfer(
+        &snap(&from),
+        &snap(&restricted_to),
+        &100_i128,
+        &TransferKind::Standard,
+        &token,
+    );
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #405)")]
+fn on_created_panics_for_restricted_recipient() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let token = Address::generate(&e);
+    let restricted_to = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+
+    irs.set_country_data_entries(
+        &restricted_to,
+        &vec![&e, individual_country(250), organization_country(276)],
+    );
+
+    client.set_identity_registry_storage(&token, &irs_id, &manager);
+    client.add_country_restriction(&token, &276, &manager);
+
+    client.on_created(&snap(&restricted_to), &100_i128, &token);
+}
+
+#[test]
+fn on_transfer_forced_is_exempt_from_policy() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let admin = Address::generate(&e);
+    let manager = Address::generate(&e);
+    let from = Address::generate(&e);
+    let token = Address::generate(&e);
+    let restricted_to = Address::generate(&e);
+    let client = create_client(&e, &admin, &manager);
+    let irs_id = e.register(MockIRSContract, ());
+    let irs = MockIRSContractClient::new(&e, &irs_id);
+
+    irs.set_country_data_entries(
+        &restricted_to,
+        &vec![&e, individual_country(250), organization_country(276)],
+    );
+
+    client.set_identity_registry_storage(&token, &irs_id, &manager);
+    client.add_country_restriction(&token, &276, &manager);
+
+    // A standard transfer to this recipient would panic; a forced one
+    // passes through untouched.
+    client.on_transfer(
+        &snap(&from),
+        &snap(&restricted_to),
+        &100_i128,
+        &TransferKind::Forced,
+        &token,
+    );
 }

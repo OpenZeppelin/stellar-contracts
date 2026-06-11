@@ -1,8 +1,11 @@
-use soroban_sdk::{contracttype, Address, Env, Vec};
+use soroban_sdk::{contracttype, panic_with_error, Address, Env, Vec};
 
-use crate::rwa::compliance::modules::{
-    transfer_allow::{emit_user_allowed, emit_user_disallowed},
-    MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+use crate::rwa::compliance::{
+    modules::{
+        transfer_allow::{emit_user_allowed, emit_user_disallowed},
+        ComplianceModuleError, MODULE_EXTEND_AMOUNT, MODULE_TTL_THRESHOLD,
+    },
+    TransferKind,
 };
 
 #[contracttype]
@@ -31,21 +34,32 @@ pub fn is_user_allowed(e: &Env, token: &Address, user: &Address) -> bool {
     }
 }
 
-/// Returns `true` when at least one of the two parties, sender or
-/// recipient, is on the allowlist.
+/// Rejects a transfer where neither party, sender nor recipient, is on the
+/// allowlist, by panicking.
 ///
-/// The transfer amount has no effect on the decision and is intentionally
-/// ignored.
+/// The transfer amount has no effect on the decision. Forced
+/// (admin/recovery) transfers are exempt from the policy, and no
+/// bookkeeping exists in this module, so they pass through untouched.
 ///
 /// # Arguments
 ///
 /// * `e` - Access to the Soroban environment.
 /// * `from` - The sender address.
 /// * `to` - The recipient address.
-/// * `_amount` - The transfer amount.
+/// * `kind` - Who initiated the transfer and under what authority.
 /// * `token` - The token address.
-pub fn can_transfer(e: &Env, from: &Address, to: &Address, _amount: i128, token: &Address) -> bool {
-    is_user_allowed(e, token, from) || is_user_allowed(e, token, to)
+///
+/// # Errors
+///
+/// * [`ComplianceModuleError::UserNotAllowed`] - When neither party is on the
+///   allowlist and the transfer is not forced.
+pub fn on_transfer(e: &Env, from: &Address, to: &Address, kind: &TransferKind, token: &Address) {
+    if *kind == TransferKind::Forced {
+        return;
+    }
+    if !is_user_allowed(e, token, from) && !is_user_allowed(e, token, to) {
+        panic_with_error!(e, ComplianceModuleError::UserNotAllowed);
+    }
 }
 
 // ################## CHANGE STATE ##################

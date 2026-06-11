@@ -1,10 +1,13 @@
 use soroban_sdk::{contract, contractimpl, symbol_short, Address, Env, String, Symbol, Vec};
 use stellar_access::access_control::{self as access_control, AccessControl};
 use stellar_macros::{only_admin, only_role};
-use stellar_tokens::rwa::compliance::modules::{
-    storage::{self as compliance_storage},
-    supply_limit::{storage as supply_limit, SupplyLimit},
-    ComplianceModule,
+use stellar_tokens::rwa::compliance::{
+    modules::{
+        storage::{self as compliance_storage},
+        supply_limit::{storage as supply_limit, SupplyLimit},
+        ComplianceModule,
+    },
+    AccountSnapshot, TransferKind,
 };
 
 const MANAGER_ROLE: Symbol = symbol_short!("manager");
@@ -35,24 +38,26 @@ impl SupplyLimit for SupplyLimitContract {
 impl ComplianceModule for SupplyLimitContract {
     // Transfers do not affect the tracked supply; no auth or bookkeeping
     // needed.
-    fn on_transfer(_e: &Env, _from: Address, _to: Address, _amount: i128, _token: Address) {}
+    fn on_transfer(
+        _e: &Env,
+        _from: AccountSnapshot,
+        _to: AccountSnapshot,
+        _amount: i128,
+        _kind: TransferKind,
+        _token: Address,
+    ) {
+    }
 
-    fn on_created(e: &Env, to: Address, amount: i128, token: Address) {
+    // Enforces the cap: panics with `SupplyLimitExceeded` when the mint
+    // would push the tracked supply past the configured limit.
+    fn on_created(e: &Env, to: AccountSnapshot, amount: i128, token: Address) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
-        supply_limit::on_created(e, &to, amount, &token);
+        supply_limit::on_created(e, &to.address, amount, &token);
     }
 
-    fn on_destroyed(e: &Env, from: Address, amount: i128, token: Address) {
+    fn on_destroyed(e: &Env, from: AccountSnapshot, amount: i128, token: Address) {
         compliance_storage::get_compliance_address(e, &token).require_auth();
-        supply_limit::on_destroyed(e, &from, amount, &token);
-    }
-
-    fn can_transfer(e: &Env, from: Address, to: Address, amount: i128, token: Address) -> bool {
-        supply_limit::can_transfer(e, &from, &to, amount, &token)
-    }
-
-    fn can_create(e: &Env, to: Address, amount: i128, token: Address) -> bool {
-        supply_limit::can_create(e, &to, amount, &token)
+        supply_limit::on_destroyed(e, &from.address, amount, &token);
     }
 
     fn name(e: &Env) -> String {

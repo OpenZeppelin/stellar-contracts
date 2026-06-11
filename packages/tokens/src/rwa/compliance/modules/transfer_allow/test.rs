@@ -6,9 +6,12 @@ use soroban_sdk::{
     vec, Address, Env,
 };
 
-use crate::rwa::compliance::modules::transfer_allow::storage::{
-    allow_user, batch_allow_users, batch_disallow_users, can_transfer, disallow_user,
-    is_user_allowed, remove_user_allowed, set_user_allowed,
+use crate::rwa::compliance::{
+    modules::transfer_allow::storage::{
+        allow_user, batch_allow_users, batch_disallow_users, disallow_user, is_user_allowed,
+        on_transfer, remove_user_allowed, set_user_allowed,
+    },
+    TransferKind,
 };
 
 #[contract]
@@ -33,7 +36,7 @@ fn set_user_allowed_persists_membership() {
 }
 
 #[test]
-fn can_transfer_allows_allowlisted_sender() {
+fn on_transfer_allows_allowlisted_sender() {
     let e = Env::default();
     let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
@@ -43,12 +46,12 @@ fn can_transfer_allows_allowlisted_sender() {
     e.as_contract(&module_id, || {
         allow_user(&e, &token, &from);
 
-        assert!(can_transfer(&e, &from, &to, 100, &token));
+        on_transfer(&e, &from, &to, &TransferKind::Standard, &token);
     });
 }
 
 #[test]
-fn can_transfer_allows_allowlisted_recipient() {
+fn on_transfer_allows_allowlisted_recipient() {
     let e = Env::default();
     let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
@@ -58,12 +61,13 @@ fn can_transfer_allows_allowlisted_recipient() {
     e.as_contract(&module_id, || {
         allow_user(&e, &token, &to);
 
-        assert!(can_transfer(&e, &from, &to, 100, &token));
+        on_transfer(&e, &from, &to, &TransferKind::Standard, &token);
     });
 }
 
 #[test]
-fn can_transfer_rejects_when_neither_party_allowlisted() {
+#[should_panic(expected = "Error(Contract, #406)")]
+fn on_transfer_panics_when_neither_party_allowlisted() {
     let e = Env::default();
     let module_id = e.register(TestTransferAllowContract, ());
     let token = Address::generate(&e);
@@ -71,11 +75,27 @@ fn can_transfer_rejects_when_neither_party_allowlisted() {
     let to = Address::generate(&e);
 
     e.as_contract(&module_id, || {
-        assert!(!can_transfer(&e, &from, &to, 100, &token));
+        on_transfer(&e, &from, &to, &TransferKind::Standard, &token);
     });
 }
 
 #[test]
+fn on_transfer_forced_is_exempt_from_policy() {
+    let e = Env::default();
+    let module_id = e.register(TestTransferAllowContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+    let to = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // Neither party is allowlisted: a standard transfer would panic,
+        // but a forced one passes through untouched.
+        on_transfer(&e, &from, &to, &TransferKind::Forced, &token);
+    });
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #406)")]
 fn allowlist_is_tracked_per_token() {
     let e = Env::default();
     let module_id = e.register(TestTransferAllowContract, ());
@@ -87,8 +107,10 @@ fn allowlist_is_tracked_per_token() {
     e.as_contract(&module_id, || {
         allow_user(&e, &token_a, &from);
 
-        assert!(can_transfer(&e, &from, &to, 100, &token_a));
-        assert!(!can_transfer(&e, &from, &to, 100, &token_b));
+        // Allowed for token_a...
+        on_transfer(&e, &from, &to, &TransferKind::Standard, &token_a);
+        // ...but the allowlist does not carry over to token_b.
+        on_transfer(&e, &from, &to, &TransferKind::Standard, &token_b);
     });
 }
 
@@ -128,6 +150,7 @@ fn disallow_user_is_noop_when_not_present() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #406)")]
 fn disallow_user_revokes_access() {
     let e = Env::default();
     let module_id = e.register(TestTransferAllowContract, ());
@@ -137,10 +160,10 @@ fn disallow_user_revokes_access() {
 
     e.as_contract(&module_id, || {
         allow_user(&e, &token, &from);
-        assert!(can_transfer(&e, &from, &to, 100, &token));
+        on_transfer(&e, &from, &to, &TransferKind::Standard, &token);
 
         disallow_user(&e, &token, &from);
-        assert!(!can_transfer(&e, &from, &to, 100, &token));
+        on_transfer(&e, &from, &to, &TransferKind::Standard, &token);
     });
 }
 
