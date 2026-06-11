@@ -293,6 +293,64 @@ fn debit_forced_consumes_oldest_first_across_expiry() {
 }
 
 #[test]
+fn debit_forced_within_free_portion_leaves_locks_untouched() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // A wallet with no locks: the forced debit has nothing to consume.
+        on_transfer(&e, &from, 80, 30, &TransferKind::Forced, &token);
+        assert_eq!(get_locked_details(&e, &token, &from).locks.len(), 0);
+
+        // 100 of the wallet's 150 stay locked until t=1000; forcing out the
+        // free 50 leaves the lock schedule untouched.
+        preset_locks(
+            &e,
+            &token,
+            &from,
+            &vec![&e, LockedTokens { amount: 100, release_ledger: 1_000 }],
+        );
+        on_transfer(&e, &from, 150, 50, &TransferKind::Forced, &token);
+
+        let details = get_locked_details(&e, &token, &from);
+        assert_eq!(details.total_locked, 100);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 100, release_ledger: 1_000 }]);
+    });
+}
+
+#[test]
+fn debit_forced_carries_over_locks_past_the_consumed_amount() {
+    let e = Env::default();
+    let module_id = e.register(TestInitialLockupPeriodContract, ());
+    let token = Address::generate(&e);
+    let from = Address::generate(&e);
+
+    e.as_contract(&module_id, || {
+        // The wallet's full balance of 100 is locked across two entries.
+        preset_locks(
+            &e,
+            &token,
+            &from,
+            &vec![
+                &e,
+                LockedTokens { amount: 40, release_ledger: 500 },
+                LockedTokens { amount: 60, release_ledger: 1_000 },
+            ],
+        );
+
+        // Forcing out exactly the first lock's amount: consumption ends at
+        // the lock boundary and the second entry is carried over untouched.
+        on_transfer(&e, &from, 100, 40, &TransferKind::Forced, &token);
+
+        let details = get_locked_details(&e, &token, &from);
+        assert_eq!(details.total_locked, 60);
+        assert_eq!(details.locks, vec![&e, LockedTokens { amount: 60, release_ledger: 1_000 }]);
+    });
+}
+
+#[test]
 fn debit_forced_tolerates_lock_shortfall() {
     let e = Env::default();
     let module_id = e.register(TestInitialLockupPeriodContract, ());

@@ -372,18 +372,15 @@ pub fn set_locked_details(e: &Env, token: &Address, wallet: &Address, details: &
 pub fn debit_unlocked(e: &Env, token: &Address, wallet: &Address, balance: i128, amount: i128) {
     let mut details = get_locked_details(e, token, wallet);
 
-    if amount > unlocked_balance(e, balance, &details) {
-        panic_with_error!(e, ComplianceModuleError::InsufficientUnlockedBalance);
-    }
-
-    // If the spend reaches past the never-locked portion, consume expired
-    // locks oldest-first to cover the difference.
-    if details.total_locked > 0 {
-        let free = (balance - details.total_locked).max(0);
-        if amount > free {
-            consume_expired_locks(e, &mut details, sub_i128_or_panic(e, amount, free));
-            set_locked_details(e, token, wallet, &details);
-        }
+    // When the spend reaches past the never-locked portion, the difference
+    // must be covered by expired locks: consuming them oldest-first panics
+    // with `InsufficientUnlockedBalance` on any shortfall. This single check
+    // also rejects spending past the balance itself, since the consumption
+    // need then exceeds every lock on the books.
+    let free = (balance - details.total_locked).max(0);
+    if amount > free {
+        consume_expired_locks(e, &mut details, sub_i128_or_panic(e, amount, free));
+        set_locked_details(e, token, wallet, &details);
     }
 }
 
@@ -417,13 +414,6 @@ pub fn debit_forced(e: &Env, token: &Address, wallet: &Address, balance: i128, a
             set_locked_details(e, token, wallet, &details);
         }
     }
-}
-
-/// Returns the amount `wallet` can currently spend, given its `balance` and
-/// already-read `details`: the free (never-locked) portion plus expired locks.
-fn unlocked_balance(e: &Env, balance: i128, details: &LockedDetails) -> i128 {
-    let free = (balance - details.total_locked).max(0);
-    add_i128_or_panic(e, free, expired_amount(e, &details.locks))
 }
 
 /// Returns the sum of lock amounts whose release time has passed.
