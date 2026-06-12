@@ -111,7 +111,7 @@ mod implementation {
 
         /// Asserts a SEP-41 transfer event with a bare `i128` data field
         /// (no muxed ID). This is the standard shape for `transfer` to a
-        /// non-muxed address, `transfer_from`, and RWA transfers.
+        /// non-muxed address and `transfer_from`.
         pub fn assert_fungible_transfer(&mut self, from: &Address, to: &Address, amount: i128) {
             let event = self.expect_event("transfer", "Transfer event not found in event log");
             self.assert_event_contract(&event);

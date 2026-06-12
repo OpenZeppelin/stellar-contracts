@@ -1,8 +1,9 @@
 extern crate std;
 
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, symbol_short, testutils::Address as _, Address, Env,
-    String,
+    contract, contractimpl, panic_with_error, symbol_short,
+    testutils::{Address as _, MuxedAddress as _},
+    Address, Env, MuxedAddress, String,
 };
 use stellar_contract_utils::pausable;
 use stellar_event_assertion::EventAssertion;
@@ -507,7 +508,7 @@ fn transfer_with_compliance_and_identity_checks() {
 
         // Mint and transfer
         RWA::mint(&e, &from, 100);
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
 
         assert_eq!(RWA::balance(&e, &from), 50);
         assert_eq!(RWA::balance(&e, &to), 50);
@@ -528,10 +529,40 @@ fn contract_overrides_transfer() {
         RWA::mint(&e, &from, 100);
 
         // Test ContractOverrides::transfer calls RWA::transfer
-        RWA::transfer(&e, &from, &to, 30);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 30);
 
         assert_eq!(RWA::balance(&e, &from), 70);
         assert_eq!(RWA::balance(&e, &to), 30);
+    });
+}
+
+#[test]
+fn transfer_to_muxed_address_emits_muxed_transfer_event() {
+    let e = Env::default();
+    e.mock_all_auths();
+    let address = e.register(MockRWAContract, ());
+    let from = Address::generate(&e);
+    let to = MuxedAddress::generate(&e);
+
+    e.as_contract(&address, || {
+        setup_all_contracts(&e);
+
+        RWA::mint(&e, &from, 100);
+
+        // `to` carries a muxed sub-account ID.
+        assert!(to.id().is_some());
+
+        <RWA as ContractOverrides>::transfer(&e, &from, &to, 50);
+
+        assert_eq!(RWA::balance(&e, &from), 50);
+        assert_eq!(RWA::balance(&e, &to.address()), 50);
+
+        // The muxed ID must survive into the event: a `MuxedTransfer` event
+        // carrying `to_muxed_id`, not a bare `Transfer`.
+        let mut event_assert = EventAssertion::new(&e, address.clone());
+        // 1 IdentityVerifierSet + 1 ComplianceSet + 1 Minted + 1 MuxedTransfer
+        event_assert.assert_event_count(4);
+        event_assert.assert_fungible_muxed_transfer(&from, &to.address(), to.id(), 50);
     });
 }
 
@@ -931,7 +962,7 @@ fn transfer_fails_when_from_address_frozen() {
         RWA::set_address_frozen(&e, &from, true);
 
         // Try to transfer - should fail with AddressFrozen error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -953,7 +984,7 @@ fn transfer_fails_when_to_address_frozen() {
         RWA::set_address_frozen(&e, &to, true);
 
         // Try to transfer - should fail with AddressFrozen error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -976,7 +1007,7 @@ fn transfer_fails_when_insufficient_free_tokens() {
         assert_eq!(RWA::get_free_tokens(&e, &from), 20);
 
         // Try to transfer 50 tokens (more than free) - should fail
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -998,7 +1029,7 @@ fn transfer_fails_when_contract_paused() {
         pausable::pause(&e);
 
         // Try to transfer - should fail with EnforcedPause error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }
 
@@ -1023,6 +1054,6 @@ fn transfer_fails_when_not_compliant() {
         });
 
         // Try to transfer - should fail with TransferNotCompliant error
-        RWA::transfer(&e, &from, &to, 50);
+        RWA::transfer(&e, &from, &MuxedAddress::from(to.clone()), 50);
     });
 }

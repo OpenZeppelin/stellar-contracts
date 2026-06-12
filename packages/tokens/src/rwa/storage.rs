@@ -33,7 +33,7 @@ pub struct RWA;
 
 impl ContractOverrides for RWA {
     fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
-        RWA::transfer(e, from, &to.address(), amount);
+        RWA::transfer(e, from, to, amount);
     }
 
     fn transfer_from(e: &Env, spender: &Address, from: &Address, to: &Address, amount: i128) {
@@ -705,19 +705,28 @@ impl RWA {
     /// - enforces compliance rules for the transfer
     /// - triggers `transferred` hook call from the compliance contract
     ///
+    /// # Events
+    ///
+    /// * topics - `["transfer", from: Address, to: Address]`
+    /// * data - `amount: i128` (when `to` has no muxed ID)
+    /// * data - `{to_muxed_id: Option<u64>, amount: i128}` (when `to` has a
+    ///   muxed ID)
+    ///
     /// Please refer to [`Base::update`] and [`Self::validate_transfer`] for the
     /// inline documentation.
-    pub fn transfer(e: &Env, from: &Address, to: &Address, amount: i128) {
+    pub fn transfer(e: &Env, from: &Address, to: &MuxedAddress, amount: i128) {
         from.require_auth();
+
+        let to_address = to.address();
 
         // Snapshot before the update so the hook observes the pre-transfer
         // state.
         let from_snapshot = Self::account_snapshot(e, from);
-        let to_snapshot = Self::account_snapshot(e, to);
+        let to_snapshot = Self::account_snapshot(e, &to_address);
 
         Self::validate_transfer(e, &from_snapshot, &to_snapshot, amount);
 
-        Base::update(e, Some(from), Some(to), amount);
+        Base::update(e, Some(from), Some(&to_address), amount);
 
         let compliance_client = ComplianceClient::new(e, &Self::compliance(e));
         compliance_client.transferred(
@@ -727,7 +736,7 @@ impl RWA {
             &TransferKind::Standard,
             &e.current_contract_address(),
         );
-        emit_transfer(e, from, to, None, amount);
+        emit_transfer(e, from, &to_address, to.id(), amount);
     }
 
     /// `transfer_from` override with added compliance and identity verification
