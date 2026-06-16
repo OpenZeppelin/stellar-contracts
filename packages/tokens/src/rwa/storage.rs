@@ -586,8 +586,7 @@ impl RWA {
     ///
     /// # Events
     ///
-    /// * topics - `["token_info", name: Symbol, symbol: Symbol, decimals: u32,
-    ///   version: Symbol, onchain_id: Address]`
+    /// * topics - `["token_onchain_id_updated", onchain_id: Address]`
     /// * data - `[]`
     ///
     /// # Security Warning
