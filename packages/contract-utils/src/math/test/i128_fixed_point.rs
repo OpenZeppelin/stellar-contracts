@@ -398,6 +398,33 @@ fn test_checked_mul_div_ceil_overflow() {
 }
 
 #[test]
+fn test_checked_mul_div_floor_div_overflow() {
+    let env = Env::default();
+    // `i128::MIN / -1` overflows; the checked variant must return `None`
+    // rather than panic (the panicking `mul_div_floor` panics here instead).
+    let x: i128 = i128::MIN;
+    let y: i128 = 1;
+    let denominator: i128 = -1;
+
+    let result = checked_mul_div_floor(&env, &x, &y, &denominator);
+
+    assert_eq!(result, None);
+}
+
+#[test]
+fn test_checked_mul_div_ceil_div_overflow() {
+    let env = Env::default();
+    // `i128::MIN / -1` overflows; the checked variant must return `None`.
+    let x: i128 = i128::MIN;
+    let y: i128 = 1;
+    let denominator: i128 = -1;
+
+    let result = checked_mul_div_ceil(&env, &x, &y, &denominator);
+
+    assert_eq!(result, None);
+}
+
+#[test]
 fn test_checked_mul_div_i128_success() {
     let env = Env::default();
     let x: i128 = 100;

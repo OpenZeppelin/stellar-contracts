@@ -443,6 +443,15 @@ fn test_checked_div_int_by_zero() {
 }
 
 #[test]
+fn test_checked_div_int_overflow() {
+    // `i128::MIN / -1` overflows; the checked variant must return `None`
+    // rather than panic.
+    let a = Wad::from_raw(i128::MIN);
+    let result = a.checked_div_int(-1);
+    assert_eq!(result, None);
+}
+
+#[test]
 fn test_neg_positive() {
     let e = Env::default();
     let positive = Wad::from_integer(&e, 5);
