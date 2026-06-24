@@ -349,12 +349,10 @@ impl Wad {
         self.0.checked_mul(n).map(Wad)
     }
 
-    /// Checked division by integer. Returns `None` on division by zero.
+    /// Checked division by integer. Returns `None` on division by zero or on
+    /// overflow (`i128::MIN / -1`).
     pub fn checked_div_int(self, n: i128) -> Option<Wad> {
-        if n == 0 {
-            return None;
-        }
-        Some(Wad(self.0 / n))
+        self.0.checked_div(n).map(Wad)
     }
 
     /// Returns the absolute value of the Wad.
